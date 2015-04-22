@@ -578,6 +578,11 @@ config ARCH_OMAP2PLUS
 	select SUPPORT_SPL
 	imply FIT
 
+config ARCH_MCOM
+	bool "Support MCom (Elvees) SoCs"
+	select CPU_V7
+	select CPU_V7_HAS_VIRT
+
 config ARCH_MESON
 	bool "Amlogic Meson"
 	help
@@ -1074,6 +1079,8 @@ source "arch/arm/mach-kirkwood/Kconfig"
 source "arch/arm/mach-mvebu/Kconfig"
 
 source "arch/arm/cpu/armv7/ls102xa/Kconfig"
+
+source "arch/arm/cpu/armv7/mcom/Kconfig"
 
 source "arch/arm/cpu/armv7/mx7ulp/Kconfig"
 

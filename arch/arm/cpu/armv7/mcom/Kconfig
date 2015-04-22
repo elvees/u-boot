@@ -1,0 +1,25 @@
+if ARCH_MCOM
+
+choice
+	prompt "MCom board select"
+
+config TARGET_SBCVM
+	bool "SBCVM"
+	select SUPPORT_SPL
+
+config TARGET_SBCDBG
+	bool "SBCDBG"
+	select SUPPORT_SPL
+
+endchoice
+
+config SYS_VENDOR
+	default "elvees"
+
+config SYS_SOC
+	default "mcom"
+
+source "board/elvees/sbcvm/Kconfig"
+source "board/elvees/sbcdbg/Kconfig"
+
+endif

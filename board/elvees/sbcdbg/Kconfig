@@ -1,0 +1,22 @@
+if TARGET_SBCDBG
+
+config SYS_CONFIG_NAME
+	default "sbcdbg"
+
+config SYS_BOARD
+	default "sbcdbg"
+
+config FDTFILE
+	string "Default fdtfile env setting for this board"
+
+config CONS_INDEX
+	int "UART for messages output"
+	default 1
+	---help---
+	1 for UART0, 2 for UART1, etc
+
+config DDR_SIZE_IN_MB
+	int "DDR size in MB"
+	default 1024
+
+endif
