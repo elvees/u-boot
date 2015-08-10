@@ -41,6 +41,17 @@ void board_init_f(ulong dummy)
 	sys_t sys;
 	INIT_SYS_REGS(sys);
 
+	/*
+	 * Set BOOT_REMAP and ACP_CTL to 0x0 due to bug in L0-commutator
+	 * (see bug #971).
+	*/
+	sys.SMCTR->BOOT_REMAP = 0x0;
+	sys.SMCTR->ACP_CTL = 0x0;
+
+	/* After changing remap we need instruction barrier for use actual
+	 * bootrom API functions */
+	asm volatile ("isb" ::: "memory");
+
 	if (bootrom_get_cpu_id() != 0) {
 
 		/* FIXME
