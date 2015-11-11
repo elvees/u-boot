@@ -16,6 +16,7 @@
 #endif
 #include <asm/arch/clock.h>
 #include <asm/arch/regs.h>
+#include <watchdog.h>
 
 #define MEM_ACCESS(ADDR) (*((volatile uint32_t*)(ADDR)))
 #define BOOTROM_COLD_RESET_BRANCH 0x0000019c
@@ -70,6 +71,11 @@ void board_init_f(ulong dummy)
 	 * branch. The SoC can be rebooted correctly after this.
 	 */
 	sys.PMCTR->ALWAYS_MISC0 = BOOTROM_COLD_RESET_BRANCH;
+
+#ifdef CONFIG_HW_WATCHDOG
+	hw_watchdog_init();
+	bootrom_uart_putstr("Watchdog enabled\n");
+#endif
 
 	/*
 	 * Set BOOT_REMAP and ACP_CTL to 0x0 due to bug in L0-commutator

@@ -18,6 +18,13 @@
 #define DIV_SYS0_CTR_VALUE		0
 #define DIV_SYS1_CTR_VALUE		1  /* L3_PCLK = L1_HCLK / 2 */
 
+/* To enable watchdog define CONFIG_HW_WATCHDOG. Watchdog will be
+ * enabled before DDR intialization and will NOT be disabled before
+ * booting Linux kernel.
+ */
+
+/* #define CONFIG_HW_WATCHDOG */
+
 #include "mcom.h"
 
 #define CONFIG_NR_DRAM_BANKS  		2
