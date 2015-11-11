@@ -18,6 +18,7 @@
 #include <asm/arch/regs.h>
 
 #define MEM_ACCESS(ADDR) (*((volatile uint32_t*)(ADDR)))
+#define BOOTROM_COLD_RESET_BRANCH 0x0000019c
 
 int spl_board_load_image(void)
 {
@@ -39,18 +40,6 @@ u32 spl_boot_mode(void)
 void board_init_f(ulong dummy)
 {
 	sys_t sys;
-	INIT_SYS_REGS(sys);
-
-	/*
-	 * Set BOOT_REMAP and ACP_CTL to 0x0 due to bug in L0-commutator
-	 * (see bug #971).
-	*/
-	sys.SMCTR->BOOT_REMAP = 0x0;
-	sys.SMCTR->ACP_CTL = 0x0;
-
-	/* After changing remap we need instruction barrier for use actual
-	 * bootrom API functions */
-	asm volatile ("isb" ::: "memory");
 
 	if (bootrom_get_cpu_id() != 0) {
 
@@ -74,6 +63,24 @@ void board_init_f(ulong dummy)
 		jump_to_kernel = (void (*)(void))MEM_ACCESS(addr_for_jump_addr);
 		jump_to_kernel();
 	}
+
+	INIT_SYS_REGS(sys);
+
+	/* Set ALWAYS_MISC0 to start address of bootrom _cold_reset
+	 * branch. The SoC can be rebooted correctly after this.
+	 */
+	sys.PMCTR->ALWAYS_MISC0 = BOOTROM_COLD_RESET_BRANCH;
+
+	/*
+	 * Set BOOT_REMAP and ACP_CTL to 0x0 due to bug in L0-commutator
+	 * (see bug #971).
+	*/
+	sys.SMCTR->BOOT_REMAP = 0x0;
+	sys.SMCTR->ACP_CTL = 0x0;
+
+	/* After changing remap we need instruction barrier for use actual
+	 * bootrom API functions */
+	asm volatile ("isb" ::: "memory");
 
 	sys.CMCTR->DIV_MPU_CTR = 1;
 	sys.CMCTR->DIV_ATB_CTR = 3;
