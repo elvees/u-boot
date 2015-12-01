@@ -10,6 +10,10 @@
 
 #include <compiler.h>
 
+#define DDRMC0_BASE 0x37204000
+#define DDRPHY0_BASE 0x37205000
+#define DDRMC1_BASE 0x37206000
+#define DDRPHY1_BASE 0x37207000
 #define NFCM_BASE   0x38007000
 #define SDMMC0_BASE 0x3800B000
 #define SDMMC1_BASE 0x3800D000
@@ -21,6 +25,10 @@
 #define SMCTR_BASE  0x38096000
 
 #define INIT_SYS_REGS(r) {\
+r.DDRMC0=(ddrmc_t*)DDRMC0_BASE;\
+r.DDRPHY0=(ddrphy_t*)DDRPHY0_BASE;\
+r.DDRMC1=(ddrmc_t*)DDRMC1_BASE;\
+r.DDRPHY1=(ddrphy_t*)DDRPHY1_BASE;\
 r.NFCM=(nfcm_regs_t*)NFCM_BASE;\
 r.SDMMC0=(sdmmc_regs_t*)SDMMC0_BASE;\
 r.SDMMC1=(sdmmc_regs_t*)SDMMC1_BASE;\
@@ -240,6 +248,102 @@ typedef struct {
 } smctr_t;
 
 typedef struct {
+	volatile uint32_t MSTR;
+	volatile uint32_t STAT;
+	volatile uint8_t RESERVED0[12];
+	volatile uint32_t MRCTRL1;
+	volatile uint8_t RESERVED1[12];
+	volatile uint32_t DERATEINT;
+	volatile uint8_t RESERVED2[8];
+	volatile uint32_t PWRCTL;
+	volatile uint8_t RESERVED3[28];
+	volatile uint32_t RFSHCTL0;
+	volatile uint8_t RESERVED4[12];
+	volatile uint32_t RFSHCTL3;
+	volatile uint8_t RESERVED5[108];
+	volatile uint32_t INIT0;
+	volatile uint32_t INIT1;
+	volatile uint32_t INIT2;
+	volatile uint32_t INIT3;
+	volatile uint32_t INIT4;
+	volatile uint32_t INIT5;
+	volatile uint8_t RESERVED6[24];
+	volatile uint32_t DRAMTMG0;
+	volatile uint32_t DRAMTMG1;
+	volatile uint32_t DRAMTMG2;
+	volatile uint32_t DRAMTMG3;
+	volatile uint32_t DRAMTMG4;
+	volatile uint8_t RESERVED7[108];
+	volatile uint32_t ZQCTL0;
+	volatile uint8_t RESERVED8[12];
+	volatile uint32_t DFITMG0;
+	volatile uint32_t DFITMG1;
+	volatile uint8_t RESERVED9[8];
+	volatile uint32_t DFIUPD0;
+	volatile uint32_t DFIUPD1;
+	volatile uint8_t RESERVED10[8];
+	volatile uint32_t DFIMISC;
+	volatile uint8_t RESERVED11[76];
+	volatile uint32_t ADDRMAP0;
+	volatile uint32_t ADDRMAP1;
+	volatile uint32_t ADDRMAP2;
+	volatile uint32_t ADDRMAP3;
+	volatile uint32_t ADDRMAP4;
+	volatile uint32_t ADDRMAP5;
+	volatile uint32_t ADDRMAP6;
+	volatile uint8_t RESERVED12[628];
+	volatile uint32_t PCTRL_0;
+	volatile uint8_t RESERVED13[172];
+	volatile uint32_t PCTRL1;
+	volatile uint8_t RESERVED14[172];
+	volatile uint32_t PCTRL2;
+	volatile uint8_t RESERVED15[12];
+} ddrmc_t;
+
+typedef struct {
+	volatile uint32_t RIDR;
+	volatile uint32_t PIR;
+	volatile uint32_t PGCR;
+	volatile uint32_t PGSR;
+	volatile uint8_t RESERVED0[8];
+	volatile uint32_t PTR0;
+	volatile uint32_t PTR1;
+	volatile uint32_t PTR2;
+	volatile uint8_t RESERVED1[4];
+	volatile uint32_t DXCCR;
+	volatile uint32_t DSGCR;
+	volatile uint32_t DCR;
+	volatile uint32_t DTPR0;
+	volatile uint32_t DTPR1;
+	volatile uint32_t DTPR2;
+	volatile uint32_t MR0;
+	volatile uint32_t MR1_LPDDR2;
+	volatile uint32_t MR2;
+	volatile uint32_t MR3;
+	volatile uint8_t RESERVED2[112];
+	volatile uint32_t DCUAR;
+	volatile uint8_t RESERVED3[16];
+	volatile uint32_t DCUTPR;
+	volatile uint8_t RESERVED4[72];
+	volatile uint32_t BISTUDPR;
+	volatile uint8_t RESERVED5[92];
+	volatile uint32_t ZQ0CR0;
+	volatile uint8_t RESERVED6[4];
+	volatile uint32_t ZQ0SR0;
+	volatile uint8_t RESERVED7[52];
+	volatile uint32_t DX0GCR;
+	volatile uint8_t RESERVED8[16];
+	volatile uint32_t DX0DQSTR;
+	volatile uint8_t RESERVED9[184];
+	volatile uint32_t DX3DQTR;
+	volatile uint8_t RESERVED10[364];
+} ddrphy_t;
+
+typedef struct {
+	ddrmc_t *DDRMC0;
+	ddrphy_t *DDRPHY0;
+	ddrmc_t *DDRMC1;
+	ddrphy_t *DDRPHY1;
 	nfcm_regs_t *NFCM;
 	sdmmc_regs_t *SDMMC0;
 	sdmmc_regs_t *SDMMC1;
