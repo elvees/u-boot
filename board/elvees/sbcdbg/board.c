@@ -133,12 +133,52 @@ void set_nt5cb256m8fn_di_cfg(ddr3_t *ddr3_mem)
 	ddr3_mem->config_1.dtpr_tmod = 0;
 }
 
+static bool is_ddrmc_active(int ddrmc_id)
+{
+	cmctr_t *CMCTR = (cmctr_t *)CMCTR_BASE;
+	ddrmc_t *DDRMC;
+	bool clk_en;
+
+	uint32_t reg = CMCTR->GATE_CORE_CTR;
+
+	switch (ddrmc_id) {
+	case 0:
+		DDRMC = (ddrmc_t *)DDRMC0_BASE;
+		clk_en = (reg >> 1) & 1;
+		break;
+	case 1:
+		DDRMC = (ddrmc_t *)DDRMC1_BASE;
+		clk_en = (reg >> 2) & 1;
+		break;
+	default:
+		puts("is_ddrmc_active: Invalid argument\n");
+		return 0;
+	}
+
+	/* If DDRMC clock disabled then DDRMC is not active.
+	 * If clock enabled we should additionally check
+	 * STAT register.
+	 */
+
+	if (clk_en && (DDRMC->STAT == 0x1))
+		return 1;
+
+	return 0;
+}
+
 void dram_init_banksize(void)
 {
+	/* DDR controller #0 is active since TPL uses it */
 	gd->bd->bi_dram[0].start = PHYS_SDRAM_0;
 	gd->bd->bi_dram[0].size = PHYS_SDRAM_0_SIZE;
-	gd->bd->bi_dram[1].start = PHYS_SDRAM_1;
-	gd->bd->bi_dram[1].size = PHYS_SDRAM_1_SIZE;
+
+	/* If DDR controller #1 is active increase
+	 * available for Linux memory size
+	 */
+	if (is_ddrmc_active(1)) {
+		gd->bd->bi_dram[1].start = PHYS_SDRAM_1;
+		gd->bd->bi_dram[1].size = PHYS_SDRAM_1_SIZE;
+	}
 }
 
 int dram_init(void)
