@@ -75,6 +75,8 @@
 	"fdt move ${fdt_addr_r} ${newfdt_addr_r} 0x4000; " \
 	"fdt addr ${newfdt_addr_r}; " \
 	"fdt chosen; " \
+	"if test ${ddrctl_cmd} = \"disable\"; then \
+		ddrctl ${ddrctl_cmd} ${ddrctl_cid}; fi; " \
 	"bootz ${kernel_addr_r} - ${newfdt_addr_r}"
 
 #define MEM_LAYOUT_ENV_SETTINGS \
@@ -91,7 +93,9 @@
 	"scriptaddr=0x43100000\0" \
 	"pxefile_addr_r=0x43200000\0" \
 	"ramdisk_addr_r=0x43300000\0" \
-	"env_addr_r=0x45000000\0"
+	"env_addr_r=0x45000000\0" \
+	"ddrctl_cid=1\0" \
+	"ddrctl_cmd=disable\0"
 
 #define BOOT_TARGET_DEVICES(func) \
     func(MMC, mmc, 0)

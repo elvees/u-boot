@@ -178,6 +178,9 @@ void dram_init_banksize(void)
 	if (is_ddrmc_active(1)) {
 		gd->bd->bi_dram[1].start = PHYS_SDRAM_1;
 		gd->bd->bi_dram[1].size = PHYS_SDRAM_1_SIZE;
+	} else {
+		gd->bd->bi_dram[1].start = 0;
+		gd->bd->bi_dram[1].size = 0;
 	}
 }
 
