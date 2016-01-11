@@ -20,6 +20,7 @@
 #define TIMERS_BASE 0x38026000
 #define RTC_BASE    0x38027000
 #define UART0_BASE  0x38028000
+#define BIST_BRIDGE_BASE 0x38035000
 #define CMCTR_BASE  0x38094000
 #define PMCTR_BASE  0x38095000
 #define SMCTR_BASE  0x38096000
@@ -35,6 +36,7 @@ r.SDMMC1=(sdmmc_regs_t*)SDMMC1_BASE;\
 r.TIMER0=(dwc_timer_regs_t*)TIMERS_BASE;\
 r.RTC=(rtc_regs_t*)RTC_BASE;\
 r.UART0=(uart_regs_t*)UART0_BASE;\
+r.BIST_BRIDGE=(bist_bridge_regs_t*)BIST_BRIDGE_BASE;\
 r.CMCTR=(cmctr_t*)CMCTR_BASE;\
 r.PMCTR=(pmctr_t*)PMCTR_BASE;\
 r.SMCTR=(smctr_t*)SMCTR_BASE;}
@@ -149,6 +151,15 @@ typedef struct {
 } uart_regs_t;
 
 typedef struct {
+	volatile uint32_t ID;
+	volatile uint32_t STAT;
+	volatile uint32_t SEQU;
+	volatile uint32_t MODE;
+	volatile uint32_t POFF;
+	volatile uint32_t UDATA[64];
+} bist_bridge_regs_t;
+
+typedef struct {
 	// CMCTR_MPU
 	volatile uint32_t RESERVED0;
 	volatile uint32_t DIV_MPU_CTR;
@@ -190,6 +201,7 @@ typedef struct {
 	volatile uint32_t SEL_DPLL;
 	volatile uint32_t SEL_SPLL;
 	volatile uint32_t SEL_VPLL;
+	volatile uint32_t SEL_UPLL;
 } cmctr_t;
 
 typedef struct {
@@ -350,6 +362,7 @@ typedef struct {
 	dwc_timer_regs_t *TIMER0;
 	rtc_regs_t *RTC;
 	uart_regs_t *UART0;
+	bist_bridge_regs_t *BIST_BRIDGE;
 	cmctr_t *CMCTR;
 	pmctr_t *PMCTR;
 	smctr_t *SMCTR;
