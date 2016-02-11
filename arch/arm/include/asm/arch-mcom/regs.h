@@ -21,6 +21,8 @@
 #define RTC_BASE    0x38027000
 #define UART0_BASE  0x38028000
 #define BIST_BRIDGE_BASE 0x38035000
+#define MFBSP0_BASE 0x38086000
+#define MFBSP1_BASE 0x38088000
 #define CMCTR_BASE  0x38094000
 #define PMCTR_BASE  0x38095000
 #define SMCTR_BASE  0x38096000
@@ -37,6 +39,8 @@ r.TIMER0=(dwc_timer_regs_t*)TIMERS_BASE;\
 r.RTC=(rtc_regs_t*)RTC_BASE;\
 r.UART0=(uart_regs_t*)UART0_BASE;\
 r.BIST_BRIDGE=(bist_bridge_regs_t*)BIST_BRIDGE_BASE;\
+r.MFBSP0=(mfbsp_t*)MFBSP0_BASE;\
+r.MFBSP1=(mfbsp_t*)MFBSP1_BASE;\
 r.CMCTR=(cmctr_t*)CMCTR_BASE;\
 r.PMCTR=(pmctr_t*)PMCTR_BASE;\
 r.SMCTR=(smctr_t*)SMCTR_BASE;}
@@ -158,6 +162,26 @@ typedef struct {
 	volatile uint32_t POFF;
 	volatile uint32_t UDATA[64];
 } bist_bridge_regs_t;
+
+typedef struct {
+	union {
+		volatile uint32_t TX;
+		volatile uint32_t RX;
+	};
+	volatile uint32_t CSR;
+	volatile uint32_t DIR;
+	volatile uint32_t GPIO_DR;
+	volatile uint32_t TCTR;
+	volatile uint32_t RCTR;
+	volatile uint32_t TSR;
+	volatile uint32_t RSR;
+	volatile uint32_t TCTR_RATE;
+	volatile uint32_t RCRE_RATE;
+	volatile uint32_t TSTART;
+	volatile uint32_t RSTART;
+	volatile uint32_t EMERG;
+	volatile uint32_t IMASK;
+} mfbsp_t;
 
 typedef struct {
 	// CMCTR_MPU
@@ -363,6 +387,8 @@ typedef struct {
 	rtc_regs_t *RTC;
 	uart_regs_t *UART0;
 	bist_bridge_regs_t *BIST_BRIDGE;
+	mfbsp_t *MFBSP0;
+	mfbsp_t *MFBSP1;
 	cmctr_t *CMCTR;
 	pmctr_t *PMCTR;
 	smctr_t *SMCTR;
