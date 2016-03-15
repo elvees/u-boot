@@ -72,7 +72,7 @@
 	"load mmc 0:1 ${kernel_addr_r} zImage; " \
 	"load mmc 0:1 ${fdt_addr_r} ${fdtfile}; " \
 	"fdt addr ${fdt_addr_r}; " \
-	"fdt move ${fdt_addr_r} ${newfdt_addr_r} 0x4000; " \
+	"fdt move ${fdt_addr_r} ${newfdt_addr_r} 0x8000; " \
 	"fdt addr ${newfdt_addr_r}; " \
 	"fdt chosen; " \
 	"if test ${ddrctl_cmd} = \"disable\"; then \
