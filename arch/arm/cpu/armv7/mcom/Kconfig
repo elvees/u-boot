@@ -17,6 +17,12 @@ config TARGET_IPKU
 
 endchoice
 
+config HW_WATCHDOG
+	bool "Enable watchdog at startup"
+	default no
+	help
+	  Enable watchdog timer in SPL and TPL
+
 config SYS_VENDOR
 	default "elvees"
 
