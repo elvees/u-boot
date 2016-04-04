@@ -57,7 +57,7 @@
 
 /* Enable pre-console buffer to get complete log on the VGA console */
 #define CONFIG_PRE_CONSOLE_BUFFER
-#define CONFIG_PRE_CON_BUF_SZ		(1024 * 1024)
+#define CONFIG_PRE_CON_BUF_SZ		1024
 /* Use the room between the end of bootm_size and the framebuffer */
 #define CONFIG_PRE_CON_BUF_ADDR		0x4f000000
 
