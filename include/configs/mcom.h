@@ -19,6 +19,8 @@
 
 #define CONFIG_SKIP_LOWLEVEL_INIT
 
+#define CONFIG_SYS_CACHELINE_SIZE	64
+
 /*
  * High Level Configuration Options
  */
@@ -32,8 +34,6 @@
  * Display CPU information
  */
 #define CONFIG_DISPLAY_CPUINFO
-
-#define CONFIG_SYS_PROMPT		"mcom# "
 
 /* Serial & console */
 #define CONFIG_SYS_NS16550
@@ -58,9 +58,6 @@
 #define CONFIG_SYS_INIT_SP_ADDR \
     (CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
 
-#define CONFIG_CMD_MEMORY
-#define CONFIG_CMD_SETEXPR
-
 #define CONFIG_SETUP_MEMORY_TAGS
 #define CONFIG_CMDLINE_TAG
 #define CONFIG_INITRD_TAG
@@ -79,11 +76,9 @@
 /*
  * Miscellaneous configurable options
  */
-#define CONFIG_CMD_ECHO
 #define CONFIG_SYS_CBSIZE		1024    /* Console I/O Buffer Size */
 #define CONFIG_SYS_PBSIZE		1024    /* Print Buffer Size */
 #define CONFIG_SYS_MAXARGS		16  /* max number of command args */
-#define CONFIG_SYS_GENERIC_BOARD
 
 /* Boot Argument Buffer Size */
 #define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
@@ -107,8 +102,6 @@
 
 #define CONFIG_ENV_OFFSET		(544 << 10) /* (8 + 24 + 512) KiB */
 #define CONFIG_ENV_SIZE			(128 << 10) /* 128 KiB */
-
-#include <config_cmd_default.h>
 
 #define CONFIG_FAT_WRITE    /* enable write access */
 
