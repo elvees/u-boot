@@ -98,7 +98,6 @@ struct dw_spi_priv {
 	unsigned int mode;
 
 	int bits_per_word;
-	u8 tmode;		/* TR/TO/RO/EEPROM */
 	u8 type;		/* SPI/SSP/MicroWire */
 	int len;
 
@@ -187,8 +186,6 @@ static int dw_spi_probe(struct udevice *bus)
 
 	/* Currently only bits_per_word == 8 supported */
 	priv->bits_per_word = 8;
-
-	priv->tmode = 0; /* Tx & Rx */
 
 	/* Basic HW init */
 	spi_hw_init(priv);
@@ -345,17 +342,7 @@ static int dw_spi_xfer(struct udevice *dev, unsigned int bitlen,
 
 	cr0 = (priv->bits_per_word - 1) | (priv->type << SPI_FRF_OFFSET) |
 		(priv->mode << SPI_MODE_OFFSET) |
-		(priv->tmode << SPI_TMOD_OFFSET);
-
-	if (rx && tx)
-		priv->tmode = SPI_TMOD_TR;
-	else if (rx)
-		priv->tmode = SPI_TMOD_RO;
-	else
-		priv->tmode = SPI_TMOD_TO;
-
-	cr0 &= ~SPI_TMOD_MASK;
-	cr0 |= (priv->tmode << SPI_TMOD_OFFSET);
+		(SPI_TMOD_TR << SPI_TMOD_OFFSET);
 
 	priv->len = bitlen >> 3;
 	debug("%s: rx=%p tx=%p len=%d [bytes]\n", __func__, rx, tx, priv->len);
