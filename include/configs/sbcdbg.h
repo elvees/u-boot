@@ -50,13 +50,6 @@
 
 #ifndef CONFIG_SPL_BUILD
 #include <config_distro_defaults.h>
-#define CONFIG_CMD_MEMINFO
-
-#undef CONFIG_CMD_FPGA
-#undef CONFIG_CMD_BOOTD
-#undef CONFIG_CMD_NET
-#undef CONFIG_CMD_NFS
-#undef CONFIG_CMD_IMLS
 
 /* Enable pre-console buffer to get complete log on the VGA console */
 #define CONFIG_PRE_CONSOLE_BUFFER
