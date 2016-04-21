@@ -1081,7 +1081,7 @@ u-boot.sb: u-boot.bin spl/u-boot-spl.bin
 # SPL image (with mkimage header) and not the binary. Otherwise the resulting image
 # which is loaded/copied by the ROM bootloader to SRAM doesn't fit.
 # The resulting image containing both U-Boot images is called u-boot.spr
-MKIMAGEFLAGS_u-boot-spl.img = -A $(ARCH) -T firmware -C none \
+MKIMAGEFLAGS_u-boot-spl.img = -A $(ARCH) -T firmware -C none -O u-boot \
 	-a $(CONFIG_SPL_TEXT_BASE) -e $(CONFIG_SPL_TEXT_BASE) -n XLOADER
 spl/u-boot-spl.img: spl/u-boot-spl.bin FORCE
 	$(call if_changed,mkimage)
