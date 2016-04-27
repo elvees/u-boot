@@ -17,6 +17,7 @@
 #include <spi.h>
 #include <fdtdec.h>
 #include <linux/compat.h>
+#include <asm/gpio.h>
 #include <asm/io.h>
 #include <asm/arch/clock_manager.h>
 
@@ -91,12 +92,12 @@ struct dw_spi_platdata {
 };
 
 struct dw_spi_priv {
+	struct gpio_desc cs;
 	void __iomem *regs;
-	unsigned int freq;		/* Default frequency */
+	unsigned int freq;	/* Default frequency */
 	unsigned int mode;
 
 	int bits_per_word;
-	u8 cs;			/* chip select pin */
 	u8 tmode;		/* TR/TO/RO/EEPROM */
 	u8 type;		/* SPI/SSP/MicroWire */
 	int len;
@@ -193,6 +194,39 @@ static int dw_spi_probe(struct udevice *bus)
 	spi_hw_init(priv);
 
 	return 0;
+}
+
+static int dw_spi_child_pre_probe(struct udevice *dev)
+{
+	struct udevice *bus = dev->parent;
+	struct dw_spi_priv *priv = dev_get_priv(bus);
+	struct spi_slave *slave = dev_get_parent_priv(dev);
+	int cs_flags = GPIOD_IS_OUT;
+
+	if (!(slave->mode & SPI_CS_HIGH))
+		cs_flags |= GPIOD_ACTIVE_LOW;
+
+	gpio_request_by_name(bus, "cs-gpios", 0, &priv->cs, cs_flags);
+
+	return 0;
+}
+
+static void dw_spi_cs_activate(struct udevice *dev)
+{
+	struct udevice *bus = dev->parent;
+	struct dw_spi_priv *priv = dev_get_priv(bus);
+
+	if (dm_gpio_is_valid(&priv->cs))
+		dm_gpio_set_value(&priv->cs, 1);
+}
+
+static void dw_spi_cs_deactivate(struct udevice *dev)
+{
+	struct udevice *bus = dev->parent;
+	struct dw_spi_priv *priv = dev_get_priv(bus);
+
+	if (dm_gpio_is_valid(&priv->cs))
+		dm_gpio_set_value(&priv->cs, 0);
 }
 
 /* Return the max entries we can fill into tx fifo */
@@ -350,8 +384,14 @@ static int dw_spi_xfer(struct udevice *dev, unsigned int bitlen,
 	/* Enable controller after writing control registers */
 	spi_enable_chip(priv, 1);
 
+	if (flags & SPI_XFER_BEGIN)
+		dw_spi_cs_activate(dev);
+
 	/* Start transfer in a polling loop */
 	ret = poll_transfer(priv);
+
+	if (flags & SPI_XFER_END)
+		dw_spi_cs_deactivate(dev);
 
 	return ret;
 }
@@ -422,4 +462,5 @@ U_BOOT_DRIVER(dw_spi) = {
 	.platdata_auto_alloc_size = sizeof(struct dw_spi_platdata),
 	.priv_auto_alloc_size = sizeof(struct dw_spi_priv),
 	.probe = dw_spi_probe,
+	.child_pre_probe = dw_spi_child_pre_probe,
 };
