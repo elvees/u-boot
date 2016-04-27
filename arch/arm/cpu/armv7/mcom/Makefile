@@ -9,4 +9,4 @@
 # SPDX-License-Identifier:	GPL-2.0+
 #
 
-obj-y += timer.o board.o sdmmc.o bootrom.o
+obj-y += timer.o board.o sdmmc.o bootrom.o clock_manager.o
