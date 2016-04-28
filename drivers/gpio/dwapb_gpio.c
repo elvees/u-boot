@@ -106,7 +106,7 @@ static int gpio_dwapb_bind(struct udevice *dev)
 	const void *blob = gd->fdt_blob;
 	struct udevice *subdev;
 	fdt_addr_t base;
-	int ret, node, bank = 0;
+	int ret, node;
 
 	/* If this is a child device, there is nothing to do here */
 	if (plat)
@@ -130,7 +130,7 @@ static int gpio_dwapb_bind(struct udevice *dev)
 			return -ENOMEM;
 
 		plat->base = base;
-		plat->bank = bank;
+		plat->bank = fdtdec_get_int(blob, node, "reg", 0);
 		plat->pins = fdtdec_get_int(blob, node, "snps,nr-gpios", 0);
 		plat->name = fdt_stringlist_get(blob, node, "bank-name", 0,
 						NULL);
@@ -143,7 +143,6 @@ static int gpio_dwapb_bind(struct udevice *dev)
 			goto err;
 
 		dev_set_of_offset(subdev, node);
-		bank++;
 	}
 
 	return 0;
