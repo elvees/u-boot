@@ -1,13 +1,16 @@
 /*
- * ddr_cfg.h
+ * Copyright 2015-2016 ELVEES NeoTek JSC, <www.elvees-nt.com>
  *
- *  Created on: Aug 28, 2013
- *      Author: dzagrebin
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #ifndef DDR_CFG_H_
 #define DDR_CFG_H_
 
+/* Mainly the following structure fields correspond to DDRMC register
+ * fields which is described in 1892VM14YA User Manual in 15.25 chapter.
+ * If some fields do not correspond, it's explicitly commented below.
+ */
 typedef struct {
 	union {
 		unsigned int full_reg;
@@ -125,6 +128,9 @@ typedef struct {
 	union {
 		unsigned int full_reg;
 		struct {
+			/* Correspond to PHYs PTR0.tdllrst, PTR0.tdlllock,
+			 *PTR0.ptr_titmrst, PTR1.tdinit1 fields
+			 */
 			unsigned ptr_tdllrst:6;
 			unsigned ptr_tdlllock:12;
 			unsigned ptr_titmrst:4;
@@ -134,8 +140,13 @@ typedef struct {
 	union {
 		unsigned int full_reg;
 		struct {
+			/* Correspond to PHYs PTR1.tdinit0 field */
 			unsigned ptr_tdinit0:19;
+			/* Correspond to PHYs DCR.ddrmd field */
 			unsigned dcr_ddrmd:3;
+			/* Correspond to PHYs DTPR0.trtp, DTPR0.twtr,
+			 * DTPR0.tccd DTPR1.trtw fields
+			 */
 			unsigned dtpr_trtp:3;
 			unsigned dtpr_twtr:3;
 			unsigned dtpr_tccd:1;
@@ -145,21 +156,34 @@ typedef struct {
 	union {
 		unsigned int full_reg;
 		struct {
+			/* Correspond to PHYs PTR2.tdinit2 field */
 			unsigned ptr_tdinit2:17;
+			/* Correspond to PHYs DTPR2.txs field */
 			unsigned dtpr_txs:10;
+			/* Correspond to PHYs DTPR2.tcke field */
 			unsigned dtpr_tcke:4;
 		};
 	} misc3;
 	union {
 		unsigned int full_reg;
 		struct {
+			/* Correspond to PHYs DTPR2.tdllk field */
 			unsigned tdllk:10;
+			/* Correspond to PHYs PGCR.dqscfg field */
 			unsigned pgcr_dqscfg:1;
+			/* Correspond to PHYs PGCR.dftcmp field */
 			unsigned pgcr_dftcmp:1;
+			/* Correspond to PHYs PGCR.ranken field */
 			unsigned pgcr_ranken:2;
+			/* Correspond to PHYs PGCR.rfshdt field */
 			unsigned pgcr_rfshdt:2;
+			/* Correspond to CMCTRs SEL_CPLL field */
 			unsigned sel_cpll:8;
+			/* Correspond to CMCTRs DIV_DDR0_CTR, DIV_DDR0_CTR1
+			 * fields
+			 */
 			unsigned ddr_div:2;
+			/* Correspond to SMCTRs DDR_REMAP field */
 			unsigned ddr_remap:1;
 		};
 	} misc4;
@@ -171,9 +195,15 @@ typedef struct {
 		};
 	} misc5;
 
-	unsigned int dump[32];  // Need for bootrom function _api_DDR_INIT()
+	/* Used to save some PHY register values which is got during DRAM
+	 * trainings
+	 */
+	unsigned int dump[32];
 } ddr_common_t;
 
+/* The ddr3_t structure is the same ddr_common_t structure but with 2
+ * additional unions, specific for ddr3: config_0, config_1.
+ */
 typedef struct {
 	union {
 		unsigned int full_reg;
@@ -337,16 +367,22 @@ typedef struct {
 		};
 	} misc5;
 
-	unsigned int dump[32];  // Need for bootrom function _api_DDR_INIT()
+	unsigned int dump[32];
 
 	union {
 		unsigned int full_reg;
 		struct {
+			/* Correspond to PHYs MR0.bl field */
 			unsigned phy_mr_bl:2;
+			/* Correspond to PHYs MR0.cl field */
 			unsigned phy_mr_cl:3;
+			/* Correspond to PHYs MR0.dr field */
 			unsigned phy_mr_dr:1;
+			/* Correspond to PHYs MR0.wr field */
 			unsigned phy_mr_wr:3;
+			/* Correspond to PHYs MR2.cwl field */
 			unsigned phy_mr_cwl:3;
+			/* Correspond to PHYs MR2.asr field */
 			unsigned phy_mr_asr:1;
 		};
 	} config_0;
@@ -354,15 +390,20 @@ typedef struct {
 		unsigned int full_reg;
 		struct {
 			unsigned t_mod:10;
+			/* Correspond to PHYs DTPR0.tmrd field */
 			unsigned dtpr_tmrd:2;
+			/* Correspond to PHYs DTPR0.tmod field */
 			unsigned dtpr_tmod:2;
+			/* Correspond to PHYs PIR.dramrst field */
 			unsigned pir_dram_rst:1;
-
 		};
 	} config_1;
 
 } ddr3_t;
 
+/* The lpddr2_t structure is the same ddr_common_t structure but with 2
+ * additional unions, specific for lpddr2: config_0, config_1.
+ */
 typedef struct {
 	union {
 		unsigned int full_reg;
@@ -526,26 +567,36 @@ typedef struct {
 		};
 	} misc5;
 
-	unsigned int dump[32];  // Need for bootrom function _api_DDR_INIT()
+	unsigned int dump[32];
 
 	union {
 		unsigned int full_reg;
 		struct {
+			/* Correspond to PHYs MR1.bl field */
 			unsigned phy_mr_bl:3;
+			/* Correspond to PHYs MR1.wc field */
 			unsigned phy_mr_wc:1;
+			/* Correspond to PHYs MR1.nwr field */
 			unsigned phy_mr_nwr:3;
+			/* Correspond to PHYs MR2.rl/wl field */
 			unsigned phy_mr_rl_wr:4;
+			/* Correspond to PHYs MR3.ds field */
 			unsigned phy_mr_ds:4;
 		};
 	} config_0;
 	union {
 		unsigned int full_reg;
 		struct {
+			/* Correspond to PHYs DCR.ddr8bnk field */
 			unsigned dcr_ddr8bnk:1;
+			/* Correspond to PHYs DCR.ddr_type field */
 			unsigned dcr_ddr_type:2;
 			unsigned t_mrw:10;
+			/* Correspond to PHYs PTR2.tdinit3 field */
 			unsigned phy_tdinit3:10;
+			/* Correspond to PHYs DTPR1.tdqsckmin field */
 			unsigned dtpr_tdqsck_min:3;
+			/* Correspond to PHYs DTPR1.tdqsckmax field */
 			unsigned dtpr_tdqsck_max:3;
 		};
 	} config_1;

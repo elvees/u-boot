@@ -1,16 +1,11 @@
 /*
- * (C) Copyright 2012-2013 Henrik Nordstrom <henrik@henriknordstrom.net>
- * (C) Copyright 2013 Luke Kenneth Casson Leighton <lkcl@lkcl.net>
+ * Copyright 2012-2013 Henrik Nordstrom <henrik@henriknordstrom.net>
+ * Copyright 2013 Luke Kenneth Casson Leighton <lkcl@lkcl.net>
+ * Copyright 2007-2011 Allwinner Technology Co., Ltd. <www.allwinnertech.com>
  *
- * (C) Copyright 2007-2011
- * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+ * Copyright 2015-2016 ELVEES NeoTek JSC, <www.elvees-nt.com>
  *
- * (C) Copyright 2015
- * ELVEES NeoTek CJSC, <www.elvees-nt.com>
- *
- * Dmitriy Zagrebin <dzagrebin@elvees.com>
- *
- * Some board init for the Elvees SBC-DBG board.
+ * Some board init for the Elvees MCom-compatible board.
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
@@ -25,15 +20,59 @@
 #include <asm/arch/regs.h>
 #include <asm/arch/sdmmc.h>
 #include <asm/io.h>
+#include <linux/kernel.h>
 
 DECLARE_GLOBAL_DATA_PTR;
+
+#define tCK DIV_ROUND_UP(1000000, ((CPLL_VALUE + 1) * (XTI_FREQ / 1000000)))
+#define bl 8 /* burst length */
+
+/* The following parameters are for Nanya NT5CB256M8FN-DI DRAM. */
+
+#define cl 7 /* read latency. Units: clocks cycles */
+#define cwl 6 /* write latency. Units: clock cycles */
+#define tWR 15000 /* Units: ps */
+#define tFAW 30000 /* Units: ps */
+#define tRAS_min 35000 /* Units: ps */
+#define tRAS_max (9 * 7800000) /* Units: ps */
+#define tRC 48750 /* Units: ps */
+#define tXPDLL max(10 * tCK, 24000) /* Units: ps */
+#define tAL 0
+#define tRTP max(4 * tCK, 7500) /* Units: ps */
+#define tWTR max(4 * tCK, 7500) /* Units: ps */
+#define tRCD 13750 /* Units: ps */
+#define tRRD max(4 * tCK, 6000) /* Units: ps */
+#define tCCD 4 /* Units: clock cycles */
+#define tRP 13750 /* Units: ps */
+
+#define ps2clocks(T) DIV_ROUND_UP((T), tCK)
+
+void dump_mem_params(const ddr3_t *ddr3_mem)
+{
+	printf("wr2pre : %d\n", ddr3_mem->dram_tmg_0.wr2pre);
+	printf("tFAW : %d\n", ddr3_mem->dram_tmg_0.t_faw);
+	printf("tRAS_max : %d\n", ddr3_mem->dram_tmg_0.t_ras_max);
+	printf("tRAS_min : %d\n", ddr3_mem->dram_tmg_0.t_ras_min);
+	printf("tRC : %d\n", ddr3_mem->dram_tmg_0.trc);
+	printf("tXP : %d\n", ddr3_mem->dram_tmg_1.t_xp);
+	printf("rd2pre : %d\n", ddr3_mem->dram_tmg_1.rd2pre);
+	printf("rd2wr : %d\n", ddr3_mem->dram_tmg_1.rd2wr);
+	printf("wr2rd : %d\n", ddr3_mem->dram_tmg_1.wr2rd);
+	printf("tRCD : %d\n", ddr3_mem->dram_tmg_2.t_rcd);
+	printf("tRRD : %d\n", ddr3_mem->dram_tmg_2.t_rrd);
+	printf("tCCD : %d\n", ddr3_mem->dram_tmg_2.t_ccd);
+	printf("tRP : %d\n", ddr3_mem->dram_tmg_2.t_rp);
+	printf("tRFC : %d\n", ddr3_mem->refr_cnt.t_rfc_min);
+	printf("tWTR : %d\n", ddr3_mem->misc2.dtpr_twtr);
+	printf("tRTP : %d\n", ddr3_mem->misc2.dtpr_trtp);
+}
 
 int board_init(void)
 {
 	return 0;
 }
 
-void set_nt5cb256m8fn_di_cfg(ddr3_t *ddr3_mem)
+void set_nt5cb256m8fndi_cfg(ddr3_t *ddr3_mem)
 {
 	ddr3_mem->misc0.full_reg = 0;
 	ddr3_mem->misc0.burst_rdwr = 4;
@@ -45,33 +84,33 @@ void set_nt5cb256m8fn_di_cfg(ddr3_t *ddr3_mem)
 	ddr3_mem->misc0.port_en_2 = 1;
 
 	ddr3_mem->dram_tmg_0.full_reg = 0;
-	ddr3_mem->dram_tmg_0.wr2pre = (6 + 4 + 9);
-	ddr3_mem->dram_tmg_0.t_faw = 27;
-	ddr3_mem->dram_tmg_0.t_ras_max = 36;
-	ddr3_mem->dram_tmg_0.t_ras_min = 18;
-	ddr3_mem->dram_tmg_0.trc = 27;
+	ddr3_mem->dram_tmg_0.wr2pre = cwl + (bl / 2) + ps2clocks(tWR);
+	ddr3_mem->dram_tmg_0.t_faw = ps2clocks(tFAW);
+	ddr3_mem->dram_tmg_0.t_ras_max = tRAS_max / (tCK * 1024);
+	ddr3_mem->dram_tmg_0.t_ras_min = ps2clocks(tRAS_min);
+	ddr3_mem->dram_tmg_0.trc = ps2clocks(tRC);
 
 	ddr3_mem->dram_tmg_1.full_reg = 0;
-	ddr3_mem->dram_tmg_1.t_xp = 13;
-	ddr3_mem->dram_tmg_1.rd2pre = (0 + 6);
-	ddr3_mem->dram_tmg_1.read_latency = 7;
-	ddr3_mem->dram_tmg_1.rd2wr = (7 + 4 + 2 - 6);
-	ddr3_mem->dram_tmg_1.wr2rd = (6 + 4 + 6);
+	ddr3_mem->dram_tmg_1.t_xp = ps2clocks(tXPDLL);
+	ddr3_mem->dram_tmg_1.rd2pre = tAL + ps2clocks(tRTP);
+	ddr3_mem->dram_tmg_1.read_latency = cl;
+	ddr3_mem->dram_tmg_1.rd2wr = cl + (bl / 2) + 2 - cwl;
+	ddr3_mem->dram_tmg_1.wr2rd = cwl + (bl / 2) + ps2clocks(tWTR);
 
 	ddr3_mem->dram_tmg_2.full_reg = 0;
-	ddr3_mem->dram_tmg_2.write_latency = 6;
-	ddr3_mem->dram_tmg_2.t_rcd = 7;
-	ddr3_mem->dram_tmg_2.t_rrd = 6;
-	ddr3_mem->dram_tmg_2.t_ccd = 4;
-	ddr3_mem->dram_tmg_2.t_rp = 7;
+	ddr3_mem->dram_tmg_2.write_latency = cwl;
+	ddr3_mem->dram_tmg_2.t_rcd = ps2clocks(tRCD) - tAL;
+	ddr3_mem->dram_tmg_2.t_rrd = ps2clocks(tRRD);
+	ddr3_mem->dram_tmg_2.t_ccd = tCCD;
+	ddr3_mem->dram_tmg_2.t_rp = ps2clocks(tRP);
 
 	ddr3_mem->refr_cnt.full_reg = 0;
-	ddr3_mem->refr_cnt.t_rfc_min = 140;
+	ddr3_mem->refr_cnt.t_rfc_min = ps2clocks(160000);
 
 	ddr3_mem->dfi_tmg.full_reg = 0;
 	ddr3_mem->dfi_tmg.dfi_t_ctrl_delay = 2;
-	ddr3_mem->dfi_tmg.dfi_tphy_wrlat = (6 - 1);
-	ddr3_mem->dfi_tmg.dfi_t_rddata_en = (7 - 2);
+	ddr3_mem->dfi_tmg.dfi_tphy_wrlat = cwl - 1;
+	ddr3_mem->dfi_tmg.dfi_t_rddata_en = cl - 2;
 	ddr3_mem->dfi_tmg.dfi_tphy_wrdata = 1;
 
 	ddr3_mem->addrmap0.full_reg = 0;
@@ -105,8 +144,8 @@ void set_nt5cb256m8fn_di_cfg(ddr3_t *ddr3_mem)
 	ddr3_mem->misc1.full_reg = 0;
 
 	ddr3_mem->misc2.full_reg = 0;
-	ddr3_mem->misc2.dtpr_twtr = 6;
-	ddr3_mem->misc2.dtpr_trtp = 6;
+	ddr3_mem->misc2.dtpr_twtr = ps2clocks(tWTR);
+	ddr3_mem->misc2.dtpr_trtp = ps2clocks(tRTP);
 	ddr3_mem->misc2.dtpr_trtw = 0;
 
 	ddr3_mem->misc3.full_reg = 0;
@@ -123,10 +162,10 @@ void set_nt5cb256m8fn_di_cfg(ddr3_t *ddr3_mem)
 	ddr3_mem->misc5.dfi_upd_int_max = 64;
 
 	ddr3_mem->config_0.full_reg = 0;
-	ddr3_mem->config_0.phy_mr_cl = 3;
+	ddr3_mem->config_0.phy_mr_cl = cl - 4;
 	ddr3_mem->config_0.phy_mr_bl = 0;
-	ddr3_mem->config_0.phy_mr_wr = 5;
-	ddr3_mem->config_0.phy_mr_cwl = 1;
+	ddr3_mem->config_0.phy_mr_wr = ps2clocks(tWR) - 4;
+	ddr3_mem->config_0.phy_mr_cwl = cwl - 5;
 
 	ddr3_mem->config_1.full_reg = 0;
 	ddr3_mem->config_1.dtpr_tmrd = 0;
@@ -191,7 +230,7 @@ int dram_init(void)
 	ddr3_t ddr3_mem;
 
 	puts("DDR controllers init started\n");
-	set_nt5cb256m8fn_di_cfg(&ddr3_mem);
+	set_nt5cb256m8fndi_cfg(&ddr3_mem);
 	uint32_t status = bootrom_DDR_INIT(1, (void *)(&ddr3_mem),
 					   (void *)(&ddr3_mem));
 
