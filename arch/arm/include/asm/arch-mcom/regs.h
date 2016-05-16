@@ -296,7 +296,8 @@ typedef struct {
 	volatile uint32_t RFSHCTL0;
 	volatile uint8_t RESERVED4[12];
 	volatile uint32_t RFSHCTL3;
-	volatile uint8_t RESERVED5[108];
+	volatile uint32_t RFSHTMG;
+	volatile uint8_t RESERVED5[104];
 	volatile uint32_t INIT0;
 	volatile uint32_t INIT1;
 	volatile uint32_t INIT2;

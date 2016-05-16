@@ -231,6 +231,27 @@ int dram_init(void)
 
 	puts("DDR controllers init started\n");
 	set_nt5cb256m8fndi_cfg(&ddr3_mem);
+
+	/* In bootroot_DDR_INIT() t_rfc_min parameter is not set for DDRMC
+	 * and t_ras_min parameters is not set for DDRPHY. Set them before
+	 * bootrom_DDR_INIT() call (workaround for bug rf#1969).
+	 */
+	cmctr_t *CMCTR = (cmctr_t *)CMCTR_BASE;
+	ddrmc_t *DDRMC[2] = { (ddrmc_t *)DDRMC0_BASE, (ddrmc_t *)DDRMC1_BASE };
+	ddrphy_t *DDRPHY[2] = { (ddrphy_t *)DDRPHY0_BASE,
+		(ddrphy_t *)DDRPHY1_BASE };
+	int i;
+
+	CMCTR->GATE_CORE_CTR |= 6;
+
+	for (i = 0; i < 2; i++) {
+		DDRMC[i]->RFSHTMG = (DDRMC[i]->RFSHTMG & ~0x1ff) |
+			ddr3_mem.refr_cnt.t_rfc_min;
+
+		DDRPHY[i]->DTPR0 = (DDRPHY[i]->DTPR0 & ~0x1f0000) |
+			(ddr3_mem.dram_tmg_0.t_ras_min << 16);
+	}
+
 	uint32_t status = bootrom_DDR_INIT(1, (void *)(&ddr3_mem),
 					   (void *)(&ddr3_mem));
 
