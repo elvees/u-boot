@@ -45,7 +45,7 @@ void set_nt5cb256m8fn_di_cfg(ddr3_t *ddr3_mem)
 	ddr3_mem->misc0.port_en_2 = 1;
 
 	ddr3_mem->dram_tmg_0.full_reg = 0;
-	ddr3_mem->dram_tmg_0.wr2pre = (6+4+9);
+	ddr3_mem->dram_tmg_0.wr2pre = (6 + 4 + 9);
 	ddr3_mem->dram_tmg_0.t_faw = 27;
 	ddr3_mem->dram_tmg_0.t_ras_max = 36;
 	ddr3_mem->dram_tmg_0.t_ras_min = 18;
@@ -53,10 +53,10 @@ void set_nt5cb256m8fn_di_cfg(ddr3_t *ddr3_mem)
 
 	ddr3_mem->dram_tmg_1.full_reg = 0;
 	ddr3_mem->dram_tmg_1.t_xp = 13;
-	ddr3_mem->dram_tmg_1.rd2pre = (0+6);
+	ddr3_mem->dram_tmg_1.rd2pre = (0 + 6);
 	ddr3_mem->dram_tmg_1.read_latency = 7;
-	ddr3_mem->dram_tmg_1.rd2wr = (7+4+2-6);
-	ddr3_mem->dram_tmg_1.wr2rd = (6+4+6);
+	ddr3_mem->dram_tmg_1.rd2wr = (7 + 4 + 2 - 6);
+	ddr3_mem->dram_tmg_1.wr2rd = (6 + 4 + 6);
 
 	ddr3_mem->dram_tmg_2.full_reg = 0;
 	ddr3_mem->dram_tmg_2.write_latency = 6;
@@ -70,8 +70,8 @@ void set_nt5cb256m8fn_di_cfg(ddr3_t *ddr3_mem)
 
 	ddr3_mem->dfi_tmg.full_reg = 0;
 	ddr3_mem->dfi_tmg.dfi_t_ctrl_delay = 2;
-	ddr3_mem->dfi_tmg.dfi_tphy_wrlat = (6-1);
-	ddr3_mem->dfi_tmg.dfi_t_rddata_en = (7-2);
+	ddr3_mem->dfi_tmg.dfi_tphy_wrlat = (6 - 1);
+	ddr3_mem->dfi_tmg.dfi_t_rddata_en = (7 - 2);
 	ddr3_mem->dfi_tmg.dfi_tphy_wrdata = 1;
 
 	ddr3_mem->addrmap0.full_reg = 0;
@@ -189,9 +189,12 @@ int dram_init(void)
 	gd->ram_size = PHYS_SDRAM_0_SIZE;
 #ifdef CONFIG_SPL_BUILD
 	ddr3_t ddr3_mem;
+
 	puts("DDR controllers init started\n");
 	set_nt5cb256m8fn_di_cfg(&ddr3_mem);
-	uint32_t status = bootrom_DDR_INIT(1, (void*)(&ddr3_mem), (void*)(&ddr3_mem));
+	uint32_t status = bootrom_DDR_INIT(1, (void *)(&ddr3_mem),
+					   (void *)(&ddr3_mem));
+
 	if (status & 0xffff)
 		puts("DDR controller #0 init failed\n");
 	else

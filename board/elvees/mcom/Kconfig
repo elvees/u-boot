@@ -1,10 +1,19 @@
-if TARGET_SBCVM
-
+if TARGET_SBCDBG
 config SYS_CONFIG_NAME
-	default "sbcvm"
+	default "sbcdbg"
 
 config SYS_BOARD
-	default "sbcvm"
+	default "mcom"
+endif
+
+if TARGET_IPKU
+config SYS_CONFIG_NAME
+	default "ipku"
+
+config SYS_BOARD
+	default "mcom"
+endif
+
 
 config FDTFILE
 	string "Default fdtfile env setting for this board"
@@ -18,5 +27,3 @@ config CONS_INDEX
 config DDR_SIZE_IN_MB
 	int "DDR size in MB"
 	default 1024
-
-endif
