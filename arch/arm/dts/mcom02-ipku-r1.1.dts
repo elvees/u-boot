@@ -1,0 +1,45 @@
+/*
+ * Copyright 2015 ELVEES NeoTek CJSC
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/interrupt-controller/irq.h>
+
+#include "mcom02.dtsi"
+
+/ {
+	model = "IP-KU";
+	revision = "1.1";
+
+	chosen {
+		bootargs = "console=ttyS0,115200";
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x40000000 0x40000000
+		       0xa0000000 0x40000000>;
+	};
+};
+
+&sd0 {
+	status = "okay";
+};
+
+&usb {
+	status = "okay";
+};
+
+/* IP-KU hangs at high SPLL values, so we should decrease it. */
+&spllclk {
+	clock-mult = <6>;
+};
+
+&l3_pclk {
+	clock-div = <1>;
+};

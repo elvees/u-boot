@@ -431,6 +431,14 @@ dtb-$(CONFIG_ARCH_ASPEED) += ast2500-evb.dtb
 
 dtb-$(CONFIG_ARCH_STI) += stih410-b2260.dtb
 
+dtb-$(CONFIG_ARCH_MCOM) += \
+	mcom02-sbcvm-r0.21.dtb \
+	mcom02-sbcdbg-r0.3.dtb \
+	mcom02-salute-el24d1-r1.3.dtb \
+	mcom02-salute-el24d1-r1.4.dtb \
+	mcom02-salute-el24d2-r1.1.dtb \
+	mcom02-ipku-r1.1.dtb
+
 targets += $(dtb-y)
 
 # Add any required device tree compiler flags here

@@ -1,0 +1,818 @@
+/*
+ * Copyright 2015 ELVEES NeoTek CJSC
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+
+#include "skeleton.dtsi"
+
+/ {
+	compatible = "elvees,mcom";
+	interrupt-parent = <&gic>;
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		enable-method = "elvees,mcom-smp";
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a9";
+			next-level-cache = <&L2>;
+			reg = <0x0>;
+			clocks = <&apllclk>;
+		};
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a9";
+			next-level-cache = <&L2>;
+			reg = <0x1>;
+			clocks = <&apllclk>;
+		};
+	};
+
+	L2: l2-cache-controller@39004000 {
+		compatible = "arm,pl310-cache";
+		reg = <0x39004000 0x1000>;
+		cache-unified;
+		cache-level = <2>;
+	};
+
+	gic: interrupt-controller@39001000 {
+		compatible = "arm,cortex-a9-gic";
+		interrupt-controller;
+		#interrupt-cells = <3>;
+		reg = <0x39001000 0x1000>,
+			<0x39000100 0x0100>;
+	};
+
+	local-timer@39000600 {
+		compatible = "arm,cortex-a9-twd-timer";
+		reg = <0x39000600 0x20>;
+		interrupts = <GIC_PPI 13
+			      (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
+		clocks = <&arm_periph_clk>;
+	};
+
+	global-timer@39000200 {
+		compatible = "arm,cortex-a9-global-timer";
+		reg = <0x39000200 0x20>;
+		interrupts = <GIC_PPI 11
+			      (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
+		clocks = <&arm_periph_clk>;
+	};
+
+	watchdog@38031000 {
+		compatible = "snps,dw-wdt";
+		reg = <0x38031000 0x1000>;
+		interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&l3_pclk>;
+	};
+
+	dsp {
+		device_type = "cpu";
+		compatible = "elvees,delcore-30m";
+		reg = <0x37001000 0x1000>, <0x37000000 0x1000>,
+		      <0x37010000 0x1000>,
+		      <0x3a600000 0x8000>, <0x3a620000 0x8000>,
+		      <0x3a400000 0x20000>, <0x3a420000 0x20000>;
+		reg-names = "cmn_regs", "dsp0_regs", "dsp1_regs",
+			    "dsp0_pram", "dsp1_pram", "xyram0", "xyram1";
+		interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&dsp_aclk>, <&dsp_pclk>, <&enc_clk>,
+			 <&dsp0_clk>, <&dsp1_clk>;
+	};
+
+	uart0: serial@38028000 {
+		compatible = "snps,dw-apb-uart";
+		reg = <0x38028000 0x1000>;
+		interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&uart0_pclk>;
+		reg-shift = <2>;
+		reg-io-width = <4>;
+	};
+
+	uart1: serial@38029000 {
+		compatible = "snps,dw-apb-uart";
+		reg = <0x38029000 0x1000>;
+		interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&uart1_pclk>;
+		reg-shift = <2>;
+		reg-io-width = <4>;
+		status = "disabled";
+	};
+
+	uart2: serial@3802a000 {
+		compatible = "snps,dw-apb-uart";
+		reg = <0x3802a000 0x1000>;
+		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&uart2_pclk>;
+		reg-shift = <2>;
+		reg-io-width = <4>;
+		status = "disabled";
+	};
+
+	uart3: serial0@3802b000 {
+		compatible = "snps,dw-apb-uart";
+		reg = <0x3802b000 0x1000>;
+		interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&uart3_pclk>;
+		reg-shift = <2>;
+		reg-io-width = <4>;
+		status = "disabled";
+	};
+
+	sd0: sdhci0@3800b000 {
+		compatible = "arasan,sdhci-8.9a";
+		reg = <0x3800b000 0x2000>;
+		interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
+		clock-names = "clk_xin", "clk_ahb";
+		clocks = <&sdmmc0_hclk>, <&sdmmc0_hclk>;
+		bus-width = <8>;
+		broken-cap-clock-base;
+		sdhci,auto-cmd12;
+		status = "disabled";
+	};
+
+	sd1: sdhci1@3800d000 {
+		compatible = "arasan,sdhci-8.9a";
+		reg = <0x3800d000 0x2000>;
+		interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+		clock-names = "clk_xin", "clk_ahb";
+		clocks = <&sdmmc1_hclk>, <&sdmmc1_hclk>;
+		bus-width = <8>;
+		broken-cap-clock-base;
+		sdhci,auto-cmd12;
+		status = "disabled";
+	};
+
+	usbphy: usbphy {
+		#phy-cells = <0>;
+		compatible = "usb-nop-xceiv";
+	};
+
+	usb: usb@38002000 {
+		compatible = "elvees,mcom-usb", "snps,dwc2";
+		reg = <0x38002000 0x1000>;
+		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&usb_clk>;
+		clock-names = "otg";
+		phys = <&usbphy>;
+		phy-names = "usb2-phy";
+		g-use-dma;
+		status = "disabled";
+	};
+
+	spi0: spi@38032000 {
+		compatible = "snps,dw-apb-ssi";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x38032000 0x1000>;
+		interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&spi0_pclk>;
+		status = "disabled";
+	};
+
+	spi1: spi@38033000 {
+		compatible = "snps,dw-apb-ssi";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x38033000 0x1000>;
+		interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&spi1_pclk>;
+		status = "disabled";
+	};
+
+	i2c0: i2c@3802c000 {
+		compatible = "snps,designware-i2c";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x3802c000 0x1000>;
+		interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&i2c0_pclk>;
+		status = "disabled";
+	};
+
+	i2c1: i2c@3802d000 {
+		compatible = "snps,designware-i2c";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x3802d000 0x1000>;
+		interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&i2c1_pclk>;
+		status = "disabled";
+	};
+
+	i2c2: i2c@3802e000 {
+		compatible = "snps,designware-i2c";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x3802e000 0x1000>;
+		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&i2c2_pclk>;
+		status = "disabled";
+	};
+
+	ethernet: ethernet@3800f000 {
+		compatible = "elvees,arasan-gemac";
+		reg = <0x3800f000 0x1000>;
+		interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&emac_hclk>;
+		status = "disabled";
+	};
+
+	vinc: vinc@37200000 {
+		compatible = "elvees,vinc";
+		reg = <0x37200000 0x4000>;
+		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&vpin_pclk>, <&vpin_aclk>, <&vpin_sclk>;
+		clock-names = "pclk", "aclk", "sclk";
+		status = "disabled";
+	};
+
+	framebuffer: framebuffer@38004000 {
+		compatible = "elvees,vpoutfb";
+		reg = <0x38004000 0x1000>;
+		width = <1280>;
+		height = <720>;
+		/* We have to pad out color to 32 bits because 24 bit color is
+		 * not supported by the Mali driver */
+		format = "x8r8g8b8";
+		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&vpout_hclk>, <&vpout_aclk>;
+		status = "disabled";
+	};
+
+	/* This device is not actually used by any driver. The only purpose
+	 * of this description is to denote the interrupts used by Mali.
+	 * Only if these interrupts are denoted that way Linux allows them
+	 * to be used and detected. Mali driver detects them by probing. */
+	gpu: gpu@37210000 {
+		compatible = "arm,mali-dev";
+		reg = <0x37210000 0x10000>;
+		interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "IRQGP", "IRQGPMMU", "IRQPMU", "IRQPP0",
+			"IRQPPMMU0";
+		clocks = <&gpu_aclk>;
+	};
+
+	spram: spram@20000000 {
+		compatible = "elvees,mcom-spram";
+		reg = <0x20000000 0x10000>;
+	};
+
+	gpio: gpio@38034000 {
+		compatible = "snps,dw-apb-gpio";
+		reg = <0x38034000 0x1000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		gpioa: gpio-controller@0 {
+			compatible = "snps,dw-apb-gpio-port";
+			gpio-controller;
+			#gpio-cells = <2>;
+			snps,nr-gpios = <32>;
+			reg = <0>;
+
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			interrupt-parent = <&gic>;
+			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		gpiob: gpio-controller@1 {
+			compatible = "snps,dw-apb-gpio-port";
+			gpio-controller;
+			#gpio-cells = <2>;
+			snps,nr-gpios = <32>;
+			reg = <1>;
+		};
+
+		gpioc: gpio-controller@2 {
+			compatible = "snps,dw-apb-gpio-port";
+			gpio-controller;
+			#gpio-cells = <2>;
+			snps,nr-gpios = <32>;
+			reg = <2>;
+		};
+
+		gpiod: gpio-controller@3 {
+			compatible = "snps,dw-apb-gpio-port";
+			gpio-controller;
+			#gpio-cells = <2>;
+			snps,nr-gpios = <32>;
+			reg = <3>;
+		};
+	};
+
+	clock-controller@38094000 {
+		compatible = "elvees,mcom-cmctr";
+		reg = <0x38094000 0x1000>;
+
+		clocks {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			xti24m: xti24m {
+				compatible = "fixed-clock";
+				#clock-cells = <0>;
+				clock-frequency = <24000000>;
+			};
+
+			xti32k: xti32k {
+				compatible = "fixed-clock";
+				#clock-cells = <0>;
+				clock-frequency = <32678>;
+			};
+
+			xtimcc: xtimcc {
+				compatible = "fixed-clock";
+				#clock-cells = <0>;
+				clock-frequency = <24000000>;
+				status = "disabled";
+			};
+
+			apllclk: apllclk {
+				compatible = "elvees,mcom-clk-pll";
+				clocks = <&xti24m>;
+				#clock-cells = <0>;
+				reg = <0x100>;
+				clk-mult-initial = <34>;
+			};
+
+			arm_periph_clk: arm_periph_clk {
+				compatible = "fixed-factor-clock";
+				clocks = <&apllclk>;
+				#clock-cells = <0>;
+				clock-div = <2>;
+				clock-mult = <1>;
+			};
+
+			mpspclk: mpspclk {
+				compatible = "elvees,mcom-clk-divider";
+				clocks = <&apllclk>;
+				#clock-cells = <0>;
+				reg = <0x4>;
+				reg-shift = <0>;
+				reg-width = <1>;
+				clk-div-initial = <1>;
+			};
+
+			atclk: atclk {
+				compatible = "elvees,mcom-clk-divider";
+				clocks = <&apllclk>;
+				#clock-cells = <0>;
+				reg = <0x8>;
+				reg-shift = <0>;
+				reg-width = <2>;
+				clk-div-initial = <3>;
+			};
+
+			apclk: apclk {
+				compatible = "elvees,mcom-clk-divider";
+				clocks = <&atclk>;
+				#clock-cells = <0>;
+				reg = <0xc>;
+				reg-shift = <0>;
+				reg-width = <1>;
+				clk-div-initial = <1>;
+			};
+
+			/* We can not reconfigure CPLL yet since it
+			 * clocks DDR
+			 */
+			cpllclk: cpllclk {
+				compatible = "fixed-factor-clock";
+				clocks = <&xti24m>;
+				#clock-cells = <0>;
+				clock-div = <1>;
+				clock-mult = <18>;
+			};
+
+			vpu_aclk: vpu_aclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&cpllclk>;
+				#clock-cells = <0>;
+				reg = <0x48>;
+				reg-bit = <5>;
+			};
+
+			vpout_aclk: vpout_aclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&cpllclk>;
+				#clock-cells = <0>;
+				reg = <0x48>;
+				reg-bit = <4>;
+			};
+
+			vpin_aclk: vpin_aclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&cpllclk>;
+				#clock-cells = <0>;
+				reg = <0x48>;
+				reg-bit = <3>;
+			};
+
+			dsp_aclk: dsp_aclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&cpllclk>;
+				#clock-cells = <0>;
+				reg = <0x68>;
+				reg-bit = <2>;
+			};
+
+			dpllclk: dpllclk {
+				compatible = "elvees,mcom-clk-pll";
+				clocks = <&xti24m>;
+				#clock-cells = <0>;
+				reg = <0x108>;
+				clk-mult-initial = <13>;
+			};
+
+			gpu_aclk_div: gpu_aclk_div {
+				compatible = "elvees,mcom-clk-divider";
+				clocks = <&dpllclk>;
+				#clock-cells = <0>;
+				reg = <0x2c>;
+				reg-shift = <0>;
+				reg-width = <2>;
+			};
+
+			gpu_aclk: gpu_aclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&gpu_aclk_div>;
+				#clock-cells = <0>;
+				reg = <0x48>;
+				reg-bit = <6>;
+			};
+
+			dsp0_clk: dsp0_clk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&dpllclk>;
+				#clock-cells = <0>;
+				reg = <0x68>;
+				reg-bit = <0>;
+			};
+
+			dsp1_clk: dsp1_clk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&dpllclk>;
+				#clock-cells = <0>;
+				reg = <0x68>;
+				reg-bit = <1>;
+			};
+
+			enc_clk: enc_clk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&dpllclk>;
+				#clock-cells = <0>;
+				reg = <0x68>;
+				reg-bit = <3>;
+			};
+
+			/* Watch youself! If you change SPLL frequency here,
+			 * you need to care that SDHCI core_baseclkfreq
+			 * register holds correct value too. */
+			spllclk: spllclk {
+				compatible = "elvees,mcom-clk-pll";
+				clocks = <&xti24m>;
+				#clock-cells = <0>;
+				reg = <0x10c>;
+				clk-mult-initial = <12>;
+			};
+
+			l1_hclk: l1_hclk {
+				compatible = "elvees,mcom-clk-divider";
+				clocks = <&spllclk>;
+				#clock-cells = <0>;
+				reg = <0x40>;
+				reg-shift = <0>;
+				reg-width = <1>;
+			};
+
+			usb_clk: usb_clk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l1_hclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <5>;
+			};
+
+			emac_hclk: emac_hclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l1_hclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <4>;
+			};
+
+			sdmmc0_hclk: sdmmc0_hclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l1_hclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <2>;
+			};
+
+			sdmmc1_hclk: sdmmc1_hclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l1_hclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <3>;
+			};
+
+			vpout_hclk: vpout_hclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l1_hclk>;
+				#clock-cells = <0>;
+				reg = <0x48>;
+				reg-bit = <4>;
+			};
+
+			l3_pclk: l3_pclk {
+				compatible = "elvees,mcom-clk-divider";
+				clocks = <&l1_hclk>;
+				#clock-cells = <0>;
+				reg = <0x44>;
+				reg-shift = <0>;
+				reg-width = <1>;
+				clk-div-initial = <1>;
+			};
+
+			i2s_pclk: i2s_pclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <1>;
+			};
+
+			spi0_pclk: spi0_pclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <19>;
+			};
+
+			spi1_pclk: spi1_pclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <20>;
+			};
+
+			i2c0_pclk: i2c0_pclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <16>;
+			};
+
+			i2c1_pclk: i2c1_pclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <17>;
+			};
+
+			i2c2_pclk: i2c2_pclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <18>;
+			};
+
+			uart0_pclk: uart0_pclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <12>;
+			};
+
+			uart1_pclk: uart1_pclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <13>;
+
+			};
+
+			uart2_pclk: uart2_pclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <14>;
+			};
+
+			uart3_pclk: uart3_pclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <15>;
+			};
+
+			vpin_pclk: vpin_pclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x48>;
+				reg-bit = <3>;
+			};
+
+			vpu_pclk: vpu_pclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x48>;
+				reg-bit = <5>;
+			};
+
+			dsp_pclk: dsp_pclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x68>;
+				reg-bit = <2>;
+			};
+
+			upllclk: upllclk {
+				compatible = "elvees,mcom-clk-pll";
+				clocks = <&xti24m>;
+				#clock-cells = <0>;
+				reg = <0x114>;
+				clk-mult-initial = <4>;
+			};
+
+			vpu_sclk: vpu_sclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&upllclk>;
+				#clock-cells = <0>;
+				reg = <0x48>;
+				reg-bit = <5>;
+			};
+
+			vpllclk: vpllclk {
+				compatible = "elvees,mcom-clk-pll";
+				clocks = <&xti24m>;
+				#clock-cells = <0>;
+				reg = <0x110>;
+				clk-mult-initial = <16>;
+			};
+
+			vpin_sclk: vpin_sclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&vpllclk>;
+				#clock-cells = <0>;
+				reg = <0x48>;
+				reg-bit = <3>;
+			};
+
+			/* TODO: Use PLL driver for SWIC PLLs */
+			sw0pll: sw0pll {
+				compatible = "fixed-factor-clock";
+				clocks = <&xti24m>;
+				#clock-cells = <0>;
+				clock-div = <5>;
+				clock-mult = <1>;
+			};
+
+			sw1pll: sw1pll {
+				compatible = "fixed-factor-clock";
+				clocks = <&xti24m>;
+				#clock-cells = <0>;
+				clock-div = <5>;
+				clock-mult = <1>;
+			};
+
+			nfc_sclk_div: nfc_sclk_div {
+				compatible = "elvees,mcom-clk-divider";
+				clocks = <&l1_hclk>;
+				#clock-cells = <0>;
+				reg = <0x38>;
+				reg-shift = <0>;
+				reg-width = <2>;
+				clk-div-initial = <2>;
+			};
+
+			nfc_sclk: nfc_sclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&nfc_sclk_div>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <21>;
+			};
+
+			nor_sclk_div: nor_sclk_div {
+				compatible = "elvees,mcom-clk-divider";
+				clocks = <&l1_hclk>;
+				#clock-cells = <0>;
+				reg = <0x3c>;
+				reg-shift = <0>;
+				reg-width = <2>;
+			};
+
+			nor_sclk: nor_sclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&nor_sclk_div>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <22>;
+			};
+		};
+	};
+
+	vpu: codec@37100000 {
+		compatible = "elvees,avico";
+		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&vpu_pclk>, <&vpu_aclk>, <&vpu_sclk>;
+		clock-names = "pclk", "aclk", "sclk";
+		reg = <0x37100000 0x00010000>, <0x3b000000 0x01000000>;
+	};
+
+	sdma: dma@37220000 {
+		compatible = "arm,pl330", "arm,primecell";
+		reg = <0x37220000 0x1000>;
+		interrupt-parent = <&gic>;
+		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&l3_pclk>;
+		clock-names = "apb_pclk";
+		#dma-cells = <1>;
+	};
+
+	nfc: nand-controller@38007000 {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		compatible = "arasan,nfc-v2p99";
+		reg = <0x38007000 0x1000>;
+		arasan,has-mdma;
+		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&nfc_sclk>;
+		status = "disabled";
+	};
+};
