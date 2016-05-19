@@ -1,5 +1,5 @@
 /*
-* Copyright 2015 ELVEES NeoTek CJSC
+* Copyright 2015-2016 ELVEES NeoTek JSC
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
@@ -83,7 +83,9 @@
 &spi0 {
 	status = "okay";
 	num-cs = <1>;
-	cs-gpios = <&gpiod 18 GPIO_ACTIVE_HIGH>;
+	/* Third argument of "cs-gpios" property is set to 0,
+	 * because it is ignored by the SPI driver. */
+	cs-gpios = <&gpiod 18 0>;
 
 	flash: flash {
 		#address-cells = <1>;
