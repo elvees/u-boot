@@ -33,14 +33,16 @@
 	/* Third argument of "cs-gpios" property is set to 0,
 	 * because it is ignored by the SPI driver. */
 	cs-gpios = <&gpiod 18 0>;
+	spi-max-frequency = <144000000>;
 
-	flash: flash {
+	flash: flash@0 {
 		#address-cells = <1>;
 		#size-cells = <1>;
-		compatible = "micron,m25p32", "jedec,spi-nor";
+		compatible = "micron,m25p32", "jedec,spi-nor", "spi-flash";
 		reg = <0>;
 		spi-max-frequency = <48000000>;
 		m25p,fast-read;
+		u-boot,dm-pre-reloc;
 	};
 };
 
