@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 ELVEES NeoTek CJSC
+ * Copyright 2015-2016 ELVEES NeoTek JSC
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -276,6 +276,7 @@
 		reg = <0x38034000 0x1000>;
 		#address-cells = <1>;
 		#size-cells = <0>;
+		u-boot,dm-pre-reloc;
 
 		gpioa: gpio-controller@0 {
 			compatible = "snps,dw-apb-gpio-port";
@@ -283,6 +284,8 @@
 			#gpio-cells = <2>;
 			snps,nr-gpios = <32>;
 			reg = <0>;
+			bank-name = "gpioa";
+			u-boot,dm-pre-reloc;
 
 			interrupt-controller;
 			#interrupt-cells = <2>;
@@ -327,6 +330,8 @@
 			#gpio-cells = <2>;
 			snps,nr-gpios = <32>;
 			reg = <1>;
+			bank-name = "gpiob";
+			u-boot,dm-pre-reloc;
 		};
 
 		gpioc: gpio-controller@2 {
@@ -335,6 +340,8 @@
 			#gpio-cells = <2>;
 			snps,nr-gpios = <32>;
 			reg = <2>;
+			bank-name = "gpioc";
+			u-boot,dm-pre-reloc;
 		};
 
 		gpiod: gpio-controller@3 {
@@ -343,6 +350,8 @@
 			#gpio-cells = <2>;
 			snps,nr-gpios = <32>;
 			reg = <3>;
+			bank-name = "gpiod";
+			u-boot,dm-pre-reloc;
 		};
 	};
 
