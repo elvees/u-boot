@@ -21,23 +21,7 @@
 #define MEM_ACCESS(ADDR) (*((volatile uint32_t*)(ADDR)))
 #define BOOTROM_COLD_RESET_BRANCH 0x0000019c
 
-int spl_board_load_image(void)
-{
-	return 0;
-}
-
 #ifdef CONFIG_SPL_BUILD
-
-u32 spl_boot_device(void)
-{
-	return BOOT_DEVICE_MMC1;
-}
-
-u32 spl_boot_mode(void)
-{
-	return MMCSD_MODE_RAW;
-}
-
 void board_init_f(ulong dummy)
 {
 	sys_t sys;
@@ -139,8 +123,8 @@ void board_init_f(ulong dummy)
 	 * is left floating */
 	sys.SDMMC1->HOST_POW_CNTL |= 0xc0;
 
-	/* Pull-up all pins for SDMMC1. For SDMMC0 pins already pulled-up in
-	 * bootrom/spi loader */
+	/* Pull-up all pins for SDMMC0 and SDMMC1 */
+	sys.SDMMC0->EXT_REG_7 = 0x0003ffff;
 	sys.SDMMC1->EXT_REG_7 = 0x0003ffff;
 }
 #endif

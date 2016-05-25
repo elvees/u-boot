@@ -36,8 +36,12 @@
 #define CONFIG_ENV_IS_IN_MMC
 #define CONFIG_SYS_MMC_ENV_DEV		0   /* first detected MMC controller */
 
-#define CONFIG_SPL_MMC_SUPPORT
-#define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR	130 /* 65KiB (1KiB reserved + 64KiB max SPL size) */
+#define CONFIG_SPL_GPIO_SUPPORT
+#define CONFIG_SPL_SPI_FLASH_SUPPORT
+#define CONFIG_SPL_SPI_SUPPORT
+#define CONFIG_SPL_SPI_LOAD
+#define CONFIG_SPL_PAD_TO		0x00010000
+#define CONFIG_SYS_SPI_U_BOOT_OFFS	0x00010000
 
 #if !defined CONFIG_ENV_IS_IN_MMC && \
 	!defined CONFIG_ENV_IS_IN_NAND && \
@@ -64,21 +68,18 @@
 	"load mmc 0:1 ${env_addr_r} u-boot.env; " \
 	"env import -t ${env_addr_r}; " \
 	"load mmc 0:1 ${kernel_addr_r} zImage; " \
-	"load mmc 0:1 ${fdt_addr_r} ${fdtfile}; " \
+	"fdt addr ${fdtcontroladdr}; " \
+	"fdt move ${fdtcontroladdr} ${fdt_addr_r} 0x8000; " \
 	"fdt addr ${fdt_addr_r}; " \
-	"fdt move ${fdt_addr_r} ${newfdt_addr_r} 0x8000; " \
-	"fdt addr ${newfdt_addr_r}; " \
-	"fdt chosen; " \
 	"if test ${ddrctl_cmd} = \"disable\"; then \
 		ddrctl ${ddrctl_cmd} ${ddrctl_cid}; fi; " \
-	"bootz ${kernel_addr_r} - ${newfdt_addr_r}"
+	"bootz ${kernel_addr_r} - ${fdt_addr_r}"
 
 #define MEM_LAYOUT_ENV_SETTINGS \
 	"bootm_size=0xf000000\0" \
 	"kernel_addr_r=0x40008000\0" \
 	"loadaddr=0x40008000\0" \
 	"fdtaddr=0x50000000\0" \
-	"newfdt_addr_r=0x51000000\0" \
 	"fdt_addr_r=0x50000000\0" \
 	"mmcdev=0\0" \
 	"mmcroot=/dev/mmcblk0p1 rw\0" \

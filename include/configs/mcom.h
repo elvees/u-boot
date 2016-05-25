@@ -111,16 +111,11 @@
 #define CONFIG_SPL_LIBGENERIC_SUPPORT
 #define CONFIG_SPL_WATCHDOG_SUPPORT
 
-#define CONFIG_SPL_BOARD_LOAD_IMAGE
-
 #define CONFIG_SPL_BSS_START_ADDR	0x4ff80000
 #define CONFIG_SPL_BSS_MAX_SIZE		0x80000     /* 512 KiB */
 #define CONFIG_SPL_TEXT_BASE		0x20000000      /* sram start+header */
 #define CONFIG_SPL_MAX_SIZE		(1024*64)       /* 64KB */
-#define CONFIG_SPL_LIBDISK_SUPPORT
 #define CONFIG_SPL_LDSCRIPT "arch/arm/cpu/armv7/u-boot-spl.lds"
-
-#define CONFIG_SPL_PAD_TO		65536
 
 /* end of 60 KiB in sram */
 #define LOW_LEVEL_SRAM_STACK		0x2000F000 /* End of sram */

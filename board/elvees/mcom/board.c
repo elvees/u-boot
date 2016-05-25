@@ -13,6 +13,7 @@
 #include <common.h>
 #include <mmc.h>
 #ifdef CONFIG_SPL_BUILD
+#include <spl.h>
 #include <asm/arch/bootrom.h>
 #endif
 #include <asm/arch/clock.h>
@@ -276,4 +277,22 @@ int board_mmc_init(bd_t *bis)
 {
 	return sdmmc_init(SDMMC0_BASE, SPLL_FREQ);
 }
+#endif
+
+#ifdef CONFIG_SPL_BUILD
+u32 spl_boot_device(void)
+{
+#ifdef CONFIG_TARGET_IPKU
+	return BOOT_DEVICE_MMC1;
+#else
+	return BOOT_DEVICE_SPI;
+#endif
+}
+
+#ifdef CONFIG_TARGET_IPKU
+u32 spl_boot_mode(void)
+{
+	return MMCSD_MODE_RAW;
+}
+#endif
 #endif
