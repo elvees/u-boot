@@ -38,8 +38,11 @@
 	L2: l2-cache-controller@39004000 {
 		compatible = "arm,pl310-cache";
 		reg = <0x39004000 0x1000>;
+		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
 		cache-unified;
 		cache-level = <2>;
+		arm,data-latency = <3 3 3>;
+		arm,tag-latency = <2 2 2>;
 	};
 
 	gic: interrupt-controller@39001000 {
