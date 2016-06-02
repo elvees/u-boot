@@ -1091,6 +1091,11 @@ OBJCOPYFLAGS_u-boot.spr = -I binary -O binary --pad-to=$(CONFIG_SPL_PAD_TO) \
 u-boot.spr: spl/u-boot-spl.img u-boot.img FORCE
 	$(call if_changed,pad_cat)
 
+OBJCOPYFLAGS_u-boot.mcom = -I binary -O binary --pad-to=$(CONFIG_SPL_PAD_TO) \
+			   --gap-fill=0xff
+u-boot.mcom: spl/u-boot-spl.img u-boot.img FORCE
+	$(call if_changed,pad_cat)
+
 ifneq ($(CONFIG_ARCH_SOCFPGA),)
 quiet_cmd_socboot = SOCBOOT $@
 cmd_socboot = cat	spl/u-boot-spl.sfp spl/u-boot-spl.sfp	\
