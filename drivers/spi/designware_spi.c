@@ -155,7 +155,6 @@ static void spi_hw_init(struct dw_spi_priv *priv)
 {
 	spi_enable_chip(priv, 0);
 	dw_writel(priv, DW_SPI_IMR, 0xff);
-	spi_enable_chip(priv, 1);
 
 	/*
 	 * Try to detect the FIFO depth if not set by interface driver,
@@ -352,9 +351,6 @@ static int dw_spi_xfer(struct udevice *dev, unsigned int bitlen,
 	priv->rx = rx;
 	priv->rx_end = priv->rx + priv->len;
 
-	/* Disable controller before writing control registers */
-	spi_enable_chip(priv, 0);
-
 	debug("%s: cr0=%08x\n", __func__, cr0);
 	/* Reprogram cr0 only if changed */
 	if (dw_readw(priv, DW_SPI_CTRL0) != cr0)
@@ -368,7 +364,11 @@ static int dw_spi_xfer(struct udevice *dev, unsigned int bitlen,
 	cs = spi_chip_select(dev);
 	dw_writel(priv, DW_SPI_SER, 1 << cs);
 
-	/* Enable controller after writing control registers */
+	/*
+	 * The SPI controller is enabled for a transfer duration and kept
+	 * disabled after the end of transfer. The Linux SPI driver hangs
+	 * if the controller is still enabled during initialization.
+	 */
 	spi_enable_chip(priv, 1);
 
 	if (flags & SPI_XFER_BEGIN)
@@ -379,6 +379,8 @@ static int dw_spi_xfer(struct udevice *dev, unsigned int bitlen,
 
 	if (flags & SPI_XFER_END)
 		dw_spi_cs_deactivate(dev);
+
+	spi_enable_chip(priv, 0);
 
 	return ret;
 }
@@ -392,16 +394,10 @@ static int dw_spi_set_speed(struct udevice *bus, uint speed)
 	if (speed > plat->frequency)
 		speed = plat->frequency;
 
-	/* Disable controller before writing control registers */
-	spi_enable_chip(priv, 0);
-
 	/* clk_div doesn't support odd number */
 	clk_div = cm_get_spi_controller_clk_hz() / speed;
 	clk_div = (clk_div + 1) & 0xfffe;
 	dw_writel(priv, DW_SPI_BAUDR, clk_div);
-
-	/* Enable controller after writing control registers */
-	spi_enable_chip(priv, 1);
 
 	priv->freq = speed;
 	debug("%s: regs=%p speed=%d clk_div=%d\n", __func__, priv->regs,
