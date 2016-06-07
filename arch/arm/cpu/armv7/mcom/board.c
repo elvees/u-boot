@@ -51,6 +51,12 @@ void board_init_f(ulong dummy)
 
 	INIT_SYS_REGS(sys);
 
+	/* DDR retention mode should be disabled as soon as possible
+	 * to avoid large current on DDRx_VDDQ (see rf#1160).
+	 */
+	sys.PMCTR->DDR_PIN_RET = 0;
+	bootrom_uart_putstr("DDR retention disabled\n");
+
 	/* Set ALWAYS_MISC0 to start address of bootrom _cold_reset
 	 * branch. The SoC can be rebooted correctly after this.
 	 */
