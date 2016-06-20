@@ -66,7 +66,8 @@
 #define CONFIG_BOOTCOMMAND \
 	"echo \"Loading Linux...\"; " \
 	"load mmc 0:1 ${env_addr_r} u-boot.env; " \
-	"env import -t ${env_addr_r}; " \
+	"size mmc 0:1 u-boot.env; " \
+	"env import -t ${env_addr_r} ${filesize}; " \
 	"load mmc 0:1 ${kernel_addr_r} zImage; " \
 	"fdt addr ${fdtcontroladdr}; " \
 	"fdt move ${fdtcontroladdr} ${fdt_addr_r} 0x8000; " \
