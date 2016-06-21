@@ -43,6 +43,7 @@ void board_init_f(ulong dummy)
 		uint32_t addr_for_jump_addr = 0x2000fff4;
 		void (*jump_to_kernel)(void);
 
+		MEM_ACCESS(addr_for_magic) = 0;
 		while(MEM_ACCESS(addr_for_magic) != magic) {}
 		invalidate_dcache_all();
 		jump_to_kernel = (void (*)(void))MEM_ACCESS(addr_for_jump_addr);
