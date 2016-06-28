@@ -21,11 +21,9 @@
 #define MEM_ACCESS(ADDR) (*((volatile uint32_t*)(ADDR)))
 #define BOOTROM_COLD_RESET_BRANCH 0x0000019c
 
-#ifdef CONFIG_SPL_BUILD
-void board_init_f(ulong dummy)
+void lowlevel_init(void)
 {
-	sys_t sys;
-
+#ifdef CONFIG_SPL_BUILD
 	if (bootrom_get_cpu_id() != 0) {
 
 		/* FIXME
@@ -49,7 +47,13 @@ void board_init_f(ulong dummy)
 		jump_to_kernel = (void (*)(void))MEM_ACCESS(addr_for_jump_addr);
 		jump_to_kernel();
 	}
+#endif
+}
 
+#ifdef CONFIG_SPL_BUILD
+void board_init_f(ulong dummy)
+{
+	sys_t sys;
 	INIT_SYS_REGS(sys);
 
 	/* DDR retention mode should be disabled as soon as possible
