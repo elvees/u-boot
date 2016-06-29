@@ -72,12 +72,11 @@ void board_init_f(ulong dummy)
 	bootrom_uart_putstr("Watchdog enabled\n");
 #endif
 
-	/*
-	 * Set BOOT_REMAP and ACP_CTL to 0x0 due to bug in L0-commutator
-	 * (see bug #971).
-	*/
-	sys.SMCTR->BOOT_REMAP = 0x0;
-	sys.SMCTR->ACP_CTL = 0x0;
+	/* Disable boot memory remapping due to the ACP bug (see rf#971) */
+	sys.SMCTR->BOOT_REMAP = 0;
+
+	/* Set default configuration for the ACP (see rf#972) */
+	sys.SMCTR->ACP_CTL = 0;
 
 	/* After changing remap we need instruction barrier for use actual
 	 * bootrom API functions */
