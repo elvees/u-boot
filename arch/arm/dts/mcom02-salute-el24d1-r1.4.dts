@@ -83,14 +83,20 @@
 			default-state = "off";
 		};
 	};
+
+	xtican: xtican {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <16000000>;
+	};
 };
 
 &spi0 {
 	status = "okay";
-	num-cs = <1>;
+	num-cs = <2>;
 	/* Third argument of "cs-gpios" property is set to 0,
 	 * because it is ignored by the SPI driver. */
-	cs-gpios = <&gpiod 18 0>;
+	cs-gpios = <&gpiod 18 0>, <&gpiod 19 0>;
 	spi-max-frequency = <144000000>;
 
 	flash: flash@0 {
@@ -101,6 +107,16 @@
 		spi-max-frequency = <48000000>;
 		m25p,fast-read;
 		u-boot,dm-pre-reloc;
+	};
+
+	can: can@1 {
+		compatible = "microchip,mcp2515";
+		reg = <1>;
+		clocks = <&xtican>;
+		interrupt-parent = <&gpioa>;
+		interrupts = <20 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpiob 16 GPIO_ACTIVE_LOW>;
+		spi-max-frequency = <10000000>;
 	};
 };
 
