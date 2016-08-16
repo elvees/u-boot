@@ -84,22 +84,12 @@ int bootrom_compress_and_dump_register_fields(
 
 #include "ddr_cfg.h"
 
-int bootrom_DDR_INIT(unsigned int reset_type, void *mem_cfg_0, void *mem_cfg_1);
-/*void bootrom_umctl2_load(ddr_common_t *ddr_mem_cfg,
-		dwc_umctl2_regs_t *umctl2_regs);
-void bootrom_lpddr2_pub_load(lpddr2_t *lpddr2_mem, dwc_pub_regs_t *pub_regs);
-void bootrom_ddr3_pub_load(ddr3_t *ddr3_mem, dwc_pub_regs_t *pub_regs);
-void bootrom_init_start(dwc_pub_regs_t *pub_regs, unsigned reset_type);
-int bootrom_pub_init_cmpl_wait(dwc_pub_regs_t *pub_regs, unsigned reset_type,
-		unsigned check);
-void bootrom_umctl2_norm_wait(dwc_umctl2_regs_t *umctl2_regs);
-void bootrom_ddr_self_refresh_enter(dwc_umctl2_regs_t *umctl2_regs);
-void bootrom_ddr_self_refresh_exit(dwc_umctl2_regs_t *umctl2_regs);
-void bootrom_phy_train_load(dwc_pub_regs_t *pub_regs,
-		ddr_common_t *ddr_mem_cfg);
-void bootrom_phy_train_save(dwc_pub_regs_t *pub_regs,
-		ddr_common_t *ddr_mem_cfg);*/
-
+void bootrom_umctl2_load(ddr3_t *mem_cfg, void *ddrmc_regs);
+void bootrom_ddr3_pub_load(ddr3_t *mem_cfg, void *pub_regs);
+void bootrom_init_start(void *pub_regs, unsigned int reset_type);
+int bootrom_pub_init_cmpl_wait(void *pub_regs, unsigned int reset_type,
+			       unsigned int check);
+void bootrom_umctl2_norm_wait(void *ddrmc_regs);
 
 /* SD/MMC types and functions */
 

@@ -224,6 +224,90 @@ void dram_init_banksize(void)
 	}
 }
 
+#ifdef CONFIG_SPL_BUILD
+static int ddr3_init(ddr3_t *ddr3_mem)
+{
+	int i;
+	uint32_t ret = 0;
+	cmctr_t *CMCTR = (cmctr_t *)CMCTR_BASE;
+	pmctr_t *PMCTR = (pmctr_t *)PMCTR_BASE;
+	ddrmc_t *DDRMC[2] = { (ddrmc_t *)DDRMC0_BASE, (ddrmc_t *)DDRMC1_BASE };
+	ddrphy_t *DDRPHY[2] = { (ddrphy_t *)DDRPHY0_BASE,
+				(ddrphy_t *)DDRPHY1_BASE };
+
+	if (!ddr3_mem)
+		return 1;
+
+	while ((PMCTR->CORE_PWR_STATUS & 1))
+		continue;
+
+	for (i = 0; i < 2; i++) {
+		CMCTR->GATE_CORE_CTR |= (1 << (i + 1));
+		/* Put ACDLL in reset mode as soon as possible since input
+		 * clock frequency is too low. Workaround for bug rf#1963.
+		 */
+		DDRPHY[i]->ACDLLCR = 0;
+		DDRMC[i]->DFIMISC = 0;
+		bootrom_umctl2_load(ddr3_mem, (void *)DDRMC[i]);
+
+		DDRMC[i]->RFSHTMG = (DDRMC[i]->RFSHTMG & ~0x1ff) |
+				ddr3_mem->refr_cnt.t_rfc_min;
+	}
+
+	PMCTR->DDR_INIT_END = 0x1;
+
+	/* Program DDR PUB registers */
+	for (i = 0; i < 2; i++) {
+		bootrom_ddr3_pub_load(ddr3_mem, (void *)DDRPHY[i]);
+
+		/* t_ras_min parameter is not set in bootrom_ddr3_pub_load().
+		 * Set it here.
+		 */
+		DDRPHY[i]->DTPR0 = (DDRPHY[i]->DTPR0 & ~0x1f0000) |
+				(ddr3_mem->dram_tmg_0.t_ras_min << 16);
+
+		/* tXS, tXP, tCKE, tDLLK timing parameters are not set in
+		 * bootrom_ddr3_pub_load(). Set it here.
+		 */
+		DDRPHY[i]->DTPR2 = (512 | (10 << 10) | (4 << 15) |
+				    (512 << 19));
+	}
+
+	CMCTR->SEL_CPLL = CPLL_VALUE;
+	while ((CMCTR->SEL_CPLL & 0x80000000) == 0)
+		continue;
+
+	/* Wait for a minimum reset duration time. */
+	udelay(1);
+
+	for (i = 0; i < 2; i++) {
+		/* Put ACDLL out of reset */
+		/* TODO: Describe bits */
+		DDRPHY[i]->ACDLLCR = 0x40000000;
+
+		/* Wait for DLL lock */
+		udelay(10);
+		bootrom_init_start(DDRPHY[i], 1);
+	}
+
+	/* Wait for DDR PHY initialization complete and then enable DDRMC */
+	for (i = 0; i < 2; i++) {
+		if (bootrom_pub_init_cmpl_wait((void *)DDRPHY[i], 1, 0)) {
+			ret |= (2 << (i * 16));
+		} else {
+			DDRMC[i]->INIT0 = (1 << 31);
+			DDRMC[i]->DFIMISC = 1;
+			bootrom_umctl2_norm_wait((void *)DDRMC[i]);
+			DDRMC[i]->PCTRL_0 = ddr3_mem->misc0.port_en_0;
+			DDRMC[i]->PCTRL1 = ddr3_mem->misc0.port_en_1;
+			DDRMC[i]->PCTRL2 = ddr3_mem->misc0.port_en_2;
+		}
+	}
+
+	return ret;
+}
+#endif
+
 int dram_init(void)
 {
 	gd->ram_size = PHYS_SDRAM_0_SIZE;
@@ -233,29 +317,9 @@ int dram_init(void)
 	puts("DDR controllers init started\n");
 	set_nt5cb256m8fndi_cfg(&ddr3_mem);
 
-	/* In bootroot_DDR_INIT() t_rfc_min parameter is not set for DDRMC
-	 * and t_ras_min parameters is not set for DDRPHY. Set them before
-	 * bootrom_DDR_INIT() call (workaround for bug rf#1969).
-	 */
-	cmctr_t *CMCTR = (cmctr_t *)CMCTR_BASE;
-	ddrmc_t *DDRMC[2] = { (ddrmc_t *)DDRMC0_BASE, (ddrmc_t *)DDRMC1_BASE };
-	ddrphy_t *DDRPHY[2] = { (ddrphy_t *)DDRPHY0_BASE,
-		(ddrphy_t *)DDRPHY1_BASE };
-	int i;
+	timer_init();
 
-	CMCTR->GATE_CORE_CTR |= 6;
-
-	for (i = 0; i < 2; i++) {
-		DDRMC[i]->RFSHTMG = (DDRMC[i]->RFSHTMG & ~0x1ff) |
-			ddr3_mem.refr_cnt.t_rfc_min;
-
-		DDRPHY[i]->DTPR0 = (DDRPHY[i]->DTPR0 & ~0x1f0000) |
-			(ddr3_mem.dram_tmg_0.t_ras_min << 16);
-	}
-
-	uint32_t status = bootrom_DDR_INIT(1, (void *)(&ddr3_mem),
-					   (void *)(&ddr3_mem));
-
+	uint32_t status = ddr3_init(&ddr3_mem);
 	if (status & 0xffff)
 		puts("DDR controller #0 init failed\n");
 	else

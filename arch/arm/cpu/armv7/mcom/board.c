@@ -91,12 +91,6 @@ void board_init_f(ulong dummy)
 		}
 	}
 
-	sys.CMCTR->SEL_CPLL = CPLL_VALUE;  // Need to setup before call dram_init()
-	if (CPLL_VALUE) {
-		while ((sys.CMCTR->SEL_CPLL & 0x80000000) == 0) {
-		}
-	}
-
 	sys.CMCTR->DIV_SYS0_CTR = DIV_SYS0_CTR_VALUE;
 	sys.CMCTR->DIV_SYS1_CTR = DIV_SYS1_CTR_VALUE;
 	sys.CMCTR->SEL_SPLL = SPLL_VALUE;
