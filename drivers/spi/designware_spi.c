@@ -395,8 +395,8 @@ static int dw_spi_set_speed(struct udevice *bus, uint speed)
 		speed = plat->frequency;
 
 	/* clk_div doesn't support odd number */
-	clk_div = cm_get_spi_controller_clk_hz() / speed;
-	clk_div = (clk_div + 1) & 0xfffe;
+	clk_div = roundup(DIV_ROUND_UP(cm_get_spi_controller_clk_hz(),
+				       speed), 2);
 	dw_writel(priv, DW_SPI_BAUDR, clk_div);
 
 	priv->freq = speed;
