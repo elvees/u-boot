@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 ELVEES NeoTek CJSC
+ * Copyright 2015-2016 ELVEES NeoTek JSC
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -20,10 +20,34 @@
 		bootargs = "console=ttyS0,115200";
 	};
 
+	aliases {
+		spi0 = &spi0;
+	};
+
 	memory {
 		device_type = "memory";
 		reg = <0x40000000 0x40000000
 		       0xa0000000 0x40000000>;
+	};
+};
+
+&spi0 {
+	status = "okay";
+	num-cs = <1>;
+	/* Third argument of "cs-gpios" property is set to 0,
+	 * because it is ignored by the SPI driver. */
+	cs-gpios = <&gpiod 18 0>;
+
+	flash: flash@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor", "spi-flash";
+		reg = <0>;
+		/* Max clock frequency, specified in the Cypress S25FL256S SPI
+		 * Flash Memory datasheet, is 50 MHz for read commands. */
+		spi-max-frequency = <50000000>;
+		m25p,fast-read;
+		u-boot,dm-pre-reloc;
 	};
 };
 
