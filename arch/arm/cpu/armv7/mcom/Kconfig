@@ -1,26 +1,10 @@
 if ARCH_MCOM
 
-choice
-	prompt "MCom board select"
-
-config TARGET_SBCDBG
-	bool "SBCDBG"
-	select SUPPORT_SPL
-
-config TARGET_IPKU
-	bool "IP-KU"
-	select SUPPORT_SPL
-
-endchoice
-
 config HW_WATCHDOG
 	bool "Enable watchdog at startup"
 	default no
 	help
-	  Enable watchdog timer in SPL and TPL
-
-config SYS_VENDOR
-	default "elvees"
+	  Enable watchdog timer for SPL and U-Boot
 
 config SYS_SOC
 	default "mcom"

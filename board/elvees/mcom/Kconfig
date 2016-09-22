@@ -1,8 +1,36 @@
 config SYS_CONFIG_NAME
 	default "mcom"
 
+config SYS_VENDOR
+	default "elvees"
+
 config SYS_BOARD
 	default "mcom"
+
+choice
+	prompt "MCom board select"
+
+config TARGET_SALUTE
+	bool "Salute"
+	select SUPPORT_SPL
+	help
+	  Support for the following boards:
+	    Salute-EL24D1
+	    Salute-EL24D2
+	    SBC-DBG
+	    SBC-VM
+	    VIP1-3D-OV7725
+	    VIP1-EVA
+	    VIP1-MC802
+	    VIP1-MC805
+
+config TARGET_IPKU
+	bool "IP-KU"
+	select SUPPORT_SPL
+	help
+	  Support for IP-KU board
+
+endchoice
 
 config FDTFILE
 	string "Default fdtfile env setting for this board"
@@ -10,8 +38,8 @@ config FDTFILE
 config CONS_INDEX
 	int "UART for messages output"
 	default 1
-	---help---
-	1 for UART0, 2 for UART1, etc
+	help
+	  1 for UART0, 2 for UART1, etc
 
 config DDR_SIZE_IN_MB
 	int "DDR size in MB"
