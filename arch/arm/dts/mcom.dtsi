@@ -177,8 +177,11 @@
 		reg = <0x38032000 0x1000>;
 		interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&spi0_pclk>;
-		status = "disabled";
+		/* The U-Boot SPI bus driver requires "spi-max-frequency"
+		 * property for the SPI master device. */
+		spi-max-frequency = <72000000>;
 		u-boot,dm-pre-reloc;
+		status = "disabled";
 	};
 
 	spi1: spi@38033000 {

@@ -97,12 +97,11 @@
 	/* Third argument of "cs-gpios" property is set to 0,
 	 * because it is ignored by the SPI driver. */
 	cs-gpios = <&gpiod 18 0>, <&gpiod 19 0>;
-	spi-max-frequency = <144000000>;
 
 	flash: flash@0 {
 		#address-cells = <1>;
 		#size-cells = <1>;
-		compatible = "micron,m25p32", "jedec,spi-nor", "spi-flash";
+		compatible = "jedec,spi-nor", "spi-flash";
 		reg = <0>;
 		/* Max clock frequency, specified in the M25P32 Serial Flash
 		 * Memory datasheet, is 33 MHz for read commands and 75 MHz
