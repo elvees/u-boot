@@ -1,5 +1,5 @@
 config SYS_CONFIG_NAME
-	default "sbcdbg"
+	default "mcom"
 
 config SYS_BOARD
 	default "mcom"
