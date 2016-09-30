@@ -162,6 +162,8 @@ static int gpio_dwapb_bind(struct udevice *dev)
 			goto err;
 
 		dev_set_of_offset(subdev, node);
+
+		setbits_le32(plat->base + GPIO_SWPORT_CTL(plat->bank), 0xffffffff);
 	}
 
 	return 0;
