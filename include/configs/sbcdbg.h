@@ -11,20 +11,6 @@
 #ifndef __SBCDBG_H
 #define __SBCDBG_H
 
-#define XTI_FREQ			24000000
-#define APLL_VALUE			0x1F
-#define CPLL_VALUE			0x11
-#define SPLL_VALUE			0x0B  /* L1_HCLK = 288 MHz */
-#define DIV_SYS0_CTR_VALUE		0
-#define DIV_SYS1_CTR_VALUE		1  /* L3_PCLK = L1_HCLK / 2 */
-
-/* To enable watchdog define CONFIG_HW_WATCHDOG. Watchdog will be
- * enabled before DDR intialization and will NOT be disabled before
- * booting Linux kernel.
- */
-
-/* #define CONFIG_HW_WATCHDOG */
-
 #include "mcom.h"
 
 #define CONFIG_NR_DRAM_BANKS  		2
@@ -38,13 +24,6 @@
 
 #define CONFIG_SF_DEFAULT_SPEED		33000000
 #define CONFIG_CMD_SF_TEST
-
-#define CONFIG_SPL_GPIO_SUPPORT
-#define CONFIG_SPL_SPI_FLASH_SUPPORT
-#define CONFIG_SPL_SPI_SUPPORT
-#define CONFIG_SPL_SPI_LOAD
-#define CONFIG_SPL_PAD_TO		0x00010000
-#define CONFIG_SYS_SPI_U_BOOT_OFFS	0x00010000
 
 #if !defined CONFIG_ENV_IS_IN_MMC && \
 	!defined CONFIG_ENV_IS_IN_NAND && \

@@ -12,6 +12,22 @@
 #ifndef __MCOM_H
 #define __MCOM_H
 
+#define XTI_FREQ			24000000
+
+#ifdef CONFIG_TARGET_IPKU
+#define APLL_VALUE			0x1F
+#define CPLL_VALUE			0x0F
+#define SPLL_VALUE			0x05	/* L1_HCLK = 144 MHz */
+#define DIV_SYS0_CTR_VALUE		0
+#define DIV_SYS1_CTR_VALUE		0	/* L3_PCLK = L1_HCLK */
+#else
+#define APLL_VALUE			0x1F
+#define CPLL_VALUE			0x11
+#define SPLL_VALUE			0x0B	/* L1_HCLK = 288 MHz */
+#define DIV_SYS0_CTR_VALUE		0
+#define DIV_SYS1_CTR_VALUE		1	/* L3_PCLK = L1_HCLK / 2 */
+#endif
+
 #define APLL_FREQ			(XTI_FREQ * (APLL_VALUE + 1))
 #define CPLL_FREQ			(XTI_FREQ * (CPLL_VALUE + 1))
 #define SPLL_FREQ			((XTI_FREQ * (SPLL_VALUE + 1)) >> DIV_SYS0_CTR_VALUE)
@@ -103,22 +119,28 @@
 
 #define CONFIG_FAT_WRITE    /* enable write access */
 
+/* SPL framework */
 #define CONFIG_SPL_FRAMEWORK
+
 #define CONFIG_SPL_LIBCOMMON_SUPPORT
-#define CONFIG_SPL_SERIAL_SUPPORT
 #define CONFIG_SPL_LIBGENERIC_SUPPORT
+#define CONFIG_SPL_GPIO_SUPPORT
+#define CONFIG_SPL_SERIAL_SUPPORT
+#define CONFIG_SPL_SPI_SUPPORT
+#define CONFIG_SPL_SPI_FLASH_SUPPORT
+#define CONFIG_SPL_SPI_LOAD
 #define CONFIG_SPL_WATCHDOG_SUPPORT
 
-#define CONFIG_SPL_BSS_START_ADDR	0x4ff80000
-#define CONFIG_SPL_BSS_MAX_SIZE		0x80000     /* 512 KiB */
-#define CONFIG_SPL_TEXT_BASE		0x20000000      /* sram start+header */
-#define CONFIG_SPL_MAX_SIZE		(1024*64)       /* 64KB */
-#define CONFIG_SPL_LDSCRIPT "arch/arm/cpu/armv7/u-boot-spl.lds"
+#define CONFIG_SPL_LDSCRIPT		"arch/arm/cpu/armv7/u-boot-spl.lds"
+#define CONFIG_SPL_MAX_SIZE		0x00010000	/* 64 KB */
+#define CONFIG_SPL_TEXT_BASE		0x20000000	/* start of sram */
+#define CONFIG_SPL_BSS_START_ADDR	0x4FF80000
+#define CONFIG_SPL_BSS_MAX_SIZE		0x00080000	/* 512 KB */
+#define CONFIG_SPL_STACK		0x2000F000	/* end of sram */
+#define CONFIG_SYS_SPL_MALLOC_START	0x4FF00000
+#define CONFIG_SYS_SPL_MALLOC_SIZE	0x00080000	/* 512 KB */
 
-/* end of 60 KiB in sram */
-#define LOW_LEVEL_SRAM_STACK		0x2000F000 /* End of sram */
-#define CONFIG_SPL_STACK		LOW_LEVEL_SRAM_STACK
-#define CONFIG_SYS_SPL_MALLOC_START	0x4ff00000
-#define CONFIG_SYS_SPL_MALLOC_SIZE	0x00080000  /* 512 KiB */
+#define CONFIG_SPL_PAD_TO			CONFIG_SPL_MAX_SIZE
+#define CONFIG_SYS_SPI_U_BOOT_OFFS		CONFIG_SPL_MAX_SIZE
 
 #endif /* __MCOM_H */

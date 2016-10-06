@@ -1,19 +1,8 @@
-if TARGET_SBCDBG
 config SYS_CONFIG_NAME
 	default "sbcdbg"
 
 config SYS_BOARD
 	default "mcom"
-endif
-
-if TARGET_IPKU
-config SYS_CONFIG_NAME
-	default "ipku"
-
-config SYS_BOARD
-	default "mcom"
-endif
-
 
 config FDTFILE
 	string "Default fdtfile env setting for this board"

@@ -346,17 +346,6 @@ int board_mmc_init(bd_t *bis)
 #ifdef CONFIG_SPL_BUILD
 u32 spl_boot_device(void)
 {
-#ifdef CONFIG_TARGET_IPKU
-	return BOOT_DEVICE_MMC1;
-#else
 	return BOOT_DEVICE_SPI;
-#endif
 }
-
-#ifdef CONFIG_TARGET_IPKU
-u32 spl_boot_mode(void)
-{
-	return MMCSD_MODE_RAW;
-}
-#endif
 #endif
