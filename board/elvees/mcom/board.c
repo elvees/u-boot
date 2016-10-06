@@ -346,6 +346,20 @@ int board_mmc_init(bd_t *bis)
 #ifdef CONFIG_SPL_BUILD
 u32 spl_boot_device(void)
 {
-	return BOOT_DEVICE_SPI;
+	smctr_t *SMCTR = (smctr_t *)SMCTR_BASE;
+
+	switch (SMCTR->BOOT) {
+	case SMCTR_BOOT_SPI0:
+		return BOOT_DEVICE_SPI;
+	case SMCTR_BOOT_SDMMC0:
+		return BOOT_DEVICE_MMC1;
+	}
+
+	return BOOT_DEVICE_NONE;
+}
+
+u32 spl_boot_mode(void)
+{
+	return MMCSD_MODE_RAW;
 }
 #endif

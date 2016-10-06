@@ -228,6 +228,12 @@ typedef struct {
 	volatile uint32_t SEL_UPLL;
 } cmctr_t;
 
+#define CMCTR_GATE_SYS_CTR_SPI1_EN	BIT(20)
+#define CMCTR_GATE_SYS_CTR_SPI0_EN	BIT(19)
+#define CMCTR_GATE_SYS_CTR_SDMMC1_EN	BIT(3)
+#define CMCTR_GATE_SYS_CTR_SDMMC0_EN	BIT(2)
+#define CMCTR_GATE_SYS_CTR_SYS_EN	BIT(0)
+
 typedef struct {
 	volatile uint32_t RESERVED0;
 	volatile uint32_t SYS_PWR_DOWN;
@@ -282,6 +288,14 @@ typedef struct {
 	volatile uint32_t IOPULL_CTR;
 	volatile uint32_t COMM_DLOCK;
 } smctr_t;
+
+enum SMCTR_BOOT {
+	SMCTR_BOOT_NOR_FLASH = 0,
+	SMCTR_BOOT_NAND_FLASH,
+	SMCTR_BOOT_UART0,
+	SMCTR_BOOT_SPI0,
+	SMCTR_BOOT_SDMMC0,
+};
 
 typedef struct {
 	volatile uint32_t MSTR;

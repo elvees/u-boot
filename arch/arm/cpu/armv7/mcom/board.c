@@ -103,7 +103,10 @@ void board_init_f(ulong dummy)
 
 	dram_init();
 
-	sys.CMCTR->GATE_SYS_CTR |= 0xc;  /* Enable clock for SDMMC0, SDMMC1 */
+	/* Enable clock frequency for SDMMC0 and SDMMC1 */
+	sys.CMCTR->GATE_SYS_CTR |= CMCTR_GATE_SYS_CTR_SDMMC0_EN;
+	sys.CMCTR->GATE_SYS_CTR |= CMCTR_GATE_SYS_CTR_SDMMC1_EN;
+
 	sys.SDMMC0->EXT_REG_1 = (sys.SDMMC0->EXT_REG_1 & 0x00FFFFFF) |
 			((SPLL_FREQ / 1000000) << 24);
 	sys.SDMMC0->EXT_REG_2 &= ~0x38000000;  /* disable SDR50, SDR104, DDR50 */
@@ -130,6 +133,9 @@ void board_init_f(ulong dummy)
 	/* Pull-up all pins for SDMMC0 and SDMMC1 */
 	sys.SDMMC0->EXT_REG_7 = 0x0003ffff;
 	sys.SDMMC1->EXT_REG_7 = 0x0003ffff;
+
+	/* Enable clock frequency for SPI0 */
+	sys.CMCTR->GATE_SYS_CTR |= CMCTR_GATE_SYS_CTR_SPI0_EN;
 }
 #endif
 
