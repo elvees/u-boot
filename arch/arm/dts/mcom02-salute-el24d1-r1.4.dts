@@ -84,11 +84,33 @@
 		};
 	};
 
+	sound {
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "Salute";
+		simple-audio-card,format = "i2s";
+		simple-audio-card,bitclock-master = <&dailink0_master>;
+		simple-audio-card,frame-master = <&dailink0_master>;
+		simple-audio-card,mclk-fs = <256>;
+
+		simple-audio-card,cpu {
+			sound-dai = <&mfbsp0>;
+		};
+
+		dailink0_master: simple-audio-card,codec {
+			sound-dai = <&alc5623>;
+			system-clock-frequency = <24576000>;
+		};
+	};
+
 	xtican: xtican {
 		compatible = "fixed-clock";
 		#clock-cells = <0>;
 		clock-frequency = <16000000>;
 	};
+};
+
+&mfbsp0 {
+	status = "okay";
 };
 
 &spi0 {
@@ -219,6 +241,13 @@
 	/* Connected to HDMI transmitter, audio and sensors */
 	status = "okay";
 	clock-frequency = <100000>;
+
+	alc5623: alc5623@1a {
+		#sound-dai-cells = <0>;
+		compatible = "realtek,alc5623";
+		reg = <0x1a>;
+	};
+
 	camera@36 {
 		compatible = "ovti,ov2715";
 		reg = <0x36>;
@@ -228,6 +257,7 @@
 			};
 		};
 	};
+
 	hdmi: it66121@4c {
 		compatible = "ite,it66121";
 		reg = <0x4c>;

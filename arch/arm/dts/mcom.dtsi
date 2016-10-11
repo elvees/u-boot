@@ -170,6 +170,23 @@
 		status = "disabled";
 	};
 
+	mfbsp0: mfbsp@38086000 {
+		#sound-dai-cells = <0>;
+		compatible = "elvees,mfbsp-i2s";
+		reg = <0x38086000 0x1000>,
+		      <0x38087000 0x000f>,
+		      <0x38087040 0x000f>;
+		reg-names = "mfbsp",
+			    "dma-playback",
+			    "dma-capture";
+		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "dma-playback",
+				  "dma-capture";
+		clocks = <&mfbsp0_pclk>;
+		status = "disabled";
+	};
+
 	spi0: spi@38032000 {
 		compatible = "snps,dw-apb-ssi";
 		#address-cells = <1>;
@@ -603,6 +620,14 @@
 				#clock-cells = <0>;
 				reg = <0x4c>;
 				reg-bit = <1>;
+			};
+
+			mfbsp0_pclk: mfbsp0_pclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <8>;
 			};
 
 			spi0_pclk: spi0_pclk {
