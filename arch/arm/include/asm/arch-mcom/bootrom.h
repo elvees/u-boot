@@ -84,12 +84,22 @@ int bootrom_compress_and_dump_register_fields(
 
 #include "ddr_cfg.h"
 
-void bootrom_umctl2_load(ddr3_t *mem_cfg, void *ddrmc_regs);
+/* WARNING: The following DDR related functions are not recommended to use
+ * since errors was found in their implementation.
+ */
+int bootrom_DDR_INIT(unsigned int reset_type, void *mem_cfg_0,
+		     void *mem_cfg_1);
+void bootrom_umctl2_load(ddr_common_t *mem_cfg, void *ddrmc_regs);
 void bootrom_ddr3_pub_load(ddr3_t *mem_cfg, void *pub_regs);
+void bootrom_lpddr2_pub_load(lpddr2_t *mem_cfg, void *pub_regs);
 void bootrom_init_start(void *pub_regs, unsigned int reset_type);
 int bootrom_pub_init_cmpl_wait(void *pub_regs, unsigned int reset_type,
 			       unsigned int check);
 void bootrom_umctl2_norm_wait(void *ddrmc_regs);
+void bootrom_ddr_self_refresh_enter(void *ddrmc_regs);
+void bootrom_ddr_self_refresh_exit(void *ddrmc_regs);
+void bootrom_phy_train_load(void *pub_regs, ddr_common_t *mem_cfg);
+void bootrom_phy_train_save(void *pub_regs, ddr_common_t *mem_cfg);
 
 /* SD/MMC types and functions */
 
