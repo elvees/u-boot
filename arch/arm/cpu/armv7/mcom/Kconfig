@@ -6,6 +6,12 @@ config HW_WATCHDOG
 	help
 	  Enable watchdog timer for SPL and U-Boot
 
+config DEBUG_DDR
+	bool "Enable DDR debug printing"
+	default no
+	help
+	  Print debug information during DDR initialization
+
 config SYS_SOC
 	default "mcom"
 

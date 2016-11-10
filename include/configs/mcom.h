@@ -1,5 +1,6 @@
 /*
  * Copyright 2015-2016 ELVEES NeoTek JSC, <www.elvees-nt.com>
+ * Copyright 2017 RnD Center "ELVEES", OJSC
  *
  * Vasiliy Zasukhin <vzasukhin@elvees.com>
  * Alexey Kiselev <akiselev@elvees.com>
@@ -13,7 +14,6 @@
 #define __MCOM_H
 
 #define XTI_FREQ			24000000
-
 #ifdef CONFIG_TARGET_IPKU
 #define APLL_VALUE			0x1F
 #define CPLL_VALUE			0x0F
@@ -27,6 +27,9 @@
 #define DIV_SYS0_CTR_VALUE		0
 #define DIV_SYS1_CTR_VALUE		1	/* L3_PCLK = L1_HCLK / 2 */
 #endif
+
+#define DIV_DDR0_CTR_VALUE              0
+#define DIV_DDR1_CTR_VALUE              0
 
 #define APLL_FREQ			(XTI_FREQ * (APLL_VALUE + 1))
 #define CPLL_FREQ			(XTI_FREQ * (CPLL_VALUE + 1))

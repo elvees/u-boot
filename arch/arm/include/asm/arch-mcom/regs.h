@@ -1,8 +1,8 @@
 /*
- * regs.h
+ * Copyright 2013-2016 ELVEES NeoTek JSC
+ * Copyright 2017 RnD Center "ELVEES", OJSC
  *
- *  Created on: Aug 29, 2013
- *      Author: dzagrebin
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #ifndef REGS_H
@@ -324,7 +324,9 @@ typedef struct {
 	volatile uint32_t DRAMTMG2;
 	volatile uint32_t DRAMTMG3;
 	volatile uint32_t DRAMTMG4;
-	volatile uint8_t RESERVED7[108];
+	volatile uint32_t DRAMTMG5;
+	volatile uint32_t DRAMTMG6;
+	volatile uint8_t RESERVED7[100];
 	volatile uint32_t ZQCTL0;
 	volatile uint8_t RESERVED8[12];
 	volatile uint32_t DFITMG0;
@@ -343,7 +345,7 @@ typedef struct {
 	volatile uint32_t ADDRMAP5;
 	volatile uint32_t ADDRMAP6;
 	volatile uint8_t RESERVED12[628];
-	volatile uint32_t PCTRL_0;
+	volatile uint32_t PCTRL0;
 	volatile uint8_t RESERVED13[172];
 	volatile uint32_t PCTRL1;
 	volatile uint8_t RESERVED14[172];
@@ -369,7 +371,7 @@ typedef struct {
 	volatile uint32_t DTPR1;
 	volatile uint32_t DTPR2;
 	volatile uint32_t MR0;
-	volatile uint32_t MR1_LPDDR2;
+	volatile uint32_t MR1;
 	volatile uint32_t MR2;
 	volatile uint32_t MR3;
 	volatile uint8_t RESERVED2[112];
@@ -384,15 +386,38 @@ typedef struct {
 	volatile uint32_t BISTUDPR;
 	volatile uint8_t RESERVED5[92];
 	volatile uint32_t ZQ0CR0;
-	volatile uint8_t RESERVED6[4];
+	volatile uint32_t ZQ0CR1;
 	volatile uint32_t ZQ0SR0;
-	volatile uint8_t RESERVED7[52];
+	volatile uint32_t ZQ0SR1;
+	volatile uint8_t RESERVED7[48];
 	volatile uint32_t DX0GCR;
-	volatile uint8_t RESERVED8[16];
+	volatile uint32_t DX0GSR0;
+	volatile uint32_t DX0GSR1;
+	volatile uint32_t DX0DLLCR;
+	volatile uint32_t DX0DQTR;
 	volatile uint32_t DX0DQSTR;
-	volatile uint8_t RESERVED9[184];
+	volatile uint8_t RESERVED9[40];
+	volatile uint32_t DX1GCR;
+	volatile uint32_t DX1GSR0;
+	volatile uint32_t DX1GSR1;
+	volatile uint32_t DX1DLLCR;
+	volatile uint32_t DX1DQTR;
+	volatile uint32_t DX1DQSTR;
+	volatile uint8_t RESERVED10[40];
+	volatile uint32_t DX2GCR;
+	volatile uint32_t DX2GSR0;
+	volatile uint32_t DX2GSR1;
+	volatile uint32_t DX2DLLCR;
+	volatile uint32_t DX2DQTR;
+	volatile uint32_t DX2DQSTR;
+	volatile uint8_t RESERVED11[40];
+	volatile uint32_t DX3GCR;
+	volatile uint32_t DX3GSR0;
+	volatile uint32_t DX3GSR1;
+	volatile uint32_t DX3DLLCR;
 	volatile uint32_t DX3DQTR;
-	volatile uint8_t RESERVED10[364];
+	volatile uint32_t DX3DQSTR;
+	volatile uint8_t RESERVED12[360];
 } ddrphy_t;
 
 typedef struct {
