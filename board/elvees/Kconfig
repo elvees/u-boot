@@ -1,11 +1,8 @@
-config SYS_CONFIG_NAME
-	default "mcom"
 
 config SYS_VENDOR
 	default "elvees"
 
-config SYS_BOARD
-	default "mcom"
+if ARCH_MCOM
 
 choice
 	prompt "MCom board select"
@@ -32,6 +29,9 @@ config TARGET_IPKU
 
 endchoice
 
+source "board/elvees/salute/Kconfig"
+source "board/elvees/ipku/Kconfig"
+
 config FDTFILE
 	string "Default fdtfile env setting for this board"
 
@@ -41,6 +41,4 @@ config CONS_INDEX
 	help
 	  1 for UART0, 2 for UART1, etc
 
-config DDR_SIZE_IN_MB
-	int "DDR size in MB"
-	default 1024
+endif

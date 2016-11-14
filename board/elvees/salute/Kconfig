@@ -1,0 +1,13 @@
+if TARGET_SALUTE
+
+config SYS_BOARD
+	default "salute"
+
+config SYS_CONFIG_NAME
+	default "mcom"
+
+config DDR_SIZE_IN_MB
+	int "DDR size in MB"
+	default 1024
+
+endif

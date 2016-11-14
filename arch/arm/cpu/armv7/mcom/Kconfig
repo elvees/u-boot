@@ -15,6 +15,6 @@ config DEBUG_DDR
 config SYS_SOC
 	default "mcom"
 
-source "board/elvees/mcom/Kconfig"
+source "board/elvees/Kconfig"
 
 endif
