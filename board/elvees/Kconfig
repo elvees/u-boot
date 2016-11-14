@@ -27,10 +27,17 @@ config TARGET_IPKU
 	help
 	  Support for IP-KU board
 
+config TARGET_SALUTE_PM
+	bool "Salute-PM"
+	select SUPPORT_SPL
+	help
+	  Support for Salute-EL24PM1 board
+
 endchoice
 
 source "board/elvees/salute/Kconfig"
 source "board/elvees/ipku/Kconfig"
+source "board/elvees/salute-pm/Kconfig"
 
 config FDTFILE
 	string "Default fdtfile env setting for this board"
