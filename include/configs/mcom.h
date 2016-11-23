@@ -45,9 +45,10 @@
 #define CONFIG_SYS_TEXT_BASE		0x41000000
 
 /*
- * Display CPU information
+ * Display CPU and Board information
  */
 #define CONFIG_DISPLAY_CPUINFO
+#define CONFIG_DISPLAY_BOARDINFO
 
 /* Serial & console */
 #define CONFIG_SYS_NS16550
