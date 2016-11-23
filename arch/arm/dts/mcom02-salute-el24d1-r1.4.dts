@@ -14,8 +14,7 @@
 #include "mcom02.dtsi"
 
 / {
-	model = "Salute-EL24D1";
-	revision = "1.4";
+	model = "Salute-EL24D1 r1.4";
 
 	chosen {
 		bootargs = "console=ttyS0,115200";

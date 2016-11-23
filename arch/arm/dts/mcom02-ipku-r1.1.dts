@@ -13,8 +13,7 @@
 #include "mcom02.dtsi"
 
 / {
-	model = "IP-KU";
-	revision = "1.1";
+	model = "IP-KU r1.1";
 
 	chosen {
 		bootargs = "console=ttyS0,115200";

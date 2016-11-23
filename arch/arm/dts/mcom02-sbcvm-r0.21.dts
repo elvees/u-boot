@@ -14,8 +14,7 @@
 #include "mcom02.dtsi"
 
 / {
-	model = "SBC-VM";
-	revision = "0.21";
+	model = "SBC-VM r0.21";
 
 	chosen {
 		bootargs = "console=ttyS0,115200";

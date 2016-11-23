@@ -14,8 +14,7 @@
 #include "mcom02.dtsi"
 
 / {
-	model = "SBC-DBG";
-	revision = "0.3";
+	model = "SBC-DBG r0.3";
 
 	chosen {
 		bootargs = "console=ttyS0,115200";
