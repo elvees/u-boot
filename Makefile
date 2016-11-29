@@ -1091,9 +1091,25 @@ OBJCOPYFLAGS_u-boot.spr = -I binary -O binary --pad-to=$(CONFIG_SPL_PAD_TO) \
 u-boot.spr: spl/u-boot-spl.img u-boot.img FORCE
 	$(call if_changed,pad_cat)
 
+# The target u-boot.mcom is used to create images for MCom boards. The
+# resulting image is the U-Boot image u-boot.img appended to the SPL image.
+# The SPL image is created from u-boot-spl.bin after padding to the 2 byte
+# boundary (workaround for rf#3346).
+SPL_MCOM_BIN_PAD_TO = $(shell wc -c $< | awk '{print $$1 + $$1 % 2}')
+OBJCOPYFLAGS_u-boot-spl-mcom.bin = -I binary -O binary \
+			    --pad-to=$(SPL_MCOM_BIN_PAD_TO) \
+			    --gap-fill=0xff
+spl/u-boot-spl-mcom.bin: spl/u-boot-spl.bin FORCE
+	$(call if_changed,objcopy)
+
+MKIMAGEFLAGS_u-boot-spl-mcom.img = -A $(ARCH) -T firmware -C none -O u-boot \
+	-a $(CONFIG_SPL_TEXT_BASE) -e $(CONFIG_SPL_TEXT_BASE) -n XLOADER
+spl/u-boot-spl-mcom.img: spl/u-boot-spl-mcom.bin FORCE
+	$(call if_changed,mkimage)
+
 OBJCOPYFLAGS_u-boot.mcom = -I binary -O binary --pad-to=$(CONFIG_SPL_PAD_TO) \
 			   --gap-fill=0xff
-u-boot.mcom: spl/u-boot-spl.img u-boot.img FORCE
+u-boot.mcom: spl/u-boot-spl-mcom.img u-boot.img FORCE
 	$(call if_changed,pad_cat)
 
 ifneq ($(CONFIG_ARCH_SOCFPGA),)
