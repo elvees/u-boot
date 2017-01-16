@@ -1,0 +1,97 @@
+/*
+ * Copyright 2017 RnD Center "ELVEES", OJSC
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/interrupt-controller/irq.h>
+
+#include "mcom02-salute-el24pm1-r1.0.dtsi"
+
+/ {
+	model = "Salute-EL24OM1 r1.0";
+
+	chosen {
+		bootargs = "console=ttyS0,115200";
+	};
+
+	aliases {
+		spi0 = &spi0;
+	};
+
+	clocks {
+		can_clk: can_clk {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <8000000>;
+		};
+	};
+
+	regulators {
+		can_xceiver_reg: regulator@1 {
+			compatible = "regulator-fixed";
+			reg = <0x1>;
+			regulator-name = "can-xceiver";
+			gpio = <&gpiod 21 0>;
+		};
+	};
+};
+
+&ethernet {
+	status = "okay";
+};
+
+&framebuffer {
+	status = "okay";
+	output = <&hdmi>;
+};
+
+&i2c0 {
+	status = "okay";
+	clock-frequency = <100000>;
+
+	hdmi: it66121@4c {
+		compatible = "ite,it66121";
+		reg = <0x4c>;
+		reset-gpios = <&gpioa 9 GPIO_ACTIVE_LOW>;
+	};
+};
+
+&sd1 {
+	status = "okay";
+};
+
+&sound {
+	status = "okay";
+};
+
+&spi0 {
+	num-cs = <2>;
+	/* Third argument of "cs-gpios" property is set to 0,
+	 * because it is ignored by the SPI driver. */
+	cs-gpios = <&gpiod 18 0>, <&gpiod 19 0>;
+
+	can: can@1 {
+		compatible = "microchip,mcp2515";
+		reg = <0x1>;
+		spi-max-frequency = <10000000>;
+		clocks = <&can_clk>;
+		interrupt-parent = <&gpioa>;
+		interrupts = <31 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpioa 15 GPIO_ACTIVE_LOW>;
+		xceiver-supply = <&can_xceiver_reg>;
+	};
+};
+
+&uart2 {
+	status = "okay";
+};
+
+/* RS-485 is used as physical layer for UART3 */
+&uart3 {
+	status = "okay";
+};
