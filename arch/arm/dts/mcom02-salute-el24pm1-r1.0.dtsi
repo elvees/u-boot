@@ -1,0 +1,126 @@
+/*
+ * Copyright 2017 RnD Center "ELVEES", OJSC
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
+#include <dt-bindings/gpio/gpio.h>
+
+#include "mcom02.dtsi"
+
+/ {
+	memory {
+		device_type = "memory";
+		reg = <0x40000000 0x40000000>,
+		      <0xa0000000 0x40000000>;
+	};
+
+	clocks {
+		audio_codec_clk: audio_codec_clk {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <12288000>;
+		};
+	};
+
+	/delete-node/ i2c@3802d000;
+	/delete-node/ i2c@3802e000;
+
+	i2c1: i2c1 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "i2c-gpio";
+		gpios = <&gpiod 23 0>, <&gpiod 22 0>;
+
+		sgtl5000: audio-codec@0a {
+			#sound-dai-cells = <0>;
+			compatible = "fsl,sgtl5000";
+			reg = <0x0a>;
+			clocks = <&audio_codec_clk>;
+			VDDA-supply = <&audio_codec_reg>;
+			VDDIO-supply = <&audio_codec_reg>;
+		};
+	};
+
+	regulators {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "simple-bus";
+
+		audio_codec_reg: regulator@0 {
+			compatible = "regulator-fixed";
+			reg = <0x0>;
+			regulator-name = "audio-codec";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			regulator-always-on;
+		};
+	};
+
+	sound: sound {
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "Salute-EL24PM1";
+		simple-audio-card,format = "i2s";
+		simple-audio-card,bitclock-master = <&dailink0_master>;
+		simple-audio-card,frame-master = <&dailink0_master>;
+		status = "disabled";
+
+		simple-audio-card,cpu {
+			sound-dai = <&mfbsp0>;
+		};
+
+		dailink0_master: simple-audio-card,codec {
+			sound-dai = <&sgtl5000>;
+		};
+	};
+};
+
+&ethernet {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	phy-mode = "mii";
+	phy-handle = <&ethernet_phy>;
+	phy-reset-gpios = <&gpioc 20 GPIO_ACTIVE_HIGH>;
+	status = "disabled";
+
+	ethernet_phy: ethernet-phy@1 {
+		reg = <0x1>;
+	};
+};
+
+&mfbsp0 {
+	status = "okay";
+};
+
+&nfc {
+	status = "okay";
+};
+
+&sd0 {
+	/* Connected to eMMC */
+	status = "okay";
+	non-removable;
+};
+
+&spi0 {
+	status = "okay";
+	num-cs = <1>;
+	/* Third argument of "cs-gpios" property is set to 0,
+	 * because it is ignored by the SPI driver. */
+	cs-gpios = <&gpiod 18 0>;
+
+	flash: flash@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor", "spi-flash";
+		reg = <0x0>;
+		/* Max clock frequency, specified in the M25P32 Serial Flash
+		 * Memory datasheet, is 33 MHz for read commands and 75 MHz
+		 * for other commands. */
+		spi-max-frequency = <33000000>;
+		m25p,fast-read;
+		u-boot,dm-pre-reloc;
+	};
+};
