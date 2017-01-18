@@ -31,6 +31,14 @@
 		       0xa0000000 0x40000000>;
 	};
 
+	clocks {
+		can_clk: can_clk {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <16000000>;
+		};
+	};
+
 	leds {
 		compatible = "gpio-leds";
 
@@ -83,6 +91,19 @@
 		};
 	};
 
+	regulators {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "simple-bus";
+
+		can_xceiver_reg: regulator@0 {
+			compatible = "regulator-fixed";
+			reg = <0x0>;
+			regulator-name = "can-xceiver";
+			gpio = <&gpiob 7 0>;
+		};
+	};
+
 	sound {
 		compatible = "simple-audio-card";
 		simple-audio-card,name = "Salute-EL24D1";
@@ -98,12 +119,6 @@
 			sound-dai = <&alc5623>;
 			system-clock-frequency = <24576000>;
 		};
-	};
-
-	xtican: xtican {
-		compatible = "fixed-clock";
-		#clock-cells = <0>;
-		clock-frequency = <16000000>;
 	};
 };
 
@@ -134,11 +149,12 @@
 	can: can@1 {
 		compatible = "microchip,mcp2515";
 		reg = <1>;
-		clocks = <&xtican>;
+		clocks = <&can_clk>;
 		interrupt-parent = <&gpioa>;
 		interrupts = <20 GPIO_ACTIVE_HIGH>;
 		reset-gpios = <&gpiob 16 GPIO_ACTIVE_LOW>;
 		spi-max-frequency = <10000000>;
+		xceiver-supply = <&can_xceiver_reg>;
 	};
 };
 
