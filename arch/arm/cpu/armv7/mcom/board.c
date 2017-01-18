@@ -21,6 +21,14 @@
 #define MEM_ACCESS(ADDR) (*((volatile uint32_t*)(ADDR)))
 #define BOOTROM_COLD_RESET_BRANCH 0x0000019c
 
+/*
+ * According to U-Boot documentation, this function is called before the stack
+ * is initialized and should be written in assembler. For MCom it uses Bootrom
+ * stack and can be written in C.
+ *
+ * BUG: U-Boot can not be started without running Bootrom, for example directly
+ * over JTAG.
+ */
 void lowlevel_init(void)
 {
 #ifdef CONFIG_SPL_BUILD
