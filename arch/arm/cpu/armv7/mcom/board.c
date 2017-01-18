@@ -1,10 +1,11 @@
 /*
- * (C) Copyright 2015
- * ELVEES NeoTek CJSC, <www.elvees-nt.com>
+ * Some init for MCom platform
+ *
+ * Copyright 2015 ELVEES NeoTek CJSC
+ * Copyright 2015-2016 ELVEES NeoTek JSC
+ * Copyright 2017 RnD Center "ELVEES", OJSC
  *
  * Vasiliy Zasukhin <vzasukhin@elvees.com>
- *
- * Some init for MCom platform.
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */

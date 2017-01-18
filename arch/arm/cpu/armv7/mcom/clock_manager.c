@@ -1,7 +1,6 @@
 /*
- * Copyright (C) 2016 ELVEES NeoTek JSC
- *
  * Copyright (C) 2013 Altera Corporation <www.altera.com>
+ * Copyright (C) 2016 ELVEES NeoTek JSC
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
