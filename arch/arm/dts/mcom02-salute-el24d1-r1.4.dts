@@ -89,7 +89,6 @@
 		simple-audio-card,format = "i2s";
 		simple-audio-card,bitclock-master = <&dailink0_master>;
 		simple-audio-card,frame-master = <&dailink0_master>;
-		simple-audio-card,mclk-fs = <256>;
 
 		simple-audio-card,cpu {
 			sound-dai = <&mfbsp0>;
