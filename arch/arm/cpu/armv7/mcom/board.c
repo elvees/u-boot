@@ -59,6 +59,10 @@ void lowlevel_init(void)
 #endif
 }
 
+/*
+ * TODO: Using structs to access registers is generally not a good idea.
+ * Change this to use defines.
+ */
 #ifdef CONFIG_SPL_BUILD
 void board_init_f(ulong dummy)
 {
