@@ -1,6 +1,6 @@
 /*
  * Copyright 2015-2016 ELVEES NeoTek JSC, <www.elvees-nt.com>
- * Copyright 2017 RnD Center "ELVEES", OJSC
+ * Copyright 2017 RnD Center "ELVEES", JSC
  *
  * Vasiliy Zasukhin <vzasukhin@elvees.com>
  * Alexey Kiselev <akiselev@elvees.com>
@@ -12,6 +12,8 @@
 
 #ifndef __MCOM_H
 #define __MCOM_H
+
+#include <linux/sizes.h>
 
 #define XTI_FREQ			24000000
 #ifdef CONFIG_TARGET_IPKU
@@ -112,15 +114,6 @@
 /* The stack sizes are set up in start.S using the settings below */
 #define CONFIG_STACKSIZE		(256 << 10) /* 256 KiB */
 
-/* FLASH and environment organization */
-
-#define CONFIG_SYS_NO_FLASH
-
-#define CONFIG_SYS_MONITOR_LEN		(512 << 10) /* 512 KiB */
-
-#define CONFIG_ENV_OFFSET		(544 << 10) /* (8 + 24 + 512) KiB */
-#define CONFIG_ENV_SIZE			(128 << 10) /* 128 KiB */
-
 #define CONFIG_FAT_WRITE    /* enable write access */
 
 #define CONFIG_NR_DRAM_BANKS		2
@@ -129,18 +122,19 @@
 #define PHYS_SDRAM_1			0xa0000000
 #define PHYS_SDRAM_1_SIZE		(CONFIG_DDR_SIZE_IN_MB << 20)
 
-#define CONFIG_ENV_IS_IN_MMC
-#define CONFIG_SYS_MMC_ENV_DEV		0   /* first detected MMC controller */
+/* Parallel Flash support */
+#define CONFIG_SYS_NO_FLASH
 
+/* Serial Flash support */
 #define CONFIG_SF_DEFAULT_SPEED		33000000
 #define CONFIG_CMD_SF_TEST
 
-#if !defined CONFIG_ENV_IS_IN_MMC && \
-	!defined CONFIG_ENV_IS_IN_NAND && \
-	!defined CONFIG_ENV_IS_IN_FAT && \
-	!defined CONFIG_ENV_IS_IN_SPI_FLASH
-#define CONFIG_ENV_IS_NOWHERE
-#endif
+/* Environment storage */
+#define CONFIG_ENV_IS_IN_SPI_FLASH
+#define CONFIG_ENV_OFFSET		SZ_64K
+#define CONFIG_ENV_SECT_SIZE		SZ_64K
+#define CONFIG_ENV_SIZE			CONFIG_ENV_SECT_SIZE
+#define CONFIG_ENV_SPI_MAX_HZ		CONFIG_SF_DEFAULT_SPEED
 
 #define CONFIG_SYS_CONSOLE_IS_IN_ENV
 
@@ -247,8 +241,12 @@
 #define CONFIG_SYS_SPL_MALLOC_START	0x4FF00000
 #define CONFIG_SYS_SPL_MALLOC_SIZE	0x00080000	/* 512 KB */
 
-#define CONFIG_SPL_PAD_TO			CONFIG_SPL_MAX_SIZE
-#define CONFIG_SYS_SPI_U_BOOT_OFFS		CONFIG_SPL_MAX_SIZE
-#define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR	(2 + CONFIG_SPL_MAX_SIZE / 512)
+/* For writing into SPI flash the U-Boot image is appended to the SPL image.
+ * The SPL image is located in the first erase sector. The second sector is
+ * reserved for the environment storage. The padding is used to align the
+ * U-Boot image to the third sector boundary. */
+#define CONFIG_SPL_PAD_TO			0x00020000
+#define CONFIG_SYS_SPI_U_BOOT_OFFS		CONFIG_SPL_PAD_TO
+#define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR	(2 + CONFIG_SPL_PAD_TO / 512)
 
 #endif /* __MCOM_H */
