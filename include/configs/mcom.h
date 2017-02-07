@@ -148,26 +148,20 @@
 #define CONFIG_PRE_CON_BUF_ADDR		0x4f000000
 
 /* @fixme We should use bootm instead of bootz. */
-/* @fixme Moving fdt is very ugly. There should be way to do it properly. */
 #define CONFIG_BOOTCOMMAND \
 	"echo 'Loading Linux...'; " \
 	"load mmc 0:1 ${env_addr_r} u-boot.env; " \
 	"size mmc 0:1 u-boot.env; " \
 	"env import -t ${env_addr_r} ${filesize}; " \
 	"load mmc 0:1 ${kernel_addr_r} zImage; " \
-	"fdt addr ${fdtcontroladdr}; " \
-	"fdt move ${fdtcontroladdr} ${fdt_addr_r} 0x8000; " \
-	"fdt addr ${fdt_addr_r}; " \
 	"if test ${ddrctl_cmd} = 'disable'; then " \
 		"ddrctl ${ddrctl_cmd} ${ddrctl_cid}; fi; " \
-	"bootz ${kernel_addr_r} - ${fdt_addr_r}"
+	"bootz ${kernel_addr_r} - ${fdtcontroladdr}"
 
 #define MEM_LAYOUT_ENV_SETTINGS \
 	"bootm_size=0xf000000\0" \
 	"kernel_addr_r=0x40008000\0" \
 	"loadaddr=0x40008000\0" \
-	"fdtaddr=0x50000000\0" \
-	"fdt_addr_r=0x50000000\0" \
 	"mmcdev=0\0" \
 	"mmcroot=/dev/mmcblk0p1 rw\0" \
 	"mmcrootfstype=ext4 rootwait\0" \
