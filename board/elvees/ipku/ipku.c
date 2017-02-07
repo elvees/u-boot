@@ -22,10 +22,7 @@
 DECLARE_GLOBAL_DATA_PTR;
 
 #ifdef CONFIG_SPL_BUILD
-/* TODO: This function sets parameters for Nanya NT5CB256M8FN-DI SDRAM.
- * But IPKU board has Micron МТ41К512М16-107 SDRAM. The parameters
- * should be modified.
- */
+/* Set parameters for Micron TwinDie МТ41К512М16-125 SDRAM */
 static int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 {
 	if (!cfg) {
@@ -38,15 +35,17 @@ static int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 		return -EINVAL;
 	}
 
+	/* TODO: Actually IP-KU SDRAM has 2 ranks. But working with 2 ranks is
+	 * untested, so set number of ranks to 1. */
 	cfg->common.ranks = MCOM_SDRAM_ONE_RANK;
 	cfg->common.banks = 8;
 	cfg->common.columns = 1024;
 	cfg->common.rows = 32768;
 	cfg->common.bl = 8;
-	cfg->common.cl = 7;
-	cfg->common.cwl = 6;
+	cfg->common.cl = 6;
+	cfg->common.cwl = 5;
 	cfg->common.twr = to_clocks(15000, tck);
-	cfg->common.tfaw = to_clocks(30000, tck);
+	cfg->common.tfaw = to_clocks(40000, tck);
 	cfg->common.tras = to_clocks(35000, tck);
 	cfg->common.tras_max = to_clocks(9 * 7800000, tck);
 	cfg->common.trc = to_clocks(48750, tck);
@@ -54,11 +53,11 @@ static int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 	cfg->common.trtp = to_clocks(max(4 * tck, 7500), tck);
 	cfg->common.twtr = to_clocks(max(4 * tck, 7500), tck);
 	cfg->common.trcd = to_clocks(13750, tck);
-	cfg->common.trrd = to_clocks(max(4 * tck, 6000), tck);
+	cfg->common.trrd = to_clocks(max(4 * tck, 7500), tck);
 	cfg->common.tccd = 4;
 	cfg->common.tcke = to_clocks(max(3 * tck, 5000), tck);
 	cfg->common.tckesr = cfg->common.tcke + 1;
-	cfg->common.tzqcs = to_clocks(max(64 * tck, 80000), tck);
+	cfg->common.tzqcs = 64;
 	cfg->common.trefi = to_clocks(7800000, tck);
 	cfg->ddr3.trp = to_clocks(13750, tck);
 	cfg->ddr3.txpdll = to_clocks(max(10 * tck, 24000), tck);
@@ -66,8 +65,8 @@ static int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 	cfg->ddr3.tmod = to_clocks(max(12 * tck, 15000), tck);
 	cfg->ddr3.tcksre = to_clocks(max(5 * tck, 10000), tck);
 	cfg->ddr3.tcksrx = to_clocks(max(5 * tck, 10000), tck);
-	cfg->ddr3.tzqoper = to_clocks(max(256 * tck, 320000), tck);
-	cfg->ddr3.trfc = to_clocks(160000, tck);
+	cfg->ddr3.tzqoper = 256;
+	cfg->ddr3.trfc = to_clocks(260000, tck);
 	cfg->ddr3.tdllk = 512;
 	cfg->ddr3.txsdll = cfg->ddr3.tdllk;
 	cfg->ddr3.txs = max(5, to_clocks(10000, tck) + (int)cfg->ddr3.trfc);
