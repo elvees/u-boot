@@ -1,6 +1,6 @@
 /*
  * Copyright 2015-2016 ELVEES NeoTek JSC
- * Copyright 2017 RnD Center "ELVEES", OJSC
+ * Copyright 2017 RnD Center "ELVEES", JSC
  *
  * SPDX-License-Identifier: GPL-2.0+
  */
@@ -190,5 +190,14 @@ u32 ddr_get_clock_period(int ctl_id, struct ddr_freq *freq);
  */
 u32 mcom_ddr_init(struct ddr_cfg *cfg0, struct ddr_cfg *cfg1,
 		  struct ddr_freq *freq);
+
+/**
+ * set_sdram_cfg - Fills ddr_cfg structure with values for specific board type
+ * @cfg: DDR configuration structure
+ * @tck: DDR clock period in ps
+ *
+ * This function should be implemented for each board type
+ */
+int set_sdram_cfg(struct ddr_cfg *cfg, int tck);
 
 #endif /* _DDR_H */

@@ -19,7 +19,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #ifdef CONFIG_SPL_BUILD
 /* Set parameters for  Micron MT41K256M16HA-125 SDRAM */
-static int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
+int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 {
 	if (!cfg) {
 		printf("Invalid pointer to DDR configuration\n");
@@ -30,6 +30,8 @@ static int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 		printf("Invalid clock period\n");
 		return -EINVAL;
 	}
+
+	cfg->type = MCOM_SDRAM_TYPE_DDR3;
 
 	cfg->common.ranks = MCOM_SDRAM_ONE_RANK;
 	cfg->common.banks = 8;
@@ -68,48 +70,3 @@ static int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 	return 0;
 }
 #endif
-
-/* TODO: This function should be moved to common code */
-int dram_init(void)
-{
-	gd->ram_size = PHYS_SDRAM_0_SIZE;
-#ifdef CONFIG_SPL_BUILD
-	struct ddr_cfg cfg[2];
-	struct ddr_freq freq;
-	int i, ret;
-
-	freq.xti_freq = XTI_FREQ;
-	freq.cpll_mult = CPLL_VALUE;
-	freq.ddr0_div = DIV_DDR0_CTR_VALUE;
-	freq.ddr1_div = DIV_DDR1_CTR_VALUE;
-
-	for (i = 0; i < 2; i++) {
-		ret = set_sdram_cfg(&cfg[i],
-				    ddr_get_clock_period(i, &freq));
-		if (ret)
-			return ret;
-		cfg[i].ctl_id = i;
-		cfg[i].type = MCOM_SDRAM_TYPE_DDR3;
-	}
-
-	timer_init();
-
-	puts("DDR controllers init started\n");
-
-	u32 status = mcom_ddr_init(&cfg[0], &cfg[1], &freq);
-
-	if (ddr_getrc(status, 0))
-		puts("DDR controller #0 init failed\n");
-	else
-		puts("DDR controller #0 init done\n");
-
-	if (ddr_getrc(status, 1))
-		puts("DDR controller #1 init failed\n");
-	else
-		puts("DDR controller #1 init done\n");
-
-	return status;
-#else
-	return 0;
-#endif
-}
