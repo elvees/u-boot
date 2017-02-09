@@ -16,6 +16,7 @@
 #include <spl.h>
 #include <asm/arch/bootrom.h>
 #include <asm/arch/ddr.h>
+#include <asm/arch/ddr-calibration.h>
 #endif
 #include <asm/arch/clock.h>
 #include <asm/arch/regs.h>
@@ -104,6 +105,10 @@ int dram_init(void)
 	}
 
 	timer_init();
+
+#ifdef CONFIG_DDR_CALIBRATION
+	set_calib_params(CONFIG_DDR_CALIBRATION_DDRMC_ID);
+#endif
 
 	puts("DDR controllers init started\n");
 

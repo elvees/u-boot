@@ -11,3 +11,7 @@
 
 obj-y += timer.o board.o bootrom.o clock_manager.o
 obj-$(CONFIG_SPL_BUILD) += ddr.o
+
+ifeq ($(CONFIG_SPL_BUILD)$(CONFIG_DDR_CALIBRATION),yy)
+	obj-y += ddr-calibration.o
+endif

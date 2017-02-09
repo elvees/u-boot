@@ -12,6 +12,24 @@ config DEBUG_DDR
 	help
 	  Print debug information during DDR initialization
 
+menu "DDR calibration mode"
+
+config DDR_CALIBRATION_DDRMC_ID
+	int "DDRMC ID used for calibration"
+	default 0
+
+config DDR_CALIBRATION
+	bool "Enable DDR calibration mode"
+	select HW_WATCHDOG
+	select SPL_WATCHDOG_SUPPORT
+	default no
+	help
+	  In DDR calibration mode U-Boot SPL tries to read calibration
+	  parameters from VRAM and initializes DDR according to this parameters.
+	  If parameters read is failed U-Boot SPL initializes DDR as usual.
+
+endmenu
+
 config SYS_SOC
 	default "mcom"
 
