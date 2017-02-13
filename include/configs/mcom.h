@@ -141,69 +141,52 @@
 #ifndef CONFIG_SPL_BUILD
 #include <config_distro_defaults.h>
 
-/* @fixme We should use bootm instead of bootz. */
+/* Default environment */
+#define CONFIG_BOOTFILE			"zImage"
+#define CONFIG_LOADADDR			0x40000000
+
+#define CONFIG_PREBOOT \
+	"if test ${ddrctl_cmd} = disable; then " \
+		"ddrctl ${ddrctl_cmd} ${ddrctl_cid};" \
+	"fi;"
+
 #define CONFIG_BOOTCOMMAND \
-	"echo 'Loading Linux...'; " \
-	"load mmc 0:1 ${env_addr_r} u-boot.env; " \
-	"size mmc 0:1 u-boot.env; " \
-	"env import -t ${env_addr_r} ${filesize}; " \
-	"load mmc 0:1 ${kernel_addr_r} zImage; " \
-	"if test ${ddrctl_cmd} = 'disable'; then " \
-		"ddrctl ${ddrctl_cmd} ${ddrctl_cid}; fi; " \
-	"bootz ${kernel_addr_r} - ${fdtcontroladdr}"
-
-#define MEM_LAYOUT_ENV_SETTINGS \
-	"bootm_size=0xf000000\0" \
-	"kernel_addr_r=0x40008000\0" \
-	"loadaddr=0x40008000\0" \
-	"mmcdev=0\0" \
-	"mmcroot=/dev/mmcblk0p1 rw\0" \
-	"mmcrootfstype=ext4 rootwait\0" \
-	"root=/dev/mmcblk0p1\0" \
-	"scriptaddr=0x43100000\0" \
-	"pxefile_addr_r=0x43200000\0" \
-	"ramdisk_addr_r=0x43300000\0" \
-	"env_addr_r=0x45000000\0" \
-	"ddrctl_cid=1\0" \
-	"ddrctl_cmd=disable\0"
-
-#define BOOT_TARGET_DEVICES(func) \
-	func(MMC, mmc, 0)
-
-#include <config_distro_bootcmd.h>
-
-#ifdef CONFIG_USB_KEYBOARD
-#define CONSOLE_STDIN_SETTINGS \
-	"preboot=usb start\0" \
-	"stdin=serial,usbkbd\0"
-#else
-#define CONSOLE_STDIN_SETTINGS \
-	"stdin=serial\0"
-#endif
-
-#ifdef CONFIG_VIDEO
-#define CONSOLE_STDOUT_SETTINGS \
-	"stdout=serial,vga\0" \
-	"stderr=serial,vga\0"
-#else
-#define CONSOLE_STDOUT_SETTINGS \
-	"stdout=serial\0" \
-	"stderr=serial\0"
-#endif
-
-#define CONSOLE_ENV_SETTINGS \
-	CONSOLE_STDIN_SETTINGS \
-	CONSOLE_STDOUT_SETTINGS
+	"mmc dev ${mmcdev};" \
+	"if mmc rescan; then " \
+		"if run loadbootenv; then " \
+			"run importbootenv;" \
+		"fi;" \
+		"if test -n ${bootenvcmd}; then " \
+			"run bootenvcmd;" \
+		"fi;" \
+		"if run mmcload; then " \
+			"run mmcboot;" \
+		"fi;" \
+	"fi;"
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
-	CONSOLE_ENV_SETTINGS \
-	MEM_LAYOUT_ENV_SETTINGS \
-	"fdtfile=" CONFIG_FDTFILE "\0" \
+	"bootm_size=0x10000000\0" \
+	"stdin=serial\0" \
+	"stdout=serial\0" \
+	"stderr=serial\0" \
+	"ddrctl_cmd=disable\0" \
+	"ddrctl_cid=1\0" \
+	"bootenv=u-boot.env\0" \
+	"bootenvcmd=\0" \
+	"loadbootenv=load mmc ${mmcdev}:${mmcbootpart} ${loadaddr} ${bootenv}\0" \
+	"importbootenv=env import -t ${loadaddr} ${filesize}\0" \
 	"console=ttyS0,115200\0" \
-	BOOTENV
+	"cmdline=\0" \
+	"mmcdev=0\0" \
+	"mmcbootpart=1\0" \
+	"mmcrootpart=2\0" \
+	"mmcrootfstype=ext4\0" \
+	"mmcargs=setenv bootargs console=${console} " \
+		"root=/dev/mmcblk${mmcdev}p${mmcrootpart} " \
+		"rootfstype=${mmcrootfstype} rw rootwait ${cmdline}\0" \
+	"mmcload=load mmc ${mmcdev}:${mmcbootpart} ${loadaddr} ${bootfile}\0" \
+	"mmcboot=run mmcargs; bootz ${loadaddr} - ${fdtcontroladdr}\0"
 
-#else /* ifndef CONFIG_SPL_BUILD */
-#define CONFIG_EXTRA_ENV_SETTINGS
 #endif
 
 /* SPL framework */
