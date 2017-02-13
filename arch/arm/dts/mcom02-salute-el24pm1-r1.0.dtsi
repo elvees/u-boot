@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 RnD Center "ELVEES", OJSC
+ * Copyright 2017 RnD Center "ELVEES", JSC
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -80,10 +80,10 @@
 &ethernet {
 	#address-cells = <1>;
 	#size-cells = <0>;
-	phy-mode = "mii";
+	phy-mode = "gmii";
 	phy-handle = <&ethernet_phy>;
 	phy-reset-gpios = <&gpioc 20 GPIO_ACTIVE_HIGH>;
-	status = "disabled";
+	txclk-125en-gpios = <&gpioa 3 GPIO_ACTIVE_HIGH>;
 
 	ethernet_phy: ethernet-phy@1 {
 		reg = <0x1>;
