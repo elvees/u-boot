@@ -40,20 +40,9 @@
 
 #define CONFIG_SYS_CACHELINE_SIZE	64
 
-/*
- * High Level Configuration Options
- */
-#define CONFIG_MCOM
-
 #include <asm/arch/cpu.h>   /* get chip and board defs */
 
 #define CONFIG_SYS_TEXT_BASE		0x41000000
-
-/*
- * Display CPU and Board information
- */
-#define CONFIG_DISPLAY_CPUINFO
-#define CONFIG_DISPLAY_BOARDINFO
 
 /* Serial & console */
 #define CONFIG_SYS_NS16550
@@ -114,16 +103,11 @@
 /* The stack sizes are set up in start.S using the settings below */
 #define CONFIG_STACKSIZE		(256 << 10) /* 256 KiB */
 
-#define CONFIG_FAT_WRITE    /* enable write access */
-
 #define CONFIG_NR_DRAM_BANKS		2
 #define PHYS_SDRAM_0			CONFIG_SYS_SDRAM_BASE
 #define PHYS_SDRAM_0_SIZE		(CONFIG_DDR_SIZE_IN_MB << 20)
 #define PHYS_SDRAM_1			0xa0000000
 #define PHYS_SDRAM_1_SIZE		(CONFIG_DDR_SIZE_IN_MB << 20)
-
-/* Parallel Flash support */
-#define CONFIG_SYS_NO_FLASH
 
 /* Serial Flash support */
 #define CONFIG_SF_DEFAULT_SPEED		33000000
@@ -135,8 +119,6 @@
 #define CONFIG_ENV_SECT_SIZE		SZ_64K
 #define CONFIG_ENV_SIZE			CONFIG_ENV_SECT_SIZE
 #define CONFIG_ENV_SPI_MAX_HZ		CONFIG_SF_DEFAULT_SPEED
-
-#define CONFIG_SYS_CONSOLE_IS_IN_ENV
 
 #ifndef CONFIG_SPL_BUILD
 #include <config_distro_defaults.h>
@@ -191,17 +173,7 @@
 
 /* SPL framework */
 #define CONFIG_SPL_FRAMEWORK
-
-#define CONFIG_SPL_LIBCOMMON_SUPPORT
-#define CONFIG_SPL_LIBDISK_SUPPORT
-#define CONFIG_SPL_LIBGENERIC_SUPPORT
-#define CONFIG_SPL_GPIO_SUPPORT
-#define CONFIG_SPL_MMC_SUPPORT
-#define CONFIG_SPL_SERIAL_SUPPORT
-#define CONFIG_SPL_SPI_SUPPORT
-#define CONFIG_SPL_SPI_FLASH_SUPPORT
 #define CONFIG_SPL_SPI_LOAD
-#define CONFIG_SPL_WATCHDOG_SUPPORT
 
 #define CONFIG_SPL_LDSCRIPT		"arch/arm/cpu/armv7/u-boot-spl.lds"
 #define CONFIG_SPL_MAX_SIZE		0x00010000	/* 64 KB */
@@ -218,6 +190,5 @@
  * U-Boot image to the third sector boundary. */
 #define CONFIG_SPL_PAD_TO			0x00020000
 #define CONFIG_SYS_SPI_U_BOOT_OFFS		CONFIG_SPL_PAD_TO
-#define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR	(2 + CONFIG_SPL_PAD_TO / 512)
 
 #endif /* __MCOM_H */
