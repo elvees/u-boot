@@ -105,8 +105,13 @@ u32 spl_boot_device(void)
 	return BOOT_DEVICE_NONE;
 }
 
-u32 spl_boot_mode(void)
+u32 spl_boot_mode(const u32 boot_device)
 {
-	return MMCSD_MODE_RAW;
+	switch (boot_device) {
+	case BOOT_DEVICE_MMC1:
+		return MMCSD_MODE_RAW;
+	}
+
+	return 0;
 }
 #endif
