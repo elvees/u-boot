@@ -250,6 +250,13 @@ config MMC_SDHCI_KONA
 
 	  If you have a controller with this interface, say Y here.
 
+config MMC_SDHCI_MCOM
+	bool "Arasan SDHCI controller support for ELVEES MCom-02 SoC"
+	depends on BLK && DM_MMC_OPS
+	depends on MMC_SDHCI
+	help
+	  Support for Arasan SDHCI host controller on ELVEES MCom-02 SoC
+
 config MMC_SDHCI_MSM
 	bool "Qualcomm SDHCI controller"
 	depends on BLK && DM_MMC_OPS
