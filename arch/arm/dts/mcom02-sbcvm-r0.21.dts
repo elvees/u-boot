@@ -99,6 +99,8 @@
 
 &vinc {
 	status = "okay";
+	elvees,pclk-divider = <16>;
+	elvees,clock-over-fsync;
 	ports {
 		port@0 {
 			#address-cells = <1>;
