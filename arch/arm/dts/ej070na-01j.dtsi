@@ -1,0 +1,29 @@
+/*
+ * Copyright 2017 RnD Center "ELVEES", JSC
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
+/ {
+	ej070na_01j: lcd-display {
+		bits-per-pixel = <24>;
+		bus-width = <24>;
+
+		display-timings {
+			1024x600p60 {
+				clock-frequency = <51206400>;
+				hactive = <1024>;
+				vactive = <600>;
+				hfront-porch = <100>;
+				hback-porch = <100>;
+				hsync-len = <120>;
+				vback-porch = <10>;
+				vfront-porch = <10>;
+				vsync-len = <15>;
+				hsync-active = <0>;
+			};
+		};
+	};
+};
