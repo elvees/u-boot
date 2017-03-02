@@ -4,7 +4,7 @@
  * Copyright 2007-2011 Allwinner Technology Co., Ltd. <www.allwinnertech.com>
  *
  * Copyright 2015-2016 ELVEES NeoTek JSC
- * Copyright 2017 RnD Center "ELVEES", OJSC
+ * Copyright 2017 RnD Center "ELVEES", JSC
  *
  * Common board initialization code for ELVEES MCom-compatible boards.
  *
@@ -12,14 +12,12 @@
  */
 
 #include <common.h>
-#include <mmc.h>
 #ifdef CONFIG_SPL_BUILD
 #include <spl.h>
 #include <asm/arch/bootrom.h>
 #endif
 #include <asm/arch/clock.h>
 #include <asm/arch/regs.h>
-#include <asm/arch/sdmmc.h>
 #include <asm/io.h>
 #include <linux/kernel.h>
 
@@ -82,13 +80,6 @@ int dram_init_banksize(void)
 
 	return 0;
 }
-
-#ifdef CONFIG_GENERIC_MMC
-int board_mmc_init(bd_t *bis)
-{
-	return sdmmc_init(SDMMC0_BASE, SPLL_FREQ);
-}
-#endif
 
 #ifdef CONFIG_SPL_BUILD
 u32 spl_boot_device(void)
