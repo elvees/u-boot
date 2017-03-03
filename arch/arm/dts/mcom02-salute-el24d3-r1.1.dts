@@ -141,6 +141,22 @@
 	output = <&it66121>;
 };
 
+&i2c0 {
+	status = "okay";
+	clock-frequency = <100000>;
+
+	camera@36 {
+		compatible = "ovti,ov2715";
+		reg = <0x36>;
+
+		port {
+			ov2715_endpoint: endpoint {
+				remote-endpoint = <&vinc_endpoint>;
+			};
+		};
+	};
+};
+
 &i2c1 {
 	status = "okay";
 	clock-frequency = <100000>;
@@ -232,4 +248,25 @@
 /* RS-232 is used as physical layer for UART3 */
 &uart3 {
 	status = "okay";
+};
+
+&vinc {
+	status = "okay";
+	elvees,pixel-clock-divider = <16>;
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0x0>;
+
+			vinc_endpoint: endpoint@0 {
+				reg = <0x0>;
+				remote-endpoint = <&ov2715_endpoint>;
+			};
+		};
+	};
 };
