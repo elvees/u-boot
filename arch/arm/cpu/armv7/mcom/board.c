@@ -14,6 +14,7 @@
 #ifdef CONFIG_SPL_BUILD
 #include <spl.h>
 #include <asm/arch/bootrom.h>
+#include <asm/arch/ddr.h>
 #endif
 #include <asm/arch/clock.h>
 #include <asm/arch/regs.h>
@@ -114,7 +115,11 @@ void board_init_f(ulong dummy)
 
 	preloader_console_init();
 
-	dram_init();
+	int rc = dram_init();
+	/* It makes no sence to continue booting if DDRMC #0 initialization
+	 * is failed */
+	if (ddr_getrc(rc, 0))
+		hang();
 
 	/* Enable clock frequency for SDMMC0 and SDMMC1 */
 	sys.CMCTR->GATE_SYS_CTR |= CMCTR_GATE_SYS_CTR_SDMMC0_EN;
