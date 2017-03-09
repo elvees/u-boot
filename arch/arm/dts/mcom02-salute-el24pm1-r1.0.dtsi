@@ -44,6 +44,22 @@
 		};
 	};
 
+	leds {
+		compatible = "gpio-leds";
+
+		dbgled0 {
+			label = "salute:green:dbgled0";
+			gpios = <&gpiod 30 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "heartbeat";
+		};
+
+		dbgled1 {
+			label = "salute:green:dbgled1";
+			gpios = <&gpiod 31 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "mmc0";
+		};
+	};
+
 	regulators {
 		#address-cells = <1>;
 		#size-cells = <0>;
