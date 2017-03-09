@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 RnD Center "ELVEES", OJSC
+ * Copyright 2017 RnD Center "ELVEES", JSC
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -28,6 +28,32 @@
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <8000000>;
+		};
+	};
+
+	leds {
+		dbgled2 {
+			label = "salute:green:dbgled2";
+			gpios = <&gpioa 6 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "mmc1";
+		};
+
+		dbgled3 {
+			label = "salute:green:dbgled3";
+			gpios = <&gpioa 14 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+		};
+
+		dbgled4 {
+			label = "salute:green:dbgled4";
+			gpios = <&gpioa 10 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+		};
+
+		dbgled5 {
+			label = "salute:green:dbgled5";
+			gpios = <&gpioa 8 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
 		};
 	};
 
