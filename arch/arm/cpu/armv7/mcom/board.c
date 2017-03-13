@@ -154,6 +154,9 @@ void board_init_f(ulong dummy)
 
 	/* Enable clock frequency for SPI0 */
 	sys.CMCTR->GATE_SYS_CTR |= CMCTR_GATE_SYS_CTR_SPI0_EN;
+
+	/* Enable clock frequency for GEMAC */
+	sys.CMCTR->GATE_SYS_CTR |= CMCTR_GATE_SYS_CTR_EMAC_EN;
 }
 #endif
 
