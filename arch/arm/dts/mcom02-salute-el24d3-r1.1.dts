@@ -128,7 +128,7 @@
 	status = "okay";
 	phy-mode = "gmii";
 	phy-handle = <&ethernet_phy>;
-	phy-reset-gpios = <&gpioa 8 GPIO_ACTIVE_HIGH>;
+	phy-reset-gpios = <&gpioa 8 GPIO_ACTIVE_LOW>;
 	txclk-125en-gpios = <&gpioa 3 GPIO_ACTIVE_HIGH>;
 
 	ethernet_phy: ethernet-phy@1 {

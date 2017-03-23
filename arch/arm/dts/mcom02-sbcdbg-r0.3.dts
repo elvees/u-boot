@@ -171,7 +171,7 @@
 	status = "okay";
 	phy-mode = "mii";
 	phy-handle = <&ethernet_phy>;
-	phy-reset-gpios = <&gpiob 1 GPIO_ACTIVE_HIGH>;
+	phy-reset-gpios = <&gpiob 1 GPIO_ACTIVE_LOW>;
 
 	ethernet_phy: ethernet-phy@7 {
 		reg = <7>;
