@@ -110,7 +110,7 @@
 #define PHYS_SDRAM_1_SIZE		(CONFIG_DDR_SIZE_IN_MB << 20)
 
 /* Serial Flash support */
-#define CONFIG_SF_DEFAULT_SPEED		33000000
+#define CONFIG_SF_DEFAULT_SPEED		36000000
 #define CONFIG_CMD_SF_TEST
 
 /* Environment storage */
