@@ -95,10 +95,8 @@
 		#size-cells = <1>;
 		compatible = "jedec,spi-nor", "spi-flash";
 		reg = <0>;
-		/* Max clock frequency, specified in the M25P32 Serial Flash
-		 * Memory datasheet, is 33 MHz for read commands and 75 MHz
-		 * for other commands. */
-		spi-max-frequency = <33000000>;
+		/* The data transfer is not stable at a higher frequency. */
+		spi-max-frequency = <36000000>;
 		m25p,fast-read;
 		u-boot,dm-pre-reloc;
 	};

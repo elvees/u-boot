@@ -42,9 +42,7 @@
 		#size-cells = <1>;
 		compatible = "jedec,spi-nor", "spi-flash";
 		reg = <0>;
-		/* Max clock frequency, specified in the Cypress S25FL256S SPI
-		 * Flash Memory datasheet, is 50 MHz for read commands. */
-		spi-max-frequency = <50000000>;
+		spi-max-frequency = <36000000>;
 		m25p,fast-read;
 		u-boot,dm-pre-reloc;
 	};
