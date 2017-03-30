@@ -265,8 +265,6 @@
 	framebuffer: framebuffer@38004000 {
 		compatible = "elvees,vpoutfb";
 		reg = <0x38004000 0x1000>;
-		width = <1280>;
-		height = <720>;
 		/* We have to pad out color to 32 bits because 24 bit color is
 		 * not supported by the Mali driver */
 		format = "x8r8g8b8";
