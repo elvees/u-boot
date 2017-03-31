@@ -175,7 +175,6 @@
 #define CONFIG_SPL_FRAMEWORK
 #define CONFIG_SPL_SPI_LOAD
 
-#define CONFIG_SPL_LDSCRIPT		"arch/arm/cpu/armv7/u-boot-spl.lds"
 #define CONFIG_SPL_MAX_SIZE		0x00010000	/* 64 KB */
 #define CONFIG_SPL_TEXT_BASE		0x20000000	/* start of sram */
 #define CONFIG_SPL_BSS_START_ADDR	0x4FF80000
