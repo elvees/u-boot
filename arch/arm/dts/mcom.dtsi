@@ -138,6 +138,7 @@
 		bus-width = <8>;
 		broken-cap-clock-base;
 		sdhci,auto-cmd12;
+		u-boot,dm-pre-reloc;
 		status = "disabled";
 	};
 
@@ -150,6 +151,7 @@
 		bus-width = <8>;
 		broken-cap-clock-base;
 		sdhci,auto-cmd12;
+		u-boot,dm-pre-reloc;
 		status = "disabled";
 	};
 
