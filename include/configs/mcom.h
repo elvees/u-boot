@@ -38,8 +38,6 @@
 #define SPLL_FREQ			((XTI_FREQ * (SPLL_VALUE + 1)) >> DIV_SYS0_CTR_VALUE)
 #define CONFIG_TIMER_CLK_FREQ		(SPLL_FREQ >> DIV_SYS1_CTR_VALUE)
 
-#define CONFIG_SYS_CACHELINE_SIZE	64
-
 #include <asm/arch/cpu.h>   /* get chip and board defs */
 
 #define CONFIG_SYS_TEXT_BASE		0x41000000
