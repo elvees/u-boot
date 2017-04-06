@@ -188,4 +188,6 @@
 #define CONFIG_SPL_PAD_TO			0x00020000
 #define CONFIG_SYS_SPI_U_BOOT_OFFS		CONFIG_SPL_PAD_TO
 
+#define CONFIG_BUILD_TARGET		"u-boot.mcom"
+
 #endif /* __MCOM_H */
