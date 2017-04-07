@@ -41,7 +41,13 @@
 
 #include <asm/arch/cpu.h>   /* get chip and board defs */
 
-#define CONFIG_SYS_TEXT_BASE		0x41000000
+#define CONFIG_SYS_SDRAM_BASE		0x40000000
+
+/* The first 64 bytes are reserved for the U-Boot image header. */
+#define CONFIG_SYS_TEXT_BASE		0x40000040
+#define CONFIG_SYS_INIT_SP_ADDR		0x40400000
+
+#define CONFIG_SYS_MALLOC_LEN		SZ_8M
 
 /* Serial & console */
 #define CONFIG_SYS_NS16550
@@ -56,16 +62,6 @@
 #define CONFIG_CONS_INDEX		1  /* UART0 */
 #endif
 
-/* DRAM Base */
-#define CONFIG_SYS_SDRAM_BASE		0x40000000
-#define CONFIG_SYS_INIT_RAM_ADDR	0x20000000
-#define CONFIG_SYS_INIT_RAM_SIZE	0xF000
-
-#define CONFIG_SYS_INIT_SP_OFFSET \
-    (CONFIG_SYS_INIT_RAM_SIZE - GENERATED_GBL_DATA_SIZE)
-#define CONFIG_SYS_INIT_SP_ADDR \
-    (CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
-
 #define CONFIG_SETUP_MEMORY_TAGS
 #define CONFIG_CMDLINE_TAG
 #define CONFIG_INITRD_TAG
@@ -77,9 +73,6 @@
 #define CONFIG_DW_WDT_CLOCK_KHZ		((SPLL_FREQ >> DIV_SYS1_CTR_VALUE)/1000)
 #define CONFIG_HW_WATCHDOG_TIMEOUT_MS	25000
 #endif
-
-/* 4MB of malloc() pool */
-#define CONFIG_SYS_MALLOC_LEN		(CONFIG_ENV_SIZE + (4 << 20))
 
 /*
  * Miscellaneous configurable options
@@ -98,9 +91,6 @@
 
 /* baudrate */
 #define CONFIG_BAUDRATE			115200
-
-/* The stack sizes are set up in start.S using the settings below */
-#define CONFIG_STACKSIZE		(256 << 10) /* 256 KiB */
 
 #define CONFIG_NR_DRAM_BANKS		2
 #define PHYS_SDRAM_0			CONFIG_SYS_SDRAM_BASE
