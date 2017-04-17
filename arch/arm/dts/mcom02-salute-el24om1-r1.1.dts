@@ -1,0 +1,110 @@
+/*
+ * Copyright 2017 RnD Center "ELVEES", JSC
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/interrupt-controller/irq.h>
+
+#include "mcom02-salute-el24pm1-r1.1.dtsi"
+
+/ {
+	model = "Salute-EL24OM1 r1.1";
+
+	chosen {
+		bootargs = "console=ttyS0,115200";
+	};
+
+	aliases {
+		spi0 = &spi0;
+	};
+
+	clocks {
+		can_clk: can_clk {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <16000000>;
+		};
+	};
+
+	leds {
+		dbgled2 {
+			label = "salute:green:dbgled2";
+			gpios = <&gpioa 15 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "mmc1";
+		};
+
+		dbgled3 {
+			label = "salute:green:dbgled3";
+			gpios = <&gpiod 12 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+		};
+
+		dbgled4 {
+			label = "salute:green:dbgled4";
+			gpios = <&gpiod 11 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+		};
+
+		dbgled5 {
+			label = "salute:green:dbgled5";
+			gpios = <&gpiod 8 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+		};
+	};
+
+	regulators {
+		can_xceiver_reg: regulator@1 {
+			compatible = "regulator-fixed";
+			reg = <0x1>;
+			regulator-name = "can-xceiver";
+			gpio = <&gpiod 21 0>;
+		};
+	};
+};
+
+&ethernet {
+	status = "okay";
+};
+
+&framebuffer {
+	status = "okay";
+};
+
+&sd1 {
+	status = "okay";
+};
+
+&sound {
+	status = "okay";
+};
+
+&spi0 {
+	num-cs = <2>;
+	/* Third argument of "cs-gpios" property is set to 0,
+	 * because it is ignored by the SPI driver. */
+	cs-gpios = <&gpiod 18 0>, <&gpiod 19 0>;
+
+	can: can@1 {
+		compatible = "microchip,mcp2515";
+		reg = <0x1>;
+		spi-max-frequency = <10000000>;
+		clocks = <&can_clk>;
+		interrupt-parent = <&gpioa>;
+		interrupts = <31 GPIO_ACTIVE_HIGH>;
+		xceiver-supply = <&can_xceiver_reg>;
+	};
+};
+
+&uart2 {
+	status = "okay";
+};
+
+/* RS-485 is used as physical layer for UART3 */
+&uart3 {
+	status = "okay";
+};
