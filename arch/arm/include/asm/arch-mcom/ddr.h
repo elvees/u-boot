@@ -129,6 +129,20 @@ enum sdram_type {
 };
 
 /**
+ * struct impedance_params - Impedance parameters for ZQ calibration
+ * @ods_mc:       Output driver strength on DDRMC side in Ohms
+ * @ods_dram:     Output driver strength on DRAM side in Ohms
+ * @odt_mc:       On-die termination on DDRMC side in Ohms (only for DDR3)
+ * @odt_dram:     On-die termination on DRAM side in Ohms (only for DDR3)
+ */
+struct impedance_params {
+	u8 ods_mc;
+	u8 ods_dram;
+	u8 odt_mc;
+	u8 odt_dram;
+};
+
+/**
  * struct ddr_cfg - DDR configuration
  * @ctl_id:       DDR Memory Controller ID
  * @type:         SDRAM type (DDR3 or LPDDR2)
@@ -138,6 +152,7 @@ enum sdram_type {
 struct ddr_cfg {
 	int ctl_id;
 	enum sdram_type type;
+	struct impedance_params impedance;
 	struct sdram_params_common common;
 	union {
 		struct sdram_params_ddr3 ddr3;

@@ -324,10 +324,84 @@ static u16 ctl_set_regs_lpddr2(struct ddr_cfg *cfg)
 	return 0;
 }
 
+static u16 set_impedance_ddr3(struct impedance_params *impedance, ddrphy_t *PHY)
+{
+	u32 tmp = 0;
+	bool odt_en = true;
+
+	switch (impedance->ods_dram) {
+	case 34:
+		tmp = BIT(1);
+		break;
+	case 40:
+		break;
+	default:
+		printf("ods_dram = %d is not supported\n", impedance->ods_dram);
+		return MCOM_DDR_CFG_ERR;
+	}
+
+	switch (impedance->odt_dram) {
+	case 0:
+		break;
+	case 40:
+		tmp |= BIT(2) | BIT(6);
+		break;
+	case 60:
+		tmp |= BIT(2);
+		break;
+	case 120:
+		tmp |= BIT(6);
+		break;
+	default:
+		printf("odt_dram = %d is not supported\n", impedance->odt_dram);
+		return MCOM_DDR_CFG_ERR;
+	}
+
+	PHY->MR1 = tmp;
+
+	switch (impedance->ods_mc) {
+	case 34:
+		tmp = 0xC;
+		break;
+	case 40:
+		tmp = 0xB;
+		break;
+	default:
+		printf("ods_mc = %d is not supported\n", impedance->ods_mc);
+		return MCOM_DDR_CFG_ERR;
+	}
+
+	switch (impedance->odt_mc) {
+	case 0:
+		odt_en = false;
+		break;
+	case 40:
+		tmp |= (8 << 4);
+		break;
+	case 60:
+		tmp |= (5 << 4);
+		break;
+	case 120:
+		tmp |= (1 << 4);
+		break;
+	default:
+		printf("odt_mc = %d is not supported\n", impedance->odt_mc);
+		return MCOM_DDR_CFG_ERR;
+	}
+
+	PHY->ZQ0CR1 = tmp;
+
+	if (odt_en)
+		PHY->DXCCR |= 1;
+
+	return 0;
+}
+
 static u16 phy_set_regs_ddr3(struct ddr_cfg *cfg, struct ddr_freq *freq)
 {
 	u32 tck, tmp, tmp2;
 	ddrphy_t *const PHY = DDRPHY[cfg->ctl_id];
+	u16 ret;
 
 	tck = ddr_get_clock_period(cfg->ctl_id, freq);
 	if (!tck)
@@ -401,6 +475,10 @@ static u16 phy_set_regs_ddr3(struct ddr_cfg *cfg, struct ddr_freq *freq)
 		   FIELD_PREP(MR0_DDR3_WR, tmp2);
 
 	PHY->MR2 = FIELD_PREP(MR2_DDR3_CWL, cfg->common.cwl - 5);
+
+	ret = set_impedance_ddr3(&cfg->impedance, PHY);
+	if (ret)
+		return ret;
 
 	return 0;
 }
