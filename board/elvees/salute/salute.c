@@ -37,6 +37,17 @@ int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 
 	cfg->type = MCOM_SDRAM_TYPE_DDR3;
 
+	/* This is the best combination of ODS/ODT parameters.
+	 * It was found during DDR calibration for board types:
+	 * Salute-EL24D1 r1.4,
+	 * Salute-EL24D1 r1.5,
+	 * Salute-EL24D2 r1.1.
+	 */
+	cfg->impedance.ods_mc = 40;
+	cfg->impedance.ods_dram = 40;
+	cfg->impedance.odt_mc = 120;
+	cfg->impedance.odt_dram = 120;
+
 	cfg->common.ranks = MCOM_SDRAM_ONE_RANK;
 	cfg->common.banks = 8;
 	cfg->common.columns = 1024;

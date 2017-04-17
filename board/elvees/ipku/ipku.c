@@ -37,6 +37,13 @@ int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 
 	cfg->type = MCOM_SDRAM_TYPE_DDR3;
 
+	/* TODO: DDR calibration should be done for IP-KU board.
+	 * This ODT/ODS values may not be optimal. */
+	cfg->impedance.ods_mc = 40;
+	cfg->impedance.ods_dram = 40;
+	cfg->impedance.odt_mc = 120;
+	cfg->impedance.odt_dram = 120;
+
 	/* TODO: Actually IP-KU SDRAM has 2 ranks. But working with 2 ranks is
 	 * untested, so set number of ranks to 1. */
 	cfg->common.ranks = MCOM_SDRAM_ONE_RANK;
