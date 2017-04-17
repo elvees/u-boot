@@ -16,6 +16,7 @@
 #include <linux/sizes.h>
 
 #define XTI_FREQ			24000000
+
 #ifdef CONFIG_TARGET_IPKU
 #define APLL_VALUE			0x1F
 #define CPLL_VALUE			0x0F
@@ -24,7 +25,7 @@
 #define DIV_SYS1_CTR_VALUE		0	/* L3_PCLK = L1_HCLK */
 #else
 #define APLL_VALUE			0x1F
-#define CPLL_VALUE			0x11
+#define CPLL_VALUE			0x0F
 #define SPLL_VALUE			0x0B	/* L1_HCLK = 288 MHz */
 #define DIV_SYS0_CTR_VALUE		0
 #define DIV_SYS1_CTR_VALUE		1	/* L3_PCLK = L1_HCLK / 2 */
