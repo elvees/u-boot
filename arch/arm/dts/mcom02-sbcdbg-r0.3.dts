@@ -149,8 +149,8 @@
 
 &vinc {
 	status = "okay";
-	elvees,pclk-divider = <16>;
-	elvees,clock-over-fsync;
+	elvees,pixel-clock-divider = <16>;
+	elvees,pixel-clock-over-fsync;
 	ports {
 		port@0 {
 			#address-cells = <1>;
