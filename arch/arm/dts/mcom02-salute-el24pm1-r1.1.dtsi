@@ -87,6 +87,11 @@
 	};
 };
 
+&i2c0 {
+	status = "okay";
+	clock-frequency = <100000>;
+};
+
 &i2c1 {
 	status = "okay";
 	clock-frequency = <100000>;
@@ -99,6 +104,11 @@
 		VDDA-supply = <&audio_codec_reg>;
 		VDDIO-supply = <&audio_codec_reg>;
 	};
+};
+
+&i2c2 {
+	status = "okay";
+	clock-frequency = <100000>;
 };
 
 &mfbsp0 {
