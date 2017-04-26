@@ -25,8 +25,16 @@
 		};
 	};
 
+	/delete-node/ i2c@3802c000;
 	/delete-node/ i2c@3802d000;
 	/delete-node/ i2c@3802e000;
+
+	i2c0: i2c0 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "i2c-gpio";
+		gpios = <&gpioa 30 0>, <&gpioa 29 0>;
+	};
 
 	i2c1: i2c1 {
 		#address-cells = <1>;
