@@ -42,7 +42,7 @@
 		cache-unified;
 		cache-level = <2>;
 		arm,data-latency = <3 3 3>;
-		arm,tag-latency = <2 2 2>;
+		arm,tag-latency = <2 3 2>;
 	};
 
 	gic: interrupt-controller@39001000 {
