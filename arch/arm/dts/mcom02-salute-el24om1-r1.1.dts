@@ -75,6 +75,19 @@
 	status = "okay";
 };
 
+&i2c2 {
+	ft5206: touchscreen@38 {
+		compatible = "edt,edt-ft5206";
+		reg = <0x38>;
+		interrupt-parent = <&gpioa>;
+		interrupts = <16 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpioa 5 GPIO_ACTIVE_LOW>;
+		touchscreen-size-x = <600>;
+		touchscreen-size-y = <1024>;
+		status = "disabled";
+	};
+};
+
 &sd1 {
 	status = "okay";
 };
