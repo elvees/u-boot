@@ -86,6 +86,11 @@
 		touchscreen-size-y = <1024>;
 		status = "disabled";
 	};
+
+	mcp7940x: rtc@6f {
+		compatible = "microchip,mcp7940x";
+		reg = <0x6f>;
+	};
 };
 
 &sd1 {
