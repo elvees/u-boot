@@ -129,6 +129,14 @@
 		status = "disabled";
 	};
 
+	pwm: pwm@0x38090000 {
+		compatible = "elvees,mcom-pwm";
+		reg = <0x38090000 0x1000>;
+		#pwm-cells = <2>;
+		clocks = <&pwm_pclk>;
+		status = "disabled";
+	};
+
 	sd0: sdhci0@3800b000 {
 		compatible = "arasan,sdhci-8.9a";
 		reg = <0x3800b000 0x2000>;
@@ -622,6 +630,14 @@
 				reg-bit = <1>;
 			};
 
+			pwm_pclk: pwm_pclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <7>;
+			};
+
 			mfbsp0_pclk: mfbsp0_pclk {
 				compatible = "elvees,mcom-clk-gate";
 				clocks = <&l3_pclk>;
@@ -684,7 +700,6 @@
 				#clock-cells = <0>;
 				reg = <0x4c>;
 				reg-bit = <13>;
-
 			};
 
 			uart2_pclk: uart2_pclk {
