@@ -84,6 +84,24 @@
 	};
 };
 
+&i2c2 {
+	ft5206: touchscreen@38 {
+		compatible = "edt,edt-ft5x06";
+		reg = <0x38>;
+		interrupt-parent = <&gpioa>;
+		interrupts = <16 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpioa 5 GPIO_ACTIVE_LOW>;
+		touchscreen-size-x = <600>;
+		touchscreen-size-y = <1024>;
+		status = "disabled";
+	};
+
+	mcp7940x: rtc@6f {
+		compatible = "microchip,mcp7940x";
+		reg = <0x6f>;
+	};
+};
+
 &sd1 {
 	status = "okay";
 };
