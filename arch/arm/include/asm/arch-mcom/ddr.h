@@ -95,15 +95,15 @@ struct sdram_params_ddr3 {
 };
 
 enum lpddr2_device_type {
-	MCOM_LPDDR2_TYPE_S2 = 0,
-	MCOM_LPDDR2_TYPE_S4 = 1
+	MCOM_LPDDR2_TYPE_S4 = 0,
+	MCOM_LPDDR2_TYPE_S2 = 1
 };
 
 /**
  * struct sdram_params_lpddr2 - Parameters for LPDDR2 SDRAMs
  * @device_type:     tRP (min) timing parameter
- * @tdqsck:          tDQSCK (min)
- * @tdqsck_max:      tDQSCK (max)
+ * @tdqsck:          tDQSCK (min) in ps
+ * @tdqsck_max:      tDQSCK (max) in ps
  * @tmrw:            tMRW (min)
  * @trpab:           tRPab (min)
  * @trppb:           tRPpb (min)
@@ -121,6 +121,7 @@ struct sdram_params_lpddr2 {
 	u32 tzqcl;
 	u32 trfcab;
 	u32 txsr;
+	u32 tzqreset;
 };
 
 enum sdram_type {
@@ -143,6 +144,24 @@ struct impedance_params {
 };
 
 /**
+ * struct ctl_params - Configuration parameters for DDRMC and PHY
+ * @dqsres:       On-die pull-up/down resistor for DQS pin (only for LPDDR2).
+ *                dqsres[3] bit selects pull-down (when set to 0) or pull-up
+ *                (when set to 1). dqsres[2:0] selects resistor value:
+ *                000 - on-die resistor disconnected; 001 - 688 ohms;
+ *                010 - 611 ohms; 011 - 550 ohms; 100 - 500 ohms;
+ *                101 - 458 ohms; 110 - 393 ohms; 111 - 344 ohms.
+ *                The resistor must be used for LPDDR2 to avoid possible
+ *                glitches on DQS pin.
+ * @dqsnres:      On-die pull-up/down resistor for DQSN pin (only for LPDDR2).
+ *                Same encoding as for dqsres.
+ */
+struct ctl_params {
+	u8 dqsres;
+	u8 dqsnres;
+};
+
+/**
  * struct ddr_cfg - DDR configuration
  * @ctl_id:       DDR Memory Controller ID
  * @type:         SDRAM type (DDR3 or LPDDR2)
@@ -154,6 +173,7 @@ struct ddr_cfg {
 	enum sdram_type type;
 	struct impedance_params impedance;
 	struct sdram_params_common common;
+	struct ctl_params ctl;
 	union {
 		struct sdram_params_ddr3 ddr3;
 		struct sdram_params_lpddr2 lpddr2;

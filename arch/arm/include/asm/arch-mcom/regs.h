@@ -329,7 +329,8 @@ typedef struct {
 	volatile uint32_t DRAMTMG6;
 	volatile uint8_t RESERVED7[100];
 	volatile uint32_t ZQCTL0;
-	volatile uint8_t RESERVED8[12];
+	volatile uint32_t ZQCTL1;
+	volatile uint8_t RESERVED8[8];
 	volatile uint32_t DFITMG0;
 	volatile uint32_t DFITMG1;
 	volatile uint8_t RESERVED9[8];

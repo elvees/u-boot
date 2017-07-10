@@ -1,6 +1,6 @@
 /*
  * Copyright 2016 ELVEES NeoTek JSC
- * Copyright 2017 RnD Center "ELVEES", OJSC
+ * Copyright 2017 RnD Center "ELVEES", JSC
  *
  * SPDX-License-Identifier: GPL-2.0+
  */
@@ -318,10 +318,88 @@ static u16 ctl_set_regs_ddr3(struct ddr_cfg *cfg)
 	return set_addr_mapping(cfg);
 }
 
-static u16 ctl_set_regs_lpddr2(struct ddr_cfg *cfg)
+static u16 ctl_set_regs_lpddr2(struct ddr_cfg *cfg, struct ddr_freq *freq)
 {
-	/* TODO: Implement the function */
-	return 0;
+	u32 tck, tmp, tmp2;
+	ddrmc_t *const MC = DDRMC[cfg->ctl_id];
+
+	tck = ddr_get_clock_period(cfg->ctl_id, freq);
+	if (!tck)
+		return MCOM_DDR_CFG_ERR;
+
+	/* TODO: Calculate the following parameters from anywhere */
+	MC->DFIUPD1 = FIELD_PREP(DFIUPD1_UPD_INTER_MAX, 64) |
+		      FIELD_PREP(DFIUPD1_UPD_INTER_MIN, 12);
+
+	MC->MSTR = FIELD_PREP(MSTR_LPDDR2, 1) |
+		   FIELD_PREP(MSTR_BURST_RDWR, cfg->common.bl / 2) |
+		   FIELD_PREP(MSTR_ACTIVE_RANKS, cfg->common.ranks);
+
+	MC->RFSHTMG = FIELD_PREP(RFSHTMG_TRFC_MIN, cfg->lpddr2.trfcab) |
+		      FIELD_PREP(RFSHTMG_TRFC_NOM, cfg->common.trefi / 32);
+
+	tmp = cfg->common.tras_max / 1024;
+	tmp2 = cfg->common.cwl + cfg->common.twr + cfg->common.bl / 2 + 1;
+	MC->DRAMTMG0 = FIELD_PREP(DRAMTMG0_TRAS_MIN, cfg->common.tras) |
+		       FIELD_PREP(DRAMTMG0_TRAS_MAX, tmp) |
+		       FIELD_PREP(DRAMTMG0_TFAW, cfg->common.tfaw) |
+		       FIELD_PREP(DRAMTMG0_WR2PRE, tmp2);
+
+	switch (cfg->lpddr2.device_type) {
+	case MCOM_LPDDR2_TYPE_S2:
+		tmp = cfg->common.bl / 2 + cfg->common.trtp - 1;
+		break;
+	case MCOM_LPDDR2_TYPE_S4:
+		tmp = cfg->common.bl / 2 + max(cfg->common.trtp, (u32)2) - 2;
+		break;
+	default:
+		printf("LPDDR2 device type (%d) is not supported\n",
+		       cfg->lpddr2.device_type);
+		return MCOM_DDR_CFG_ERR;
+	}
+
+	MC->DRAMTMG1 = FIELD_PREP(DRAMTMG1_TRC, cfg->common.trc) |
+		       FIELD_PREP(DRAMTMG1_RD2PRE, tmp) |
+		       FIELD_PREP(DRAMTMG1_TXP, cfg->common.txp);
+
+	tmp = cfg->common.cwl + cfg->common.bl / 2 + cfg->common.twtr + 1;
+	tmp2 = cfg->common.cl + cfg->common.bl / 2 + 1 - cfg->common.cwl
+		+ to_clocks(cfg->lpddr2.tdqsck_max, tck);
+	MC->DRAMTMG2 = FIELD_PREP(DRAMTMG2_WR2RD, tmp) |
+		       FIELD_PREP(DRAMTMG2_RD2WR, tmp2) |
+		       FIELD_PREP(DRAMTMG2_READ_LAT, cfg->common.cl) |
+		       FIELD_PREP(DRAMTMG2_WRITE_LAT, cfg->common.cwl);
+
+	MC->DRAMTMG3 = FIELD_PREP(DRAMTMG3_TMRW, cfg->lpddr2.tmrw);
+
+	tmp = max(cfg->lpddr2.trpab, cfg->lpddr2.trppb);
+	MC->DRAMTMG4 = FIELD_PREP(DRAMTMG4_TRP, tmp) |
+		       FIELD_PREP(DRAMTMG4_TRRD, cfg->common.trrd) |
+		       FIELD_PREP(DRAMTMG4_TCCD, cfg->common.tccd) |
+		       FIELD_PREP(DRAMTMG4_TRCD, cfg->common.trcd);
+
+	tmp = max(cfg->common.tcke, cfg->common.tckesr);
+	MC->DRAMTMG5 = FIELD_PREP(DRAMTMG5_TCKE, tmp) |
+		       FIELD_PREP(DRAMTMG5_TCKESR, cfg->common.tckesr) |
+		       FIELD_PREP(DRAMTMG5_TCKSRE, 2) |
+		       FIELD_PREP(DRAMTMG5_TCKSRX, 2);
+
+	tmp = MC->DRAMTMG6 & ~DRAMTMG6_TCKCSX;
+	MC->DRAMTMG6 = tmp | FIELD_PREP(DRAMTMG6_TCKCSX, cfg->common.txp + 2);
+
+	MC->ZQCTL0 = FIELD_PREP(ZQCTL0_TZQSHORT, cfg->common.tzqcs) |
+		     FIELD_PREP(ZQCTL0_TZQLONG, cfg->lpddr2.tzqcl);
+
+	tmp = MC->ZQCTL1 & ~ZQCTL1_TZQRESET;
+	MC->ZQCTL1 = tmp | FIELD_PREP(ZQCTL1_TZQRESET, cfg->lpddr2.tzqreset);
+
+	tmp = cfg->common.cl - 2 + to_clocks(cfg->lpddr2.tdqsck, tck);
+	MC->DFITMG0 = FIELD_PREP(DFITMG0_TPHY_WRLAT, cfg->common.cwl) |
+		      FIELD_PREP(DFITMG0_TPHY_WRDATA, 1) |
+		      FIELD_PREP(DFITMG0_RDDATA_EN, tmp) |
+		      FIELD_PREP(DFITMG0_CTRL_DELAY, 2);
+
+	return set_addr_mapping(cfg);
 }
 
 static u16 set_impedance_ddr3(struct impedance_params *impedance, ddrphy_t *PHY)
@@ -483,9 +561,163 @@ static u16 phy_set_regs_ddr3(struct ddr_cfg *cfg, struct ddr_freq *freq)
 	return 0;
 }
 
+static u16 set_impedance_lpddr2(struct impedance_params *impedance,
+				ddrphy_t *PHY)
+{
+	u32 tmp;
+
+	switch (impedance->ods_dram) {
+	case 34:
+		tmp = 1;
+		break;
+	case 40:
+		tmp = 2;
+		break;
+	case 48:
+		tmp = 3;
+		break;
+	case 60:
+		tmp = 4;
+		break;
+	case 80:
+		tmp = 6;
+		break;
+	case 120:
+		tmp = 7;
+		break;
+	default:
+		printf("ods_dram = %d is not supported\n", impedance->ods_dram);
+		return MCOM_DDR_CFG_ERR;
+	}
+	PHY->MR3 = tmp;
+
+	switch (impedance->ods_mc) {
+	case 34:
+		tmp = 13;
+		break;
+	case 40:
+		tmp = 11;
+		break;
+	case 48:
+		tmp = 9;
+		break;
+	case 60:
+		tmp = 7;
+		break;
+	case 80:
+		tmp = 5;
+		break;
+	default:
+		printf("ods_mc = %d is not supported\n", impedance->ods_mc);
+		return MCOM_DDR_CFG_ERR;
+	}
+	PHY->ZQ0CR1 = tmp;
+
+	return 0;
+}
+
 static u16 phy_set_regs_lpddr2(struct ddr_cfg *cfg, struct ddr_freq *freq)
 {
-	/* TODO: Implement the function */
+	u32 tck, tmp, tmp2;
+	ddrphy_t *const PHY = DDRPHY[cfg->ctl_id];
+	u16 ret;
+
+	tck = ddr_get_clock_period(cfg->ctl_id, freq);
+	if (!tck)
+		return MCOM_DDR_CFG_ERR;
+
+	PHY->PGCR &= ~(PGCR_DFTCMP | PGCR_RANKEN);
+	PHY->PGCR |= FIELD_PREP(PGCR_DQSCFG, 1) |
+		     FIELD_PREP(PGCR_RANKEN, cfg->common.ranks) |
+		     FIELD_PREP(PGCR_RFSHDT, REFRESH_NUM_DUR_TRAIN);
+
+	PHY->PTR0 = FIELD_PREP(PTR0_TDLLSRST,
+			       to_clocks(DLL_SRST_TIME_PS, tck)) |
+		    FIELD_PREP(PTR0_TDLLLOCK,
+			       to_clocks(DLL_LOCK_TIME_PS, tck)) |
+		    FIELD_PREP(PTR0_TITMSRST, ITM_SRST_TIME_CK);
+
+	tmp = to_clocks(TDINIT0_LPDDR2_PS, tck);
+	tmp2 = to_clocks(TDINIT1_LPDDR2_PS, tck);
+	PHY->PTR1 = FIELD_PREP(PTR1_TDINIT0, tmp) |
+		    FIELD_PREP(PTR1_TDINIT1, tmp2);
+
+	tmp = to_clocks(TDINIT2_LPDDR2_PS, tck);
+	tmp2 = to_clocks(TDINIT3_LPDDR2_PS, tck);
+	PHY->PTR2 = FIELD_PREP(PTR2_TDINIT2, tmp) |
+		    FIELD_PREP(PTR2_TDINIT3, tmp2);
+
+	PHY->DXCCR = FIELD_PREP(DXCCR_DQSRES, cfg->ctl.dqsres) |
+		     FIELD_PREP(DXCCR_DQSNRES, cfg->ctl.dqsnres);
+
+	tmp = to_clocks(cfg->lpddr2.tdqsck_max - cfg->lpddr2.tdqsck, tck);
+	PHY->DSGCR &= ~(DSGCR_DQSGX | DSGCR_DQSGE | DSGCR_NL2OE);
+	PHY->DSGCR |= FIELD_PREP(DSGCR_DQSGX, tmp) |
+		      FIELD_PREP(DSGCR_DQSGE, tmp) |
+		      FIELD_PREP(DSGCR_NL2PD, 1);
+
+	PHY->DCR = FIELD_PREP(DCR_DDRMD, 4) |
+		   FIELD_PREP(DCR_DDR8BANK, (cfg->common.banks == 8) ? 1 : 0) |
+		   FIELD_PREP(DCR_DDRTYPE, cfg->lpddr2.device_type);
+
+	tmp = max(cfg->lpddr2.trpab, cfg->lpddr2.trppb);
+	PHY->DTPR0 = FIELD_PREP(DTPR0_TRTP, cfg->common.trtp) |
+		     FIELD_PREP(DTPR0_TWTR, cfg->common.twtr) |
+		     FIELD_PREP(DTPR0_TRP, tmp) |
+		     FIELD_PREP(DTPR0_TRCD, cfg->common.trcd) |
+		     FIELD_PREP(DTPR0_TRAS, cfg->common.tras) |
+		     FIELD_PREP(DTPR0_TRRD, cfg->common.trrd) |
+		     FIELD_PREP(DTPR0_TRC, cfg->common.trc) |
+		     FIELD_PREP(DTPR0_TCCD, (cfg->common.tccd <= 4) ? 0 : 1);
+
+	tmp = to_clocks(cfg->lpddr2.tdqsck_max, tck);
+	PHY->DTPR1 = FIELD_PREP(DTPR1_TFAW, cfg->common.tfaw) |
+		     FIELD_PREP(DTPR1_TRFC, cfg->lpddr2.trfcab) |
+		     FIELD_PREP(DTPR1_TDQSMIN, cfg->lpddr2.tdqsck / tck) |
+		     FIELD_PREP(DTPR1_TDQSMAX, tmp);
+
+	PHY->DTPR2 = FIELD_PREP(DTPR2_TXS, cfg->lpddr2.txsr) |
+		     FIELD_PREP(DTPR2_TXP, cfg->common.txp) |
+		     FIELD_PREP(DTPR2_TCKE, cfg->common.tckesr);
+
+	if (cfg->common.bl != 4 && cfg->common.bl != 8 &&
+	    cfg->common.bl != 16) {
+		printf("Burst length (%d) is not supported\n", cfg->common.bl);
+		return MCOM_DDR_CFG_ERR;
+	}
+
+	PHY->MR1 = FIELD_PREP(MR1_LPDDR2_BL, ffs(cfg->common.bl) - 1);
+
+	if (cfg->common.twr < 3 || cfg->common.twr > 8) {
+		printf("tWR (%d) is not supported\n", cfg->common.twr);
+		return MCOM_DDR_CFG_ERR;
+	}
+
+	PHY->MR1 |= FIELD_PREP(MR1_LPDDR2_NWR, cfg->common.twr - 2);
+
+	if (cfg->common.cl == 3 && cfg->common.cwl == 1) {
+		tmp = 1;
+	} else if (cfg->common.cl == 4 && cfg->common.cwl == 2) {
+		tmp = 2;
+	} else if (cfg->common.cl == 5 && cfg->common.cwl == 2) {
+		tmp = 3;
+	} else if (cfg->common.cl == 6 && cfg->common.cwl == 3) {
+		tmp = 4;
+	} else if (cfg->common.cl == 7 && cfg->common.cwl == 4) {
+		tmp = 5;
+	} else if (cfg->common.cl == 8 && cfg->common.cwl == 4) {
+		tmp = 6;
+	} else {
+		printf("CL/CWL (%d/%d) are not supported\n", cfg->common.cl,
+		       cfg->common.cwl);
+		return MCOM_DDR_CFG_ERR;
+	}
+	PHY->MR2 = FIELD_PREP(MR2_LPDDR2_RL_WL, tmp);
+
+	ret = set_impedance_lpddr2(&cfg->impedance, PHY);
+	if (ret)
+		return ret;
+
 	return 0;
 }
 
@@ -508,7 +740,7 @@ static u16 validate_cfg(struct ddr_cfg *cfg)
 		return 0;
 }
 
-static u16 ddr_init_phase1(struct ddr_cfg *cfg)
+static u16 ddr_init_phase1(struct ddr_cfg *cfg, struct ddr_freq *freq)
 {
 	u16 rc = 0;
 	int ctl_id = cfg->ctl_id;
@@ -528,7 +760,7 @@ static u16 ddr_init_phase1(struct ddr_cfg *cfg)
 		rc = ctl_set_regs_ddr3(cfg);
 		break;
 	case MCOM_SDRAM_TYPE_LPDDR2:
-		rc = ctl_set_regs_lpddr2(cfg);
+		rc = ctl_set_regs_lpddr2(cfg, freq);
 		break;
 	default:
 		printf("SDRAM type (%d) is unsupported", cfg->type);
@@ -747,7 +979,7 @@ u32 mcom_ddr_init(struct ddr_cfg *cfg0, struct ddr_cfg *cfg1,
 			continue;
 		}
 
-		rc[i] = ddr_init_phase1(cfg[i]);
+		rc[i] = ddr_init_phase1(cfg[i], freq);
 	}
 
 	if (rc[0] && rc[1])

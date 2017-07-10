@@ -1,6 +1,6 @@
 /*
  * Copyright 2015-2016 ELVEES NeoTek JSC
- * Copyright 2017 RnD Center "ELVEES", OJSC
+ * Copyright 2017 RnD Center "ELVEES", JSC
  *
  * SPDX-License-Identifier: GPL-2.0+
  */
@@ -57,6 +57,7 @@
 #define ZQCTL0_TZQLONG            GENMASK(25, 16)
 
 #define ZQCTL1_TZQSHORT_INTERVAL  GENMASK(19, 0)
+#define ZQCTL1_TZQRESET           GENMASK(29, 20)
 
 #define DFIMISC_INIT_COMPLETE_EN  BIT(0)
 
@@ -144,10 +145,14 @@
 #define PTR2_TDINIT3              GENMASK(26, 17)
 
 #define DXCCR_DXODT               BIT(0)
+#define DXCCR_DQSRES              GENMASK(7, 4)
+#define DXCCR_DQSNRES             GENMASK(11, 8)
 #define DXCCR_AWDT                BIT(16)
 
 #define DSGCR_DQSGX               GENMASK(7, 5)
 #define DSGCR_DQSGE               GENMASK(10, 8)
+#define DSGCR_NL2PD               BIT(24)
+#define DSGCR_NL2OE               BIT(25)
 
 #define DCR_DDRMD                 GENMASK(2, 0)
 #define DCR_DDR8BANK              BIT(3)
@@ -189,7 +194,7 @@
 #define MR1_LPDDR2_BL             GENMASK(2, 0)
 #define MR1_LPDDR2_BT             BIT(3)
 #define MR1_LPDDR2_WC             BIT(4)
-#define MR1_LPDDR2_nWR            GENMASK(7, 5)
+#define MR1_LPDDR2_NWR            GENMASK(7, 5)
 
 #define MR2_DDR3_CWL              GENMASK(5, 3)
 #define MR2_DDR3_RTTWR            GENMASK(10, 9)
