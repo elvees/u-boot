@@ -72,6 +72,15 @@
 			sound-dai = <&sgtl5000>;
 		};
 	};
+
+	ft313h: usb@00000000 {
+		compatible = "ftdi,usb-ft313h";
+		reg = <0x00000000 0x0200>;
+		clocks = <&nor_sclk>;
+		interrupt-parent = <&gpioa>;
+		interrupts = <4 GPIO_ACTIVE_HIGH>;
+		status = "disabled";
+	};
 };
 
 &ethernet {

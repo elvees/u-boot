@@ -94,6 +94,10 @@
 	output = <&hdmi>;
 };
 
+&ft313h {
+	status = "okay";
+};
+
 &i2c0 {
 	hdmi: it66121@4c {
 		compatible = "ite,it66121";
