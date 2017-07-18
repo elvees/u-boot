@@ -58,10 +58,10 @@ static int arasan_sdhci_probe(struct udevice *dev)
 	host->name = dev->name;
 	host->ioaddr = (void *)devfdt_get_addr(dev);
 	host->quirks = SDHCI_QUIRK_WAIT_SEND_CMD | SDHCI_QUIRK_NO_HISPD_BIT;
-
+	host->max_clk = SPLL_FREQ;
 	host->ops = &arasan_sdhci_ops;
 
-	ret = sdhci_setup_cfg(&plat->cfg, host, SPLL_FREQ, 400000);
+	ret = sdhci_setup_cfg(&plat->cfg, host, 0, 400000);
 	if (ret)
 		return ret;
 
