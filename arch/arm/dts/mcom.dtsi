@@ -468,7 +468,7 @@
 				clocks = <&xti24m>;
 				#clock-cells = <0>;
 				clock-div = <1>;
-				clock-mult = <18>;
+				clock-mult = <16>;
 			};
 
 			vpu_aclk: vpu_aclk {
