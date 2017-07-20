@@ -120,7 +120,16 @@
 };
 
 &sd1 {
+	#address-cells = <1>;
+	#size-cells = <0>;
 	status = "okay";
+
+	ap6212: wifi@1 {
+		reg = <1>;
+		compatible = "brcm,bcm4329-fmac";
+		reg-on-gpio = <&gpioc 23 GPIO_ACTIVE_HIGH>;
+		status = "disabled";
+	};
 };
 
 &sound {
