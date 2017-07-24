@@ -127,11 +127,15 @@ void board_init_f(ulong dummy)
 
 	sys.SDMMC0->EXT_REG_1 = (sys.SDMMC0->EXT_REG_1 & 0x00FFFFFF) |
 			((SPLL_FREQ / 1000000) << 24);
+	sys.SDMMC0->EXT_REG_1 &= ~0x00010000;  /* disable SDMA */
+	sys.SDMMC0->EXT_REG_1 &= ~0x00008000;  /* disable ADMA2 */
 	sys.SDMMC0->EXT_REG_2 &= ~0x38000000;  /* disable SDR50, SDR104, DDR50 */
 	sys.SDMMC0->EXT_REG_6 &= ~0x39000000;  /* disable 1.8V mode */
 
 	sys.SDMMC1->EXT_REG_1 = (sys.SDMMC1->EXT_REG_1 & 0x00FFFFFF) |
 			((SPLL_FREQ / 1000000) << 24);
+	sys.SDMMC1->EXT_REG_1 &= ~0x00010000;  /* disable SDMA */
+	sys.SDMMC1->EXT_REG_1 &= ~0x00008000;  /* disable ADMA2 */
 	sys.SDMMC1->EXT_REG_2 &= ~0x38000000;  /* disable SDR50, SDR104, DDR50 */
 	sys.SDMMC1->EXT_REG_6 &= ~0x39000000;  /* disable 1.8V mode */
 
