@@ -135,12 +135,18 @@
 		"fi;" \
 	"fi;"
 
+#ifdef CONFIG_TARGET_SALUTE_PM
+#define DDRCTL_CMD "ddrctl_cmd=enable\0"
+#else
+#define DDRCTL_CMD "ddrctl_cmd=disable\0"
+#endif
+
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"bootm_size=0x10000000\0" \
 	"stdin=serial\0" \
 	"stdout=serial\0" \
 	"stderr=serial\0" \
-	"ddrctl_cmd=disable\0" \
+	DDRCTL_CMD \
 	"ddrctl_cid=1\0" \
 	"bootenv=u-boot.env\0" \
 	"bootenvcmd=\0" \
