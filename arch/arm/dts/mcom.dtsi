@@ -270,6 +270,16 @@
 		status = "disabled";
 	};
 
+	/* This node is used by the vpout-drm driver. */
+	vpout: vpout@38004000 {
+		compatible = "elvees,mcom02-vpout";
+		reg = <0x38004000 0x1000>;
+		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&vpout_aclk>;
+		status = "disabled";
+	};
+
+	/* This node is used by the old vpoutfb driver. */
 	framebuffer: framebuffer@38004000 {
 		compatible = "elvees,vpoutfb";
 		reg = <0x38004000 0x1000>;
