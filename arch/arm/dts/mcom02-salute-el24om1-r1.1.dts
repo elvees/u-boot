@@ -89,12 +89,24 @@
 	status = "okay";
 };
 
-&framebuffer {
+&ft313h {
 	status = "okay";
 };
 
-&ft313h {
-	status = "okay";
+&i2c0 {
+	tda19988: hdmi-encoder@70 {
+		compatible = "nxp,tda998x";
+		reg = <0x70>;
+		interrupt-parent = <&gpioa>;
+		interrupts = <11 GPIO_ACTIVE_HIGH>;
+		video-ports = <0x234501>;
+
+		port {
+			hdmi_endpoint: endpoint {
+				remote-endpoint = <&vpout_endpoint>;
+			};
+		};
+	};
 };
 
 &i2c2 {
@@ -160,4 +172,14 @@
 /* RS-485 is used as physical layer for UART3 */
 &uart3 {
 	status = "okay";
+};
+
+&vpout {
+	status = "okay";
+
+	port {
+		vpout_endpoint: endpoint {
+			remote-endpoint = <&hdmi_endpoint>;
+		};
+	};
 };
