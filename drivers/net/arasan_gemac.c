@@ -516,7 +516,8 @@ static int arasan_gemac_probe(struct udevice *dev)
 
 	priv->base = (void *)dev_get_addr(dev);
 
-	phy_mode = fdt_getprop(gd->fdt_blob, dev->of_offset, "phy-mode", 0);
+	phy_mode = fdt_getprop(gd->fdt_blob, dev_of_offset(dev),
+			       "phy-mode", 0);
 	if (!phy_mode)
 		return -EINVAL;
 
@@ -524,7 +525,7 @@ static int arasan_gemac_probe(struct udevice *dev)
 	if (priv->phy_interface < 0)
 		return -EINVAL;
 
-	phy_handle = fdtdec_lookup_phandle(gd->fdt_blob, dev->of_offset,
+	phy_handle = fdtdec_lookup_phandle(gd->fdt_blob, dev_of_offset(dev),
 					   "phy-handle");
 	if (phy_handle < 0)
 		return -EINVAL;
