@@ -514,7 +514,7 @@ static int arasan_gemac_probe(struct udevice *dev)
 	const char *phy_mode;
 	int phy_handle, ret;
 
-	priv->base = (void *)dev_get_addr(dev);
+	priv->base = (void *)devfdt_get_addr(dev);
 
 	phy_mode = fdt_getprop(gd->fdt_blob, dev_of_offset(dev),
 			       "phy-mode", 0);
