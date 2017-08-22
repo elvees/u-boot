@@ -539,7 +539,7 @@ static u16 phy_set_regs_ddr3(struct ddr_cfg *cfg, struct ddr_freq *freq)
 		return MCOM_DDR_CFG_ERR;
 	}
 
-	if ((cfg->common.twr >= 5) && (cfg->common.twr <= 8)) {
+	if ((cfg->common.twr >= MCOM_DDR_MIN_TWR) && (cfg->common.twr <= 8)) {
 		tmp2 = cfg->common.twr - 4;
 	} else if ((cfg->common.twr == 10) || (cfg->common.twr == 12)) {
 		tmp2 = cfg->common.twr >> 1;

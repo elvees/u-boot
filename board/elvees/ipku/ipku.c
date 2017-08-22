@@ -53,7 +53,7 @@ int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 	cfg->common.bl = 8;
 	cfg->common.cl = 6;
 	cfg->common.cwl = 5;
-	cfg->common.twr = to_clocks(15000, tck);
+	cfg->common.twr = max(MCOM_DDR_MIN_TWR, to_clocks(15000, tck));
 	cfg->common.tfaw = to_clocks(40000, tck);
 	cfg->common.tras = to_clocks(35000, tck);
 	cfg->common.tras_max = to_clocks(9 * 7800000, tck);

@@ -226,6 +226,8 @@ u32 ddr_get_clock_period(int ctl_id, struct ddr_freq *freq);
 u32 mcom_ddr_init(struct ddr_cfg *cfg0, struct ddr_cfg *cfg1,
 		  struct ddr_freq *freq);
 
+#define MCOM_DDR_MIN_TWR 5
+
 /**
  * set_sdram_cfg - Fills ddr_cfg structure with values for specific board type
  * @cfg: DDR configuration structure
