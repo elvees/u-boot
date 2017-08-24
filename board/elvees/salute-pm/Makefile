@@ -6,3 +6,4 @@
 #
 
 obj-y += salute-pm.o
+obj-$(CONFIG_SPL_BUILD) += pfuze.o

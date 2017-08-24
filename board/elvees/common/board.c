@@ -83,6 +83,11 @@ int dram_init_banksize(void)
 	return 0;
 }
 
+__weak int ddr_poweron(void)
+{
+	return 0;
+}
+
 int dram_init(void)
 {
 	gd->ram_size = PHYS_SDRAM_0_SIZE;
@@ -90,6 +95,12 @@ int dram_init(void)
 	struct ddr_cfg cfg[2];
 	struct ddr_freq freq;
 	int i, ret;
+
+	ret = ddr_poweron();
+	if (ret) {
+		printf("Failed to set DDR power: %d\n", ret);
+		hang();
+	}
 
 	freq.xti_freq = XTI_FREQ;
 	freq.cpll_mult = CPLL_VALUE;
