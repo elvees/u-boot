@@ -3,7 +3,7 @@
  *
  * Copyright 2015 ELVEES NeoTek CJSC
  * Copyright 2015-2016 ELVEES NeoTek JSC
- * Copyright 2017 RnD Center "ELVEES", OJSC
+ * Copyright 2017 RnD Center "ELVEES", JSC
  *
  * Vasiliy Zasukhin <vzasukhin@elvees.com>
  *
@@ -114,6 +114,12 @@ void board_init_f(ulong dummy)
 	}
 
 	preloader_console_init();
+
+#ifdef CONFIG_TARGET_SALUTE_PM
+	/* Enable I2C0 clock here since DDR power on Salute-EL24PM1
+	 * is enabled using I2C0.*/
+	sys.CMCTR->GATE_SYS_CTR |= CMCTR_GATE_SYS_CTR_I2C0_EN;
+#endif
 
 	int rc = dram_init();
 	/* It makes no sence to continue booting if DDRMC #0 initialization

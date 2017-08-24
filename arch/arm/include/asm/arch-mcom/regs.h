@@ -1,6 +1,6 @@
 /*
  * Copyright 2013-2016 ELVEES NeoTek JSC
- * Copyright 2017 RnD Center "ELVEES", OJSC
+ * Copyright 2017 RnD Center "ELVEES", JSC
  *
  * SPDX-License-Identifier: GPL-2.0+
  */
@@ -230,6 +230,7 @@ typedef struct {
 
 #define CMCTR_GATE_SYS_CTR_SPI1_EN	BIT(20)
 #define CMCTR_GATE_SYS_CTR_SPI0_EN	BIT(19)
+#define CMCTR_GATE_SYS_CTR_I2C0_EN	BIT(16)
 #define CMCTR_GATE_SYS_CTR_EMAC_EN	BIT(4)
 #define CMCTR_GATE_SYS_CTR_SDMMC1_EN	BIT(3)
 #define CMCTR_GATE_SYS_CTR_SDMMC0_EN	BIT(2)
