@@ -49,6 +49,14 @@
 
 #define CONFIG_SYS_MALLOC_LEN		SZ_8M
 
+/* I2C support */
+#ifdef CONFIG_TARGET_SALUTE_PM
+#define CONFIG_SYS_I2C
+#define CONFIG_SYS_I2C_BASE		0x3802C000
+#define CONFIG_SYS_I2C_SPEED		100000
+#define IC_CLK				(SPLL_FREQ / 1000000)
+#endif
+
 /* Serial & console */
 #define CONFIG_SYS_NS16550
 #define CONFIG_SYS_NS16550_SERIAL
