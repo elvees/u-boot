@@ -119,6 +119,8 @@ void board_init_f(ulong dummy)
 	/* Enable I2C0 clock here since DDR power on Salute-EL24PM1
 	 * is enabled using I2C0.*/
 	sys.CMCTR->GATE_SYS_CTR |= CMCTR_GATE_SYS_CTR_I2C0_EN;
+
+	spl_early_init();
 #endif
 
 	int rc = dram_init();
