@@ -55,6 +55,12 @@
 #define CONFIG_SYS_I2C_BASE		0x3802C000
 #define CONFIG_SYS_I2C_SPEED		100000
 #define IC_CLK				(SPLL_FREQ / 1000000)
+
+/* Power support */
+#define CONFIG_POWER
+#define CONFIG_POWER_I2C
+#define CONFIG_POWER_PFUZE100
+#define CONFIG_POWER_PFUZE100_I2C_ADDR	0x08
 #endif
 
 /* Serial & console */
