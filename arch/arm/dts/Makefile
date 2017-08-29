@@ -441,6 +441,7 @@ dtb-$(CONFIG_ARCH_MCOM) += \
 	mcom02-salute-el24d3-r1.1.dtb \
 	mcom02-salute-el24om1-r1.0.dtb \
 	mcom02-salute-el24om1-r1.1.dtb \
+	mcom02-salute-el24om1-r1.2.dtb \
 	mcom02-ipku-r1.1.dtb
 
 targets += $(dtb-y)
