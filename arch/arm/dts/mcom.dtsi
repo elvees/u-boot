@@ -25,6 +25,13 @@
 			next-level-cache = <&L2>;
 			reg = <0x0>;
 			clocks = <&apllclk>;
+
+			operating-points = <
+				/* kHz uV */
+				816000 1100000
+				504000 1100000
+				312000 1100000
+			>;
 		};
 		cpu@1 {
 			device_type = "cpu";
