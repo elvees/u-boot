@@ -69,6 +69,70 @@
 		clocks = <&arm_periph_clk>;
 	};
 
+	timer@38026000 {
+		compatible = "snps,dw-apb-timer";
+		reg = <0x38026000 0x14>;
+		interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&l3_pclk>;
+		clock-names = "timer";
+	};
+
+	timer@38026014 {
+		compatible = "snps,dw-apb-timer";
+		reg = <0x38026014 0x14>;
+		interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&l3_pclk>;
+		clock-names = "timer";
+	};
+
+	timer@38026028 {
+		compatible = "snps,dw-apb-timer";
+		reg = <0x38026028 0x14>;
+		interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&l3_pclk>;
+		clock-names = "timer";
+	};
+
+	timer@3802603C {
+		compatible = "snps,dw-apb-timer";
+		reg = <0x3802603C 0x14>;
+		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&l3_pclk>;
+		clock-names = "timer";
+	};
+
+	timer@38026050 {
+		compatible = "snps,dw-apb-timer";
+		reg = <0x38026050 0x14>;
+		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&l3_pclk>;
+		clock-names = "timer";
+	};
+
+	timer@38026064 {
+		compatible = "snps,dw-apb-timer";
+		reg = <0x38026064 0x14>;
+		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&l3_pclk>;
+		clock-names = "timer";
+	};
+
+	timer@38026078 {
+		compatible = "snps,dw-apb-timer";
+		reg = <0x38026078 0x14>;
+		interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&l3_pclk>;
+		clock-names = "timer";
+	};
+
+	timer@3802608C {
+		compatible = "snps,dw-apb-timer";
+		reg = <0x3802608C 0x14>;
+		interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&l3_pclk>;
+		clock-names = "timer";
+	};
+
 	watchdog@38031000 {
 		compatible = "snps,dw-wdt";
 		reg = <0x38031000 0x1000>;
