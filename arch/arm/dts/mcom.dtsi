@@ -25,6 +25,7 @@
 			next-level-cache = <&L2>;
 			reg = <0x0>;
 			clocks = <&apllclk>;
+			clock-latency = <60000>;
 
 			operating-points = <
 				/* kHz uV */
