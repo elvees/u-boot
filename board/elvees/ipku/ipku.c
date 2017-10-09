@@ -35,6 +35,9 @@ int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 		return -EINVAL;
 	}
 
+	/* TODO: This function works only for exactly 1066 MHz, because memory
+	 * timings could be different for different frequency. */
+
 	cfg->type = MCOM_SDRAM_TYPE_DDR3;
 
 	/* TODO: DDR calibration should be done for IP-KU board.
@@ -51,24 +54,24 @@ int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 	cfg->common.columns = 1024;
 	cfg->common.rows = 32768;
 	cfg->common.bl = 8;
-	cfg->common.cl = 6;
-	cfg->common.cwl = 5;
+	cfg->common.cl = 7;
+	cfg->common.cwl = 6;
 	cfg->common.twr = max(MCOM_DDR_MIN_TWR, to_clocks(15000, tck));
-	cfg->common.tfaw = to_clocks(40000, tck);
-	cfg->common.tras = to_clocks(35000, tck);
+	cfg->common.tfaw = to_clocks(50000, tck);
+	cfg->common.tras = to_clocks(37500, tck);
 	cfg->common.tras_max = to_clocks(9 * 7800000, tck);
-	cfg->common.trc = to_clocks(48750, tck);
-	cfg->common.txp = to_clocks(max(3 * tck, 6000), tck);
+	cfg->common.trc = to_clocks(50625, tck);
+	cfg->common.txp = to_clocks(max(3 * tck, 7500), tck);
 	cfg->common.trtp = to_clocks(max(4 * tck, 7500), tck);
 	cfg->common.twtr = to_clocks(max(4 * tck, 7500), tck);
-	cfg->common.trcd = to_clocks(13750, tck);
-	cfg->common.trrd = to_clocks(max(4 * tck, 7500), tck);
+	cfg->common.trcd = to_clocks(13125, tck);
+	cfg->common.trrd = to_clocks(max(4 * tck, 10000), tck);
 	cfg->common.tccd = 4;
-	cfg->common.tcke = to_clocks(max(3 * tck, 5000), tck);
+	cfg->common.tcke = to_clocks(max(3 * tck, 7500), tck);
 	cfg->common.tckesr = cfg->common.tcke + 1;
 	cfg->common.tzqcs = 64;
 	cfg->common.trefi = to_clocks(7800000, tck);
-	cfg->ddr3.trp = to_clocks(13750, tck);
+	cfg->ddr3.trp = to_clocks(13125, tck);
 	cfg->ddr3.txpdll = to_clocks(max(10 * tck, 24000), tck);
 	cfg->ddr3.tmrd = 4;
 	cfg->ddr3.tmod = to_clocks(max(12 * tck, 15000), tck);
