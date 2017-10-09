@@ -6,15 +6,11 @@
  * published by the Free Software Foundation.
  */
 
-/dts-v1/;
-
 #include <dt-bindings/interrupt-controller/irq.h>
 
 #include "mcom02-salute-el24pm1-r1.1-1.2.dtsi"
 
 / {
-	model = "Salute-EL24OM1 r1.2";
-
 	chosen {
 		bootargs = "console=ttyS0,115200";
 	};
@@ -100,12 +96,7 @@
 		interrupt-parent = <&gpioa>;
 		interrupts = <11 GPIO_ACTIVE_HIGH>;
 		video-ports = <0x234501>;
-
-		port {
-			hdmi_endpoint: endpoint {
-				remote-endpoint = <&vpout_endpoint>;
-			};
-		};
+		status = "disabled";
 	};
 };
 
@@ -137,8 +128,8 @@
 	status = "okay";
 
 	ap6212: wifi@1 {
-		reg = <1>;
 		compatible = "brcm,bcm4329-fmac";
+		reg = <1>;
 		reg-on-gpio = <&gpioc 23 GPIO_ACTIVE_HIGH>;
 		status = "disabled";
 	};
@@ -172,14 +163,4 @@
 /* RS-485 is used as physical layer for UART3 */
 &uart3 {
 	status = "okay";
-};
-
-&vpout {
-	status = "okay";
-
-	port {
-		vpout_endpoint: endpoint {
-			remote-endpoint = <&hdmi_endpoint>;
-		};
-	};
 };
