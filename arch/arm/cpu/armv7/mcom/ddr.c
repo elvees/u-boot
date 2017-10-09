@@ -315,6 +315,10 @@ static u16 ctl_set_regs_ddr3(struct ddr_cfg *cfg)
 		      FIELD_PREP(DFITMG0_RDDATA_EN, cfg->common.cl - 2) |
 		      FIELD_PREP(DFITMG0_CTRL_DELAY, 2);
 
+	MC->DFITMG1 = FIELD_PREP(DFITMG1_DRAM_CLK_EN, 2) |
+		      FIELD_PREP(DFITMG1_DRAM_CLK_DIS, 2) |
+		      FIELD_PREP(DFITMG1_WRDATA_DELAY, cfg->common.cwl);
+
 	return set_addr_mapping(cfg);
 }
 
@@ -398,6 +402,10 @@ static u16 ctl_set_regs_lpddr2(struct ddr_cfg *cfg, struct ddr_freq *freq)
 		      FIELD_PREP(DFITMG0_TPHY_WRDATA, 1) |
 		      FIELD_PREP(DFITMG0_RDDATA_EN, tmp) |
 		      FIELD_PREP(DFITMG0_CTRL_DELAY, 2);
+
+	MC->DFITMG1 = FIELD_PREP(DFITMG1_DRAM_CLK_EN, 2) |
+		      FIELD_PREP(DFITMG1_DRAM_CLK_DIS, 2) |
+		      FIELD_PREP(DFITMG1_WRDATA_DELAY, cfg->common.cwl + 1);
 
 	return set_addr_mapping(cfg);
 }
