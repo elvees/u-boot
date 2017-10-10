@@ -910,6 +910,16 @@
 		};
 	};
 
+	pmctr: pmctr@38095000 {
+		compatible = "elvees,mcom-pmctr";
+		reg = <0x38095000 0x1000>;
+	};
+
+	smctr: smctr@38096000 {
+		compatible = "elvees,mcom-smctr";
+		reg = <0x38096000 0x1000>;
+	};
+
 	vpu: codec@37100000 {
 		compatible = "elvees,avico";
 		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
