@@ -19,16 +19,20 @@
 
 #ifdef CONFIG_TARGET_IPKU
 #define APLL_VALUE			0x1F
-#define CPLL_VALUE			0x0F
 #define SPLL_VALUE			0x05	/* L1_HCLK = 144 MHz */
 #define DIV_SYS0_CTR_VALUE		0
 #define DIV_SYS1_CTR_VALUE		0	/* L3_PCLK = L1_HCLK */
 #else
 #define APLL_VALUE			0x1F
-#define CPLL_VALUE			0x0F
 #define SPLL_VALUE			0x0B	/* L1_HCLK = 288 MHz */
 #define DIV_SYS0_CTR_VALUE		0
 #define DIV_SYS1_CTR_VALUE		1	/* L3_PCLK = L1_HCLK / 2 */
+#endif
+
+#ifdef CONFIG_TARGET_SALUTE_PM
+#define CPLL_VALUE			0x14
+#else
+#define CPLL_VALUE			0x0F
 #endif
 
 #define DIV_DDR0_CTR_VALUE              0
