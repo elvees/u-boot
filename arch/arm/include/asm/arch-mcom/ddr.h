@@ -145,20 +145,29 @@ struct impedance_params {
 
 /**
  * struct ctl_params - Configuration parameters for DDRMC and PHY
- * @dqsres:       On-die pull-up/down resistor for DQS pin (only for LPDDR2).
- *                dqsres[3] bit selects pull-down (when set to 0) or pull-up
- *                (when set to 1). dqsres[2:0] selects resistor value:
- *                000 - on-die resistor disconnected; 001 - 688 ohms;
- *                010 - 611 ohms; 011 - 550 ohms; 100 - 500 ohms;
- *                101 - 458 ohms; 110 - 393 ohms; 111 - 344 ohms.
- *                The resistor must be used for LPDDR2 to avoid possible
- *                glitches on DQS pin.
- * @dqsnres:      On-die pull-up/down resistor for DQSN pin (only for LPDDR2).
- *                Same encoding as for dqsres.
+ * @dqsres:              On-die pull-up/down resistor for DQS pin
+ *                       (only for LPDDR2). dqsres[3] bit selects pull-down
+ *                       (when set to 0) or pull-up (when set to 1).
+ *                       dqsres[2:0] selects resistor value:
+ *                       000 - on-die resistor disconnected; 001 - 688 ohms;
+ *                       010 - 611 ohms; 011 - 550 ohms; 100 - 500 ohms;
+ *                       101 - 458 ohms; 110 - 393 ohms; 111 - 344 ohms.
+ *                       The resistor must be used for LPDDR2 to avoid possible
+ *                       glitches on DQS pin.
+ * @dqsnres:             On-die pull-up/down resistor for DQSN pin
+ *                       (only for LPDDR2). Same encoding as for dqsres.
+ * @dqs_gating_override: Override DQS gating configuration which is found
+ *                       during built-in DQS calibration by the values from
+ *                       @dqs_gating array for each lane.
+ * @dqs_gating:          Array of DQS gating delays. dqs_gating[0] corresponds
+ *                       lane0, dqs_gating[1] to lane1 and so on.
+ *                       Used only if @dqs_gating_override is set to 1.
  */
 struct ctl_params {
 	u8 dqsres;
 	u8 dqsnres;
+	u8 dqs_gating_override;
+	u16 dqs_gating[4];
 };
 
 /**

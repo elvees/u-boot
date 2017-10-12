@@ -797,6 +797,26 @@ static void ddr_set_freq(struct ddr_freq *freq)
 		continue;
 }
 
+static void dqs_gating_override(struct ddr_cfg *cfg)
+{
+	int ctl_id = cfg->ctl_id;
+
+	/* Disable DQS drift compensation */
+	DDRPHY[ctl_id]->PGCR &= ~PGCR_DFTCMP;
+
+	DDRPHY[ctl_id]->DX0DQSTR &= ~DXDQSTR_GATING;
+	DDRPHY[ctl_id]->DX0DQSTR |= cfg->ctl.dqs_gating[0];
+
+	DDRPHY[ctl_id]->DX1DQSTR &= ~DXDQSTR_GATING;
+	DDRPHY[ctl_id]->DX1DQSTR |= cfg->ctl.dqs_gating[1];
+
+	DDRPHY[ctl_id]->DX2DQSTR &= ~DXDQSTR_GATING;
+	DDRPHY[ctl_id]->DX2DQSTR |= cfg->ctl.dqs_gating[2];
+
+	DDRPHY[ctl_id]->DX3DQSTR &= ~DXDQSTR_GATING;
+	DDRPHY[ctl_id]->DX3DQSTR |= cfg->ctl.dqs_gating[3];
+}
+
 static u16 phy_init(struct ddr_cfg *cfg)
 {
 	u16 rc = 0;
@@ -831,6 +851,9 @@ static u16 phy_init(struct ddr_cfg *cfg)
 		rc = MCOM_DDR_TRAIN_ERR;
 		printf("Read valid training error for ctl %d\n", ctl_id);
 	}
+
+	if (!rc && cfg->ctl.dqs_gating_override)
+		dqs_gating_override(cfg);
 
 	return rc;
 }

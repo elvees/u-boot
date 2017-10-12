@@ -47,6 +47,8 @@ int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 	cfg->impedance.odt_mc = 120;
 	cfg->impedance.odt_dram = 120;
 
+	cfg->ctl.dqs_gating_override = 0;
+
 	/* TODO: Actually IP-KU SDRAM has 2 ranks. But working with 2 ranks is
 	 * untested, so set number of ranks to 1. */
 	cfg->common.ranks = MCOM_SDRAM_ONE_RANK;

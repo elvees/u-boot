@@ -209,4 +209,6 @@
 
 #define ZQ0CR1_ZPROG              GENMASK(7, 0)
 
+#define DXDQSTR_GATING            GENMASK(15, 0)
+
 #endif /* _REG_FIELDS_DDR_H */
