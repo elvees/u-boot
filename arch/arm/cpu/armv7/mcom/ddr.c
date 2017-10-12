@@ -459,6 +459,9 @@ static u16 set_impedance_ddr3(struct impedance_params *impedance, ddrphy_t *PHY)
 
 	switch (impedance->odt_mc) {
 	case 0:
+		/* Impedance divider should not be zero even if ODT is
+		 * disabled. */
+		tmp |= (7 << 4);
 		odt_en = false;
 		break;
 	case 40:
