@@ -21,6 +21,8 @@ DECLARE_GLOBAL_DATA_PTR;
 /* Set parameters for  Micron MT41K256M16HA-125 SDRAM */
 int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 {
+	int i;
+
 	if (!cfg) {
 		printf("Invalid pointer to DDR configuration\n");
 		return -EINVAL;
@@ -44,6 +46,11 @@ int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 	cfg->impedance.ods_dram = 40;
 	cfg->impedance.odt_mc = 120;
 	cfg->impedance.odt_dram = 0;
+
+	cfg->ctl.dqs_gating_override = 1;
+	/* TODO: Replace this configuration by the optimal one. */
+	for (i = 0; i < 4; i++)
+		cfg->ctl.dqs_gating[i] = 0xa001;
 
 	cfg->common.ranks = MCOM_SDRAM_ONE_RANK;
 	cfg->common.banks = 8;
