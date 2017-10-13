@@ -838,8 +838,14 @@ static u16 phy_init(struct ddr_cfg *cfg)
 	/* start PHY and DRAM initialization */
 	DDRPHY[ctl_id]->PIR = tmp;
 
-	/* wait for the end of PHY and DRAM initialization */
-	while (!FIELD_GET(PGSR_IDONE, DDRPHY[ctl_id]->PGSR))
+	tmp = FIELD_PREP(PGSR_IDONE, 1) |
+	      FIELD_PREP(PGSR_DLDONE, 1) |
+	      FIELD_PREP(PGSR_ZCDONE, 1) |
+	      FIELD_PREP(PGSR_DIDONE, 1) |
+	      FIELD_PREP(PGSR_DTDONE, 1);
+
+	/* Wait for the end of PHY & DRAM initialization and DT trainings. */
+	while ((DDRPHY[ctl_id]->PGSR & tmp) != tmp)
 		continue;
 
 	if (FIELD_GET(PGSR_DTERR, DDRPHY[ctl_id]->PGSR)) {
