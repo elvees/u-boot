@@ -115,11 +115,10 @@ int dram_init(void)
 		cfg[i].ctl_id = i;
 	}
 
-	timer_init();
-
 #ifdef CONFIG_DDR_CALIBRATION
-	set_calib_params(CONFIG_DDR_CALIBRATION_DDRMC_ID);
+	set_calib_cfg(cfg);
 #endif
+	timer_init();
 
 	puts("DDR controllers init started\n");
 

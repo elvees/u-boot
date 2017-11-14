@@ -8,35 +8,49 @@
 #define _DDR_CALIBRATION_H
 
 #include <linux/types.h>
+#include <asm/arch/ddr.h>
 
 #define VRAM_BASE	0x3B000000
 #define CALIB_MAGIC	0x12345678
-#define MAX_CFG_NUM	16384
+#define MAX_CFG_NUM	8194
 
-struct lane_cfg {
-	u8 lane;
-	u8 sdphase;
-	u8 sfdly;
-	u8 mfdly;
+/**
+ * struct ddr_calib_cfg - Configuration used during DDR calibration
+ * @impedance:    Impedance parameters for ZQ calibration
+ * @dqs_gating:   Array of DQS gating delays. dqs_gating[0] corresponds
+ *                lane0, dqs_gating[1] to lane1 and so on.
+ */
+struct ddr_calib_cfg {
+	struct impedance_params impedance;
+	u16 dqs_gating[4];
 };
 
-struct calib_cfg {
-	u8 mc_odt_ods;
-	u8 dram_odt_ods;
-	u8 acmfdly;
-	u8 is_valid;
-	struct lane_cfg lcfg;
-};
-
-struct calib_data {
+/**
+ * struct ddr_calib_data - Structure with information for DDR calibration
+ * @magic:    Magic value. Calibration will not start if no magic in VRAM.
+ * @ctl_id:   DDRMC ID for which calibration should be performed
+ * @phase:    Calibration phase
+ * @cur_cfg:  Current configuration index in cfg array
+ * @prev_cfg: Previous configuration index in cfg array
+ * @cfg_num:  Number of checked configurations
+ * @status:   Array with DDR stress test status for each configuration
+ * @cfg:      Configuration array
+ */
+struct ddr_calib_data {
 	u32 magic;
-	u32 cur_cfg_idx;
-	u32 end_cfg_idx;
-	u32 prev_cfg_idx;
-	u32 cfg_tries;
-	struct calib_cfg cfg[MAX_CFG_NUM];
+	u8  ctl_id;
+	u8  phase;
+	u16 cur_cfg;
+	u16 prev_cfg;
+	u16 cfg_num;
+	struct ddr_calib_cfg cfg[MAX_CFG_NUM];
+	u8 status[MAX_CFG_NUM];
 };
 
-void set_calib_params(int ctl_id);
+/**
+ * set_calib_cfg - Fixup DDR configuration with DDR calibration parameters
+ * @cfgs: Array of DDR configurations
+ */
+void set_calib_cfg(struct ddr_cfg *cfgs);
 
 #endif /* _DDR_CALIBRATION_H */
