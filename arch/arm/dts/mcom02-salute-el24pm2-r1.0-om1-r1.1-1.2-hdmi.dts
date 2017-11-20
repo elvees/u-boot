@@ -8,11 +8,7 @@
 
 /dts-v1/;
 
-#include "mcom02-salute-el24om1-r1.1-1.2.dtsi"
-
-/ {
-	model = "Salute-EL24OM1 r1.2";
-};
+#include "mcom02-salute-el24pm2-r1.0-om1-r1.1-1.2.dtsi"
 
 &tda19988 {
 	status = "okay";

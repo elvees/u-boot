@@ -6,8 +6,6 @@
  * published by the Free Software Foundation.
  */
 
-#include "mcom02-salute-el24om1-r1.1-1.2.dtsi"
-
 / {
 	backlight: backlight {
 		compatible = "pwm-backlight";

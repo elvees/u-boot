@@ -1,0 +1,18 @@
+/*
+ * Copyright 2017 RnD Center "ELVEES", JSC
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
+#include "mcom02-salute-el24pm1-r1.1-1.2.dtsi"
+#include "mcom02-salute-el24om1-r1.1-1.2.dtsi"
+
+/ {
+	model = "Salute-EL24PM1 r1.1-1.2, Salute-EL24OM1 r1.1-1.2";
+};
+
+&ft313h {
+	status = "okay";
+};

@@ -8,8 +8,6 @@
 
 #include <dt-bindings/interrupt-controller/irq.h>
 
-#include "mcom02-salute-el24pm1-r1.1-1.2.dtsi"
-
 / {
 	chosen {
 		bootargs = "console=ttyS0,115200";
@@ -64,10 +62,6 @@
 };
 
 &ethernet {
-	status = "okay";
-};
-
-&ft313h {
 	status = "okay";
 };
 
