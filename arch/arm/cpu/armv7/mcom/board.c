@@ -20,8 +20,44 @@
 #include <asm/arch/regs.h>
 #include <watchdog.h>
 
-#define MEM_ACCESS(ADDR) (*((volatile uint32_t*)(ADDR)))
+#include <asm/io.h>
+
 #define BOOTROM_COLD_RESET_BRANCH 0x0000019c
+
+#define SMCTR_BASE 0x38096000
+#define SMCTR_BOOT_REMAP (SMCTR_BASE + 0x4)
+
+#define ARM_PERIPHBASE 0x39000000
+#define SCU_BASE ARM_PERIPHBASE
+#define SCU_POWER_STATUS (SCU_BASE + 0x8)
+#define SCU_PM_NORMAL	0
+#define SCU_PM_DORMANT	2
+#define SCU_PM_POWEROFF	3
+
+#define PMCTR_BASE 0x38095000
+#define PMCTR_SYS_PWR_STATUS (PMCTR_BASE + 0x0c)
+
+#ifdef CONFIG_SPL_BUILD
+static void cpu_poweroff(const u32 cpu)
+{
+	u32 val;
+
+	dcache_disable();
+	invalidate_dcache_all();
+
+	val = readl(SCU_POWER_STATUS);
+	val |= SCU_PM_POWEROFF << (cpu * 8);
+	writel(val, SCU_POWER_STATUS);
+
+	wfi();
+}
+
+static void cpu_waitoff(const u32 cpu)
+{
+	while (!(readl(PMCTR_SYS_PWR_STATUS) & BIT(cpu + 1)))
+		continue;
+}
+#endif
 
 /*
  * According to U-Boot documentation, this function is called before the stack
@@ -34,29 +70,12 @@
 void lowlevel_init(void)
 {
 #ifdef CONFIG_SPL_BUILD
-	if (bootrom_get_cpu_id() != 0) {
+	u32 cpu = bootrom_get_cpu_id();
 
-		/* FIXME
-		 *
-		 * The code in this block is actualy a hack.
-		 * We should power down all cores except core0. Instead of that
-		 * core1 simply polls certain spram address. When magic value is
-		 * read (value is written by linux kernel) core1 jumps to the
-		 * kernel code. Jump address is got from another spram address.
-		 *
-		*/
-
-		uint32_t magic = 0xdeadbeef;
-		uint32_t addr_for_magic = 0x2000fff8;
-		uint32_t addr_for_jump_addr = 0x2000fff4;
-		void (*jump_to_kernel)(void);
-
-		MEM_ACCESS(addr_for_magic) = 0;
-		while(MEM_ACCESS(addr_for_magic) != magic) {}
-		invalidate_dcache_all();
-		jump_to_kernel = (void (*)(void))MEM_ACCESS(addr_for_jump_addr);
-		jump_to_kernel();
-	}
+	if (cpu != 0)
+		cpu_poweroff(cpu);
+	else
+		cpu_waitoff(1);
 #endif
 }
 
