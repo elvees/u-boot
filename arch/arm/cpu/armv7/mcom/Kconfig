@@ -1,5 +1,14 @@
 if ARCH_MCOM
 
+config BOOT_ELF_FROM_SPI
+	bool "Enable ELF file booting from SPI"
+	help
+	  After U-boot is started the following operation will be
+	  performed:
+	  * ELF file of the application will be loaded from SPI flash
+	    to RAM.
+	  * Application in ELF file will be launched automatically.
+
 config HW_WATCHDOG
 	bool "Enable watchdog at startup"
 	select SPL_WATCHDOG_SUPPORT

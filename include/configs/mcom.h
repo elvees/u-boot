@@ -139,6 +139,12 @@
 		"ddrctl ${ddrctl_cmd} ${ddrctl_cid};" \
 	"fi;"
 
+#ifdef CONFIG_BOOT_ELF_FROM_SPI
+#define CONFIG_BOOTCOMMAND \
+	"sf probe ${bootelf_spibus};" \
+	"sf read ${bootelf_addr} ${bootelf_spioffset} ${bootelf_elfsize};" \
+	"bootelf ${bootelf_addr};"
+#else
 #define CONFIG_BOOTCOMMAND \
 	"mmc dev ${mmcdev};" \
 	"if mmc rescan; then " \
@@ -152,6 +158,7 @@
 			"run mmcboot;" \
 		"fi;" \
 	"fi;"
+#endif
 
 #ifdef CONFIG_TARGET_SALUTE_PM
 #define DDRCTL_CMD "ddrctl_cmd=enable\0"
@@ -162,6 +169,10 @@
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"bootm_size=0x10000000\0" \
 	"stdin=serial\0" \
+	"bootelf_spioffset=0x100000\0" \
+	"bootelf_spibus=0\0" \
+	"bootelf_addr=0x50000000\0" \
+	"bootelf_elfsize=0x200000\0" \
 	"stdout=serial\0" \
 	"stderr=serial\0" \
 	DDRCTL_CMD \
