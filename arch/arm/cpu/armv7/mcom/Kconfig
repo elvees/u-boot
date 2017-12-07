@@ -2,6 +2,7 @@ if ARCH_MCOM
 
 config HW_WATCHDOG
 	bool "Enable watchdog at startup"
+	select SPL_WATCHDOG_SUPPORT
 	default no
 	help
 	  Enable watchdog timer for SPL and U-Boot
@@ -17,7 +18,6 @@ menu "DDR calibration mode"
 config DDR_CALIBRATION
 	bool "Enable DDR calibration mode"
 	select HW_WATCHDOG
-	select SPL_WATCHDOG_SUPPORT
 	default no
 	help
 	  In DDR calibration mode U-Boot SPL tries to read calibration
