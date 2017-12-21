@@ -74,7 +74,7 @@ static int arasan_sdhci_probe(struct udevice *dev)
 }
 
 static const struct udevice_id arasan_sdhci_match_table[] = {
-	{ .compatible = "arasan,sdhci-8.9a" },
+	{ .compatible = "elvees,sdhci-mcom02" },
 	{ },
 };
 
