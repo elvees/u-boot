@@ -210,7 +210,7 @@
 	};
 
 	sd0: sdhci0@3800b000 {
-		compatible = "arasan,sdhci-8.9a";
+		compatible = "elvees,sdhci-mcom02";
 		reg = <0x3800b000 0x2000>;
 		interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
 		clock-names = "clk_xin", "clk_ahb";
@@ -223,7 +223,7 @@
 	};
 
 	sd1: sdhci1@3800d000 {
-		compatible = "arasan,sdhci-8.9a";
+		compatible = "elvees,sdhci-mcom02";
 		reg = <0x3800d000 0x2000>;
 		interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
 		clock-names = "clk_xin", "clk_ahb";
