@@ -117,6 +117,11 @@
 	};
 };
 
+/* Bluetooth is connected to UART1 */
+&uart1 {
+	status = "okay";
+};
+
 &uart2 {
 	status = "okay";
 };
