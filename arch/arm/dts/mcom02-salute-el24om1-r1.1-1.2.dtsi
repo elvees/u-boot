@@ -89,6 +89,18 @@
 	};
 };
 
+&i2c1 {
+	camera@36 {
+		compatible = "ovti,ov5647";
+		reg = <0x36>;
+		port {
+			ov5647_endpoint: endpoint {
+				remote = <&vinc_endpoint0>;
+			};
+		};
+	};
+};
+
 &sd1 {
 	#address-cells = <1>;
 	#size-cells = <0>;
@@ -141,4 +153,23 @@
 /* RS-485 is used as physical layer for UART3 */
 &uart3 {
 	status = "okay";
+};
+
+&vinc {
+	status = "okay";
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0x0>;
+
+			vinc_endpoint0: endpoint@0 {
+				reg = <0x0>;
+				remote-endpoint = <&ov5647_endpoint>;
+			};
+		};
+	};
 };
