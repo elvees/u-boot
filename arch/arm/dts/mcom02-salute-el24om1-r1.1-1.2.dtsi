@@ -126,6 +126,12 @@
 /* Bluetooth is connected to UART1 */
 &uart1 {
 	status = "okay";
+
+	bt {
+		compatible = "brcm,bcm43438-bt";
+		wake-gpio = <&gpioc 24 GPIO_ACTIVE_HIGH>;
+		reset-gpio = <&gpioc 22 GPIO_ACTIVE_LOW>;
+	};
 };
 
 &uart2 {
