@@ -49,6 +49,12 @@
 			gpios = <&gpiod 8 GPIO_ACTIVE_HIGH>;
 			default-state = "off";
 		};
+
+		userled {
+			label = "salute:green:userled";
+			gpios = <&gpiod 27 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "heartbeat";
+		};
 	};
 
 	regulators {
