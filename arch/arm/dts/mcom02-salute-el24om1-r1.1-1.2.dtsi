@@ -116,6 +116,16 @@
 		compatible = "silabs,si514";
 	};
 
+	camera@30 {
+		compatible = "ovti,ov2640";
+		reg = <0x30>;
+		port {
+			ov2640_endpoint: endpoint {
+				remote = <&vinc_endpoint2>;
+			};
+		};
+	};
+
 	camera@36 {
 		compatible = "ovti,ov5647";
 		reg = <0x36>;
@@ -215,6 +225,7 @@
 				elvees,ifacenum = /bits/ 8 <2>;
 			};
 		};
+
 		port@1 {
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -224,6 +235,19 @@
 				reg = <0x0>;
 				remote-endpoint = <&ov5647_1_endpoint>;
 				elvees,ifacenum = /bits/ 8 <3>;
+			};
+		};
+
+		port@2 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0x2>;
+
+			vinc_endpoint2: endpoint@0 {
+				reg = <0x0>;
+				remote-endpoint = <&ov2640_endpoint>;
+				elvees,pport-low-bits;
+				elvees,ifacenum = /bits/ 8 <0>;
 			};
 		};
 	};
