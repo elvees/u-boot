@@ -87,6 +87,12 @@
 		compatible = "microchip,mcp7940x";
 		reg = <0x6f>;
 	};
+
+	si514: clock-generator@55 {
+		reg = <0x55>;
+		#clock-cells = <0>;
+		compatible = "silabs,si514";
+	};
 };
 
 &i2c1 {
