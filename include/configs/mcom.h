@@ -47,6 +47,12 @@
 
 #define CONFIG_SYS_SDRAM_BASE		0x40000000
 
+#define CONFIG_NR_DRAM_BANKS		2
+#define PHYS_SDRAM_0			CONFIG_SYS_SDRAM_BASE
+#define PHYS_SDRAM_0_SIZE		SZ_1G
+#define PHYS_SDRAM_1			0xA0000000
+#define PHYS_SDRAM_1_SIZE		SZ_1G
+
 /* The first 64 bytes are reserved for the U-Boot image header. */
 #define CONFIG_SYS_TEXT_BASE		0x40000040
 #define CONFIG_SYS_INIT_SP_ADDR		0x40400000
@@ -109,12 +115,6 @@
 
 /* baudrate */
 #define CONFIG_BAUDRATE			115200
-
-#define CONFIG_NR_DRAM_BANKS		2
-#define PHYS_SDRAM_0			CONFIG_SYS_SDRAM_BASE
-#define PHYS_SDRAM_0_SIZE		(CONFIG_DDR_SIZE_IN_MB << 20)
-#define PHYS_SDRAM_1			0xa0000000
-#define PHYS_SDRAM_1_SIZE		(CONFIG_DDR_SIZE_IN_MB << 20)
 
 /* Serial Flash support */
 #define CONFIG_SF_DEFAULT_SPEED		36000000
