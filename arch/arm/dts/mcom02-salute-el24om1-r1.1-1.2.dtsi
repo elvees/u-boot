@@ -8,6 +8,9 @@
 
 #include <dt-bindings/interrupt-controller/irq.h>
 
+#define TDA998x_SPDIF	1
+#define TDA998x_I2S	2
+
 / {
 	chosen {
 		bootargs = "console=ttyS0,115200";
@@ -65,6 +68,23 @@
 			gpio = <&gpiod 21 0>;
 		};
 	};
+
+	sound_hdmi: sound-hdmi {
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "Salute-EL24OM1-HDMI";
+		simple-audio-card,format = "i2s";
+		simple-audio-card,bitclock-master = <&dailink1_master>;
+		simple-audio-card,frame-master = <&dailink1_master>;
+		status = "disabled";
+
+		dailink1_master: simple-audio-card,cpu {
+			sound-dai = <&i2s>;
+		};
+
+		simple-audio-card,codec {
+			sound-dai = <&tda19988>;
+		};
+	};
 };
 
 &ethernet {
@@ -78,6 +98,8 @@
 		interrupt-parent = <&gpioa>;
 		interrupts = <11 GPIO_ACTIVE_HIGH>;
 		video-ports = <0x234501>;
+		#sound-dai-cells = <0>;
+		audio-ports = <TDA998x_I2S 0x3>;
 		status = "disabled";
 	};
 };
@@ -105,6 +127,11 @@
 			};
 		};
 	};
+};
+
+&i2s {
+	clocks = <&i2s_pclk>, <&si514 0>;
+	clock-names = "pclk", "i2sclk";
 };
 
 &sd1 {
