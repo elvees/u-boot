@@ -323,6 +323,14 @@
 		status = "disabled";
 	};
 
+	i2s: i2s@38030000 {
+		compatible = "snps,designware-i2s";
+		reg = <0x38030000 0x1000>;
+		interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+		#sound-dai-cells = <0>;
+		status = "disabled";
+	};
+
 	ethernet: ethernet@3800f000 {
 		compatible = "elvees,arasan-gemac";
 		reg = <0x3800f000 0x1000>;
