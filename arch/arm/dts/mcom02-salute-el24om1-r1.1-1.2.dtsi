@@ -205,6 +205,7 @@
 
 /* RS-485 is used as physical layer for UART3 */
 &uart3 {
+	rts-gpio = <&gpiod 20 GPIO_ACTIVE_HIGH>;
 	status = "okay";
 };
 
