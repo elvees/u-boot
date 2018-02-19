@@ -74,6 +74,10 @@
 	};
 };
 
+&cpllclk {
+	clock-mult = <21>;
+};
+
 &ethernet {
 	#address-cells = <1>;
 	#size-cells = <0>;
