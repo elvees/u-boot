@@ -280,6 +280,7 @@ typedef struct {
 	volatile uint32_t DDR_REMAP;
 	volatile uint32_t CPU_SECURE_CTR;
 	volatile uint32_t ACP_CTL;
+	volatile uint32_t RESERVED1[3];
 	volatile uint32_t MIPI_MUX;
 	volatile uint32_t CHIP_ID;
 	volatile uint32_t CHIP_CONFIG;

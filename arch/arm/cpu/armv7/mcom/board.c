@@ -188,6 +188,10 @@ void board_init_f(ulong dummy)
 
 	/* Enable clock frequency for GEMAC */
 	sys.CMCTR->GATE_SYS_CTR |= CMCTR_GATE_SYS_CTR_EMAC_EN;
+
+	/* Switch second MIPI interface to CSI mode
+	 * TODO: Move to Linux kernel */
+	sys.SMCTR->MIPI_MUX &= ~BIT(0);
 }
 #endif
 
