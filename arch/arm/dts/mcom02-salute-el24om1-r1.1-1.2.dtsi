@@ -115,6 +115,16 @@
 		#clock-cells = <0>;
 		compatible = "silabs,si514";
 	};
+
+	camera@36 {
+		compatible = "ovti,ov5647";
+		reg = <0x36>;
+		port {
+			ov5647_1_endpoint: endpoint {
+				remote = <&vinc_endpoint1>;
+			};
+		};
+	};
 };
 
 &i2c1 {
@@ -122,7 +132,7 @@
 		compatible = "ovti,ov5647";
 		reg = <0x36>;
 		port {
-			ov5647_endpoint: endpoint {
+			ov5647_0_endpoint: endpoint {
 				remote = <&vinc_endpoint0>;
 			};
 		};
@@ -201,7 +211,19 @@
 
 			vinc_endpoint0: endpoint@0 {
 				reg = <0x0>;
-				remote-endpoint = <&ov5647_endpoint>;
+				remote-endpoint = <&ov5647_0_endpoint>;
+				elvees,ifacenum = /bits/ 8 <2>;
+			};
+		};
+		port@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0x1>;
+
+			vinc_endpoint1: endpoint@0 {
+				reg = <0x0>;
+				remote-endpoint = <&ov5647_1_endpoint>;
+				elvees,ifacenum = /bits/ 8 <3>;
 			};
 		};
 	};
