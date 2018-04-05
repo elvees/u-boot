@@ -136,9 +136,10 @@
 		port@0 {
 			#address-cells = <1>;
 			#size-cells = <0>;
-			endpoint@0 {
+			vinc_endpoint0: endpoint@0 {
 				reg = <0>;
 				remote-endpoint = <&ov2715endpoint>;
+				elvees,ifacenum = /bits/ 8 <2>;
 			};
 		};
 	};
@@ -189,7 +190,7 @@
 		reg = <0x36>;
 		port {
 			ov2715endpoint: endpoint {
-				remote = <&{/vinc/ports/port@0/endpoint@0}>;
+				remote = <&vinc_endpoint0>;
 			};
 		};
 	};
