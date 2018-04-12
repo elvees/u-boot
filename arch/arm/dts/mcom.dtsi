@@ -242,6 +242,32 @@
 		status = "disabled";
 	};
 
+	swic0: swic0@38082000 {
+		compatible = "elvees,mcom02-swic";
+		reg = <0x38082000 0x2000>;
+		interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+		clock-names = "aclk", "txclk";
+		clocks = <&swic0aclk>, <&swic0txclk>;
+		status = "disabled";
+	};
+
+	swic1: swic1@38084000 {
+		compatible = "elvees,mcom02-swic";
+		reg = <0x38084000 0x2000>;
+		interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
+		clock-names = "aclk", "txclk";
+		clocks = <&swic1aclk>, <&swic1txclk>;
+		status = "disabled";
+	};
+
 	usbphy: usbphy {
 		#phy-cells = <0>;
 		compatible = "usb-nop-xceiv";
@@ -871,8 +897,23 @@
 				reg-bit = <3>;
 			};
 
-			/* TODO: Use PLL driver for SWIC PLLs */
-			sw0pll: sw0pll {
+			swic0aclk: swic0aclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <10>;
+			};
+
+			swic1aclk: swic1aclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&l3_pclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <11>;
+			};
+
+			swic0pllclk: swic0pllclk {
 				compatible = "fixed-factor-clock";
 				clocks = <&xti24m>;
 				#clock-cells = <0>;
@@ -880,12 +921,28 @@
 				clock-mult = <1>;
 			};
 
-			sw1pll: sw1pll {
+			swic1pllclk: swic1pllclk {
 				compatible = "fixed-factor-clock";
 				clocks = <&xti24m>;
 				#clock-cells = <0>;
 				clock-div = <5>;
 				clock-mult = <1>;
+			};
+
+			swic0txclk: swic0txclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&swic0pllclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <10>;
+			};
+
+			swic1txclk: swic1txclk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&swic1pllclk>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <11>;
 			};
 
 			nfc_sclk_div: nfc_sclk_div {

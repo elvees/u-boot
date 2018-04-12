@@ -288,6 +288,14 @@
 	};
 };
 
+&swic0 {
+	status = "okay";
+};
+
+&swic1 {
+	status = "okay";
+};
+
 /* Bluetooth is connected to UART1 */
 &uart1 {
 	status = "okay";
