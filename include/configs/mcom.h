@@ -29,7 +29,7 @@
 #define DIV_SYS1_CTR_VALUE		1	/* L3_PCLK = L1_HCLK / 2 */
 #endif
 
-#ifdef CONFIG_TARGET_SALUTE_PM
+#if defined(CONFIG_TARGET_SALUTE_PM) || defined(CONFIG_TARGET_SALUTE_D2)
 #define CPLL_VALUE			0x14
 #else
 #define CPLL_VALUE			0x0F

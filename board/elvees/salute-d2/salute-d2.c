@@ -1,10 +1,6 @@
 /*
- * Copyright 2012-2013 Henrik Nordstrom <henrik@henriknordstrom.net>
- * Copyright 2013 Luke Kenneth Casson Leighton <lkcl@lkcl.net>
- * Copyright 2007-2011 Allwinner Technology Co., Ltd. <www.allwinnertech.com>
- *
  * Copyright 2015-2016 ELVEES NeoTek JSC
- * Copyright 2017 RnD Center "ELVEES", OJSC
+ * Copyright 2017-2018 RnD Center "ELVEES", JSC
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
@@ -22,9 +18,10 @@
 DECLARE_GLOBAL_DATA_PTR;
 
 #ifdef CONFIG_SPL_BUILD
-/* Set parameters for Nanya NT5CB256M8FN-DI SDRAM */
 int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 {
+	int i;
+
 	if (!cfg) {
 		printf("Invalid pointer to DDR configuration\n");
 		return -EINVAL;
@@ -42,16 +39,17 @@ int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 
 	/* This is the best combination of ODS/ODT parameters.
 	 * It was found during DDR calibration for board types:
-	 * Salute-EL24D1 r1.4,
-	 * Salute-EL24D1 r1.5,
 	 * Salute-EL24D2 r1.1.
 	 */
 	cfg->impedance.ods_mc = 40;
 	cfg->impedance.ods_dram = 40;
-	cfg->impedance.odt_mc = 120;
-	cfg->impedance.odt_dram = 120;
+	cfg->impedance.odt_mc = 0;
+	cfg->impedance.odt_dram = 0;
 
-	cfg->ctl.dqs_gating_override = 0;
+	cfg->ctl.dqs_gating_override = 1;
+	/* TODO: Replace this configuration by the optimal one. */
+	for (i = 0; i < 4; i++)
+		cfg->ctl.dqs_gating[i] = 0xa001;
 
 	cfg->common.ranks = MCOM_SDRAM_ONE_RANK;
 	cfg->common.banks = 8;

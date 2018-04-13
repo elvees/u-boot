@@ -7,19 +7,25 @@ if ARCH_MCOM
 choice
 	prompt "MCom board select"
 
-config TARGET_SALUTE
-	bool "Salute"
+config TARGET_SALUTE_D1
+	bool "Salute-D1"
 	select SUPPORT_SPL
 	help
 	  Support for the following boards:
 	    Salute-EL24D1
-	    Salute-EL24D2
 	    SBC-DBG
 	    SBC-VM
 	    VIP1-3D-OV7725
 	    VIP1-EVA
 	    VIP1-MC802
 	    VIP1-MC805
+
+config TARGET_SALUTE_D2
+	bool "Salute-D2"
+	select SUPPORT_SPL
+	help
+	  Support for the following boards:
+	    Salute-EL24D2
 
 config TARGET_IPKU
 	bool "IP-KU"
@@ -35,7 +41,8 @@ config TARGET_SALUTE_PM
 
 endchoice
 
-source "board/elvees/salute/Kconfig"
+source "board/elvees/salute-d1/Kconfig"
+source "board/elvees/salute-d2/Kconfig"
 source "board/elvees/ipku/Kconfig"
 source "board/elvees/salute-pm/Kconfig"
 

@@ -1,0 +1,9 @@
+if TARGET_SALUTE_D1
+
+config SYS_BOARD
+	default "salute-d1"
+
+config SYS_CONFIG_NAME
+	default "mcom"
+
+endif

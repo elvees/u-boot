@@ -1,7 +1,7 @@
-if TARGET_SALUTE
+if TARGET_SALUTE_D2
 
 config SYS_BOARD
-	default "salute"
+	default "salute-d2"
 
 config SYS_CONFIG_NAME
 	default "mcom"
