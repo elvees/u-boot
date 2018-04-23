@@ -157,6 +157,7 @@
 &sd1 {
 	#address-cells = <1>;
 	#size-cells = <0>;
+	keep-power-in-suspend;
 	status = "okay";
 
 	ap6212: wifi@1 {
