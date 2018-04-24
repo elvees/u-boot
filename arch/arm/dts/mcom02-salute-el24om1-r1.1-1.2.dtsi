@@ -75,7 +75,6 @@
 		simple-audio-card,format = "i2s";
 		simple-audio-card,bitclock-master = <&dailink1_master>;
 		simple-audio-card,frame-master = <&dailink1_master>;
-		status = "disabled";
 
 		dailink1_master: simple-audio-card,cpu {
 			sound-dai = <&i2s>;
@@ -85,6 +84,69 @@
 			sound-dai = <&tda19988>;
 		};
 	};
+
+	backlight: backlight {
+		compatible = "pwm-backlight";
+		pwms = <&pwm 0 500000>;
+		brightness-levels = <
+			 0  1  2  3  4  5  6  7  8  9
+			10 11 12 13 14 15 16 17 18 19
+			20 21 22 23 24 25 26 27 28 29
+			30 31 32 33 34 35 36 37 38 39
+			40 41 42 43 44 45 46 47 48 49
+			50 51 52 53 54 55 56 57 58 59
+			60 61 62 63 64 65 66 67 68 69
+			70 71 72 73 74 75 76 77 78 79
+			80 81 82 83 84 85 86 87 88 89
+			90 91 92 93 94 95 96 97 98 99
+			100>;
+		default-brightness-level = <50>;
+	};
+
+	at070tn92: panel0 {
+		compatible = "elvees,mcom02-vpout,panel";
+
+		panel-info {
+			bpp = <32>;
+		};
+
+		display-timings {
+			800x480p60 {
+				clock-frequency = <33300000>;
+				hactive = <800>;
+				vactive = <480>;
+				hfront-porch = <85>;
+				hback-porch = <85>;
+				hsync-len = <86>;
+				vfront-porch = <15>;
+				vback-porch = <15>;
+				vsync-len = <15>;
+			};
+		};
+	};
+
+	ej070na: panel1 {
+		compatible = "elvees,mcom02-vpout,panel";
+
+		panel-info {
+			bpp = <32>;
+		};
+
+		display-timings {
+			1024x600p60 {
+				clock-frequency = <51206400>;
+				hactive = <1024>;
+				vactive = <600>;
+				hfront-porch = <100>;
+				hback-porch = <100>;
+				hsync-len = <120>;
+				vfront-porch = <10>;
+				vback-porch = <10>;
+				vsync-len = <15>;
+			};
+		};
+	};
+
 };
 
 &ethernet {
@@ -100,7 +162,24 @@
 		video-ports = <0x234501>;
 		#sound-dai-cells = <0>;
 		audio-ports = <TDA998x_I2S 0x3>;
-		status = "disabled";
+
+		port {
+			hdmi_in: endpoint {
+				remote-endpoint = <&hdmi_out>;
+			};
+		};
+	};
+};
+
+&i2c1 {
+	camera@36 {
+		compatible = "ovti,ov5647";
+		reg = <0x36>;
+		port {
+			ov5647_0_endpoint: endpoint {
+				remote = <&vinc_endpoint0>;
+			};
+		};
 	};
 };
 
@@ -135,23 +214,26 @@
 			};
 		};
 	};
-};
 
-&i2c1 {
-	camera@36 {
-		compatible = "ovti,ov5647";
-		reg = <0x36>;
-		port {
-			ov5647_0_endpoint: endpoint {
-				remote = <&vinc_endpoint0>;
-			};
-		};
+	ft5206: touchscreen@38 {
+		compatible = "edt,edt-ft5206";
+		reg = <0x38>;
+		interrupt-parent = <&gpioa>;
+		interrupts = <16 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpioa 5 GPIO_ACTIVE_LOW>;
+		touchscreen-size-x = <600>;
+		touchscreen-size-y = <1024>;
 	};
 };
 
 &i2s {
 	clocks = <&i2s_pclk>, <&si514 0>;
 	clock-names = "pclk", "i2sclk";
+	status = "okay";
+};
+
+&pwm {
+	status = "okay";
 };
 
 &sd1 {
@@ -251,6 +333,16 @@
 				elvees,pport-low-bits;
 				elvees,ifacenum = /bits/ 8 <0>;
 			};
+		};
+	};
+};
+
+&vpout {
+	status = "okay";
+
+	port {
+		hdmi_out: endpoint {
+			remote-endpoint = <&hdmi_in>;
 		};
 	};
 };
