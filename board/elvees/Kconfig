@@ -33,6 +33,12 @@ config TARGET_IPKU
 	help
 	  Support for IP-KU board
 
+config TARGET_MCOM02_UKF
+	bool "MCom-02-UKF"
+	select SUPPORT_SPL
+	help
+	  Support for MCom-02-UKF board
+
 config TARGET_SALUTE_PM
 	bool "Salute-PM"
 	select SUPPORT_SPL

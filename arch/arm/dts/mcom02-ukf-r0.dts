@@ -1,0 +1,81 @@
+/*
+ * Copyright 2018 RnD Center "ELVEES", JSC
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/net/ti-dp83867.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+
+#include "mcom02.dtsi"
+
+/ {
+	model = "MCom-02-UKF r0";
+
+	chosen {
+		bootargs = "console=ttyS0,115200";
+	};
+
+	aliases {
+		spi0 = &spi0;
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x40000000 0x40000000
+		       0xa0000000 0x40000000>;
+	};
+};
+
+&spi0 {
+	status = "okay";
+	num-cs = <1>;
+	/* Third argument of "cs-gpios" property is set to 0,
+	 * because it is ignored by the SPI driver. */
+	cs-gpios = <&gpiod 18 0>;
+
+	flash: flash@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor", "spi-flash";
+		reg = <0>;
+		spi-max-frequency = <36000000>;
+		m25p,fast-read;
+		u-boot,dm-pre-reloc;
+	};
+};
+
+&ethernet {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+	phy-mode = "gmii";
+	phy-handle = <&ethernet_phy>;
+	phy-reset-gpios = <&gpiob 15 GPIO_ACTIVE_LOW>;
+	txclk-125en-gpios = <&gpiob 14 GPIO_ACTIVE_HIGH>;
+
+	ethernet_phy: ethernet-phy@0 {
+		reg = <0x0>;
+	};
+};
+
+&framebuffer {
+	status = "okay";
+};
+
+&sd0 {
+	status = "okay";
+};
+
+&spllclk {
+	clock-mult = <6>;
+};
+
+&l3_pclk {
+	clock-div = <1>;
+};

@@ -17,7 +17,7 @@
 
 #define XTI_FREQ			24000000
 
-#ifdef CONFIG_TARGET_IPKU
+#if defined(CONFIG_TARGET_IPKU) || defined(CONFIG_TARGET_MCOM02_UKF)
 #define APLL_VALUE			0x1F
 #define SPLL_VALUE			0x05	/* L1_HCLK = 144 MHz */
 #define DIV_SYS0_CTR_VALUE		0
@@ -32,8 +32,14 @@
 #if defined(CONFIG_TARGET_SALUTE_PM) || defined(CONFIG_TARGET_SALUTE_D2)
 #define CPLL_VALUE			0x14
 #else
+
+#ifdef CONFIG_TARGET_MCOM02_UKF
+#define CPLL_VALUE			0x0A
+#else
 #define CPLL_VALUE			0x0F
-#endif
+#endif  /* CONFIG_TARGET_MCOM02_UKF */
+
+#endif  /* CONFIG_TARGET_SALUTE_PM */
 
 #define DIV_DDR0_CTR_VALUE              0
 #define DIV_DDR1_CTR_VALUE              0

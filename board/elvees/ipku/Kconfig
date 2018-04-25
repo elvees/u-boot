@@ -1,4 +1,4 @@
-if TARGET_IPKU
+if TARGET_IPKU || TARGET_MCOM02_UKF
 
 config SYS_BOARD
 	default "ipku"
