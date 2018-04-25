@@ -103,12 +103,17 @@
 		default-brightness-level = <50>;
 	};
 
+	/*
+	 * Backlight will work regardless of panel DPMS, if `backlight` property
+	 * in both panels are commented. To enable backlight working with panel
+	 * DPMS you have to uncomment `backlight` property in panel node.
+	 *
+	 * NOTICE: Use of the same backlight in both panels is mutually
+	 * exclusive.
+	 */
 	at070tn92: panel0 {
 		compatible = "elvees,mcom02-vpout,panel";
-
-		panel-info {
-			bpp = <32>;
-		};
+		/* backlight =<&backlight>; */
 
 		display-timings {
 			800x480p60 {
@@ -123,14 +128,17 @@
 				vsync-len = <15>;
 			};
 		};
+
+		port {
+			at070tn92_in: endpoint {
+				remote-endpoint = <&at070tn92_out>;
+			};
+		};
 	};
 
 	ej070na: panel1 {
 		compatible = "elvees,mcom02-vpout,panel";
-
-		panel-info {
-			bpp = <32>;
-		};
+		/* backlight =<&backlight>; */
 
 		display-timings {
 			1024x600p60 {
@@ -143,6 +151,12 @@
 				vfront-porch = <10>;
 				vback-porch = <10>;
 				vsync-len = <15>;
+			};
+		};
+
+		port {
+			ej070na_in: endpoint {
+				remote-endpoint = <&ej070na_out>;
 			};
 		};
 	};
@@ -344,8 +358,31 @@
 	status = "okay";
 
 	port {
-		hdmi_out: endpoint {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		hdmi_out: endpoint@0 {
+			reg = <0>;
 			remote-endpoint = <&hdmi_in>;
+			info {
+				bpp = <32>;
+			};
+		};
+
+		ej070na_out: endpoint@1 {
+			reg = <1>;
+			remote-endpoint = <&ej070na_in>;
+			info {
+				bpp = <32>;
+			};
+		};
+
+		at070tn92_out: endpoint@2 {
+			reg = <2>;
+			remote-endpoint = <&at070tn92_in>;
+			info {
+				bpp = <32>;
+			};
 		};
 	};
 };
