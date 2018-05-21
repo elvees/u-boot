@@ -37,6 +37,12 @@
 #define PMCTR_BASE 0x38095000
 #define PMCTR_SYS_PWR_STATUS (PMCTR_BASE + 0x0c)
 
+/* SD/MMC does not work with big baseclkfreq value (#MCOM02SW-55).
+ * As a workaround set baseclkfreq to 32 MHz if real frequency exceeds
+ * 100 MHz. */
+#define SDMMC_BASE_CLK_FREQ(x) ((((x) < 100000000) ? ((x) / 1000000) : 32) \
+			       << 24)
+
 #ifdef CONFIG_SPL_BUILD
 static void cpu_poweroff(const u32 cpu)
 {
@@ -153,14 +159,14 @@ void board_init_f(ulong dummy)
 	sys.CMCTR->GATE_SYS_CTR |= CMCTR_GATE_SYS_CTR_SDMMC1_EN;
 
 	sys.SDMMC0->EXT_REG_1 = (sys.SDMMC0->EXT_REG_1 & 0x00FFFFFF) |
-			((SPLL_FREQ / 1000000) << 24);
+			SDMMC_BASE_CLK_FREQ(SPLL_FREQ);
 	sys.SDMMC0->EXT_REG_1 &= ~0x00010000;  /* disable SDMA */
 	sys.SDMMC0->EXT_REG_1 &= ~0x00008000;  /* disable ADMA2 */
 	sys.SDMMC0->EXT_REG_2 &= ~0x38000000;  /* disable SDR50, SDR104, DDR50 */
 	sys.SDMMC0->EXT_REG_6 &= ~0x39000000;  /* disable 1.8V mode */
 
 	sys.SDMMC1->EXT_REG_1 = (sys.SDMMC1->EXT_REG_1 & 0x00FFFFFF) |
-			((SPLL_FREQ / 1000000) << 24);
+			SDMMC_BASE_CLK_FREQ(SPLL_FREQ);
 	sys.SDMMC1->EXT_REG_1 &= ~0x00010000;  /* disable SDMA */
 	sys.SDMMC1->EXT_REG_1 &= ~0x00008000;  /* disable ADMA2 */
 	sys.SDMMC1->EXT_REG_2 &= ~0x38000000;  /* disable SDR50, SDR104, DDR50 */
