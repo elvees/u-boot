@@ -187,6 +187,9 @@
 	mcp7940x: rtc@6f {
 		compatible = "microchip,mcp7940x";
 		reg = <0x6f>;
+		interrupt-parent = <&gpioa>;
+		interrupts = <12 GPIO_ACTIVE_HIGH>;
+		wakeup-source;
 	};
 
 	si514: clock-generator@55 {
