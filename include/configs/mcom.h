@@ -59,6 +59,9 @@
 
 #define CONFIG_SYS_MALLOC_LEN		SZ_8M
 
+/* DesignWare USB core */
+#define CONFIG_USB_DWC2
+
 /* I2C support */
 #ifdef CONFIG_TARGET_SALUTE_PM
 #define CONFIG_SYS_I2C
