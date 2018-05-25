@@ -149,16 +149,15 @@
 	"bootelf ${bootelf_addr};"
 #else
 #define CONFIG_BOOTCOMMAND \
-	"mmc dev ${mmcdev};" \
-	"if mmc rescan; then " \
+	"if run prep_bootdev; then " \
 		"if run loadbootenv; then " \
 			"run importbootenv;" \
 		"fi;" \
 		"if test -n ${bootenvcmd}; then " \
 			"run bootenvcmd;" \
 		"fi;" \
-		"if run mmcload; then " \
-			"run mmcboot;" \
+		"if run loadbootfile; then " \
+			"run mcomboot;" \
 		"fi;" \
 	"fi;"
 #endif
@@ -182,20 +181,32 @@
 	"ddrctl_cid=1\0" \
 	"bootenv=u-boot.env\0" \
 	"bootenvcmd=\0" \
-	"loadbootenv=load mmc ${mmcdev}:${mmcbootpart} ${loadaddr} ${bootenv}\0" \
-	"importbootenv=env import -t ${loadaddr} ${filesize}\0" \
 	"console=ttyS0,115200\0" \
 	"cmdline=\0" \
-	"mmcdev=0\0" \
-	"mmcbootpart=1\0" \
-	"mmcrootpart=2\0" \
-	"mmcrootfstype=ext4\0" \
-	"mmcargs=setenv bootargs console=${console} " \
-		"root=/dev/mmcblk${mmcdev}p${mmcrootpart} " \
-		"rootfstype=${mmcrootfstype} rw rootwait ${cmdline}\0" \
-	"mmcload=load mmc ${mmcdev}:${mmcbootpart} ${loadaddr} ${bootfile}\0" \
-	"mmcboot=run mmcargs; bootz ${loadaddr} - ${fdtcontroladdr}\0"
-
+	"bootsource=mmc\0" \
+	"bootdev=0\0" \
+	"bootpartnum=1\0" \
+	"rootpartnum=2\0" \
+	"rootfstype=ext4\0" \
+	"rootfspart=\0" \
+	"prep_bootdev=" \
+		"if test ${bootsource} = usb; then " \
+			"rootfspart=sda${rootpartnum};" \
+			"usb start;" \
+		"elif test ${bootsource} = mmc; then " \
+			"rootfspart=mmcblk${bootdev}p${rootpartnum};" \
+			"mmc dev ${bootdev};"\
+			"mmc rescan;" \
+		"fi;\0" \
+	"loadbootenv=load ${bootsource} ${bootdev}:${bootpartnum} " \
+		"${loadaddr} ${bootenv}\0" \
+	"importbootenv=env import -t ${loadaddr} ${filesize}\0" \
+	"loadbootfile=load ${bootsource} ${bootdev}:${bootpartnum} " \
+		"${loadaddr} ${bootfile}\0" \
+	"set_bootargs=setenv bootargs console=${console} " \
+		"root=/dev/${rootfspart} " \
+		"rootfstype=${rootfstype} rw rootwait ${cmdline}\0" \
+	"mcomboot=run set_bootargs;bootz ${loadaddr} - ${fdtcontroladdr}\0"
 #endif
 
 /* SPL framework */
