@@ -1,0 +1,75 @@
+/* Copyright 2018 RnD Center "ELVEES", JSC */
+
+/dts-v1/;
+
+#include "mcom02-salute-el24pm2-r1.0.dtsi"
+
+/ {
+	model = "Salute-EL24PM2 r1.0-1.1, Salute-PM-UKF r1.0";
+
+	aliases {
+		spi0 = &spi0;
+	};
+};
+
+&uart1 {
+	status = "okay";
+};
+
+&uart2 {
+	status = "okay";
+};
+
+&uart3 {
+	status = "okay";
+};
+
+&ethernet {
+	status = "okay";
+};
+
+&spi0 {
+	num-cs = <2>;
+	/* Third argument of "cs-gpios" property is set to 0,
+	* because it is ignored by the SPI driver. */
+	cs-gpios = <&gpiod 18 0>, <&gpiod 19 0>;
+
+	mram: mram@1 {
+		#address-cells = <1>;
+		compatible = "everspin,mr25h40", "spi-flash";
+		reg = <0x1>;
+		spi-max-frequency = <40000000>;
+	};
+};
+
+&sd1 {
+	status = "okay";
+	non-removable;
+};
+
+&i2c0 {
+	fram0: fram0@50 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "atmel,24c16", "i2c-eeprom";
+		reg = <0x50>;
+	};
+};
+
+&i2c1 {
+	fram1: fram1@50 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "atmel,24c16", "i2c-eeprom";
+		reg = <0x50>;
+	};
+};
+
+&i2c2 {
+	fram2: fram2@50 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "atmel,24c16", "i2c-eeprom";
+		reg = <0x50>;
+	};
+};
