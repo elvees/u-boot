@@ -166,8 +166,6 @@ void board_init_f(ulong dummy)
 	sys.SDMMC1->EXT_REG_2 &= ~0x38000000;  /* disable SDR50, SDR104, DDR50 */
 	sys.SDMMC1->EXT_REG_6 &= ~0x39000000;  /* disable 1.8V mode */
 
-	sys.SDMMC1->EXT_REG_1 &= ~0x00080000;  /* embedded card */
-
 	/*
 	 * HACK: Write operations fails with some SD cards in HighSpeed mode.
 	 * Disable HighSpeed mode for workaround as a dirty hack.
