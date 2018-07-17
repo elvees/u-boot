@@ -228,6 +228,7 @@ typedef struct {
 	volatile uint32_t SEL_UPLL;
 } cmctr_t;
 
+#define CMCTR_GATE_SYS_CTR_NFC_EN	BIT(21)
 #define CMCTR_GATE_SYS_CTR_SPI1_EN	BIT(20)
 #define CMCTR_GATE_SYS_CTR_SPI0_EN	BIT(19)
 #define CMCTR_GATE_SYS_CTR_I2C0_EN	BIT(16)

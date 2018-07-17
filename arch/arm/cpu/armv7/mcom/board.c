@@ -190,6 +190,10 @@ void board_init_f(ulong dummy)
 	/* Enable clock frequency for USBIC */
 	sys.CMCTR->GATE_SYS_CTR |= CMCTR_GATE_SYS_CTR_USBIC_EN;
 
+	/* Enable clocks for NFC */
+	sys.CMCTR->DIV_NFC_CTR = 2;
+	sys.CMCTR->GATE_SYS_CTR |= CMCTR_GATE_SYS_CTR_NFC_EN;
+
 	/* Switch second MIPI interface to CSI mode
 	 * TODO: Move to Linux kernel */
 	sys.SMCTR->MIPI_MUX &= ~BIT(0);
