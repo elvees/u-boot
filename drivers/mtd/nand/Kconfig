@@ -97,6 +97,13 @@ config NAND_ARASAN
 	  controller. This uses the hardware ECC for read and
 	  write operations.
 
+config NAND_MCOM02
+	bool "Support for MCom-02 NFC"
+	help
+	  This enables driver support for MCom-02 NAND flash
+	  controller. This uses the hardware ECC for read and
+	  write operations.
+
 config NAND_MXS
 	bool "MXS NAND support"
 	depends on MX6 || MX7
