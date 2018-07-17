@@ -65,9 +65,6 @@
 
 #define CONFIG_SYS_MALLOC_LEN		SZ_8M
 
-/* DesignWare USB core */
-#define CONFIG_USB_DWC2
-
 /* I2C support */
 #ifdef CONFIG_TARGET_SALUTE_PM
 #define CONFIG_SYS_I2C
@@ -242,6 +239,11 @@
 		"root=${rootfsdev} ${extra_args} " \
 		"rootfstype=${rootfstype} rw rootwait ${cmdline}\0" \
 	"mcomboot=run set_bootargs;bootz ${loadaddr} - ${fdtcontroladdr}\0"
+#endif
+
+#define CONFIG_USB_DWC2
+#ifdef CONFIG_CMD_USB_MASS_STORAGE
+#define CONFIG_USB_FUNCTION_MASS_STORAGE
 #endif
 
 /* SPL framework */

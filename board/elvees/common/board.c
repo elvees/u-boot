@@ -4,7 +4,7 @@
  * Copyright 2007-2011 Allwinner Technology Co., Ltd. <www.allwinnertech.com>
  *
  * Copyright 2015-2016 ELVEES NeoTek JSC
- * Copyright 2017 RnD Center "ELVEES", JSC
+ * Copyright 2017-2018 RnD Center "ELVEES", JSC
  *
  * Common board initialization code for ELVEES MCom-compatible boards.
  *
@@ -22,6 +22,8 @@
 #include <asm/arch/regs.h>
 #include <asm/io.h>
 #include <linux/kernel.h>
+#include <usb.h>
+#include <usb/dwc2_udc.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -182,3 +184,32 @@ u32 spl_boot_mode(const u32 boot_device)
 	return 0;
 }
 #endif
+
+static struct dwc2_plat_otg_data mcom02_otg_data;
+
+int board_usb_init(int index, enum usb_init_type init)
+{
+	int node;
+	unsigned long int addr;
+	const void *blob = gd->fdt_blob;
+
+	if (init == USB_INIT_DEVICE) {
+		node = fdt_node_offset_by_compatible(blob, -1, "snps,dwc2");
+
+		if (node <= 0) {
+			printf("No USB Device Controller found\n");
+			return -ENODEV;
+		}
+
+		addr = fdtdec_get_addr(blob, node, "reg");
+		if (addr == FDT_ADDR_T_NONE) {
+			printf("UDC has no 'reg' property\n");
+			return -EINVAL;
+		}
+
+		mcom02_otg_data.regs_otg = addr;
+
+		return dwc2_udc_probe(&mcom02_otg_data);
+	}
+	return 0;
+}
