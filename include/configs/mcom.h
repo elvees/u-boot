@@ -106,6 +106,12 @@
 #define CONFIG_SYS_NAND_SELF_INIT
 #define CONFIG_SYS_NAND_ONFI_DETECTION
 #define CONFIG_MTD_DEVICE
+#define CONFIG_CMD_MTDPARTS
+#define CONFIG_MTD_PARTITIONS
+#define CONFIG_RBTREE
+#define CONFIG_LZO
+#define MTDIDS_DEFAULT		"nand0=mcom02-nand"
+#define MTDPARTS_DEFAULT	"mtdparts=mcom02-nand:-(allnand)"
 #endif
 
 /*
@@ -191,27 +197,43 @@
 	"console=ttyS0,115200\0" \
 	"cmdline=\0" \
 	"bootsource=mmc\0" \
-	"bootdev=0\0" \
+	"mmcdev=0\0" \
 	"bootpartnum=1\0" \
 	"rootpartnum=2\0" \
 	"rootfstype=ext4\0" \
-	"rootfspart=\0" \
+	"rootfsdev=\0" \
+	"loadcmd=load\0" \
+	"loaddev=\0" \
+	"loadpart=\0" \
+	"extra_args=\0" \
 	"prep_bootdev=" \
 		"if test ${bootsource} = usb; then " \
-			"rootfspart=sda${rootpartnum};" \
+			"rootfsdev=/dev/sda${rootpartnum};" \
+			"loaddev=${bootsource};" \
+			"loadpart=0:${bootpartnum};" \
 			"usb start;" \
 		"elif test ${bootsource} = mmc; then " \
-			"rootfspart=mmcblk${bootdev}p${rootpartnum};" \
-			"mmc dev ${bootdev};"\
+			"rootfsdev=/dev/mmcblk${mmcdev}p${rootpartnum};" \
+			"loaddev=${bootsource};" \
+			"loadpart=${mmcdev}:${bootpartnum};" \
+			"mmc dev ${mmcdev};"\
 			"mmc rescan;" \
+		"elif test ${bootsource} = nand; then " \
+			"rootfsdev=ubi0:root;" \
+			"setenv loadcmd ubifsload;" \
+			"setenv rootfstype ubifs;" \
+			"extra_args=ubi.mtd=arasan_nfc;" \
+			"mtdparts default;" \
+			"ubi part allnand;" \
+			"ubifsmount ubi:boot;" \
 		"fi;\0" \
-	"loadbootenv=load ${bootsource} ${bootdev}:${bootpartnum} " \
+	"loadbootenv=${loadcmd} ${loaddev} ${loadpart} " \
 		"${loadaddr} ${bootenv}\0" \
 	"importbootenv=env import -t ${loadaddr} ${filesize}\0" \
-	"loadbootfile=load ${bootsource} ${bootdev}:${bootpartnum} " \
+	"loadbootfile=${loadcmd} ${loaddev} ${loadpart} " \
 		"${loadaddr} ${bootfile}\0" \
 	"set_bootargs=setenv bootargs console=${console} " \
-		"root=/dev/${rootfspart} " \
+		"root=${rootfsdev} ${extra_args} " \
 		"rootfstype=${rootfstype} rw rootwait ${cmdline}\0" \
 	"mcomboot=run set_bootargs;bootz ${loadaddr} - ${fdtcontroladdr}\0"
 #endif
