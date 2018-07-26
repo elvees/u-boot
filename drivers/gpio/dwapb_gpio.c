@@ -125,7 +125,10 @@ static int gpio_dwapb_bind(struct udevice *dev)
 	const void *blob = gd->fdt_blob;
 	struct udevice *subdev;
 	fdt_addr_t base;
-	int ret, node;
+	u32 skip_list[32];
+	u32 skip_mask = 0;
+	int skip_count;
+	int ret, node, i;
 
 	/* If this is a child device, there is nothing to do here */
 	if (plat)
@@ -153,6 +156,18 @@ static int gpio_dwapb_bind(struct udevice *dev)
 		plat->pins = fdtdec_get_int(blob, node, "snps,nr-gpios", 0);
 		plat->name = fdt_stringlist_get(blob, node, "bank-name", 0,
 						NULL);
+		if (fdt_getprop(blob, node, "skip-gpios", &skip_count)) {
+			skip_count /= sizeof(u32);
+			if (skip_count > ARRAY_SIZE(skip_list)) {
+				printf("Error: skip-gpios is too large\n");
+				ret = -EINVAL;
+				goto err;
+			}
+			fdtdec_get_int_array(blob, node, "skip-gpios",
+					     skip_list, skip_count);
+			for (i = 0; i < skip_count; i++)
+				skip_mask |= BIT(skip_list[i]);
+		}
 
 		ret = device_bind(dev, dev->driver, plat->name,
 				  plat, -1, &subdev);
@@ -161,7 +176,8 @@ static int gpio_dwapb_bind(struct udevice *dev)
 
 		dev_set_of_offset(subdev, node);
 
-		setbits_le32(plat->base + GPIO_SWPORT_CTL(plat->bank), 0xffffffff);
+		setbits_le32(plat->base + GPIO_SWPORT_CTL(plat->bank),
+			     ~skip_mask);
 	}
 
 	return 0;
