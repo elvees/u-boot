@@ -72,6 +72,10 @@
 	status = "okay";
 };
 
+&gpiod {
+	skip-gpios = <13>;
+};
+
 &spllclk {
 	clock-mult = <6>;
 };
