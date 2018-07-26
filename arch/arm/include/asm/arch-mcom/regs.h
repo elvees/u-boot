@@ -20,6 +20,7 @@
 #define TIMERS_BASE 0x38026000
 #define RTC_BASE    0x38027000
 #define UART0_BASE  0x38028000
+#define GPIO0_BASE  0x38034000
 #define BIST_BRIDGE_BASE 0x38035000
 #define MFBSP0_BASE 0x38086000
 #define MFBSP1_BASE 0x38088000
@@ -38,6 +39,7 @@ r.SDMMC1=(sdmmc_regs_t*)SDMMC1_BASE;\
 r.TIMER0=(dwc_timer_regs_t*)TIMERS_BASE;\
 r.RTC=(rtc_regs_t*)RTC_BASE;\
 r.UART0=(uart_regs_t*)UART0_BASE;\
+r.GPIO0=(gpio_regs_t*)GPIO0_BASE;\
 r.BIST_BRIDGE=(bist_bridge_regs_t*)BIST_BRIDGE_BASE;\
 r.MFBSP0=(mfbsp_t*)MFBSP0_BASE;\
 r.MFBSP1=(mfbsp_t*)MFBSP1_BASE;\
@@ -153,6 +155,32 @@ typedef struct {
 	volatile uint32_t STET;
 	volatile uint32_t HTX;
 } uart_regs_t;
+
+typedef struct {
+	volatile uint32_t DR;
+	volatile uint32_t DDR;
+	volatile uint32_t CTL;
+} gpio_swport_regs_t;
+
+typedef struct {
+	volatile gpio_swport_regs_t SWPORTA;
+	volatile gpio_swport_regs_t SWPORTB;
+	volatile gpio_swport_regs_t SWPORTC;
+	volatile gpio_swport_regs_t SWPORTD;
+	volatile uint32_t INTEN;
+	volatile uint32_t INTMASK;
+	volatile uint32_t INTTYPE_LEVEL;
+	volatile uint32_t INT_POLARITY;
+	volatile uint32_t INTSTATUS;
+	volatile uint32_t RAW_INTSTATUS;
+	volatile uint32_t DEBOUNCE;
+	volatile uint32_t PORTA_EOI;
+	volatile uint32_t EXT_PORTA;
+	volatile uint32_t EXT_PORTB;
+	volatile uint32_t EXT_PORTC;
+	volatile uint32_t EXT_PORTD;
+	volatile uint32_t LS_SYNC;
+} gpio_regs_t;
 
 typedef struct {
 	volatile uint32_t ID;
@@ -437,6 +465,7 @@ typedef struct {
 	dwc_timer_regs_t *TIMER0;
 	rtc_regs_t *RTC;
 	uart_regs_t *UART0;
+	gpio_regs_t *GPIO0;
 	bist_bridge_regs_t *BIST_BRIDGE;
 	mfbsp_t *MFBSP0;
 	mfbsp_t *MFBSP1;

@@ -121,6 +121,13 @@ void board_init_f(ulong dummy)
 	 * bootrom API functions */
 	asm volatile ("isb" ::: "memory");
 
+#ifdef CONFIG_TARGET_MCOM02_UKF
+	/* GPIOD13 is used for DDR controller power enable */
+	sys.GPIO0->SWPORTD.CTL &= ~BIT(13);
+	sys.GPIO0->SWPORTD.DDR |= BIT(13);
+	sys.GPIO0->SWPORTD.DR |= BIT(13);
+#endif
+
 	sys.CMCTR->DIV_MPU_CTR = 1;
 	sys.CMCTR->DIV_ATB_CTR = 3;
 	sys.CMCTR->DIV_APB_CTR = 1;
