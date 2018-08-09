@@ -93,6 +93,11 @@
 	status = "okay";
 };
 
+&nfc {
+	status = "okay";
+	nand-bus-width = <16>;
+};
+
 &gpiod {
 	skip-gpios = <13>;
 };
