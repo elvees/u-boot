@@ -89,6 +89,10 @@
 	non-removable;
 };
 
+&usb {
+	status = "okay";
+};
+
 &gpiod {
 	skip-gpios = <13>;
 };
