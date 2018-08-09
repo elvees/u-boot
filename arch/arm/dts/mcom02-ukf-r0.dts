@@ -84,6 +84,11 @@
 	status = "okay";
 };
 
+&sd1 {
+	status = "okay";
+	non-removable;
+};
+
 &gpiod {
 	skip-gpios = <13>;
 };
