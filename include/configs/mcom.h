@@ -34,7 +34,7 @@
 #else
 
 #ifdef CONFIG_TARGET_MCOM02_UKF
-#define CPLL_VALUE			0x0A
+#define CPLL_VALUE			0x0D
 #else
 #define CPLL_VALUE			0x0F
 #endif  /* CONFIG_TARGET_MCOM02_UKF */
