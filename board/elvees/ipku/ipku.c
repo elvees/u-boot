@@ -42,10 +42,18 @@ int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 
 	/* TODO: DDR calibration should be done for IP-KU board.
 	 * This ODT/ODS values may not be optimal. */
+#ifdef CONFIG_TARGET_MCOM02_UKF
+	/* Parameters have been chosen manually */
+	cfg->impedance.ods_mc = 34;
+	cfg->impedance.ods_dram = 34;
+	cfg->impedance.odt_mc = 40;
+	cfg->impedance.odt_dram = 40;
+#else
 	cfg->impedance.ods_mc = 40;
 	cfg->impedance.ods_dram = 40;
 	cfg->impedance.odt_mc = 120;
 	cfg->impedance.odt_dram = 120;
+#endif
 
 	cfg->ctl.dqs_gating_override = 0;
 
