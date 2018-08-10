@@ -88,6 +88,22 @@ __weak int ddr_poweron(void)
 	return 0;
 }
 
+#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_PRINT_DDR_PARAMS
+static void print_ddr_params(struct ddr_cfg *cfgs)
+{
+	int i;
+
+	for (i = 0; i < 2; i++) {
+		printf("DDR #%d parameters: ", i);
+		printf("ods_mc=%d, ods_dram=%d, odt_mc=%d, odt_dram=%d\n",
+		       cfgs[i].impedance.ods_mc, cfgs[i].impedance.ods_dram,
+		       cfgs[i].impedance.odt_mc, cfgs[i].impedance.odt_dram);
+	}
+}
+#endif
+#endif
+
 int dram_init(void)
 {
 	gd->ram_size = PHYS_SDRAM_0_SIZE;
@@ -124,15 +140,16 @@ int dram_init(void)
 
 	u32 status = mcom_ddr_init(&cfg[0], &cfg[1], &freq);
 
-	if (ddr_getrc(status, 0))
-		puts("DDR controller #0 init failed\n");
-	else
-		puts("DDR controller #0 init done\n");
+	for (i = 0; i < 2; i++) {
+		const char *result_str[2] = {"done", "failed"};
 
-	if (ddr_getrc(status, 1))
-		puts("DDR controller #1 init failed\n");
-	else
-		puts("DDR controller #1 init done\n");
+		printf("DDR controller #%d init %s\n",
+		       i, result_str[!!ddr_getrc(status, i)]);
+	}
+	printf("DDR frequency: %d MHz\n", CPLL_FREQ / 1000000);
+#ifdef CONFIG_PRINT_DDR_PARAMS
+	print_ddr_params(cfg);
+#endif
 
 	return status;
 #else

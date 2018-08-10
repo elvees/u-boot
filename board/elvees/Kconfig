@@ -61,4 +61,9 @@ config CONS_INDEX
 	help
 	  1 for UART0, 2 for UART1, etc
 
+config PRINT_DDR_PARAMS
+	bool "Enable DDR parameters printing"
+	help
+	  Print DDR parameters (ODT, ODS) to console
+
 endif
