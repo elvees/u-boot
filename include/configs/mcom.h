@@ -166,9 +166,6 @@
 #else
 #define CONFIG_BOOTCOMMAND \
 	"if run prep_bootdev; then " \
-		"if run loadbootenv; then " \
-			"run importbootenv;" \
-		"fi;" \
 		"if test -n ${bootenvcmd}; then " \
 			"run bootenvcmd;" \
 		"fi;" \
@@ -184,6 +181,12 @@
 #define DDRCTL_CMD "ddrctl_cmd=disable\0"
 #endif
 
+#if defined(CONFIG_TARGET_SALUTE_D1) || defined(CONFIG_TARGET_SALUTE_D2)
+#define BLACKLIST "modprobe.blacklist=vpoutfb"
+#else
+#define BLACKLIST
+#endif
+
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"bootm_size=0x10000000\0" \
 	"stdin=serial\0" \
@@ -195,10 +198,9 @@
 	"stderr=serial\0" \
 	DDRCTL_CMD \
 	"ddrctl_cid=1\0" \
-	"bootenv=u-boot.env\0" \
 	"bootenvcmd=\0" \
 	"console=ttyS0,115200\0" \
-	"cmdline=\0" \
+	"cmdline=" BLACKLIST "\0" \
 	"bootsource=mmc\0" \
 	"mmcdev=0\0" \
 	"bootpartnum=1\0" \
@@ -230,9 +232,6 @@
 			"ubi part allnand;" \
 			"ubifsmount ubi:boot;" \
 		"fi;\0" \
-	"loadbootenv=${loadcmd} ${loaddev} ${loadpart} " \
-		"${loadaddr} ${bootenv}\0" \
-	"importbootenv=env import -t ${loadaddr} ${filesize}\0" \
 	"loadbootfile=${loadcmd} ${loaddev} ${loadpart} " \
 		"${loadaddr} ${bootfile}\0" \
 	"set_bootargs=setenv bootargs console=${console} " \
