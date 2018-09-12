@@ -187,6 +187,12 @@
 #define BLACKLIST
 #endif
 
+#ifdef CONFIG_TARGET_SALUTE_PM
+#define VIDEO_MODE "video=HDMI-A-1:1920x1080"
+#else
+#define VIDEO_MODE
+#endif
+
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"bootm_size=0x10000000\0" \
 	"stdin=serial\0" \
@@ -200,7 +206,7 @@
 	"ddrctl_cid=1\0" \
 	"bootenvcmd=\0" \
 	"console=ttyS0,115200\0" \
-	"cmdline=" BLACKLIST "\0" \
+	"cmdline=" BLACKLIST VIDEO_MODE "\0" \
 	"bootsource=mmc\0" \
 	"mmcdev=0\0" \
 	"bootpartnum=1\0" \
