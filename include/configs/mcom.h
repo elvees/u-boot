@@ -216,7 +216,6 @@
 	"loadcmd=load\0" \
 	"loaddev=\0" \
 	"loadpart=\0" \
-	"extra_args=\0" \
 	"prep_bootdev=" \
 		"if test ${bootsource} = usb; then " \
 			"rootfsdev=/dev/sda${rootpartnum};" \
@@ -233,7 +232,7 @@
 			"rootfsdev=ubi0:root;" \
 			"setenv loadcmd ubifsload;" \
 			"setenv rootfstype ubifs;" \
-			"extra_args=ubi.mtd=arasan_nfc;" \
+			"setenv cmdline ${cmdline} ubi.mtd=arasan_nfc;" \
 			"mtdparts default;" \
 			"ubi part allnand;" \
 			"ubifsmount ubi:boot;" \
@@ -241,8 +240,8 @@
 	"loadbootfile=${loadcmd} ${loaddev} ${loadpart} " \
 		"${loadaddr} ${bootfile}\0" \
 	"set_bootargs=setenv bootargs console=${console} " \
-		"root=${rootfsdev} ${extra_args} " \
-		"rootfstype=${rootfstype} rw rootwait ${cmdline}\0" \
+		"root=${rootfsdev} rootfstype=${rootfstype} rw rootwait " \
+		"${cmdline}\0" \
 	"mcomboot=run set_bootargs;bootz ${loadaddr} - ${fdtcontroladdr}\0"
 #endif
 
