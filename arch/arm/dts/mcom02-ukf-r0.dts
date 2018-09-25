@@ -95,7 +95,6 @@
 
 &nfc {
 	status = "okay";
-	nand-bus-width = <16>;
 };
 
 &gpiod {
