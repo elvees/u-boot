@@ -45,6 +45,7 @@
 &sd1 {
 	status = "okay";
 	non-removable;
+	bus-width = <4>;
 };
 
 &i2c0 {
