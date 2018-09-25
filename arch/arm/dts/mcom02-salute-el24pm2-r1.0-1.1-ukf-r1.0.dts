@@ -48,6 +48,10 @@
 	bus-width = <4>;
 };
 
+&sound {
+	status = "okay";
+};
+
 &i2c0 {
 	fram0: fram0@50 {
 		#address-cells = <1>;
