@@ -365,6 +365,7 @@
 			reg = <0>;
 			remote-endpoint = <&hdmi_in>;
 			info {
+				label = "HDMI";
 				bpp = <32>;
 			};
 		};
@@ -373,6 +374,7 @@
 			reg = <1>;
 			remote-endpoint = <&ej070na_in>;
 			info {
+				label = "EJ070NA";
 				bpp = <32>;
 			};
 		};
@@ -381,6 +383,7 @@
 			reg = <2>;
 			remote-endpoint = <&at070tn92_in>;
 			info {
+				label = "AT070TN92";
 				bpp = <32>;
 			};
 		};
