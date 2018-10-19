@@ -48,6 +48,27 @@
 	bus-width = <4>;
 };
 
+&vinc {
+	status = "okay";
+	ports {
+		port@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			vinc_endpoint0: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&tc358748_0endpoint>;
+				elvees,ifacenum = /bits/ 8 <2>;
+			};
+
+			vinc_endpoint1: endpoint@1 {
+				reg = <1>;
+				remote-endpoint = <&tc358748_1endpoint>;
+				elvees,ifacenum = /bits/ 8 <3>;
+			};
+		};
+	};
+};
+
 &sound {
 	status = "okay";
 };
@@ -59,6 +80,23 @@
 		compatible = "atmel,24c16", "i2c-eeprom";
 		reg = <0x50>;
 	};
+
+	tc358748_0@0e {
+		compatible = "toshiba,tc358748";
+		reg = <0x0e>;
+		clock-frequency = <40000000>;
+		pixel-frequency = <126000000>;
+		vvalid-invert;
+		/* TC358748 on I2C0 is connected to HSYNC instead of VDEN.
+		 * HSYNC polarity is different from VDEN.
+		 */
+		hvalid-invert;
+		port {
+			tc358748_0endpoint: endpoint {
+				remote = <&vinc_endpoint0>;
+			};
+		};
+	};
 };
 
 &i2c1 {
@@ -67,6 +105,19 @@
 		#size-cells = <1>;
 		compatible = "atmel,24c16", "i2c-eeprom";
 		reg = <0x50>;
+	};
+
+	tc358748_1@0e {
+		compatible = "toshiba,tc358748";
+		reg = <0x0e>;
+		clock-frequency = <40000000>;
+		pixel-frequency = <126000000>;
+		vvalid-invert;
+		port {
+			tc358748_1endpoint: endpoint {
+				remote = <&vinc_endpoint1>;
+			};
+		};
 	};
 };
 
@@ -77,4 +128,8 @@
 		compatible = "atmel,24c16", "i2c-eeprom";
 		reg = <0x50>;
 	};
+};
+
+&framebuffer {
+	status = "okay";
 };
