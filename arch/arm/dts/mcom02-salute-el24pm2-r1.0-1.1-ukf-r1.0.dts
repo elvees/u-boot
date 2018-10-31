@@ -2,7 +2,7 @@
 
 /dts-v1/;
 
-#include "mcom02-salute-el24pm2-r1.0.dtsi"
+#include "mcom02-salute-el24pm2-r1.0-1.1.dtsi"
 
 / {
 	model = "Salute-EL24PM2 r1.0-1.1, Salute-PM-UKF r1.0";
