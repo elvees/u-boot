@@ -13,6 +13,16 @@
 
 / {
 	model = "Salute-EL24PM1 r1.1-1.2, Salute-EL24OM1 r1.1-1.2";
+	compatible = "elvees,salute-el24pm1-r1.2-om1-r1.2",
+		     "elvees,salute-el24pm1-r1.2-om1-r1.1",
+		     "elvees,salute-el24pm1-r1.1-om1-r1.1",
+		     "elvees,salute-el24pm1-om1",
+		     "elvees,salute-el24om1-r1.2",
+		     "elvees,salute-el24om1-r1.1",
+		     "elvees,salute-el24om1",
+		     "elvees,salute-el24pm1-r1.2",
+		     "elvees,salute-el24pm1-r1.1",
+		     "elvees,salute-el24pm1";
 };
 
 &ft313h {

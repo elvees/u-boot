@@ -16,6 +16,8 @@
 
 / {
 	model = "MCom-02-UKF r0";
+	compatible = "elvees,mcom02-ukf-r0",
+		     "elvees,mcom02-ukf";
 
 	chosen {
 		bootargs = "console=ttyS0,115200";

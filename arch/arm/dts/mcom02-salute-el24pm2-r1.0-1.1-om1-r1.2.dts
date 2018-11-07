@@ -13,6 +13,14 @@
 
 / {
 	model = "Salute-EL24PM2 r1.0-1.1, Salute-EL24OM1 r1.2";
+	compatible = "elvees,salute-el24pm2-r1.1-om1-r1.2",
+		     "elvees,salute-el24pm2-r1.0-om1-r1.2",
+		     "elvees,salute-el24pm2-om1",
+		     "elvees,salute-el24om1-r1.2",
+		     "elvees,salute-el24om1",
+		     "elvees,salute-el24pm2-r1.1",
+		     "elvees,salute-el24pm2-r1.0",
+		     "elvees,salute-el24pm2";
 };
 
 &usb {

@@ -6,6 +6,14 @@
 
 / {
 	model = "Salute-EL24PM2 r1.0-1.1, Salute-PM-UKF r1.0";
+	compatible = "elvees,salute-el24pm2-r1.1-pm-ukf-r1.0",
+		     "elvees,salute-el24pm2-r1.0-pm-ukf-r1.0",
+		     "elvees,salute-el24pm2-pm-ukf",
+		     "elvees,salute-pm-ukf-r1.0",
+		     "elvees,salute-pm-ukf",
+		     "elvees,salute-el24pm2-r1.1",
+		     "elvees,salute-el24pm2-r1.0",
+		     "elvees,salute-el24pm2";
 
 	aliases {
 		spi0 = &spi0;

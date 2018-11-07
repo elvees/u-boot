@@ -14,6 +14,8 @@
 
 / {
 	model = "IP-KU r1.1";
+	compatible = "elvees,ip-ku-r1.1",
+		     "elvees,ip-ku";
 
 	chosen {
 		bootargs = "console=ttyS0,115200";
