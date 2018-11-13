@@ -1006,6 +1006,15 @@
 	pmctr: pmctr@38095000 {
 		compatible = "elvees,mcom-pmctr";
 		reg = <0x38095000 0x1000>;
+
+		domains {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			pd_vpu: domain@1 {
+				#power-domain-cells = <0>;
+				pwr-mask = <0x4>;
+			};
+		};
 	};
 
 	smctr: smctr@38096000 {
@@ -1019,6 +1028,7 @@
 		clocks = <&vpu_pclk>, <&vpu_aclk>, <&vpu_sclk>;
 		clock-names = "pclk", "aclk", "sclk";
 		reg = <0x37100000 0x00010000>, <0x3b000000 0x01000000>;
+		power-domains = <&pd_vpu>;
 	};
 
 	sdma: dma@37220000 {
