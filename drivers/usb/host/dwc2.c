@@ -799,6 +799,9 @@ int wait_for_chhltd(struct dwc2_hc_regs *hc_regs, uint32_t *sub, u8 *toggle)
 	if (hcint & (DWC2_HCINT_NAK | DWC2_HCINT_FRMOVRUN))
 		return -EAGAIN;
 
+	if (hcint & DWC2_HCINT_XACTERR)
+		return -EIO;
+
 	debug("%s: Error (HCINT=%08x)\n", __func__, hcint);
 	return -EINVAL;
 }
@@ -816,14 +819,10 @@ static int transfer_chunk(struct dwc2_hc_regs *hc_regs, void *aligned_buffer,
 {
 	int ret = 0;
 	uint32_t sub;
+	int attempt;
 
 	debug("%s: chunk: pid %d xfer_len %u pkts %u\n", __func__,
 	      *pid, xfer_len, num_packets);
-
-	writel((xfer_len << DWC2_HCTSIZ_XFERSIZE_OFFSET) |
-	       (num_packets << DWC2_HCTSIZ_PKTCNT_OFFSET) |
-	       (*pid << DWC2_HCTSIZ_PID_OFFSET),
-	       &hc_regs->hctsiz);
 
 	if (xfer_len) {
 		if (in) {
@@ -840,20 +839,40 @@ static int transfer_chunk(struct dwc2_hc_regs *hc_regs, void *aligned_buffer,
 		}
 	}
 
-	writel(phys_to_bus((unsigned long)aligned_buffer), &hc_regs->hcdma);
+	/*
+	 * Host must retry the transaction 3 times before it halts end point.
+	 * But in some cases it's insufficient. So we use 6 attempts.
+	 */
+	for (attempt = 6; attempt > 0; attempt--) {
+		writel((xfer_len << DWC2_HCTSIZ_XFERSIZE_OFFSET) |
+		       (num_packets << DWC2_HCTSIZ_PKTCNT_OFFSET) |
+		       (*pid << DWC2_HCTSIZ_PID_OFFSET),
+		       &hc_regs->hctsiz);
 
-	/* Clear old interrupt conditions for this host channel. */
-	writel(0x3fff, &hc_regs->hcint);
+		writel(phys_to_bus((unsigned long)aligned_buffer),
+		       &hc_regs->hcdma);
 
-	/* Set host channel enable after all other setup is complete. */
-	clrsetbits_le32(&hc_regs->hcchar, DWC2_HCCHAR_MULTICNT_MASK |
-			DWC2_HCCHAR_CHEN | DWC2_HCCHAR_CHDIS |
-			DWC2_HCCHAR_ODDFRM,
-			(1 << DWC2_HCCHAR_MULTICNT_OFFSET) |
-			(odd_frame << DWC2_HCCHAR_ODDFRM_OFFSET) |
-			DWC2_HCCHAR_CHEN);
+		/* Clear old interrupt conditions for this host channel. */
+		writel(0x3fff, &hc_regs->hcint);
 
-	ret = wait_for_chhltd(hc_regs, &sub, pid);
+		/* Set host channel enable after all other setup is complete. */
+		clrsetbits_le32(&hc_regs->hcchar, DWC2_HCCHAR_MULTICNT_MASK |
+				DWC2_HCCHAR_CHEN | DWC2_HCCHAR_CHDIS |
+				DWC2_HCCHAR_ODDFRM,
+				(1 << DWC2_HCCHAR_MULTICNT_OFFSET) |
+				(odd_frame << DWC2_HCCHAR_ODDFRM_OFFSET) |
+				DWC2_HCCHAR_CHEN);
+
+		ret = wait_for_chhltd(hc_regs, &sub, pid);
+
+		/*
+		 * retry the transaction within the number of attempts
+		 * if it was corrupted.
+		 */
+		if (ret != -EIO)
+			break;
+	}
+
 	if (ret < 0)
 		return ret;
 
