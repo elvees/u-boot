@@ -216,6 +216,7 @@
 	"loadcmd=load\0" \
 	"loaddev=\0" \
 	"loadpart=\0" \
+	"usb_pgood_delay=5000\0" \
 	"prep_bootdev=" \
 		"if test ${bootsource} = usb; then " \
 			"rootfsdev=/dev/sda${rootpartnum};" \
