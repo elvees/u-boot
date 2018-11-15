@@ -1023,8 +1023,8 @@
 	vpu: codec@37100000 {
 		compatible = "elvees,avico";
 		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-		clocks = <&vpu_pclk>, <&vpu_aclk>, <&vpu_sclk>;
-		clock-names = "pclk", "aclk", "sclk";
+		clocks = <&vpu_pclk>, <&vpu_aclk>, <&vpu_sclk>, <&dsp_aclk>;
+		clock-names = "pclk", "aclk", "sclk", "dsp_aclk";
 		reg = <0x37100000 0x00010000>, <0x3b000000 0x01000000>;
 		power-domains = <&pd_vpu>;
 	};
