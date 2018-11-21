@@ -21,6 +21,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define GPIO_SWPORT_DR(p)	(0x00 + (p) * 0xc)
 #define GPIO_SWPORT_DDR(p)	(0x04 + (p) * 0xc)
+#define GPIO_SWPORT_CTL(p)	(0x08 + (p) * 0xc)
 #define GPIO_INTEN		0x30
 #define GPIO_INTMASK		0x34
 #define GPIO_INTTYPE_LEVEL	0x38
@@ -36,6 +37,23 @@ struct gpio_dwapb_platdata {
 	int		pins;
 	fdt_addr_t	base;
 };
+
+static int dwapb_gpio_request(struct udevice *dev, unsigned pin,
+			      const char *label)
+{
+	struct gpio_dwapb_platdata *plat = dev_get_platdata(dev);
+
+	clrbits_le32(plat->base + GPIO_SWPORT_CTL(plat->bank), 1 << pin);
+	return 0;
+}
+
+static int dwapb_gpio_free(struct udevice *dev, unsigned pin)
+{
+	struct gpio_dwapb_platdata *plat = dev_get_platdata(dev);
+
+	setbits_le32(plat->base + GPIO_SWPORT_CTL(plat->bank), 1 << pin);
+	return 0;
+}
 
 static int dwapb_gpio_direction_input(struct udevice *dev, unsigned pin)
 {
@@ -66,7 +84,6 @@ static int dwapb_gpio_get_value(struct udevice *dev, unsigned pin)
 	return !!(readl(plat->base + GPIO_EXT_PORT(plat->bank)) & (1 << pin));
 }
 
-
 static int dwapb_gpio_set_value(struct udevice *dev, unsigned pin, int val)
 {
 	struct gpio_dwapb_platdata *plat = dev_get_platdata(dev);
@@ -80,6 +97,8 @@ static int dwapb_gpio_set_value(struct udevice *dev, unsigned pin, int val)
 }
 
 static const struct dm_gpio_ops gpio_dwapb_ops = {
+	.request		= dwapb_gpio_request,
+	.free			= dwapb_gpio_free,
 	.direction_input	= dwapb_gpio_direction_input,
 	.direction_output	= dwapb_gpio_direction_output,
 	.get_value		= dwapb_gpio_get_value,
