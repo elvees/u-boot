@@ -16,7 +16,8 @@
 / {
 	model = "Salute-EL24D1 r1.5";
 	compatible = "elvees,salute-el24d1-r1.5",
-		     "elvees,salute-el24d1";
+		     "elvees,salute-el24d1",
+		     "elvees,mcom02";
 
 	chosen {
 		bootargs = "console=ttyS0,115200";

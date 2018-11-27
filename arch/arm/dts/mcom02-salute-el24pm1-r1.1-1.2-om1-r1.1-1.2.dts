@@ -22,7 +22,8 @@
 		     "elvees,salute-el24om1",
 		     "elvees,salute-el24pm1-r1.2",
 		     "elvees,salute-el24pm1-r1.1",
-		     "elvees,salute-el24pm1";
+		     "elvees,salute-el24pm1",
+		     "elvees,mcom02";
 };
 
 &ft313h {

@@ -20,7 +20,8 @@
 		     "elvees,salute-el24om1",
 		     "elvees,salute-el24pm2-r1.1",
 		     "elvees,salute-el24pm2-r1.0",
-		     "elvees,salute-el24pm2";
+		     "elvees,salute-el24pm2",
+		     "elvees,mcom02";
 };
 
 &usb {
