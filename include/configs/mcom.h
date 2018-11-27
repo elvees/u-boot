@@ -188,7 +188,7 @@
 #endif
 
 #ifdef CONFIG_TARGET_SALUTE_PM
-#define VIDEO_MODE "video=HDMI-A-1:1920x1080"
+#define VIDEO_MODE "video=HDMI:1920x1080"
 #else
 #define VIDEO_MODE
 #endif
