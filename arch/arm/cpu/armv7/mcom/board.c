@@ -3,7 +3,7 @@
  *
  * Copyright 2015 ELVEES NeoTek CJSC
  * Copyright 2015-2016 ELVEES NeoTek JSC
- * Copyright 2017 RnD Center "ELVEES", JSC
+ * Copyright 2017-2018 RnD Center "ELVEES", JSC
  *
  * Vasiliy Zasukhin <vzasukhin@elvees.com>
  *
@@ -126,6 +126,17 @@ void board_init_f(ulong dummy)
 	sys.GPIO0->SWPORTD.CTL &= ~BIT(13);
 	sys.GPIO0->SWPORTD.DDR |= BIT(13);
 	sys.GPIO0->SWPORTD.DR |= BIT(13);
+#endif
+
+#ifdef CONFIG_TARGET_IPKU2
+	/* GPIOC14 is used for DDR controller power enable */
+	sys.GPIO0->SWPORTC.CTL &= ~BIT(14);
+	sys.GPIO0->SWPORTC.DDR |= BIT(14);
+	sys.GPIO0->SWPORTC.DR &= ~BIT(14);
+	/* GPIOC14 is connected to DDR regulator via FPGA.
+	 * We need to wait some time for FPGA loading. */
+	timer_init();
+	mdelay(8000);
 #endif
 
 	sys.CMCTR->DIV_MPU_CTR = 1;

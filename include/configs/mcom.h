@@ -17,7 +17,8 @@
 
 #define XTI_FREQ			24000000
 
-#if defined(CONFIG_TARGET_IPKU) || defined(CONFIG_TARGET_MCOM02_UKF)
+#if defined(CONFIG_TARGET_IPKU) || defined(CONFIG_TARGET_IPKU2) || \
+	defined(CONFIG_TARGET_MCOM02_UKF)
 #define APLL_VALUE			0x1F
 #define SPLL_VALUE			0x05	/* L1_HCLK = 144 MHz */
 #define DIV_SYS0_CTR_VALUE		0
