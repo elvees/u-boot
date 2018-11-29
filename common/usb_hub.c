@@ -137,6 +137,9 @@ static void usb_hub_power_on(struct usb_hub_device *hub)
 			          (unsigned)simple_strtol(env, NULL, 0));
 	debug("pgood_delay=%dms\n", pgood_delay);
 
+	printf("USB%d: Waiting %u ms for power to become stable...\n",
+	       dev->devnum, pgood_delay);
+
 	/*
 	 * Do a minimum delay of the larger value of 100ms or pgood_delay
 	 * so that the power can stablize before the devices are queried
