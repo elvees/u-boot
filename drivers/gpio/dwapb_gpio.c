@@ -126,7 +126,7 @@ static int gpio_dwapb_bind(struct udevice *dev)
 	struct udevice *subdev;
 	fdt_addr_t base;
 	u32 skip_list[32];
-	u32 skip_mask = 0;
+	u32 skip_mask;
 	int skip_count;
 	int ret, node, i;
 
@@ -143,6 +143,8 @@ static int gpio_dwapb_bind(struct udevice *dev)
 	for (node = fdt_first_subnode(blob, dev_of_offset(dev));
 	     node > 0;
 	     node = fdt_next_subnode(blob, node)) {
+		skip_mask = 0;
+
 		if (!fdtdec_get_bool(blob, node, "gpio-controller"))
 			continue;
 
