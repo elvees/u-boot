@@ -18,10 +18,9 @@ DECLARE_GLOBAL_DATA_PTR;
 #define TIMER_INT_MASK	(0x1 << 2)	/* mask interrupt */
 #define TIMER_EN		(0x1 << 0)	/* enable timer */
 
-#define TIMER_CLOCK			CONFIG_TIMER_CLK_FREQ
-#define COUNT_TO_USEC(x)	((x) / (TIMER_CLOCK / 1000000))
-#define USEC_TO_COUNT(x)	((x) * (TIMER_CLOCK / 1000000))
-#define TICKS_PER_HZ		(TIMER_CLOCK / CONFIG_SYS_HZ)
+#define COUNT_TO_USEC(x)	((x) / (TIMER_FREQ / 1000000))
+#define USEC_TO_COUNT(x)	((x) * (TIMER_FREQ / 1000000))
+#define TICKS_PER_HZ		(TIMER_FREQ / CONFIG_SYS_HZ)
 #define TICKS_TO_HZ(x)		((x) / TICKS_PER_HZ)
 
 #define TIMER_LOAD_VAL		0xffffffff

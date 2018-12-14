@@ -48,7 +48,7 @@
 #define APLL_FREQ			(XTI_FREQ * (APLL_VALUE + 1))
 #define CPLL_FREQ			(XTI_FREQ * (CPLL_VALUE + 1))
 #define SPLL_FREQ			((XTI_FREQ * (SPLL_VALUE + 1)) >> DIV_SYS0_CTR_VALUE)
-#define CONFIG_TIMER_CLK_FREQ		(SPLL_FREQ >> DIV_SYS1_CTR_VALUE)
+#define TIMER_FREQ			(SPLL_FREQ >> DIV_SYS1_CTR_VALUE)
 
 #include <asm/arch/cpu.h>   /* get chip and board defs */
 
