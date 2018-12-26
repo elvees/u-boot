@@ -122,6 +122,10 @@
 		clock-frequency = <40000000>;
 		pixel-frequency = <126000000>;
 		vvalid-invert;
+		/* TC358748 on I2C1 is connected to HSYNC instead of VDEN.
+		 * HSYNC polarity is different from VDEN.
+		 */
+		hvalid-invert;
 		port {
 			tc358748_1endpoint: endpoint {
 				remote = <&vinc_endpoint1>;
