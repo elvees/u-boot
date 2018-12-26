@@ -160,18 +160,33 @@
 		clocks = <&l3_pclk>;
 	};
 
-	dsp {
-		device_type = "cpu";
-		compatible = "elvees,delcore-30m";
+	dsp@0 {
+		dsp_num = <2>;
+		compatible = "elvees,delcore30m";
 		reg = <0x37001000 0x1000>, <0x37000000 0x1000>,
-		      <0x37010000 0x1000>,
-		      <0x3a600000 0x8000>, <0x3a620000 0x8000>,
-		      <0x3a400000 0x20000>, <0x3a420000 0x20000>;
+		      <0x37010000 0x1000>, <0x3a600000 0x20000>,
+		      <0x3a620000 0x20000>, <0x38081000 0x1000>;
 		reg-names = "cmn_regs", "dsp0_regs", "dsp1_regs",
-			    "dsp0_pram", "dsp1_pram", "xyram0", "xyram1";
+			    "dsp0_pram", "dsp1_pram", "spinlock";
+		sdma_regs = <&sdma>;
+		xyram = <&xyram0>, <&xyram1>;
 		interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&dsp_aclk>, <&dsp_pclk>, <&enc_clk>,
 			 <&dsp0_clk>, <&dsp1_clk>;
+	};
+
+	xyram0: xyram@3a400000 {
+		compatible = "mmio-sram";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reg = <0x3a400000 0x20000>;
+	};
+
+	xyram1: xyram@3a420000 {
+		compatible = "mmio-sram";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reg = <0x3a420000 0x20000>;
 	};
 
 	uart0: serial@38028000 {
@@ -1006,7 +1021,7 @@
 	};
 
 	sdma: dma@37220000 {
-		compatible = "arm,pl330", "arm,primecell";
+		compatible = "arm,pl330", "arm,primecell", "syscon";
 		reg = <0x37220000 0x1000>;
 		interrupt-parent = <&gic>;
 		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
