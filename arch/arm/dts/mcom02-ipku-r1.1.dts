@@ -61,7 +61,7 @@
 
 /* IP-KU hangs at high SPLL values, so we should decrease it. */
 &spllclk {
-	clock-mult = <6>;
+	clk-mult-initial = <6>;
 };
 
 &l3_pclk {

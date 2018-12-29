@@ -117,7 +117,7 @@
 };
 
 &spllclk {
-	clock-mult = <6>;
+	clk-mult-initial = <6>;
 };
 
 &l3_pclk {
