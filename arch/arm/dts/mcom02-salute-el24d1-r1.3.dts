@@ -296,7 +296,4 @@
 
 &nfc {
 	status = "okay";
-	partition@0 {
-		reg = <0x0 0x0000000 0x1 0x00000000>;
-	};
 };
