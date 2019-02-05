@@ -129,6 +129,7 @@ static int gpio_dwapb_bind(struct udevice *dev)
 	u32 skip_mask;
 	int skip_count;
 	int ret, node, i;
+	u32 reg;
 
 	/* If this is a child device, there is nothing to do here */
 	if (plat)
@@ -178,8 +179,9 @@ static int gpio_dwapb_bind(struct udevice *dev)
 
 		dev_set_of_offset(subdev, node);
 
-		setbits_le32(plat->base + GPIO_SWPORT_CTL(plat->bank),
-			     ~skip_mask);
+		reg = readl(plat->base + GPIO_SWPORT_CTL(plat->bank));
+		reg |= ~skip_mask;
+		setbits_le32(plat->base + GPIO_SWPORT_CTL(plat->bank), reg);
 	}
 
 	return 0;
