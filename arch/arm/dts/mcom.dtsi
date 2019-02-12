@@ -651,7 +651,7 @@
 				clocks = <&xti24m>;
 				#clock-cells = <0>;
 				reg = <0x108>;
-				clk-mult-initial = <13>;
+				clk-mult-initial = <28>;
 			};
 
 			gpu_aclk_div: gpu_aclk_div {
@@ -661,6 +661,7 @@
 				reg = <0x2c>;
 				reg-shift = <0>;
 				reg-width = <2>;
+				clk-div-initial = <1>;
 			};
 
 			gpu_aclk: gpu_aclk {
