@@ -265,13 +265,38 @@ static int dw_spi_child_pre_probe(struct udevice *dev)
 	struct dw_spi_priv *priv = dev_get_priv(bus);
 	struct spi_slave *slave = dev_get_parent_priv(dev);
 	int cs_flags = GPIOD_IS_OUT;
+	int ret;
 
 	if (!(slave->mode & SPI_CS_HIGH))
 		cs_flags |= GPIOD_ACTIVE_LOW;
 
-	gpio_request_by_name(bus, "cs-gpios", 0, &priv->cs_gpio, cs_flags);
+	ret = gpio_get_list_count(bus, "cs-gpios");
 
-	return 0;
+	/* Do nothing unless there is "cs-gpios" property */
+	if (ret == -ENOENT)
+		return 0;
+
+	ret = gpio_request_by_name(bus, "cs-gpios", 0, &priv->cs_gpio,
+				   cs_flags);
+	if (ret)
+		debug("%s: request 'cs' gpio failed\n", __func__);
+
+	return ret;
+}
+
+static int dw_spi_child_post_remove(struct udevice *dev)
+{
+	struct udevice *bus = dev->parent;
+	struct dw_spi_priv *priv = dev_get_priv(bus);
+	int ret = 0;
+
+	if (dm_gpio_is_valid(&priv->cs_gpio))
+		ret = dm_gpio_free(bus, &priv->cs_gpio);
+
+	if (ret)
+		debug("%s: free 'cs' gpio failed\n", __func__);
+
+	return ret;
 }
 
 static void dw_spi_cs_activate(struct udevice *dev)
@@ -516,5 +541,6 @@ U_BOOT_DRIVER(dw_spi) = {
 	.priv_auto_alloc_size = sizeof(struct dw_spi_priv),
 	.probe = dw_spi_probe,
 	.child_pre_probe = dw_spi_child_pre_probe,
+	.child_post_remove = dw_spi_child_post_remove,
 	.remove = dw_spi_remove,
 };
