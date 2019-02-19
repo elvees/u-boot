@@ -8,7 +8,9 @@
 #include <common.h>
 #include <asm/arch/clock_manager.h>
 
-unsigned int cm_get_spi_controller_clk_hz(void)
+int dw_spi_get_clk(struct udevice *bus, ulong *rate)
 {
-	return SPLL_FREQ >> DIV_SYS1_CTR_VALUE;
+	*rate = SPLL_FREQ >> DIV_SYS1_CTR_VALUE;
+
+	return 0;
 }
