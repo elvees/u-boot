@@ -21,11 +21,21 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/regs.h>
 #include <asm/io.h>
+#include <environment.h>
 #include <linux/kernel.h>
+#include <spi.h>
+#include <spi_flash.h>
 #include <usb.h>
 #include <usb/dwc2_udc.h>
 
 DECLARE_GLOBAL_DATA_PTR;
+
+/* Struct is similar to env_t but env_t has additional field if
+ * CONFIG_SYS_REDUNDAND_ENVIRONMENT is defined */
+struct factory_env {
+	u32 crc;
+	unsigned char data[];
+};
 
 int board_init(void)
 {
@@ -213,3 +223,91 @@ int board_usb_init(int index, enum usb_init_type init)
 	}
 	return 0;
 }
+
+#if defined(CONFIG_MISC_INIT_R) && defined(CONFIG_SPL_SPI_FLASH_SUPPORT)
+static struct factory_env *read_factory_settings(u32 *data_size)
+{
+	struct spi_flash *flash;
+	struct factory_env *ptr = NULL;
+	u32 factorysize;
+	u32 factoryoffset;
+
+	flash = spi_flash_probe(CONFIG_SF_DEFAULT_BUS, CONFIG_SF_DEFAULT_CS,
+				CONFIG_SF_DEFAULT_SPEED,
+				CONFIG_SF_DEFAULT_MODE);
+	if (!flash) {
+		printf("Unable to probe SPI flash\n");
+		return NULL;
+	}
+	/* Factory settings are contained in the last eraseblock */
+	factorysize = flash->erase_size;
+	factoryoffset = flash->size - flash->erase_size;
+
+	/* factorysize and factoryoffset variables are needed for change
+	 * factory settings from U-Boot command line */
+	env_set_hex("factorysize", factorysize);
+	env_set_hex("factoryoffset", factoryoffset);
+	ptr = (struct factory_env *)malloc(factorysize);
+	if (!ptr) {
+		printf("Not enough memory\n");
+		goto flash_free;
+	}
+	if (spi_flash_read(flash, factoryoffset, factorysize, ptr)) {
+		printf("Unable to read factory settings from SPI flash\n");
+		free(ptr);
+		ptr = NULL;
+		goto flash_free;
+	}
+	*data_size = factorysize;
+
+flash_free:
+	spi_flash_free(flash);
+	return ptr;
+}
+
+int misc_init_r(void)
+{
+	struct factory_env *factory_env;
+	u32 data_size;
+	u32 real_crc;
+
+	printf("Loading factory settings from SPI Flash... ");
+	factory_env = read_factory_settings(&data_size);
+	/* U-Boot will hang if misc_init_r() return non-zero value.
+	 * misc_inti_r() returns 0 even in case of errors, because
+	 * factory settings loading errors should not cause a hang. */
+	if (!factory_env)
+		return 0;
+
+	data_size -= sizeof(real_crc);
+	real_crc = crc32(0, factory_env->data, data_size);
+	if (real_crc != factory_env->crc) {
+		/* If SPI flash block (include CRC) is 0xff it means that
+		 * block is empty. If data (include CRC) is not 0xff it means
+		 * that data is damaged. */
+		if (real_crc != (u32)-1)
+			printf("CRC error in factory settings\n");
+
+		/* Factory settings not found or corrupted. Nothing to import */
+		goto free_exit;
+	}
+
+	if (!himport_r(&env_htab, (char *)factory_env->data, data_size, '\0',
+		       H_NOCLEAR, 0, 0, NULL)) {
+		printf("Unable to import factory settings\n");
+		goto free_exit;
+	}
+	/* If ethaddr variable does not exists then create and set it using
+	 * address from factory_eth_mac */
+	if (!env_get("ethaddr")) {
+		char *factory_eth_mac = env_get("factory_eth_mac");
+
+		if (factory_eth_mac)
+			env_set("ethaddr", factory_eth_mac);
+	}
+
+free_exit:
+	free(factory_env);
+	return 0;
+}
+#endif
