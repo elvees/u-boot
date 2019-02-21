@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2009
  * Net Insight <www.netinsight.net>
@@ -7,8 +8,6 @@
  * (C) Copyright 2009
  * Marvell Semiconductor <www.marvell.com>
  * Written-by: Prafulla Wadaskar <prafulla@marvell.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _CONFIG_OPENRD_H
@@ -19,14 +18,11 @@
  */
 #define CONFIG_SHEEVA_88SV131	1	/* CPU Core subversion */
 #define CONFIG_KW88F6281	1	/* SOC Name */
-#define CONFIG_MACH_OPENRD_BASE	/* Machine type */
 #define CONFIG_SKIP_LOWLEVEL_INIT	/* disable board lowlevel_init */
 
 /*
  * Commands configuration
  */
-#define CONFIG_SYS_MVFS
-#define CONFIG_CMD_NAND
 
 /*
  * mv-common.h should be defined after CMD configs since it used them
@@ -38,10 +34,7 @@
  *  Environment variables configurations
  */
 #ifdef CONFIG_CMD_NAND
-#define CONFIG_ENV_IS_IN_NAND		1
 #define CONFIG_ENV_SECT_SIZE		0x20000	/* 128K */
-#else
-#define CONFIG_ENV_IS_NOWHERE		1	/* if env in SDRAM */
 #endif
 /*
  * max 4k env size is enough, but in case of nand
@@ -63,18 +56,11 @@
 	"setenv bootargs ${x_bootargs} ${x_bootargs_root}; "	\
 	"${x_bootcmd_usb}; bootm 0x6400000;"
 
-#define MTDIDS_DEFAULT		"nand0=nand_mtd"
-#define MTDPARTS_DEFAULT	"mtdparts=nand_mtd:0x100000@0x000000(uboot),"\
-	"0x400000@0x100000(uImage),"\
-	"0x1fb00000@0x500000(rootfs)"
-
-#define CONFIG_EXTRA_ENV_SETTINGS	"x_bootargs=console"		\
-	"=ttyS0,115200 "MTDPARTS_DEFAULT " rw ubi.mtd=2,2048\0"		\
+#define CONFIG_EXTRA_ENV_SETTINGS	"x_bootargs=console=ttyS0,115200 " \
+	CONFIG_MTDPARTS_DEFAULT " rw ubi.mtd=2,2048\0" \
 	"x_bootcmd_kernel=nand read 0x6400000 0x100000 0x300000\0"	\
 	"x_bootcmd_usb=usb start\0"					\
-	"x_bootargs_root=root=ubi0:rootfs rootfstype=ubifs\0"		\
-	"mtdids="MTDIDS_DEFAULT"\0"					\
-	"mtdparts="MTDPARTS_DEFAULT"\0"
+	"x_bootargs_root=root=ubi0:rootfs rootfstype=ubifs\0"
 
 /*
  * Ethernet Driver configuration

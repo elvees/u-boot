@@ -1,22 +1,16 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  *  (C) Copyright 2010,2011
  *  NVIDIA Corporation <www.nvidia.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <dm.h>
+#include <efi_loader.h>
 #include <errno.h>
 #include <ns16550.h>
-#include <linux/compiler.h>
-#include <linux/sizes.h>
+#include <usb.h>
 #include <asm/io.h>
-#include <asm/arch/clock.h>
-#include <asm/arch/funcmux.h>
-#include <asm/arch/pinmux.h>
-#include <asm/arch/pmu.h>
-#include <asm/arch/tegra.h>
 #include <asm/arch-tegra/ap.h>
 #include <asm/arch-tegra/board.h>
 #include <asm/arch-tegra/clk_rst.h>
@@ -25,17 +19,16 @@
 #include <asm/arch-tegra/uart.h>
 #include <asm/arch-tegra/warmboot.h>
 #include <asm/arch-tegra/gpu.h>
+#include <asm/arch-tegra/usb.h>
+#include <asm/arch-tegra/xusb-padctl.h>
+#include <asm/arch/clock.h>
+#include <asm/arch/funcmux.h>
+#include <asm/arch/pinmux.h>
+#include <asm/arch/pmu.h>
+#include <asm/arch/tegra.h>
 #ifdef CONFIG_TEGRA_CLOCK_SCALING
 #include <asm/arch/emc.h>
 #endif
-#include <asm/arch-tegra/usb.h>
-#ifdef CONFIG_USB_EHCI_TEGRA
-#include <usb.h>
-#endif
-#include <asm/arch-tegra/xusb-padctl.h>
-#include <power/as3722.h>
-#include <i2c.h>
-#include <spi.h>
 #include "emc.h"
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -148,11 +141,6 @@ int board_init(void)
 		debug("Memory controller init failed: %d\n", err);
 #  endif
 # endif /* CONFIG_TEGRA_PMU */
-#ifdef CONFIG_PMIC_AS3722
-	err = as3722_init(NULL);
-	if (err && err != -ENODEV)
-		return err;
-#endif
 #endif /* CONFIG_SYS_I2C_TEGRA */
 
 #ifdef CONFIG_USB_EHCI_TEGRA
@@ -162,15 +150,17 @@ int board_init(void)
 #if defined(CONFIG_DM_VIDEO)
 	board_id = tegra_board_id();
 	err = tegra_lcd_pmic_init(board_id);
-	if (err)
+	if (err) {
+		debug("Failed to set up LCD PMIC\n");
 		return err;
+	}
 #endif
 
 #ifdef CONFIG_TEGRA_NAND
 	pin_mux_nand();
 #endif
 
-	tegra_xusb_padctl_init(gd->fdt_blob);
+	tegra_xusb_padctl_init();
 
 #ifdef CONFIG_TEGRA_LP0
 	/* save Sdram params to PMC 2, 4, and 24 for WB0 */
@@ -221,12 +211,25 @@ int board_early_init_f(void)
 
 int board_late_init(void)
 {
+#if CONFIG_IS_ENABLED(EFI_LOADER)
+	if (gd->bd->bi_dram[1].start) {
+		/*
+		 * Only bank 0 is below board_get_usable_ram_top(), so all of
+		 * bank 1 is not mapped by the U-Boot MMU configuration, and so
+		 * we must prevent EFI from using it.
+		 */
+		efi_add_memory_map(gd->bd->bi_dram[1].start,
+				   gd->bd->bi_dram[1].size >> EFI_PAGE_SHIFT,
+				   EFI_BOOT_SERVICES_DATA, false);
+	}
+#endif
+
 #if defined(CONFIG_TEGRA_SUPPORT_NON_SECURE)
 	if (tegra_cpu_is_non_secure()) {
 		printf("CPU is in NS mode\n");
-		setenv("cpu_ns_mode", "1");
+		env_set("cpu_ns_mode", "1");
 	} else {
-		setenv("cpu_ns_mode", "");
+		env_set("cpu_ns_mode", "");
 	}
 #endif
 	start_cpu_fan();
@@ -260,6 +263,10 @@ static ulong carveout_size(void)
 {
 #ifdef CONFIG_ARM64
 	return SZ_512M;
+#elif defined(CONFIG_ARMV7_SECURE_RESERVE_SIZE)
+	// BASE+SIZE might not == 4GB. If so, we want the carveout to cover
+	// from BASE to 4GB, not BASE to BASE+SIZE.
+	return (0 - CONFIG_ARMV7_SECURE_BASE) & ~(SZ_2M - 1);
 #else
 	return 0;
 #endif

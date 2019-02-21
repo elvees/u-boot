@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (c) 2012 Michael Walle
  * Michael Walle <michael@walle.cc>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _CONFIG_LSXL_H
@@ -30,7 +29,6 @@
 #define CONFIG_KW88F6281		/* SOC Name */
 
 #define CONFIG_SKIP_LOWLEVEL_INIT	/* disable board lowlevel_init */
-#define CONFIG_MISC_INIT_R
 #define CONFIG_SHOW_BOOT_PROGRESS
 
 #define CONFIG_KIRKWOOD_GPIO
@@ -46,7 +44,6 @@
 #include "mv-common.h"
 
 /* loading initramfs images without uimage header */
-#define CONFIG_SUPPORT_RAW_INITRD
 
 /* ST M25P40 */
 #undef CONFIG_ENV_SPI_MAX_HZ
@@ -60,10 +57,7 @@
 #ifdef CONFIG_SPI_FLASH
 #define CONFIG_SYS_MAX_FLASH_BANKS	1
 #define CONFIG_SYS_MAX_FLASH_SECT	8
-#define CONFIG_ENV_IS_IN_SPI_FLASH	1
 #define CONFIG_ENV_SECT_SIZE		0x10000 /* 64K */
-#else
-#define CONFIG_ENV_IS_NOWHERE
 #endif
 
 #define CONFIG_ENV_SIZE			0x10000 /* 64k */
@@ -73,8 +67,6 @@
  * Default environment variables
  */
 #define CONFIG_LOADADDR		0x00800000
-#define CONFIG_BOOTCOMMAND	"run bootcmd_${bootsource}"
-#define CONFIG_BOOTARGS		"console=ttyS0,115200 root=/dev/sda2"
 
 #if defined(CONFIG_LSXHL)
 #define CONFIG_FDTFILE "kirkwood-lsxhl.dtb"
@@ -146,7 +138,6 @@
 #endif /* CONFIG_CMD_NET */
 
 #ifdef CONFIG_IDE
-#undef CONFIG_IDE_LED
 #undef CONFIG_SYS_IDE_MAXBUS
 #define CONFIG_SYS_IDE_MAXBUS		1
 #undef CONFIG_SYS_IDE_MAXDEVICE

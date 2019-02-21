@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2010
  * Texas Instruments, <www.ti.com>
@@ -5,8 +6,6 @@
  * Authors:
  *	Aneesh V <aneesh@ti.com>
  *	Sricharan R <r.sricharan@ti.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _OMAP5_H_
@@ -58,11 +57,16 @@
 #define OMAP5430_CONTROL_ID_CODE_ES2_0          0x1B94202F
 #define OMAP5432_CONTROL_ID_CODE_ES1_0		0x0B99802F
 #define OMAP5432_CONTROL_ID_CODE_ES2_0          0x1B99802F
+#define DRA762_CONTROL_ID_CODE_ES1_0		0x0BB5002F
 #define DRA752_CONTROL_ID_CODE_ES1_0		0x0B99002F
 #define DRA752_CONTROL_ID_CODE_ES1_1		0x1B99002F
 #define DRA752_CONTROL_ID_CODE_ES2_0		0x2B99002F
 #define DRA722_CONTROL_ID_CODE_ES1_0		0x0B9BC02F
 #define DRA722_CONTROL_ID_CODE_ES2_0		0x1B9BC02F
+#define DRA722_CONTROL_ID_CODE_ES2_1		0x2B9BC02F
+
+#define DRA762_ABZ_PACKAGE			0x2
+#define DRA762_ACD_PACKAGE			0x3
 
 /* UART */
 #define UART1_BASE		(OMAP54XX_L4_PER_BASE + 0x6a000)
@@ -224,8 +228,8 @@ struct s32ktimer {
 #define OMAP_ABB_GPU_TXDONE_MASK		(0x1 << 28)
 
 /* ABB efuse masks */
-#define OMAP5_ABB_FUSE_VSET_MASK		(0x1F << 24)
-#define OMAP5_ABB_FUSE_ENABLE_MASK		(0x1 << 29)
+#define OMAP5_PROD_ABB_FUSE_VSET_MASK		(0x1F << 20)
+#define OMAP5_PROD_ABB_FUSE_ENABLE_MASK		(0x1 << 25)
 #define DRA7_ABB_FUSE_VSET_MASK			(0x1F << 20)
 #define DRA7_ABB_FUSE_ENABLE_MASK		(0x1 << 25)
 #define OMAP5_ABB_LDOVBBMPU_MUX_CTRL_MASK	(0x1 << 10)

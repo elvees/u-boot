@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2016 Amarula Solutions B.V.
  * Copyright (C) 2016 Engicam S.r.l.
  * Author: Jagan Teki <jagan@amarulasolutions.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -20,10 +19,8 @@
 #include <asm/arch/mx6-pins.h>
 #include <asm/arch/sys_proto.h>
 
-#include <asm/imx-common/iomux-v3.h>
-#include <asm/imx-common/video.h>
-
-DECLARE_GLOBAL_DATA_PTR;
+#include <asm/mach-imx/iomux-v3.h>
+#include <asm/mach-imx/video.h>
 
 #define UART_PAD_CTRL  (PAD_CTL_PKE | PAD_CTL_PUE |             \
         PAD_CTL_PUS_100K_UP | PAD_CTL_SPEED_MED |               \
@@ -38,6 +35,63 @@ static iomux_v3_cfg_t const uart_pads[] = {
 	IOMUX_PADS(PAD_UART1_RX_DATA__UART1_DCE_RX | MUX_PAD_CTRL(UART_PAD_CTRL)),
 #endif
 };
+
+#ifdef CONFIG_SPL_LOAD_FIT
+int board_fit_config_name_match(const char *name)
+{
+        if (is_mx6dq() && !strcmp(name, "imx6q-icore"))
+                return 0;
+        else if (is_mx6dq() && !strcmp(name, "imx6q-icore-rqs"))
+                return 0;
+        else if (is_mx6dq() && !strcmp(name, "imx6q-icore-mipi"))
+                return 0;
+        else if ((is_mx6dl() || is_mx6solo()) && !strcmp(name, "imx6dl-icore"))
+                return 0;
+        else if ((is_mx6dl() || is_mx6solo()) && !strcmp(name, "imx6dl-icore-rqs"))
+                return 0;
+        else if ((is_mx6dl() || is_mx6solo()) && !strcmp(name, "imx6dl-icore-mipi"))
+                return 0;
+        else
+                return -1;
+}
+#endif
+
+#ifdef CONFIG_ENV_IS_IN_MMC
+void board_boot_order(u32 *spl_boot_list)
+{
+	u32 bmode = imx6_src_get_boot_mode();
+	u8 boot_dev = BOOT_DEVICE_MMC1;
+
+	switch ((bmode & IMX6_BMODE_MASK) >> IMX6_BMODE_SHIFT) {
+	case IMX6_BMODE_SD:
+	case IMX6_BMODE_ESD:
+		/* SD/eSD - BOOT_DEVICE_MMC1 */
+		break;
+	case IMX6_BMODE_MMC:
+	case IMX6_BMODE_EMMC:
+		/* MMC/eMMC */
+		boot_dev = BOOT_DEVICE_MMC2;
+		break;
+	default:
+		/* Default - BOOT_DEVICE_MMC1 */
+		printf("Wrong board boot order\n");
+		break;
+	}
+
+	spl_boot_list[0] = boot_dev;
+}
+#endif
+
+#ifdef CONFIG_SPL_OS_BOOT
+int spl_start_uboot(void)
+{
+	/* break into full u-boot on 'c' */
+	if (serial_tstc() && serial_getc() == 'c')
+		return 1;
+
+	return 0;
+}
+#endif
 
 #ifdef CONFIG_MX6QDL
 /*
@@ -332,17 +386,6 @@ static void ccgr_init(void)
 #endif
 }
 
-static void gpr_init(void)
-{
-	struct iomuxc *iomux = (struct iomuxc *)IOMUXC_BASE_ADDR;
-
-	/* enable AXI cache for VDOA/VPU/IPU */
-	writel(0xF00000CF, &iomux->gpr[4]);
-	/* set IPU AXI-id0 Qos=0xf(bypass) AXI-id1 Qos=0x7 */
-	writel(0x007F007F, &iomux->gpr[6]);
-	writel(0x007F007F, &iomux->gpr[7]);
-}
-
 static void spl_dram_init(void)
 {
 #ifdef CONFIG_MX6QDL
@@ -371,7 +414,8 @@ void board_init_f(ulong dummy)
 	/* setup AIPS and disable watchdog */
 	arch_cpu_init();
 
-	gpr_init();
+	if (!(is_mx6ul()))
+		gpr_init();
 
 	/* iomux */
 	SETUP_IOMUX_PADS(uart_pads);
@@ -384,10 +428,4 @@ void board_init_f(ulong dummy)
 
 	/* DDR initialization */
 	spl_dram_init();
-
-	/* Clear the BSS. */
-	memset(__bss_start, 0, __bss_end - __bss_start);
-
-	/* load/boot image from boot device */
-	board_init_r(NULL, 0);
 }

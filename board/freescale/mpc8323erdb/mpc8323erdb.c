@@ -15,7 +15,7 @@
 #include <i2c.h>
 #include <miiphy.h>
 #include <command.h>
-#include <libfdt.h>
+#include <linux/libfdt.h>
 #if defined(CONFIG_PCI)
 #include <pci.h>
 #endif
@@ -216,7 +216,7 @@ int mac_read_from_eeprom(void)
 						buf[i * 6 + 4], buf[i * 6 + 5]);
 					sprintf((char *)enetvar,
 						i ? "eth%daddr" : "ethaddr", i);
-					setenv((char *)enetvar, str);
+					env_set((char *)enetvar, str);
 				}
 			}
 		}

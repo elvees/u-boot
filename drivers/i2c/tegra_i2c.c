@@ -1,15 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
  * Copyright (c) 2010-2011 NVIDIA Corporation
  *  NVIDIA Corporation <www.nvidia.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
-#include <fdtdec.h>
 #include <i2c.h>
 #include <asm/io.h>
 #include <clk.h>
@@ -20,8 +18,6 @@
 #endif
 #include <asm/arch/gpio.h>
 #include <asm/arch-tegra/tegra_i2c.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 enum i2c_type {
 	TYPE_114,
@@ -365,16 +361,20 @@ static int tegra_i2c_probe(struct udevice *dev)
 
 	i2c_bus->id = dev->seq;
 	i2c_bus->type = dev_get_driver_data(dev);
-	i2c_bus->regs = (struct i2c_ctlr *)devfdt_get_addr(dev);
+	i2c_bus->regs = (struct i2c_ctlr *)dev_read_addr(dev);
+	if ((ulong)i2c_bus->regs == FDT_ADDR_T_NONE) {
+		debug("%s: Cannot get regs address\n", __func__);
+		return -EINVAL;
+	}
 
 	ret = reset_get_by_name(dev, "i2c", &i2c_bus->reset_ctl);
 	if (ret) {
-		error("reset_get_by_name() failed: %d\n", ret);
+		pr_err("reset_get_by_name() failed: %d\n", ret);
 		return ret;
 	}
 	ret = clk_get_by_name(dev, "div-clk", &i2c_bus->clk);
 	if (ret) {
-		error("clk_get_by_name() failed: %d\n", ret);
+		pr_err("clk_get_by_name() failed: %d\n", ret);
 		return ret;
 	}
 

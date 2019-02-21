@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2016 Google Inc.
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <common.h>
@@ -10,8 +9,6 @@
 #include <asm/io.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/pwm.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 struct tegra_pwm_priv {
 	struct pwm_ctlr *regs;
@@ -59,7 +56,7 @@ static int tegra_pwm_ofdata_to_platdata(struct udevice *dev)
 {
 	struct tegra_pwm_priv *priv = dev_get_priv(dev);
 
-	priv->regs = (struct pwm_ctlr *)devfdt_get_addr(dev);
+	priv->regs = (struct pwm_ctlr *)dev_read_addr(dev);
 
 	return 0;
 }

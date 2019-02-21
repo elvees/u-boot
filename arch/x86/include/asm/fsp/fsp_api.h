@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: Intel */
 /*
  * Copyright (C) 2013, Intel Corporation
  * Copyright (C) 2014, Bin Meng <bmeng.cn@gmail.com>
- *
- * SPDX-License-Identifier:	Intel
  */
 
 #ifndef __FSP_API_H__
@@ -43,7 +42,8 @@ struct common_buf {
 	u32	stack_top;
 	u32	boot_mode;	/* Current system boot mode */
 	void	*upd_data;	/* User platform configuraiton data region */
-	u32	reserved[7];	/* Reserved */
+	u32	tolum_size;	/* Top of low usable memory size (FSP 1.1) */
+	u32	reserved[6];	/* Reserved */
 };
 
 enum fsp_phase {

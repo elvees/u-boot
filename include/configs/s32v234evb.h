@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2015-2016 Freescale Semiconductor, Inc.
- *
- * SPDX-License-Identifier:     GPL-2.0+
  *
  * Configuration settings for the Freescale S32V234 EVB board.
  */
@@ -9,14 +8,9 @@
 #ifndef __CONFIG_H
 #define __CONFIG_H
 
-#ifndef CONFIG_SPL_BUILD
-#include <config_distro_defaults.h>
-#endif
-
 #include <asm/arch/imx-regs.h>
 
 #define CONFIG_S32V234
-#define CONFIG_DM
 
 /* Config GIC */
 #define CONFIG_GICV2
@@ -62,8 +56,6 @@
 #define CONFIG_SYS_MALLOC_LEN		(CONFIG_ENV_SIZE + 2 * 1024 * 1024)
 #endif
 
-#define CONFIG_DM_SERIAL
-#define CONFIG_FSL_LINFLEXUART
 #define LINFLEXUART_BASE		LINFLEXD0_BASE_ADDR
 
 #define CONFIG_DEBUG_UART_LINFLEXUART
@@ -73,9 +65,6 @@
 #define CONFIG_ENV_OVERWRITE
 #define CONFIG_SYS_UART_PORT		(1)
 
-#undef CONFIG_CMD_IMLS
-
-#define CONFIG_FSL_ESDHC
 #define CONFIG_FSL_USDHC
 #define CONFIG_SYS_FSL_ESDHC_ADDR	USDHC_BASE_ADDR
 #define CONFIG_SYS_FSL_ESDHC_NUM	1
@@ -86,15 +75,11 @@
 #if 0
 
 /* Ethernet config */
-#define CONFIG_CMD_PING
 #define CONFIG_CMD_MII
 #define CONFIG_FEC_MXC
-#define CONFIG_MII
 #define IMX_FEC_BASE            ENET_BASE_ADDR
 #define CONFIG_FEC_XCV_TYPE     RMII
 #define CONFIG_FEC_MXC_PHYADDR  0
-#define CONFIG_PHYLIB
-#define CONFIG_PHY_MICREL
 #endif
 
 #if 0				/* Disable until the FLASH will be implemented */
@@ -103,7 +88,6 @@
 
 #ifdef CONFIG_SYS_USE_NAND
 /* Nand Flash Configs */
-#define	CONFIG_CMD_NAND
 #define CONFIG_JFFS2_NAND
 #define MTD_NAND_FSL_NFC_SWECC 1
 #define CONFIG_NAND_FSL_NFC
@@ -115,7 +99,6 @@
 #endif
 
 #define CONFIG_LOADADDR			0xC307FFC0
-#define CONFIG_BOOTARGS			"console=ttyLF0 root=/dev/ram rw"
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"boot_scripts=boot.scr.uimg boot.scr\0" \
@@ -164,25 +147,13 @@
 #include <config_distro_bootcmd.h>
 
 /* Miscellaneous configurable options */
-#define CONFIG_SYS_LONGHELP	/* undef to save memory */
-#define CONFIG_SYS_PROMPT_HUSH_PS2	"> "
 #define CONFIG_SYS_PROMPT		"=> "
-#undef CONFIG_AUTO_COMPLETE
-#define CONFIG_SYS_CBSIZE		256	/* Console I/O Buffer Size */
-#define CONFIG_SYS_PBSIZE		\
-			(CONFIG_SYS_CBSIZE + sizeof(CONFIG_SYS_PROMPT) + 16)
-#define CONFIG_SYS_MAXARGS		16	/* max number of command args */
-#define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
-#define CONFIG_CMDLINE_EDITING
 
-#define CONFIG_CMD_MEMTEST
 #define CONFIG_SYS_MEMTEST_START	(DDR_BASE_ADDR)
 #define CONFIG_SYS_MEMTEST_END		(DDR_BASE_ADDR + 0x7C00000)
 
 #define CONFIG_SYS_LOAD_ADDR		CONFIG_LOADADDR
 #define CONFIG_SYS_HZ				1000
-
-#define CONFIG_SYS_TEXT_BASE		0x3E800000	/* SDRAM */
 
 #ifdef CONFIG_RUN_FROM_IRAM_ONLY
 #define CONFIG_SYS_MALLOC_BASE		(DDR_BASE_ADDR)
@@ -190,13 +161,11 @@
 
 #if 0
 /* Configure PXE */
-#define CONFIG_BOOTP_PXE
 #define CONFIG_BOOTP_PXE_CLIENTARCH	0x100
 #endif
 
 /* Physical memory map */
 /* EVB board has 2x256 MB DDR chips, DDR0 and DDR1, u-boot is using just one */
-#define CONFIG_NR_DRAM_BANKS		1
 #define PHYS_SDRAM			(DDR_BASE_ADDR)
 #define PHYS_SDRAM_SIZE			(256 * 1024 * 1024)
 
@@ -211,15 +180,11 @@
 
 /* environment organization */
 #define CONFIG_ENV_SIZE			(8 * 1024)
-#define CONFIG_ENV_IS_IN_MMC
 
 #define CONFIG_ENV_OFFSET		(12 * 64 * 1024)
 #define CONFIG_SYS_MMC_ENV_DEV		0
 
 
 #define CONFIG_BOOTP_BOOTFILESIZE
-#define CONFIG_BOOTP_BOOTPATH
-#define CONFIG_BOOTP_GATEWAY
-#define CONFIG_BOOTP_HOSTNAME
 
 #endif

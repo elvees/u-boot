@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2016 Google, Inc
  * Written by Simon Glass <sjg@chromium.org>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -16,8 +15,6 @@
 #include <asm/arch/pwm.h>
 #include <power/regulator.h>
 
-DECLARE_GLOBAL_DATA_PTR;
-
 struct rk_pwm_priv {
 	struct rk3288_pwm *regs;
 	ulong freq;
@@ -29,6 +26,7 @@ static int rk_pwm_set_invert(struct udevice *dev, uint channel, bool polarity)
 	struct rk_pwm_priv *priv = dev_get_priv(dev);
 
 	debug("%s: polarity=%u\n", __func__, polarity);
+	priv->enable_conf &= ~(PWM_DUTY_MASK | PWM_INACTIVE_MASK);
 	if (polarity)
 		priv->enable_conf |= PWM_DUTY_NEGATIVE | PWM_INACTIVE_POSTIVE;
 	else
@@ -75,7 +73,7 @@ static int rk_pwm_ofdata_to_platdata(struct udevice *dev)
 {
 	struct rk_pwm_priv *priv = dev_get_priv(dev);
 
-	priv->regs = (struct rk3288_pwm *)devfdt_get_addr(dev);
+	priv->regs = (struct rk3288_pwm *)dev_read_addr(dev);
 
 	return 0;
 }

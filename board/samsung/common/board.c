@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2013 SAMSUNG Electronics
  * Rajeshwari Shinde <rajeshwari.s@samsung.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -307,14 +306,16 @@ int checkboard(void)
 #ifdef CONFIG_BOARD_LATE_INIT
 int board_late_init(void)
 {
-	stdio_print_current_devices();
+	struct udevice *dev;
+	int ret;
 
-	if (cros_ec_get_error()) {
+	stdio_print_current_devices();
+	ret = uclass_first_device_err(UCLASS_CROS_EC, &dev);
+	if (ret && ret != -ENODEV) {
 		/* Force console on */
 		gd->flags &= ~GD_FLG_SILENT;
 
-		printf("cros-ec communications failure %d\n",
-		       cros_ec_get_error());
+		printf("cros-ec communications failure %d\n", ret);
 		puts("\nPlease reset with Power+Refresh\n\n");
 		panic("Cannot init cros-ec device");
 		return -1;

@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2009
  * Marvell Semiconductor <www.marvell.com>
  * Written-by: Prafulla Wadaskar <prafulla@marvell.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <config.h>
@@ -34,7 +33,9 @@ struct sdram_addr_dec {
 #define REG_CPUCS_WIN_WIN0_CS(x)	(((x) & 0x3) << 2)
 #define REG_CPUCS_WIN_SIZE(x)		(((x) & 0xff) << 24)
 
-#define SDRAM_SIZE_MAX			0xc0000000
+#ifndef MVEBU_SDRAM_SIZE_MAX
+#define MVEBU_SDRAM_SIZE_MAX		0xc0000000
+#endif
 
 #define SCRUB_MAGIC		0xbeefdead
 
@@ -179,11 +180,11 @@ static void dram_ecc_scrubbing(void)
 	reg_write(REG_SDRAM_CONFIG_ADDR, temp);
 
 	for (cs = 0; cs < CONFIG_NR_DRAM_BANKS; cs++) {
-		size = mvebu_sdram_bs(cs) - 1;
+		size = mvebu_sdram_bs(cs);
 		if (size == 0)
 			continue;
 
-		total = (u64)size + 1;
+		total = (u64)size;
 		total_mem += (u32)(total / (1 << 30));
 		start_addr = 0;
 		mv_xor_init2(cs);
@@ -194,7 +195,7 @@ static void dram_ecc_scrubbing(void)
 			size -= start_addr;
 		}
 
-		mv_xor_mem_init(SCRB_XOR_CHAN, start_addr, size,
+		mv_xor_mem_init(SCRB_XOR_CHAN, start_addr, size - 1,
 				SCRUB_MAGIC, SCRUB_MAGIC);
 
 		/* Wait for previous transfer completion */
@@ -216,6 +217,35 @@ static int ecc_enabled(void)
 
 	return 0;
 }
+
+/* Return the width of the DRAM bus, or 0 for unknown. */
+static int bus_width(void)
+{
+	int full_width = 0;
+
+	if (reg_read(REG_SDRAM_CONFIG_ADDR) & (1 << REG_SDRAM_CONFIG_WIDTH_OFFS))
+		full_width = 1;
+
+	switch (mvebu_soc_family()) {
+	case MVEBU_SOC_AXP:
+	    return full_width ? 64 : 32;
+	    break;
+	case MVEBU_SOC_A375:
+	case MVEBU_SOC_A38X:
+	case MVEBU_SOC_MSYS:
+	    return full_width ? 32 : 16;
+	default:
+	    return 0;
+	}
+}
+
+static int cycle_mode(void)
+{
+	int val = reg_read(REG_DUNIT_CTRL_LOW_ADDR);
+
+	return (val >> REG_DUNIT_CTRL_LOW_2T_OFFS) & REG_DUNIT_CTRL_LOW_2T_MASK;
+}
+
 #else
 static void dram_ecc_scrubbing(void)
 {
@@ -247,8 +277,8 @@ int dram_init(void)
 		 * address space left for the internal registers etc.
 		 */
 		size += mvebu_sdram_bs(i);
-		if (size > SDRAM_SIZE_MAX)
-			size = SDRAM_SIZE_MAX;
+		if (size > MVEBU_SDRAM_SIZE_MAX)
+			size = MVEBU_SDRAM_SIZE_MAX;
 	}
 
 	for (; i < CONFIG_NR_DRAM_BANKS; i++) {
@@ -284,7 +314,7 @@ int dram_init_banksize(void)
 
 		/* Clip the banksize to 1GiB if it exceeds the max size */
 		size += gd->bd->bi_dram[i].size;
-		if (size > SDRAM_SIZE_MAX)
+		if (size > MVEBU_SDRAM_SIZE_MAX)
 			mvebu_sdram_bs_set(i, 0x40000000);
 	}
 
@@ -295,9 +325,25 @@ int dram_init_banksize(void)
 void board_add_ram_info(int use_default)
 {
 	struct sar_freq_modes sar_freq;
+	int mode;
+	int width;
 
 	get_sar_freq(&sar_freq);
 	printf(" (%d MHz, ", sar_freq.d_clk);
+
+	width = bus_width();
+	if (width)
+		printf("%d-bit, ", width);
+
+	mode = cycle_mode();
+	/* Mode 0 = Single cycle
+	 * Mode 1 = Two cycles   (2T)
+	 * Mode 2 = Three cycles (3T)
+	 */
+	if (mode == 1)
+		printf("2T, ");
+	if (mode == 2)
+		printf("3T, ");
 
 	if (ecc_enabled())
 		printf("ECC");

@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2016 Rockchip Electronics Co., Ltd
  * Copyright (c) 2016 Andreas Färber
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <common.h>
@@ -12,6 +11,8 @@
 #include <asm/arch/cru_rk3368.h>
 #include <asm/arch/grf_rk3368.h>
 #include <syscon.h>
+
+DECLARE_GLOBAL_DATA_PTR;
 
 #define IMEM_BASE                  0xFF8C0000
 
@@ -49,6 +50,17 @@ static struct mm_region rk3368_mem_map[] = {
 };
 
 struct mm_region *mem_map = rk3368_mem_map;
+
+int dram_init_banksize(void)
+{
+	size_t max_size = min((unsigned long)gd->ram_size, gd->ram_top);
+
+	/* Reserve 0x200000 for ATF bl31 */
+	gd->bd->bi_dram[0].start = 0x200000;
+	gd->bd->bi_dram[0].size = max_size - gd->bd->bi_dram[0].start;
+
+	return 0;
+}
 
 #ifdef CONFIG_ARCH_EARLY_INIT_R
 static int mcu_init(void)

@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2008 Stefan Roese <sr@denx.de>, DENX Software Engineering
  *
  * Copyright (C) 2006 Micronas GmbH
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -72,7 +71,7 @@ int dram_init(void)
 int checkboard(void)
 {
 	char buf[64];
-	int i = getenv_f("serial#", buf, sizeof(buf));
+	int i = env_get_f("serial#", buf, sizeof(buf));
 	u32 config0 = read_c0_prid();
 
 	if ((config0 & 0xff0000) == PRID_COMP_LEGACY

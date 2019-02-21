@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2017 NXP Semiconductors
  * Copyright 2015 Freescale Semiconductor
- *
- * SPDX-License-Identifier:	GPL-2.0+
+ * Copyright 2017 NXP
  */
 #include <common.h>
 #include <malloc.h>
@@ -13,7 +12,7 @@
 #include <asm/io.h>
 #include <hwconfig.h>
 #include <fdt_support.h>
-#include <libfdt.h>
+#include <linux/libfdt.h>
 #include <fsl-mc/fsl_mc.h>
 #include <environment.h>
 #include <efi_loader.h>
@@ -71,11 +70,10 @@ int checkboard(void)
 #ifdef CONFIG_TARGET_LS2081ARDB
 #ifdef CONFIG_FSL_QIXIS
 	sw = QIXIS_READ(arch);
-	printf("Board Arch: V%d, ", sw >> 4);
 	printf("Board version: %c, ", (sw & 0xf) + 'A');
 
 	sw = QIXIS_READ(brdcfg[0]);
-	sw = (sw & QIXIS_QMAP_MASK) >> QIXIS_QMAP_SHIFT;
+	sw = (sw >> QIXIS_QMAP_SHIFT) & QIXIS_QMAP_MASK;
 	switch (sw) {
 	case 0:
 		puts("boot from QSPI DEV#0\n");
@@ -101,6 +99,7 @@ int checkboard(void)
 		printf("invalid setting of SW%u\n", sw);
 		break;
 	}
+	printf("FPGA: v%d.%d\n", QIXIS_READ(scver), QIXIS_READ(tagdata));
 #endif
 	puts("SERDES1 Reference : ");
 	printf("Clock1 = 100MHz ");
@@ -204,24 +203,11 @@ int config_board_mux(int ctrl_type)
 
 int board_init(void)
 {
-	char *env_hwconfig;
-	u32 __iomem *dcfg_ccsr = (u32 __iomem *)DCFG_BASE;
 #ifdef CONFIG_FSL_MC_ENET
 	u32 __iomem *irq_ccsr = (u32 __iomem *)ISC_BASE;
 #endif
-	u32 val;
 
 	init_final_memctl_regs();
-
-	val = in_le32(dcfg_ccsr + DCFG_RCWSR13 / 4);
-
-	env_hwconfig = getenv("hwconfig");
-
-	if (hwconfig_f("dspi", env_hwconfig) &&
-	    DCFG_RCWSR13_DSPI == (val & (u32)(0xf << 8)))
-		config_board_mux(MUX_TYPE_DSPI);
-	else
-		config_board_mux(MUX_TYPE_SDHC);
 
 #ifdef CONFIG_ENV_IS_NOWHERE
 	gd->env_addr = (ulong)&default_environment[0];
@@ -230,6 +216,10 @@ int board_init(void)
 
 #ifdef CONFIG_FSL_QIXIS
 	QIXIS_WRITE(rst_ctl, QIXIS_RST_CTL_RESET_EN);
+#endif
+
+#ifdef CONFIG_FSL_CAAM
+	sec_init();
 #endif
 #ifdef CONFIG_FSL_LS_PPA
 	ppa_init();
@@ -257,36 +247,48 @@ int board_early_init_f(void)
 
 int misc_init_r(void)
 {
-#ifdef CONFIG_FSL_QIXIS
-	/*
-	 * LS2081ARDB has smart voltage translator which needs
-	 * to be programmed as below
-	 */
-#ifndef CONFIG_TARGET_LS2081ARDB
-	u8 sw;
+	char *env_hwconfig;
+	u32 __iomem *dcfg_ccsr = (u32 __iomem *)DCFG_BASE;
+	u32 val;
+	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	u32 svr = gur_in32(&gur->svr);
 
-	sw = QIXIS_READ(arch);
+	val = in_le32(dcfg_ccsr + DCFG_RCWSR13 / 4);
+
+	env_hwconfig = env_get("hwconfig");
+
+	if (hwconfig_f("dspi", env_hwconfig) &&
+	    DCFG_RCWSR13_DSPI == (val & (u32)(0xf << 8)))
+		config_board_mux(MUX_TYPE_DSPI);
+	else
+		config_board_mux(MUX_TYPE_SDHC);
+
 	/*
-	 * LS2080ARDB/LS2088ARDB RevF board has smart voltage translator
+	 * LS2081ARDB RevF board has smart voltage translator
 	 * which needs to be programmed to enable high speed SD interface
 	 * by setting GPIO4_10 output to zero
 	 */
-	if ((sw & 0xf) == 0x5) {
-#endif
+#ifdef CONFIG_TARGET_LS2081ARDB
 		out_le32(GPIO4_GPDIR_ADDR, (1 << 21 |
 					    in_le32(GPIO4_GPDIR_ADDR)));
 		out_le32(GPIO4_GPDAT_ADDR, (~(1 << 21) &
 					    in_le32(GPIO4_GPDAT_ADDR)));
-#ifndef CONFIG_TARGET_LS2081ARDB
-	}
 #endif
-#endif
-
 	if (hwconfig("sdhc"))
 		config_board_mux(MUX_TYPE_SDHC);
 
 	if (adjust_vdd(0))
 		printf("Warning: Adjusting core voltage failed.\n");
+	/*
+	 * Default value of board env is based on filename which is
+	 * ls2080ardb. Modify board env for other supported SoCs
+	 */
+	if ((SVR_SOC_VER(svr) == SVR_LS2088A) ||
+	    (SVR_SOC_VER(svr) == SVR_LS2048A))
+		env_set("board", "ls2088ardb");
+	else if ((SVR_SOC_VER(svr) == SVR_LS2081A) ||
+	    (SVR_SOC_VER(svr) == SVR_LS2041A))
+		env_set("board", "ls2081ardb");
 
 	return 0;
 }
@@ -328,7 +330,7 @@ void fdt_fixup_board_enet(void *fdt)
 		return;
 	}
 
-	if (get_mc_boot_status() == 0)
+	if ((get_mc_boot_status() == 0) && (get_dpl_apply_status() == 0))
 		fdt_status_okay(fdt, offset);
 	else
 		fdt_status_fail(fdt, offset);
@@ -341,6 +343,32 @@ void board_quiesce_devices(void)
 #endif
 
 #ifdef CONFIG_OF_BOARD_SETUP
+void fsl_fdt_fixup_flash(void *fdt)
+{
+	int offset;
+
+/*
+ * IFC and QSPI are muxed on board.
+ * So disable IFC node in dts if QSPI is enabled or
+ * disable QSPI node in dts in case QSPI is not enabled.
+ */
+#ifdef CONFIG_FSL_QSPI
+	offset = fdt_path_offset(fdt, "/soc/ifc");
+
+	if (offset < 0)
+		offset = fdt_path_offset(fdt, "/ifc");
+#else
+	offset = fdt_path_offset(fdt, "/soc/quadspi");
+
+	if (offset < 0)
+		offset = fdt_path_offset(fdt, "/quadspi");
+#endif
+	if (offset < 0)
+		return;
+
+	fdt_status_disabled(fdt, offset);
+}
+
 int ft_board_setup(void *blob, bd_t *bd)
 {
 	u64 base[CONFIG_NR_DRAM_BANKS];
@@ -366,7 +394,11 @@ int ft_board_setup(void *blob, bd_t *bd)
 
 	fdt_fixup_memory_banks(blob, base, size, 2);
 
+	fdt_fsl_mc_fixup_iommu_map_entry(blob);
+
 	fsl_fdt_fixup_dr_usb(blob, bd);
+
+	fsl_fdt_fixup_flash(blob);
 
 #ifdef CONFIG_FSL_MC_ENET
 	fdt_fixup_board_enet(blob);

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright 2015-2016 Toradex, Inc.
  *
@@ -5,8 +6,6 @@
  *
  * Based on vf610twr.h:
  * Copyright 2013 Freescale Semiconductor, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -15,8 +14,6 @@
 #include <asm/arch/imx-regs.h>
 
 #define CONFIG_SYS_FSL_CLK
-
-#define CONFIG_DISPLAY_BOARDINFO_LATE	/* Calls show_board_info() */
 
 #define CONFIG_SKIP_LOWLEVEL_INIT
 
@@ -39,41 +36,21 @@
 
 /* Allow to overwrite serial and ethaddr */
 #define CONFIG_ENV_OVERWRITE
-#define CONFIG_ENV_VARS_UBOOT_CONFIG
-#define CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
 
 /* NAND support */
-#define CONFIG_CMD_NAND
 #define CONFIG_SYS_NAND_ONFI_DETECTION
 #define CONFIG_SYS_MAX_NAND_DEVICE	1
 #define CONFIG_SYS_NAND_BASE		NFC_BASE_ADDR
 
 /* Dynamic MTD partition support */
-#define CONFIG_CMD_MTDPARTS	/* Enable 'mtdparts' command line support */
-#define CONFIG_MTD_PARTITIONS
-#define CONFIG_MTD_DEVICE	/* needed for mtdparts commands */
-#define MTDIDS_DEFAULT		"nand0=vf610_nfc"
-#define MTDPARTS_DEFAULT	"mtdparts=vf610_nfc:"		\
-				"128k(vf-bcb)ro,"		\
-				"1408k(u-boot)ro,"		\
-				"512k(u-boot-env),"		\
-				"-(ubi)"
 
-#define CONFIG_FSL_ESDHC
 #define CONFIG_SYS_FSL_ESDHC_ADDR	0
 #define CONFIG_SYS_FSL_ESDHC_NUM	1
 
-#define CONFIG_RBTREE
-#define CONFIG_LZO
-#define CONFIG_CMD_UBIFS	/* increases size by almost 60 KB */
-
 #define CONFIG_FEC_MXC
-#define CONFIG_MII
 #define IMX_FEC_BASE			ENET1_BASE_ADDR
 #define CONFIG_FEC_XCV_TYPE		RMII
 #define CONFIG_FEC_MXC_PHYADDR          0
-#define CONFIG_PHYLIB
-#define CONFIG_PHY_MICREL
 
 #define CONFIG_IPADDR		192.168.10.2
 #define CONFIG_NETMASK		255.255.255.0
@@ -83,8 +60,7 @@
 #define CONFIG_FDTADDR			0x84000000
 
 /* We boot from the gfxRAM area of the OCRAM. */
-#define CONFIG_SYS_TEXT_BASE		0x3f408000
-#define CONFIG_BOARD_SIZE_LIMIT		524288
+#define CONFIG_BOARD_SIZE_LIMIT		520192
 
 #define SD_BOOTCMD \
 	"sdargs=root=/dev/mmcblk0p2 rw rootwait\0"	\
@@ -137,7 +113,7 @@
 	"fatload ${interface} 0:1 ${loadaddr} flash_blk.img && " \
 	"source ${loadaddr}\0" \
 	"setupdate=run setsdupdate || run setusbupdate\0" \
-	"mtdparts=" MTDPARTS_DEFAULT "\0" \
+	"mtdparts=" CONFIG_MTDPARTS_DEFAULT "\0" \
 	"dfu_alt_info=" DFU_ALT_NAND_INFO "\0" \
 	"video-mode=dcufb:640x480-16@60,monitor=lcd\0" \
 	"splashpos=m,m\0" \
@@ -146,12 +122,7 @@
 	UBI_BOOTCMD
 
 /* Miscellaneous configurable options */
-#define CONFIG_SYS_LONGHELP		/* undef to save memory */
-#undef CONFIG_AUTO_COMPLETE
 #define CONFIG_SYS_CBSIZE		1024	/* Console I/O Buffer Size */
-#define CONFIG_SYS_PBSIZE		\
-			(CONFIG_SYS_CBSIZE + sizeof(CONFIG_SYS_PROMPT) + 16)
-#define CONFIG_SYS_MAXARGS		16	/* max number of command args */
 #define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
 
 #define CONFIG_SYS_MEMTEST_START	0x80010000
@@ -159,10 +130,8 @@
 
 #define CONFIG_SYS_LOAD_ADDR		CONFIG_LOADADDR
 #define CONFIG_SYS_HZ			1000
-#define CONFIG_CMDLINE_EDITING
 
 /* Physical memory map */
-#define CONFIG_NR_DRAM_BANKS		1
 #define PHYS_SDRAM			(0x80000000)
 #define PHYS_SDRAM_SIZE			(256 * 1024 * 1024)
 
@@ -198,6 +167,5 @@
 #define CONFIG_SYS_DFU_DATA_BUF_SIZE (1024 * 1024)
 
 /* USB Storage */
-#define CONFIG_USB_FUNCTION_MASS_STORAGE
 
 #endif /* __CONFIG_H */

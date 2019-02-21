@@ -1,12 +1,11 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2013 Boundary Devices Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 #ifndef __ASM_ARCH_MX6_PINS_H__
 #define __ASM_ARCH_MX6_PINS_H__
 
-#include <asm/imx-common/iomux-v3.h>
+#include <asm/mach-imx/iomux-v3.h>
 
 #define MX6_PAD_DECLARE(prefix, name, pco, mc, mm, sio, si, pc) \
 	prefix##name = IOMUX_PAD(pco, mc, mm, sio, si, pc)

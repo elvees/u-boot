@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  *	Andesboot - Startup Code for Whitiger core
  *
@@ -5,8 +6,6 @@
  *	Copyright (C) 2006	Shawn Lin <nobuhiro@andestech.com>
  *	Copyright (C) 2011	Macpaul Lin <macpaul@andestech.com>
  *				Greentime Hu <greentime@andestech.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 .pic
@@ -119,17 +118,44 @@ set_ivb:
 	/* set IVIC, vector size: 4 bytes, base: 0x0 */
 	mtsr	$r0, $ivb
 /*
- * MMU_CTL NTC0 Cacheable/Write-Back
+ * MMU_CTL NTC0 Non-cacheable
  */
+	li	$r0, ~0x6
+	mfsr	$r1, $mr0
+	and	$r1, $r1, $r0
+	mtsr	$r1, $mr0
+
 	li	$r0, ~0x3
 	mfsr	$r1, $mr8
 	and	$r1, $r1, $r0
 	mtsr	$r1, $mr8
 #if (!defined(CONFIG_SYS_ICACHE_OFF) || !defined(CONFIG_SYS_DCACHE_OFF))
+/*
+ * MMU_CTL NTC0 Cacheable/Write-Back
+ */
 	li	$r0, 0x4
 	mfsr	$r1, $mr0
 	or	$r1, $r1, $r0
 	mtsr	$r1, $mr0
+#endif
+
+#ifndef CONFIG_SYS_DCACHE_OFF
+#ifdef CONFIG_ARCH_MAP_SYSMEM
+/*
+ * MMU_CTL NTC1 Non-cacheable
+ */
+	li	$r0, ~0x18
+	mfsr	$r1, $mr0
+	and	$r1, $r1, $r0
+	mtsr	$r1, $mr0
+/*
+ * MMU_CTL NTM1 mapping for partition 0
+ */
+	li	$r0, ~0x6000
+	mfsr	$r1, $mr0
+	and	$r1, $r1, $r0
+	mtsr	$r1, $mr0
+#endif
 #endif
 
 #if !defined(CONFIG_SYS_ICACHE_OFF)
@@ -172,14 +198,6 @@ update_gp:
  */
 #ifndef CONFIG_SKIP_TRUNOFF_WATCHDOG
 	jal	turnoff_watchdog
-#endif
-
-/*
- * Do CPU critical regs init only at reboot,
- * not when booting from ram
- */
-#ifdef CONFIG_INIT_CRITICAL
-	jal	cpu_init_crit		! Do CPU critical regs init
 #endif
 
 /*
@@ -291,49 +309,6 @@ call_board_init_r:
 
 	/* jump to it ... */
 	jr	$lp			/* jump to board_init_r() */
-
-/*
- * Initialize CPU critical registers
- *
- *	1.	Setup control registers
- *		1.1 Mask all IRQs
- *		1.2 Flush cache and TLB
- *		1.3 Disable MMU and cache
- *	2.	Setup memory timing
- */
-
-cpu_init_crit:
-
-	move	$r0, $lp		/* push	ra */
-
-	/* Disable Interrupts by clear GIE in $PSW reg */
-	setgie.d
-
-	/* Flush caches and TLB */
-	/* Invalidate caches */
-	jal	invalidate_icac
-	jal	invalidate_dcac
-
-	/* Flush TLB */
-	mfsr	$p0, $MMU_CFG
-	andi	$p0, $p0, 0x3			! MMPS
-	li	$p1, 0x2			! TLB MMU
-	bne	$p0, $p1, 1f
-	tlbop	flushall			! Flush TLB
-
-1:
-	! Disable MMU, Dcache
-	! Whitiger is MMU disabled when reset
-	! Disable the D$
-	mfsr	$p0, MR_CAC_CTL			! Get the $CACHE_CTL reg
-	li	$p1, DIS_DCAC
-	and	$p0, $p0, $p1			! Set DC_EN bit
-	mtsr	$p0, MR_CAC_CTL			! write back the $CACHE_CTL reg
-	isb
-
-	move	$lp, $r0
-2:
-	ret
 
 /*
  * Invalidate I$

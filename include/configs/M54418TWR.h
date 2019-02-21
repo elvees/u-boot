@@ -1,10 +1,9 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Configuation settings for the Freescale MCF54418 TWR board.
  *
  * Copyright 2010-2012 Freescale Semiconductor, Inc.
  * TsiChung Liew (Tsi-Chung.Liew@freescale.com)
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -18,11 +17,12 @@
  * High Level Configuration Options
  * (easy to change)
  */
-#define CONFIG_M54418TWR	/* M54418TWR board */
 
 #define CONFIG_MCFUART
 #define CONFIG_SYS_UART_PORT		(0)
 #define CONFIG_SYS_BAUDRATE_TABLE	{ 9600 , 19200 , 38400 , 57600, 115200 }
+
+#define LDS_BOARD_TEXT			board/freescale/m54418twr/sbf_dram_init.o (.text*)
 
 #undef CONFIG_WATCHDOG
 
@@ -32,13 +32,6 @@
  * BOOTP options
  */
 #define CONFIG_BOOTP_BOOTFILESIZE
-#define CONFIG_BOOTP_BOOTPATH
-#define CONFIG_BOOTP_GATEWAY
-#define CONFIG_BOOTP_HOSTNAME
-
-/* Command line configuration */
-#undef CONFIG_CMD_NAND
-#define CONFIG_CMD_REGINFO
 
 /*
  * NAND FLASH
@@ -55,7 +48,6 @@
 /* Network configuration */
 #define CONFIG_MCFFEC
 #ifdef CONFIG_MCFFEC
-#define CONFIG_MII			1
 #define CONFIG_MII_INIT		1
 #define CONFIG_SYS_DISCOVER_PHY
 #define CONFIG_SYS_RX_ETH_BUFFER	2
@@ -70,22 +62,6 @@
 #define MCFFEC_TOUT_LOOP		50000
 #define CONFIG_SYS_FEC0_PHYADDR	0
 #define CONFIG_SYS_FEC1_PHYADDR	1
-
-
-#ifdef	CONFIG_SYS_NAND_BOOT
-#define CONFIG_BOOTARGS	"root=/dev/mtdblock2 rw rootfstype=jffs2 " \
-				"mtdparts=NAND:1M(u-boot)ro,7M(kernel)ro," \
-				"-(jffs2) console=ttyS0,115200"
-#else
-#define CONFIG_BOOTARGS	"root=/dev/nfs rw nfsroot="	\
-				__stringify(CONFIG_SERVERIP) ":/tftpboot/" \
-				__stringify(CONFIG_IPADDR) "  ip="	\
-				__stringify(CONFIG_IPADDR) ":"	\
-				__stringify(CONFIG_SERVERIP)":"	\
-				__stringify(CONFIG_GATEWAYIP)": "	\
-				__stringify(CONFIG_NETMASK)		\
-				"::eth0:off:rw console=ttyS0,115200"
-#endif
 
 #define CONFIG_ETHPRIME	"FEC0"
 #define CONFIG_IPADDR		192.168.1.2
@@ -107,7 +83,7 @@
 #endif			/* CONFIG_SYS_DISCOVER_PHY */
 #endif
 
-#define CONFIG_HOSTNAME		M54418TWR
+#define CONFIG_HOSTNAME		"M54418TWR"
 
 #if defined(CONFIG_CF_SBF)
 /* ST Micro serial flash */
@@ -173,10 +149,8 @@
 #define CONFIG_SYS_IMMR		CONFIG_SYS_MBAR
 
 /* DSPI and Serial Flash */
-#define CONFIG_CF_SPI
 #define CONFIG_CF_DSPI
 #define CONFIG_SERIAL_FLASH
-#define CONFIG_HARD_SPI
 #define CONFIG_SYS_SBFHDR_SIZE		0x7
 #ifdef CONFIG_CMD_SPI
 
@@ -195,20 +169,6 @@
 #define CONFIG_EXTRA_CLOCK
 
 #define CONFIG_PRAM			2048	/* 2048 KB */
-
-#define CONFIG_SYS_LONGHELP		/* undef to save memory */
-
-#if defined(CONFIG_CMD_KGDB)
-#define CONFIG_SYS_CBSIZE		1024	/* Console I/O Buffer Size */
-#else
-#define CONFIG_SYS_CBSIZE		256	/* Console I/O Buffer Size */
-#endif
-/* Print Buffer Size */
-#define CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE + \
-					sizeof(CONFIG_SYS_PROMPT) + 16)
-#define CONFIG_SYS_MAXARGS		16	/* max number of command args */
-/* Boot Argument Buffer Size    */
-#define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
 
 #define CONFIG_SYS_LOAD_ADDR		(CONFIG_SYS_SDRAM_BASE + 0x10000)
 
@@ -273,20 +233,17 @@
  * Environment is embedded in u-boot in the second sector of the flash
  */
 #if !defined(CONFIG_SERIAL_BOOT)  /*MRAM boot*/
-#define CONFIG_ENV_IS_IN_MRAM	1
 #define CONFIG_ENV_ADDR		(0x40000 - 0x1000) /*MRAM size 40000*/
 #define CONFIG_ENV_SIZE		0x1000
 #endif
 
 #if defined(CONFIG_CF_SBF)
-#define CONFIG_ENV_IS_IN_SPI_FLASH	1
 #define CONFIG_ENV_SPI_CS		1
 #define CONFIG_ENV_OFFSET		0x40000
 #define CONFIG_ENV_SIZE		0x2000
 #define CONFIG_ENV_SECT_SIZE		0x10000
 #endif
 #if defined(CONFIG_SYS_NAND_BOOT)
-#define CONFIG_ENV_IS_NOWHERE
 #define CONFIG_ENV_OFFSET	0x80000
 #define CONFIG_ENV_SIZE	0x20000
 #define CONFIG_ENV_SECT_SIZE	0x20000
@@ -296,10 +253,8 @@
 /* FLASH organization */
 #define CONFIG_SYS_FLASH_BASE		CONFIG_SYS_CS0_BASE
 
-#undef CONFIG_SYS_FLASH_CFI
 #ifdef CONFIG_SYS_FLASH_CFI
 
-#define CONFIG_FLASH_CFI_DRIVER	1
 /* Max size that the board might have */
 #define CONFIG_SYS_FLASH_SIZE		0x1000000
 #define CONFIG_SYS_FLASH_CFI_WIDTH	FLASH_CFI_16BIT
@@ -308,7 +263,6 @@
 /* max number of sectors on one chip */
 #define CONFIG_SYS_MAX_FLASH_SECT	270
 /* "Real" (hardware) sectors protection */
-#define CONFIG_SYS_FLASH_PROTECTION
 #define CONFIG_SYS_FLASH_CHECKSUM
 #define CONFIG_SYS_FLASH_BANKS_LIST	{ CONFIG_SYS_CS0_BASE }
 #else
@@ -325,25 +279,9 @@
 #ifdef CONFIG_CMD_JFFS2
 #define CONFIG_JFFS2_DEV		"nand0"
 #define CONFIG_JFFS2_PART_OFFSET	(0x800000)
-#define CONFIG_CMD_MTDPARTS
-#define CONFIG_MTD_DEVICE
-#define MTDIDS_DEFAULT		"nand0=m54418twr.nand"
-
-#define MTDPARTS_DEFAULT	"mtdparts=m54418twr.nand:1m(data),"	\
-						"7m(kernel),"		\
-						"-(rootfs)"
 
 #endif
 
-#ifdef CONFIG_CMD_UBI
-#define CONFIG_CMD_MTDPARTS
-#define CONFIG_MTD_DEVICE	/* needed for mtdparts command */
-#define CONFIG_MTD_PARTITIONS	/* mtdparts and UBI support */
-#define CONFIG_RBTREE
-#define MTDIDS_DEFAULT		"nand0=NAND"
-#define MTDPARTS_DEFAULT	"mtdparts=NAND:1m(u-boot),"	\
-					"-(ubi)"
-#endif
 /* Cache Configuration */
 #define CONFIG_SYS_CACHELINE_SIZE	16
 #define ICACHE_STATUS			(CONFIG_SYS_INIT_RAM_ADDR + \

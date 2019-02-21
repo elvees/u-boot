@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (c) 2011 The Chromium OS Authors.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /* Tegra clock control functions */
@@ -266,7 +265,7 @@ void clock_ll_start_uart(enum periph_id periph_id);
  * @param node		Node to look at
  * @return peripheral ID, or PERIPH_ID_NONE if none
  */
-enum periph_id clock_decode_periph_id(const void *blob, int node);
+int clock_decode_periph_id(struct udevice *dev);
 
 /**
  * Checks if the oscillator bypass is enabled (XOBP bit)

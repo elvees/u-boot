@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2000-2002
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -21,42 +20,32 @@
 #include <watchdog.h>
 #include <command.h>
 #include <mpc8xx.h>
-#include <commproc.h>
 #include <netdev.h>
 #include <asm/cache.h>
+#include <asm/cpm_8xx.h>
 #include <linux/compiler.h>
 #include <asm/io.h>
 
 #if defined(CONFIG_OF_LIBFDT)
-#include <libfdt.h>
+#include <linux/libfdt.h>
 #include <fdt_support.h>
 #endif
 
 DECLARE_GLOBAL_DATA_PTR;
 
-static char *cpu_warning = "\n         " \
-	"*** Warning: CPU Core has Silicon Bugs -- Check the Errata ***";
-
 static int check_CPU(long clock, uint pvr, uint immr)
 {
-	char *id_str =
-	NULL;
-	immap_t __iomem *immap = (immap_t __iomem *)(immr & 0xFFFF0000);
-	uint k, m;
+	immap_t __iomem *immap = (immap_t __iomem *)CONFIG_SYS_IMMR;
+	uint k;
 	char buf[32];
-	char pre = 'X';
-	char *mid = "xx";
-	char *suf;
 
 	/* the highest 16 bits should be 0x0050 for a 860 */
 
-	if ((pvr >> 16) != 0x0050)
+	if (PVR_VER(pvr) != PVR_VER(PVR_8xx))
 		return -1;
 
 	k = (immr << 16) |
 	    in_be16(&immap->im_cpm.cp_dparam16[PROFF_REVNUM / sizeof(u16)]);
-	m = 0;
-	suf = "";
 
 	/*
 	 * Some boards use sockets so different CPUs can be used.
@@ -65,31 +54,19 @@ static int check_CPU(long clock, uint pvr, uint immr)
 	switch (k) {
 		/* MPC866P/MPC866T/MPC859T/MPC859DSL/MPC852T */
 	case 0x08010004:		/* Rev. A.0 */
-		suf = "A";
-		/* fall through */
-	case 0x08000003:		/* Rev. 0.3 */
-		pre = 'M'; m = 1;
-		if (id_str == NULL)
-			id_str =
-		"PC866x"; /* Unknown chip from MPC866 family */
+		printf("MPC866xxxZPnnA");
 		break;
-	case 0x09000000:
-		pre = 'M'; mid = suf = ""; m = 1;
-		if (id_str == NULL)
-			id_str = "PC885"; /* 870/875/880/885 */
+	case 0x08000003:		/* Rev. 0.3 */
+		printf("MPC866xxxZPnn");
+		break;
+	case 0x09000000:		/* 870/875/880/885 */
+		puts("MPC885ZPnn");
 		break;
 
 	default:
-		suf = NULL;
+		printf("unknown MPC86x (0x%08x)", k);
 		break;
 	}
-
-	if (id_str == NULL)
-		id_str = "PC86x";	/* Unknown 86x chip */
-	if (suf)
-		printf("%c%s%sZPnn%s", pre, id_str, mid, suf);
-	else
-		printf("unknown M%s (0x%08x)", id_str, k);
 
 	printf(" at %s MHz: ", strmhz(buf, clock));
 
@@ -102,9 +79,6 @@ static int check_CPU(long clock, uint pvr, uint immr)
 	if (in_be32(&immap->im_cpm.cp_fec.fec_addr_low) == 0x12345678)
 		printf(" FEC present");
 
-	if (!m)
-		puts(cpu_warning);
-
 	putc('\n');
 
 	return 0;
@@ -115,7 +89,7 @@ static int check_CPU(long clock, uint pvr, uint immr)
 int checkcpu(void)
 {
 	ulong clock = gd->cpu_clk;
-	uint immr = get_immr(0);	/* Return full IMMR contents */
+	uint immr = get_immr();	/* Return full IMMR contents */
 	uint pvr = get_pvr();
 
 	puts("CPU:   ");
@@ -262,8 +236,7 @@ int do_reset(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
  */
 unsigned long get_tbclk(void)
 {
-	uint immr = get_immr(0);	/* Return full IMMR contents */
-	immap_t __iomem *immap = (immap_t __iomem *)(immr & 0xFFFF0000);
+	immap_t __iomem *immap = (immap_t __iomem *)CONFIG_SYS_IMMR;
 	ulong oscclk, factor, pll;
 
 	if (in_be32(&immap->im_clkrst.car_sccr) & SCCR_TBS)
@@ -295,31 +268,6 @@ unsigned long get_tbclk(void)
 
 	return oscclk / 16;
 }
-
-/* ------------------------------------------------------------------------- */
-
-#if defined(CONFIG_WATCHDOG)
-void watchdog_reset(void)
-{
-	int re_enable = disable_interrupts();
-
-	reset_8xx_watchdog((immap_t __iomem *)CONFIG_SYS_IMMR);
-	if (re_enable)
-		enable_interrupts();
-}
-#endif /* CONFIG_WATCHDOG */
-
-#if defined(CONFIG_WATCHDOG)
-
-void reset_8xx_watchdog(immap_t __iomem *immr)
-{
-	/*
-	 * All other boards use the MPC8xx Internal Watchdog
-	 */
-	out_be16(&immr->im_siu_conf.sc_swsr, 0x556c);	/* write magic1 */
-	out_be16(&immr->im_siu_conf.sc_swsr, 0xaa39);	/* write magic2 */
-}
-#endif /* CONFIG_WATCHDOG */
 
 /*
  * Initializes on-chip ethernet controllers.

@@ -1,9 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * LG Optimus Black codename sniper config
  *
  * Copyright (C) 2015 Paul Kocialkowski <contact@paulk.fr>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -22,8 +21,6 @@
  * Board
  */
 
-#define CONFIG_MISC_INIT_R
-
 /*
  * Clocks
  */
@@ -39,8 +36,6 @@
  * DRAM
  */
 
-#define CONFIG_SDRC
-#define CONFIG_NR_DRAM_BANKS	2
 #define PHYS_SDRAM_1		OMAP34XX_SDRC_CS0
 #define PHYS_SDRAM_2		OMAP34XX_SDRC_CS1
 
@@ -48,7 +43,6 @@
  * Memory
  */
 
-#define CONFIG_SYS_TEXT_BASE		0x80100000
 #define CONFIG_SYS_SDRAM_BASE		0x80000000
 #define CONFIG_SYS_INIT_SP_ADDR		(NON_SECURE_SRAM_END - \
 					 GENERATED_GBL_DATA_SIZE)
@@ -60,22 +54,15 @@
  */
 
 #define CONFIG_SYS_I2C
-#define CONFIG_SYS_OMAP24_I2C_SPEED	400000
-#define CONFIG_SYS_OMAP24_I2C_SLAVE	1
-#define CONFIG_SYS_I2C_OMAP34XX
 #define CONFIG_I2C_MULTI_BUS
 
 /*
  * Input
  */
 
-#define CONFIG_TWL4030_INPUT
-
 /*
  * SPL
  */
-
-#define CONFIG_SPL_FRAMEWORK
 
 #define CONFIG_SPL_TEXT_BASE		0x40200000
 #define CONFIG_SPL_MAX_SIZE		(SRAM_SCRATCH_SPACE_ADDR - \
@@ -86,19 +73,10 @@
 #define CONFIG_SYS_SPL_MALLOC_SIZE	(1024 * 1024)
 #define CONFIG_SPL_STACK		LOW_LEVEL_SRAM_STACK
 
-#define CONFIG_SPL_LDSCRIPT		"arch/arm/mach-omap2/u-boot-spl.lds"
-
 #define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION		1
 #define CONFIG_SPL_FS_LOAD_PAYLOAD_NAME			"u-boot.img"
 
-#define CONFIG_AUTO_COMPLETE
-
-#define CONFIG_SYS_LONGHELP
-
-#define CONFIG_SYS_MAXARGS	16
 #define CONFIG_SYS_CBSIZE	512
-#define CONFIG_SYS_PBSIZE	(CONFIG_SYS_CBSIZE + sizeof(CONFIG_SYS_PROMPT) \
-				 + 16)
 
 /*
  * Serial
@@ -111,39 +89,15 @@
 
 #define CONFIG_SYS_NS16550_CLK		V_NS16550_CLK
 #define CONFIG_SYS_NS16550_COM3		OMAP34XX_UART3
-#define CONFIG_CONS_INDEX		3
 
 #define CONFIG_SYS_BAUDRATE_TABLE	{ 4800, 9600, 19200, 38400, 57600, \
 					  115200 }
-
-/*
- * USB gadget
- */
-
-#define CONFIG_USB_MUSB_PIO_ONLY
-#define CONFIG_USB_MUSB_OMAP2PLUS
-#define CONFIG_TWL4030_USB
-
-/*
- * Fastboot
- */
-
-#define CONFIG_USB_FUNCTION_FASTBOOT
-
-#define CONFIG_FASTBOOT_BUF_ADDR	CONFIG_SYS_LOAD_ADDR
-#define CONFIG_FASTBOOT_BUF_SIZE	0x2000000
-
-#define CONFIG_FASTBOOT_FLASH
-#define CONFIG_FASTBOOT_FLASH_MMC_DEV	0
-
-#define CONFIG_CMD_FASTBOOT
 
 /*
  * Environment
  */
 
 #define CONFIG_ENV_SIZE		(128 * 1024)
-#define CONFIG_ENV_IS_NOWHERE
 
 #define CONFIG_ENV_OVERWRITE
 
@@ -179,8 +133,6 @@
 
 #define CONFIG_SYS_LOAD_ADDR	0x82000000
 
-#define CONFIG_ANDROID_BOOT_IMAGE
-
 #define CONFIG_BOOTCOMMAND \
 	"setenv boot_mmc_part ${kernel_mmc_part}; " \
 	"if test reboot-${reboot-mode} = reboot-r; then " \
@@ -198,6 +150,5 @@
  */
 
 #include <config_defaults.h>
-#include <config_distro_defaults.h>
 
 #endif

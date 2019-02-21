@@ -1,11 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Image manipulator for Marvell SoCs
  *  supports Kirkwood, Dove, Armada 370, Armada XP, and Armada 38x
  *
  * (C) Copyright 2013 Thomas Petazzoni
  * <thomas.petazzoni@free-electrons.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  *
  * Not implemented: support for the register headers in v1 images
  */
@@ -24,7 +23,8 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || \
+    (defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x2070000fL)
 static void RSA_get0_key(const RSA *r,
                  const BIGNUM **n, const BIGNUM **e, const BIGNUM **d)
 {
@@ -36,7 +36,7 @@ static void RSA_get0_key(const RSA *r,
        *d = r->d;
 }
 
-#else
+#elif !defined(LIBRESSL_VERSION_NUMBER)
 void EVP_MD_CTX_cleanup(EVP_MD_CTX *ctx)
 {
 	EVP_MD_CTX_reset(ctx);
@@ -288,6 +288,33 @@ static uint8_t image_checksum8(void *start, uint32_t len)
 	} while (--len);
 
 	return csum;
+}
+
+size_t kwbimage_header_size(unsigned char *ptr)
+{
+	if (image_version((void *)ptr) == 0)
+		return sizeof(struct main_hdr_v0);
+	else
+		return KWBHEADER_V1_SIZE((struct main_hdr_v1 *)ptr);
+}
+
+/*
+ * Verify checksum over a complete header that includes the checksum field.
+ * Return 1 when OK, otherwise 0.
+ */
+static int main_hdr_checksum_ok(void *hdr)
+{
+	/* Offsets of checksum in v0 and v1 headers are the same */
+	struct main_hdr_v0 *main_hdr = (struct main_hdr_v0 *)hdr;
+	uint8_t checksum;
+
+	checksum = image_checksum8(hdr, kwbimage_header_size(hdr));
+	/* Calculated checksum includes the header checksum field. Compensate
+	 * for that.
+	 */
+	checksum -= main_hdr->checksum;
+
+	return checksum == main_hdr->checksum;
 }
 
 static uint32_t image_checksum32(void *start, uint32_t len)
@@ -1587,14 +1614,13 @@ static int kwbimage_check_image_types(uint8_t type)
 static int kwbimage_verify_header(unsigned char *ptr, int image_size,
 				  struct image_tool_params *params)
 {
-	struct main_hdr_v0 *main_hdr;
 	uint8_t checksum;
+	size_t header_size = kwbimage_header_size(ptr);
 
-	main_hdr = (struct main_hdr_v0 *)ptr;
-	checksum = image_checksum8(ptr,
-				   sizeof(struct main_hdr_v0)
-				   - sizeof(uint8_t));
-	if (checksum != main_hdr->checksum)
+	if (header_size > image_size)
+		return -FDT_ERR_BADSTRUCTURE;
+
+	if (!main_hdr_checksum_ok(ptr))
 		return -FDT_ERR_BADSTRUCTURE;
 
 	/* Only version 0 extended header has checksum */

@@ -1,6 +1,5 @@
-# Copyright (c) 2016 Google, Inc
-#
 # SPDX-License-Identifier: GPL-2.0+
+# Copyright (c) 2016 Google, Inc
 
 import pytest
 
@@ -38,5 +37,6 @@ stringarray "one" "" ""
 def test_ofplatdata(u_boot_console):
     """Test that of-platdata can be generated and used in sandbox"""
     cons = u_boot_console
+    cons.restart_uboot_with_flags(['--show_of_platdata'])
     output = cons.get_spawn_output().replace('\r', '')
     assert OF_PLATDATA_OUTPUT in output

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2009 Benjamin Herrenschmidt, IBM Corp
  * benh@kernel.crashing.org
@@ -5,18 +6,14 @@
  * Based on parts of drivers/of/fdt.c from Linux v4.9
  * Modifications for U-Boot
  * Copyright (c) 2017 Google, Inc
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
-#include <libfdt.h>
+#include <linux/libfdt.h>
 #include <of_live.h>
 #include <malloc.h>
 #include <dm/of_access.h>
 #include <linux/err.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 static void *unflatten_dt_alloc(void **mem, unsigned long size,
 				unsigned long align)
@@ -216,9 +213,12 @@ static void *unflatten_dt_node(const void *blob, void *mem, int *poffset,
 	*poffset = fdt_next_node(blob, *poffset, &depth);
 	if (depth < 0)
 		depth = 0;
-	while (*poffset > 0 && depth > old_depth)
+	while (*poffset > 0 && depth > old_depth) {
 		mem = unflatten_dt_node(blob, mem, poffset, np, NULL,
 					fpsize, dryrun);
+		if (!mem)
+			return NULL;
+	}
 
 	if (*poffset < 0 && *poffset != -FDT_ERR_NOTFOUND) {
 		debug("unflatten: error %d processing FDT\n", *poffset);
@@ -286,6 +286,8 @@ static int unflatten_device_tree(const void *blob,
 	start = 0;
 	size = (unsigned long)unflatten_dt_node(blob, NULL, &start, NULL, NULL,
 						0, true);
+	if (!size)
+		return -EFAULT;
 	size = ALIGN(size, 4);
 
 	debug("  size is %lx, allocating...\n", size);

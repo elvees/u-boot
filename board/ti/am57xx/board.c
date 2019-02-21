@@ -1,11 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com
  *
  * Author: Felipe Balbi <balbi@ti.com>
  *
  * Based on board/ti/dra7xx/evm.c
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -30,17 +29,21 @@
 #include <dwc3-uboot.h>
 #include <dwc3-omap-uboot.h>
 #include <ti-usb-phy-uboot.h>
+#include <mmc.h>
 
 #include "../common/board_detect.h"
 #include "mux_data.h"
 
 #define board_is_x15()		board_ti_is("BBRDX15_")
 #define board_is_x15_revb1()	(board_ti_is("BBRDX15_") && \
-				 (strncmp("B.10", board_ti_get_rev(), 3) <= 0))
+				 !strncmp("B.10", board_ti_get_rev(), 3))
+#define board_is_x15_revc()	(board_ti_is("BBRDX15_") && \
+				 !strncmp("C.00", board_ti_get_rev(), 3))
 #define board_is_am572x_evm()	board_ti_is("AM572PM_")
 #define board_is_am572x_evm_reva3()	\
 				(board_ti_is("AM572PM_") && \
-				 (strncmp("A.30", board_ti_get_rev(), 3) <= 0))
+				 !strncmp("A.30", board_ti_get_rev(), 3))
+#define board_is_am574x_idk()	board_ti_is("AM574IDK")
 #define board_is_am572x_idk()	board_ti_is("AM572IDK")
 #define board_is_am571x_idk()	board_ti_is("AM571IDK")
 
@@ -86,10 +89,18 @@ static const struct dmm_lisa_map_regs am571x_idk_lisa_regs = {
 	.is_ma_present  = 0x1
 };
 
+static const struct dmm_lisa_map_regs am574x_idk_lisa_regs = {
+	.dmm_lisa_map_2 = 0xc0600200,
+	.dmm_lisa_map_3 = 0x80600100,
+	.is_ma_present  = 0x1
+};
+
 void emif_get_dmm_regs(const struct dmm_lisa_map_regs **dmm_lisa_regs)
 {
 	if (board_is_am571x_idk())
 		*dmm_lisa_regs = &am571x_idk_lisa_regs;
+	else if (board_is_am574x_idk())
+		*dmm_lisa_regs = &am574x_idk_lisa_regs;
 	else
 		*dmm_lisa_regs = &beagle_x15_lisa_regs;
 }
@@ -221,14 +232,75 @@ static const u32 beagle_x15_emif2_ddr3_ext_phy_ctrl_const_regs[] = {
 	0x0
 };
 
+static const struct emif_regs am571x_emif1_ddr3_666mhz_emif_regs = {
+	.sdram_config_init		= 0x61863332,
+	.sdram_config			= 0x61863332,
+	.sdram_config2			= 0x08000000,
+	.ref_ctrl			= 0x0000514d,
+	.ref_ctrl_final			= 0x0000144a,
+	.sdram_tim1			= 0xd333887c,
+	.sdram_tim2			= 0x30b37fe3,
+	.sdram_tim3			= 0x409f8ad8,
+	.read_idle_ctrl			= 0x00050000,
+	.zq_config			= 0x5007190b,
+	.temp_alert_config		= 0x00000000,
+	.emif_ddr_phy_ctlr_1_init	= 0x0024400f,
+	.emif_ddr_phy_ctlr_1		= 0x0e24400f,
+	.emif_ddr_ext_phy_ctrl_1	= 0x10040100,
+	.emif_ddr_ext_phy_ctrl_2	= 0x00910091,
+	.emif_ddr_ext_phy_ctrl_3	= 0x00950095,
+	.emif_ddr_ext_phy_ctrl_4	= 0x009b009b,
+	.emif_ddr_ext_phy_ctrl_5	= 0x009e009e,
+	.emif_rd_wr_lvl_rmp_win		= 0x00000000,
+	.emif_rd_wr_lvl_rmp_ctl		= 0x80000000,
+	.emif_rd_wr_lvl_ctl		= 0x00000000,
+	.emif_rd_wr_exec_thresh		= 0x00000305
+};
+
+static const struct emif_regs am574x_emif1_ddr3_666mhz_emif_ecc_regs = {
+	.sdram_config_init		= 0x61863332,
+	.sdram_config			= 0x61863332,
+	.sdram_config2			= 0x08000000,
+	.ref_ctrl			= 0x0000514d,
+	.ref_ctrl_final			= 0x0000144a,
+	.sdram_tim1			= 0xd333887c,
+	.sdram_tim2			= 0x30b37fe3,
+	.sdram_tim3			= 0x409f8ad8,
+	.read_idle_ctrl			= 0x00050000,
+	.zq_config			= 0x5007190b,
+	.temp_alert_config		= 0x00000000,
+	.emif_ddr_phy_ctlr_1_init	= 0x0024400f,
+	.emif_ddr_phy_ctlr_1		= 0x0e24400f,
+	.emif_ddr_ext_phy_ctrl_1	= 0x10040100,
+	.emif_ddr_ext_phy_ctrl_2	= 0x00910091,
+	.emif_ddr_ext_phy_ctrl_3	= 0x00950095,
+	.emif_ddr_ext_phy_ctrl_4	= 0x009b009b,
+	.emif_ddr_ext_phy_ctrl_5	= 0x009e009e,
+	.emif_rd_wr_lvl_rmp_win		= 0x00000000,
+	.emif_rd_wr_lvl_rmp_ctl		= 0x80000000,
+	.emif_rd_wr_lvl_ctl		= 0x00000000,
+	.emif_rd_wr_exec_thresh		= 0x00000305,
+	.emif_ecc_ctrl_reg		= 0xD0000001,
+	.emif_ecc_address_range_1	= 0x3FFF0000,
+	.emif_ecc_address_range_2	= 0x00000000
+};
+
 void emif_get_reg_dump(u32 emif_nr, const struct emif_regs **regs)
 {
 	switch (emif_nr) {
 	case 1:
-		*regs = &beagle_x15_emif1_ddr3_532mhz_emif_regs;
+		if (board_is_am571x_idk())
+			*regs = &am571x_emif1_ddr3_666mhz_emif_regs;
+		else if (board_is_am574x_idk())
+			*regs = &am574x_emif1_ddr3_666mhz_emif_ecc_regs;
+		else
+			*regs = &beagle_x15_emif1_ddr3_532mhz_emif_regs;
 		break;
 	case 2:
-		*regs = &beagle_x15_emif2_ddr3_532mhz_emif_regs;
+		if (board_is_am574x_idk())
+			*regs = &am571x_emif1_ddr3_666mhz_emif_regs;
+		else
+			*regs = &beagle_x15_emif2_ddr3_532mhz_emif_regs;
 		break;
 	}
 }
@@ -451,6 +523,8 @@ void do_board_detect(void)
 		bname = "BeagleBoard X15";
 	else if (board_is_am572x_evm())
 		bname = "AM572x EVM";
+	else if (board_is_am574x_idk())
+		bname = "AM574x IDK";
 	else if (board_is_am572x_idk())
 		bname = "AM572x IDK";
 	else if (board_is_am571x_idk())
@@ -474,6 +548,8 @@ static void setup_board_eeprom_env(void)
 	if (board_is_x15()) {
 		if (board_is_x15_revb1())
 			name = "beagle_x15_revb1";
+		else if (board_is_x15_revc())
+			name = "beagle_x15_revc";
 		else
 			name = "beagle_x15";
 	} else if (board_is_am572x_evm()) {
@@ -481,6 +557,8 @@ static void setup_board_eeprom_env(void)
 			name = "am57xx_evm_reva3";
 		else
 			name = "am57xx_evm";
+	} else if (board_is_am574x_idk()) {
+		name = "am574x_idk";
 	} else if (board_is_am572x_idk()) {
 		name = "am572x_idk";
 	} else if (board_is_am571x_idk()) {
@@ -498,7 +576,7 @@ invalid_eeprom:
 
 void vcores_init(void)
 {
-	if (board_is_am572x_idk())
+	if (board_is_am572x_idk() || board_is_am574x_idk())
 		*omap_vcores = &am572x_idk_volts;
 	else if (board_is_am571x_idk())
 		*omap_vcores = &am571x_idk_volts;
@@ -509,7 +587,12 @@ void vcores_init(void)
 void hw_data_init(void)
 {
 	*prcm = &dra7xx_prcm;
-	*dplls_data = &dra7xx_dplls;
+	if (is_dra72x())
+		*dplls_data = &dra72x_dplls;
+	else if (is_dra76x())
+		*dplls_data = &dra76x_dplls;
+	else
+		*dplls_data = &dra7xx_dplls;
 	*ctrl = &dra7xx_ctrl;
 }
 
@@ -540,7 +623,7 @@ void am57x_idk_lcd_detect(void)
 {
 	int r = -ENODEV;
 	char *idk_lcd = "no";
-	uint8_t buf = 0;
+	struct udevice *dev;
 
 	/* Only valid for IDKs */
 	if (board_is_x15() || board_is_am572x_evm())
@@ -550,32 +633,29 @@ void am57x_idk_lcd_detect(void)
 	if (board_is_am571x_idk() && !am571x_idk_needs_lcd())
 		goto out;
 
-	r = i2c_set_bus_num(OSD_TS_FT_BUS_ADDRESS);
+	r = i2c_get_chip_for_busnum(OSD_TS_FT_BUS_ADDRESS,
+				    OSD_TS_FT_CHIP_ADDRESS, 1, &dev);
 	if (r) {
-		printf("%s: Failed to set bus address to %d: %d\n",
-		       __func__, OSD_TS_FT_BUS_ADDRESS, r);
-		goto out;
-	}
-	r = i2c_probe(OSD_TS_FT_CHIP_ADDRESS);
-	if (r) {
+		printf("%s: Failed to get I2C device %d/%d (ret %d)\n",
+		       __func__, OSD_TS_FT_BUS_ADDRESS, OSD_TS_FT_CHIP_ADDRESS,
+		       r);
 		/* AM572x IDK has no explicit settings for optional LCD kit */
-		if (board_is_am571x_idk()) {
+		if (board_is_am571x_idk())
 			printf("%s: Touch screen detect failed: %d!\n",
 			       __func__, r);
-		}
 		goto out;
 	}
 
 	/* Read FT ID */
-	r = i2c_read(OSD_TS_FT_CHIP_ADDRESS, OSD_TS_FT_REG_ID, 1, &buf, 1);
-	if (r) {
+	r = dm_i2c_reg_read(dev, OSD_TS_FT_REG_ID);
+	if (r < 0) {
 		printf("%s: Touch screen ID read %d:0x%02x[0x%02x] failed:%d\n",
 		       __func__, OSD_TS_FT_BUS_ADDRESS, OSD_TS_FT_CHIP_ADDRESS,
 		       OSD_TS_FT_REG_ID, r);
 		goto out;
 	}
 
-	switch (buf) {
+	switch (r) {
 	case OSD_TS_FT_ID_5606:
 		idk_lcd = "osd101t2045";
 		break;
@@ -584,13 +664,26 @@ void am57x_idk_lcd_detect(void)
 		break;
 	default:
 		printf("%s: Unidentifed Touch screen ID 0x%02x\n",
-		       __func__, buf);
+		       __func__, r);
 		/* we will let default be "no lcd" */
 	}
 out:
-	setenv("idk_lcd", idk_lcd);
+	env_set("idk_lcd", idk_lcd);
 	return;
 }
+
+#if CONFIG_IS_ENABLED(DM_USB) && CONFIG_IS_ENABLED(OF_CONTROL)
+static int device_okay(const char *path)
+{
+	int node;
+
+	node = fdt_path_offset(gd->fdt_blob, path);
+	if (node < 0)
+		return 0;
+
+	return fdtdec_get_is_enabled(gd->fdt_blob, node);
+}
+#endif
 
 int board_late_init(void)
 {
@@ -608,7 +701,7 @@ int board_late_init(void)
 	 * on HS devices.
 	 */
 	if (get_device_type() == HS_DEVICE)
-		setenv("boot_fit", "1");
+		env_set("boot_fit", "1");
 
 	/*
 	 * Set the GPIO7 Pad to POWERHOLD. This has higher priority
@@ -631,6 +724,12 @@ int board_late_init(void)
 	board_ti_set_ethaddr(2);
 #endif
 
+#if CONFIG_IS_ENABLED(DM_USB) && CONFIG_IS_ENABLED(OF_CONTROL)
+	if (device_okay("/ocp/omap_dwc3_1@48880000"))
+		enable_usb_clocks(0);
+	if (device_okay("/ocp/omap_dwc3_2@488c0000"))
+		enable_usb_clocks(1);
+#endif
 	return 0;
 }
 
@@ -653,6 +752,11 @@ void recalibrate_iodelay(void)
 		pconf_sz = ARRAY_SIZE(core_padconf_array_essential_am572x_idk);
 		iod = iodelay_cfg_array_am572x_idk;
 		iod_sz = ARRAY_SIZE(iodelay_cfg_array_am572x_idk);
+	} else if (board_is_am574x_idk()) {
+		pconf = core_padconf_array_essential_am574x_idk;
+		pconf_sz = ARRAY_SIZE(core_padconf_array_essential_am574x_idk);
+		iod = iodelay_cfg_array_am574x_idk;
+		iod_sz = ARRAY_SIZE(iodelay_cfg_array_am574x_idk);
 	} else if (board_is_am571x_idk()) {
 		pconf = core_padconf_array_essential_am571x_idk;
 		pconf_sz = ARRAY_SIZE(core_padconf_array_essential_am571x_idk);
@@ -683,7 +787,8 @@ void recalibrate_iodelay(void)
 
 	/* Now do the weird minor deltas that should be safe */
 	if (board_is_x15() || board_is_am572x_evm()) {
-		if (board_is_x15_revb1() || board_is_am572x_evm_reva3()) {
+		if (board_is_x15_revb1() || board_is_am572x_evm_reva3() ||
+		    board_is_x15_revc()) {
 			pconf = core_padconf_array_delta_x15_sr2_0;
 			pconf_sz = ARRAY_SIZE(core_padconf_array_delta_x15_sr2_0);
 		} else {
@@ -726,6 +831,35 @@ int board_mmc_init(bd_t *bis)
 	omap_mmc_init(1, 0, 0, -1, -1);
 	return 0;
 }
+
+static const struct mmc_platform_fixups am57x_es1_1_mmc1_fixups = {
+	.hw_rev = "rev11",
+	.unsupported_caps = MMC_CAP(MMC_HS_200) |
+			    MMC_CAP(UHS_SDR104),
+	.max_freq = 96000000,
+};
+
+static const struct mmc_platform_fixups am57x_es1_1_mmc23_fixups = {
+	.hw_rev = "rev11",
+	.unsupported_caps = MMC_CAP(MMC_HS_200) |
+			    MMC_CAP(UHS_SDR104) |
+			    MMC_CAP(UHS_SDR50),
+	.max_freq = 48000000,
+};
+
+const struct mmc_platform_fixups *platform_fixups_mmc(uint32_t addr)
+{
+	switch (omap_revision()) {
+	case DRA752_ES1_0:
+	case DRA752_ES1_1:
+		if (addr == OMAP_HSMMC1_BASE)
+			return &am57x_es1_1_mmc1_fixups;
+		else
+			return &am57x_es1_1_mmc23_fixups;
+	default:
+		return NULL;
+	}
+}
 #endif
 
 #if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_OS_BOOT)
@@ -737,101 +871,14 @@ int spl_start_uboot(void)
 
 #ifdef CONFIG_SPL_ENV_SUPPORT
 	env_init();
-	env_relocate_spec();
-	if (getenv_yesno("boot_os") != 1)
+	env_load();
+	if (env_get_yesno("boot_os") != 1)
 		return 1;
 #endif
 
 	return 0;
 }
 #endif
-
-#ifdef CONFIG_USB_DWC3
-static struct dwc3_device usb_otg_ss2 = {
-	.maximum_speed = USB_SPEED_HIGH,
-	.base = DRA7_USB_OTG_SS2_BASE,
-	.tx_fifo_resize = false,
-	.index = 1,
-};
-
-static struct dwc3_omap_device usb_otg_ss2_glue = {
-	.base = (void *)DRA7_USB_OTG_SS2_GLUE_BASE,
-	.utmi_mode = DWC3_OMAP_UTMI_MODE_SW,
-	.index = 1,
-};
-
-static struct ti_usb_phy_device usb_phy2_device = {
-	.usb2_phy_power = (void *)DRA7_USB2_PHY2_POWER,
-	.index = 1,
-};
-
-int usb_gadget_handle_interrupts(int index)
-{
-	u32 status;
-
-	status = dwc3_omap_uboot_interrupt_status(index);
-	if (status)
-		dwc3_uboot_handle_interrupt(index);
-
-	return 0;
-}
-#endif /* CONFIG_USB_DWC3 */
-
-#if defined(CONFIG_USB_DWC3) || defined(CONFIG_USB_XHCI_OMAP)
-int omap_xhci_board_usb_init(int index, enum usb_init_type init)
-{
-	enable_usb_clocks(index);
-	switch (index) {
-	case 0:
-		if (init == USB_INIT_DEVICE) {
-			printf("port %d can't be used as device\n", index);
-			disable_usb_clocks(index);
-			return -EINVAL;
-		}
-		break;
-	case 1:
-		if (init == USB_INIT_DEVICE) {
-#ifdef CONFIG_USB_DWC3
-			usb_otg_ss2.dr_mode = USB_DR_MODE_PERIPHERAL;
-			usb_otg_ss2_glue.vbus_id_status = OMAP_DWC3_VBUS_VALID;
-			ti_usb_phy_uboot_init(&usb_phy2_device);
-			dwc3_omap_uboot_init(&usb_otg_ss2_glue);
-			dwc3_uboot_init(&usb_otg_ss2);
-#endif
-		} else {
-			printf("port %d can't be used as host\n", index);
-			disable_usb_clocks(index);
-			return -EINVAL;
-		}
-
-		break;
-	default:
-		printf("Invalid Controller Index\n");
-	}
-
-	return 0;
-}
-
-int omap_xhci_board_usb_cleanup(int index, enum usb_init_type init)
-{
-#ifdef CONFIG_USB_DWC3
-	switch (index) {
-	case 0:
-	case 1:
-		if (init == USB_INIT_DEVICE) {
-			ti_usb_phy_uboot_exit(index);
-			dwc3_uboot_exit(index);
-			dwc3_omap_uboot_exit(index);
-		}
-		break;
-	default:
-		printf("Invalid Controller Index\n");
-	}
-#endif
-	disable_usb_clocks(index);
-	return 0;
-}
-#endif /* defined(CONFIG_USB_DWC3) || defined(CONFIG_USB_XHCI_OMAP) */
 
 #ifdef CONFIG_DRIVER_TI_CPSW
 
@@ -928,11 +975,11 @@ int board_eth_init(bd_t *bis)
 	mac_addr[4] = (mac_lo & 0xFF00) >> 8;
 	mac_addr[5] = mac_lo & 0xFF;
 
-	if (!getenv("ethaddr")) {
+	if (!env_get("ethaddr")) {
 		printf("<ethaddr> not set. Validating first E-fuse MAC\n");
 
 		if (is_valid_ethaddr(mac_addr))
-			eth_setenv_enetaddr("ethaddr", mac_addr);
+			eth_env_set_enetaddr("ethaddr", mac_addr);
 	}
 
 	mac_lo = readl((*ctrl)->control_core_mac_id_1_lo);
@@ -944,9 +991,9 @@ int board_eth_init(bd_t *bis)
 	mac_addr[4] = (mac_lo & 0xFF00) >> 8;
 	mac_addr[5] = mac_lo & 0xFF;
 
-	if (!getenv("eth1addr")) {
+	if (!env_get("eth1addr")) {
 		if (is_valid_ethaddr(mac_addr))
-			eth_setenv_enetaddr("eth1addr", mac_addr);
+			eth_env_set_enetaddr("eth1addr", mac_addr);
 	}
 
 	ctrl_val = readl((*ctrl)->control_core_control_io1) & (~0x33);
@@ -954,7 +1001,8 @@ int board_eth_init(bd_t *bis)
 	writel(ctrl_val, (*ctrl)->control_core_control_io1);
 
 	/* The phy address for the AM57xx IDK are different than x15 */
-	if (board_is_am572x_idk() || board_is_am571x_idk()) {
+	if (board_is_am572x_idk() || board_is_am571x_idk() ||
+	    board_is_am574x_idk()) {
 		cpsw_data.slave_data[0].phy_addr = 0;
 		cpsw_data.slave_data[1].phy_addr = 1;
 	}
@@ -981,9 +1029,9 @@ int board_eth_init(bd_t *bis)
 			for (i = 0; i < num_macs; i++) {
 				u64_to_mac(mac1 + i, mac_addr);
 				if (is_valid_ethaddr(mac_addr)) {
-					eth_setenv_enetaddr_by_index("eth",
-								     i + 2,
-								     mac_addr);
+					eth_env_set_enetaddr_by_index("eth",
+								      i + 2,
+								      mac_addr);
 				}
 			}
 		}
@@ -1027,6 +1075,9 @@ int board_fit_config_name_match(const char *name)
 		if (board_is_x15_revb1()) {
 			if (!strcmp(name, "am57xx-beagle-x15-revb1"))
 				return 0;
+		} else if (board_is_x15_revc()) {
+			if (!strcmp(name, "am57xx-beagle-x15-revc"))
+				return 0;
 		} else if (!strcmp(name, "am57xx-beagle-x15")) {
 			return 0;
 		}
@@ -1034,6 +1085,8 @@ int board_fit_config_name_match(const char *name)
 		   !strcmp(name, "am57xx-beagle-x15")) {
 		return 0;
 	} else if (board_is_am572x_idk() && !strcmp(name, "am572x-idk")) {
+		return 0;
+	} else if (board_is_am574x_idk() && !strcmp(name, "am574x-idk")) {
 		return 0;
 	} else if (board_is_am571x_idk() && !strcmp(name, "am571x-idk")) {
 		return 0;
@@ -1053,6 +1106,16 @@ void board_tee_image_process(ulong tee_image, size_t tee_size)
 {
 	secure_tee_install((u32)tee_image);
 }
+
+#if CONFIG_IS_ENABLED(FASTBOOT) && !CONFIG_IS_ENABLED(ENV_IS_NOWHERE)
+int fastboot_set_reboot_flag(void)
+{
+	printf("Setting reboot to fastboot flag ...\n");
+	env_set("dofastboot", "1");
+	env_save();
+	return 0;
+}
+#endif
 
 U_BOOT_FIT_LOADABLE_HANDLER(IH_TYPE_TEE, board_tee_image_process);
 #endif

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  *
  * Common board functions for OMAP3 based boards.
@@ -13,8 +14,6 @@
  *      Richard Woodruff <r-woodruff2@ti.com>
  *      Syed Mohammed Khasim <khasim@ti.com>
  *
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
 #include <dm.h>
@@ -27,8 +26,6 @@
 #include <asm/gpio.h>
 #include <asm/omap_common.h>
 #include <linux/compiler.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 /* Declarations */
 extern omap3_sysinfo sysinfo;
@@ -212,6 +209,12 @@ void board_init_f(ulong dummy)
 {
 	early_system_init();
 	mem_init();
+	/*
+	* Save the boot parameters passed from romcode.
+	* We cannot delay the saving further than this,
+	* to prevent overwrites.
+	*/
+	save_omap_boot_params();
 }
 #endif
 

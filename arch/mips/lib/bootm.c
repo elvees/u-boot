@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2003
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -80,7 +79,7 @@ static void linux_cmdline_legacy(bootm_headers_t *images)
 
 	linux_cmdline_init();
 
-	bootargs = getenv("bootargs");
+	bootargs = env_get("bootargs");
 	if (!bootargs)
 		return;
 
@@ -202,11 +201,11 @@ static void linux_env_legacy(bootm_headers_t *images)
 	sprintf(env_buf, "0x%X", (uint) (gd->bd->bi_flashsize));
 	linux_env_set("flash_size", env_buf);
 
-	cp = getenv("ethaddr");
+	cp = env_get("ethaddr");
 	if (cp)
 		linux_env_set("ethaddr", cp);
 
-	cp = getenv("eth1addr");
+	cp = env_get("eth1addr");
 	if (cp)
 		linux_env_set("eth1addr", cp);
 
@@ -253,17 +252,15 @@ static int boot_reloc_fdt(bootm_headers_t *images)
 #endif
 }
 
+#if CONFIG_IS_ENABLED(MIPS_BOOT_FDT) && CONFIG_IS_ENABLED(OF_LIBFDT)
 int arch_fixup_fdt(void *blob)
 {
-#if CONFIG_IS_ENABLED(MIPS_BOOT_FDT) && CONFIG_IS_ENABLED(OF_LIBFDT)
 	u64 mem_start = virt_to_phys((void *)gd->bd->bi_memstart);
 	u64 mem_size = gd->ram_size;
 
 	return fdt_fixup_memory_banks(blob, &mem_start, &mem_size, 1);
-#else
-	return 0;
-#endif
 }
+#endif
 
 static int boot_setup_fdt(bootm_headers_t *images)
 {
@@ -279,17 +276,17 @@ static void boot_prep_linux(bootm_headers_t *images)
 		boot_reloc_fdt(images);
 		boot_setup_fdt(images);
 	} else {
-		if (CONFIG_IS_ENABLED(CONFIG_MIPS_BOOT_ENV_LEGACY))
-			linux_env_legacy(images);
-
 		if (CONFIG_IS_ENABLED(MIPS_BOOT_CMDLINE_LEGACY)) {
 			linux_cmdline_legacy(images);
 
-			if (!CONFIG_IS_ENABLED(CONFIG_MIPS_BOOT_ENV_LEGACY))
+			if (!CONFIG_IS_ENABLED(MIPS_BOOT_ENV_LEGACY))
 				linux_cmdline_append(images);
 
 			linux_cmdline_dump();
 		}
+
+		if (CONFIG_IS_ENABLED(MIPS_BOOT_ENV_LEGACY))
+			linux_env_legacy(images);
 	}
 }
 

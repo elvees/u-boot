@@ -1,16 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2000-2002
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <mpc8xx.h>
 #include <mpc8xx_irq.h>
+#include <asm/cpm_8xx.h>
 #include <asm/processor.h>
 #include <asm/io.h>
-#include <commproc.h>
 
 /************************************************************************/
 
@@ -30,7 +29,7 @@ static void cpm_interrupt(void *regs);
 
 /************************************************************************/
 
-int interrupt_init_cpu(unsigned *decrementer_count)
+void interrupt_init_cpu(unsigned *decrementer_count)
 {
 	immap_t __iomem *immr = (immap_t __iomem *)CONFIG_SYS_IMMR;
 
@@ -41,8 +40,6 @@ int interrupt_init_cpu(unsigned *decrementer_count)
 
 	/* Configure CPM interrupts */
 	cpm_interrupt_init();
-
-	return 0;
 }
 
 /************************************************************************/

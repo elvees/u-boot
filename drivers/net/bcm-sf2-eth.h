@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright 2014-2017 Broadcom.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _BCM_SF2_ETH_H_
@@ -19,8 +18,6 @@
 
 /* Support 2 Ethernet ports now */
 #define BCM_ETH_MAX_PORT_NUM	2
-
-#define CONFIG_BCM_SF2_ETH_DEFAULT_PORT	0
 
 enum {
 	MAC_DMA_TX = 1,

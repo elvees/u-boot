@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2015 Rockchip Electronics Co., Ltd
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <common.h>
@@ -13,8 +12,6 @@
 #include <asm/arch/sdram_rk3036.h>
 #include <asm/arch/timer.h>
 #include <asm/arch/uart.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 #define GRF_BASE	0x20008000
 
@@ -40,7 +37,7 @@ void board_init_f(ulong dummy)
 	sdram_init();
 
 	/* return to maskrom */
-	back_to_bootrom();
+	back_to_bootrom(BROM_BOOT_NEXTSTAGE);
 }
 
 /* Place Holders */
@@ -50,12 +47,6 @@ void board_init_r(gd_t *id, ulong dest_addr)
 	 * Function attribute is no-return
 	 * This Function never executes
 	 */
-	while (1)
-		;
-}
-
-void hang(void)
-{
 	while (1)
 		;
 }

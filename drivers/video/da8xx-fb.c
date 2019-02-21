@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Porting to u-boot:
  *
@@ -9,12 +10,10 @@
  *
  * Based on the LCD driver for TI Avalanche processors written by
  * Ajay Singh and Shalom Hai.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
-#include <malloc.h>
+#include <memalign.h>
 #include <video_fb.h>
 #include <linux/list.h>
 #include <linux/fb.h>
@@ -853,9 +852,10 @@ static u32 wait_for_event(u32 event)
 	do {
 		ret = lcdc_irq_handler();
 		udelay(1000);
-	} while (!(ret & event));
+		--timeout;
+	} while (!(ret & event) && timeout);
 
-	if (timeout <= 0) {
+	if (!(ret & event)) {
 		printf("%s: event %d not hit\n", __func__, event);
 		return -1;
 	}
@@ -924,7 +924,7 @@ void *video_hw_init(void)
 	      da8xx_lcd_cfg->bpp);
 
 	size = sizeof(struct fb_info) + sizeof(struct da8xx_fb_par);
-	da8xx_fb_info = malloc(size);
+	da8xx_fb_info = malloc_cache_aligned(size);
 	debug("da8xx_fb_info at %x\n", (unsigned int)da8xx_fb_info);
 
 	if (!da8xx_fb_info) {
@@ -949,7 +949,7 @@ void *video_hw_init(void)
 			da8xx_lcd_cfg->bpp;
 	par->vram_size = par->vram_size * LCD_NUM_BUFFERS / 8;
 
-	par->vram_virt = malloc(par->vram_size);
+	par->vram_virt = malloc_cache_aligned(par->vram_size);
 
 	par->vram_phys = (dma_addr_t) par->vram_virt;
 	debug("Requesting 0x%x bytes for framebuffer at 0x%x\n",
@@ -972,7 +972,7 @@ void *video_hw_init(void)
 		da8xx_fb_fix.line_length - 1;
 
 	/* allocate palette buffer */
-	par->v_palette_base = malloc(PALETTE_SIZE);
+	par->v_palette_base = malloc_cache_aligned(PALETTE_SIZE);
 	if (!par->v_palette_base) {
 		printf("GLCD: malloc for palette buffer failed\n");
 		goto err_release_fb_mem;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2004-2011
  * Texas Instruments, <www.ti.com>
@@ -10,8 +11,6 @@
  *	Richard Woodruff <r-woodruff2@ti.com>
  *	Syed Mohammed Khasim <khasim@ti.com>
  *
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
 #include <dm.h>
@@ -20,7 +19,7 @@
 #include <status_led.h>
 #endif
 #include <twl4030.h>
-#include <linux/mtd/nand.h>
+#include <linux/mtd/rawnand.h>
 #include <asm/io.h>
 #include <asm/arch/mmc_host_def.h>
 #include <asm/arch/mux.h>
@@ -102,6 +101,17 @@ int board_init(void)
 
 	return 0;
 }
+
+#if defined(CONFIG_SPL_OS_BOOT)
+int spl_start_uboot(void)
+{
+	/* break into full u-boot on 'c' */
+	if (serial_tstc() && serial_getc() == 'c')
+		return 1;
+
+	return 0;
+}
+#endif /* CONFIG_SPL_OS_BOOT */
 
 /*
  * Routine: get_board_revision
@@ -341,16 +351,16 @@ int misc_init_r(void)
 	switch (get_board_revision()) {
 	case REVISION_AXBX:
 		printf("Beagle Rev Ax/Bx\n");
-		setenv("beaglerev", "AxBx");
+		env_set("beaglerev", "AxBx");
 		break;
 	case REVISION_CX:
 		printf("Beagle Rev C1/C2/C3\n");
-		setenv("beaglerev", "Cx");
+		env_set("beaglerev", "Cx");
 		MUX_BEAGLE_C();
 		break;
 	case REVISION_C4:
 		printf("Beagle Rev C4\n");
-		setenv("beaglerev", "C4");
+		env_set("beaglerev", "C4");
 		MUX_BEAGLE_C();
 		/* Set VAUX2 to 1.8V for EHCI PHY */
 		twl4030_pmrecv_vsel_cfg(TWL4030_PM_RECEIVER_VAUX2_DEDICATED,
@@ -360,7 +370,7 @@ int misc_init_r(void)
 		break;
 	case REVISION_XM_AB:
 		printf("Beagle xM Rev A/B\n");
-		setenv("beaglerev", "xMAB");
+		env_set("beaglerev", "xMAB");
 		MUX_BEAGLE_XM();
 		/* Set VAUX2 to 1.8V for EHCI PHY */
 		twl4030_pmrecv_vsel_cfg(TWL4030_PM_RECEIVER_VAUX2_DEDICATED,
@@ -371,7 +381,7 @@ int misc_init_r(void)
 		break;
 	case REVISION_XM_C:
 		printf("Beagle xM Rev C\n");
-		setenv("beaglerev", "xMC");
+		env_set("beaglerev", "xMC");
 		MUX_BEAGLE_XM();
 		/* Set VAUX2 to 1.8V for EHCI PHY */
 		twl4030_pmrecv_vsel_cfg(TWL4030_PM_RECEIVER_VAUX2_DEDICATED,
@@ -397,14 +407,14 @@ int misc_init_r(void)
 			expansion_config.revision,
 			expansion_config.fab_revision);
 		MUX_TINCANTOOLS_ZIPPY();
-		setenv("buddy", "zippy");
+		env_set("buddy", "zippy");
 		break;
 	case TINCANTOOLS_ZIPPY2:
 		printf("Recognized Tincantools Zippy2 board (rev %d %s)\n",
 			expansion_config.revision,
 			expansion_config.fab_revision);
 		MUX_TINCANTOOLS_ZIPPY();
-		setenv("buddy", "zippy2");
+		env_set("buddy", "zippy2");
 		break;
 	case TINCANTOOLS_TRAINER:
 		printf("Recognized Tincantools Trainer board (rev %d %s)\n",
@@ -412,37 +422,37 @@ int misc_init_r(void)
 			expansion_config.fab_revision);
 		MUX_TINCANTOOLS_ZIPPY();
 		MUX_TINCANTOOLS_TRAINER();
-		setenv("buddy", "trainer");
+		env_set("buddy", "trainer");
 		break;
 	case TINCANTOOLS_SHOWDOG:
 		printf("Recognized Tincantools Showdow board (rev %d %s)\n",
 			expansion_config.revision,
 			expansion_config.fab_revision);
 		/* Place holder for DSS2 definition for showdog lcd */
-		setenv("defaultdisplay", "showdoglcd");
-		setenv("buddy", "showdog");
+		env_set("defaultdisplay", "showdoglcd");
+		env_set("buddy", "showdog");
 		break;
 	case KBADC_BEAGLEFPGA:
 		printf("Recognized KBADC Beagle FPGA board\n");
 		MUX_KBADC_BEAGLEFPGA();
-		setenv("buddy", "beaglefpga");
+		env_set("buddy", "beaglefpga");
 		break;
 	case LW_BEAGLETOUCH:
 		printf("Recognized Liquidware BeagleTouch board\n");
-		setenv("buddy", "beagletouch");
+		env_set("buddy", "beagletouch");
 		break;
 	case BRAINMUX_LCDOG:
 		printf("Recognized Brainmux LCDog board\n");
-		setenv("buddy", "lcdog");
+		env_set("buddy", "lcdog");
 		break;
 	case BRAINMUX_LCDOGTOUCH:
 		printf("Recognized Brainmux LCDog Touch board\n");
-		setenv("buddy", "lcdogtouch");
+		env_set("buddy", "lcdogtouch");
 		break;
 	case BBTOYS_WIFI:
 		printf("Recognized BeagleBoardToys WiFi board\n");
 		MUX_BBTOYS_WIFI()
-		setenv("buddy", "bbtoys-wifi");
+		env_set("buddy", "bbtoys-wifi");
 		break;
 	case BBTOYS_VGA:
 		printf("Recognized BeagleBoardToys VGA board\n");
@@ -459,20 +469,20 @@ int misc_init_r(void)
 	case LSR_COM6L_ADPT:
 		printf("Recognized LSR COM6L Adapter Board\n");
 		MUX_BBTOYS_WIFI()
-		setenv("buddy", "lsr-com6l-adpt");
+		env_set("buddy", "lsr-com6l-adpt");
 		break;
 	case BEAGLE_NO_EEPROM:
 		printf("No EEPROM on expansion board\n");
-		setenv("buddy", "none");
+		env_set("buddy", "none");
 		break;
 	default:
 		printf("Unrecognized expansion board: %x\n",
 			expansion_config.device_vendor);
-		setenv("buddy", "unknown");
+		env_set("buddy", "unknown");
 	}
 
 	if (expansion_config.content == 1)
-		setenv(expansion_config.env_var, expansion_config.env_setting);
+		env_set(expansion_config.env_var, expansion_config.env_setting);
 
 	twl4030_power_init();
 	switch (get_board_revision()) {
@@ -509,6 +519,14 @@ int misc_init_r(void)
 
 	if (generate_fake_mac)
 		omap_die_id_usbethaddr();
+
+#if defined(CONFIG_MTDIDS_DEFAULT) && defined(CONFIG_MTDPARTS_DEFAULT)
+	if (strlen(CONFIG_MTDIDS_DEFAULT))
+		env_set("mtdids", CONFIG_MTDIDS_DEFAULT);
+
+	if (strlen(CONFIG_MTDPARTS_DEFAULT))
+		env_set("mtdparts", CONFIG_MTDPARTS_DEFAULT);
+#endif
 
 	return 0;
 }

@@ -1,6 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0+
 # Copyright (c) 2011 The Chromium OS Authors.
-#
-# SPDX-License-Identifier:	GPL-2.0+
 #
 
 from __future__ import print_function
@@ -59,25 +58,25 @@ class _ProjectConfigParser(ConfigParser.SafeConfigParser):
     >>> config = _ProjectConfigParser("zzz")
     >>> config.readfp(StringIO(sample_config))
     >>> config.get("alias", "enemies")
-    'Evil <evil@example.com>'
+    u'Evil <evil@example.com>'
 
     # Check to make sure that alias gets overridden by project.
     >>> config = _ProjectConfigParser("sm")
     >>> config.readfp(StringIO(sample_config))
     >>> config.get("alias", "enemies")
-    'Green G. <ugly@example.com>'
+    u'Green G. <ugly@example.com>'
 
     # Check to make sure that settings get merged with project.
     >>> config = _ProjectConfigParser("linux")
     >>> config.readfp(StringIO(sample_config))
     >>> sorted(config.items("settings"))
-    [('am_hero', 'True'), ('process_tags', 'False')]
+    [(u'am_hero', u'True'), (u'process_tags', u'False')]
 
     # Check to make sure that settings works with unknown project.
     >>> config = _ProjectConfigParser("unknown")
     >>> config.readfp(StringIO(sample_config))
     >>> sorted(config.items("settings"))
-    [('am_hero', 'True')]
+    [(u'am_hero', u'True')]
     """
     def __init__(self, project_name):
         """Construct _ProjectConfigParser.
@@ -100,6 +99,17 @@ class _ProjectConfigParser(ConfigParser.SafeConfigParser):
         for setting_name, setting_value in project_defaults.items():
             self.set(project_settings, setting_name, setting_value)
 
+    def _to_unicode(self, val):
+        """Make sure a value is of type 'unicode'
+
+        Args:
+            val: string or unicode object
+
+        Returns:
+            unicode version of val
+        """
+        return val if isinstance(val, unicode) else val.decode('utf-8')
+
     def get(self, section, option, *args, **kwargs):
         """Extend SafeConfigParser to try project_section before section.
 
@@ -109,14 +119,15 @@ class _ProjectConfigParser(ConfigParser.SafeConfigParser):
             See SafeConfigParser.
         """
         try:
-            return ConfigParser.SafeConfigParser.get(
+            val = ConfigParser.SafeConfigParser.get(
                 self, "%s_%s" % (self._project_name, section), option,
                 *args, **kwargs
             )
         except (ConfigParser.NoSectionError, ConfigParser.NoOptionError):
-            return ConfigParser.SafeConfigParser.get(
+            val = ConfigParser.SafeConfigParser.get(
                 self, section, option, *args, **kwargs
             )
+        return self._to_unicode(val)
 
     def items(self, section, *args, **kwargs):
         """Extend SafeConfigParser to add project_section to section.
@@ -151,7 +162,8 @@ class _ProjectConfigParser(ConfigParser.SafeConfigParser):
 
         item_dict = dict(top_items)
         item_dict.update(project_items)
-        return item_dict.items()
+        return {(self._to_unicode(item), self._to_unicode(val))
+                for item, val in item_dict.iteritems()}
 
 def ReadGitAliases(fname):
     """Read a git alias file. This is in the form used by git:
@@ -212,7 +224,12 @@ def CreatePatmanConfigFile(config_fname):
         print("Couldn't create patman config file\n")
         raise
 
-    print("[alias]\nme: %s <%s>" % (name, email), file=f)
+    print('''[alias]
+me: %s <%s>
+
+[bounces]
+nxp = Zhikang Zhang <zhikang.zhang@nxp.com>
+''' % (name, email), file=f)
     f.close();
 
 def _UpdateDefaults(parser, config):
@@ -259,7 +276,7 @@ def _ReadAliasFile(fname):
                 line = line.strip()
                 if not line or line.startswith('#'):
                     continue
-                words = line.split(' ', 2)
+                words = line.split(None, 2)
                 if len(words) < 3 or words[0] != 'alias':
                     if not bad_line:
                         bad_line = "%s:%d:Invalid line '%s'" % (fname, linenum,
@@ -268,6 +285,36 @@ def _ReadAliasFile(fname):
                 alias[words[1]] = [s.strip() for s in words[2].split(',')]
         if bad_line:
             print(bad_line)
+
+def _ReadBouncesFile(fname):
+    """Read in the bounces file if it exists
+
+    Args:
+        fname: Filename to read.
+    """
+    if os.path.exists(fname):
+        with open(fname) as fd:
+            for line in fd:
+                if line.startswith('#'):
+                    continue
+                bounces.add(line.strip())
+
+def GetItems(config, section):
+    """Get the items from a section of the config.
+
+    Args:
+        config: _ProjectConfigParser object containing settings
+        section: name of section to retrieve
+
+    Returns:
+        List of (name, value) tuples for the section
+    """
+    try:
+        return config.items(section)
+    except ConfigParser.NoSectionError as e:
+        return []
+    except:
+        raise
 
 def Setup(parser, project_name, config_fname=''):
     """Set up the settings module by reading config files.
@@ -290,13 +337,18 @@ def Setup(parser, project_name, config_fname=''):
 
     config.read(config_fname)
 
-    for name, value in config.items('alias'):
+    for name, value in GetItems(config, 'alias'):
         alias[name] = value.split(',')
+
+    _ReadBouncesFile('doc/bounces')
+    for name, value in GetItems(config, 'bounces'):
+        bounces.add(value)
 
     _UpdateDefaults(parser, config)
 
 # These are the aliases we understand, indexed by alias. Each member is a list.
 alias = {}
+bounces = set()
 
 if __name__ == "__main__":
     import doctest

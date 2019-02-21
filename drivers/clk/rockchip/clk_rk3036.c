@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * (C) Copyright 2015 Google, Inc
- *
- * SPDX-License-Identifier:	GPL-2.0
  */
 
 #include <common.h>
@@ -16,8 +15,6 @@
 #include <dm/lists.h>
 #include <dt-bindings/clock/rk3036-cru.h>
 #include <linux/log2.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 enum {
 	VCO_MAX_HZ	= 2400U * 1000000,
@@ -235,7 +232,7 @@ static ulong rockchip_mmc_get_clk(struct rk3036_cru *cru, uint clk_general_rate,
 	}
 
 	src_rate = mux == EMMC_SEL_24M ? OSC_HZ : clk_general_rate;
-	return DIV_TO_RATE(src_rate, div);
+	return DIV_TO_RATE(src_rate, div) / 2;
 }
 
 static ulong rockchip_mmc_set_clk(struct rk3036_cru *cru, uint clk_general_rate,
@@ -247,10 +244,11 @@ static ulong rockchip_mmc_set_clk(struct rk3036_cru *cru, uint clk_general_rate,
 	debug("%s: clk_general_rate=%u\n", __func__, clk_general_rate);
 
 	/* mmc clock auto divide 2 in internal */
-	src_clk_div = (clk_general_rate / 2 + freq - 1) / freq;
+	src_clk_div = DIV_ROUND_UP(clk_general_rate / 2, freq);
 
-	if (src_clk_div > 0x7f) {
-		src_clk_div = (OSC_HZ / 2 + freq - 1) / freq;
+	if (src_clk_div > 128) {
+		src_clk_div = DIV_ROUND_UP(OSC_HZ / 2, freq);
+		assert(src_clk_div - 1 < 128);
 		mux = EMMC_SEL_24M;
 	} else {
 		mux = EMMC_SEL_GPLL;
@@ -316,11 +314,19 @@ static struct clk_ops rk3036_clk_ops = {
 	.set_rate	= rk3036_clk_set_rate,
 };
 
+static int rk3036_clk_ofdata_to_platdata(struct udevice *dev)
+{
+	struct rk3036_clk_priv *priv = dev_get_priv(dev);
+
+	priv->cru = dev_read_addr_ptr(dev);
+
+	return 0;
+}
+
 static int rk3036_clk_probe(struct udevice *dev)
 {
 	struct rk3036_clk_priv *priv = dev_get_priv(dev);
 
-	priv->cru = (struct rk3036_cru *)devfdt_get_addr(dev);
 	rkclk_init(priv->cru);
 
 	return 0;
@@ -329,11 +335,29 @@ static int rk3036_clk_probe(struct udevice *dev)
 static int rk3036_clk_bind(struct udevice *dev)
 {
 	int ret;
+	struct udevice *sys_child;
+	struct sysreset_reg *priv;
 
 	/* The reset driver does not have a device node, so bind it here */
-	ret = device_bind_driver(gd->dm_root, "rk3036_sysreset", "reset", &dev);
+	ret = device_bind_driver(dev, "rockchip_sysreset", "sysreset",
+				 &sys_child);
+	if (ret) {
+		debug("Warning: No sysreset driver: ret=%d\n", ret);
+	} else {
+		priv = malloc(sizeof(struct sysreset_reg));
+		priv->glb_srst_fst_value = offsetof(struct rk3036_cru,
+						    cru_glb_srst_fst_value);
+		priv->glb_srst_snd_value = offsetof(struct rk3036_cru,
+						    cru_glb_srst_snd_value);
+		sys_child->priv = priv;
+	}
+
+#if CONFIG_IS_ENABLED(CONFIG_RESET_ROCKCHIP)
+	ret = offsetof(struct rk3036_cru, cru_softrst_con[0]);
+	ret = rockchip_reset_bind(dev, ret, 9);
 	if (ret)
-		debug("Warning: No RK3036 reset driver: ret=%d\n", ret);
+		debug("Warning: software reset driver bind faile\n");
+#endif
 
 	return 0;
 }
@@ -348,6 +372,7 @@ U_BOOT_DRIVER(rockchip_rk3036_cru) = {
 	.id		= UCLASS_CLK,
 	.of_match	= rk3036_clk_ids,
 	.priv_auto_alloc_size = sizeof(struct rk3036_clk_priv),
+	.ofdata_to_platdata = rk3036_clk_ofdata_to_platdata,
 	.ops		= &rk3036_clk_ops,
 	.bind		= rk3036_clk_bind,
 	.probe		= rk3036_clk_probe,

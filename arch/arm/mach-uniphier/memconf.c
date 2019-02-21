@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2011-2015 Panasonic Corporation
  * Copyright (C) 2016      Socionext Inc.
  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -15,7 +14,7 @@
 #include "init.h"
 
 static int __uniphier_memconf_init(const struct uniphier_board_data *bd,
-				   int have_ch2, int have_ch2_disable_bit)
+				   int have_ch2)
 {
 	u32 val = 0;
 	unsigned long size_per_word;
@@ -100,8 +99,7 @@ static int __uniphier_memconf_init(const struct uniphier_board_data *bd,
 		goto out;
 
 	if (!bd->dram_ch[2].size) {
-		if (have_ch2_disable_bit)
-			val |= SG_MEMCONF_CH2_DISABLE;
+		val |= SG_MEMCONF_CH2_DISABLE;
 		goto out;
 	}
 
@@ -149,15 +147,10 @@ out:
 
 int uniphier_memconf_2ch_init(const struct uniphier_board_data *bd)
 {
-	return __uniphier_memconf_init(bd, 0, 0);
-}
-
-int uniphier_memconf_3ch_no_disbit_init(const struct uniphier_board_data *bd)
-{
-	return __uniphier_memconf_init(bd, 1, 0);
+	return __uniphier_memconf_init(bd, 0);
 }
 
 int uniphier_memconf_3ch_init(const struct uniphier_board_data *bd)
 {
-	return __uniphier_memconf_init(bd, 1, 1);
+	return __uniphier_memconf_init(bd, 1);
 }

@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2017 NXP
  *
  * Peng Fan <peng.fan@nxp.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -524,7 +523,7 @@ static int pfuze100_regulator_set_value(struct udevice *dev, int uV)
 	return pfuze100_regulator_val(dev, PMIC_OP_SET, &uV);
 }
 
-static bool pfuze100_regulator_get_enable(struct udevice *dev)
+static int pfuze100_regulator_get_enable(struct udevice *dev)
 {
 	int ret;
 	bool enable = false;

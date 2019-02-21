@@ -1,7 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2015 Stephen Warren
 # Copyright (c) 2015-2016, NVIDIA CORPORATION. All rights reserved.
-#
-# SPDX-License-Identifier: GPL-2.0
 
 # Implementation of pytest run-time hook functions. These are invoked by
 # pytest at certain points during operation, e.g. startup, for each executed
@@ -19,10 +18,14 @@ import os
 import os.path
 import pytest
 from _pytest.runner import runtestprotocol
-import ConfigParser
 import re
 import StringIO
 import sys
+
+try:
+    import configparser
+except:
+    import ConfigParser as configparser
 
 # Globals: The HTML log file, and the connection to the U-Boot console.
 log = None
@@ -167,7 +170,7 @@ def pytest_configure(config):
         with open(dot_config, 'rt') as f:
             ini_str = '[root]\n' + f.read()
             ini_sio = StringIO.StringIO(ini_str)
-            parser = ConfigParser.RawConfigParser()
+            parser = configparser.RawConfigParser()
             parser.readfp(ini_sio)
             ubconfig.buildconfig.update(parser.items('root'))
 
@@ -200,7 +203,7 @@ def pytest_configure(config):
         import u_boot_console_exec_attach
         console = u_boot_console_exec_attach.ConsoleExecAttach(log, ubconfig)
 
-re_ut_test_list = re.compile(r'_u_boot_list_2_(dm|env)_test_2_\1_test_(.*)\s*$')
+re_ut_test_list = re.compile(r'_u_boot_list_2_(.*)_test_2_\1_test_(.*)\s*$')
 def generate_ut_subtest(metafunc, fixture_name):
     """Provide parametrization for a ut_subtest fixture.
 
@@ -344,6 +347,7 @@ tests_failed = []
 tests_xpassed = []
 tests_xfailed = []
 tests_skipped = []
+tests_warning = []
 tests_passed = []
 
 def pytest_itemcollected(item):
@@ -380,6 +384,11 @@ def cleanup():
     if log:
         with log.section('Status Report', 'status_report'):
             log.status_pass('%d passed' % len(tests_passed))
+            if tests_warning:
+                log.status_warning('%d passed with warning' % len(tests_warning))
+                for test in tests_warning:
+                    anchor = anchors.get(test, None)
+                    log.status_warning('... ' + test, anchor)
             if tests_skipped:
                 log.status_skipped('%d skipped' % len(tests_skipped))
                 for test in tests_skipped:
@@ -429,12 +438,12 @@ def setup_boardspec(item):
     for board in mark.args:
         if board.startswith('!'):
             if ubconfig.board_type == board[1:]:
-                pytest.skip('board not supported')
+                pytest.skip('board "%s" not supported' % ubconfig.board_type)
                 return
         else:
             required_boards.append(board)
     if required_boards and ubconfig.board_type not in required_boards:
-        pytest.skip('board not supported')
+        pytest.skip('board "%s" not supported' % ubconfig.board_type)
 
 def setup_buildconfigspec(item):
     """Process any 'buildconfigspec' marker for a test.
@@ -455,7 +464,35 @@ def setup_buildconfigspec(item):
         return
     for option in mark.args:
         if not ubconfig.buildconfig.get('config_' + option.lower(), None):
-            pytest.skip('.config feature not enabled')
+            pytest.skip('.config feature "%s" not enabled' % option.lower())
+
+def tool_is_in_path(tool):
+    for path in os.environ["PATH"].split(os.pathsep):
+        fn = os.path.join(path, tool)
+        if os.path.isfile(fn) and os.access(fn, os.X_OK):
+            return True
+    return False
+
+def setup_requiredtool(item):
+    """Process any 'requiredtool' marker for a test.
+
+    Such a marker lists some external tool (binary, executable, application)
+    that the test requires. If tests are being executed on a system that
+    doesn't have the required tool, the test is marked to be skipped.
+
+    Args:
+        item: The pytest test item.
+
+    Returns:
+        Nothing.
+    """
+
+    mark = item.get_marker('requiredtool')
+    if not mark:
+        return
+    for tool in mark.args:
+        if not tool_is_in_path(tool):
+            pytest.skip('tool "%s" not in $PATH' % tool)
 
 def start_test_section(item):
     anchors[item.name] = log.start_section(item.name)
@@ -476,6 +513,7 @@ def pytest_runtest_setup(item):
     start_test_section(item)
     setup_boardspec(item)
     setup_buildconfigspec(item)
+    setup_requiredtool(item)
 
 def pytest_runtest_protocol(item, nextitem):
     """pytest hook: Called to execute a test.
@@ -491,7 +529,9 @@ def pytest_runtest_protocol(item, nextitem):
         A list of pytest reports (test result data).
     """
 
+    log.get_and_reset_warning()
     reports = runtestprotocol(item, nextitem=nextitem)
+    was_warning = log.get_and_reset_warning()
 
     # In pytest 3, runtestprotocol() may not call pytest_runtest_setup() if
     # the test is skipped. That call is required to create the test's section
@@ -502,9 +542,14 @@ def pytest_runtest_protocol(item, nextitem):
         start_test_section(item)
 
     failure_cleanup = False
-    test_list = tests_passed
-    msg = 'OK'
-    msg_log = log.status_pass
+    if not was_warning:
+        test_list = tests_passed
+        msg = 'OK'
+        msg_log = log.status_pass
+    else:
+        test_list = tests_warning
+        msg = 'OK (with warning)'
+        msg_log = log.status_warning
     for report in reports:
         if report.outcome == 'failed':
             if hasattr(report, 'wasxfail'):
@@ -545,7 +590,7 @@ def pytest_runtest_protocol(item, nextitem):
         # is fixed, if this exception still exists, it will then be logged as
         # part of the test's stdout.
         import traceback
-        print 'Exception occurred while logging runtest status:'
+        print('Exception occurred while logging runtest status:')
         traceback.print_exc()
         # FIXME: Can we force a test failure here?
 

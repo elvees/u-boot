@@ -1,10 +1,9 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Configuation settings for the Freescale MCF5485 FireEngine board.
  *
  * Copyright (C) 2004-2008 Freescale Semiconductor, Inc.
  * TsiChung Liew (Tsi-Chung.Liew@freescale.com)
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -25,15 +24,10 @@
 #undef CONFIG_HW_WATCHDOG
 #define CONFIG_WATCHDOG_TIMEOUT	5000	/* timeout in milliseconds, max timeout is 6.71sec */
 
-/* Command line configuration */
-#define CONFIG_CMD_PCI
-#define CONFIG_CMD_REGINFO
-
 #define CONFIG_SLTTMR
 
 #define CONFIG_FSLDMAFEC
 #ifdef CONFIG_FSLDMAFEC
-#	define CONFIG_MII		1
 #	define CONFIG_MII_INIT		1
 #	define CONFIG_HAS_ETH1
 
@@ -68,9 +62,6 @@
 
 #ifdef CONFIG_CMD_USB
 #	define CONFIG_USB_OHCI_NEW
-#	ifndef CONFIG_CMD_PCI
-#		define CONFIG_CMD_PCI
-#	endif
 /*#	define CONFIG_PCI_OHCI*/
 #	define CONFIG_SYS_USB_OHCI_REGS_BASE		0x80041000
 #	define CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS	15
@@ -105,7 +96,7 @@
 
 #define CONFIG_UDP_CHECKSUM
 
-#define CONFIG_HOSTNAME		M548xEVB
+#define CONFIG_HOSTNAME		"M548xEVB"
 #define CONFIG_EXTRA_ENV_SETTINGS		\
 	"netdev=eth0\0"				\
 	"loadaddr=10000\0"			\
@@ -119,17 +110,7 @@
 	""
 
 #define CONFIG_PRAM		512	/* 512 KB */
-#define CONFIG_SYS_LONGHELP		/* undef to save memory */
 
-#ifdef CONFIG_CMD_KGDB
-#	define CONFIG_SYS_CBSIZE	1024	/* Console I/O Buffer Size */
-#else
-#	define CONFIG_SYS_CBSIZE	256	/* Console I/O Buffer Size */
-#endif
-
-#define CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE+sizeof(CONFIG_SYS_PROMPT)+16)	/* Print Buffer Size */
-#define CONFIG_SYS_MAXARGS		16	/* max number of command args */
-#define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE	/* Boot Argument Buffer Size    */
 #define CONFIG_SYS_LOAD_ADDR		0x00010000
 
 #define CONFIG_SYS_CLK			CONFIG_SYS_BUSCLK
@@ -196,14 +177,10 @@
 /*-----------------------------------------------------------------------
  * FLASH organization
  */
-#define CONFIG_SYS_FLASH_CFI
 #ifdef CONFIG_SYS_FLASH_CFI
 #	define CONFIG_SYS_FLASH_BASE		(CONFIG_SYS_CS0_BASE)
-#	define CONFIG_FLASH_CFI_DRIVER	1
 #	define CONFIG_SYS_FLASH_CFI_WIDTH	FLASH_CFI_16BIT
 #	define CONFIG_SYS_MAX_FLASH_SECT	137	/* max number of sectors on one chip */
-#	define CONFIG_SYS_FLASH_PROTECTION	/* "Real" (hardware) sectors protection */
-#	define CONFIG_SYS_FLASH_USE_BUFFER_WRITE
 #ifdef CONFIG_SYS_NOR1SZ
 #	define CONFIG_SYS_MAX_FLASH_BANKS	2	/* max number of memory banks */
 #	define CONFIG_SYS_FLASH_SIZE		((CONFIG_SYS_NOR1SZ + CONFIG_SYS_BOOTSZ) << 20)
@@ -220,7 +197,6 @@
  */
 #define CONFIG_ENV_OFFSET		0x40000
 #define CONFIG_ENV_SECT_SIZE	0x10000
-#define CONFIG_ENV_IS_IN_FLASH	1
 
 /*-----------------------------------------------------------------------
  * Cache Configuration

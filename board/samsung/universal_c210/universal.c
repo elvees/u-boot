@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  *  Copyright (C) 2010 Samsung Electronics
  *  Minkyu Kang <mk7.kang@samsung.com>
  *  Kyungmin Park <kyungmin.park@samsung.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -397,6 +396,6 @@ void exynos_lcd_misc_init(vidinfo_t *vid)
 	vid->pclk_name = 1;	/* MPLL */
 	vid->sclk_div = 1;
 
-	setenv("lcdinfo", "lcd=ld9040");
+	env_set("lcdinfo", "lcd=ld9040");
 }
 #endif

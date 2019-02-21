@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2015, Bin Meng <bmeng.cn@gmail.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _X86_TABLES_H_
@@ -9,13 +8,8 @@
 
 #include <tables_csum.h>
 
-/*
- * All x86 tables happen to like the address range from 0xf0000 to 0x100000.
- * We use 0xf0000 as the starting address to store those tables, including
- * PIRQ routing table, Multi-Processor table and ACPI table.
- */
-#define ROM_TABLE_ADDR	0xf0000
-#define ROM_TABLE_END	0xfffff
+#define ROM_TABLE_ADDR	CONFIG_ROM_TABLE_ADDR
+#define ROM_TABLE_END	(CONFIG_ROM_TABLE_ADDR + CONFIG_ROM_TABLE_SIZE - 1)
 
 #define ROM_TABLE_ALIGN	1024
 

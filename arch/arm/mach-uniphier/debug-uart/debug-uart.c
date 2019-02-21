@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2016 Masahiro Yamada <yamada.masahiro@socionext.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -33,11 +32,6 @@ void _debug_uart_init(void)
 	unsigned int divisor;
 
 	switch (uniphier_get_soc_id()) {
-#if defined(CONFIG_ARCH_UNIPHIER_SLD3)
-	case UNIPHIER_SLD3_ID:
-		divisor = uniphier_sld3_debug_uart_init();
-		break;
-#endif
 #if defined(CONFIG_ARCH_UNIPHIER_LD4)
 	case UNIPHIER_LD4_ID:
 		divisor = uniphier_ld4_debug_uart_init();

@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2016
  * Texas Instruments Incorporated, <www.ti.com>
  *
  * Keerthy <j-keerthy@ti.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -15,8 +14,6 @@
 #include <power/pmic.h>
 #include <power/regulator.h>
 #include <power/palmas.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 #define	REGULATOR_ON		0x1
 #define	REGULATOR_OFF		0x0
@@ -163,6 +160,38 @@ static int palmas_smps_val(struct udevice *dev, int op, int *uV)
 	return pmic_reg_write(dev->parent, adr, ret);
 }
 
+static int palmas_ldo_bypass_enable(struct udevice *dev, bool enabled)
+{
+	int type = dev_get_driver_data(dev_get_parent(dev));
+	struct dm_regulator_uclass_platdata *p;
+	unsigned int adr;
+	int reg;
+
+	if (type == TPS65917) {
+		/* bypass available only on LDO1 and LDO2 */
+		if (dev->driver_data > 2)
+			return -ENOTSUPP;
+	} else if (type == TPS659038) {
+		/* bypass available only on LDO9 */
+		if (dev->driver_data != 9)
+			return -ENOTSUPP;
+	}
+
+	p = dev_get_uclass_platdata(dev);
+	adr = p->ctrl_reg;
+
+	reg = pmic_reg_read(dev->parent, adr);
+	if (reg < 0)
+		return reg;
+
+	if (enabled)
+		reg |= PALMAS_LDO_BYPASS_EN;
+	else
+		reg &= ~PALMAS_LDO_BYPASS_EN;
+
+	return pmic_reg_write(dev->parent, adr, reg);
+}
+
 static int palmas_ldo_enable(struct udevice *dev, int op, bool *enable)
 {
 	int ret;
@@ -193,6 +222,10 @@ static int palmas_ldo_enable(struct udevice *dev, int op, bool *enable)
 
 		ret = pmic_reg_write(dev->parent, adr, ret);
 		if (ret)
+			return ret;
+
+		ret = palmas_ldo_bypass_enable(dev, false);
+		if (ret && (ret != -ENOTSUPP))
 			return ret;
 	}
 
@@ -304,7 +337,7 @@ static int ldo_set_value(struct udevice *dev, int uV)
 	return palmas_ldo_val(dev, PMIC_OP_SET, &uV);
 }
 
-static bool ldo_get_enable(struct udevice *dev)
+static int ldo_get_enable(struct udevice *dev)
 {
 	bool enable = false;
 	int ret;
@@ -411,7 +444,7 @@ static int smps_set_value(struct udevice *dev, int uV)
 	return palmas_smps_val(dev, PMIC_OP_SET, &uV);
 }
 
-static bool smps_get_enable(struct udevice *dev)
+static int smps_get_enable(struct udevice *dev)
 {
 	bool enable = false;
 	int ret;

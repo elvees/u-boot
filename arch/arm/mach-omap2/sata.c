@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * TI SATA platform driver
  *
  * (C) Copyright 2013
  * Texas Instruments, <www.ti.com>
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <common.h>
@@ -63,8 +62,10 @@ void scsi_init(void)
 	scsi_scan(1);
 }
 
-void scsi_bus_reset(void)
+int scsi_bus_reset(struct udevice *dev)
 {
 	ahci_reset((void __iomem *)DWC_AHSATA_BASE);
 	ahci_init((void __iomem *)DWC_AHSATA_BASE);
+
+	return 0;
 }

@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2014, Bin Meng <bmeng.cn@gmail.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /dts-v1/;
@@ -12,9 +11,9 @@
 
 /include/ "skeleton.dtsi"
 /include/ "serial.dtsi"
+/include/ "reset.dtsi"
 /include/ "rtc.dtsi"
 /include/ "tsc_timer.dtsi"
-/include/ "coreboot_fb.dtsi"
 
 / {
 	model = "Intel Minnowboard Max";
@@ -272,6 +271,9 @@
 		fsp,enable-spi;
 		fsp,enable-sata;
 		fsp,sata-mode = <SATA_MODE_AHCI>;
+#ifdef CONFIG_USB_XHCI_HCD
+		fsp,enable-xhci;
+#endif
 		fsp,lpe-mode = <LPE_MODE_PCI>;
 		fsp,lpss-sio-mode = <LPSS_SIO_MODE_PCI>;
 		fsp,enable-dma0;

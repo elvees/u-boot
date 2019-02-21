@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Common board functions for siemens AM335X based boards
  * (C) Copyright 2013 Siemens Schweiz AG
@@ -6,8 +7,6 @@
  * Based on:
  * U-Boot file:/board/ti/am335x/board.c
  * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -121,7 +120,7 @@ unsigned char get_button_state(char * const envname, unsigned char def)
 	char *ptr_env;
 
 	/* If button is not found we take default */
-	ptr_env = getenv(envname);
+	ptr_env = env_get(envname);
 	if (NULL == ptr_env) {
 		gpio = def;
 	} else {
@@ -199,7 +198,7 @@ void set_env_gpios(unsigned char state)
 		strcat(str_tmp, num);
 
 		/* If env var is not found we stop */
-		ptr_env = getenv(str_tmp);
+		ptr_env = env_get(str_tmp);
 		if (NULL == ptr_env)
 			break;
 

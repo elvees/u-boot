@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2015 Realtek Semiconductor Corp. All rights reserved.
- *
- * SPDX-License-Identifier:	GPL-2.0
  *
  */
 
@@ -11,7 +10,6 @@
 #include <malloc.h>
 #include <memalign.h>
 #include <usb.h>
-#include <usb/lin_gadget_compat.h>
 #include <linux/mii.h>
 #include <linux/bitops.h>
 #include "usb_ether.h"
@@ -26,7 +24,7 @@ struct r8152_dongle {
 	unsigned short product;
 };
 
-static const struct r8152_dongle const r8152_dongles[] = {
+static const struct r8152_dongle r8152_dongles[] = {
 	/* Realtek */
 	{ 0x0bda, 0x8050 },
 	{ 0x0bda, 0x8152 },
@@ -59,7 +57,7 @@ struct r8152_version {
 	bool           gmii;
 };
 
-static const struct r8152_version const r8152_versions[] = {
+static const struct r8152_version r8152_versions[] = {
 	{ 0x4c00, RTL_VER_01, 0 },
 	{ 0x4c10, RTL_VER_02, 0 },
 	{ 0x5c00, RTL_VER_03, 1 },

@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * (C) Copyright 2017 Rockchip Electronics Co., Ltd
- *
- * SPDX-License-Identifier:	GPL-2.0
  */
 
 #include <common.h>
@@ -25,7 +24,7 @@ void *rockchip_get_cru(void)
 	if (ret)
 		return ERR_PTR(ret);
 
-	priv = devfdt_get_addr_ptr(dev);
+	priv = dev_get_priv(dev);
 
 	return priv->cru;
 }

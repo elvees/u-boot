@@ -1,14 +1,12 @@
-/*
- * Device Tree Source for UniPhier Pro4 Sanji Board
- *
- * Copyright (C) 2016 Socionext Inc.
- *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
- *
- * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
- */
+// SPDX-License-Identifier: GPL-2.0+ OR MIT
+//
+// Device Tree Source for UniPhier Pro4 Sanji Board
+//
+// Copyright (C) 2016 Socionext Inc.
+//   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
 
 /dts-v1/;
-/include/ "uniphier-pro4.dtsi"
+#include "uniphier-pro4.dtsi"
 
 / {
 	model = "UniPhier Pro4 Sanji Board";
@@ -70,14 +68,6 @@
 	status = "okay";
 };
 
-&usb0 {
-	status = "okay";
-};
-
-&usb1 {
-	status = "okay";
-};
-
 &usb2 {
 	status = "okay";
 };
@@ -86,23 +76,21 @@
 	status = "okay";
 };
 
-/* for U-Boot only */
-&serial0 {
-	u-boot,dm-pre-reloc;
+&eth {
+	status = "okay";
+	phy-handle = <&ethphy>;
 };
 
-&mio_clk {
-	u-boot,dm-pre-reloc;
+&mdio {
+	ethphy: ethphy@1 {
+		reg = <1>;
+	};
 };
 
-&emmc {
-	u-boot,dm-pre-reloc;
+&usb0 {
+	status = "okay";
 };
 
-&pinctrl_uart0 {
-	u-boot,dm-pre-reloc;
-};
-
-&pinctrl_emmc {
-	u-boot,dm-pre-reloc;
+&usb1 {
+	status = "okay";
 };

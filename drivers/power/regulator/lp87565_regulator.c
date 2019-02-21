@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2017
  * Texas Instruments Incorporated, <www.ti.com>
  *
  * Keerthy <j-keerthy@ti.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -15,8 +14,6 @@
 #include <power/pmic.h>
 #include <power/regulator.h>
 #include <power/lp87565.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 static const char lp87565_buck_ctrl1[LP87565_BUCK_NUM] = {0x2, 0x4, 0x6, 0x8, 0x2, 0x6};
 static const char lp87565_buck_vout[LP87565_BUCK_NUM] = {0xA, 0xC, 0xE, 0x10, 0xA, 0xE };
@@ -166,7 +163,7 @@ static int buck_set_value(struct udevice *dev, int uV)
 	return lp87565_buck_val(dev, PMIC_OP_SET, &uV);
 }
 
-static bool buck_get_enable(struct udevice *dev)
+static int buck_get_enable(struct udevice *dev)
 {
 	bool enable = false;
 	int ret;

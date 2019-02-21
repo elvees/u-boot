@@ -1,10 +1,9 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * DDR3
  *
  * (C) Copyright 2014
  *     Texas Instruments Incorporated, <www.ti.com>
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #ifndef _DDR3_H_
@@ -35,6 +34,20 @@ struct ddr3_phy_config {
 	unsigned int zq1cr1;
 	unsigned int zq2cr1;
 	unsigned int pir_v1;
+	unsigned int datx8_2_mask;
+	unsigned int datx8_2_val;
+	unsigned int datx8_3_mask;
+	unsigned int datx8_3_val;
+	unsigned int datx8_4_mask;
+	unsigned int datx8_4_val;
+	unsigned int datx8_5_mask;
+	unsigned int datx8_5_val;
+	unsigned int datx8_6_mask;
+	unsigned int datx8_6_val;
+	unsigned int datx8_7_mask;
+	unsigned int datx8_7_val;
+	unsigned int datx8_8_mask;
+	unsigned int datx8_8_val;
 	unsigned int pir_v2;
 };
 

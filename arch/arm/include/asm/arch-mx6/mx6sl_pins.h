@@ -1,13 +1,12 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2013 Freescale Semiconductor, Inc. All Rights Reserved.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __ASM_ARCH_MX6_MX6SL_PINS_H__
 #define __ASM_ARCH_MX6_MX6SL_PINS_H__
 
-#include <asm/imx-common/iomux-v3.h>
+#include <asm/mach-imx/iomux-v3.h>
 
 enum {
 	MX6_PAD_ECSPI1_MISO__ECSPI_MISO				= IOMUX_PAD(0x0358, 0x0068, 0, 0x0684, 0, 0),

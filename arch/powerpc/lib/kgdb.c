@@ -38,20 +38,6 @@ kgdb_longjmp(long *buf, int val)
 	     : "=&r"(temp) : "r" (buf), "r" (val));
 }
 
-static inline unsigned long
-get_msr(void)
-{
-	unsigned long msr;
-	asm volatile("mfmsr %0" : "=r" (msr):);
-	return msr;
-}
-
-static inline void
-set_msr(unsigned long msr)
-{
-	asm volatile("mtmsr %0" : : "r" (msr));
-}
-
 /* Convert the SPARC hardware trap type code to a unix signal number. */
 /*
  * This table contains the mapping between PowerPC hardware trap types, and
@@ -66,7 +52,7 @@ static struct hard_trap_info
 	{ 0x300, SIGSEGV },			/* address error (store) */
 	{ 0x400, SIGBUS },			/* instruction bus error */
 	{ 0x500, SIGINT },			/* interrupt */
-	{ 0x600, SIGBUS },			/* alingment */
+	{ 0x600, SIGBUS },			/* alignment */
 	{ 0x700, SIGTRAP },			/* breakpoint trap */
 	{ 0x800, SIGFPE },			/* fpu unavail */
 	{ 0x900, SIGALRM },			/* decrementer */

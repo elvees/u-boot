@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Board functions for IGEP COM AQUILA and SMARC AM335x based boards
  *
  * Copyright (C) 2013-2017, ISEE 2007 SL - http://www.isee.biz/
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -194,13 +193,13 @@ int board_late_init(void)
 #ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
 	switch (get_board_revision()) {
 		case 0:
-			setenv("board_name", "igep0034-lite");
+			env_set("board_name", "igep0034-lite");
 			break;
 		case 1:
-			setenv("board_name", "igep0034");
+			env_set("board_name", "igep0034");
 			break;
 		default:
-			setenv("board_name", "igep0033");
+			env_set("board_name", "igep0033");
 			break;
 	}
 #endif
@@ -212,7 +211,7 @@ int board_late_init(void)
 int ft_board_setup(void *blob, bd_t *bd)
 {
 #ifdef CONFIG_FDT_FIXUP_PARTITIONS
-	static struct node_info nodes[] = {
+	static const struct node_info nodes[] = {
 		{ "ti,omap2-nand", MTD_DEV_TYPE_NAND, },
 	};
 
@@ -264,7 +263,7 @@ int board_eth_init(bd_t *bis)
 	uint8_t mac_addr[6];
 	uint32_t mac_hi, mac_lo;
 
-	if (!eth_getenv_enetaddr("ethaddr", mac_addr)) {
+	if (!eth_env_get_enetaddr("ethaddr", mac_addr)) {
 		/* try reading mac address from efuse */
 		mac_lo = readl(&cdev->macid0l);
 		mac_hi = readl(&cdev->macid0h);
@@ -275,7 +274,7 @@ int board_eth_init(bd_t *bis)
 		mac_addr[4] = mac_lo & 0xFF;
 		mac_addr[5] = (mac_lo & 0xFF00) >> 8;
 		if (is_valid_ethaddr(mac_addr))
-			eth_setenv_enetaddr("ethaddr", mac_addr);
+			eth_env_set_enetaddr("ethaddr", mac_addr);
 	}
 
 	writel((GMII1_SEL_RMII | RMII1_IO_CLK_EN),

@@ -1,22 +1,22 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * STMicroelectronics TPM ST33ZP24 I2C UBOOT driver
  *
- * Copyright (C) 2016 STMicroelectronics
+ * Copyright (C) 2016, STMicroelectronics - All Rights Reserved
+ * Author(s): Christophe Ricard <christophe-h.ricard@st.com> for STMicroelectronics.
  *
  * Description: Device driver for ST33ZP24 I2C TPM TCG.
  *
  * This device driver implements the TPM interface as defined in
  * the TCG TPM Interface Spec version 1.21, revision 1.0 and the
  * STMicroelectronics Protocol Stack Specification version 1.2.0.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <dm.h>
 #include <fdtdec.h>
 #include <i2c.h>
-#include <tpm.h>
+#include <tpm-v1.h>
 #include <errno.h>
 #include <linux/types.h>
 #include <asm/unaligned.h>
@@ -302,7 +302,8 @@ static int st33zp24_i2c_recv_data(struct udevice *dev, u8 *buf, size_t count)
 static int st33zp24_i2c_recv(struct udevice *dev, u8 *buf, size_t count)
 {
 	struct tpm_chip *chip = dev_get_priv(dev);
-	int size, expected;
+	int size;
+	unsigned int expected;
 
 	if (!chip)
 		return -ENODEV;
@@ -319,7 +320,7 @@ static int st33zp24_i2c_recv(struct udevice *dev, u8 *buf, size_t count)
 	}
 
 	expected = get_unaligned_be32(buf + 2);
-	if (expected > count) {
+	if (expected > count || expected < TPM_HEADER_SIZE) {
 		size = -EIO;
 		goto out;
 	}

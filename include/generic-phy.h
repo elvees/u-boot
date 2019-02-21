@@ -1,13 +1,13 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2017 Texas Instruments Incorporated - http://www.ti.com/
  * Written by Jean-Jacques Hiblot  <jjhiblot@ti.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __GENERIC_PHY_H
 #define __GENERIC_PHY_H
 
+struct ofnode_phandle_args;
 
 /**
  * struct phy - A handle to (allowing control of) a single phy port.
@@ -122,6 +122,7 @@ struct phy_ops {
 	int	(*power_off)(struct phy *phy);
 };
 
+#ifdef CONFIG_PHY
 
 /**
  * generic_phy_init() - initialize the PHY port
@@ -219,5 +220,57 @@ int generic_phy_get_by_index(struct udevice *user, int index,
  */
 int generic_phy_get_by_name(struct udevice *user, const char *phy_name,
 			    struct phy *phy);
+
+#else /* CONFIG_PHY */
+
+static inline int generic_phy_init(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int generic_phy_exit(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int generic_phy_reset(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int generic_phy_power_on(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int generic_phy_power_off(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int generic_phy_get_by_index(struct udevice *user, int index,
+			     struct phy *phy)
+{
+	return 0;
+}
+
+static inline int generic_phy_get_by_name(struct udevice *user, const char *phy_name,
+			    struct phy *phy)
+{
+	return 0;
+}
+
+#endif /* CONFIG_PHY */
+
+/**
+ * generic_phy_valid() - check if PHY port is valid
+ *
+ * @phy:	the PHY port to check
+ * @return TRUE if valid, or FALSE
+ */
+static inline bool generic_phy_valid(struct phy *phy)
+{
+	return phy->dev != NULL;
+}
 
 #endif /*__GENERIC_PHY_H */

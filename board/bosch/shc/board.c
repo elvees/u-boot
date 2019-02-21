@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * board.c
  *
@@ -8,8 +9,6 @@
  * Board functions for TI AM335X based boards
  *
  * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -251,7 +250,7 @@ static void check_button_status(void)
 
 	if (value == 0) {
 		printf("front button activated !\n");
-		setenv("harakiri", "1");
+		env_set("harakiri", "1");
 	}
 }
 
@@ -460,7 +459,7 @@ int board_late_init(void)
 #ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
 	if (shc_eeprom_valid)
 		if (is_valid_ethaddr(header.mac_addr))
-			eth_setenv_enetaddr("ethaddr", header.mac_addr);
+			eth_env_set_enetaddr("ethaddr", header.mac_addr);
 #endif
 
 	return 0;
@@ -522,7 +521,7 @@ static struct cpsw_platform_data cpsw_data = {
  * when we build an SPL that has neither option but full U-Boot will.
  */
 #if ((defined(CONFIG_SPL_ETH_SUPPORT) || \
-	defined(CONFIG_SPL_USBETH_SUPPORT)) && \
+	defined(CONFIG_SPL_USB_ETHER)) && \
 	defined(CONFIG_SPL_BUILD)) || \
 	((defined(CONFIG_DRIVER_TI_CPSW) || \
 	  defined(CONFIG_USB_ETHER) && defined(CONFIG_USB_MUSB_GADGET)) && \
@@ -545,11 +544,11 @@ int board_eth_init(bd_t *bis)
 
 #if (defined(CONFIG_DRIVER_TI_CPSW) && !defined(CONFIG_SPL_BUILD)) || \
 	(defined(CONFIG_SPL_ETH_SUPPORT) && defined(CONFIG_SPL_BUILD))
-	if (!getenv("ethaddr")) {
+	if (!env_get("ethaddr")) {
 		printf("<ethaddr> not set. Validating first E-fuse MAC\n");
 
 		if (is_valid_ethaddr(mac_addr))
-			eth_setenv_enetaddr("ethaddr", mac_addr);
+			eth_env_set_enetaddr("ethaddr", mac_addr);
 	}
 
 	writel(MII_MODE_ENABLE, &cdev->miisel);
@@ -563,9 +562,9 @@ int board_eth_init(bd_t *bis)
 #endif
 
 #if defined(CONFIG_USB_ETHER) && \
-	(!defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_USBETH_SUPPORT))
+	(!defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_USB_ETHER))
 	if (is_valid_ethaddr(mac_addr))
-		eth_setenv_enetaddr("usbnet_devaddr", mac_addr);
+		eth_env_set_enetaddr("usbnet_devaddr", mac_addr);
 
 	rv = usb_eth_initialize(bis);
 	if (rv < 0)

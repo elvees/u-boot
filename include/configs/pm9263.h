@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2007-2008
  * Stelian Pop <stelian@popies.net>
@@ -5,8 +6,6 @@
  * Ilko Iliev <www.ronetix.at>
  *
  * Configuation settings for the RONETIX PM9263 board.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -27,9 +26,7 @@
 #define CONFIG_SYS_AT91_SLOW_CLOCK	32768		/* slow clock xtal */
 
 #define CONFIG_SYS_AT91_CPU_NAME	"AT91SAM9263"
-#define CONFIG_PM9263		1	/* on a Ronetix PM9263 Board	*/
 #define CONFIG_ARCH_CPU_INIT
-#define CONFIG_SYS_TEXT_BASE	0
 
 #define CONFIG_MACH_TYPE	MACH_TYPE_PM9263
 
@@ -154,11 +151,6 @@
 /*
  * Hardware drivers
  */
-#define CONFIG_AT91_GPIO	1
-#define CONFIG_ATMEL_USART	1
-#define CONFIG_USART_BASE		ATMEL_BASE_DBGU
-#define	CONFIG_USART_ID			ATMEL_ID_SYS
-
 /* LCD */
 #define LCD_BPP				LCD_COLOR8
 #define CONFIG_LCD_LOGO			1
@@ -170,42 +162,16 @@
 
 #define CONFIG_LCD_IN_PSRAM		1
 
-/* LED */
-#define CONFIG_AT91_LED
-#define CONFIG_RED_LED		GPIO_PIN_PB(7) /* this is the power led */
-#define CONFIG_GREEN_LED	GPIO_PIN_PB(8) /* this is the user1 led */
-
-
 /*
  * BOOTP options
  */
 #define CONFIG_BOOTP_BOOTFILESIZE	1
-#define CONFIG_BOOTP_BOOTPATH		1
-#define CONFIG_BOOTP_GATEWAY		1
-#define CONFIG_BOOTP_HOSTNAME		1
-
-/*
- * Command line configuration.
- */
-#define CONFIG_CMD_NAND		1
 
 /* SDRAM */
-#define CONFIG_NR_DRAM_BANKS	1
 #define PHYS_SDRAM		0x20000000
 #define PHYS_SDRAM_SIZE		0x04000000	/* 64 megs */
 
-/* DataFlash */
-#define CONFIG_ATMEL_DATAFLASH_SPI
-#define CONFIG_HAS_DATAFLASH			1
-#define CONFIG_SYS_MAX_DATAFLASH_BANKS		1
-#define CONFIG_SYS_DATAFLASH_LOGIC_ADDR_CS0	0xC0000000	/* CS0 */
-#define AT91_SPI_CLK				15000000
-#define DATAFLASH_TCSS				(0x1a << 16)
-#define DATAFLASH_TCHS				(0x1 << 24)
-
 /* NOR flash, if populated */
-#define CONFIG_SYS_FLASH_CFI		1
-#define CONFIG_FLASH_CFI_DRIVER		1
 #define PHYS_FLASH_1			0x10000000
 #define CONFIG_SYS_FLASH_BASE		PHYS_FLASH_1
 #define CONFIG_SYS_MAX_FLASH_SECT	256
@@ -213,7 +179,6 @@
 
 /* NAND flash */
 #ifdef CONFIG_CMD_NAND
-#define CONFIG_NAND_ATMEL
 #define CONFIG_SYS_MAX_NAND_DEVICE	1
 #define CONFIG_SYS_NAND_BASE		0x40000000
 #define CONFIG_SYS_NAND_DBW_8		1
@@ -268,39 +233,24 @@
 #ifdef CONFIG_SYS_USE_DATAFLASH
 
 /* bootstrap + u-boot + env + linux in dataflash on CS0 */
-#define CONFIG_ENV_IS_IN_DATAFLASH
-#define CFG_MONITOR_BASE	(CFG_DATAFLASH_LOGIC_ADDR_CS0 + 0x8400)
 #define CONFIG_ENV_OFFSET	0x4200
-#define CONFIG_ENV_ADDR		(CFG_DATAFLASH_LOGIC_ADDR_CS0 + CONFIG_ENV_OFFSET)
 #define CONFIG_ENV_SIZE		0x4200
-#define CONFIG_BOOTCOMMAND	"cp.b 0xC0042000 0x22000000 0x210000; bootm"
-#define CONFIG_BOOTARGS		"console=ttyS0,115200 " \
-				"root=/dev/mtdblock0 " \
-				"mtdparts=atmel_nand:-(root) "\
-				"rw rootfstype=jffs2"
+#define CONFIG_ENV_SECT_SIZE	0x210
+#define CONFIG_ENV_SPI_MAX_HZ	15000000
+#define CONFIG_BOOTCOMMAND	"sf probe 0; " \
+				"sf read 0x22000000 0x84000 0x294000; " \
+				"bootm 0x22000000"
 
 #elif defined(CONFIG_SYS_USE_NANDFLASH) /* CFG_USE_NANDFLASH */
 
 /* bootstrap + u-boot + env + linux in nandflash */
-#define CONFIG_ENV_IS_IN_NAND
 #define CONFIG_ENV_OFFSET		0x60000
 #define CONFIG_ENV_OFFSET_REDUND	0x80000
 #define CONFIG_ENV_SIZE		0x20000		/* 1 sector = 128 kB */
 #define CONFIG_BOOTCOMMAND	"nand read 0x22000000 0xA0000 0x200000; bootm"
-#define CONFIG_BOOTARGS		"console=ttyS0,115200 "		\
-				"root=/dev/mtdblock5 "		\
-				"mtdparts=atmel_nand:"		\
-					"128k(bootstrap)ro,"	\
-					"256k(uboot)ro,"	\
-					"128k(env1)ro,"		\
-					"128k(env2)ro,"		\
-					"2M(linux),"		\
-					"-(root) "		\
-				"rw rootfstype=jffs2"
 
 #elif defined(CONFIG_SYS_USE_FLASH) /* CFG_USE_FLASH */
 
-#define CONFIG_ENV_IS_IN_FLASH	1
 #define CONFIG_ENV_OFFSET	0x40000
 #define CONFIG_ENV_SECT_SIZE	0x10000
 #define	CONFIG_ENV_SIZE		0x10000
@@ -317,21 +267,10 @@
 #define CONFIG_ROOTPATH			"/ronetix/rootfs"
 
 #define CONFIG_CON_ROT			"fbcon=rotate:3 "
-#define CONFIG_BOOTARGS			"root=/dev/mtdblock4 rootfstype=jffs2 "\
-					CONFIG_CON_ROT
-
-#define MTDIDS_DEFAULT			"nor0=physmap-flash.0,nand0=nand"
-#define MTDPARTS_DEFAULT		\
-	"mtdparts=physmap-flash.0:"	\
-		"256k(u-boot)ro,"	\
-		"64k(u-boot-env)ro,"	\
-		"1408k(kernel),"	\
-		"-(rootfs);"		\
-	"nand:-(nand)"
 
 #define CONFIG_EXTRA_ENV_SETTINGS				\
-	"mtdids=" MTDIDS_DEFAULT "\0"				\
-	"mtdparts=" MTDPARTS_DEFAULT "\0"			\
+	"mtdids=" CONFIG_MTDIDS_DEFAULT "\0"				\
+	"mtdparts=" CONFIG_MTDPARTS_DEFAULT "\0"			\
 	"partition=nand0,0\0"					\
 	"ramargs=setenv bootargs $(bootargs) $(mtdparts)\0"	\
 	"nfsargs=setenv bootargs root=/dev/nfs rw "		\
@@ -351,20 +290,13 @@
 #error "Undefined memory device"
 #endif
 
-#define CONFIG_SYS_CBSIZE		256
-#define CONFIG_SYS_MAXARGS		16
-#define CONFIG_SYS_PBSIZE		\
-		(CONFIG_SYS_CBSIZE + sizeof(CONFIG_SYS_PROMPT) + 16)
-#define CONFIG_SYS_LONGHELP		1
-#define CONFIG_CMDLINE_EDITING		1
-
 /*
  * Size of malloc() pool
  */
 #define CONFIG_SYS_MALLOC_LEN	ROUND(3 * CONFIG_ENV_SIZE + 128 * 1024, 0x1000)
 
 #define CONFIG_SYS_SDRAM_BASE	PHYS_SDRAM
-#define CONFIG_SYS_INIT_SP_ADDR	(CONFIG_SYS_SDRAM_BASE + 0x1000 - \
+#define CONFIG_SYS_INIT_SP_ADDR	(CONFIG_SYS_SDRAM_BASE + 16 * 1024 - \
 				GENERATED_GBL_DATA_SIZE)
 
 #endif

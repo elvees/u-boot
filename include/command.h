@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2000-2009
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -68,7 +67,9 @@ extern int cmd_auto_complete(const char *const prompt, char *buf, int *np, int *
  *
  * @cmdtp: Command which caused the error
  * @err: Error code (0 if none, -ve for error, like -EIO)
- * @return 0 if there is not error, 1 (CMD_RET_FAILURE) if an error is found
+ * @return 0 (CMD_RET_SUCCESS) if there is not error,
+ *	   1 (CMD_RET_FAILURE) if an error is found
+ *	   -1 (CMD_RET_USAGE) if 'usage' error is found
  */
 int cmd_process_error(cmd_tbl_t *cmdtp, int err);
 
@@ -80,11 +81,10 @@ int cmd_process_error(cmd_tbl_t *cmdtp, int err);
  * void function (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]);
  */
 
-#if defined(CONFIG_CMD_MEMORY)		\
-	|| defined(CONFIG_CMD_I2C)	\
-	|| defined(CONFIG_CMD_ITEST)	\
-	|| defined(CONFIG_CMD_PCI)	\
-	|| defined(CONFIG_CMD_PORTIO)
+#if defined(CONFIG_CMD_MEMORY) || \
+	defined(CONFIG_CMD_I2C) || \
+	defined(CONFIG_CMD_ITEST) || \
+	defined(CONFIG_CMD_PCI)
 #define CMD_DATA_SIZE
 extern int cmd_get_data_size(char* arg, int default_size);
 #endif
@@ -112,6 +112,8 @@ extern int common_diskboot(cmd_tbl_t *cmdtp, const char *intf, int argc,
 extern int do_reset(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]);
 extern int do_poweroff(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]);
 
+extern unsigned long do_go_exec(ulong (*entry)(int, char * const []), int argc,
+				char * const argv[]);
 /*
  * Error codes that commands return to cmd_process(). We use the standard 0
  * and 1 for success and failure, but add one more case - failure with a

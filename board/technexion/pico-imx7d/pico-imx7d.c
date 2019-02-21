@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2017 NXP Semiconductors
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm/arch/clock.h>
@@ -10,8 +9,8 @@
 #include <asm/arch/mx7-pins.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/gpio.h>
-#include <asm/imx-common/iomux-v3.h>
-#include <asm/imx-common/mxc_i2c.h>
+#include <asm/mach-imx/iomux-v3.h>
+#include <asm/mach-imx/mxc_i2c.h>
 #include <asm/io.h>
 #include <common.h>
 #include <fsl_esdhc.h>
@@ -59,7 +58,7 @@ static struct i2c_pads_info i2c_pad_info4 = {
 
 int dram_init(void)
 {
-	gd->ram_size = PHYS_SDRAM_SIZE;
+	gd->ram_size = imx_ddr_size();
 
 	return 0;
 }
@@ -182,7 +181,7 @@ static int setup_fec(void)
 			(IOMUXC_GPR_GPR1_GPR_ENET1_TX_CLK_SEL_MASK |
 			IOMUXC_GPR_GPR1_GPR_ENET1_CLK_DIR_MASK), 0);
 
-	return set_clk_enet(ENET_125MHz);
+	return set_clk_enet(ENET_125MHZ);
 }
 
 int board_phy_config(struct phy_device *phydev)
@@ -283,7 +282,34 @@ int checkboard(void)
 	return 0;
 }
 
+static iomux_v3_cfg_t const usb_otg2_pads[] = {
+	MX7D_PAD_UART3_CTS_B__USB_OTG2_PWR | MUX_PAD_CTRL(NO_PAD_CTRL),
+};
+
+int board_ehci_hcd_init(int port)
+{
+	switch (port) {
+	case 0:
+		break;
+	case 1:
+		imx_iomux_v3_setup_multiple_pads(usb_otg2_pads,
+						 ARRAY_SIZE(usb_otg2_pads));
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
 int board_usb_phy_mode(int port)
 {
-	return USB_INIT_DEVICE;
+	switch (port) {
+	case 0:
+		return USB_INIT_DEVICE;
+	case 1:
+		return USB_INIT_HOST;
+	default:
+		return -EINVAL;
+	}
+	return 0;
 }

@@ -1,11 +1,11 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2016 Rockchip Electronics Co., Ltd
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <common.h>
 #include <dm.h>
+#include <environment.h>
 #include <i2c_eeprom.h>
 #include <netdev.h>
 
@@ -29,7 +29,7 @@ int rk_board_late_init(void)
 		return 0;
 
 	if (is_valid_ethaddr(ethaddr))
-		eth_setenv_enetaddr("ethaddr", ethaddr);
+		eth_env_set_enetaddr("ethaddr", ethaddr);
 
 	return 0;
 }

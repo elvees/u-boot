@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2015, Bin Meng <bmeng.cn@gmail.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -21,10 +20,6 @@
 #define CONFIG_STD_DEVICES_SETTINGS	"stdin=serial\0" \
 					"stdout=serial\0" \
 					"stderr=serial\0"
-
-/* SATA is not supported in Quark SoC */
-#undef CONFIG_SCSI_AHCI
-#undef CONFIG_SCSI
 
 /* 10/100M Ethernet support */
 #define CONFIG_DESIGNWARE_ETH

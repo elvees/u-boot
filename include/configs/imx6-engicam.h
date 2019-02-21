@@ -1,10 +1,9 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2016 Amarula Solutions B.V.
  * Copyright (C) 2016 Engicam S.r.l.
  *
  * Configuration settings for the Engicam i.MX6 SOM Starter Kits.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __IMX6_ENGICAM_CONFIG_H
@@ -118,7 +117,6 @@
 #endif
 
 /* Physical Memory Map */
-#define CONFIG_NR_DRAM_BANKS		1
 #define PHYS_SDRAM			MMDC0_ARB_BASE_ADDR
 
 #define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM
@@ -129,11 +127,6 @@
 					GENERATED_GBL_DATA_SIZE)
 #define CONFIG_SYS_INIT_SP_ADDR		(CONFIG_SYS_INIT_RAM_ADDR + \
 					CONFIG_SYS_INIT_SP_OFFSET)
-
-/* FIT */
-#ifdef CONFIG_FIT
-# define CONFIG_IMAGE_FORMAT_LEGACY
-#endif
 
 /* UART */
 #ifdef CONFIG_MXC_UART
@@ -159,21 +152,6 @@
 # define CONFIG_SYS_NAND_U_BOOT_OFFS	0x200000
 
 /* MTD device */
-# define CONFIG_MTD_DEVICE
-# define CONFIG_CMD_MTDPARTS
-# define CONFIG_MTD_PARTITIONS
-# define MTDIDS_DEFAULT			"nand0=gpmi-nand"
-# define MTDPARTS_DEFAULT		"mtdparts=gpmi-nand:2m(spl),2m(uboot)," \
-					"1m(env),8m(kernel),1m(dtb),-(rootfs)"
-
-/* UBI */
-# define CONFIG_CMD_UBIFS
-# define CONFIG_RBTREE
-# define CONFIG_LZO
-
-# define CONFIG_APBH_DMA
-# define CONFIG_APBH_DMA_BURST
-# define CONFIG_APBH_DMA_BURST8
 #endif
 
 /* Ethernet */
@@ -185,13 +163,24 @@
 #  define CONFIG_FEC_MXC_PHYADDR	0
 #  define CONFIG_FEC_XCV_TYPE		RMII
 # endif
+#endif
 
-# define CONFIG_MII
+/* Falcon Mode */
+#ifdef CONFIG_SPL_OS_BOOT
+# define CONFIG_SPL_FS_LOAD_ARGS_NAME	"args"
+# define CONFIG_SPL_FS_LOAD_KERNEL_NAME	"uImage"
+# define CONFIG_CMD_SPL
+# define CONFIG_SYS_SPL_ARGS_ADDR	0x18000000
+# define CONFIG_CMD_SPL_WRITE_SIZE	(128 * SZ_1K)
+
+/* MMC support: args@1MB kernel@2MB */
+# define CONFIG_SYS_MMCSD_RAW_MODE_ARGS_SECTOR		0x800   /* 1MB */
+# define CONFIG_SYS_MMCSD_RAW_MODE_ARGS_SECTORS		(CONFIG_CMD_SPL_WRITE_SIZE / 512)
+# define CONFIG_SYS_MMCSD_RAW_MODE_KERNEL_SECTOR	0x1000  /* 2MB */
 #endif
 
 /* Framebuffer */
 #ifdef CONFIG_VIDEO_IPUV3
-# define CONFIG_IPUV3_CLK		260000000
 # define CONFIG_IMX_VIDEO_SKIP
 
 # define CONFIG_SPLASH_SCREEN
@@ -204,24 +193,13 @@
 
 /* SPL */
 #ifdef CONFIG_SPL
-# ifdef CONFIG_NAND_MXS
+# ifdef CONFIG_ENV_IS_IN_NAND
 #  define CONFIG_SPL_NAND_SUPPORT
 # else
 #  define CONFIG_SPL_MMC_SUPPORT
 # endif
 
 # include "imx6_spl.h"
-# ifdef CONFIG_SPL_BUILD
-#  if defined(CONFIG_TARGET_MX6Q_ICORE_RQS) || defined(CONFIG_TARGET_MX6UL_ISIOT)
-#   define CONFIG_SYS_FSL_USDHC_NUM	2
-#  else
-#   define CONFIG_SYS_FSL_USDHC_NUM	1
-#  endif
-
-#  define CONFIG_SYS_FSL_ESDHC_ADDR	0
-#  undef CONFIG_DM_GPIO
-#  undef CONFIG_DM_MMC
-# endif
 #endif
 
 #endif /* __IMX6_ENGICAM_CONFIG_H */

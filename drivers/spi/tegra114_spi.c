@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * NVIDIA Tegra SPI controller (T114 and later)
  *
  * Copyright (c) 2010-2013 NVIDIA Corporation
- *
- * SPDX-License-Identifier:	GPL-2.0
  */
 
 #include <common.h>
@@ -12,10 +11,7 @@
 #include <asm/arch/clock.h>
 #include <asm/arch-tegra/clk_rst.h>
 #include <spi.h>
-#include <fdtdec.h>
 #include "tegra_spi.h"
-
-DECLARE_GLOBAL_DATA_PTR;
 
 /* COMMAND1 */
 #define SPI_CMD1_GO			BIT(31)
@@ -100,11 +96,9 @@ struct tegra114_spi_priv {
 static int tegra114_spi_ofdata_to_platdata(struct udevice *bus)
 {
 	struct tegra_spi_platdata *plat = bus->platdata;
-	const void *blob = gd->fdt_blob;
-	int node = dev_of_offset(bus);
 
-	plat->base = devfdt_get_addr(bus);
-	plat->periph_id = clock_decode_periph_id(blob, node);
+	plat->base = dev_read_addr(bus);
+	plat->periph_id = clock_decode_periph_id(bus);
 
 	if (plat->periph_id == PERIPH_ID_NONE) {
 		debug("%s: could not decode periph id %d\n", __func__,
@@ -113,10 +107,10 @@ static int tegra114_spi_ofdata_to_platdata(struct udevice *bus)
 	}
 
 	/* Use 500KHz as a suitable default */
-	plat->frequency = fdtdec_get_int(blob, node, "spi-max-frequency",
-					500000);
-	plat->deactivate_delay_us = fdtdec_get_int(blob, node,
-					"spi-deactivate-delay", 0);
+	plat->frequency = dev_read_u32_default(bus, "spi-max-frequency",
+					       500000);
+	plat->deactivate_delay_us = dev_read_u32_default(bus,
+						"spi-deactivate-delay", 0);
 	debug("%s: base=%#08lx, periph_id=%d, max-frequency=%d, deactivate_delay=%d\n",
 	      __func__, plat->base, plat->periph_id, plat->frequency,
 	      plat->deactivate_delay_us);

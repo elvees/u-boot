@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2007 Semihalf
  *
  * Written by: Rafal Jaworowski <raj@semihalf.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <config.h>
@@ -458,7 +457,7 @@ static int API_env_get(va_list ap)
 	if ((value = (char **)va_arg(ap, uintptr_t)) == NULL)
 		return API_EINVAL;
 
-	*value = getenv(name);
+	*value = env_get(name);
 
 	return 0;
 }
@@ -481,7 +480,7 @@ static int API_env_set(va_list ap)
 	if ((value = (char *)va_arg(ap, uintptr_t)) == NULL)
 		return API_EINVAL;
 
-	setenv(name, value);
+	env_set(name, value);
 
 	return 0;
 }
@@ -625,7 +624,7 @@ int syscall(int call, int *retval, ...)
 
 void api_init(void)
 {
-	struct api_signature *sig = NULL;
+	struct api_signature *sig;
 
 	/* TODO put this into linker set one day... */
 	calls_table[API_RSVD] = NULL;
@@ -663,7 +662,7 @@ void api_init(void)
 		return;
 	}
 
-	setenv_hex("api_address", (unsigned long)sig);
+	env_set_hex("api_address", (unsigned long)sig);
 	debugf("API sig @ 0x%lX\n", (unsigned long)sig);
 	memcpy(sig->magic, API_SIG_MAGIC, 8);
 	sig->version = API_SIG_VERSION;

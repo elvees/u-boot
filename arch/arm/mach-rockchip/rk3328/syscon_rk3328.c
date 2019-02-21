@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2016 Rockchip Electronics Co., Ltd
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -11,6 +10,7 @@
 
 static const struct udevice_id rk3328_syscon_ids[] = {
 	{ .compatible = "rockchip,rk3328-grf", .data = ROCKCHIP_SYSCON_GRF },
+	{ }
 };
 
 U_BOOT_DRIVER(syscon_rk3328) = {

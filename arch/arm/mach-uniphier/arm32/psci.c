@@ -1,14 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2016 Socionext Inc.
  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <linux/bitops.h>
+#include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
+#include <linux/printk.h>
 #include <linux/psci.h>
 #include <linux/sizes.h>
 #include <asm/processor.h>
@@ -29,7 +30,6 @@ u32 uniphier_smp_booted[CONFIG_ARMV7_PSCI_NR_CPUS];
 static int uniphier_get_nr_cpus(void)
 {
 	switch (uniphier_get_soc_id()) {
-	case UNIPHIER_SLD3_ID:
 	case UNIPHIER_PRO4_ID:
 	case UNIPHIER_PRO5_ID:
 		return 2;
@@ -92,7 +92,7 @@ static void uniphier_smp_kick_all_cpus(void)
 	}
 
 	if (!timeout)
-		printf("warning: some of secondary CPUs may not boot\n");
+		pr_warn("warning: some of secondary CPUs may not boot\n");
 
 	uniphier_cache_disable();
 }
@@ -130,7 +130,8 @@ void psci_arch_init(void)
 
 u32 uniphier_psci_holding_pen_release __secure_data = 0xffffffff;
 
-int __secure psci_cpu_on(u32 function_id, u32 cpuid, u32 entry_point)
+int __secure psci_cpu_on(u32 function_id, u32 cpuid, u32 entry_point,
+			 u32 context_id)
 {
 	u32 cpu = cpuid & 0xff;
 
@@ -138,9 +139,11 @@ int __secure psci_cpu_on(u32 function_id, u32 cpuid, u32 entry_point)
 	debug_puth(cpuid);
 	debug_puts(", entry_point=");
 	debug_puth(entry_point);
+	debug_puts(", context_id=");
+	debug_puth(context_id);
 	debug_puts("\n");
 
-	psci_save_target_pc(cpu, entry_point);
+	psci_save(cpu, entry_point, context_id);
 
 	/* We assume D-cache is off, so do not call flush_dcache() here */
 	uniphier_psci_holding_pen_release = cpu;

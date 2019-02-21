@@ -1,6 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (c) 2011 The Chromium OS Authors.
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -8,7 +8,6 @@
 
 #ifdef FTRACE
 #define CONFIG_TRACE
-#define CONFIG_CMD_TRACE
 #define CONFIG_TRACE_BUFFER_SIZE	(16 << 20)
 #define CONFIG_TRACE_EARLY_SIZE		(8 << 20)
 #define CONFIG_TRACE_EARLY
@@ -25,12 +24,7 @@
 #endif
 
 #define CONFIG_LMB
-#define CONFIG_ANDROID_BOOT_IMAGE
 
-#define CONFIG_CMD_PCI
-
-#define CONFIG_FS_EXT4
-#define CONFIG_EXT4_WRITE
 #define CONFIG_HOST_MAX_DEVICES 4
 
 /*
@@ -39,22 +33,13 @@
 #define CONFIG_MALLOC_F_ADDR		0x0010000
 #define CONFIG_SYS_MALLOC_LEN		(32 << 20)	/* 32MB  */
 
-#define CONFIG_SYS_LONGHELP			/* #undef to save memory */
 #define CONFIG_SYS_CBSIZE		1024	/* Console I/O Buffer Size */
 
-/* Print Buffer Size */
-#define CONFIG_SYS_PBSIZE (CONFIG_SYS_CBSIZE + sizeof(CONFIG_SYS_PROMPT) + 16)
-#define CONFIG_SYS_MAXARGS	16
-
 /* turn on command-line edit/c/auto */
-#define CONFIG_CMDLINE_EDITING
-#define CONFIG_AUTO_COMPLETE
 
 #define CONFIG_ENV_SIZE		8192
-#define CONFIG_ENV_IS_NOWHERE
 
 /* SPI - enable all SPI flash types for testing purposes */
-#define CONFIG_CMD_SF_TEST
 
 #define CONFIG_I2C_EDID
 
@@ -69,36 +54,24 @@
 /* Size of our emulated memory */
 #define CONFIG_SYS_SDRAM_BASE		0
 #define CONFIG_SYS_SDRAM_SIZE		(128 << 20)
-#define CONFIG_SYS_TEXT_BASE		0
 #define CONFIG_SYS_MONITOR_BASE	0
-#define CONFIG_NR_DRAM_BANKS		1
 
 #define CONFIG_SYS_BAUDRATE_TABLE	{4800, 9600, 19200, 38400, 57600,\
 					115200}
 
-/* include default commands */
-#include <config_distro_defaults.h>
-
 #define BOOT_TARGET_DEVICES(func) \
 	func(HOST, host, 1) \
 	func(HOST, host, 0)
-
-#define CONFIG_BOOTCOMMAND ""
 
 #include <config_distro_bootcmd.h>
 
 #define CONFIG_KEEP_SERVERADDR
 #define CONFIG_UDP_CHECKSUM
 #define CONFIG_TIMESTAMP
-#define CONFIG_BOOTP_DNS
 #define CONFIG_BOOTP_DNS2
 #define CONFIG_BOOTP_SEND_HOSTNAME
 #define CONFIG_BOOTP_SERVERIP
 #define CONFIG_IP_DEFRAG
-
-#define CONFIG_CMD_SANDBOX
-
-#define CONFIG_BOOTARGS ""
 
 #ifndef SANDBOX_NO_SDL
 #define CONFIG_SANDBOX_SDL
@@ -144,7 +117,6 @@
 
 #define CONFIG_GZIP_COMPRESSED
 #define CONFIG_BZIP2
-#define CONFIG_LZO
 
 #ifndef CONFIG_SPL_BUILD
 #define CONFIG_SYS_IDE_MAXBUS		1
@@ -157,18 +129,12 @@
 #define CONFIG_SYS_ATA_STRIDE		4
 #endif
 
-#define CONFIG_SCSI
 #define CONFIG_SCSI_AHCI_PLAT
 #define CONFIG_SYS_SCSI_MAX_DEVICE	2
 #define CONFIG_SYS_SCSI_MAX_SCSI_ID	8
 #define CONFIG_SYS_SCSI_MAX_LUN		4
 
-#define CONFIG_CMD_SATA
 #define CONFIG_SYS_SATA_MAX_DEVICE	2
-
-#define CONFIG_SYSTEMACE
-#define CONFIG_SYS_SYSTEMACE_WIDTH	16
-#define CONFIG_SYS_SYSTEMACE_BASE	0
 
 #define CONFIG_MISC_INIT_F
 

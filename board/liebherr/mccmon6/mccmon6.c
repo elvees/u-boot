@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2016-2017
  * Lukasz Majewski, DENX Software Engineering, lukma@denx.de
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -12,10 +11,10 @@
 #include <asm/arch/mx6-pins.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/gpio.h>
-#include <asm/imx-common/iomux-v3.h>
-#include <asm/imx-common/mxc_i2c.h>
-#include <asm/imx-common/spi.h>
-#include <asm/imx-common/boot_mode.h>
+#include <asm/mach-imx/iomux-v3.h>
+#include <asm/mach-imx/mxc_i2c.h>
+#include <asm/mach-imx/spi.h>
+#include <asm/mach-imx/boot_mode.h>
 #include <asm/io.h>
 #include <fsl_esdhc.h>
 #include <mmc.h>
@@ -367,7 +366,7 @@ int board_init(void)
 
 int board_late_init(void)
 {
-	setenv("board_name", "mccmon6");
+	env_set("board_name", "mccmon6");
 
 	return 0;
 }
@@ -467,7 +466,7 @@ int spl_start_uboot(void)
 		return 1;
 
 	env_init();
-	ret = getenv_f("boot_os", s, sizeof(s));
+	ret = env_get_f("boot_os", s, sizeof(s));
 	if ((ret != -1) && (strcmp(s, "no") == 0))
 		return 1;
 
@@ -481,7 +480,7 @@ int spl_start_uboot(void)
 	 * recovery_status = <any value> -> start SWUpdate
 	 *
 	 */
-	ret = getenv_f("recovery_status", s, sizeof(s));
+	ret = env_get_f("recovery_status", s, sizeof(s));
 	if (ret != -1)
 		return 1;
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * spi driver for rockchip
  *
@@ -5,8 +6,6 @@
  *
  * (C) Copyright 2008-2013 Rockchip Electronics
  * Peter, Software Engineering, <superpeter.cai@gmail.com>.
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <common.h>
@@ -21,8 +20,6 @@
 #include <asm/arch/periph.h>
 #include <dm/pinctrl.h>
 #include "rk_spi.h"
-
-DECLARE_GLOBAL_DATA_PTR;
 
 /* Change to 1 to output registers at the start of each transaction */
 #define DEBUG_RK_SPI	0
@@ -94,7 +91,7 @@ static void rkspi_set_clk(struct rockchip_spi_priv *priv, uint speed)
 	 */
 	if (clk_div > 0xfffe) {
 		clk_div = 0xfffe;
-		debug("%s: can't divide down to %d hz (actual will be %d hz)\n",
+		debug("%s: can't divide down to %d Hz (actual will be %d Hz)\n",
 		      __func__, speed, priv->input_rate / clk_div);
 	}
 
@@ -182,11 +179,9 @@ static int rockchip_spi_ofdata_to_platdata(struct udevice *bus)
 #if !CONFIG_IS_ENABLED(OF_PLATDATA)
 	struct rockchip_spi_platdata *plat = dev_get_platdata(bus);
 	struct rockchip_spi_priv *priv = dev_get_priv(bus);
-	const void *blob = gd->fdt_blob;
-	int node = dev_of_offset(bus);
 	int ret;
 
-	plat->base = devfdt_get_addr(bus);
+	plat->base = dev_read_addr(bus);
 
 	ret = clk_get_by_index(bus, 0, &priv->clk);
 	if (ret < 0) {
@@ -195,12 +190,13 @@ static int rockchip_spi_ofdata_to_platdata(struct udevice *bus)
 		return ret;
 	}
 
-	plat->frequency = fdtdec_get_int(blob, node, "spi-max-frequency",
-					 50000000);
-	plat->deactivate_delay_us = fdtdec_get_int(blob, node,
-					"spi-deactivate-delay", 0);
-	plat->activate_delay_us = fdtdec_get_int(blob, node,
-						 "spi-activate-delay", 0);
+	plat->frequency =
+		dev_read_u32_default(bus, "spi-max-frequency", 50000000);
+	plat->deactivate_delay_us =
+		dev_read_u32_default(bus, "spi-deactivate-delay", 0);
+	plat->activate_delay_us =
+		dev_read_u32_default(bus, "spi-activate-delay", 0);
+
 	debug("%s: base=%x, max-frequency=%d, deactivate_delay=%d\n",
 	      __func__, (uint)plat->base, plat->frequency,
 	      plat->deactivate_delay_us);
@@ -211,6 +207,14 @@ static int rockchip_spi_ofdata_to_platdata(struct udevice *bus)
 
 static int rockchip_spi_calc_modclk(ulong max_freq)
 {
+	/*
+	 * While this is not strictly correct for the RK3368, as the
+	 * GPLL will be 576MHz, things will still work, as the
+	 * clk_set_rate(...) implementation in our clock-driver will
+	 * chose the next closest rate not exceeding what we request
+	 * based on the output of this function.
+	 */
+
 	unsigned div;
 	const unsigned long gpll_hz = 594000000UL;
 
@@ -444,6 +448,7 @@ static const struct dm_spi_ops rockchip_spi_ops = {
 
 static const struct udevice_id rockchip_spi_ids[] = {
 	{ .compatible = "rockchip,rk3288-spi" },
+	{ .compatible = "rockchip,rk3368-spi" },
 	{ .compatible = "rockchip,rk3399-spi" },
 	{ }
 };

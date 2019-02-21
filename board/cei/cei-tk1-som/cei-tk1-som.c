@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2014
  * NVIDIA Corporation <www.nvidia.com>
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <common.h>
@@ -12,8 +11,6 @@
 #include <asm/arch/pinmux.h>
 
 #include "pinmux-config-cei-tk1-som.h"
-
-DECLARE_GLOBAL_DATA_PTR;
 
 /*
  * Routine: pinmux_init
@@ -39,6 +36,7 @@ void pinmux_init(void)
 #ifdef CONFIG_PCI_TEGRA
 int tegra_pcie_board_init(void)
 {
+/* TODO: Convert to driver model
 	struct udevice *pmic;
 	int err;
 
@@ -59,6 +57,7 @@ int tegra_pcie_board_init(void)
 		error("failed to set SD4 voltage: %d\n", err);
 		return err;
 	}
+*/
 
 	return 0;
 }

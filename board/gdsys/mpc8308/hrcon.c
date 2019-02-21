@@ -1,15 +1,14 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2014
- * Dirk Eibach,  Guntermann & Drunck GmbH, eibach@gdsys.de
- *
- * SPDX-License-Identifier:	GPL-2.0+
+ * Dirk Eibach,  Guntermann & Drunck GmbH, dirk.eibach@gdsys.cc
  */
 
 #include <common.h>
 #include <hwconfig.h>
 #include <i2c.h>
 #include <spi.h>
-#include <libfdt.h>
+#include <linux/libfdt.h>
 #include <fdt_support.h>
 #include <pci.h>
 #include <mpc83xx.h>
@@ -32,8 +31,6 @@
 #include <pca9698.h>
 
 #include <miiphy.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 #define MAX_MUX_CHANNELS 2
 
@@ -103,7 +100,7 @@ int fpga_get_reg(u32 fpga, u16 *reg, off_t regoff, u16 *data)
 
 int checkboard(void)
 {
-	char *s = getenv("serial#");
+	char *s = env_get("serial#");
 	bool hw_type_cat = pca9698_get_value(0x20, 20);
 
 	puts("Board: ");

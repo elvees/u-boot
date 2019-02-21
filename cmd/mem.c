@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2000
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -17,11 +16,7 @@
 #include <cli.h>
 #include <command.h>
 #include <console.h>
-#ifdef CONFIG_HAS_DATAFLASH
-#include <dataflash.h>
-#endif
 #include <hash.h>
-#include <inttypes.h>
 #include <mapmem.h>
 #include <watchdog.h>
 #include <asm/io.h>
@@ -52,10 +47,8 @@ static	ulong	base_address = 0;
 #define DISP_LINE_LEN	16
 static int do_mem_md(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
-	ulong	addr, length;
-#if defined(CONFIG_HAS_DATAFLASH)
-	ulong	nbytes, linebytes;
-#endif
+	ulong	addr, length, bytes;
+	const void *buf;
 	int	size;
 	int rc = 0;
 
@@ -88,40 +81,13 @@ static int do_mem_md(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			length = simple_strtoul(argv[2], NULL, 16);
 	}
 
-#if defined(CONFIG_HAS_DATAFLASH)
-	/* Print the lines.
-	 *
-	 * We buffer all read data, so we can make sure data is read only
-	 * once, and all accesses are with the specified bus width.
-	 */
-	nbytes = length * size;
-	do {
-		char	linebuf[DISP_LINE_LEN];
-		void* p;
-		linebytes = (nbytes>DISP_LINE_LEN)?DISP_LINE_LEN:nbytes;
+	bytes = size * length;
+	buf = map_sysmem(addr, bytes);
 
-		rc = read_dataflash(addr, (linebytes/size)*size, linebuf);
-		p = (rc == DATAFLASH_OK) ? linebuf : (void*)addr;
-		print_buffer(addr, p, size, linebytes/size, DISP_LINE_LEN/size);
-
-		nbytes -= linebytes;
-		addr += linebytes;
-		if (ctrlc()) {
-			rc = 1;
-			break;
-		}
-	} while (nbytes > 0);
-#else
-	{
-		ulong bytes = size * length;
-		const void *buf = map_sysmem(addr, bytes);
-
-		/* Print the lines. */
-		print_buffer(addr, buf, size, length, DISP_LINE_LEN / size);
-		addr += bytes;
-		unmap_sysmem(buf);
-	}
-#endif
+	/* Print the lines. */
+	print_buffer(addr, buf, size, length, DISP_LINE_LEN / size);
+	addr += bytes;
+	unmap_sysmem(buf);
 
 	dp_last_addr = addr;
 	dp_last_length = length;
@@ -286,13 +252,6 @@ static int do_mem_cmp(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 	count = simple_strtoul(argv[3], NULL, 16);
 
-#ifdef CONFIG_HAS_DATAFLASH
-	if (addr_dataflash(addr1) | addr_dataflash(addr2)){
-		puts ("Comparison with DataFlash space not supported.\n\r");
-		return 0;
-	}
-#endif
-
 	bytes = size * count;
 	base = buf1 = map_sysmem(addr1, bytes);
 	buf2 = map_sysmem(addr2, bytes);
@@ -315,8 +274,7 @@ static int do_mem_cmp(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		if (word1 != word2) {
 			ulong offset = buf1 - base;
 #ifdef CONFIG_SYS_SUPPORT_64BIT_DATA
-			printf("%s at 0x%p (%#0*"PRIx64") != %s at 0x%p (%#0*"
-			       PRIx64 ")\n",
+			printf("%s at 0x%p (%#0*llx) != %s at 0x%p (%#0*llx)\n",
 			       type, (void *)(addr1 + offset), size, word1,
 			       type, (void *)(addr2 + offset), size, word2);
 #else
@@ -370,11 +328,7 @@ static int do_mem_cp(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 #ifdef CONFIG_MTD_NOR_FLASH
 	/* check if we are copying to Flash */
-	if ( (addr2info(dest) != NULL)
-#ifdef CONFIG_HAS_DATAFLASH
-	   && (!addr_dataflash(dest))
-#endif
-	   ) {
+	if (addr2info(dest) != NULL) {
 		int rc;
 
 		puts ("Copy to Flash... ");
@@ -386,44 +340,6 @@ static int do_mem_cp(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		}
 		puts ("done\n");
 		return 0;
-	}
-#endif
-
-#ifdef CONFIG_HAS_DATAFLASH
-	/* Check if we are copying from RAM or Flash to DataFlash */
-	if (addr_dataflash(dest) && !addr_dataflash(addr)){
-		int rc;
-
-		puts ("Copy to DataFlash... ");
-
-		rc = write_dataflash (dest, addr, count*size);
-
-		if (rc != 1) {
-			dataflash_perror (rc);
-			return (1);
-		}
-		puts ("done\n");
-		return 0;
-	}
-
-	/* Check if we are copying from DataFlash to RAM */
-	if (addr_dataflash(addr) && !addr_dataflash(dest)
-#ifdef CONFIG_MTD_NOR_FLASH
-				 && (addr2info(dest) == NULL)
-#endif
-	   ){
-		int rc;
-		rc = read_dataflash(addr, count * size, (char *) dest);
-		if (rc != 1) {
-			dataflash_perror (rc);
-			return (1);
-		}
-		return 0;
-	}
-
-	if (addr_dataflash(addr) && addr_dataflash(dest)){
-		puts ("Unsupported combination of source/destination.\n\r");
-		return 1;
 	}
 #endif
 
@@ -1072,13 +988,6 @@ mod_mem(cmd_tbl_t *cmdtp, int incrflag, int flag, int argc, char * const argv[])
 		addr += base_address;
 	}
 
-#ifdef CONFIG_HAS_DATAFLASH
-	if (addr_dataflash(addr)){
-		puts ("Can't modify DataFlash in place. Use cp instead.\n\r");
-		return 0;
-	}
-#endif
-
 	/* Print the address, followed by value.  Then accept input for
 	 * the next value.  A non-converted value exits.
 	 */
@@ -1089,7 +998,7 @@ mod_mem(cmd_tbl_t *cmdtp, int incrflag, int flag, int argc, char * const argv[])
 			printf(" %08x", *((u32 *)ptr));
 #ifdef CONFIG_SYS_SUPPORT_64BIT_DATA
 		else if (size == 8)
-			printf(" %016" PRIx64, *((u64 *)ptr));
+			printf(" %016llx", *((u64 *)ptr));
 #endif
 		else if (size == 2)
 			printf(" %04x", *((u16 *)ptr));

@@ -66,6 +66,11 @@ config SPI_FLASH_GIGADEVICE
 	help
 	  Add support for various GigaDevice SPI flash chips (GD25xxx)
 
+config SPI_FLASH_ISSI
+	bool "ISSI SPI flash support"
+	help
+	  Add support for various ISSI SPI flash chips (ISxxx)
+
 config SPI_FLASH_MACRONIX
 	bool "Macronix SPI flash support"
 	help
@@ -90,6 +95,12 @@ config SPI_FLASH_WINBOND
 	bool "Winbond SPI flash support"
 	help
 	  Add support for various Winbond SPI flash chips (W25xxx)
+
+config SPI_FLASH_XMC
+	bool "XMC SPI flash support"
+	help
+	  Add support for various XMC (Wuhan Xinxin Semiconductor
+	  Manufacturing Corp.) SPI flash chips (XM25xxx)
 
 endif
 
@@ -134,17 +145,5 @@ config SPI_FLASH_MTD
 	  UBI which can only operate on top of the MTD layer.
 
 	  If unsure, say N
-
-if SPL
-
-config SPL_SPI_SUNXI
-	bool "Support for SPI Flash on Allwinner SoCs in SPL"
-	depends on MACH_SUN4I || MACH_SUN5I || MACH_SUN7I || MACH_SUNXI_H3_H5 || MACH_SUN50I
-	---help---
-	Enable support for SPI Flash. This option allows SPL to read from
-	sunxi SPI Flash. It uses the same method as the boot ROM, so does
-	not need any extra configuration.
-
-endif
 
 endmenu # menu "SPI Flash Support"

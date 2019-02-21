@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2001 Sysgo Real-Time Solutions, GmbH <www.elinos.com>
  * Andreas Heppel <aheppel@sysgo.de>
@@ -5,8 +6,6 @@
  * (C) Copyright 2002
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  * Wolfgang Grandegger, DENX Software Engineering, wg@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -694,7 +693,7 @@ static int do_pci(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		if ((bdf = get_pci_dev(argv[2])) == -1)
 			return 1;
 		break;
-#if defined(CONFIG_CMD_PCI_ENUM) || defined(CONFIG_DM_PCI)
+#if defined(CONFIG_DM_PCI)
 	case 'e':
 		pci_init();
 		return 0;
@@ -782,7 +781,7 @@ static int do_pci(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 static char pci_help_text[] =
 	"[bus] [long]\n"
 	"    - short or long list of PCI devices on bus 'bus'\n"
-#if defined(CONFIG_CMD_PCI_ENUM) || defined(CONFIG_DM_PCI)
+#if defined(CONFIG_DM_PCI)
 	"pci enum\n"
 	"    - Enumerate PCI buses\n"
 #endif

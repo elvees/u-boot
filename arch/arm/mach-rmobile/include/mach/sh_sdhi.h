@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * drivers/mmc/sh-sdhi.h
  *
@@ -5,8 +6,6 @@
  *
  * Copyright (C) 2013-2017 Renesas Electronics Corporation
  * Copyright (C) 2008-2009 Renesas Solutions Corp.
- *
- * SPDX-License-Identifier:	GPL-2.0
  */
 
 #ifndef _SH_SDHI_H
@@ -49,11 +48,6 @@
 
 /* SDHI CMD VALUE */
 #define CMD_MASK			0x0000ffff
-#define SDHI_APP			0x0040
-#define SDHI_MMC_SEND_OP_COND		0x0701
-#define SDHI_SD_APP_SEND_SCR		0x0073
-#define SDHI_SD_SWITCH			0x1C06
-#define SDHI_MMC_SEND_EXT_CSD		0x1C08
 
 /* SDHI_PORTSEL */
 #define USE_1PORT			(1 << 8) /* 1 port */

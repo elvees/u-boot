@@ -238,10 +238,6 @@
 				clocks = <&isi_clk>;
 				clock-names = "isi_clk";
 				status = "disabled";
-				port {
-					#address-cells = <1>;
-					#size-cells = <0>;
-				};
 			};
 
 			sfr: sfr@f0038000 {
@@ -998,6 +994,8 @@
 					interrupt-parent = <&pmc>;
 					interrupts = <AT91_PMC_LOCKU>;
 					clocks = <&main>;
+					regmap-sfr = <&sfr>;
+					u-boot,dm-pre-reloc;
 				};
 
 				mck: masterck {
@@ -1535,5 +1533,10 @@
 				clocks = <&hsmc_clk>;
 			};
 		};
+	};
+
+	onewire_tm: onewire {
+		compatible = "w1-gpio";
+		status = "disabled";
 	};
 };

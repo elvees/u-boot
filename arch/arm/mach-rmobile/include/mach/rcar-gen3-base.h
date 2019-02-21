@@ -1,9 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * ./arch/arm/mach-rmobile/include/mach/rcar-gen3-base.h
  *
  * Copyright (C) 2015 Renesas Electronics Corporation
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __ASM_ARCH_RCAR_GEN3_BASE_H
@@ -68,13 +67,9 @@
 #define SMSTPCR10		0xE6150998
 #define SMSTPCR11		0xE615099C
 
-/* SDHI */
-#define CONFIG_SYS_SH_SDHI0_BASE	0xEE100000
-#define CONFIG_SYS_SH_SDHI1_BASE	0xEE120000
-#define CONFIG_SYS_SH_SDHI2_BASE	0xEE140000
-#define CONFIG_SYS_SH_SDHI3_BASE	0xEE160000
-
 /* PFC */
+#define PFC_PUEN5	0xE6060414
+#define PUEN_SSI_SDATA4	BIT(17)
 #define PFC_PUEN6       0xE6060418
 #define PUEN_USB1_OVC   (1 << 2)
 #define PUEN_USB1_PWEN  (1 << 1)

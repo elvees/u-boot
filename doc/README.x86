@@ -1,9 +1,7 @@
+# SPDX-License-Identifier: GPL-2.0+
 #
 # Copyright (C) 2014, Simon Glass <sjg@chromium.org>
 # Copyright (C) 2014, Bin Meng <bmeng.cn@gmail.com>
-#
-# SPDX-License-Identifier:	GPL-2.0+
-#
 
 U-Boot on x86
 =============
@@ -18,12 +16,15 @@ U-Boot supports running as a coreboot [1] payload on x86. So far only Link
 work with minimal adjustments on other x86 boards since coreboot deals with
 most of the low-level details.
 
+U-Boot is a main bootloader on Intel Edison board.
+
 U-Boot also supports booting directly from x86 reset vector, without coreboot.
 In this case, known as bare mode, from the fact that it runs on the
 'bare metal', U-Boot acts like a BIOS replacement. The following platforms
 are supported:
 
    - Bayley Bay CRB
+   - Cherry Hill CRB
    - Congatec QEVAL 2.0 & conga-QA3/E3845
    - Cougar Canyon 2 CRB
    - Crown Bay CRB
@@ -31,7 +32,7 @@ are supported:
    - Link (Chromebook Pixel)
    - Minnowboard MAX
    - Samus (Chromebook Pixel 2015)
-   - QEMU x86
+   - QEMU x86 (32-bit & 64-bit)
 
 As for loading an OS, U-Boot supports directly booting a 32-bit or 64-bit
 Linux kernel as part of a FIT image. It also supports a compressed zImage.
@@ -43,23 +44,18 @@ Build Instructions for U-Boot as coreboot payload
 Building U-Boot as a coreboot payload is just like building U-Boot for targets
 on other architectures, like below:
 
-$ make coreboot-x86_defconfig
+$ make coreboot_defconfig
 $ make all
 
-Note this default configuration will build a U-Boot payload for the QEMU board.
-To build a coreboot payload against another board, you can change the build
-configuration during the 'make menuconfig' process.
+Build Instructions for U-Boot as main bootloader
+------------------------------------------------
 
-x86 architecture  --->
-	...
-	(qemu-x86) Board configuration file
-	(qemu-x86_i440fx) Board Device Tree Source (dts) file
-	(0x01920000) Board specific Cache-As-RAM (CAR) address
-	(0x4000) Board specific Cache-As-RAM (CAR) size
+Intel Edison instructions:
 
-Change the 'Board configuration file' and 'Board Device Tree Source (dts) file'
-to point to a new board. You can also change the Cache-As-RAM (CAR) related
-settings here if the default values do not fit your new board.
+Simple you can build U-Boot and obtain u-boot.bin
+
+$ make edison_defconfig
+$ make all
 
 Build Instructions for U-Boot as BIOS replacement (bare mode)
 -------------------------------------------------------------
@@ -67,11 +63,15 @@ Building a ROM version of U-Boot (hereafter referred to as u-boot.rom) is a
 little bit tricky, as generally it requires several binary blobs which are not
 shipped in the U-Boot source tree. Due to this reason, the u-boot.rom build is
 not turned on by default in the U-Boot source tree. Firstly, you need turn it
-on by enabling the ROM build:
+on by enabling the ROM build either via an environment variable
 
-$ export BUILD_ROM=y
+    $ export BUILD_ROM=y
 
-This tells the Makefile to build u-boot.rom as a target.
+or via configuration
+
+    CONFIG_BUILD_ROM=y
+
+Both tell the Makefile to build u-boot.rom as a target.
 
 ---
 
@@ -241,7 +241,9 @@ the board manual. The SPI-0 flash should have flash descriptor plus ME firmware
 and SPI-1 flash is used to store U-Boot. For convenience, the complete 8MB SPI-0
 flash image is included in the FSP package (named Rom00_8M_MB_PPT.bin). Program
 this image to the SPI-0 flash according to the board manual just once and we are
-all set. For programming U-Boot we just need to program SPI-1 flash.
+all set. For programming U-Boot we just need to program SPI-1 flash. Since the
+default u-boot.rom image for this board is set to 2MB, it should be programmed
+to the last 2MB of the 8MB chip, address range [600000, 7FFFFF].
 
 ---
 
@@ -307,7 +309,7 @@ Offset   Description         Controlling config
 6ef000   Environment         CONFIG_ENV_OFFSET
 6f0000   MRC cache           CONFIG_ENABLE_MRC_CACHE
 700000   u-boot-dtb.bin      CONFIG_SYS_TEXT_BASE
-790000   vga.bin             CONFIG_VGA_BIOS_ADDR
+7b0000   vga.bin             CONFIG_VGA_BIOS_ADDR
 7c0000   fsp.bin             CONFIG_FSP_ADDR
 7f8000   <spare>             (depends on size of fsp.bin)
 7ff800   U-Boot 16-bit boot  CONFIG_SYS_X86_START16
@@ -317,6 +319,35 @@ Overall ROM image size is controlled by CONFIG_ROM_SIZE.
 Note that the debug version of the FSP is bigger in size. If this version
 is used, CONFIG_FSP_ADDR needs to be configured to 0xfffb0000 instead of
 the default value 0xfffc0000.
+
+---
+
+Intel Cherry Hill specific instructions for bare mode:
+
+This uses Intel FSP for Braswell platform. Download it from Intel FSP website,
+put the .fd file to the board directory and rename it to fsp.bin.
+
+Extract descriptor.bin and me.bin from the original BIOS on the board using
+ifdtool and put them to the board directory as well.
+
+Note the FSP package for Braswell does not ship a traditional legacy VGA BIOS
+image for the integrated graphics device. Instead a new binary called Video
+BIOS Table (VBT) is shipped. Put it to the board directory and rename it to
+vbt.bin if you want graphics support in U-Boot.
+
+Now you can build U-Boot and obtain u-boot.rom
+
+$ make cherryhill_defconfig
+$ make all
+
+An important note for programming u-boot.rom to the on-board SPI flash is that
+you need make sure the SPI flash's 'quad enable' bit in its status register
+matches the settings in the descriptor.bin, otherwise the board won't boot.
+
+For the on-board SPI flash MX25U6435F, this can be done by writing 0x40 to the
+status register by DediProg in: Config > Modify Status Register > Write Status
+Register(s) > Register1 Value(Hex). This is is a one-time change. Once set, it
+persists in SPI flash part regardless of the u-boot.rom image burned.
 
 ---
 
@@ -345,7 +376,9 @@ QEMU x86 target instructions for bare mode:
 
 To build u-boot.rom for QEMU x86 targets, just simply run
 
-$ make qemu-x86_defconfig
+$ make qemu-x86_defconfig (for 32-bit)
+or
+$ make qemu-x86_64_defconfig (for 64-bit)
 $ make all
 
 Note this default configuration will build a U-Boot for the QEMU x86 i440FX
@@ -381,16 +414,9 @@ To enable video you must enable these options in coreboot:
    - Set framebuffer graphics resolution (1280x1024 32k-color (1:5:5))
    - Keep VESA framebuffer
 
-And include coreboot_fb.dtsi in your board's device tree source file, like:
-
-   /include/ "coreboot_fb.dtsi"
-
 At present it seems that for Minnowboard Max, coreboot does not pass through
 the video information correctly (it always says the resolution is 0x0). This
 works correctly for link though.
-
-Note: coreboot framebuffer driver does not work on QEMU. The reason is unknown
-at this point. Patches are welcome if you figure out anything wrong.
 
 Test with QEMU for bare mode
 ----------------------------
@@ -454,6 +480,46 @@ Here the kernel (bzImage) is loaded to 01000000 and initrd is to 04000000. Then,
 'zboot' can be used to boot the kernel:
 
 => zboot 01000000 - 04000000 1b1ab50
+
+To run 64-bit U-Boot, qemu-system-x86_64 should be used instead, e.g.:
+$ qemu-system-x86_64 -nographic -bios path/to/u-boot.rom
+
+A specific CPU can be specified via the '-cpu' parameter but please make
+sure the specified CPU supports 64-bit like '-cpu core2duo'. Conversely
+'-cpu pentium' won't work for obvious reasons that the processor only
+supports 32-bit.
+
+Note 64-bit support is very preliminary at this point. Lots of features
+are missing in the 64-bit world. One notable feature is the VGA console
+support which is currently missing, so that you must specify '-nographic'
+to get 64-bit U-Boot up and running.
+
+Updating U-Boot on Edison
+-------------------------
+By default Intel Edison boards are shipped with preinstalled heavily
+patched U-Boot v2014.04. Though it supports DFU which we may be able to
+use.
+
+1. Prepare u-boot.bin as described in chapter above. You still need one
+more step (if and only if you have original U-Boot), i.e. run the
+following command:
+
+$ truncate -s %4096 u-boot.bin
+
+2. Run your board and interrupt booting to U-Boot console. In the console
+call:
+
+ => run do_force_flash_os
+
+3. Wait for few seconds, it will prepare environment variable and runs
+DFU. Run DFU command from the host system:
+
+$ dfu-util -v -d 8087:0a99 --alt u-boot0 -D u-boot.bin
+
+4. Return to U-Boot console and following hint. i.e. push Ctrl+C, and
+reset the board:
+
+ => reset
 
 CPU Microcode
 -------------
@@ -753,11 +819,7 @@ command.
 You can also bake this behaviour into your build by hard-coding the
 environment variables if you add this to minnowmax.h:
 
-#undef CONFIG_BOOTARGS
 #undef CONFIG_BOOTCOMMAND
-
-#define CONFIG_BOOTARGS		\
-	"root=/dev/sda2 ro"
 #define CONFIG_BOOTCOMMAND	\
 	"ext2load scsi 0:2 03000000 /boot/vmlinuz-3.13.0-58-generic; " \
 	"ext2load scsi 0:2 04000000 /boot/initrd.img-3.13.0-58-generic; " \
@@ -765,6 +827,10 @@ environment variables if you add this to minnowmax.h:
 
 #undef CONFIG_EXTRA_ENV_SETTINGS
 #define CONFIG_EXTRA_ENV_SETTINGS "boot=zboot 03000000 0 04000000 ${filesize}"
+
+and change CONFIG_BOOTARGS value in configs/minnowmax_defconfig to:
+
+CONFIG_BOOTARGS="root=/dev/sda2 ro"
 
 Test with SeaBIOS
 -----------------
@@ -1061,35 +1127,43 @@ the "Power" submenu from the Windows start menu.
 EFI Support
 -----------
 U-Boot supports booting as a 32-bit or 64-bit EFI payload, e.g. with UEFI.
-This is enabled with CONFIG_EFI_STUB. U-Boot can also run as an EFI
-application, with CONFIG_EFI_APP. The CONFIG_EFI_LOADER option, where U-Booot
-provides an EFI environment to the kernel (i.e. replaces UEFI completely but
-provides the same EFI run-time services) is not currently supported on x86.
+This is enabled with CONFIG_EFI_STUB to boot from both 32-bit and 64-bit
+UEFI BIOS. U-Boot can also run as an EFI application, with CONFIG_EFI_APP.
+The CONFIG_EFI_LOADER option, where U-Boot provides an EFI environment to
+the kernel (i.e. replaces UEFI completely but provides the same EFI run-time
+services) is supported too. For example, we can even use 'bootefi' command
+to load a 'u-boot-payload.efi', see below test logs on QEMU.
 
-See README.efi for details of EFI support in U-Boot.
+  => load ide 0 3000000 u-boot-payload.efi
+  489787 bytes read in 138 ms (3.4 MiB/s)
+  => bootefi 3000000
+  Scanning disk ide.blk#0...
+  Found 2 disks
+  WARNING: booting without device tree
+  ## Starting EFI application at 03000000 ...
+  U-Boot EFI Payload
 
-64-bit Support
---------------
-U-Boot supports booting a 64-bit kernel directly and is able to change to
-64-bit mode to do so. It also supports (with CONFIG_EFI_STUB) booting from
-both 32-bit and 64-bit UEFI. However, U-Boot itself is currently always built
-in 32-bit mode. Some access to the full memory range is provided with
-arch_phys_memset().
 
-The development work to make U-Boot itself run in 64-bit mode has not yet
-been attempted. The best approach would likely be to build a 32-bit SPL
-image for U-Boot, with CONFIG_SPL_BUILD. This could then handle the early CPU
-init in 16-bit and 32-bit mode, running the FSP and any other binaries that
-are needed. Then it could change to 64-bit model and jump to U-Boot proper.
+  U-Boot 2018.07-rc2 (Jun 23 2018 - 17:12:58 +0800)
 
-Given U-Boot's extensive 64-bit support this has not been a high priority,
-but it would be a nice addition.
+  CPU: x86_64, vendor AMD, device 663h
+  DRAM:  2 GiB
+  MMC:
+  Video: 1024x768x32
+  Model: EFI x86 Payload
+  Net:   e1000: 52:54:00:12:34:56
+
+  Warning: e1000#0 using MAC address from ROM
+  eth0: e1000#0
+  No controllers found
+  Hit any key to stop autoboot:  0
+
+See README.u-boot_on_efi and README.uefi for details of EFI support in U-Boot.
 
 TODO List
 ---------
 - Audio
 - Chrome OS verified boot
-- Building U-Boot to run in 64-bit mode
 
 References
 ----------

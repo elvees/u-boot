@@ -1,12 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2015-2017 Socionext Inc.
  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <stdio.h>
 #include <linux/io.h>
+#include <linux/printk.h>
 #include <linux/sizes.h>
 
 #include "../soc-info.h"
@@ -297,7 +298,7 @@ static int do_ddrm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 	param = uniphier_get_ddrmphy_param();
 	if (!param) {
-		printf("unsupported SoC\n");
+		pr_err("unsupported SoC\n");
 		return CMD_RET_FAILURE;
 	}
 

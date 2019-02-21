@@ -1,10 +1,9 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * SPI flash internal definitions
  *
  * Copyright (C) 2008 Atmel Corporation
  * Copyright (C) 2013 Jagannadha Sutradharudu Teki, Xilinx Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _SF_INTERNAL_H_
@@ -33,6 +32,7 @@ enum spi_nor_option_flags {
 /* CFI Manufacture ID's */
 #define SPI_FLASH_CFI_MFR_SPANSION	0x01
 #define SPI_FLASH_CFI_MFR_STMICRO	0x20
+#define SPI_FLASH_CFI_MFR_MICRON	0x2C
 #define SPI_FLASH_CFI_MFR_MACRONIX	0xc2
 #define SPI_FLASH_CFI_MFR_SST		0xbf
 #define SPI_FLASH_CFI_MFR_WINBOND	0xef
@@ -87,6 +87,19 @@ enum spi_nor_option_flags {
 
 /* SST specific */
 #ifdef CONFIG_SPI_FLASH_SST
+#define SST26_CMD_READ_BPR		0x72
+#define SST26_CMD_WRITE_BPR		0x42
+
+#define SST26_BPR_8K_NUM		4
+#define SST26_MAX_BPR_REG_LEN		(18 + 1)
+#define SST26_BOUND_REG_SIZE		((32 + SST26_BPR_8K_NUM * 8) * SZ_1K)
+
+enum lock_ctl {
+	SST26_CTL_LOCK,
+	SST26_CTL_UNLOCK,
+	SST26_CTL_CHECK
+};
+
 # define CMD_SST_BP		0x02    /* Byte Program */
 # define CMD_SST_AAI_WP		0xAD	/* Auto Address Incr Word Program */
 
@@ -156,6 +169,9 @@ int spi_flash_cmd_write(struct spi_slave *spi, const u8 *cmd, size_t cmd_len,
 
 /* Flash erase(sectors) operation, support all possible erase commands */
 int spi_flash_cmd_erase_ops(struct spi_flash *flash, u32 offset, size_t len);
+
+/* Get software write-protect value (BP bits) */
+int spi_flash_cmd_get_sw_write_prot(struct spi_flash *flash);
 
 /* Lock stmicro spi flash region */
 int stm_lock(struct spi_flash *flash, u32 ofs, size_t len);

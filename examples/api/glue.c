@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2007-2008 Semihalf, Rafal Jaworowski <raj@semihalf.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -415,4 +414,16 @@ int ub_display_draw_bitmap(ulong bitmap, int x, int y)
 void ub_display_clear(void)
 {
 	syscall(API_DISPLAY_CLEAR, NULL);
+}
+
+__weak void *memcpy(void *dest, const void *src, size_t size)
+{
+	unsigned char *dptr = dest;
+	const unsigned char *ptr = src;
+	const unsigned char *end = src + size;
+
+	while (ptr < end)
+		*dptr++ = *ptr++;
+
+	return dest;
 }

@@ -144,10 +144,6 @@ config TARGET_M5253DEMO
 	bool "Support M5253DEMO"
 	select M5253
 
-config TARGET_M5253EVBE
-	bool "Support M5253EVBE"
-	select M5253
-
 config TARGET_M5272C3
 	bool "Support M5272C3"
 	select M5272
@@ -200,6 +196,10 @@ config TARGET_AMCORE
 	bool "Support AMCORE"
 	select M5307
 
+config TARGET_STMARK2
+        bool "Support stmark2"
+        select M54418
+
 endchoice
 
 source "board/BuS/eb_cpu5282/Kconfig"
@@ -210,7 +210,6 @@ source "board/freescale/m52277evb/Kconfig"
 source "board/freescale/m5235evb/Kconfig"
 source "board/freescale/m5249evb/Kconfig"
 source "board/freescale/m5253demo/Kconfig"
-source "board/freescale/m5253evbe/Kconfig"
 source "board/freescale/m5272c3/Kconfig"
 source "board/freescale/m5275evb/Kconfig"
 source "board/freescale/m5282evb/Kconfig"
@@ -223,5 +222,6 @@ source "board/freescale/m54455evb/Kconfig"
 source "board/freescale/m547xevb/Kconfig"
 source "board/freescale/m548xevb/Kconfig"
 source "board/sysam/amcore/Kconfig"
+source "board/sysam/stmark2/Kconfig"
 
 endmenu

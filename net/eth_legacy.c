@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2001-2015
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  * Joe Hershberger, National Instruments
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -137,7 +136,7 @@ int eth_write_hwaddr(struct eth_device *dev, const char *base_name,
 	unsigned char env_enetaddr[ARP_HLEN];
 	int ret = 0;
 
-	eth_getenv_enetaddr_by_index(base_name, eth_number, env_enetaddr);
+	eth_env_get_enetaddr_by_index(base_name, eth_number, env_enetaddr);
 
 	if (!is_zero_ethaddr(env_enetaddr)) {
 		if (!is_zero_ethaddr(dev->enetaddr) &&
@@ -152,8 +151,8 @@ int eth_write_hwaddr(struct eth_device *dev, const char *base_name,
 
 		memcpy(dev->enetaddr, env_enetaddr, ARP_HLEN);
 	} else if (is_valid_ethaddr(dev->enetaddr)) {
-		eth_setenv_enetaddr_by_index(base_name, eth_number,
-					     dev->enetaddr);
+		eth_env_set_enetaddr_by_index(base_name, eth_number,
+					      dev->enetaddr);
 	} else if (is_zero_ethaddr(dev->enetaddr)) {
 #ifdef CONFIG_NET_RANDOM_ETHADDR
 		net_random_ethaddr(dev->enetaddr);
@@ -261,7 +260,7 @@ int eth_initialize(void)
 		bootstage_error(BOOTSTAGE_ID_NET_ETH_START);
 	} else {
 		struct eth_device *dev = eth_devices;
-		char *ethprime = getenv("ethprime");
+		char *ethprime = env_get("ethprime");
 
 		bootstage_mark(BOOTSTAGE_ID_NET_ETH_INIT);
 		do {

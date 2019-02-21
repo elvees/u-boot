@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * am3517crane.c - board file for AM3517 CraneBoard
  *
@@ -6,8 +7,6 @@
  * Based on logicpd/am3517evm/am3517evm.c
  *
  * Copyright (C) 2011 Mistral Solutions Pvt Ltd
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -43,7 +42,7 @@ int board_init(void)
  */
 int misc_init_r(void)
 {
-#ifdef CONFIG_SYS_I2C_OMAP34XX
+#ifdef CONFIG_SYS_I2C_OMAP24XX
 	i2c_init(CONFIG_SYS_OMAP24_I2C_SPEED, CONFIG_SYS_OMAP24_I2C_SLAVE);
 #endif
 

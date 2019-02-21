@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2002 ELTEC Elektronik AG
  * Frank Gottschling <fgottschling@eltec.de>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -71,16 +70,6 @@
 #include <malloc.h>
 #include <video.h>
 #include <linux/compiler.h>
-
-/*
- * Defines for the CT69000 driver
- */
-#ifdef	CONFIG_VIDEO_CT69000
-
-#define VIDEO_FB_LITTLE_ENDIAN
-#define VIDEO_HW_RECTFILL
-#define VIDEO_HW_BITBLT
-#endif
 
 #if defined(CONFIG_VIDEO_MXS)
 #define VIDEO_FB_16BPP_WORD_SWAP
@@ -778,7 +767,7 @@ static void parse_putc(const char c)
 		break;
 
 	case '\n':		/* next line */
-		if (console_col || (!console_col && nl))
+		if (console_col || nl)
 			console_newline(1);
 		nl = 1;
 		break;
@@ -1308,6 +1297,10 @@ next_run:
 			break;
 		}
 	}
+
+	if (cfb_do_flush_cache)
+		flush_cache(VIDEO_FB_ADRS, VIDEO_SIZE);
+
 	return 0;
 error:
 	printf("Error: Too much encoded pixel data, validate your bitmap\n");
@@ -1866,7 +1859,7 @@ static void *video_logo(void)
 	splash_get_pos(&video_logo_xpos, &video_logo_ypos);
 
 #ifdef CONFIG_SPLASH_SCREEN
-	s = getenv("splashimage");
+	s = env_get("splashimage");
 	if (s != NULL) {
 		ret = splash_screen_prepare();
 		if (ret < 0)
@@ -1910,16 +1903,32 @@ static void *video_logo(void)
 	sprintf(info, " %s", version_string);
 
 #ifndef CONFIG_HIDE_LOGO_VERSION
-	space = (VIDEO_LINE_LEN / 2 - VIDEO_INFO_X) / VIDEO_FONT_WIDTH;
+	space = (VIDEO_COLS - VIDEO_INFO_X) / VIDEO_FONT_WIDTH;
 	len = strlen(info);
 
 	if (len > space) {
-		video_drawchars(VIDEO_INFO_X, VIDEO_INFO_Y,
-				(uchar *) info, space);
-		video_drawchars(VIDEO_INFO_X + VIDEO_FONT_WIDTH,
-				VIDEO_INFO_Y + VIDEO_FONT_HEIGHT,
-				(uchar *) info + space, len - space);
-		y_off = 1;
+		int xx = VIDEO_INFO_X, yy = VIDEO_INFO_Y;
+		uchar *p = (uchar *) info;
+
+		while (len) {
+			if (len > space) {
+				video_drawchars(xx, yy, p, space);
+				len -= space;
+
+				p = (uchar *)p + space;
+
+				if (!y_off) {
+					xx += VIDEO_FONT_WIDTH;
+					space--;
+				}
+				yy += VIDEO_FONT_HEIGHT;
+
+				y_off++;
+			} else {
+				video_drawchars(xx, yy, p, len);
+				len = 0;
+			}
+		}
 	} else
 		video_drawstring(VIDEO_INFO_X, VIDEO_INFO_Y, (uchar *) info);
 
@@ -2091,7 +2100,8 @@ static int cfg_video_init(void)
 	}
 	eorx = fgx ^ bgx;
 
-	video_clear();
+	if (!CONFIG_IS_ENABLED(NO_FB_CLEAR))
+		video_clear();
 
 #ifdef CONFIG_VIDEO_LOGO
 	/* Plot the logo and get start point of console */

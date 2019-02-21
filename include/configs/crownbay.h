@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2014, Bin Meng <bmeng.cn@gmail.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -20,9 +19,6 @@
 #define CONFIG_STD_DEVICES_SETTINGS	"stdin=serial,i8042-kbd,usbkbd\0" \
 					"stdout=serial,vidconsole\0" \
 					"stderr=serial,vidconsole\0"
-
-#define CONFIG_SCSI_DEV_LIST		\
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_TCF_SATA}
 
 /* Environment configuration */
 #define CONFIG_ENV_SECT_SIZE		0x1000

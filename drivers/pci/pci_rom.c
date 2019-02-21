@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) 2014 Google, Inc
  *
@@ -19,8 +20,6 @@
  * David Mosberger-Tang
  *
  * Copyright 1997 -- 1999 Martin Mares <mj@atrey.karlin.mff.cuni.cz>
-
- * SPDX-License-Identifier:	GPL-2.0
  */
 
 #include <common.h>
@@ -202,47 +201,6 @@ static int pci_rom_load(struct pci_rom_header *rom_header,
 
 struct vbe_mode_info mode_info;
 
-int vbe_get_video_info(struct graphic_device *gdev)
-{
-#ifdef CONFIG_FRAMEBUFFER_SET_VESA_MODE
-	struct vesa_mode_info *vesa = &mode_info.vesa;
-
-	gdev->winSizeX = vesa->x_resolution;
-	gdev->winSizeY = vesa->y_resolution;
-
-	gdev->plnSizeX = vesa->x_resolution;
-	gdev->plnSizeY = vesa->y_resolution;
-
-	gdev->gdfBytesPP = vesa->bits_per_pixel / 8;
-
-	switch (vesa->bits_per_pixel) {
-	case 32:
-	case 24:
-		gdev->gdfIndex = GDF_32BIT_X888RGB;
-		break;
-	case 16:
-		gdev->gdfIndex = GDF_16BIT_565RGB;
-		break;
-	default:
-		gdev->gdfIndex = GDF__8BIT_INDEX;
-		break;
-	}
-
-	gdev->isaBase = CONFIG_SYS_ISA_IO_BASE_ADDRESS;
-	gdev->pciBase = vesa->phys_base_ptr;
-
-	gdev->frameAdrs = vesa->phys_base_ptr;
-	gdev->memSize = vesa->bytes_per_scanline * vesa->y_resolution;
-
-	gdev->vprBase = vesa->phys_base_ptr;
-	gdev->cprBase = vesa->phys_base_ptr;
-
-	return gdev->winSizeX ? 0 : -ENOSYS;
-#else
-	return -ENOSYS;
-#endif
-}
-
 void setup_video(struct screen_info *screen_info)
 {
 	struct vesa_mode_info *vesa = &mode_info.vesa;
@@ -289,7 +247,7 @@ int dm_pci_run_vga_bios(struct udevice *dev, int (*int15_handler)(void),
 	}
 
 	if (!board_should_load_oprom(dev))
-		return -ENXIO;
+		return log_msg_ret("Should not load OPROM", -ENXIO);
 
 	ret = pci_rom_probe(dev, &rom);
 	if (ret)
@@ -370,9 +328,10 @@ int vbe_setup_video_priv(struct vesa_mode_info *vesa,
 			 struct video_uc_platdata *plat)
 {
 	if (!vesa->x_resolution)
-		return -ENXIO;
+		return log_msg_ret("No x resolution", -ENXIO);
 	uc_priv->xsize = vesa->x_resolution;
 	uc_priv->ysize = vesa->y_resolution;
+	uc_priv->line_length = vesa->bytes_per_scanline;
 	switch (vesa->bits_per_pixel) {
 	case 32:
 	case 24:
@@ -396,8 +355,6 @@ int vbe_setup_video(struct udevice *dev, int (*int15_handler)(void))
 	struct video_priv *uc_priv = dev_get_uclass_priv(dev);
 	int ret;
 
-	printf("Video: ");
-
 	/* If we are running from EFI or coreboot, this can't work */
 	if (!ll_boot_init()) {
 		printf("Not available (previous bootloader prevents it)\n");
@@ -418,7 +375,7 @@ int vbe_setup_video(struct udevice *dev, int (*int15_handler)(void))
 		return ret;
 	}
 
-	printf("%dx%dx%d\n", uc_priv->xsize, uc_priv->ysize,
+	printf("Video: %dx%dx%d\n", uc_priv->xsize, uc_priv->ysize,
 	       mode_info.vesa.bits_per_pixel);
 
 	return 0;

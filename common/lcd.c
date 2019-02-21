@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Common LCD routines
  *
  * (C) Copyright 2001-2002
  * Wolfgang Denk, DENX Software Engineering -- wd@denx.de
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /* #define DEBUG */
@@ -223,7 +222,7 @@ void lcd_clear(void)
 	/* Paint the logo and retrieve LCD base address */
 	debug("[LCD] Drawing the logo...\n");
 	if (do_splash) {
-		s = getenv("splashimage");
+		s = env_get("splashimage");
 		if (s) {
 			do_splash = 0;
 			addr = simple_strtoul(s, NULL, 16);
@@ -242,14 +241,6 @@ void lcd_clear(void)
 #endif
 	lcd_sync();
 }
-
-static int do_lcd_clear(cmd_tbl_t *cmdtp, int flag, int argc,
-			char *const argv[])
-{
-	lcd_clear();
-	return 0;
-}
-U_BOOT_CMD(cls,	1, 1, do_lcd_clear, "clear screen", "");
 
 static int lcd_init(void *lcdbase)
 {
@@ -390,7 +381,6 @@ static inline void lcd_logo_plot(int x, int y) {}
 
 #if defined(CONFIG_CMD_BMP) || defined(CONFIG_SPLASH_SCREEN)
 #ifdef CONFIG_SPLASH_SCREEN_ALIGN
-#define BMP_ALIGN_CENTER	0x7FFF
 
 static void splash_align_axis(int *axis, unsigned long panel_size,
 					unsigned long picture_size)
@@ -578,7 +568,7 @@ int lcd_display_bitmap(ulong bmp_image, int x, int y)
 	unsigned long pwidth = panel_info.vl_col;
 	unsigned colors, bpix, bmp_bpix;
 	int hdr_size;
-	struct bmp_color_table_entry *palette = bmp->color_table;
+	struct bmp_color_table_entry *palette;
 
 	if (!bmp || !(bmp->header.signature[0] == 'B' &&
 		bmp->header.signature[1] == 'M')) {
@@ -587,6 +577,7 @@ int lcd_display_bitmap(ulong bmp_image, int x, int y)
 		return 1;
 	}
 
+	palette = bmp->color_table;
 	width = get_unaligned_le32(&bmp->header.width);
 	height = get_unaligned_le32(&bmp->header.height);
 	bmp_bpix = get_unaligned_le16(&bmp->header.bit_count);

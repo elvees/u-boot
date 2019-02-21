@@ -14,7 +14,6 @@
 #include <net.h>
 #include <net/tftp.h>
 #include "bootp.h"
-#include "nfs.h"
 #ifdef CONFIG_LED_STATUS
 #include <status_led.h>
 #endif
@@ -148,9 +147,14 @@ static void store_net_params(struct bootp_hdr *bp)
 {
 #if !defined(CONFIG_BOOTP_SERVERIP)
 	struct in_addr tmp_ip;
+	bool overwrite_serverip = true;
+
+#if defined(CONFIG_BOOTP_PREFER_SERVERIP)
+	overwrite_serverip = false;
+#endif
 
 	net_copy_ip(&tmp_ip, &bp->bp_siaddr);
-	if (tmp_ip.s_addr != 0)
+	if (tmp_ip.s_addr != 0 && (overwrite_serverip || !net_server_ip.s_addr))
 		net_copy_ip(&net_server_ip, &bp->bp_siaddr);
 	memcpy(net_server_ethaddr,
 	       ((struct ethernet_hdr *)net_rx_packet)->et_src, 6);
@@ -158,7 +162,8 @@ static void store_net_params(struct bootp_hdr *bp)
 #if defined(CONFIG_CMD_DHCP)
 	    !(dhcp_option_overload & OVERLOAD_FILE) &&
 #endif
-	    (strlen(bp->bp_file) > 0)) {
+	    (strlen(bp->bp_file) > 0) &&
+	    !net_boot_file_name_explicit) {
 		copy_filename(net_boot_file_name, bp->bp_file,
 			      sizeof(net_boot_file_name));
 	}
@@ -170,7 +175,7 @@ static void store_net_params(struct bootp_hdr *bp)
 	 * not contain a new value
 	 */
 	if (*net_boot_file_name)
-		setenv("bootfile", net_boot_file_name);
+		env_set("bootfile", net_boot_file_name);
 #endif
 	net_copy_ip(&net_ip, &bp->bp_yiaddr);
 }
@@ -334,7 +339,7 @@ static void bootp_process_vendor(u8 *ext, int size)
 		debug("net_nis_domain : %s\n", net_nis_domain);
 
 #if defined(CONFIG_CMD_SNTP) && defined(CONFIG_BOOTP_NTPSERVER)
-	if (net_ntp_server)
+	if (net_ntp_server.s_addr)
 		debug("net_ntp_server : %pI4\n", &net_ntp_server);
 #endif
 }
@@ -387,12 +392,19 @@ static void bootp_timeout_handler(void)
 
 	if (time_taken >= time_taken_max) {
 #ifdef CONFIG_BOOTP_MAY_FAIL
-		puts("\nRetry time exceeded\n");
-		net_set_state(NETLOOP_FAIL);
-#else
-		puts("\nRetry time exceeded; starting again\n");
-		net_start_again();
+		char *ethrotate;
+
+		ethrotate = env_get("ethrotate");
+		if ((ethrotate && strcmp(ethrotate, "no") == 0) ||
+		    net_restart_wrap) {
+			puts("\nRetry time exceeded\n");
+			net_set_state(NETLOOP_FAIL);
+		} else
 #endif
+		{
+			puts("\nRetry time exceeded; starting again\n");
+			net_start_again();
+		}
 	} else {
 		bootp_timeout *= 2;
 		if (bootp_timeout > 2000)
@@ -414,7 +426,7 @@ static void bootp_timeout_handler(void)
 static u8 *add_vci(u8 *e)
 {
 	char *vci = NULL;
-	char *env_vci = getenv("bootp_vci");
+	char *env_vci = env_get("bootp_vci");
 
 #if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_NET_VCI_STRING)
 	vci = CONFIG_SPL_NET_VCI_STRING;
@@ -488,7 +500,7 @@ static int dhcp_extended(u8 *e, int message_type, struct in_addr server_ip,
 		*e++ = tmp & 0xff;
 	}
 #if defined(CONFIG_BOOTP_SEND_HOSTNAME)
-	hostname = getenv("hostname");
+	hostname = env_get("hostname");
 	if (hostname) {
 		int hostnamelen = strlen(hostname);
 
@@ -503,8 +515,8 @@ static int dhcp_extended(u8 *e, int message_type, struct in_addr server_ip,
 	clientarch = CONFIG_BOOTP_PXE_CLIENTARCH;
 #endif
 
-	if (getenv("bootp_arch"))
-		clientarch = getenv_ulong("bootp_arch", 16, clientarch);
+	if (env_get("bootp_arch"))
+		clientarch = env_get_ulong("bootp_arch", 16, clientarch);
 
 	if (clientarch > 0) {
 		*e++ = 93;	/* Client System Architecture */
@@ -520,7 +532,7 @@ static int dhcp_extended(u8 *e, int message_type, struct in_addr server_ip,
 	*e++ = 0;	/* minor revision */
 
 #ifdef CONFIG_LIB_UUID
-	uuid = getenv("pxeuuid");
+	uuid = env_get("pxeuuid");
 
 	if (uuid) {
 		if (uuid_str_valid(uuid)) {
@@ -713,7 +725,7 @@ void bootp_request(void)
 	dhcp_state = INIT;
 #endif
 
-	ep = getenv("bootpretryperiod");
+	ep = env_get("bootpretryperiod");
 	if (ep != NULL)
 		time_taken_max = simple_strtoul(ep, NULL, 10);
 	else
@@ -883,10 +895,13 @@ static void dhcp_process_options(uchar *popt, uchar *end)
 		case 66:	/* Ignore TFTP server name */
 			break;
 		case 67:	/* Bootfile option */
-			size = truncate_sz("Bootfile",
-					   sizeof(net_boot_file_name), oplen);
-			memcpy(&net_boot_file_name, popt + 2, size);
-			net_boot_file_name[size] = 0;
+			if (!net_boot_file_name_explicit) {
+				size = truncate_sz("Bootfile",
+						   sizeof(net_boot_file_name),
+						   oplen);
+				memcpy(&net_boot_file_name, popt + 2, size);
+				net_boot_file_name[size] = 0;
+			}
 			break;
 		default:
 #if defined(CONFIG_BOOTP_VENDOREX)

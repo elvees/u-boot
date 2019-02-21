@@ -973,23 +973,9 @@
  * differentiated by the version number in the Communication Processor
  * Module (CPM).
  */
-#define PVR_821		0x00500000
-#define PVR_823		PVR_821
-#define PVR_850		PVR_821
-#define PVR_860		PVR_821
-#define PVR_7400	0x000C0000
-#define PVR_8240	0x00810100
+#define PVR_8xx		0x00500000
 
-/*
- * PowerQUICC II family processors report different PVR values depending
- * on silicon process (HiP3, HiP4, HiP7, etc.)
- */
-#define PVR_8260	PVR_8240
-#define PVR_8260_HIP3	0x00810101
-#define PVR_8260_HIP4	0x80811014
-#define PVR_8260_HIP7	0x80822011
-#define PVR_8260_HIP7R1 0x80822013
-#define PVR_8260_HIP7RA	0x80822014
+#define PVR_7400	0x000C0000
 
 /*
  * MPC 52xx
@@ -1218,11 +1204,6 @@ int fsl_qoriq_dsp_core_to_cluster(unsigned int core);
 #endif
 
 
-#ifndef CONFIG_MACH_SPECIFIC
-extern int _machine;
-extern int have_of;
-#endif /* CONFIG_MACH_SPECIFIC */
-
 /* what kind of prep workstation we are */
 extern int _prep_type;
 /*
@@ -1344,20 +1325,11 @@ void ll_puts(const char *);
 /* In misc.c */
 void _nmask_and_or_msr(unsigned long nmask, unsigned long or_val);
 
+#ifndef CONFIG_CPU_MPC83XX
 int prt_83xx_rsr(void);
-int prt_8260_rsr(void);
-int prt_8260_clks(void);
+#endif
 
 #endif /* ndef ASSEMBLY*/
-
-#ifdef CONFIG_MACH_SPECIFIC
-#if defined(CONFIG_WALNUT)
-#define _machine _MACH_walnut
-#define have_of 0
-#else
-#error "Machine not defined correctly"
-#endif
-#endif /* CONFIG_MACH_SPECIFIC */
 
 #if defined(CONFIG_MPC85xx)
  #define EPAPR_MAGIC	(0x45504150)

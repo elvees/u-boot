@@ -1,11 +1,10 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (c) 2014 The Chromium OS Authors.
  *
  * Part of this file is adapted from coreboot
  * src/arch/x86/include/arch/cpu.h and
  * src/arch/x86/lib/cpu.c
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _ASM_CPU_H
@@ -287,17 +286,5 @@ u32 cpu_get_family_model(void);
  * @return the CPU ID masked with 0xf
  */
 u32 cpu_get_stepping(void);
-
-/**
- * cpu_run_reference_code() - Run the platform reference code
- *
- * Some platforms require a binary blob to be executed once SDRAM is
- * available. This is used to set up various platform features, such as the
- * platform controller hub (PCH). This function should be implemented by the
- * CPU-specific code.
- *
- * @return 0 on success, -ve on failure
- */
-int cpu_run_reference_code(void);
 
 #endif

@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2012 Calxeda, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -172,7 +171,7 @@ static void cphy_override_lane(u8 port)
 
 #define WAIT_MS_LINKUP	4
 
-int ahci_link_up(struct ahci_probe_ent *probe_ent, int port)
+int ahci_link_up(struct ahci_uc_priv *probe_ent, int port)
 {
 	u32 tmp;
 	int j = 0;

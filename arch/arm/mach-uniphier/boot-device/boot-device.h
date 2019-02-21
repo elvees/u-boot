@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2017 Socionext Inc.
  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _UNIPHIER_BOOT_DEVICE_H_
@@ -13,14 +12,12 @@ struct uniphier_boot_device {
 	const char *desc;
 };
 
-extern const struct uniphier_boot_device uniphier_sld3_boot_device_table[];
 extern const struct uniphier_boot_device uniphier_ld4_boot_device_table[];
 extern const struct uniphier_boot_device uniphier_pro5_boot_device_table[];
 extern const struct uniphier_boot_device uniphier_pxs2_boot_device_table[];
 extern const struct uniphier_boot_device uniphier_ld11_boot_device_table[];
 extern const struct uniphier_boot_device uniphier_pxs3_boot_device_table[];
 
-extern const unsigned int uniphier_sld3_boot_device_count;
 extern const unsigned int uniphier_ld4_boot_device_count;
 extern const unsigned int uniphier_pro5_boot_device_count;
 extern const unsigned int uniphier_pxs2_boot_device_count;

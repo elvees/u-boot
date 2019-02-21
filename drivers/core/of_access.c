@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Originally from Linux v4.9
  * Paul Mackerras	August 1996.
@@ -16,12 +17,10 @@
  *
  * This file follows drivers/of/base.c with functions in the same order as the
  * Linux version.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
-#include <libfdt.h>
+#include <linux/libfdt.h>
 #include <dm/of_access.h>
 #include <linux/ctype.h>
 #include <linux/err.h>
@@ -94,6 +93,30 @@ int of_n_size_cells(const struct device_node *np)
 
 	/* No #size-cells property for the root node */
 	return OF_ROOT_NODE_SIZE_CELLS_DEFAULT;
+}
+
+int of_simple_addr_cells(const struct device_node *np)
+{
+	const __be32 *ip;
+
+	ip = of_get_property(np, "#address-cells", NULL);
+	if (ip)
+		return be32_to_cpup(ip);
+
+	/* Return a default of 2 to match fdt_address_cells()*/
+	return 2;
+}
+
+int of_simple_size_cells(const struct device_node *np)
+{
+	const __be32 *ip;
+
+	ip = of_get_property(np, "#size-cells", NULL);
+	if (ip)
+		return be32_to_cpup(ip);
+
+	/* Return a default of 2 to match fdt_size_cells()*/
+	return 2;
 }
 
 struct property *of_find_property(const struct device_node *np,
@@ -353,6 +376,33 @@ struct device_node *of_find_compatible_node(struct device_node *from,
 	return np;
 }
 
+static int of_device_has_prop_value(const struct device_node *device,
+				    const char *propname, const void *propval,
+				    int proplen)
+{
+	struct property *prop = of_find_property(device, propname, NULL);
+
+	if (!prop || !prop->value || prop->length != proplen)
+		return 0;
+	return !memcmp(prop->value, propval, proplen);
+}
+
+struct device_node *of_find_node_by_prop_value(struct device_node *from,
+					       const char *propname,
+					       const void *propval, int proplen)
+{
+	struct device_node *np;
+
+	for_each_of_allnodes_from(from, np) {
+		if (of_device_has_prop_value(np, propname, propval, proplen) &&
+		    of_node_get(np))
+			break;
+	}
+	of_node_put(from);
+
+	return np;
+}
+
 struct device_node *of_find_node_by_phandle(phandle handle)
 {
 	struct device_node *np;
@@ -430,6 +480,26 @@ int of_read_u32_array(const struct device_node *np, const char *propname,
 	debug("size %zd\n", sz);
 	while (sz--)
 		*out_values++ = be32_to_cpup(val++);
+
+	return 0;
+}
+
+int of_read_u64(const struct device_node *np, const char *propname, u64 *outp)
+{
+	const __be64 *val;
+
+	debug("%s: %s: ", __func__, propname);
+	if (!np)
+		return -EINVAL;
+	val = of_find_property_value_of_size(np, propname, sizeof(*outp));
+	if (IS_ERR(val)) {
+		debug("(not found)\n");
+		return PTR_ERR(val);
+	}
+
+	*outp = be64_to_cpup(val);
+	debug("%#llx (%lld)\n", (unsigned long long)*outp,
+              (unsigned long long)*outp);
 
 	return 0;
 }
@@ -639,6 +709,13 @@ int of_parse_phandle_with_args(const struct device_node *np,
 
 	return __of_parse_phandle_with_args(np, list_name, cells_name, 0,
 					    index, out_args);
+}
+
+int of_count_phandle_with_args(const struct device_node *np,
+			       const char *list_name, const char *cells_name)
+{
+	return __of_parse_phandle_with_args(np, list_name, cells_name, 0,
+					    -1, NULL);
 }
 
 static void of_alias_add(struct alias_prop *ap, struct device_node *np,

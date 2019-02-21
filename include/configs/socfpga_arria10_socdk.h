@@ -1,15 +1,12 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  *  Copyright (C) 2015-2017 Altera Corporation <www.altera.com>
- *
- * SPDX-License-Identifier:	GPL-2.0
  */
 
 #ifndef __CONFIG_SOCFGPA_ARRIA10_H__
 #define __CONFIG_SOCFGPA_ARRIA10_H__
 
 #include <asm/arch/base_addr_a10.h>
-
-#define CONFIG_HW_WATCHDOG
 
 /* Booting Linux */
 #define CONFIG_LOADADDR		0x01000000
@@ -25,22 +22,10 @@
 #define PHYS_SDRAM_1_SIZE		0x40000000
 
 /* Ethernet on SoC (EMAC) */
-#if defined(CONFIG_CMD_NET)
-#define CONFIG_PHY_MICREL
-#define CONFIG_PHY_MICREL_KSZ9031
-#endif
 
 /*
  * U-Boot environment configurations
  */
-#define CONFIG_ENV_IS_IN_MMC
-
-/*
- * arguments passed to the bootz command. The value of
- * CONFIG_BOOTARGS goes into the environment value "bootargs".
- * Do note the value will overide also the chosen node in FDT blob.
- */
-#define CONFIG_BOOTARGS "console=ttyS0," __stringify(CONFIG_BAUDRATE)
 
 /*
  * Serial / UART configurations

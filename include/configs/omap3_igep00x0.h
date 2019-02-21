@@ -1,20 +1,15 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Common configuration settings for IGEP technology based boards
  *
  * (C) Copyright 2012
  * ISEE 2007 SL, <www.iseebcn.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __IGEP00X0_H
 #define __IGEP00X0_H
 
-#define CONFIG_NR_DRAM_BANKS            2
-#define CONFIG_NAND
-
 #include <configs/ti_omap3_common.h>
-#include <asm/mach-types.h>
 
 /*
  * We are only ever GP parts and will utilize all of the "downloaded image"
@@ -23,24 +18,19 @@
 #undef CONFIG_SPL_TEXT_BASE
 #define CONFIG_SPL_TEXT_BASE		0x40200000
 
-#define CONFIG_MISC_INIT_R
-
 #define CONFIG_REVISION_TAG		1
 
-/* Status LED available for IGEP0020 and IGEP0030 but not IGEP0032 */
-#if (CONFIG_MACH_TYPE == MACH_TYPE_IGEP0020) || \
-		       (CONFIG_MACH_TYPE == MACH_TYPE_IGEP0030)
-#if (CONFIG_MACH_TYPE == MACH_TYPE_IGEP0020)
-#define RED_LED_GPIO 27
-#elif (CONFIG_MACH_TYPE == MACH_TYPE_IGEP0030)
-#define RED_LED_GPIO 16
-#endif
-#endif
+/* TPS65950 */
+#define PBIASLITEVMODE1			(1 << 8)
 
-/* USB */
-#define CONFIG_USB_MUSB_UDC		1
-#define CONFIG_USB_OMAP3		1
-#define CONFIG_TWL4030_USB		1
+/* LED */
+#define IGEP0020_GPIO_LED		27
+#define IGEP0030_GPIO_LED		16
+
+/* Board and revision detection GPIOs */
+#define IGEP0030_USB_TRANSCEIVER_RESET		54
+#define GPIO_IGEP00X0_BOARD_DETECTION		28
+#define GPIO_IGEP00X0_REVISION_DETECTION	129
 
 /* USB device configuration */
 #define CONFIG_USB_DEVICE		1
@@ -51,9 +41,6 @@
 #define CONFIG_USBD_PRODUCTID		0x5678
 #define CONFIG_USBD_MANUFACTURER	"Texas Instruments"
 #define CONFIG_USBD_PRODUCT_NAME	"IGEP"
-
-#define CONFIG_CMD_MTDPARTS
-#define CONFIG_CMD_ONENAND
 
 #ifndef CONFIG_SPL_BUILD
 
@@ -73,24 +60,29 @@
 
 #include <config_distro_bootcmd.h>
 
+#define ENV_FINDFDT \
+	"findfdt="\
+		"if test ${board_name} = igep0020; then " \
+			"if test ${board_rev} = F; then " \
+				"setenv fdtfile omap3-igep0020-rev-f.dtb; " \
+			"else " \
+				"setenv fdtfile omap3-igep0020.dtb; fi; fi; " \
+		"if test ${board_name} = igep0030; then " \
+			"if test ${board_rev} = G; then " \
+				"setenv fdtfile omap3-igep0030-rev-g.dtb; " \
+			"else " \
+				"setenv fdtfile omap3-igep0030.dtb; fi; fi; " \
+		"if test ${fdtfile} = ''; then " \
+			"echo WARNING: Could not determine device tree to use; fi; \0"
+
 #define CONFIG_EXTRA_ENV_SETTINGS \
+	ENV_FINDFDT \
 	ENV_DEVICE_SETTINGS \
 	MEM_LAYOUT_SETTINGS \
 	BOOTENV
 
 #endif
 
-/*
- * SMSC911x Ethernet
- */
-#if defined(CONFIG_CMD_NET)
-#define CONFIG_SMC911X
-#define CONFIG_SMC911X_32_BIT
-#define CONFIG_SMC911X_BASE		0x2C000000
-#endif /* (CONFIG_CMD_NET) */
-
-#define CONFIG_RBTREE
-#define CONFIG_MTD_PARTITIONS
 #define CONFIG_SYS_MTDPARTS_RUNTIME
 
 /* OneNAND config */
@@ -99,8 +91,6 @@
 #define CONFIG_SYS_ONENAND_BLOCK_SIZE	(128*1024)
 
 /* NAND config */
-#define CONFIG_SPL_OMAP3_ID_NAND
-#define CONFIG_SYS_NAND_BUSWIDTH_16BIT
 #define CONFIG_SYS_NAND_5_ADDR_CYCLE
 #define CONFIG_SYS_NAND_PAGE_COUNT	64
 #define CONFIG_SYS_NAND_PAGE_SIZE	2048
@@ -117,8 +107,6 @@
 #define CONFIG_SYS_NAND_ECCSIZE		512
 #define CONFIG_SYS_NAND_ECCBYTES	14
 #define CONFIG_NAND_OMAP_ECCSCHEME	OMAP_ECC_BCH8_CODE_HW_DETECTION_SW
-#define CONFIG_NAND_OMAP_GPMC
-#define CONFIG_BCH
 
 /* UBI configuration */
 #define CONFIG_SPL_UBI			1
@@ -135,12 +123,9 @@
 #define CONFIG_SPL_UBI_INFO_ADDR	0x88080000
 
 /* environment organization */
-#define CONFIG_ENV_IS_NOWHERE		1
 #define CONFIG_ENV_UBI_PART		"UBI"
 #define CONFIG_ENV_UBI_VOLUME		"config"
 #define CONFIG_ENV_UBI_VOLUME_REDUND	"config_r"
-#define CONFIG_UBI_SILENCE_MSG		1
-#define CONFIG_UBIFS_SILENCE_MSG	1
 #define CONFIG_ENV_SIZE			(32*1024)
 
 #endif /* __IGEP00X0_H */

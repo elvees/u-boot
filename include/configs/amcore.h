@@ -1,16 +1,14 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Sysam AMCORE board configuration
  *
  * (C) Copyright 2016  Angelo Dureghello <angelo@sysam.it>
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #ifndef __AMCORE_CONFIG_H
 #define __AMCORE_CONFIG_H
 
-#define CONFIG_AMCORE
-#define CONFIG_HOSTNAME			AMCORE
+#define CONFIG_HOSTNAME			"AMCORE"
 
 #define CONFIG_MCFTMR
 #define CONFIG_MCFUART
@@ -31,23 +29,7 @@
 		"cp.b 0x20000 0xfff00000 ${filesize}\0"
 
 /* undef to save memory	*/
-#undef	CONFIG_SYS_LONGHELP
 
-#if defined(CONFIG_CMD_KGDB)
-/* Console I/O buff. size */
-#define CONFIG_SYS_CBSIZE		1024
-#else
-#define CONFIG_SYS_CBSIZE		256
-#endif
-/* Print buffer size */
-#define CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE + \
-					 sizeof(CONFIG_SYS_PROMPT)+16)
-/* max number of command args	*/
-#define CONFIG_SYS_MAXARGS		16
-/* Boot argument buffer size	*/
-#define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
-
-#define CONFIG_AUTO_COMPLETE		1 /* add autocompletion support	*/
 #define CONFIG_MX_CYCLIC		1 /* enable mdc/mwc commands	*/
 
 #define CONFIG_SYS_LOAD_ADDR		0x20000	/* default load address */
@@ -76,9 +58,6 @@
 #define CONFIG_SYS_MAX_FLASH_SECT	1024
 #define CONFIG_SYS_FLASH_ERASE_TOUT	1000
 
-#define CONFIG_SYS_FLASH_CFI
-#define CONFIG_FLASH_CFI_DRIVER
-#define CONFIG_SYS_FLASH_USE_BUFFER_WRITE
 /* amcore design has flash data bytes wired swapped */
 #define CONFIG_SYS_WRITE_SWAPPED_DATA
 /* reserve 128-4KB */
@@ -87,15 +66,14 @@
 #define CONFIG_SYS_MALLOC_LEN		(1 * 1024 * 1024)
 #define CONFIG_SYS_BOOTPARAMS_LEN	(64 * 1024)
 
-#define CONFIG_ENV_IS_IN_FLASH		1
 #define CONFIG_ENV_ADDR			(CONFIG_SYS_FLASH_BASE + \
 					 CONFIG_SYS_MONITOR_LEN)
 #define CONFIG_ENV_SIZE			0x1000
 #define CONFIG_ENV_SECT_SIZE		0x1000
 
 #define LDS_BOARD_TEXT \
-        . = DEFINED(env_offset) ? env_offset : .; \
-        common/env_embedded.o (.text*);
+	. = DEFINED(env_offset) ? env_offset : .; \
+	env/embedded.o(.text*);
 
 /* memory map space for linux boot data */
 #define CONFIG_SYS_BOOTMAPSZ		(8 << 20)

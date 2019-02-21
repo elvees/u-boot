@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * i2c driver for Freescale i.MX series
  *
@@ -10,15 +11,13 @@
  *  Copyright (C) 2007 RightHand Technologies, Inc.
  *  Copyright (C) 2008 Darius Augulis <darius.augulis at teltonika.lt>
  *
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/imx-regs.h>
 #include <linux/errno.h>
-#include <asm/imx-common/mxc_i2c.h>
+#include <asm/mach-imx/mxc_i2c.h>
 #include <asm/io.h>
 #include <i2c.h>
 #include <watchdog.h>
@@ -176,7 +175,7 @@ static int bus_i2c_set_bus_speed(struct mxc_i2c_bus *i2c_bus, int speed)
 	int reg_shift = quirk ? VF610_I2C_REGSHIFT : IMX_I2C_REGSHIFT;
 
 	if (!base)
-		return -ENODEV;
+		return -EINVAL;
 
 	/* Store divider value */
 	writeb(idx, base + (IFDR << reg_shift));
@@ -239,7 +238,7 @@ static int tx_byte(struct mxc_i2c_bus *i2c_bus, u8 byte)
 	if (ret < 0)
 		return ret;
 	if (ret & I2SR_RX_NO_AK)
-		return -ENODEV;
+		return -EREMOTEIO;
 	return 0;
 }
 
@@ -317,16 +316,19 @@ static int i2c_init_transfer_(struct mxc_i2c_bus *i2c_bus, u8 chip,
 	temp |= I2CR_MTX | I2CR_TX_NO_AK;
 	writeb(temp, base + (I2CR << reg_shift));
 
-	/* write slave address */
-	ret = tx_byte(i2c_bus, chip << 1);
-	if (ret < 0)
-		return ret;
-
-	while (alen--) {
-		ret = tx_byte(i2c_bus, (addr >> (alen * 8)) & 0xff);
+	if (alen >= 0)	{
+		/* write slave address */
+		ret = tx_byte(i2c_bus, chip << 1);
 		if (ret < 0)
 			return ret;
+
+		while (alen--) {
+			ret = tx_byte(i2c_bus, (addr >> (alen * 8)) & 0xff);
+			if (ret < 0)
+				return ret;
+		}
 	}
+
 	return 0;
 }
 
@@ -418,14 +420,14 @@ static int i2c_init_transfer(struct mxc_i2c_bus *i2c_bus, u8 chip,
 			VF610_I2C_REGSHIFT : IMX_I2C_REGSHIFT;
 
 	if (!i2c_bus->base)
-		return -ENODEV;
+		return -EINVAL;
 
 	for (retry = 0; retry < 3; retry++) {
 		ret = i2c_init_transfer_(i2c_bus, chip, addr, alen);
 		if (ret >= 0)
 			return 0;
 		i2c_imx_stop(i2c_bus);
-		if (ret == -ENODEV)
+		if (ret == -EREMOTEIO)
 			return ret;
 
 		printf("%s: failed for chip 0x%x retry=%d\n", __func__, chip,
@@ -537,9 +539,11 @@ static int bus_i2c_read(struct mxc_i2c_bus *i2c_bus, u8 chip, u32 addr,
 	if (ret < 0)
 		return ret;
 
-	temp = readb(base + (I2CR << reg_shift));
-	temp |= I2CR_RSTA;
-	writeb(temp, base + (I2CR << reg_shift));
+	if (alen >= 0) {
+		temp = readb(base + (I2CR << reg_shift));
+		temp |= I2CR_RSTA;
+		writeb(temp, base + (I2CR << reg_shift));
+	}
 
 	ret = tx_byte(i2c_bus, (chip << 1) | 1);
 	if (ret < 0) {
@@ -584,6 +588,22 @@ static int bus_i2c_write(struct mxc_i2c_bus *i2c_bus, u8 chip, u32 addr,
 #define I2C4_BASE_ADDR	0
 #endif
 
+#if !defined(I2C5_BASE_ADDR)
+#define I2C5_BASE_ADDR 0
+#endif
+
+#if !defined(I2C6_BASE_ADDR)
+#define I2C6_BASE_ADDR 0
+#endif
+
+#if !defined(I2C7_BASE_ADDR)
+#define I2C7_BASE_ADDR 0
+#endif
+
+#if !defined(I2C8_BASE_ADDR)
+#define I2C8_BASE_ADDR 0
+#endif
+
 static struct mxc_i2c_bus mxc_i2c_buses[] = {
 #if defined(CONFIG_ARCH_LS1021A) || defined(CONFIG_VF610) || \
 	defined(CONFIG_FSL_LAYERSCAPE)
@@ -591,11 +611,19 @@ static struct mxc_i2c_bus mxc_i2c_buses[] = {
 	{ 1, I2C2_BASE_ADDR, I2C_QUIRK_FLAG },
 	{ 2, I2C3_BASE_ADDR, I2C_QUIRK_FLAG },
 	{ 3, I2C4_BASE_ADDR, I2C_QUIRK_FLAG },
+	{ 4, I2C5_BASE_ADDR, I2C_QUIRK_FLAG },
+	{ 5, I2C6_BASE_ADDR, I2C_QUIRK_FLAG },
+	{ 6, I2C7_BASE_ADDR, I2C_QUIRK_FLAG },
+	{ 7, I2C8_BASE_ADDR, I2C_QUIRK_FLAG },
 #else
 	{ 0, I2C1_BASE_ADDR, 0 },
 	{ 1, I2C2_BASE_ADDR, 0 },
 	{ 2, I2C3_BASE_ADDR, 0 },
 	{ 3, I2C4_BASE_ADDR, 0 },
+	{ 4, I2C5_BASE_ADDR, 0 },
+	{ 5, I2C6_BASE_ADDR, 0 },
+	{ 6, I2C7_BASE_ADDR, 0 },
+	{ 7, I2C8_BASE_ADDR, 0 },
 #endif
 };
 
@@ -733,6 +761,38 @@ U_BOOT_I2C_ADAP_COMPLETE(mxc3, mxc_i2c_init, mxc_i2c_probe,
 			 CONFIG_SYS_MXC_I2C4_SLAVE, 3)
 #endif
 
+#ifdef CONFIG_SYS_I2C_MXC_I2C5
+U_BOOT_I2C_ADAP_COMPLETE(mxc4, mxc_i2c_init, mxc_i2c_probe,
+			 mxc_i2c_read, mxc_i2c_write,
+			 mxc_i2c_set_bus_speed,
+			 CONFIG_SYS_MXC_I2C5_SPEED,
+			 CONFIG_SYS_MXC_I2C5_SLAVE, 4)
+#endif
+
+#ifdef CONFIG_SYS_I2C_MXC_I2C6
+U_BOOT_I2C_ADAP_COMPLETE(mxc5, mxc_i2c_init, mxc_i2c_probe,
+			 mxc_i2c_read, mxc_i2c_write,
+			 mxc_i2c_set_bus_speed,
+			 CONFIG_SYS_MXC_I2C6_SPEED,
+			 CONFIG_SYS_MXC_I2C6_SLAVE, 5)
+#endif
+
+#ifdef CONFIG_SYS_I2C_MXC_I2C7
+U_BOOT_I2C_ADAP_COMPLETE(mxc6, mxc_i2c_init, mxc_i2c_probe,
+			 mxc_i2c_read, mxc_i2c_write,
+			 mxc_i2c_set_bus_speed,
+			 CONFIG_SYS_MXC_I2C7_SPEED,
+			 CONFIG_SYS_MXC_I2C7_SLAVE, 6)
+#endif
+
+#ifdef CONFIG_SYS_I2C_MXC_I2C8
+U_BOOT_I2C_ADAP_COMPLETE(mxc7, mxc_i2c_init, mxc_i2c_probe,
+			 mxc_i2c_read, mxc_i2c_write,
+			 mxc_i2c_set_bus_speed,
+			 CONFIG_SYS_MXC_I2C8_SPEED,
+			 CONFIG_SYS_MXC_I2C8_SLAVE, 7)
+#endif
+
 #else
 
 static int mxc_i2c_set_bus_speed(struct udevice *bus, unsigned int speed)
@@ -754,7 +814,7 @@ static int mxc_i2c_probe(struct udevice *bus)
 
 	addr = devfdt_get_addr(bus);
 	if (addr == FDT_ADDR_T_NONE)
-		return -ENODEV;
+		return -EINVAL;
 
 	i2c_bus->base = addr;
 	i2c_bus->index = bus->seq;
@@ -779,11 +839,11 @@ static int mxc_i2c_probe(struct udevice *bus)
 		ret2 = gpio_request_by_name_nodev(offset_to_ofnode(node),
 				"sda-gpios", 0, &i2c_bus->sda_gpio,
 				GPIOD_IS_OUT);
-		if (!dm_gpio_is_valid(&i2c_bus->sda_gpio) |
-		    !dm_gpio_is_valid(&i2c_bus->scl_gpio) |
-		    ret | ret2) {
+		if (!dm_gpio_is_valid(&i2c_bus->sda_gpio) ||
+		    !dm_gpio_is_valid(&i2c_bus->scl_gpio) ||
+		    ret || ret2) {
 			dev_err(dev, "i2c bus %d at %lu, fail to request scl/sda gpio\n", bus->seq, i2c_bus->base);
-			return -ENODEV;
+			return -EINVAL;
 		}
 	}
 

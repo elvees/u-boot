@@ -35,35 +35,6 @@ static inline void sync(void)
 }
 
 /*
- * Given a physical address and a length, return a virtual address
- * that can be used to access the memory range with the caching
- * properties specified by "flags".
- */
-#define MAP_NOCACHE	(0)
-#define MAP_WRCOMBINE	(0)
-#define MAP_WRBACK	(0)
-#define MAP_WRTHROUGH	(0)
-
-static inline void *
-map_physmem(phys_addr_t paddr, unsigned long len, unsigned long flags)
-{
-	return (void *)((unsigned long)paddr);
-}
-
-/*
- * Take down a mapping set up by map_physmem().
- */
-static inline void unmap_physmem(void *vaddr, unsigned long flags)
-{
-
-}
-
-static inline phys_addr_t virt_to_phys(void * vaddr)
-{
-	return (phys_addr_t)((unsigned long)vaddr);
-}
-
-/*
  * Generic virtual read/write.  Note that we don't support half-word
  * read/writes.  We define __arch_*[bl] here, and leave __arch_*w
  * to the architecture specific code.
@@ -189,7 +160,12 @@ static inline void __raw_readsl(unsigned long addr, void *data, int longlen)
 #define in_be32(a)	in_arch(l,be32,a)
 #define in_be16(a)	in_arch(w,be16,a)
 
+#define out_32(a,v)	__raw_writel(v,a)
+#define out_16(a,v)	__raw_writew(v,a)
 #define out_8(a,v)	__raw_writeb(v,a)
+
+#define in_32(a)	__raw_readl(a)
+#define in_16(a)	__raw_readw(a)
 #define in_8(a)		__raw_readb(a)
 
 #define clrbits(type, addr, clear) \
@@ -209,6 +185,10 @@ static inline void __raw_readsl(unsigned long addr, void *data, int longlen)
 #define setbits_le32(addr, set) setbits(le32, addr, set)
 #define clrsetbits_le32(addr, clear, set) clrsetbits(le32, addr, clear, set)
 
+#define clrbits_32(addr, clear) clrbits(32, addr, clear)
+#define setbits_32(addr, set) setbits(32, addr, set)
+#define clrsetbits_32(addr, clear, set) clrsetbits(32, addr, clear, set)
+
 #define clrbits_be16(addr, clear) clrbits(be16, addr, clear)
 #define setbits_be16(addr, set) setbits(be16, addr, set)
 #define clrsetbits_be16(addr, clear, set) clrsetbits(be16, addr, clear, set)
@@ -216,6 +196,10 @@ static inline void __raw_readsl(unsigned long addr, void *data, int longlen)
 #define clrbits_le16(addr, clear) clrbits(le16, addr, clear)
 #define setbits_le16(addr, set) setbits(le16, addr, set)
 #define clrsetbits_le16(addr, clear, set) clrsetbits(le16, addr, clear, set)
+
+#define clrbits_16(addr, clear) clrbits(16, addr, clear)
+#define setbits_16(addr, set) setbits(16, addr, set)
+#define clrsetbits_16(addr, clear, set) clrsetbits(16, addr, clear, set)
 
 #define clrbits_8(addr, clear) clrbits(8, addr, clear)
 #define setbits_8(addr, set) setbits(8, addr, set)
@@ -426,6 +410,7 @@ out:
 #endif	/* __mem_isa */
 #endif	/* __KERNEL__ */
 
+#include <asm-generic/io.h>
 #include <iotrace.h>
 
 #endif	/* __ASM_ARM_IO_H */

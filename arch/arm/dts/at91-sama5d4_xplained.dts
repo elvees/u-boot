@@ -58,6 +58,18 @@
 		stdout-path = &usart3;
 	};
 
+	onewire_tm: onewire {
+		gpios = <&pioE 15 GPIO_ACTIVE_LOW>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_onewire_tm_default>;
+		status = "okay";
+
+		w1_eeprom: w1_eeprom@0 {
+			compatible = "maxim,ds24b33";
+			status = "okay";
+		};
+	};
+
 	memory {
 		reg = <0x20000000 0x20000000>;
 	};
@@ -74,6 +86,31 @@
 
 	ahb {
 		apb {
+			hlcdc: hlcdc@f0000000 {
+				atmel,vl-bpix = <4>;
+				atmel,guard-time = <1>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_pwm &pinctrl_lcd_rgb888>;
+				status = "okay";
+				u-boot,dm-pre-reloc;
+
+				display-timings {
+					u-boot,dm-pre-reloc;
+					480x272 {
+						clock-frequency = <9000000>;
+						hactive = <480>;
+						vactive = <272>;
+						hsync-len = <41>;
+						hfront-porch = <2>;
+						hback-porch = <2>;
+						vfront-porch = <2>;
+						vback-porch = <2>;
+						vsync-len = <11>;
+						u-boot,dm-pre-reloc;
+					};
+				};
+			};
+
 			spi0: spi@f8010000 {
 				u-boot,dm-pre-reloc;
 				cs-gpios = <&pioC 3 0>, <0>, <0>, <0>;
@@ -88,6 +125,11 @@
 
 			i2c0: i2c@f8014000 {
 				status = "okay";
+
+				i2c_eeprom: i2c_eeprom@5c {
+					compatible = "atmel,24mac402";
+					reg = <0x5c>;
+				};
 			};
 
 			macb0: ethernet@f8020000 {
@@ -168,6 +210,10 @@
 					pinctrl_macb0_phy_irq: macb0_phy_irq_0 {
 						atmel,pins =
 							<AT91_PIOE 1 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
+					};
+					pinctrl_onewire_tm_default: onewire_tm_default {
+						atmel,pins =
+							<AT91_PIOE 15 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP>;
 					};
 				};
 			};

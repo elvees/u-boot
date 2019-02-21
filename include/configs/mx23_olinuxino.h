@@ -1,25 +1,21 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2013 Marek Vasut <marex@denx.de>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 #ifndef __CONFIGS_MX23_OLINUXINO_H__
 #define __CONFIGS_MX23_OLINUXINO_H__
 
 /* System configurations */
-#define CONFIG_MX23				/* i.MX23 SoC */
 #define CONFIG_MACH_TYPE	4105
 
 /* U-Boot Commands */
 
 /* Memory configuration */
-#define CONFIG_NR_DRAM_BANKS		1		/* 1 bank of DRAM */
 #define PHYS_SDRAM_1			0x40000000	/* Base address */
 #define PHYS_SDRAM_1_SIZE		0x08000000	/* Max 128 MB RAM */
 #define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM_1
 
 /* Environment */
-#define CONFIG_ENV_IS_IN_MMC
 #define CONFIG_ENV_OVERWRITE
 
 /* Environment is in MMC */
@@ -38,10 +34,6 @@
 #endif
 
 /* Ethernet */
-#ifdef CONFIG_CMD_NET
-#define CONFIG_USB_HOST_ETHER
-#define CONFIG_USB_ETHER_SMSC95XX
-#endif
 
 /* Booting Linux */
 #define CONFIG_BOOTFILE		"uImage"

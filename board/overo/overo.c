@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Maintainer : Steve Sakoman <steve@sakoman.com>
  *
@@ -9,15 +10,13 @@
  *
  * (C) Copyright 2004-2008
  * Texas Instruments, <www.ti.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
 #include <dm.h>
 #include <ns16550.h>
 #include <netdev.h>
 #include <twl4030.h>
-#include <linux/mtd/nand.h>
+#include <linux/mtd/rawnand.h>
 #include <asm/io.h>
 #include <asm/arch/mmc_host_def.h>
 #include <asm/arch/mux.h>
@@ -31,8 +30,6 @@
 #include <usb.h>
 #include <asm/ehci-omap.h>
 #endif
-
-DECLARE_GLOBAL_DATA_PTR;
 
 #define TWL4030_I2C_BUS			0
 #define EXPANSION_EEPROM_I2C_BUS	2
@@ -172,47 +169,47 @@ int misc_init_r(void)
 			expansion_config.revision,
 			expansion_config.fab_revision);
 		MUX_GUMSTIX();
-		setenv("defaultdisplay", "dvi");
-		setenv("expansionname", "summit");
+		env_set("defaultdisplay", "dvi");
+		env_set("expansionname", "summit");
 		break;
 	case GUMSTIX_TOBI:
 		printf("Recognized Tobi expansion board (rev %d %s)\n",
 			expansion_config.revision,
 			expansion_config.fab_revision);
 		MUX_GUMSTIX();
-		setenv("defaultdisplay", "dvi");
-		setenv("expansionname", "tobi");
+		env_set("defaultdisplay", "dvi");
+		env_set("expansionname", "tobi");
 		break;
 	case GUMSTIX_TOBI_DUO:
 		printf("Recognized Tobi Duo expansion board (rev %d %s)\n",
 			expansion_config.revision,
 			expansion_config.fab_revision);
 		MUX_GUMSTIX();
-		setenv("expansionname", "tobiduo");
+		env_set("expansionname", "tobiduo");
 		break;
 	case GUMSTIX_PALO35:
 		printf("Recognized Palo35 expansion board (rev %d %s)\n",
 			expansion_config.revision,
 			expansion_config.fab_revision);
 		MUX_GUMSTIX();
-		setenv("defaultdisplay", "lcd35");
-		setenv("expansionname", "palo35");
+		env_set("defaultdisplay", "lcd35");
+		env_set("expansionname", "palo35");
 		break;
 	case GUMSTIX_PALO43:
 		printf("Recognized Palo43 expansion board (rev %d %s)\n",
 			expansion_config.revision,
 			expansion_config.fab_revision);
 		MUX_GUMSTIX();
-		setenv("defaultdisplay", "lcd43");
-		setenv("expansionname", "palo43");
+		env_set("defaultdisplay", "lcd43");
+		env_set("expansionname", "palo43");
 		break;
 	case GUMSTIX_CHESTNUT43:
 		printf("Recognized Chestnut43 expansion board (rev %d %s)\n",
 			expansion_config.revision,
 			expansion_config.fab_revision);
 		MUX_GUMSTIX();
-		setenv("defaultdisplay", "lcd43");
-		setenv("expansionname", "chestnut43");
+		env_set("defaultdisplay", "lcd43");
+		env_set("expansionname", "chestnut43");
 		break;
 	case GUMSTIX_PINTO:
 		printf("Recognized Pinto expansion board (rev %d %s)\n",
@@ -225,8 +222,8 @@ int misc_init_r(void)
 			expansion_config.revision,
 			expansion_config.fab_revision);
 		MUX_GUMSTIX();
-		setenv("defaultdisplay", "lcd43");
-		setenv("expansionname", "gallop43");
+		env_set("defaultdisplay", "lcd43");
+		env_set("expansionname", "gallop43");
 		break;
 	case GUMSTIX_ALTO35:
 		printf("Recognized Alto35 expansion board (rev %d %s)\n",
@@ -234,8 +231,8 @@ int misc_init_r(void)
 			expansion_config.fab_revision);
 		MUX_GUMSTIX();
 		MUX_ALTO35();
-		setenv("defaultdisplay", "lcd35");
-		setenv("expansionname", "alto35");
+		env_set("defaultdisplay", "lcd35");
+		env_set("expansionname", "alto35");
 		break;
 	case GUMSTIX_STAGECOACH:
 		printf("Recognized Stagecoach expansion board (rev %d %s)\n",
@@ -261,8 +258,8 @@ int misc_init_r(void)
 			expansion_config.fab_revision);
 		MUX_GUMSTIX();
 		MUX_ARBOR43C();
-		setenv("defaultdisplay", "lcd43");
-		setenv("expansionname", "arbor43c");
+		env_set("defaultdisplay", "lcd43");
+		env_set("expansionname", "arbor43c");
 		break;
 	case ETTUS_USRP_E:
 		printf("Recognized Ettus Research USRP-E (rev %d %s)\n",
@@ -270,13 +267,13 @@ int misc_init_r(void)
 			expansion_config.fab_revision);
 		MUX_GUMSTIX();
 		MUX_USRP_E();
-		setenv("defaultdisplay", "dvi");
+		env_set("defaultdisplay", "dvi");
 		break;
 	case GUMSTIX_NO_EEPROM:
 	case GUMSTIX_EMPTY_EEPROM:
 		puts("No or empty EEPROM on expansion board\n");
 		MUX_GUMSTIX();
-		setenv("expansionname", "tobi");
+		env_set("expansionname", "tobi");
 		break;
 	default:
 		printf("Unrecognized expansion board 0x%08x\n", expansion_id);
@@ -284,14 +281,14 @@ int misc_init_r(void)
 	}
 
 	if (expansion_config.content == 1)
-		setenv(expansion_config.env_var, expansion_config.env_setting);
+		env_set(expansion_config.env_var, expansion_config.env_setting);
 
 	omap_die_id_display();
 
 	if (get_cpu_family() == CPU_OMAP34XX)
-		setenv("boardname", "overo");
+		env_set("boardname", "overo");
 	else
-		setenv("boardname", "overo-storm");
+		env_set("boardname", "overo-storm");
 
 	return 0;
 }

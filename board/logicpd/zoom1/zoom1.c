@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2004-2008
  * Texas Instruments, <www.ti.com>
@@ -11,11 +12,10 @@
  *	Richard Woodruff <r-woodruff2@ti.com>
  *	Syed Mohammed Khasim <khasim@ti.com>
  *
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
 #include <dm.h>
+#include <environment.h>
 #include <ns16550.h>
 #include <netdev.h>
 #include <twl4030.h>
@@ -130,10 +130,10 @@ int board_eth_init(bd_t *bis)
 	uchar eth_addr[6];
 
 	rc = smc911x_initialize(0, CONFIG_SMC911X_BASE);
-	if (!eth_getenv_enetaddr(STR_ENV_ETHADDR, eth_addr)) {
+	if (!eth_env_get_enetaddr(STR_ENV_ETHADDR, eth_addr)) {
 		dev = eth_get_dev_by_index(0);
 		if (dev) {
-			eth_setenv_enetaddr(STR_ENV_ETHADDR, dev->enetaddr);
+			eth_env_set_enetaddr(STR_ENV_ETHADDR, dev->enetaddr);
 		} else {
 			printf("zoom1: Couldn't get eth device\n");
 			rc = -1;

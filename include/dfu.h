@@ -1,11 +1,10 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * dfu.h - DFU flashable area description
  *
  * Copyright (C) 2012 Samsung Electronics
  * authors: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
  *	    Lukasz Majewski <l.majewski@samsung.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __DFU_ENTITY_H_
@@ -110,7 +109,7 @@ struct dfu_entity {
 		struct sf_internal_data sf;
 	} data;
 
-	long (*get_medium_size)(struct dfu_entity *dfu);
+	int (*get_medium_size)(struct dfu_entity *dfu, u64 *size);
 
 	int (*read_medium)(struct dfu_entity *dfu,
 			u64 offset, void *buf, long *len);
@@ -132,7 +131,7 @@ struct dfu_entity {
 	u8 *i_buf;
 	u8 *i_buf_start;
 	u8 *i_buf_end;
-	long r_left;
+	u64 r_left;
 	long b_left;
 
 	u32 bad_skip;	/* for nand use */

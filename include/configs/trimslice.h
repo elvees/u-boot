@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  *  (C) Copyright 2010-2012
  *  NVIDIA Corporation <www.nvidia.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -28,7 +27,6 @@
 #define CONFIG_SYS_I2C_TEGRA
 
 /* Environment in SPI */
-#define CONFIG_ENV_IS_IN_SPI_FLASH
 #define CONFIG_ENV_SPI_MAX_HZ		48000000
 #define CONFIG_ENV_SPI_MODE		SPI_MODE_0
 #define CONFIG_ENV_SECT_SIZE		CONFIG_ENV_SIZE
@@ -39,11 +37,8 @@
 #define CONFIG_USB_EHCI_TEGRA
 
 /* USB networking support */
-#define CONFIG_USB_HOST_ETHER
-#define CONFIG_USB_ETHER_ASIX
 
 /* PCI host support */
-#define CONFIG_CMD_PCI
 
 /* General networking support */
 

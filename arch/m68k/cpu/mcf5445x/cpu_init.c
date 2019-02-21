@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  *
  * (C) Copyright 2000-2003
@@ -5,8 +6,6 @@
  *
  * (C) Copyright 2004-2007, 2012 Freescale Semiconductor, Inc.
  * TsiChung Liew (Tsi-Chung.Liew@freescale.com)
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -174,6 +173,15 @@ void cpu_init_f(void)
 
 	/* Lowest slew rate for UART0,1,2 */
 	out_8(&gpio->srcr_uart, 0x00);
+
+#ifdef CONFIG_FSL_ESDHC
+	/* eSDHC pin as faster speed */
+	out_8(&gpio->srcr_sdhc, 0x03);
+
+	/* All esdhc pins as SD */
+	out_8(&gpio->par_sdhch, 0xff);
+	out_8(&gpio->par_sdhcl, 0xff);
+#endif
 #endif		/* CONFIG_MCF5441x */
 
 #ifdef CONFIG_MCF5445x
@@ -205,6 +213,7 @@ void cpu_init_f(void)
 	/* FlexBus Chipselect */
 	init_fbcs();
 
+#ifdef CONFIG_SYS_CS0_BASE
 	/*
 	 * now the flash base address is no longer at 0 (Newer ColdFire family
 	 * boot at address 0 instead of 0xFFnn_nnnn). The vector table must
@@ -212,6 +221,7 @@ void cpu_init_f(void)
 	 */
 	if (CONFIG_SYS_CS0_BASE != 0)
 		setvbr(CONFIG_SYS_CS0_BASE);
+#endif
 
 	icache_enable();
 }
@@ -533,4 +543,5 @@ void cfspi_release_bus(uint bus, uint cs)
 		clrbits_8(&gpio->par_dspiow, GPIO_PAR_DSPIOW_DSPI0PSC1);
 #endif
 }
+
 #endif

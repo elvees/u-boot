@@ -1,9 +1,17 @@
 menu "UBI support"
 
+config CONFIG_UBI_SILENCE_MSG
+	bool "UBI silence verbose messages"
+	default ENV_IS_IN_UBI
+	help
+	  Make the verbose messages from UBI stop printing. This leaves
+	  warnings and errors enabled.
+
 config MTD_UBI
 	bool "Enable UBI - Unsorted block images"
 	select CRC32
-	select RBTREE if ARCH_SUNXI
+	select RBTREE
+	select MTD_PARTITIONS
 	help
 	  UBI is a software layer above MTD layer which admits of LVM-like
 	  logical volumes on top of MTD devices, hides some complexities of

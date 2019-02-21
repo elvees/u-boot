@@ -1,11 +1,10 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2007 Michal Simek
  * (C) Copyright 2004 Atmark Techno, Inc.
  *
  * Michal  SIMEK <monstr@monstr.eu>
  * Yasushi SHOJI <yashi@atmark-techno.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm-offsets.h>
@@ -31,8 +30,8 @@ _start:
 	mts	rshr, r1
 	addi	r1, r1, -4	/* Decrement SP to top of memory */
 #else
-#if defined(CONFIG_SYS_MALLOC_F_LEN)
-	addi	r1, r0, CONFIG_SYS_INIT_SP_OFFSET - CONFIG_SYS_MALLOC_F_LEN
+#if CONFIG_VAL(SYS_MALLOC_F_LEN)
+	addi	r1, r0, CONFIG_SYS_INIT_SP_OFFSET - CONFIG_VAL(SYS_MALLOC_F_LEN)
 #else
 	addi	r1, r0, CONFIG_SYS_INIT_SP_OFFSET
 #endif
@@ -162,14 +161,14 @@ clear_bss:
 #ifndef CONFIG_SPL_BUILD
 	or	r5, r0, r0	/* flags - empty */
 	addi    r31, r0, _gd
-#if defined(CONFIG_SYS_MALLOC_F_LEN)
+#if CONFIG_VAL(SYS_MALLOC_F_LEN)
 	addi	r6, r0, CONFIG_SYS_INIT_SP_OFFSET
 	swi	r6, r31, GD_MALLOC_BASE
 #endif
 	brai	board_init_f
 #else
 	addi	r31, r0, _gd
-#if defined(CONFIG_SYS_MALLOC_F_LEN)
+#if CONFIG_VAL(SYS_MALLOC_F_LEN)
 	addi	r6, r0, CONFIG_SPL_STACK_ADDR
 	swi	r6, r31, GD_MALLOC_BASE
 #endif

@@ -1,6 +1,4 @@
-/*
- * SPDX-License-Identifier:	GPL-2.0+
- */
+// SPDX-License-Identifier: GPL-2.0+
 
 #include <common.h>
 #include <malloc.h>
@@ -125,7 +123,6 @@
 #define TOUT_LOOP   1000000
 
 #define SETUP_FRAME_LEN 192
-#define ETH_ALEN	6
 
 struct de4x5_desc {
 	volatile s32 status;
@@ -750,7 +747,7 @@ static void update_srom(struct eth_device *dev, bd_t *bis)
 	uchar enetaddr[6];
 
 	/* Ethernet Addr... */
-	if (!eth_getenv_enetaddr("ethaddr", enetaddr))
+	if (!eth_env_get_enetaddr("ethaddr", enetaddr))
 		return;
 	eeprom[0x0a] = (enetaddr[1] << 8) | enetaddr[0];
 	eeprom[0x0b] = (enetaddr[3] << 8) | enetaddr[2];

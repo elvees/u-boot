@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2016 samtec automotive software & electronics gmbh
  *
  * Author: Christoph Fritz <chf.fritz@googlemail.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm/arch/clock.h>
@@ -13,11 +12,12 @@
 #include <asm/arch/mx6-pins.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/gpio.h>
-#include <asm/imx-common/iomux-v3.h>
+#include <asm/mach-imx/iomux-v3.h>
 #include <asm/io.h>
-#include <asm/imx-common/mxc_i2c.h>
+#include <asm/mach-imx/mxc_i2c.h>
 #include <linux/sizes.h>
 #include <common.h>
+#include <environment.h>
 #include <fsl_esdhc.h>
 #include <mmc.h>
 #include <i2c.h>
@@ -131,8 +131,8 @@ int board_eth_init(bd_t *bis)
 
 	/* just to get secound mac address */
 	imx_get_mac_from_fuse(1, eth1addr);
-	if (!getenv("eth1addr") && is_valid_ethaddr(eth1addr))
-		eth_setenv_enetaddr("eth1addr", eth1addr);
+	if (!env_get("eth1addr") && is_valid_ethaddr(eth1addr))
+		eth_env_set_enetaddr("eth1addr", eth1addr);
 
 	imx_iomux_v3_setup_multiple_pads(fec1_pads, ARRAY_SIZE(fec1_pads));
 
@@ -378,7 +378,7 @@ static int read_adc(u32 *val)
 
 	/* start auto calibration */
 	setbits_le32(b + ADCx_GC, ADCx_GC_CAL);
-	ret = wait_for_bit("ADC", b + ADCx_GC, ADCx_GC_CAL, ADCx_GC_CAL, 10, 0);
+	ret = wait_for_bit_le32(b + ADCx_GC, ADCx_GC_CAL, ADCx_GC_CAL, 10, 0);
 	if (ret)
 		goto adc_exit;
 
@@ -386,7 +386,7 @@ static int read_adc(u32 *val)
 	writel(0, b + ADCx_HC0);
 
 	/* wait for conversion */
-	ret = wait_for_bit("ADC", b + ADCx_HS, ADCx_HS_C0, ADCx_HS_C0, 10, 0);
+	ret = wait_for_bit_le32(b + ADCx_HS, ADCx_HS_C0, ADCx_HS_C0, 10, 0);
 	if (ret)
 		goto adc_exit;
 
@@ -413,11 +413,11 @@ static int set_pin_state(void)
 		return ret;
 
 	if (val >= VAL_UPPER)
-		setenv("pin_state", "connected");
+		env_set("pin_state", "connected");
 	else if (val < VAL_UPPER && val > VAL_LOWER)
-		setenv("pin_state", "open");
+		env_set("pin_state", "open");
 	else
-		setenv("pin_state", "button");
+		env_set("pin_state", "button");
 
 	return ret;
 }

@@ -1,11 +1,13 @@
 SoC overview
 
 	1. LS1043A
-	2. LS2080A
-	3. LS1012A
-	4. LS1046A
-	5. LS2088A
-	6. LS2081A
+	2. LS1088A
+	3. LS2080A
+	4. LS1012A
+	5. LS1046A
+	6. LS2088A
+	7. LS2081A
+	8. LX2160A
 
 LS1043A
 ---------
@@ -44,6 +46,38 @@ The LS1043A SoC includes the following function and features:
    - Two DUARTs
    - Integrated flash controller supporting NAND and NOR flash
  - QorIQ platform's trust architecture 2.1
+
+LS1088A
+--------
+The QorIQ LS1088A processor is built on the Layerscape
+architecture combining eight ARM A53 processor cores
+with advanced, high-performance datapath acceleration
+and networks, peripheral interfaces required for
+networking, wireless infrastructure, and general-purpose
+embedded applications.
+
+LS1088A is compliant with the Layerscape Chassis Generation 3.
+
+Features summary:
+ - 8 32-bit / 64-bit ARM v8 Cortex-A53 CPUs
+ - Cores are in 2 cluster of 4-cores each
+ - 1MB L2 - Cache per cluster
+ - Cache coherent interconnect (CCI-400)
+ - 1 64-bit DDR4 SDRAM memory controller with ECC
+ - Data path acceleration architecture 2.0 (DPAA2)
+ - 4-Lane 10GHz SerDes comprising of WRIOP
+ - 4-Lane 10GHz SerDes comprising of PCI, SATA, uQE(TDM/HLDC/UART)
+ - Ethernet interfaces: SGMIIs, RGMIIs, QSGMIIs, XFIs
+ - QSPI, SPI, IFC2.0 supporting NAND, NOR flash
+ - 3 PCIe3.0 , 1 SATA3.0, 2 USB3.0, 1 SDXC, 2 DUARTs etc
+ - 2 DUARTs
+ - 4 I2C, GPIO
+ - Thermal monitor unit(TMU)
+ - 4 Flextimers and 1 generic timer
+ - Support for hardware virtualization and partitioning enforcement
+ - QorIQ platform's trust architecture 3.0
+ - Service processor (SP) provides pre-boot initialization and secure-boot
+   capabilities
 
 LS2080A
 --------
@@ -238,3 +272,59 @@ Refer to LS2084A(LS2088A) section above for details.
 It has one more similar SoC personality
 1)LS2041A, few difference w.r.t. LS2081A:
        a) Four 64-bit ARM v8 Cortex-A72 CPUs
+
+LX2160A
+--------
+The QorIQ LX2160A processor is built in the 16FFC process on
+the Layerscape architecture combining sixteen ARM A72 processor
+cores with advanced, high-performance datapath acceleration and
+network, peripheral interfaces required for networking, wireless
+infrastructure, storage, and general-purpose embedded applications.
+
+LX2160A is compliant with the Layerscape Chassis Generation 3.2.
+
+The LX2160A SoC includes the following function and features:
+  Sixteen 32-bit / 64-bit ARM v8 A72 CPUs
+  Cache Coherent Interconnect Fabric (CCN508 aka “Eliot”)
+  Two 64-bit 3.2GT/s DDR4 SDRAM memory controllers with ECC.
+  Data path acceleration architecture (DPAA2)
+  24 Serdes lanes at up to 25 GHz
+  Ethernet interfaces
+  Single WRIOP tile supporting 130Gbps using 18 MACs
+  Support for 10G-SXGMII (aka USXGMII).
+  Support for SGMII (and 1000Base-KX)
+  Support for XFI (and 10GBase-KR)
+  Support for CAUI4 (100G); CAUI2 (50G) and 25G-AUI(25G).
+  Support for XLAUI (and 40GBase-KR4) for 40G.
+  Support for two RGMII parallel interfaces.
+  Energy efficient Ethernet support (802.3az)
+  IEEE 1588 support.
+  High-speed peripheral interfaces
+	Two PCIe Gen 4.0 8-lane controllers supporting SR-IOV,
+	Four PCIe Gen 4.0 4-lane controllers.
+	Four serial ATA (SATA 3.0) controllers.
+	Two USB 3.0 controllers with integrated PHY
+	Two Enhanced secure digital host controllers
+	Two Controller Area Network (CAN) modules
+	Flexible Serial peripheral interface (FlexSPI) controller.
+	Three Serial peripheral interface (SPI) controllers.
+	Eight I2C Controllers.
+	Four PL011 UARTs supporting two 4-pin UART ports or four 2-pin UART ports.
+	General Purpose IO (GPIO)
+  Support for hardware virtualization and partitioning (ARM MMU-500)
+  Support for GIC (ARM GIC-500)
+  QorIQ platform Trust Architecture 3.0
+  One Secure WatchDog timer and one Non-Secure Watchdog timer.
+  ARM Generic Timer
+  Two Flextimers
+  Debug supporting run control, data acquisition, high-speed trace,
+  performance/event monitoring
+  Thermal Monitor Unit (TMU) with +/- 2C accuracy
+  Support for Voltage ID (VID) for yield improvement
+
+LX2160A SoC has 2 more similar SoC personalities
+1)LX2120A, few difference w.r.t. LX2160A:
+       a) Twelve 64-bit ARM v8 Cortex-A72 CPUs
+
+2)LX2080A, few difference w.r.t. LX2160A:
+       a) Eight 64-bit ARM v8 Cortex-A72 CPUs

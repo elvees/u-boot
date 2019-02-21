@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * NVIDIA Tegra20 GPIO handling.
  *  (C) Copyright 2010-2012,2015
  *  NVIDIA Corporation <www.nvidia.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -22,8 +21,6 @@
 #include <asm/gpio.h>
 #include <dm/device-internal.h>
 #include <dt-bindings/gpio/gpio.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 static const int CONFIG_SFIO = 0;
 static const int CONFIG_GPIO = 1;
@@ -337,11 +334,13 @@ static int gpio_tegra_bind(struct udevice *parent)
 	 * This driver does not make use of interrupts, other than to figure
 	 * out the number of GPIO banks
 	 */
-	if (!fdt_getprop(gd->fdt_blob, dev_of_offset(parent), "interrupts",
-			 &len))
-		return -EINVAL;
+	len = dev_read_size(parent, "interrupts");
+	if (len < 0)
+		return len;
 	bank_count = len / 3 / sizeof(u32);
-	ctlr = (struct gpio_ctlr *)devfdt_get_addr(parent);
+	ctlr = (struct gpio_ctlr *)dev_read_addr(parent);
+	if ((ulong)ctlr == FDT_ADDR_T_NONE)
+		return -EINVAL;
 	}
 #endif
 	for (bank = 0; bank < bank_count; bank++) {
@@ -379,5 +378,4 @@ U_BOOT_DRIVER(gpio_tegra) = {
 	.probe = gpio_tegra_probe,
 	.priv_auto_alloc_size = sizeof(struct tegra_port_info),
 	.ops	= &gpio_tegra_ops,
-	.flags	= DM_FLAG_PRE_RELOC,
 };

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
  *
@@ -5,11 +6,11 @@
  *
  * Copyright (C) 2009 Nick Thompson, GE Fanuc, Ltd. <nick.thompson@gefanuc.com>
  * Copyright (C) 2007 Sergey Kubushyn <ksi@koi8.net>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <dm.h>
+#include <environment.h>
 #include <i2c.h>
 #include <net.h>
 #include <netdev.h>
@@ -24,6 +25,7 @@
 #include <linux/errno.h>
 #include <hwconfig.h>
 #include <asm/mach-types.h>
+#include <asm/gpio.h>
 
 #ifdef CONFIG_MMC_DAVINCI
 #include <mmc.h>
@@ -47,6 +49,33 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define CFG_MAC_ADDR_OFFSET	(flash->size - SZ_64K)
 
+#ifdef CONFIG_SPL_BUILD
+#include <ns16550.h>
+#include <dm/platform_data/spi_davinci.h>
+
+static const struct ns16550_platdata da850evm_serial = {
+	.base = DAVINCI_UART2_BASE,
+	.reg_shift = 2,
+	.clock = 150000000,
+	.fcr = UART_FCR_DEFVAL,
+};
+
+U_BOOT_DEVICE(da850evm_uart) = {
+	.name = "ns16550_serial",
+	.platdata = &da850evm_serial,
+};
+
+static const struct davinci_spi_platdata davinci_spi_data = {
+        .regs = (struct davinci_spi_regs *)0x01f0e000,
+        .num_cs = 4,
+};
+
+U_BOOT_DEVICE(davinci_spi) = {
+        .name = "davinci_spi",
+        .platdata = &davinci_spi_data,
+};
+#endif
+
 #ifdef CONFIG_MAC_ADDR_IN_SPIFLASH
 static int get_mac_addr(u8 *addr)
 {
@@ -60,7 +89,7 @@ static int get_mac_addr(u8 *addr)
 		return -1;
 	}
 
-	ret = spi_flash_read(flash, CFG_MAC_ADDR_OFFSET, 6, addr);
+	ret = spi_flash_read(flash, (CFG_MAC_ADDR_OFFSET) + 1, 7, addr);
 	if (ret) {
 		printf("Error - unable to read MAC address from SPI flash.\n");
 		return -1;
@@ -131,13 +160,16 @@ int misc_init_r(void)
 	uchar env_enetaddr[6];
 	int enetaddr_found;
 
-	enetaddr_found = eth_getenv_enetaddr("ethaddr", env_enetaddr);
+	enetaddr_found = eth_env_get_enetaddr("ethaddr", env_enetaddr);
+
+#endif
 
 #ifdef CONFIG_MAC_ADDR_IN_SPIFLASH
 	int spi_mac_read;
 	uchar buff[6];
 
 	spi_mac_read = get_mac_addr(buff);
+	buff[0] = 0;
 
 	/*
 	 * MAC address not present in the environment
@@ -147,7 +179,7 @@ int misc_init_r(void)
 	if (!enetaddr_found) {
 		if (!spi_mac_read) {
 			if (is_valid_ethaddr(buff)) {
-				if (eth_setenv_enetaddr("ethaddr", buff)) {
+				if (eth_env_set_enetaddr("ethaddr", buff)) {
 					printf("Warning: Failed to "
 					"set MAC address from SPI flash\n");
 				}
@@ -167,7 +199,8 @@ int misc_init_r(void)
 					"with the MAC address in the environment\n");
 		printf("Default using MAC address from environment\n");
 	}
-#endif
+
+#elif defined(CONFIG_MAC_ADDR_IN_EEPROM)
 	uint8_t enetaddr[8];
 	int eeprom_mac_read;
 
@@ -198,6 +231,7 @@ int misc_init_r(void)
 	return 0;
 }
 
+#ifndef CONFIG_DM_MMC
 #ifdef CONFIG_MMC_DAVINCI
 static struct davinci_mmc mmc_sd0 = {
 	.reg_base = (struct davinci_mmc_regs *)DAVINCI_MMC_SD0_BASE,
@@ -213,6 +247,7 @@ int board_mmc_init(bd_t *bis)
 	/* Add slot-0 to mmc subsystem */
 	return davinci_mmc_init(bis, &mmc_sd0);
 }
+#endif
 #endif
 
 static const struct pinmux_config gpio_pins[] = {
@@ -292,7 +327,7 @@ u32 get_board_rev(void)
 	u32 maxcpuclk = CONFIG_DA850_EVM_MAX_CPU_CLK;
 	u32 rev = 0;
 
-	s = getenv("maxcpuclk");
+	s = env_get("maxcpuclk");
 	if (s)
 		maxcpuclk = simple_strtoul(s, NULL, 10);
 

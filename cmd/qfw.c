@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2015 Miao Yan <yanmiaobest@gmail.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -55,7 +54,7 @@ static int qemu_fwcfg_setup_kernel(void *load_addr, void *initrd_addr)
 		 * when invoking qemu), do not update bootargs
 		 */
 		if (*data_addr != '\0') {
-			if (setenv("bootargs", data_addr) < 0)
+			if (env_set("bootargs", data_addr) < 0)
 				printf("warning: unable to change bootargs\n");
 		}
 	}
@@ -123,7 +122,7 @@ static int qemu_fwcfg_do_load(cmd_tbl_t *cmdtp, int flag,
 	void *load_addr;
 	void *initrd_addr;
 
-	env = getenv("loadaddr");
+	env = env_get("loadaddr");
 	load_addr = env ?
 		(void *)simple_strtoul(env, NULL, 16) :
 #ifdef CONFIG_LOADADDR
@@ -132,7 +131,7 @@ static int qemu_fwcfg_do_load(cmd_tbl_t *cmdtp, int flag,
 		NULL;
 #endif
 
-	env = getenv("ramdiskaddr");
+	env = env_get("ramdiskaddr");
 	initrd_addr = env ?
 		(void *)simple_strtoul(env, NULL, 16) :
 #ifdef CONFIG_RAMDISK_ADDR

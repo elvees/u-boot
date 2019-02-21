@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * LPC32xx SSP interface (SPI mode)
  *
  * (C) Copyright 2014  DENX Software Engineering GmbH
  * Written-by: Albert ARIBAUD <albert.aribaud@3adev.fr>
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <common.h>
@@ -48,15 +47,6 @@ static inline struct lpc32xx_spi_slave *to_lpc32xx_spi_slave(
 	return container_of(slave, struct lpc32xx_spi_slave, slave);
 }
 
-/* spi_init is called during boot when CONFIG_CMD_SPI is defined */
-void spi_init(void)
-{
-	/*
-	 *  nothing to do: clocking was enabled in lpc32xx_ssp_enable()
-	 * and configuration will be done in spi_setup_slave()
-	*/
-}
-
 /* the following is called in sequence by do_spi_xfer() */
 
 struct spi_slave *spi_setup_slave(uint bus, uint cs, uint max_hz, uint mode)
@@ -66,17 +56,17 @@ struct spi_slave *spi_setup_slave(uint bus, uint cs, uint max_hz, uint mode)
 	/* we only set up SSP0 for now, so ignore bus */
 
 	if (mode & SPI_3WIRE) {
-		error("3-wire mode not supported");
+		pr_err("3-wire mode not supported");
 		return NULL;
 	}
 
 	if (mode & SPI_SLAVE) {
-		error("slave mode not supported\n");
+		pr_err("slave mode not supported\n");
 		return NULL;
 	}
 
 	if (mode & SPI_PREAMBLE) {
-		error("preamble byte skipping not supported\n");
+		pr_err("preamble byte skipping not supported\n");
 		return NULL;
 	}
 
@@ -130,7 +120,7 @@ int spi_xfer(struct spi_slave *slave, unsigned int bitlen,
 		int status = readl(&lslave->regs->sr);
 		if ((idx_out < bytelen) && (status & SSP_SR_TNF))
 			writel(((u8 *)dout)[idx_out++], &lslave->regs->data);
-		if ((idx_in < bytelen) && (status & status & SSP_SR_RNE))
+		if ((idx_in < bytelen) && (status & SSP_SR_RNE))
 			((u8 *)din)[idx_in++] = readl(&lslave->regs->data);
 		if (get_timer(start_time) >= CONFIG_LPC32XX_SSP_TIMEOUT)
 			return -1;

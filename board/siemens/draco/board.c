@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Board functions for TI AM335X based draco board
  * (C) Copyright 2013 Siemens Schweiz AG
@@ -9,8 +10,6 @@
  * u-boot:/board/ti/am335x/board.c
  *
  * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -35,8 +34,6 @@
 #include "board.h"
 #include "../common/factoryset.h"
 #include <nand.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 #ifdef CONFIG_SPL_BUILD
 static struct draco_baseboard_id __attribute__((section(".data"))) settings;
@@ -272,13 +269,13 @@ int board_late_init(void)
 #ifdef CONFIG_FACTORYSET
 	/* Set ASN in environment*/
 	if (factory_dat.asn[0] != 0) {
-		setenv("dtb_name", (char *)factory_dat.asn);
+		env_set("dtb_name", (char *)factory_dat.asn);
 	} else {
 		/* dtb suffix gets added in load script */
-		setenv("dtb_name", "am335x-draco");
+		env_set("dtb_name", "am335x-draco");
 	}
 #else
-	setenv("dtb_name", "am335x-draco");
+	env_set("dtb_name", "am335x-draco");
 #endif
 
 	return 0;
@@ -330,7 +327,7 @@ int board_eth_init(bd_t *bis)
 	int n = 0;
 	int rv;
 
-	factoryset_setenv();
+	factoryset_env_set();
 
 	/* Set rgmii mode and enable rmii clock to be sourced from chip */
 	writel((RMII_MODE_ENABLE | RMII_CHIPCKL_ENABLE), &cdev->miisel);

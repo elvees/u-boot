@@ -1,11 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2012 Freescale Semiconductor, Inc.
  * Author: Fabio Estevam <fabio.estevam@freescale.com>
  *
  * Copyright (C) 2013, 2014 TQ Systems (ported SabreSD to TQMa6x)
  * Author: Markus Niebel <markus.niebel@tq-group.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm/arch/clock.h>
@@ -16,11 +15,11 @@
 #include <linux/errno.h>
 #include <asm/gpio.h>
 #include <asm/io.h>
-#include <asm/imx-common/mxc_i2c.h>
-#include <asm/imx-common/spi.h>
+#include <asm/mach-imx/mxc_i2c.h>
+#include <asm/mach-imx/spi.h>
 #include <common.h>
 #include <fsl_esdhc.h>
-#include <libfdt.h>
+#include <linux/libfdt.h>
 #include <i2c.h>
 #include <mmc.h>
 #include <power/pfuze100_pmic.h>
@@ -251,7 +250,7 @@ int power_init_board(void)
 
 int board_late_init(void)
 {
-	setenv("board_name", tqma6_get_boardname());
+	env_set("board_name", tqma6_get_boardname());
 
 	tqma6_bb_board_late_init();
 

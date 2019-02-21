@@ -15,6 +15,23 @@ struct p_current{
 
 extern struct p_current *current;
 
+/* avoid conflict with <dm/device.h> */
+#ifdef dev_dbg
+#undef dev_dbg
+#endif
+#ifdef dev_vdbg
+#undef dev_vdbg
+#endif
+#ifdef dev_info
+#undef dev_info
+#endif
+#ifdef dev_err
+#undef dev_err
+#endif
+#ifdef dev_warn
+#undef dev_warn
+#endif
+
 #define dev_dbg(dev, fmt, args...)		\
 	debug(fmt, ##args)
 #define dev_vdbg(dev, fmt, args...)		\
@@ -25,17 +42,25 @@ extern struct p_current *current;
 	printf(fmt, ##args)
 #define dev_warn(dev, fmt, args...)		\
 	printf(fmt, ##args)
-#define printk	printf
-#define printk_once	printf
 
-#define KERN_EMERG
-#define KERN_ALERT
-#define KERN_CRIT
-#define KERN_ERR
-#define KERN_WARNING
-#define KERN_NOTICE
-#define KERN_INFO
-#define KERN_DEBUG
+#define netdev_emerg(dev, fmt, args...)		\
+	printf(fmt, ##args)
+#define netdev_alert(dev, fmt, args...)		\
+	printf(fmt, ##args)
+#define netdev_crit(dev, fmt, args...)		\
+	printf(fmt, ##args)
+#define netdev_err(dev, fmt, args...)		\
+	printf(fmt, ##args)
+#define netdev_warn(dev, fmt, args...)		\
+	printf(fmt, ##args)
+#define netdev_notice(dev, fmt, args...)	\
+	printf(fmt, ##args)
+#define netdev_info(dev, fmt, args...)		\
+	printf(fmt, ##args)
+#define netdev_dbg(dev, fmt, args...)		\
+	debug(fmt, ##args)
+#define netdev_vdbg(dev, fmt, args...)		\
+	debug(fmt, ##args)
 
 #define GFP_ATOMIC ((gfp_t) 0)
 #define GFP_KERNEL ((gfp_t) 0)
@@ -97,21 +122,6 @@ static inline void kmem_cache_destroy(struct kmem_cache *cachep)
 #define remove_wait_queue(...)	do { } while (0)
 
 #define KERNEL_VERSION(a,b,c)	(((a) << 16) + ((b) << 8) + (c))
-
-#ifndef BUG
-#define BUG() do { \
-	printf("U-Boot BUG at %s:%d!\n", __FILE__, __LINE__); \
-} while (0)
-
-#define BUG_ON(condition) do { if (condition) BUG(); } while(0)
-#endif /* BUG */
-
-#define WARN_ON(condition) ({						\
-	int __ret_warn_on = !!(condition);				\
-	if (unlikely(__ret_warn_on))					\
-		printf("WARNING in %s line %d\n", __FILE__, __LINE__);	\
-	unlikely(__ret_warn_on);					\
-})
 
 #define PAGE_SIZE	4096
 
@@ -202,7 +212,6 @@ typedef unsigned long blkcnt_t;
 #define init_waitqueue_head(...)	do { } while (0)
 #define wait_event_interruptible(...)	0
 #define wake_up_interruptible(...)	do { } while (0)
-#define print_hex_dump(...)		do { } while (0)
 #define dump_stack(...)			do { } while (0)
 
 #define task_pid_nr(x)			0

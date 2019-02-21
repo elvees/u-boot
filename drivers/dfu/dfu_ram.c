@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2013
  * Afzal Mohammed <afzal.mohd.ma@gmail.com>
@@ -5,8 +6,6 @@
  * Reference: dfu_mmc.c
  * Copyright (C) 2012 Samsung Electronics
  * author: Lukasz Majewski <l.majewski@samsung.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -18,12 +17,12 @@ static int dfu_transfer_medium_ram(enum dfu_op op, struct dfu_entity *dfu,
 				   u64 offset, void *buf, long *len)
 {
 	if (dfu->layout != DFU_RAM_ADDR) {
-		error("unsupported layout: %s\n", dfu_get_layout(dfu->layout));
+		pr_err("unsupported layout: %s\n", dfu_get_layout(dfu->layout));
 		return  -EINVAL;
 	}
 
 	if (offset > dfu->data.ram.size) {
-		error("request exceeds allowed area\n");
+		pr_err("request exceeds allowed area\n");
 		return -EINVAL;
 	}
 
@@ -41,9 +40,11 @@ static int dfu_write_medium_ram(struct dfu_entity *dfu, u64 offset,
 	return dfu_transfer_medium_ram(DFU_OP_WRITE, dfu, offset, buf, len);
 }
 
-long dfu_get_medium_size_ram(struct dfu_entity *dfu)
+int dfu_get_medium_size_ram(struct dfu_entity *dfu, u64 *size)
 {
-	return dfu->data.ram.size;
+	*size = dfu->data.ram.size;
+
+	return 0;
 }
 
 static int dfu_read_medium_ram(struct dfu_entity *dfu, u64 offset,
@@ -60,14 +61,14 @@ int dfu_fill_entity_ram(struct dfu_entity *dfu, char *devstr, char *s)
 	for (; parg < argv + sizeof(argv) / sizeof(*argv); ++parg) {
 		*parg = strsep(&s, " ");
 		if (*parg == NULL) {
-			error("Invalid number of arguments.\n");
+			pr_err("Invalid number of arguments.\n");
 			return -ENODEV;
 		}
 	}
 
 	dfu->dev_type = DFU_DEV_RAM;
 	if (strcmp(argv[0], "ram")) {
-		error("unsupported device: %s\n", argv[0]);
+		pr_err("unsupported device: %s\n", argv[0]);
 		return -ENODEV;
 	}
 

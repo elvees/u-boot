@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2015 Google, Inc
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <clk.h>
@@ -17,6 +16,7 @@
 #include <asm/io.h>
 #include <asm/arch/bootrom.h>
 #include <asm/arch/clock.h>
+#include <asm/arch/grf_rk3188.h>
 #include <asm/arch/hardware.h>
 #include <asm/arch/periph.h>
 #include <asm/arch/pmu_rk3188.h>
@@ -50,7 +50,7 @@ u32 spl_boot_device(void)
 		debug("node=%d\n", node);
 		goto fallback;
 	}
-	ret = device_get_global_by_of_offset(node, &dev);
+	ret = device_get_global_by_ofnode(offset_to_ofnode(node), &dev);
 	if (ret) {
 		debug("device at node %s/%d not found: %d\n", bootdev, node,
 		      ret);
@@ -70,11 +70,6 @@ u32 spl_boot_device(void)
 fallback:
 #endif
 	return BOOT_DEVICE_MMC1;
-}
-
-u32 spl_boot_mode(const u32 boot_device)
-{
-	return MMCSD_MODE_RAW;
 }
 
 static int setup_arm_clock(void)
@@ -98,24 +93,38 @@ static int setup_arm_clock(void)
 	return ret;
 }
 
-void board_init_f(ulong dummy)
+void board_debug_uart_init(void)
 {
-	struct udevice *pinctrl, *dev;
-	struct rk3188_pmu *pmu;
-	int ret;
-
-	/* Example code showing how to enable the debug UART on RK3188 */
-#ifdef EARLY_UART
-#include <asm/arch/grf_rk3188.h>
 	/* Enable early UART on the RK3188 */
 #define GRF_BASE	0x20008000
 	struct rk3188_grf * const grf = (void *)GRF_BASE;
+	enum {
+		GPIO1B1_SHIFT		= 2,
+		GPIO1B1_MASK		= 3,
+		GPIO1B1_GPIO		= 0,
+		GPIO1B1_UART2_SOUT,
 
+		GPIO1B0_SHIFT		= 0,
+		GPIO1B0_MASK		= 3,
+		GPIO1B0_GPIO		= 0,
+		GPIO1B0_UART2_SIN,
+	};
+
+	/* Enable early UART on the RK3188 */
 	rk_clrsetreg(&grf->gpio1b_iomux,
 		     GPIO1B1_MASK << GPIO1B1_SHIFT |
 		     GPIO1B0_MASK << GPIO1B0_SHIFT,
 		     GPIO1B1_UART2_SOUT << GPIO1B1_SHIFT |
 		     GPIO1B0_UART2_SIN << GPIO1B0_SHIFT);
+}
+
+void board_init_f(ulong dummy)
+{
+	struct udevice *pinctrl, *dev;
+	int ret;
+
+#define EARLY_UART
+#ifdef EARLY_UART
 	/*
 	 * Debug UART can be used from here if required:
 	 *
@@ -131,28 +140,36 @@ void board_init_f(ulong dummy)
 	printch('\n');
 #endif
 
+#ifdef CONFIG_ROCKCHIP_USB_UART
+	rk_clrsetreg(&grf->uoc0_con[0],
+		     SIDDQ_MASK | UOC_DISABLE_MASK | COMMON_ON_N_MASK,
+		     1 << SIDDQ_SHIFT | 1 << UOC_DISABLE_SHIFT |
+		     1 << COMMON_ON_N_SHIFT);
+	rk_clrsetreg(&grf->uoc0_con[2],
+		     SOFT_CON_SEL_MASK, 1 << SOFT_CON_SEL_SHIFT);
+	rk_clrsetreg(&grf->uoc0_con[3],
+		     OPMODE_MASK | XCVRSELECT_MASK |
+		     TERMSEL_FULLSPEED_MASK | SUSPENDN_MASK,
+		     OPMODE_NODRIVING << OPMODE_SHIFT |
+		     XCVRSELECT_FSTRANSC << XCVRSELECT_SHIFT |
+		     1 << TERMSEL_FULLSPEED_SHIFT |
+		     1 << SUSPENDN_SHIFT);
+	rk_clrsetreg(&grf->uoc0_con[0],
+		     BYPASSSEL_MASK | BYPASSDMEN_MASK,
+		     1 << BYPASSSEL_SHIFT | 1 << BYPASSDMEN_SHIFT);
+#endif
+
 	ret = spl_early_init();
 	if (ret) {
 		debug("spl_early_init() failed: %d\n", ret);
 		hang();
 	}
 
-	rockchip_timer_init();
-
 	ret = rockchip_get_clk(&dev);
 	if (ret) {
 		debug("CLK init failed: %d\n", ret);
 		return;
 	}
-
-	/*
-	 * Recover the bootrom's stackpointer.
-	 * For whatever reason needs to run after rockchip_get_clk.
-	 */
-	pmu = syscon_get_first_range(ROCKCHIP_SYSCON_PMU);
-	if (IS_ERR(pmu))
-		error("pmu syscon returned %ld\n", PTR_ERR(pmu));
-	SAVE_SP_ADDR = readl(&pmu->sys_reg[2]);
 
 	ret = uclass_get_device(UCLASS_PINCTRL, 0, &pinctrl);
 	if (ret) {
@@ -167,9 +184,8 @@ void board_init_f(ulong dummy)
 	}
 
 	setup_arm_clock();
-
-#if defined(CONFIG_ROCKCHIP_SPL_BACK_TO_BROM) && !defined(CONFIG_SPL_BOARD_INIT)
-	back_to_bootrom();
+#if CONFIG_IS_ENABLED(ROCKCHIP_BACK_TO_BROM) && !defined(CONFIG_SPL_BOARD_INIT)
+	back_to_bootrom(BROM_BOOT_NEXTSTAGE);
 #endif
 }
 
@@ -229,8 +245,8 @@ void spl_board_init(void)
 	}
 
 	preloader_console_init();
-#ifdef CONFIG_ROCKCHIP_SPL_BACK_TO_BROM
-	back_to_bootrom();
+#if CONFIG_IS_ENABLED(ROCKCHIP_BACK_TO_BROM)
+	back_to_bootrom(BROM_BOOT_NEXTSTAGE);
 #endif
 	return;
 

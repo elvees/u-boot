@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2015
  * Kamil Lulko, <kamil.lulko@gmail.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -12,12 +11,12 @@
 
 flash_info_t flash_info[CONFIG_SYS_MAX_FLASH_BANKS];
 
-#define STM32_FLASH		((struct stm32_flash_regs *)FLASH_CNTL_BASE)
+#define STM32_FLASH	((struct stm32_flash_regs *)STM32_FLASH_CNTL_BASE)
 
 void stm32_flash_latency_cfg(int latency)
 {
 	/* 5 wait states, Prefetch enabled, D-Cache enabled, I-Cache enabled */
-	writel(FLASH_ACR_WS(5) | FLASH_ACR_PRFTEN | FLASH_ACR_ICEN
+	writel(FLASH_ACR_WS(latency) | FLASH_ACR_PRFTEN | FLASH_ACR_ICEN
 		| FLASH_ACR_DCEN, &STM32_FLASH->acr);
 }
 

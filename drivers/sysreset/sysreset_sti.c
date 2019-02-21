@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
- * (C) Copyright 2017 Patrice Chotard <patrice.chotard@st.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
+ * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
+ * Author(s): Patrice Chotard, <patrice.chotard@st.com> for STMicroelectronics.
  */
 
 #include <common.h>
@@ -39,7 +39,7 @@ static int sti_sysreset_probe(struct udevice *dev)
 					     "st,syscfg", NULL, 0, 0,
 					     &syscfg_phandle);
 	if (ret < 0) {
-		error("Can't get syscfg phandle: %d\n", ret);
+		pr_err("Can't get syscfg phandle: %d\n", ret);
 		return ret;
 	}
 
@@ -47,18 +47,18 @@ static int sti_sysreset_probe(struct udevice *dev)
 					     syscfg_phandle.node,
 					     &syscon);
 	if (ret) {
-		error("%s: uclass_get_device_by_of_offset failed: %d\n",
+		pr_err("%s: uclass_get_device_by_of_offset failed: %d\n",
 		      __func__, ret);
 		return ret;
 	}
 
 	regmap = syscon_get_regmap(syscon);
 	if (!regmap) {
-		error("unable to get regmap for %s\n", syscon->name);
+		pr_err("unable to get regmap for %s\n", syscon->name);
 		return -ENODEV;
 	}
 
-	priv->base = regmap->base;
+	priv->base = regmap->ranges[0].start;
 
 	return 0;
 }

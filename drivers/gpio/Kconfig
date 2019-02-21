@@ -58,6 +58,11 @@ config ATMEL_PIO4
 	  may be dedicated as a general purpose I/O or be assigned to
 	  a function of an embedded peripheral.
 
+config DA8XX_GPIO
+	bool "DA8xx GPIO Driver"
+	help
+	  This driver supports the DA8xx GPIO controller
+
 config INTEL_BROADWELL_GPIO
 	bool "Intel Broadwell GPIO driver"
 	depends on DM
@@ -67,6 +72,12 @@ config INTEL_BROADWELL_GPIO
 	  driver from the common Intel ICH6 driver. It supports a total of
 	  95 GPIOs which can be configured from the device tree.
 
+config INTEL_ICH6_GPIO
+	bool "Intel ICH6 compatible legacy GPIO driver"
+	depends on DM_GPIO
+	help
+	  Say yes here to select Intel ICH6 compatible legacy GPIO driver.
+
 config IMX_RGPIO2P
 	bool "i.MX7ULP RGPIO2P driver"
 	depends on DM
@@ -74,12 +85,26 @@ config IMX_RGPIO2P
 	help
 	  This driver supports i.MX7ULP Rapid GPIO2P controller.
 
+config HSDK_CREG_GPIO
+	bool "HSDK CREG GPIO griver"
+	depends on DM_GPIO
+	default n
+	help
+	  This driver supports CREG GPIOs on Synopsys HSDK SOC.
+
 config LPC32XX_GPIO
 	bool "LPC32XX GPIO driver"
 	depends on DM
 	default n
 	help
 	  Support for the LPC32XX GPIO driver.
+
+config MSCC_BITBANG_SPI_GPIO
+	bool "Microsemi bitbang spi GPIO driver"
+	depends on DM_GPIO && SOC_VCOREIII
+	help
+	  Support controlling the GPIO used for SPI bitbang by software. Can
+	  be used by the VCoreIII SoCs, but it was mainly useful for Luton.
 
 config MSM_GPIO
 	bool "Qualcomm GPIO driver"
@@ -95,6 +120,11 @@ config MSM_GPIO
 	  - APQ8016
 	  - MSM8916
 
+config MXC_GPIO
+	bool "Freescale/NXP MXC GPIO driver"
+	help
+	  Support GPIO controllers on various i.MX platforms
+
 config OMAP_GPIO
 	bool "TI OMAP GPIO driver"
 	depends on ARCH_OMAP2PLUS
@@ -102,6 +132,15 @@ config OMAP_GPIO
 	help
 	  Support GPIO controllers on the TI OMAP3/4/5 and related (such as
 	  AM335x/AM43xx/AM57xx/DRA7xx/etc) families of SoCs.
+
+config CMD_PCA953X
+	bool "Enable the pca953x command"
+	help
+	  Deprecated: This should be converted to driver model.
+
+	  This command provides access to a pca953x GPIO device using the
+	  legacy GPIO interface. Several subcommands are provided which mirror
+	  the standard 'gpio' command. It should use that instead.
 
 config PM8916_GPIO
 	bool "Qualcomm PM8916 PMIC GPIO/keypad driver"
@@ -119,6 +158,12 @@ config PCF8575_GPIO
 	help
 	 Support for PCF8575 I2C 16-bit GPIO expander. Most of these
 	 chips are from NXP and TI.
+
+config RCAR_GPIO
+	bool "Renesas RCar GPIO driver"
+	depends on DM_GPIO && ARCH_RMOBILE
+	help
+	  This driver supports the GPIO banks on Renesas RCar SoCs.
 
 config ROCKCHIP_GPIO
 	bool "Rockchip GPIO driver"
@@ -149,6 +194,21 @@ config SANDBOX_GPIO_COUNT
 	  are specified using the device tree. But you can also have a number
 	  of 'anonymous' GPIOs that do not belong to any device or bank.
 	  Select a suitable value depending on your needs.
+
+config XILINX_GPIO
+	bool "Xilinx GPIO driver"
+	depends on DM_GPIO
+	help
+	  This config enable the Xilinx GPIO driver for Microblaze.
+
+config CMD_TCA642X
+	bool "tca642x - Command to access tca642x state"
+	help
+	  DEPRECATED - This needs conversion to driver model
+
+	  This provides a way to looking at the pin state of this device.
+	  This mirrors the 'gpio' command and that should be used in preference
+	  to custom code.
 
 config TEGRA_GPIO
 	bool "Tegra20..210 GPIO driver"
@@ -187,7 +247,7 @@ config PIC32_GPIO
 
 config STM32F7_GPIO
 	bool "ST STM32 GPIO driver"
-	depends on DM_GPIO && STM32
+	depends on DM_GPIO && (STM32 || ARCH_STM32MP)
 	default y
 	help
 	  Device model driver support for STM32 GPIO controller. It should be
@@ -239,11 +299,11 @@ config DM_PCA953X
 	  Now, max 24 bits chips and PCA953X compatible chips are
 	  supported
 
-config MPC85XX_GPIO
-	bool "Freescale MPC85XX GPIO driver"
+config MPC8XXX_GPIO
+	bool "Freescale MPC8XXX GPIO driver"
 	depends on DM_GPIO
 	help
-	  This driver supports the built-in GPIO controller of MPC85XX CPUs.
+	  This driver supports the built-in GPIO controller of MPC8XXX CPUs.
 	  Each GPIO bank is identified by its own entry in the device tree,
 	  i.e.
 
@@ -262,6 +322,11 @@ config MPC85XX_GPIO
 	  value setting, the open-drain feature, which can configure individual
 	  GPIOs to work as open-drain outputs, is supported.
 
-	  The driver has been tested on MPC85XX, but it is likely that other
-	  PowerQUICC III devices will work as well.
+config MT7621_GPIO
+	bool "MediaTek MT7621 GPIO driver"
+	depends on DM_GPIO && ARCH_MT7620
+	default y
+	help
+	  Say yes here to support MediaTek MT7621 compatible GPIOs.
+
 endmenu

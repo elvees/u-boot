@@ -1,11 +1,10 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Configuation settings for the Renesas Solutions ECOVEC board
  *
  * Copyright (C) 2009 - 2011 Renesas Solutions Corp.
  * Copyright (C) 2009 Kuninori Morimoto <morimoto.kuninori@renesas.com>
  * Copyright (C) 2010, 2011 Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __ECOVEC_H
@@ -23,14 +22,8 @@
  */
 
 #define CONFIG_CPU_SH7724	1
-#define CONFIG_ECOVEC		1
 
 #define CONFIG_ECOVEC_ROMIMAGE_ADDR 0xA0040000
-#define CONFIG_SYS_TEXT_BASE 0x8FFC0000
-
-#define CONFIG_CMD_SDRAM
-
-#define CONFIG_BOOTARGS		"console=ttySC0,115200"
 
 #define CONFIG_DISPLAY_BOARDINFO
 #undef  CONFIG_SHOW_BOOT_PROGRESS
@@ -49,11 +42,9 @@
 #define CONFIG_SH_I2C_CLOCK  	41666666
 
 /* Ether */
-#define CONFIG_SH_ETHER 1
 #define CONFIG_SH_ETHER_USE_PORT (0)
 #define CONFIG_SH_ETHER_PHY_ADDR (0x1f)
 #define CONFIG_PHY_SMSC 1
-#define CONFIG_PHYLIB
 #define CONFIG_BITBANGMII
 #define CONFIG_BITBANGMII_MULTI
 #define CONFIG_SH_ETHER_PHY_MODE PHY_INTERFACE_MODE_MII
@@ -67,21 +58,13 @@
 #define CONFIG_SUPERH_ON_CHIP_R8A66597
 
 /* undef to save memory	*/
-#define CONFIG_SYS_LONGHELP
 /* Monitor Command Prompt */
-/* Buffer size for input from the Console */
-#define CONFIG_SYS_CBSIZE		256
 /* Buffer size for Console output */
 #define CONFIG_SYS_PBSIZE		256
-/* max args accepted for monitor commands */
-#define CONFIG_SYS_MAXARGS		16
-/* Buffer size for Boot Arguments passed to kernel */
-#define CONFIG_SYS_BARGSIZE	512
 /* List of legal baudrate settings for this board */
 #define CONFIG_SYS_BAUDRATE_TABLE	{ 115200 }
 
 /* SCIF */
-#define CONFIG_SCIF_CONSOLE	1
 #define CONFIG_SCIF		1
 #define CONFIG_CONS_SCIF0	1
 
@@ -95,7 +78,6 @@
 #define CONFIG_SYS_MEMTEST_START (CONFIG_SYS_SDRAM_BASE)
 #define CONFIG_SYS_MEMTEST_END	 (CONFIG_SYS_MEMTEST_START + 200 * 1024 * 1024)
 /* Enable alternate, more extensive, memory test */
-#undef  CONFIG_SYS_ALT_MEMTEST
 /* Scratch address used by the alternate memory test */
 #undef  CONFIG_SYS_MEMTEST_SCRATCH
 
@@ -103,8 +85,6 @@
 #undef  CONFIG_SYS_LOADS_BAUD_CHANGE
 
 /* FLASH */
-#define CONFIG_FLASH_CFI_DRIVER 1
-#define CONFIG_SYS_FLASH_CFI
 #undef  CONFIG_SYS_FLASH_QUIET_TEST
 #define CONFIG_SYS_FLASH_EMPTY_INFO
 #define CONFIG_SYS_FLASH_BASE	(0xA0000000)
@@ -127,7 +107,6 @@
  * Use hardware flash sectors protection instead
  * of U-Boot software protection
  */
-#undef  CONFIG_SYS_FLASH_PROTECTION
 #undef  CONFIG_SYS_DIRECT_FLASH_TFTP
 
 /* Address of u-boot image in Flash (NOT run time address in SDRAM) ?!? */
@@ -139,7 +118,6 @@
 #define CONFIG_SYS_BOOTMAPSZ	(8 * 1024 * 1024)
 
 /* ENV setting */
-#define CONFIG_ENV_IS_IN_FLASH
 #define CONFIG_ENV_OVERWRITE	1
 #define CONFIG_ENV_SECT_SIZE	(128 * 1024)
 #define CONFIG_ENV_SIZE		(CONFIG_ENV_SECT_SIZE)
@@ -150,8 +128,6 @@
 
 /* Board Clock */
 #define CONFIG_SYS_CLK_FREQ 41666666
-#define CONFIG_SH_TMU_CLK_FREQ CONFIG_SYS_CLK_FREQ
 #define CONFIG_SH_SCIF_CLK_FREQ CONFIG_SYS_CLK_FREQ
-#define CONFIG_SYS_TMU_CLK_DIV      4
 
 #endif	/* __ECOVEC_H */

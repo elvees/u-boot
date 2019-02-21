@@ -34,12 +34,10 @@
 		ssc0 = &ssc0;
 		ssc1 = &ssc1;
 		pwm0 = &pwm0;
+		spi0 = &spi0;
 	};
 
 	cpus {
-		#address-cells = <0>;
-		#size-cells = <0>;
-
 		cpu {
 			compatible = "arm,arm926ej-s";
 			device_type = "cpu";
@@ -252,8 +250,6 @@
 			};
 
 			adc0: adc@fffd0000 {
-				#address-cells = <1>;
-				#size-cells = <0>;
 				compatible = "atmel,at91sam9rl-adc";
 				reg = <0xfffd0000 0x100>;
 				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;

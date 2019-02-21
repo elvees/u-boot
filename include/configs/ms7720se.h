@@ -1,21 +1,15 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Configuation settings for the Hitachi Solution Engine 7720
  *
  * Copyright (C) 2007 Yoshihiro Shimoda <shimoda.yoshihiro@renesas.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __MS7720SE_H
 #define __MS7720SE_H
 
 #define CONFIG_CPU_SH7720	1
-#define CONFIG_MS7720SE		1
 
-#define CONFIG_CMD_SDRAM
-#define CONFIG_CMD_PCMCIA
-
-#define CONFIG_BOOTARGS		"console=ttySC0,115200"
 #define CONFIG_BOOTFILE		"/boot/zImage"
 #define CONFIG_LOADADDR		0x8E000000
 
@@ -27,18 +21,11 @@
 #define MS7720SE_FLASH_BASE_1		0xA0000000
 #define MS7720SE_FLASH_BANK_SIZE	(8 * 1024 * 1024)
 
-#define CONFIG_SYS_TEXT_BASE	0x8FFC0000
-#define CONFIG_SYS_LONGHELP		/* undef to save memory	*/
-#define CONFIG_SYS_CBSIZE	256	/* Buffer size for input from the Console */
 #define CONFIG_SYS_PBSIZE	256	/* Buffer size for Console output */
-#define CONFIG_SYS_MAXARGS	16	/* max args accepted for monitor commands */
-/* Buffer size for Boot Arguments passed to kernel */
-#define CONFIG_SYS_BARGSIZE	512
 /* List of legal baudrate settings for this board */
 #define CONFIG_SYS_BAUDRATE_TABLE	{ 115200 }
 
 /* SCIF */
-#define CONFIG_SCIF_CONSOLE	1
 #define CONFIG_CONS_SCIF0	1
 
 #define CONFIG_SYS_MEMTEST_START	MS7720SE_SDRAM_BASE
@@ -54,8 +41,6 @@
 #define CONFIG_SYS_BOOTMAPSZ		(8 * 1024 * 1024)
 
 /* FLASH */
-#define CONFIG_SYS_FLASH_CFI
-#define CONFIG_FLASH_CFI_DRIVER
 #undef  CONFIG_SYS_FLASH_QUIET_TEST
 #define CONFIG_SYS_FLASH_EMPTY_INFO	/* print 'E' for empty sector on flinfo */
 
@@ -65,7 +50,6 @@
 #define CONFIG_SYS_MAX_FLASH_BANKS	1
 #define CONFIG_SYS_FLASH_BANKS_LIST	{ CONFIG_SYS_FLASH_BASE }
 
-#define CONFIG_ENV_IS_IN_FLASH
 #define CONFIG_ENV_SECT_SIZE	(64 * 1024)
 #define CONFIG_ENV_SIZE		CONFIG_ENV_SECT_SIZE
 #define CONFIG_ENV_ADDR		(CONFIG_SYS_MONITOR_BASE + CONFIG_SYS_MONITOR_LEN)
@@ -74,9 +58,7 @@
 
 /* Board Clock */
 #define CONFIG_SYS_CLK_FREQ	33333333
-#define CONFIG_SH_TMU_CLK_FREQ CONFIG_SYS_CLK_FREQ
 #define CONFIG_SH_SCIF_CLK_FREQ CONFIG_SYS_CLK_FREQ
-#define CONFIG_SYS_TMU_CLK_DIV		4	/* 4 (default), 16, 64, 256 or 1024 */
 
 /* PCMCIA */
 #define CONFIG_IDE_PCMCIA	1

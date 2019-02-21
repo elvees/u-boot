@@ -1,9 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright 2013 Freescale Semiconductor, Inc.
  *
  * Configuration settings for the phytec PCM-052 SoM.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -23,8 +22,6 @@
 #define CONFIG_ENV_OVERWRITE
 
 /* NAND support */
-#define CONFIG_CMD_NAND
-#define CONFIG_CMD_NAND_TRIMFFS
 #define CONFIG_SYS_NAND_ONFI_DETECTION
 
 #ifdef CONFIG_CMD_NAND
@@ -33,44 +30,19 @@
 
 #define CONFIG_JFFS2_NAND
 
-/* UBI */
-#define CONFIG_CMD_UBIFS
-#define CONFIG_RBTREE
-#define CONFIG_LZO
-
 /* Dynamic MTD partition support */
-#define CONFIG_CMD_MTDPARTS
-#define CONFIG_MTD_PARTITIONS
-#define CONFIG_MTD_DEVICE
-
-#ifndef MTDIDS_DEFAULT
-#define MTDIDS_DEFAULT			"nand0=NAND"
-#endif
-
-#ifndef MTDPARTS_DEFAULT
-#define MTDPARTS_DEFAULT		"mtdparts=NAND:640k(bootloader)"\
-					",128k(env1)"\
-					",128k(env2)"\
-					",128k(dtb)"\
-					",6144k(kernel)"\
-					",-(root)"
-#endif
 
 #endif
 
-#define CONFIG_FSL_ESDHC
 #define CONFIG_SYS_FSL_ESDHC_ADDR	0
 #define CONFIG_SYS_FSL_ESDHC_NUM	1
 
 /*#define CONFIG_ESDHC_DETECT_USE_EXTERN_IRQ1*/
 
 #define CONFIG_FEC_MXC
-#define CONFIG_MII
 #define IMX_FEC_BASE			ENET_BASE_ADDR
 #define CONFIG_FEC_XCV_TYPE		RMII
 #define CONFIG_FEC_MXC_PHYADDR          0
-#define CONFIG_PHYLIB
-#define CONFIG_PHY_MICREL
 
 /* QSPI Configs*/
 
@@ -86,7 +58,6 @@
 #define CONFIG_SYS_I2C_MXC
 
 /* RTC (actually an RV-4162 but M41T62-compatible) */
-#define CONFIG_RTC_M41T62
 #define CONFIG_SYS_I2C_RTC_ADDR 0x68
 #define CONFIG_SYS_RTC_BUS_NUM 2
 
@@ -99,8 +70,7 @@
 #define CONFIG_LOADADDR			0x82000000
 
 /* We boot from the gfxRAM area of the OCRAM. */
-#define CONFIG_SYS_TEXT_BASE		0x3f408000
-#define CONFIG_BOARD_SIZE_LIMIT		524288
+#define CONFIG_BOARD_SIZE_LIMIT		520192
 
 /* if no target-specific extra environment settings were defined by the
    target, define an empty one */
@@ -143,7 +113,7 @@
 	"nfs_root=/path/to/nfs/root\0" \
 	"tftptimeout=1000\0" \
 	"tftptimeoutcountmax=1000000\0" \
-	"mtdparts=" MTDPARTS_DEFAULT "\0" \
+	"mtdparts=" CONFIG_MTDPARTS_DEFAULT "\0" \
 	"bootargs_base=setenv bootargs rw " \
 		" mem=" __stringify(CONFIG_PCM052_DDR_SIZE) "M " \
 		"console=ttyLP1,115200n8\0" \
@@ -210,14 +180,6 @@
 		"nand write ${ram_addr} root ${filesize}; fi\0"
 
 /* Miscellaneous configurable options */
-#define CONFIG_SYS_LONGHELP		/* undef to save memory */
-#define CONFIG_AUTO_COMPLETE
-#define CONFIG_CMDLINE_EDITING
-#define CONFIG_SYS_CBSIZE		256	/* Console I/O Buffer Size */
-#define CONFIG_SYS_PBSIZE		\
-			(CONFIG_SYS_CBSIZE + sizeof(CONFIG_SYS_PROMPT) + 16)
-#define CONFIG_SYS_MAXARGS		16	/* max number of command args */
-#define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
 
 #define CONFIG_SYS_MEMTEST_START	0x80010000
 #define CONFIG_SYS_MEMTEST_END		0x87C00000
@@ -225,7 +187,6 @@
 #define CONFIG_SYS_LOAD_ADDR		CONFIG_LOADADDR
 
 /* Physical memory map */
-#define CONFIG_NR_DRAM_BANKS		1
 #define PHYS_SDRAM			(0x80000000)
 #define PHYS_SDRAM_SIZE			(CONFIG_PCM052_DDR_SIZE * 1024 * 1024)
 

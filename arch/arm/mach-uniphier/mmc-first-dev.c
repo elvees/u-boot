@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2016 Socionext Inc.
  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -35,7 +34,7 @@ static int do_mmcsetn(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	if (dev < 0)
 		return CMD_RET_FAILURE;
 
-	setenv_ulong("mmc_first_dev", dev);
+	env_set_ulong("mmc_first_dev", dev);
 	return CMD_RET_SUCCESS;
 }
 

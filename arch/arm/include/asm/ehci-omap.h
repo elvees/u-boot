@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * OMAP EHCI port support
  * Based on LINUX KERNEL
@@ -5,8 +6,6 @@
  *
  * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com*
  * Author: Govindraj R <govindraj.raja@ti.com>
- *
- * SPDX-License-Identifier:	GPL-2.0
  */
 
 #ifndef _OMAP_COMMON_EHCI_H_
@@ -19,11 +18,7 @@ enum usbhs_omap_port_mode {
 	OMAP_EHCI_PORT_MODE_HSIC,
 };
 
-#ifdef CONFIG_SYS_USB_EHCI_MAX_ROOT_PORTS
-#define OMAP_HS_USB_PORTS	CONFIG_SYS_USB_EHCI_MAX_ROOT_PORTS
-#else
 #define OMAP_HS_USB_PORTS	3
-#endif
 
 #define is_ehci_phy_mode(x)	((x) == OMAP_EHCI_PORT_MODE_PHY)
 #define is_ehci_tll_mode(x)	((x) == OMAP_EHCI_PORT_MODE_TLL)

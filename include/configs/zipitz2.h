@@ -1,9 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Aeronix Zipit Z2 configuration file
  *
  * Copyright (C) 2009-2010 Marek Vasut <marek.vasut@gmail.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -13,7 +12,6 @@
  * High Level Board Configuration Options
  */
 #define	CONFIG_CPU_PXA27X		1	/* Marvell PXA270 CPU */
-#define	CONFIG_SYS_TEXT_BASE		0x0
 
 #undef	CONFIG_SKIP_LOWLEVEL_INIT
 #define	CONFIG_PREBOOT
@@ -22,7 +20,6 @@
  * Environment settings
  */
 #define	CONFIG_ENV_OVERWRITE
-#define CONFIG_ENV_IS_IN_FLASH		1
 #define CONFIG_ENV_ADDR			0x40000
 #define CONFIG_ENV_SIZE			0x10000
 
@@ -36,19 +33,15 @@
 	"else "								\
 		"bootm 0x50000; "					\
 	"fi; "
-#define	CONFIG_BOOTARGS							\
-	"console=tty0 console=ttyS2,115200 fbcon=rotate:3"
 #define	CONFIG_TIMESTAMP
 #define	CONFIG_CMDLINE_TAG
 #define	CONFIG_SETUP_MEMORY_TAGS
-#define	CONFIG_SYS_TEXT_BASE		0x0
 
 /*
  * Serial Console Configuration
  * STUART - the lower serial port on Colibri board
  */
 #define	CONFIG_STUART			1
-#define CONFIG_CONS_INDEX		2
 
 /*
  * Bootloader Components Configuration
@@ -82,11 +75,6 @@ unsigned char zipitz2_spi_read(void);
 #endif
 #endif
 
-#define	CONFIG_SYS_LONGHELP				/* undef to save memory	*/
-#define	CONFIG_SYS_CBSIZE		256		/* Console I/O Buffer Size */
-#define	CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE+sizeof(CONFIG_SYS_PROMPT)+16)	/* Print Buffer Size */
-#define	CONFIG_SYS_MAXARGS		16		/* max number of command args */
-#define	CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE	/* Boot Argument Buffer Size */
 #define	CONFIG_SYS_DEVICE_NULLDEV	1
 
 /*
@@ -103,7 +91,6 @@ unsigned char zipitz2_spi_read(void);
 /*
  * DRAM Map
  */
-#define	CONFIG_NR_DRAM_BANKS		1		/* We have 1 bank of DRAM */
 #define	PHYS_SDRAM_1			0xa0000000	/* SDRAM Bank #1 */
 #define	PHYS_SDRAM_1_SIZE		0x02000000	/* 32 MB */
 
@@ -126,8 +113,6 @@ unsigned char zipitz2_spi_read(void);
 #define PHYS_FLASH_SECT_SIZE		0x00010000	/* 64 KB sectors */
 #define CONFIG_SYS_FLASH_BASE		PHYS_FLASH_1
 
-#define CONFIG_SYS_FLASH_CFI
-#define CONFIG_FLASH_CFI_DRIVER		1
 #define CONFIG_SYS_FLASH_CFI_WIDTH      FLASH_CFI_16BIT
 
 #define CONFIG_SYS_MONITOR_BASE		PHYS_FLASH_1
@@ -136,13 +121,10 @@ unsigned char zipitz2_spi_read(void);
 #define CONFIG_SYS_MAX_FLASH_BANKS	1
 #define CONFIG_SYS_MAX_FLASH_SECT	256
 
-#define CONFIG_SYS_FLASH_USE_BUFFER_WRITE	1
-
 #define CONFIG_SYS_FLASH_ERASE_TOUT	240000
 #define CONFIG_SYS_FLASH_WRITE_TOUT	240000
 #define CONFIG_SYS_FLASH_LOCK_TOUT	240000
 #define CONFIG_SYS_FLASH_UNLOCK_TOUT	240000
-#define CONFIG_SYS_FLASH_PROTECTION
 
 /*
  * GPIO settings

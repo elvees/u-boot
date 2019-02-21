@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2015-2016 Marvell International Ltd.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -10,7 +9,7 @@
 #include <asm/arch/cpu.h>
 #include <asm/arch/soc.h>
 
-#include "comphy.h"
+#include "comphy_core.h"
 #include "comphy_hpipe.h"
 #include "sata.h"
 #include "utmi_phy.h"
@@ -509,7 +508,7 @@ static int comphy_pcie_power_up(u32 lane, u32 pcie_width, bool clk_src,
 				debug("Read from reg = %p - value = 0x%x\n",
 				      hpipe_addr + HPIPE_LANE_STATUS1_REG,
 				      data);
-				error("HPIPE_LANE_STATUS1_PCLK_EN_MASK is 0\n");
+				pr_err("HPIPE_LANE_STATUS1_PCLK_EN_MASK is 0\n");
 				ret = 0;
 			}
 		}
@@ -633,7 +632,7 @@ static int comphy_usb3_power_up(u32 lane, void __iomem *hpipe_base,
 	if (data != 0) {
 		debug("Read from reg = %p - value = 0x%x\n",
 		      hpipe_addr + HPIPE_LANE_STATUS1_REG, data);
-		error("HPIPE_LANE_STATUS1_PCLK_EN_MASK is 0\n");
+		pr_err("HPIPE_LANE_STATUS1_PCLK_EN_MASK is 0\n");
 		ret = 0;
 	}
 
@@ -642,7 +641,8 @@ static int comphy_usb3_power_up(u32 lane, void __iomem *hpipe_base,
 }
 
 static int comphy_sata_power_up(u32 lane, void __iomem *hpipe_base,
-				void __iomem *comphy_base, int cp_index)
+				void __iomem *comphy_base, int cp_index,
+				u32 invert)
 {
 	u32 mask, data, i, ret = 1;
 	void __iomem *hpipe_addr = HPIPE_ADDR(hpipe_base, lane);
@@ -666,14 +666,14 @@ static int comphy_sata_power_up(u32 lane, void __iomem *hpipe_base,
 			gd->fdt_blob, sata_node, "marvell,armada-8k-ahci");
 
 	if (sata_node == 0) {
-		error("SATA node not found in FDT\n");
+		pr_err("SATA node not found in FDT\n");
 		return 0;
 	}
 
 	sata_base = (void __iomem *)fdtdec_get_addr_size_auto_noparent(
 		gd->fdt_blob, sata_node, "reg", 0, NULL, true);
 	if (sata_base == NULL) {
-		error("SATA address not found in FDT\n");
+		pr_err("SATA address not found in FDT\n");
 		return 0;
 	}
 
@@ -928,6 +928,19 @@ static int comphy_sata_power_up(u32 lane, void __iomem *hpipe_base,
 	reg_set(hpipe_addr + HPIPE_PWR_CTR_REG,
 		0x0 << HPIPE_PWR_CTR_RST_DFE_OFFSET,
 		HPIPE_PWR_CTR_RST_DFE_MASK);
+
+	/* Set RX / TX swaps */
+	data = mask = 0;
+	if (invert & PHY_POLARITY_TXD_INVERT) {
+		data |= (1 << HPIPE_SYNC_PATTERN_TXD_SWAP_OFFSET);
+		mask |= HPIPE_SYNC_PATTERN_TXD_SWAP_MASK;
+	}
+	if (invert & PHY_POLARITY_RXD_INVERT) {
+		data |= (1 << HPIPE_SYNC_PATTERN_RXD_SWAP_OFFSET);
+		mask |= HPIPE_SYNC_PATTERN_RXD_SWAP_MASK;
+	}
+	reg_set(hpipe_addr + HPIPE_SYNC_PATTERN_REG, data, mask);
+
 	/* SW reset for interupt logic */
 	reg_set(hpipe_addr + HPIPE_PWR_CTR_REG,
 		0x1 << HPIPE_PWR_CTR_SFT_RST_OFFSET,
@@ -976,7 +989,7 @@ static int comphy_sata_power_up(u32 lane, void __iomem *hpipe_base,
 	if (data != 0) {
 		debug("Read from reg = %p - value = 0x%x\n",
 		      hpipe_addr + HPIPE_LANE_STATUS1_REG, data);
-		error("SD_EXTERNAL_STATUS0_PLL_TX is %d, SD_EXTERNAL_STATUS0_PLL_RX is %d\n",
+		pr_err("SD_EXTERNAL_STATUS0_PLL_TX is %d, SD_EXTERNAL_STATUS0_PLL_RX is %d\n",
 		      (data & SD_EXTERNAL_STATUS0_PLL_TX_MASK),
 		      (data & SD_EXTERNAL_STATUS0_PLL_RX_MASK));
 		ret = 0;
@@ -1099,7 +1112,7 @@ static int comphy_sgmii_power_up(u32 lane, u32 sgmii_speed,
 	if (data != 0) {
 		debug("Read from reg = %p - value = 0x%x\n",
 		      sd_ip_addr + SD_EXTERNAL_STATUS0_REG, data);
-		error("SD_EXTERNAL_STATUS0_PLL_RX is %d, SD_EXTERNAL_STATUS0_PLL_TX is %d\n",
+		pr_err("SD_EXTERNAL_STATUS0_PLL_RX is %d, SD_EXTERNAL_STATUS0_PLL_TX is %d\n",
 		      (data & SD_EXTERNAL_STATUS0_PLL_RX_MASK),
 		      (data & SD_EXTERNAL_STATUS0_PLL_TX_MASK));
 		ret = 0;
@@ -1117,7 +1130,7 @@ static int comphy_sgmii_power_up(u32 lane, u32 sgmii_speed,
 	data = polling_with_timeout(addr, data, mask, 100);
 	if (data != 0) {
 		debug("Read from reg = %p - value = 0x%x\n", sd_ip_addr + SD_EXTERNAL_STATUS0_REG, data);
-		error("SD_EXTERNAL_STATUS0_RX_INIT is 0\n");
+		pr_err("SD_EXTERNAL_STATUS0_RX_INIT is 0\n");
 		ret = 0;
 	}
 
@@ -1398,7 +1411,7 @@ static int comphy_sfi_power_up(u32 lane, void __iomem *hpipe_base,
 	data = polling_with_timeout(addr, data, mask, 15000);
 	if (data != 0) {
 		debug("Read from reg = %p - value = 0x%x\n", sd_ip_addr + SD_EXTERNAL_STATUS0_REG, data);
-		error("SD_EXTERNAL_STATUS0_PLL_RX is %d, SD_EXTERNAL_STATUS0_PLL_TX is %d\n",
+		pr_err("SD_EXTERNAL_STATUS0_PLL_RX is %d, SD_EXTERNAL_STATUS0_PLL_TX is %d\n",
 		      (data & SD_EXTERNAL_STATUS0_PLL_RX_MASK),
 		      (data & SD_EXTERNAL_STATUS0_PLL_TX_MASK));
 		ret = 0;
@@ -1418,7 +1431,7 @@ static int comphy_sfi_power_up(u32 lane, void __iomem *hpipe_base,
 	if (data != 0) {
 		debug("Read from reg = %p - value = 0x%x\n",
 		      sd_ip_addr + SD_EXTERNAL_STATUS0_REG, data);
-		error("SD_EXTERNAL_STATUS0_RX_INIT is 0\n");
+		pr_err("SD_EXTERNAL_STATUS0_RX_INIT is 0\n");
 		ret = 0;
 	}
 
@@ -1577,7 +1590,7 @@ static int comphy_rxauii_power_up(u32 lane, void __iomem *hpipe_base,
 	if (data != 0) {
 		debug("Read from reg = %p - value = 0x%x\n",
 		      sd_ip_addr + SD_EXTERNAL_STATUS0_REG, data);
-		error("SD_EXTERNAL_STATUS0_PLL_RX is %d, SD_EXTERNAL_STATUS0_PLL_TX is %d\n",
+		pr_err("SD_EXTERNAL_STATUS0_PLL_RX is %d, SD_EXTERNAL_STATUS0_PLL_TX is %d\n",
 		      (data & SD_EXTERNAL_STATUS0_PLL_RX_MASK),
 		      (data & SD_EXTERNAL_STATUS0_PLL_TX_MASK));
 		ret = 0;
@@ -1596,7 +1609,7 @@ static int comphy_rxauii_power_up(u32 lane, void __iomem *hpipe_base,
 	if (data != 0) {
 		debug("Read from reg = %p - value = 0x%x\n",
 		      sd_ip_addr + SD_EXTERNAL_STATUS0_REG, data);
-		error("SD_EXTERNAL_STATUS0_RX_INIT is 0\n");
+		pr_err("SD_EXTERNAL_STATUS0_RX_INIT is 0\n");
 		ret = 0;
 	}
 
@@ -1742,7 +1755,7 @@ static int comphy_utmi_power_up(u32 utmi_index, void __iomem *utmi_base_addr,
 	mask = data;
 	data = polling_with_timeout(addr, data, mask, 100);
 	if (data != 0) {
-		error("Impedance calibration is not done\n");
+		pr_err("Impedance calibration is not done\n");
 		debug("Read from reg = %p - value = 0x%x\n", addr, data);
 		ret = 0;
 	}
@@ -1751,7 +1764,7 @@ static int comphy_utmi_power_up(u32 utmi_index, void __iomem *utmi_base_addr,
 	mask = data;
 	data = polling_with_timeout(addr, data, mask, 100);
 	if (data != 0) {
-		error("PLL calibration is not done\n");
+		pr_err("PLL calibration is not done\n");
 		debug("Read from reg = %p - value = 0x%x\n", addr, data);
 		ret = 0;
 	}
@@ -1761,7 +1774,7 @@ static int comphy_utmi_power_up(u32 utmi_index, void __iomem *utmi_base_addr,
 	mask = data;
 	data = polling_with_timeout(addr, data, mask, 100);
 	if (data != 0) {
-		error("PLL is not ready\n");
+		pr_err("PLL is not ready\n");
 		debug("Read from reg = %p - value = 0x%x\n", addr, data);
 		ret = 0;
 	}
@@ -1818,7 +1831,7 @@ static void comphy_utmi_phy_init(u32 utmi_phy_count,
 					  cp110_utmi_data[i].usb_cfg_addr,
 					  cp110_utmi_data[i].utmi_cfg_addr,
 					  cp110_utmi_data[i].utmi_phy_port)) {
-			error("Failed to initialize UTMI PHY %d\n", i);
+			pr_err("Failed to initialize UTMI PHY %d\n", i);
 			continue;
 		}
 		printf("UTMI PHY %d initialized to ", i);
@@ -1864,7 +1877,7 @@ void comphy_dedicated_phys_init(void)
 			(void __iomem *)fdtdec_get_addr_size_auto_noparent(
 				gd->fdt_blob, node, "reg", 0, NULL, true);
 		if (cp110_utmi_data[i].utmi_base_addr == NULL) {
-			error("UTMI PHY base address is invalid\n");
+			pr_err("UTMI PHY base address is invalid\n");
 			i++;
 			continue;
 		}
@@ -1874,7 +1887,7 @@ void comphy_dedicated_phys_init(void)
 			(void __iomem *)fdtdec_get_addr_size_auto_noparent(
 				gd->fdt_blob, node, "reg", 1, NULL, true);
 		if (cp110_utmi_data[i].usb_cfg_addr == NULL) {
-			error("UTMI PHY base address is invalid\n");
+			pr_err("UTMI PHY base address is invalid\n");
 			i++;
 			continue;
 		}
@@ -1884,7 +1897,7 @@ void comphy_dedicated_phys_init(void)
 			(void __iomem *)fdtdec_get_addr_size_auto_noparent(
 				gd->fdt_blob, node, "reg", 2, NULL, true);
 		if (cp110_utmi_data[i].utmi_cfg_addr == NULL) {
-			error("UTMI PHY base address is invalid\n");
+			pr_err("UTMI PHY base address is invalid\n");
 			i++;
 			continue;
 		}
@@ -1896,7 +1909,7 @@ void comphy_dedicated_phys_init(void)
 		cp110_utmi_data[i].utmi_phy_port = fdtdec_get_int(
 			gd->fdt_blob, node, "utmi-port", UTMI_PHY_INVALID);
 		if (cp110_utmi_data[i].utmi_phy_port == UTMI_PHY_INVALID) {
-			error("UTMI PHY port type is invalid\n");
+			pr_err("UTMI PHY port type is invalid\n");
 			i++;
 			continue;
 		}
@@ -2007,7 +2020,8 @@ int comphy_cp110_init(struct chip_serdes_phy_config *ptr_chip_cfg,
 		case PHY_TYPE_SATA3:
 			ret = comphy_sata_power_up(
 				lane, hpipe_base_addr, comphy_base_addr,
-				ptr_chip_cfg->cp_index);
+				ptr_chip_cfg->cp_index,
+				serdes_map[lane].invert);
 			break;
 		case PHY_TYPE_USB3_HOST0:
 		case PHY_TYPE_USB3_HOST1:
@@ -2049,7 +2063,7 @@ int comphy_cp110_init(struct chip_serdes_phy_config *ptr_chip_cfg,
 			 * PHY_TYPE_UNCONNECTED state.
 			 */
 			ptr_comphy_map->type = PHY_TYPE_UNCONNECTED;
-			error("PLL is not locked - Failed to initialize lane %d\n",
+			pr_err("PLL is not locked - Failed to initialize lane %d\n",
 			      lane);
 		}
 	}

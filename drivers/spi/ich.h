@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (c) 2011 The Chromium OS Authors.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  *
  * This file is derived from the flashrom project.
  */
@@ -174,11 +173,10 @@ enum ich_version {
 
 struct ich_spi_platdata {
 	enum ich_version ich_version;	/* Controller version, 7 or 9 */
+	bool lockdown;			/* lock down controller settings? */
 };
 
 struct ich_spi_priv {
-	int ichspi_lock;
-	int locked;
 	int opmenu;
 	int menubytes;
 	void *base;		/* Base of register set */

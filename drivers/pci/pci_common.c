@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2014 Google, Inc
  *
@@ -6,8 +7,6 @@
  *
  * (C) Copyright 2002, 2003
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -89,7 +88,7 @@ __weak int pci_skip_dev(struct pci_controller *hose, pci_dev_t dev)
 		/*
 		 * Only skip configuration if "pciconfighost" is not set
 		 */
-		if (getenv("pciconfighost") == NULL)
+		if (env_get("pciconfighost") == NULL)
 			return 1;
 #else
 		return 1;

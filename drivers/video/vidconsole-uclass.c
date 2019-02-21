@@ -1,18 +1,27 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2015 Google, Inc
  * (C) Copyright 2001-2015
  * DENX Software Engineering -- wd@denx.de
  * Compulab Ltd - http://compulab.co.il/
  * Bernecker & Rainer Industrieelektronik GmbH - http://www.br-automation.com
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <linux/ctype.h>
 #include <dm.h>
 #include <video.h>
 #include <video_console.h>
-#include <video_font.h>		/* Get font data, width and height */
+#include <video_font.h>		/* Bitmap font for code page 437 */
+
+/*
+ * Structure to describe a console color
+ */
+struct vid_rgb {
+	u32 r;
+	u32 g;
+	u32 b;
+};
 
 /* By default we scroll by a single line */
 #ifndef CONFIG_CONSOLE_SCROLL_LINES
@@ -77,6 +86,7 @@ static int vidconsole_back(struct udevice *dev)
 		if (priv->ycur < 0)
 			priv->ycur = 0;
 	}
+	video_sync(dev->parent, false);
 
 	return 0;
 }
@@ -103,7 +113,283 @@ static void vidconsole_newline(struct udevice *dev)
 	}
 	priv->last_ch = 0;
 
-	video_sync(dev->parent);
+	video_sync(dev->parent, false);
+}
+
+static const struct vid_rgb colors[VID_COLOR_COUNT] = {
+	{ 0x00, 0x00, 0x00 },  /* black */
+	{ 0xc0, 0x00, 0x00 },  /* red */
+	{ 0x00, 0xc0, 0x00 },  /* green */
+	{ 0xc0, 0x60, 0x00 },  /* brown */
+	{ 0x00, 0x00, 0xc0 },  /* blue */
+	{ 0xc0, 0x00, 0xc0 },  /* magenta */
+	{ 0x00, 0xc0, 0xc0 },  /* cyan */
+	{ 0xc0, 0xc0, 0xc0 },  /* light gray */
+	{ 0x80, 0x80, 0x80 },  /* gray */
+	{ 0xff, 0x00, 0x00 },  /* bright red */
+	{ 0x00, 0xff, 0x00 },  /* bright green */
+	{ 0xff, 0xff, 0x00 },  /* yellow */
+	{ 0x00, 0x00, 0xff },  /* bright blue */
+	{ 0xff, 0x00, 0xff },  /* bright magenta */
+	{ 0x00, 0xff, 0xff },  /* bright cyan */
+	{ 0xff, 0xff, 0xff },  /* white */
+};
+
+u32 vid_console_color(struct video_priv *priv, unsigned int idx)
+{
+	switch (priv->bpix) {
+	case VIDEO_BPP16:
+		return ((colors[idx].r >> 3) << 11) |
+		       ((colors[idx].g >> 2) <<  5) |
+		       ((colors[idx].b >> 3) <<  0);
+	case VIDEO_BPP32:
+		return (colors[idx].r << 16) |
+		       (colors[idx].g <<  8) |
+		       (colors[idx].b <<  0);
+	default:
+		/*
+		 * For unknown bit arrangements just support
+		 * black and white.
+		 */
+		if (idx)
+			return 0xffffff; /* white */
+		else
+			return 0x000000; /* black */
+	}
+}
+
+static char *parsenum(char *s, int *num)
+{
+	char *end;
+	*num = simple_strtol(s, &end, 10);
+	return end;
+}
+
+/**
+ * set_cursor_position() - set cursor position
+ *
+ * @priv:	private data of the video console
+ * @row:	new row
+ * @col:	new column
+ */
+static void set_cursor_position(struct vidconsole_priv *priv, int row, int col)
+{
+	/*
+	 * Ensure we stay in the bounds of the screen.
+	 */
+	if (row >= priv->rows)
+		row = priv->rows - 1;
+	if (col >= priv->cols)
+		col = priv->cols - 1;
+
+	priv->ycur = row * priv->y_charsize;
+	priv->xcur_frac = priv->xstart_frac +
+			  VID_TO_POS(col * priv->x_charsize);
+}
+
+/**
+ * get_cursor_position() - get cursor position
+ *
+ * @priv:	private data of the video console
+ * @row:	row
+ * @col:	column
+ */
+static void get_cursor_position(struct vidconsole_priv *priv,
+				int *row, int *col)
+{
+	*row = priv->ycur / priv->y_charsize;
+	*col = VID_TO_PIXEL(priv->xcur_frac - priv->xstart_frac) /
+	       priv->x_charsize;
+}
+
+/*
+ * Process a character while accumulating an escape string.  Chars are
+ * accumulated into escape_buf until the end of escape sequence is
+ * found, at which point the sequence is parsed and processed.
+ */
+static void vidconsole_escape_char(struct udevice *dev, char ch)
+{
+	struct vidconsole_priv *priv = dev_get_uclass_priv(dev);
+
+	if (!IS_ENABLED(CONFIG_VIDEO_ANSI))
+		goto error;
+
+	/* Sanity checking for bogus ESC sequences: */
+	if (priv->escape_len >= sizeof(priv->escape_buf))
+		goto error;
+	if (priv->escape_len == 0) {
+		switch (ch) {
+		case '7':
+			/* Save cursor position */
+			get_cursor_position(priv, &priv->row_saved,
+					    &priv->col_saved);
+			priv->escape = 0;
+
+			return;
+		case '8': {
+			/* Restore cursor position */
+			int row = priv->row_saved;
+			int col = priv->col_saved;
+
+			set_cursor_position(priv, row, col);
+			priv->escape = 0;
+			return;
+		}
+		case '[':
+			break;
+		default:
+			goto error;
+		}
+	}
+
+	priv->escape_buf[priv->escape_len++] = ch;
+
+	/*
+	 * Escape sequences are terminated by a letter, so keep
+	 * accumulating until we get one:
+	 */
+	if (!isalpha(ch))
+		return;
+
+	/*
+	 * clear escape mode first, otherwise things will get highly
+	 * surprising if you hit any debug prints that come back to
+	 * this console.
+	 */
+	priv->escape = 0;
+
+	switch (ch) {
+	case 'H':
+	case 'f': {
+		int row, col;
+		char *s = priv->escape_buf;
+
+		/*
+		 * Set cursor position: [%d;%df or [%d;%dH
+		 */
+		s++;    /* [ */
+		s = parsenum(s, &row);
+		s++;    /* ; */
+		s = parsenum(s, &col);
+
+		/*
+		 * Video origin is [0, 0], terminal origin is [1, 1].
+		 */
+		if (row)
+			--row;
+		if (col)
+			--col;
+
+		set_cursor_position(priv, row, col);
+
+		break;
+	}
+	case 'J': {
+		int mode;
+
+		/*
+		 * Clear part/all screen:
+		 *   [J or [0J - clear screen from cursor down
+		 *   [1J       - clear screen from cursor up
+		 *   [2J       - clear entire screen
+		 *
+		 * TODO we really only handle entire-screen case, others
+		 * probably require some additions to video-uclass (and
+		 * are not really needed yet by efi_console)
+		 */
+		parsenum(priv->escape_buf + 1, &mode);
+
+		if (mode == 2) {
+			video_clear(dev->parent);
+			video_sync(dev->parent, false);
+			priv->ycur = 0;
+			priv->xcur_frac = priv->xstart_frac;
+		} else {
+			debug("unsupported clear mode: %d\n", mode);
+		}
+		break;
+	}
+	case 'm': {
+		struct video_priv *vid_priv = dev_get_uclass_priv(dev->parent);
+		char *s = priv->escape_buf;
+		char *end = &priv->escape_buf[priv->escape_len];
+
+		/*
+		 * Set graphics mode: [%d;...;%dm
+		 *
+		 * Currently only supports the color attributes:
+		 *
+		 * Foreground Colors:
+		 *
+		 *   30	Black
+		 *   31	Red
+		 *   32	Green
+		 *   33	Yellow
+		 *   34	Blue
+		 *   35	Magenta
+		 *   36	Cyan
+		 *   37	White
+		 *
+		 * Background Colors:
+		 *
+		 *   40	Black
+		 *   41	Red
+		 *   42	Green
+		 *   43	Yellow
+		 *   44	Blue
+		 *   45	Magenta
+		 *   46	Cyan
+		 *   47	White
+		 */
+
+		s++;    /* [ */
+		while (s < end) {
+			int val;
+
+			s = parsenum(s, &val);
+			s++;
+
+			switch (val) {
+			case 0:
+				/* all attributes off */
+				video_set_default_colors(dev->parent, false);
+				break;
+			case 1:
+				/* bold */
+				vid_priv->fg_col_idx |= 8;
+				vid_priv->colour_fg = vid_console_color(
+						vid_priv, vid_priv->fg_col_idx);
+				break;
+			case 30 ... 37:
+				/* foreground color */
+				vid_priv->fg_col_idx &= ~7;
+				vid_priv->fg_col_idx |= val - 30;
+				vid_priv->colour_fg = vid_console_color(
+						vid_priv, vid_priv->fg_col_idx);
+				break;
+			case 40 ... 47:
+				/* background color */
+				vid_priv->colour_bg = vid_console_color(
+							vid_priv, val - 40);
+				break;
+			default:
+				/* ignore unsupported SGR parameter */
+				break;
+			}
+		}
+
+		break;
+	}
+	default:
+		debug("unrecognized escape sequence: %*s\n",
+		      priv->escape_len, priv->escape_buf);
+	}
+
+	return;
+
+error:
+	/* something went wrong, just revert to normal mode: */
+	priv->escape = 0;
 }
 
 int vidconsole_put_char(struct udevice *dev, char ch)
@@ -111,7 +397,16 @@ int vidconsole_put_char(struct udevice *dev, char ch)
 	struct vidconsole_priv *priv = dev_get_uclass_priv(dev);
 	int ret;
 
+	if (priv->escape) {
+		vidconsole_escape_char(dev, ch);
+		return 0;
+	}
+
 	switch (ch) {
+	case '\x1b':
+		priv->escape_len = 0;
+		priv->escape = 1;
+		break;
 	case '\a':
 		/* beep */
 		break;
@@ -162,6 +457,7 @@ static void vidconsole_putc(struct stdio_dev *sdev, const char ch)
 	struct udevice *dev = sdev->priv;
 
 	vidconsole_put_char(dev, ch);
+	video_sync(dev->parent, false);
 }
 
 static void vidconsole_puts(struct stdio_dev *sdev, const char *s)
@@ -170,7 +466,7 @@ static void vidconsole_puts(struct stdio_dev *sdev, const char *s)
 
 	while (*s)
 		vidconsole_put_char(dev, *s++);
-	video_sync(dev->parent);
+	video_sync(dev->parent, false);
 }
 
 /* Set up the number of rows and colours (rotated drivers override this) */
@@ -223,6 +519,8 @@ void vidconsole_position_cursor(struct udevice *dev, unsigned col, unsigned row)
 	struct udevice *vid_dev = dev->parent;
 	struct video_priv *vid_priv = dev_get_uclass_priv(vid_dev);
 
+	col *= priv->x_charsize;
+	row *= priv->y_charsize;
 	priv->xcur_frac = VID_TO_POS(min_t(short, col, vid_priv->xsize - 1));
 	priv->ycur = min_t(short, row, vid_priv->ysize - 1);
 }
@@ -258,6 +556,8 @@ static int do_video_puts(cmd_tbl_t *cmdtp, int flag, int argc,
 		return CMD_RET_FAILURE;
 	for (s = argv[1]; *s; s++)
 		vidconsole_put_char(dev, *s);
+
+	video_sync(dev->parent, false);
 
 	return 0;
 }

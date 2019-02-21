@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2015 Google, Inc
  * Written by Simon Glass <sjg@chromium.org>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -15,6 +14,15 @@
 #include <dm/root.h>
 #include <linux/err.h>
 
+/*
+ * Caution:
+ * This API requires the given device has alerady been bound to syscon driver.
+ * For example,
+ *    compatible = "syscon", "simple-mfd";
+ * works, but
+ *    compatible = "simple-mfd", "syscon";
+ * does not.  The behavior is different from Linux.
+ */
 struct regmap *syscon_get_regmap(struct udevice *dev)
 {
 	struct syscon_uc_info *priv;
@@ -41,8 +49,31 @@ static int syscon_pre_probe(struct udevice *dev)
 	return regmap_init_mem_platdata(dev, plat->reg, ARRAY_SIZE(plat->reg),
 					&priv->regmap);
 #else
-	return regmap_init_mem(dev, &priv->regmap);
+	return regmap_init_mem(dev_ofnode(dev), &priv->regmap);
 #endif
+}
+
+struct regmap *syscon_regmap_lookup_by_phandle(struct udevice *dev,
+					       const char *name)
+{
+	struct udevice *syscon;
+	struct regmap *r;
+	int err;
+
+	err = uclass_get_device_by_phandle(UCLASS_SYSCON, dev,
+					   name, &syscon);
+	if (err) {
+		dev_dbg(dev, "unable to find syscon device\n");
+		return ERR_PTR(err);
+	}
+
+	r = syscon_get_regmap(syscon);
+	if (!r) {
+		dev_dbg(dev, "unable to find regmap\n");
+		return ERR_PTR(-ENODEV);
+	}
+
+	return r;
 }
 
 int syscon_get_by_driver_data(ulong driver_data, struct udevice **devp)
@@ -104,5 +135,42 @@ static const struct udevice_id generic_syscon_ids[] = {
 U_BOOT_DRIVER(generic_syscon) = {
 	.name	= "syscon",
 	.id	= UCLASS_SYSCON,
+#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+	.bind           = dm_scan_fdt_dev,
+#endif
 	.of_match = generic_syscon_ids,
 };
+
+/*
+ * Linux-compatible syscon-to-regmap
+ * The syscon node can be bound to another driver, but still works
+ * as a syscon provider.
+ */
+struct regmap *syscon_node_to_regmap(ofnode node)
+{
+	struct udevice *dev, *parent;
+	int ret;
+
+	if (!uclass_get_device_by_ofnode(UCLASS_SYSCON, node, &dev))
+		return syscon_get_regmap(dev);
+
+	if (!ofnode_device_is_compatible(node, "syscon"))
+		return ERR_PTR(-EINVAL);
+
+	/* bound to driver with same ofnode or to root if not found */
+	if (device_find_global_by_ofnode(node, &parent))
+		parent = dm_root();
+
+	/* force bound to syscon class */
+	ret = device_bind_driver_to_node(parent, "syscon",
+					 ofnode_get_name(node),
+					 node, &dev);
+	if (ret)
+		return ERR_PTR(ret);
+
+	ret = device_probe(dev);
+	if (ret)
+		return ERR_PTR(ret);
+
+	return syscon_get_regmap(dev);
+}

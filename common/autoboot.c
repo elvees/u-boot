@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2000
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -14,6 +13,7 @@
 #include <menu.h>
 #include <post.h>
 #include <u-boot/sha256.h>
+#include <bootcount.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -50,14 +50,14 @@ static int slow_equals(u8 *a, u8 *b, int len)
 
 static int passwd_abort(uint64_t etime)
 {
-	const char *sha_env_str = getenv("bootstopkeysha256");
+	const char *sha_env_str = env_get("bootstopkeysha256");
 	u8 sha_env[SHA256_SUM_LEN];
 	u8 sha[SHA256_SUM_LEN];
 	char presskey[MAX_DELAY_STOP_STR];
 	const char *algo_name = "sha256";
 	u_int presskey_len = 0;
 	int abort = 0;
-	int size;
+	int size = sizeof(sha);
 	int ret;
 
 	if (sha_env_str == NULL)
@@ -109,8 +109,8 @@ static int passwd_abort(uint64_t etime)
 		int retry;
 	}
 	delaykey[] = {
-		{ .str = getenv("bootdelaykey"),  .retry = 1 },
-		{ .str = getenv("bootstopkey"),   .retry = 0 },
+		{ .str = env_get("bootdelaykey"),  .retry = 1 },
+		{ .str = env_get("bootstopkey"),   .retry = 0 },
 	};
 
 	char presskey[MAX_DELAY_STOP_STR];
@@ -278,12 +278,12 @@ static void process_fdt_options(const void *blob)
 	/* Add an env variable to point to a kernel payload, if available */
 	addr = fdtdec_get_config_int(gd->fdt_blob, "kernel-offset", 0);
 	if (addr)
-		setenv_addr("kernaddr", (void *)(CONFIG_SYS_TEXT_BASE + addr));
+		env_set_addr("kernaddr", (void *)(CONFIG_SYS_TEXT_BASE + addr));
 
 	/* Add an env variable to point to a root disk, if available */
 	addr = fdtdec_get_config_int(gd->fdt_blob, "rootdisk-offset", 0);
 	if (addr)
-		setenv_addr("rootaddr", (void *)(CONFIG_SYS_TEXT_BASE + addr));
+		env_set_addr("rootaddr", (void *)(CONFIG_SYS_TEXT_BASE + addr));
 #endif /* CONFIG_OF_CONTROL && CONFIG_SYS_TEXT_BASE */
 }
 
@@ -291,20 +291,10 @@ const char *bootdelay_process(void)
 {
 	char *s;
 	int bootdelay;
-#ifdef CONFIG_BOOTCOUNT_LIMIT
-	unsigned long bootcount = 0;
-	unsigned long bootlimit = 0;
-#endif /* CONFIG_BOOTCOUNT_LIMIT */
 
-#ifdef CONFIG_BOOTCOUNT_LIMIT
-	bootcount = bootcount_load();
-	bootcount++;
-	bootcount_store(bootcount);
-	setenv_ulong("bootcount", bootcount);
-	bootlimit = getenv_ulong("bootlimit", 10, 0);
-#endif /* CONFIG_BOOTCOUNT_LIMIT */
+	bootcount_inc();
 
-	s = getenv("bootdelay");
+	s = env_get("bootdelay");
 	bootdelay = s ? (int)simple_strtol(s, NULL, 10) : CONFIG_BOOTDELAY;
 
 #ifdef CONFIG_OF_CONTROL
@@ -321,17 +311,13 @@ const char *bootdelay_process(void)
 
 #ifdef CONFIG_POST
 	if (gd->flags & GD_FLG_POSTFAIL) {
-		s = getenv("failbootcmd");
+		s = env_get("failbootcmd");
 	} else
 #endif /* CONFIG_POST */
-#ifdef CONFIG_BOOTCOUNT_LIMIT
-	if (bootlimit && (bootcount > bootlimit)) {
-		printf("Warning: Bootlimit (%u) exceeded. Using altbootcmd.\n",
-		       (unsigned)bootlimit);
-		s = getenv("altbootcmd");
-	} else
-#endif /* CONFIG_BOOTCOUNT_LIMIT */
-		s = getenv("bootcmd");
+	if (bootcount_error())
+		s = env_get("altbootcmd");
+	else
+		s = env_get("bootcmd");
 
 	process_fdt_options(gd->fdt_blob);
 	stored_bootdelay = bootdelay;
@@ -357,7 +343,7 @@ void autoboot_command(const char *s)
 
 #ifdef CONFIG_MENUKEY
 	if (menukey == CONFIG_MENUKEY) {
-		s = getenv("menucmd");
+		s = env_get("menucmd");
 		if (s)
 			run_command_list(s, -1, 0);
 	}

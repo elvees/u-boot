@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * board.c
  *
@@ -5,8 +6,6 @@
  *
  * Copyright (C) 2013 Hannes Schmelzer <oe5hpm@oevsv.at>
  * Bernecker & Rainer Industrieelektronik GmbH - http://www.br-automation.com
- *
- * SPDX-License-Identifier:	GPL-2.0+
  *
  */
 #include <common.h>
@@ -114,8 +113,6 @@ void am33xx_spl_board_init(void)
 		0
 	};
 	do_enable_clocks(clk_domains, clk_modules_xre1specific, 1);
-	/* setup LCD-Pixel Clock */
-	writel(0x2, CM_DPLL + 0x34);
 	/* power-OFF LCD-Display */
 	gpio_direction_output(LCD_PWR, 0);
 
@@ -203,7 +200,7 @@ int board_late_init(void)
 				lcd_position_cursor(1, 8);
 				lcd_puts(
 				"switching to network-console ...       ");
-				setenv("bootcmd", "run netconsole");
+				env_set("bootcmd", "run netconsole");
 				cnt = 4;
 				break;
 			} else if (!gpio_get_value(ESC_KEY) &&
@@ -211,7 +208,7 @@ int board_late_init(void)
 				lcd_position_cursor(1, 8);
 				lcd_puts(
 				"starting u-boot script from USB ...    ");
-				setenv("bootcmd", "run usbscript");
+				env_set("bootcmd", "run usbscript");
 				cnt = 4;
 				break;
 			} else if ((!gpio_get_value(ESC_KEY) &&
@@ -221,7 +218,7 @@ int board_late_init(void)
 				lcd_position_cursor(1, 8);
 				lcd_puts(
 				"starting script from network ...      ");
-				setenv("bootcmd", "run netscript");
+				env_set("bootcmd", "run netscript");
 				cnt = 4;
 				break;
 			} else if (!gpio_get_value(ESC_KEY)) {
@@ -232,19 +229,19 @@ int board_late_init(void)
 		lcd_position_cursor(1, 8);
 		lcd_puts(
 		"starting vxworks from network ...      ");
-		setenv("bootcmd", "run netboot");
+		env_set("bootcmd", "run netboot");
 		cnt = 4;
 	} else if (scratchreg == 0xCD) {
 		lcd_position_cursor(1, 8);
 		lcd_puts(
 		"starting script from network ...      ");
-		setenv("bootcmd", "run netscript");
+		env_set("bootcmd", "run netscript");
 		cnt = 4;
 	} else if (scratchreg == 0xCE) {
 		lcd_position_cursor(1, 8);
 		lcd_puts(
 		"starting AR from eMMC ...             ");
-		setenv("bootcmd", "run mmcboot");
+		env_set("bootcmd", "run mmcboot");
 		cnt = 4;
 	}
 
@@ -252,7 +249,7 @@ int board_late_init(void)
 	switch (cnt) {
 	case 0:
 		lcd_puts("entering BOOT-mode.                    ");
-		setenv("bootcmd", "run defaultAR");
+		env_set("bootcmd", "run defaultAR");
 		buf = 0x0000;
 		break;
 	case 1:
@@ -282,10 +279,10 @@ int board_late_init(void)
 	snprintf(othbootargs, sizeof(othbootargs),
 		 "u=vxWorksFTP pw=vxWorks o=0x%08x;0x%08x;0x%08x;0x%08x",
 		 (unsigned int) gd->fb_base-0x20,
-		 (u32)getenv_ulong("vx_memtop", 16, gd->fb_base-0x20),
-		 (u32)getenv_ulong("vx_romfsbase", 16, 0),
-		 (u32)getenv_ulong("vx_romfssize", 16, 0));
-	setenv("othbootargs", othbootargs);
+		 (u32)env_get_ulong("vx_memtop", 16, gd->fb_base-0x20),
+		 (u32)env_get_ulong("vx_romfsbase", 16, 0),
+		 (u32)env_get_ulong("vx_romfssize", 16, 0));
+	env_set("othbootargs", othbootargs);
 	/*
 	 * reset VBAR registers to its reset location, VxWorks 6.9.3.2 does
 	 * expect that vectors are there, original u-boot moves them to _start

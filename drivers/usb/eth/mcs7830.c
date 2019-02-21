@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2013 Gerhard Sittig <gsi@denx.de>
  * based on the U-Boot Asix driver as well as information
  * from the Linux Moschip driver
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -418,25 +417,25 @@ static int mcs7830_basic_reset(struct usb_device *udev,
 
 	rc = mcs7830_set_autoneg(udev);
 	if (rc < 0) {
-		error("setting autoneg failed\n");
+		pr_err("setting autoneg failed\n");
 		return rc;
 	}
 
 	rc = mcs7830_write_mchash(udev, priv);
 	if (rc < 0) {
-		error("failed to set multicast hash\n");
+		pr_err("failed to set multicast hash\n");
 		return rc;
 	}
 
 	rc = mcs7830_write_config(udev, priv);
 	if (rc < 0) {
-		error("failed to set configuration\n");
+		pr_err("failed to set configuration\n");
 		return rc;
 	}
 
 	rc = mcs7830_apply_fixup(udev);
 	if (rc < 0) {
-		error("fixup application failed\n");
+		pr_err("fixup application failed\n");
 		return rc;
 	}
 
@@ -541,11 +540,11 @@ static int mcs7830_recv_common(struct ueth_data *ueth, uint8_t *buf)
 	debug("%s() RX want len %d, got len %d, rc %d\n",
 	      __func__, wantlen, gotlen, rc);
 	if (rc != 0) {
-		error("RX: failed to receive\n");
+		pr_err("RX: failed to receive\n");
 		return rc;
 	}
 	if (gotlen > wantlen) {
-		error("RX: got too many bytes (%d)\n", gotlen);
+		pr_err("RX: got too many bytes (%d)\n", gotlen);
 		return -EIO;
 	}
 

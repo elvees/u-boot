@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2004,2007-2011 Freescale Semiconductor, Inc.
  * (C) Copyright 2002, 2003 Motorola Inc.
@@ -5,8 +6,6 @@
  *
  * (C) Copyright 2000
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <config.h>
@@ -23,6 +22,7 @@
 #include <post.h>
 #include <asm/processor.h>
 #include <fsl_ddr_sdram.h>
+#include <asm/ppc.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -384,7 +384,7 @@ int cpu_mmc_init(bd_t *bis)
  * Currently prints out LAWs, BR0/OR0 for LBC, CSPR/CSOR/Timing
  * parameters for IFC and TLBs
  */
-void mpc85xx_reginfo(void)
+void print_reginfo(void)
 {
 	print_tlbcam();
 	print_laws();

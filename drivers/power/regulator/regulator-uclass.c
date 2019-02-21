@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2014-2015 Samsung Electronics
  * Przemyslaw Marczak <p.marczak@samsung.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -11,8 +10,6 @@
 #include <dm/uclass-internal.h>
 #include <power/pmic.h>
 #include <power/regulator.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 int regulator_mode(struct udevice *dev, struct dm_regulator_mode **modep)
 {
@@ -96,7 +93,7 @@ int regulator_set_current(struct udevice *dev, int uA)
 	return ops->set_current(dev, uA);
 }
 
-bool regulator_get_enable(struct udevice *dev)
+int regulator_get_enable(struct udevice *dev)
 {
 	const struct dm_regulator_ops *ops = dev_get_driver_ops(dev);
 
@@ -109,9 +106,14 @@ bool regulator_get_enable(struct udevice *dev)
 int regulator_set_enable(struct udevice *dev, bool enable)
 {
 	const struct dm_regulator_ops *ops = dev_get_driver_ops(dev);
+	struct dm_regulator_uclass_platdata *uc_pdata;
 
 	if (!ops || !ops->set_enable)
 		return -ENOSYS;
+
+	uc_pdata = dev_get_uclass_platdata(dev);
+	if (!enable && uc_pdata->always_on)
+		return 0;
 
 	return ops->set_enable(dev, enable);
 }

@@ -14,6 +14,27 @@ config DM_VIDEO
 	  option compiles in the video uclass and routes all LCD/video access
 	  through this.
 
+config BACKLIGHT_PWM
+	bool "Generic PWM based Backlight Driver"
+	depends on DM_VIDEO && DM_PWM
+	default y
+	help
+	  If you have a LCD backlight adjustable by PWM, say Y to enable
+	  this driver.
+	  This driver can be use with "simple-panel" and
+	  it understands the standard device tree
+	  (leds/backlight/pwm-backlight.txt)
+
+config BACKLIGHT_GPIO
+	bool "Generic GPIO based Backlight Driver"
+	depends on DM_VIDEO
+	help
+	  If you have a LCD backlight adjustable by GPIO, say Y to enable
+	  this driver.
+	  This driver can be used with "simple-panel" and
+	  it understands the standard device tree
+	  (leds/backlight/gpio-backlight.txt)
+
 config VIDEO_BPP8
 	bool "Support 8-bit-per-pixel displays"
 	depends on DM_VIDEO
@@ -43,6 +64,14 @@ config VIDEO_BPP32
 	  Enabling this will include code to support this display. Without
 	  this option, such displays will not be supported and console output
 	  will be empty.
+
+config VIDEO_ANSI
+	bool "Support ANSI escape sequences in video console"
+	depends on DM_VIDEO
+	default y if DM_VIDEO
+	help
+	  Enable ANSI escape sequence decoding for a more fully functional
+	  console.
 
 config CONSOLE_NORMAL
 	bool "Support a simple text console"
@@ -98,6 +127,14 @@ config SYS_WHITE_ON_BLACK
 	 better in low-light situations or to reduce eye strain in some
 	 cases.
 
+config NO_FB_CLEAR
+	bool "Skip framebuffer clear"
+	help
+	  If firmware (whatever loads u-boot) has already put a splash image
+	  on screen, you might want to preserve it until whatever u-boot
+	  loads takes over the screen.  This, for example, can be used to
+	  keep splash image on screen until grub graphical boot menu starts.
+
 source "drivers/video/fonts/Kconfig"
 
 config VIDCONSOLE_AS_LCD
@@ -119,6 +156,15 @@ config VIDEO_COREBOOT
 	  coreboot already. This can in principle be used with any platform
 	  that coreboot supports.
 
+config VIDEO_EFI
+	bool "Enable EFI framebuffer driver support"
+	depends on EFI_STUB
+	help
+	  Turn on this option to enable a framebuffeer driver when U-Boot is
+	  loaded as a payload (see README.u-boot_on_efi) by an EFI BIOS where
+	  the graphics device is configured by the EFI BIOS already. This can
+	  in principle be used with any platform that has an EFI BIOS.
+
 config VIDEO_VESA
 	bool "Enable VESA video driver support"
 	default n
@@ -137,7 +183,7 @@ config FRAMEBUFFER_SET_VESA_MODE
 
 choice
 	prompt "framebuffer graphics resolution"
-	default FRAMEBUFFER_VESA_MODE_117
+	default FRAMEBUFFER_VESA_MODE_118
 	depends on FRAMEBUFFER_SET_VESA_MODE
 	help
 	  This option sets the resolution used for the U-Boot framebuffer (and
@@ -362,9 +408,14 @@ config VIDEO_MVEBU
 	Support for the LCD controller integrated in the Marvell
 	Armada XP SoC.
 
+config VIDEO_OMAP3
+	bool "Enable OMAP3+ DSS Support"
+	depends on ARCH_OMAP2PLUS
+	help
+	  This enables the Display subsystem (DSS) on OMAP3+ boards.
+
 config I2C_EDID
 	bool "Enable EDID library"
-	depends on DM_I2C
 	default n
 	help
 	   This enables library for accessing EDID data from an LCD panel.
@@ -380,11 +431,30 @@ config DISPLAY
 	   The devices provide a simple interface to start up the display,
 	   read display information and enable it.
 
+config NXP_TDA19988
+	bool "Enable NXP TDA19988 support"
+	depends on DISPLAY
+	default n
+	help
+	  This enables support for the NXP TDA19988 HDMI encoder. This encoder
+	  will convert RGB data streams into HDMI-encoded signals.
+
 config ATMEL_HLCD
 	bool "Enable ATMEL video support using HLCDC"
 	depends on DM_VIDEO
 	help
 	   HLCDC supports video output to an attached LCD panel.
+
+config LOGICORE_DP_TX
+	bool "Enable Logicore DP TX driver"
+	depends on DISPLAY
+	help
+	  Enable the driver for the transmitter part of the Xilinx LogiCORE
+	  DisplayPort, a IP core for Xilinx FPGAs that implements a DisplayPort
+	  video interface as defined by VESA DisplayPort v1.2.
+
+	  Note that this is a pure transmitter device, and has no display
+	  capabilities by itself.
 
 config VIDEO_BROADWELL_IGD
 	bool "Enable Intel Broadwell integrated graphics device"
@@ -427,6 +497,14 @@ config VIDEO_FSL_DCU_MAX_FB_SIZE_MB
 
 source "drivers/video/rockchip/Kconfig"
 
+config VIDEO_ARM_MALIDP
+	bool "Enable Arm Mali Display Processor support"
+	depends on DM_VIDEO && OF_CONTROL
+	select VEXPRESS_CLK
+	help
+	  This enables support for Arm Ltd Mali Display Processors from
+	  the DP500, DP550 and DP650 family.
+
 config VIDEO_SANDBOX_SDL
 	bool "Enable sandbox video console using SDL"
 	depends on SANDBOX
@@ -435,6 +513,8 @@ config VIDEO_SANDBOX_SDL
 	  appears as an SDL (Simple DirectMedia Layer) window. This is a
 	  console device and can display stdout output. Within U-Boot is is
 	  a normal bitmap display and can display images as well as text.
+
+source "drivers/video/stm32/Kconfig"
 
 config VIDEO_TEGRA20
 	bool "Enable LCD support on Tegra20"
@@ -562,36 +642,9 @@ config CONSOLE_SCROLL_LINES
 	  console jump but can help speed up operation when scrolling
 	  is slow.
 
-config VIDEO_CT69000
-	bool "Enable Chips & Technologies 69000 video driver"
-	depends on VIDEO
-	help
-	  This enables a frame buffer driver for the Chips & Technologies
-	  ct69000, a fairly old graphics device (circa 2000) which is used
-	  on some hardware. It operates over the ISA bus, and supports
-	  some acceleration features.
-
-	  For the CT69000 and SMI_LYNXEM drivers, videomode is
-		selected via environment 'videomode'. Two different ways
-		are possible:
-		- "videomode=num"   'num' is a standard LiLo mode numbers.
-		Following standard modes are supported	(* is default):
-
-		      Colors	640x480 800x600 1024x768 1152x864 1280x1024
-		-------------+---------------------------------------------
-		      8 bits |	0x301*	0x303	 0x305	  0x161	    0x307
-		     15 bits |	0x310	0x313	 0x316	  0x162	    0x319
-		     16 bits |	0x311	0x314	 0x317	  0x163	    0x31A
-		     24 bits |	0x312	0x315	 0x318	    ?	    0x31B
-		-------------+---------------------------------------------
-		(i.e. setenv videomode 317; saveenv; reset;)
-
-		- "videomode=bootargs" all the video parameters are parsed
-		from the bootargs. (See drivers/video/videomodes.c)
-
 config SYS_CONSOLE_BG_COL
 	hex "Background colour"
-	depends on CFB_CONSOLE || VIDEO_CT69000
+	depends on CFB_CONSOLE
 	default 0x00
 	help
 	  Defines the background colour for the console. The value is from
@@ -602,7 +655,7 @@ config SYS_CONSOLE_BG_COL
 
 config SYS_CONSOLE_FG_COL
 	hex "Foreground colour"
-	depends on CFB_CONSOLE || VIDEO_CT69000
+	depends on CFB_CONSOLE
 	default 0xa0
 	help
 	  Defines the foreground colour for the console. The value is from
@@ -627,5 +680,46 @@ config VIDEO_DW_HDMI
 	  As this does not provide any functionality by itself (but
 	  rather requires a SoC-specific glue driver to call it), it
 	  can not be enabled from the configuration menu.
+
+config VIDEO_SIMPLE
+	bool "Simple display driver for preconfigured display"
+	help
+	  Enables a simple generic display driver which utilizes the
+	  simple-framebuffer devicetree bindings.
+
+	  This driver assumes that the display hardware has been initialized
+	  before u-boot starts, and u-boot will simply render to the pre-
+	  allocated frame buffer surface.
+
+config VIDEO_DT_SIMPLEFB
+	bool "Enable SimpleFB support for passing framebuffer to OS"
+	help
+	  Enables the code to pass the framebuffer to the kernel as a
+	  simple framebuffer in the device tree.
+	  The video output is initialized by U-Boot, and kept by the
+	  kernel.
+
+config OSD
+	bool "Enable OSD support"
+	depends on DM
+	default n
+	help
+	   This supports drivers that provide a OSD (on-screen display), which
+	   is a (usually text-oriented) graphics buffer to show information on
+	   a display.
+
+config SANDBOX_OSD
+	bool "Enable sandbox OSD"
+	depends on OSD
+	help
+	  Enable support for sandbox OSD device used for testing purposes.
+
+config IHS_VIDEO_OUT
+	bool "Enable IHS video out driver"
+	depends on OSD
+	help
+	  Enable support for the gdsys Integrated Hardware Systems (IHS) video
+	  out On-screen Display (OSD) used on gdsys FPGAs to control dynamic
+	  textual overlays of the display outputs.
 
 endmenu

@@ -1,9 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) Stefano Babic <sbabic@denx.de>
  *
  * Configuration settings for the E+L i.MX6Q DO82 board.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __EL_ZC5202_H
@@ -19,14 +18,12 @@
 
 /* Ethernet */
 #define CONFIG_FEC_MXC
-#define CONFIG_MII
 #define IMX_FEC_BASE				ENET_BASE_ADDR
 #define CONFIG_FEC_XCV_TYPE			MII100
 #define CONFIG_ETHPRIME				"FEC"
 #define CONFIG_FEC_MXC_PHYADDR			0
 #define CONFIG_MV88E6352_SWITCH
 
-#define CONFIG_CMD_PCI
 #define CONFIG_PCI_SCAN_SHOW
 #define CONFIG_PCIE_IMX
 

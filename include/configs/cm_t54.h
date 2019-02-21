@@ -1,11 +1,10 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Config file for Compulab CM-T54 board
  *
  * Copyright (C) 2014, Compulab Ltd - http://compulab.co.il/
  *
  * Author: Dmitry Lifshitz <lifshitz@compulab.co.il>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_CM_T54_H
@@ -14,10 +13,11 @@
 #define CONFIG_CM_T54
 #define CONFIG_DRAM_2G
 
+#define PARTS_DEFAULT
+
 #include <configs/ti_omap5_common.h>
 
 /* EEPROM related defines */
-#define CONFIG_SYS_I2C_OMAP34XX
 #define CONFIG_SYS_I2C_EEPROM_ADDR	0x50
 #define CONFIG_SYS_I2C_EEPROM_ADDR_LEN	1
 #define CONFIG_SYS_I2C_EEPROM_BUS	0
@@ -26,14 +26,12 @@
 #define OMAP_HSMMC_USE_GPIO
 
 /* UART setup */
-#define CONFIG_CONS_INDEX		4
 #define CONFIG_SYS_NS16550_COM4		UART4_BASE
 
 /* MMC ENV related defines */
 #undef CONFIG_ENV_OFFSET
 #undef CONFIG_ENV_SIZE
 
-#define CONFIG_ENV_IS_IN_MMC
 #define CONFIG_SYS_MMC_ENV_DEV		1		/* SLOT2: eMMC(1) */
 #define CONFIG_SYS_MMC_ENV_PART		0
 #define CONFIG_ENV_OFFSET		0xc0000		/* (in bytes) 768 KB */
@@ -49,16 +47,12 @@
 #define CONFIG_SPL_SATA_BOOT_DEVICE		0
 #define CONFIG_SYS_SATA_FAT_BOOT_PARTITION	1
 
-#define CONFIG_SCSI
-#define CONFIG_LIBATA
-#define CONFIG_SCSI_AHCI
 #define CONFIG_SCSI_AHCI_PLAT
 #define CONFIG_SYS_SCSI_MAX_SCSI_ID	1
 #define CONFIG_SYS_SCSI_MAX_LUN		1
 #define CONFIG_SYS_SCSI_MAX_DEVICE	(CONFIG_SYS_SCSI_MAX_SCSI_ID * \
 						CONFIG_SYS_SCSI_MAX_LUN)
 /* USB UHH support options */
-#define CONFIG_SYS_USB_EHCI_MAX_ROOT_PORTS	3
 #define CONFIG_EHCI_HCD_INIT_AFTER_RESET
 
 #define CONFIG_OMAP_EHCI_PHY2_RESET_GPIO	76 /* HSIC2 HUB #RESET */
@@ -74,11 +68,6 @@
 #define CONFIG_SYS_EEPROM_SIZE			256
 
 /* USB Networking options */
-#define CONFIG_USB_HOST_ETHER
-#define CONFIG_USB_ETHER_SMSC95XX
-#define CONFIG_USB_ETHER_RNDIS
-#define CONFIG_USB_ETHER_ASIX
-#define CONFIG_USB_ETHER_MCS7830
 
 /*
  * Miscellaneous configurable options

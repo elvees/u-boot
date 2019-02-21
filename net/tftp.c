@@ -706,11 +706,11 @@ void tftp_start(enum proto_t protocol)
 	 * TFTP protocol has a minimal timeout of 1 second.
 	 */
 
-	ep = getenv("tftpblocksize");
+	ep = env_get("tftpblocksize");
 	if (ep != NULL)
 		tftp_block_size_option = simple_strtol(ep, NULL, 10);
 
-	ep = getenv("tftptimeout");
+	ep = env_get("tftptimeout");
 	if (ep != NULL)
 		timeout_ms = simple_strtol(ep, NULL, 10);
 
@@ -720,7 +720,7 @@ void tftp_start(enum proto_t protocol)
 		timeout_ms = 1000;
 	}
 
-	ep = getenv("tftptimeoutcountmax");
+	ep = env_get("tftptimeoutcountmax");
 	if (ep != NULL)
 		tftp_timeout_count_max = simple_strtol(ep, NULL, 10);
 
@@ -735,29 +735,18 @@ void tftp_start(enum proto_t protocol)
 	      tftp_block_size_option, timeout_ms);
 
 	tftp_remote_ip = net_server_ip;
-	if (net_boot_file_name[0] == '\0') {
+	if (!net_parse_bootfile(&tftp_remote_ip, tftp_filename, MAX_LEN)) {
 		sprintf(default_filename, "%02X%02X%02X%02X.img",
 			net_ip.s_addr & 0xFF,
 			(net_ip.s_addr >>  8) & 0xFF,
 			(net_ip.s_addr >> 16) & 0xFF,
 			(net_ip.s_addr >> 24) & 0xFF);
 
-		strncpy(tftp_filename, default_filename, MAX_LEN);
-		tftp_filename[MAX_LEN - 1] = 0;
+		strncpy(tftp_filename, default_filename, DEFAULT_NAME_LEN);
+		tftp_filename[DEFAULT_NAME_LEN - 1] = 0;
 
 		printf("*** Warning: no boot file name; using '%s'\n",
 		       tftp_filename);
-	} else {
-		char *p = strchr(net_boot_file_name, ':');
-
-		if (p == NULL) {
-			strncpy(tftp_filename, net_boot_file_name, MAX_LEN);
-			tftp_filename[MAX_LEN - 1] = 0;
-		} else {
-			tftp_remote_ip = string_to_ip(net_boot_file_name);
-			strncpy(tftp_filename, p + 1, MAX_LEN);
-			tftp_filename[MAX_LEN - 1] = 0;
-		}
 	}
 
 	printf("Using %s device\n", eth_get_name());
@@ -805,7 +794,9 @@ void tftp_start(enum proto_t protocol)
 		printf("Load address: 0x%lx\n", load_addr);
 		puts("Loading: *\b");
 		tftp_state = STATE_SEND_RRQ;
+#ifdef CONFIG_CMD_BOOTEFI
 		efi_set_bootdev("Net", "", tftp_filename);
+#endif
 	}
 
 	time_start = get_timer(0);
@@ -822,10 +813,10 @@ void tftp_start(enum proto_t protocol)
 	tftp_our_port = 1024 + (get_timer(0) % 3072);
 
 #ifdef CONFIG_TFTP_PORT
-	ep = getenv("tftpdstp");
+	ep = env_get("tftpdstp");
 	if (ep != NULL)
 		tftp_remote_port = simple_strtol(ep, NULL, 10);
-	ep = getenv("tftpsrcp");
+	ep = env_get("tftpsrcp");
 	if (ep != NULL)
 		tftp_our_port = simple_strtol(ep, NULL, 10);
 #endif

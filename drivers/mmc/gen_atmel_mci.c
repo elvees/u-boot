@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2010
  * Rob Emanuele <rob@emanuele.us>
@@ -5,8 +6,6 @@
  *
  * Original Driver:
  * Copyright (C) 2004-2006 Atmel Corporation
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -22,8 +21,6 @@
 #include <asm/arch/hardware.h>
 #include "atmel_mci.h"
 
-DECLARE_GLOBAL_DATA_PTR;
-
 #ifndef CONFIG_SYS_MMC_CLK_OD
 # define CONFIG_SYS_MMC_CLK_OD	150000
 #endif
@@ -36,13 +33,22 @@ DECLARE_GLOBAL_DATA_PTR;
 # define MCI_BUS 0
 #endif
 
-struct atmel_mci_priv {
+#ifdef CONFIG_DM_MMC
+struct atmel_mci_plat {
+	struct mmc		mmc;
 	struct mmc_config	cfg;
 	struct atmel_mci	*mci;
+};
+#endif
+
+struct atmel_mci_priv {
+#ifndef CONFIG_DM_MMC
+	struct mmc_config	cfg;
+	struct atmel_mci	*mci;
+#endif
 	unsigned int		initialized:1;
 	unsigned int		curr_clk;
 #ifdef CONFIG_DM_MMC
-	struct mmc	mmc;
 	ulong		bus_clk_rate;
 #endif
 };
@@ -65,20 +71,37 @@ static void dump_cmd(u32 cmdr, u32 arg, u32 status, const char* msg)
 	      cmdr, cmdr & 0x3F, arg, status, msg);
 }
 
+static inline void mci_set_blklen(atmel_mci_t *mci, int blklen)
+{
+	unsigned int version = atmel_mci_get_version(mci);
+
+	blklen &= 0xfffc;
+
+	/* MCI IP version >= 0x200 has blkr */
+	if (version >= 0x200)
+		writel(MMCI_BFINS(BLKLEN, blklen, readl(&mci->blkr)),
+		       &mci->blkr);
+	else
+		writel(MMCI_BFINS(BLKLEN, blklen, readl(&mci->mr)), &mci->mr);
+}
+
 /* Setup for MCI Clock and Block Size */
 #ifdef CONFIG_DM_MMC
-static void mci_set_mode(struct atmel_mci_priv *priv, u32 hz, u32 blklen)
+static void mci_set_mode(struct udevice *dev, u32 hz, u32 blklen)
 {
-	struct mmc *mmc = &priv->mmc;
+	struct atmel_mci_plat *plat = dev_get_platdata(dev);
+	struct atmel_mci_priv *priv = dev_get_priv(dev);
+	struct mmc *mmc = &plat->mmc;
 	u32 bus_hz = priv->bus_clk_rate;
+	atmel_mci_t *mci = plat->mci;
 #else
 static void mci_set_mode(struct mmc *mmc, u32 hz, u32 blklen)
 {
 	struct atmel_mci_priv *priv = mmc->priv;
 	u32 bus_hz = get_mci_clk_rate();
+	atmel_mci_t *mci = priv->mci;
 #endif
 
-	atmel_mci_t *mci = priv->mci;
 	u32 clkdiv = 255;
 	unsigned int version = atmel_mci_get_version(mci);
 	u32 clkodd = 0;
@@ -112,7 +135,6 @@ static void mci_set_mode(struct mmc *mmc, u32 hz, u32 blklen)
 		priv->curr_clk = bus_hz / (clkdiv * 2 + clkodd + 2);
 	else
 		priv->curr_clk = (bus_hz / (clkdiv + 1)) / 2;
-	blklen &= 0xfffc;
 
 	mr = MMCI_BF(CLKDIV, clkdiv);
 
@@ -126,14 +148,10 @@ static void mci_set_mode(struct mmc *mmc, u32 hz, u32 blklen)
 	 */
 	if (version >= 0x500)
 		mr |= MMCI_BF(CLKODD, clkodd);
-	else
-		mr |= MMCI_BF(BLKLEN, blklen);
 
 	writel(mr, &mci->mr);
 
-	/* MCI IP version >= 0x200 has blkr */
-	if (version >= 0x200)
-		writel(MMCI_BF(BLKLEN, blklen), &mci->blkr);
+	mci_set_blklen(mci, blklen);
 
 	if (mmc->card_caps & mmc->cfg->host_caps & MMC_MODE_HS)
 		writel(MMCI_BIT(HSMODE), &mci->cfg);
@@ -222,15 +240,16 @@ io_fail:
 static int atmel_mci_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 			      struct mmc_data *data)
 {
+	struct atmel_mci_plat *plat = dev_get_platdata(dev);
 	struct atmel_mci_priv *priv = dev_get_priv(dev);
-	struct mmc *mmc = mmc_get_mmc_dev(dev);
+	atmel_mci_t *mci = plat->mci;
 #else
 static int
 mci_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd, struct mmc_data *data)
 {
 	struct atmel_mci_priv *priv = mmc->priv;
-#endif
 	atmel_mci_t *mci = priv->mci;
+#endif
 	u32 cmdr;
 	u32 error_flags = 0;
 	u32 status;
@@ -243,11 +262,13 @@ mci_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd, struct mmc_data *data)
 	/* Figure out the transfer arguments */
 	cmdr = mci_encode_cmd(cmd, data, &error_flags);
 
+	mci_set_blklen(mci, data->blocksize);
+
 	/* For multi blocks read/write, set the block register */
 	if ((cmd->cmdidx == MMC_CMD_READ_MULTIPLE_BLOCK)
 			|| (cmd->cmdidx == MMC_CMD_WRITE_MULTIPLE_BLOCK))
-		writel(data->blocks | MMCI_BF(BLKLEN, mmc->read_bl_len),
-			&mci->blkr);
+		writel(data->blocks | MMCI_BF(BLKLEN, data->blocksize),
+		       &mci->blkr);
 
 	/* Send the command */
 	writel(cmd->cmdarg, &mci->argr);
@@ -281,17 +302,15 @@ mci_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd, struct mmc_data *data)
 	if (data) {
 		u32 word_count, block_count;
 		u32* ioptr;
-		u32 sys_blocksize, dummy, i;
+		u32 i;
 		u32 (*mci_data_op)
 			(atmel_mci_t *mci, u32* data, u32 error_flags);
 
 		if (data->flags & MMC_DATA_READ) {
 			mci_data_op = mci_data_read;
-			sys_blocksize = mmc->read_bl_len;
 			ioptr = (u32*)data->dest;
 		} else {
 			mci_data_op = mci_data_write;
-			sys_blocksize = mmc->write_bl_len;
 			ioptr = (u32*)data->src;
 		}
 
@@ -314,16 +333,6 @@ mci_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd, struct mmc_data *data)
 					     1, cnt, 0);
 			}
 #endif
-#ifdef DEBUG
-			if (!status && word_count < (sys_blocksize / 4))
-				printf("filling rest of block...\n");
-#endif
-			/* fill the rest of a full block */
-			while (!status && word_count < (sys_blocksize / 4)) {
-				status = mci_data_op(mci, &dummy,
-					error_flags);
-				word_count++;
-			}
 			if (status) {
 				dump_cmd(cmdr, cmd->cmdarg, status,
 					"Data Transfer Failed");
@@ -362,22 +371,23 @@ mci_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd, struct mmc_data *data)
 #ifdef CONFIG_DM_MMC
 static int atmel_mci_set_ios(struct udevice *dev)
 {
-	struct atmel_mci_priv *priv = dev_get_priv(dev);
+	struct atmel_mci_plat *plat = dev_get_platdata(dev);
 	struct mmc *mmc = mmc_get_mmc_dev(dev);
+	atmel_mci_t *mci = plat->mci;
 #else
 /* Entered into mmc structure during driver init */
 static int mci_set_ios(struct mmc *mmc)
 {
 	struct atmel_mci_priv *priv = mmc->priv;
-#endif
 	atmel_mci_t *mci = priv->mci;
+#endif
 	int bus_width = mmc->bus_width;
 	unsigned int version = atmel_mci_get_version(mci);
 	int busw;
 
 	/* Set the clock speed */
 #ifdef CONFIG_DM_MMC
-	mci_set_mode(priv, mmc->clock, MMC_DEFAULT_BLKLEN);
+	mci_set_mode(dev, mmc->clock, MMC_DEFAULT_BLKLEN);
 #else
 	mci_set_mode(mmc, mmc->clock, MMC_DEFAULT_BLKLEN);
 #endif
@@ -410,15 +420,17 @@ static int mci_set_ios(struct mmc *mmc)
 }
 
 #ifdef CONFIG_DM_MMC
-static int atmel_mci_hw_init(struct atmel_mci_priv *priv)
+static int atmel_mci_hw_init(struct udevice *dev)
 {
+	struct atmel_mci_plat *plat = dev_get_platdata(dev);
+	atmel_mci_t *mci = plat->mci;
 #else
 /* Entered into mmc structure during driver init */
 static int mci_init(struct mmc *mmc)
 {
 	struct atmel_mci_priv *priv = mmc->priv;
-#endif
 	atmel_mci_t *mci = priv->mci;
+#endif
 
 	/* Initialize controller */
 	writel(MMCI_BIT(SWRST), &mci->cr);	/* soft reset */
@@ -433,7 +445,7 @@ static int mci_init(struct mmc *mmc)
 
 	/* Set default clocks and blocklen */
 #ifdef CONFIG_DM_MMC
-	mci_set_mode(priv, CONFIG_SYS_MMC_CLK_OD, MMC_DEFAULT_BLKLEN);
+	mci_set_mode(dev, CONFIG_SYS_MMC_CLK_OD, MMC_DEFAULT_BLKLEN);
 #else
 	mci_set_mode(mmc, CONFIG_SYS_MMC_CLK_OD, MMC_DEFAULT_BLKLEN);
 #endif
@@ -509,12 +521,14 @@ static const struct dm_mmc_ops atmel_mci_mmc_ops = {
 	.set_ios = atmel_mci_set_ios,
 };
 
-static void atmel_mci_setup_cfg(struct atmel_mci_priv *priv)
+static void atmel_mci_setup_cfg(struct udevice *dev)
 {
+	struct atmel_mci_plat *plat = dev_get_platdata(dev);
+	struct atmel_mci_priv *priv = dev_get_priv(dev);
 	struct mmc_config *cfg;
 	u32 version;
 
-	cfg = &priv->cfg;
+	cfg = &plat->cfg;
 	cfg->name = "Atmel mci";
 	cfg->voltages = MMC_VDD_32_33 | MMC_VDD_33_34;
 
@@ -522,7 +536,7 @@ static void atmel_mci_setup_cfg(struct atmel_mci_priv *priv)
 	 * If the version is above 3.0, the capabilities of the 8-bit
 	 * bus width and high speed are supported.
 	 */
-	version = atmel_mci_get_version(priv->mci);
+	version = atmel_mci_get_version(plat->mci);
 	if ((version & 0xf00) >= 0x300) {
 		cfg->host_caps = MMC_MODE_8BIT |
 				 MMC_MODE_HS | MMC_MODE_HS_52MHz;
@@ -568,7 +582,7 @@ failed:
 static int atmel_mci_probe(struct udevice *dev)
 {
 	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(dev);
-	struct atmel_mci_priv *priv = dev_get_priv(dev);
+	struct atmel_mci_plat *plat = dev_get_platdata(dev);
 	struct mmc *mmc;
 	int ret;
 
@@ -576,25 +590,25 @@ static int atmel_mci_probe(struct udevice *dev)
 	if (ret)
 		return ret;
 
-	priv->mci = (struct atmel_mci *)devfdt_get_addr_ptr(dev);
+	plat->mci = (struct atmel_mci *)devfdt_get_addr_ptr(dev);
 
-	atmel_mci_setup_cfg(priv);
+	atmel_mci_setup_cfg(dev);
 
-	mmc = &priv->mmc;
-	mmc->cfg = &priv->cfg;
+	mmc = &plat->mmc;
+	mmc->cfg = &plat->cfg;
 	mmc->dev = dev;
 	upriv->mmc = mmc;
 
-	atmel_mci_hw_init(priv);
+	atmel_mci_hw_init(dev);
 
 	return 0;
 }
 
 static int atmel_mci_bind(struct udevice *dev)
 {
-	struct atmel_mci_priv *priv = dev_get_priv(dev);
+	struct atmel_mci_plat *plat = dev_get_platdata(dev);
 
-	return mmc_bind(dev, &priv->mmc, &priv->cfg);
+	return mmc_bind(dev, &plat->mmc, &plat->cfg);
 }
 
 static const struct udevice_id atmel_mci_ids[] = {
@@ -608,6 +622,7 @@ U_BOOT_DRIVER(atmel_mci) = {
 	.of_match = atmel_mci_ids,
 	.bind = atmel_mci_bind,
 	.probe = atmel_mci_probe,
+	.platdata_auto_alloc_size = sizeof(struct atmel_mci_plat),
 	.priv_auto_alloc_size = sizeof(struct atmel_mci_priv),
 	.ops = &atmel_mci_mmc_ops,
 };

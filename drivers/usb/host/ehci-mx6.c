@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
  * Copyright (C) 2010 Freescale Semiconductor, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -14,8 +13,8 @@
 #include <asm/io.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/clock.h>
-#include <asm/imx-common/iomux-v3.h>
-#include <asm/imx-common/sys_proto.h>
+#include <asm/mach-imx/iomux-v3.h>
+#include <asm/mach-imx/sys_proto.h>
 #include <dm.h>
 #include <asm/mach-types.h>
 #include <power/regulator.h>
@@ -142,13 +141,12 @@ static int usb_phy_enable(int index, struct usb_ehci *ehci)
 
 	/* Stop then Reset */
 	clrbits_le32(usb_cmd, UCMD_RUN_STOP);
-	ret = wait_for_bit(__func__, usb_cmd, UCMD_RUN_STOP, false, 10000,
-			   false);
+	ret = wait_for_bit_le32(usb_cmd, UCMD_RUN_STOP, false, 10000, false);
 	if (ret)
 		return ret;
 
 	setbits_le32(usb_cmd, UCMD_RESET);
-	ret = wait_for_bit(__func__, usb_cmd, UCMD_RESET, false, 10000, false);
+	ret = wait_for_bit_le32(usb_cmd, UCMD_RESET, false, 10000, false);
 	if (ret)
 		return ret;
 
@@ -337,7 +335,7 @@ int ehci_mx6_common_init(struct usb_ehci *ehci, int index)
 	return 0;
 }
 
-#ifndef CONFIG_DM_USB
+#if !CONFIG_IS_ENABLED(DM_USB)
 int ehci_hcd_init(int index, enum usb_init_type init,
 		struct ehci_hccr **hccr, struct ehci_hcor **hcor)
 {

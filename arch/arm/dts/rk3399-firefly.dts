@@ -1,14 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd.
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 /dts-v1/;
 #include <dt-bindings/pwm/pwm.h>
 #include <dt-bindings/pinctrl/rockchip.h>
 #include "rk3399.dtsi"
-#include "rk3399-sdram-ddr3-1333.dtsi"
+#include "rk3399-sdram-ddr3-1600.dtsi"
 
 / {
 	model = "Firefly-RK3399 Board";
@@ -16,6 +15,7 @@
 
 	chosen {
 		stdout-path = &uart2;
+		u-boot,spl-boot-order = &sdhci, &sdmmc;
 	};
 
 	backlight: backlight {
@@ -156,8 +156,9 @@
 		regulator-name = "vdd_log";
 		regulator-always-on;
 		regulator-boot-on;
-		regulator-min-microvolt = <800000>;
+		regulator-min-microvolt = <430000>;
 		regulator-max-microvolt = <1400000>;
+		regulator-init-microvolt = <950000>;
 	};
 
 	vccadc_ref: vccadc-ref {
@@ -209,8 +210,8 @@
 	snps,reset-gpio = <&gpio3 RK_PB7 GPIO_ACTIVE_LOW>;
 	snps,reset-active-low;
 	snps,reset-delays-us = <0 10000 50000>;
-	tx_delay = <0x28>;
-	rx_delay = <0x11>;
+	tx_delay = <0x33>;
+	rx_delay = <0x45>;
 	status = "okay";
 };
 
@@ -330,10 +331,10 @@
 				regulator-always-on;
 				regulator-boot-on;
 				regulator-min-microvolt = <1800000>;
-				regulator-max-microvolt = <3300000>;
+				regulator-max-microvolt = <3000000>;
 				regulator-state-mem {
 					regulator-on-in-suspend;
-					regulator-suspend-microvolt = <3300000>;
+					regulator-suspend-microvolt = <3000000>;
 				};
 			};
 
@@ -587,6 +588,12 @@
 
 &saradc {
 	vref-supply = <&vccadc_ref>;
+	status = "okay";
+};
+
+&sdmmc {
+	u-boot,dm-pre-reloc;
+	bus-width = <4>;
 	status = "okay";
 };
 

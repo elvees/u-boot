@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2011 The Chromium OS Authors.
  * (C) Copyright 2010-2015
  * NVIDIA Corporation <www.nvidia.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /* Tegra20 Clock control functions */
@@ -667,7 +666,7 @@ static int tegra_plle_train(void)
 	} while (--timeout);
 
 	if (timeout == 0) {
-		error("timeout waiting for PLLE to become ready");
+		pr_err("timeout waiting for PLLE to become ready");
 		return -ETIMEDOUT;
 	}
 
@@ -697,7 +696,7 @@ int tegra_plle_enable(void)
 	if ((value & PLLE_MISC_PLL_READY) == 0) {
 		err = tegra_plle_train();
 		if (err < 0) {
-			error("failed to train PLLE: %d", err);
+			pr_err("failed to train PLLE: %d", err);
 			return err;
 		}
 	}
@@ -726,7 +725,7 @@ int tegra_plle_enable(void)
 	} while (--timeout);
 
 	if (timeout == 0) {
-		error("timeout waiting for PLLE to lock");
+		pr_err("timeout waiting for PLLE to lock");
 		return -ETIMEDOUT;
 	}
 

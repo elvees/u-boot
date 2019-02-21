@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * (C) Copyright 2015 Google, Inc
  * (C) Copyright 2016 Heiko Stuebner <heiko@sntech.de>
- *
- * SPDX-License-Identifier:	GPL-2.0
  */
 
 #include <common.h>
@@ -22,8 +21,6 @@
 #include <dm/lists.h>
 #include <dm/uclass-internal.h>
 #include <linux/log2.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 enum rk3188_clk_type {
 	RK3188_CRU,
@@ -70,9 +67,6 @@ enum {
 	SOCSTS_CPLL_LOCK	= 1 << 7,
 	SOCSTS_GPLL_LOCK	= 1 << 8,
 };
-
-#define RATE_TO_DIV(input_rate, output_rate) \
-	((input_rate) / (output_rate) - 1);
 
 #define DIV_TO_RATE(input_rate, div)	((input_rate) / ((div) + 1))
 
@@ -126,7 +120,7 @@ static int rkclk_configure_ddr(struct rk3188_cru *cru, struct rk3188_grf *grf,
 			       unsigned int hz, bool has_bwadj)
 {
 	static const struct pll_div dpll_cfg[] = {
-		{.nf = 25, .nr = 2, .no = 1},
+		{.nf = 75, .nr = 1, .no = 6},
 		{.nf = 400, .nr = 9, .no = 2},
 		{.nf = 500, .nr = 9, .no = 2},
 		{.nf = 100, .nr = 3, .no = 1},
@@ -287,7 +281,7 @@ static ulong rockchip_mmc_get_clk(struct rk3188_cru *cru, uint gclk_rate,
 		return -EINVAL;
 	}
 
-	return DIV_TO_RATE(gclk_rate, div);
+	return DIV_TO_RATE(gclk_rate, div) / 2;
 }
 
 static ulong rockchip_mmc_set_clk(struct rk3188_cru *cru, uint gclk_rate,
@@ -296,7 +290,8 @@ static ulong rockchip_mmc_set_clk(struct rk3188_cru *cru, uint gclk_rate,
 	int src_clk_div;
 
 	debug("%s: gclk_rate=%u\n", __func__, gclk_rate);
-	src_clk_div = RATE_TO_DIV(gclk_rate, freq);
+	/* mmc clock defaulg div 2 internal, need provide double in cru */
+	src_clk_div = DIV_ROUND_UP(gclk_rate / 2, freq) - 1;
 	assert(src_clk_div <= 0x3f);
 
 	switch (periph) {
@@ -350,8 +345,9 @@ static ulong rockchip_spi_get_clk(struct rk3188_cru *cru, uint gclk_rate,
 static ulong rockchip_spi_set_clk(struct rk3188_cru *cru, uint gclk_rate,
 				  int periph, uint freq)
 {
-	int src_clk_div = RATE_TO_DIV(gclk_rate, freq);
+	int src_clk_div = DIV_ROUND_UP(gclk_rate, freq) - 1;
 
+	assert(src_clk_div < 128);
 	switch (periph) {
 	case SCLK_SPI0:
 		assert(src_clk_div <= SPI0_DIV_MASK);
@@ -400,8 +396,8 @@ static void rkclk_init(struct rk3188_cru *cru, struct rk3188_grf *grf,
 	 * reparent aclk_cpu_pre from apll to gpll
 	 * set up dependent divisors for PCLK/HCLK and ACLK clocks.
 	 */
-	aclk_div = RATE_TO_DIV(GPLL_HZ, CPU_ACLK_HZ);
-	assert((aclk_div + 1) * CPU_ACLK_HZ == GPLL_HZ && aclk_div < 0x1f);
+	aclk_div = DIV_ROUND_UP(GPLL_HZ, CPU_ACLK_HZ) - 1;
+	assert((aclk_div + 1) * CPU_ACLK_HZ == GPLL_HZ && aclk_div <= 0x1f);
 
 	rk_clrsetreg(&cru->cru_clksel_con[0],
 		     CPU_ACLK_PLL_MASK << CPU_ACLK_PLL_SHIFT |
@@ -542,7 +538,7 @@ static int rk3188_clk_ofdata_to_platdata(struct udevice *dev)
 #if !CONFIG_IS_ENABLED(OF_PLATDATA)
 	struct rk3188_clk_priv *priv = dev_get_priv(dev);
 
-	priv->cru = (struct rk3188_cru *)devfdt_get_addr(dev);
+	priv->cru = dev_read_addr_ptr(dev);
 #endif
 
 	return 0;
@@ -574,11 +570,29 @@ static int rk3188_clk_probe(struct udevice *dev)
 static int rk3188_clk_bind(struct udevice *dev)
 {
 	int ret;
+	struct udevice *sys_child;
+	struct sysreset_reg *priv;
 
 	/* The reset driver does not have a device node, so bind it here */
-	ret = device_bind_driver(gd->dm_root, "rk3188_sysreset", "reset", &dev);
+	ret = device_bind_driver(dev, "rockchip_sysreset", "sysreset",
+				 &sys_child);
+	if (ret) {
+		debug("Warning: No sysreset driver: ret=%d\n", ret);
+	} else {
+		priv = malloc(sizeof(struct sysreset_reg));
+		priv->glb_srst_fst_value = offsetof(struct rk3188_cru,
+						    cru_glb_srst_fst_value);
+		priv->glb_srst_snd_value = offsetof(struct rk3188_cru,
+						    cru_glb_srst_snd_value);
+		sys_child->priv = priv;
+	}
+
+#if CONFIG_IS_ENABLED(CONFIG_RESET_ROCKCHIP)
+	ret = offsetof(struct rk3188_cru, cru_softrst_con[0]);
+	ret = rockchip_reset_bind(dev, ret, 9);
 	if (ret)
-		debug("Warning: No rk3188 reset driver: ret=%d\n", ret);
+		debug("Warning: software reset driver bind faile\n");
+#endif
 
 	return 0;
 }

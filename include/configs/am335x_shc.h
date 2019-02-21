@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2016
  * Heiko Schocher, DENX Software Engineering, hs@denx.de.
@@ -6,8 +7,6 @@
  * am335x_evm.h
  *
  * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_AM335X_SHC_H
@@ -16,17 +15,12 @@
 #include <configs/ti_am335x_common.h>
 
 /* settings we don;t want on this board */
-#undef CONFIG_SPL_AM33XX_ENABLE_RTC32K_OSC
-#undef CONFIG_CMD_EXT4
-#undef CONFIG_CMD_EXT4_WRITE
-#undef CONFIG_CMD_MMC_SPI
 #undef CONFIG_CMD_SPI
 
 #define CONFIG_CMD_CACHE
 
 #ifndef CONFIG_SPL_BUILD
 # define CONFIG_TIMESTAMP
-# define CONFIG_LZO
 #endif
 
 #define CONFIG_SYS_BOOTM_LEN		(16 << 20)
@@ -34,8 +28,6 @@
 /* Clock Defines */
 #define V_OSCK				24000000  /* Clock output from T2 */
 #define V_SCLK				(V_OSCK)
-
-#define CONFIG_ENV_IS_IN_MMC		1
 
 /*
  * in case of SD Card or Network boot we want to have a possibility to
@@ -70,9 +62,6 @@
 # define CONFIG_BOOT_RETRY_TIME 30
 # define CONFIG_RESET_TO_RETRY
 #endif
-
-#define CONFIG_ENV_VARS_UBOOT_CONFIG
-#define CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
 
 #ifndef CONFIG_SPL_BUILD
 #define CONFIG_EXTRA_ENV_SETTINGS \
@@ -243,18 +232,11 @@
 #define CONFIG_SYS_NS16550_COM4		0x481a6000	/* UART3 */
 #define CONFIG_SYS_NS16550_COM5		0x481a8000	/* UART4 */
 #define CONFIG_SYS_NS16550_COM6		0x481aa000	/* UART5 */
-#define CONFIG_CONS_INDEX               1
 
 /* PMIC support */
 #define CONFIG_POWER_TPS65217
 
 /* SPL */
-
-#define CONFIG_SPL_LDSCRIPT		"arch/arm/mach-omap2/u-boot-spl.lds"
-
-#ifndef CONFIG_SPL_USBETH_SUPPORT
-#define CONFIG_FASTBOOT_FLASH_MMC_DEV   1
-#endif
 
 /*
  * Disable MMC DM for SPL build and can be re-enabled after adding
@@ -262,25 +244,13 @@
  */
 #ifdef CONFIG_SPL_BUILD
 #undef CONFIG_DM_MMC
-#undef CONFIG_DM_MMC_OPS
 #undef CONFIG_TIMER
 #endif
 
-#define CONFIG_CMD_DHCP
-#define CONFIG_CMD_PING
-#define CONFIG_DRIVER_TI_CPSW
-#define CONFIG_MII
 #define CONFIG_BOOTP_DEFAULT
-#define CONFIG_BOOTP_DNS
 #define CONFIG_BOOTP_DNS2
 #define CONFIG_BOOTP_SEND_HOSTNAME
-#define CONFIG_BOOTP_GATEWAY
-#define CONFIG_BOOTP_SUBNETMASK
 #define CONFIG_NET_RETRY_COUNT         10
-#define CONFIG_NET_MULTI
-#define CONFIG_PHY_GIGE
-#define CONFIG_PHYLIB
-#define CONFIG_PHY_ADDR			0
 #define CONFIG_PHY_SMSC
 
 /* I2C configuration */
@@ -290,11 +260,4 @@
 #define CONFIG_SYS_I2C_SLAVE		1
 
 #define CONFIG_SHOW_BOOT_PROGRESS
-
-#if defined CONFIG_SHC_NETBOOT
-#ifdef CONFIG_SPL_BUILD
-#define CONFIG_ENV_IS_NOWHERE
-#undef CONFIG_ENV_IS_IN_MMC
-#endif
-#endif
 #endif	/* ! __CONFIG_AM335X_SHC_H */

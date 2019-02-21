@@ -1,9 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * iPAQ h2200 board configuration
  *
  * Copyright (C) 2012 Lukasz Dalek <luk0104@gmail.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -12,9 +11,7 @@
 #define CONFIG_MACH_TYPE		MACH_TYPE_H2200
 
 #define CONFIG_CPU_PXA25X		1
-#define CONFIG_BOARD_H2200
 
-#define CONFIG_NR_DRAM_BANKS		1
 #define PHYS_SDRAM_1			0xa0000000 /* SDRAM Bank #1 */
 #define PHYS_SDRAM_1_SIZE		0x04000000 /* 64 MB */
 
@@ -26,8 +23,6 @@
 #define CONFIG_ENV_SIZE			0x00040000
 #define CONFIG_SYS_MALLOC_LEN		(CONFIG_ENV_SIZE + 128*1024)
 
-#define CONFIG_ENV_IS_NOWHERE
-#define CONFIG_SYS_MAXARGS		16
 #define CONFIG_SYS_LOAD_ADDR		0xa3000000 /* default load address */
 
 /*
@@ -44,8 +39,6 @@
  *	.org 0x1000
  * --- Header end ---
  */
-
-#define CONFIG_SYS_TEXT_BASE		0xa0041000
 
 /*
  * Static chips
@@ -105,7 +98,6 @@
  * Serial port
  */
 #define CONFIG_FFUART
-#define CONFIG_CONS_INDEX		3
 
 #define CONFIG_SYS_BAUDRATE_TABLE	{ 9600, 38400, 115200 }
 
@@ -114,15 +106,6 @@
 #define CONFIG_INITRD_TAG
 
 /* Monitor Command Prompt */
-
-/* Console I/O Buffer Size */
-#define CONFIG_SYS_CBSIZE		256
-
-/* Print Buffer Size */
-#define CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE + \
-					sizeof(CONFIG_SYS_PROMPT) + 16)
-
-#define CONFIG_BOOTARGS "root=/dev/ram0 ro console=ttyS0,115200n8"
 
 #define CONFIG_USB_DEV_PULLUP_GPIO	33
 /* USB VBUS GPIO 3 */
@@ -134,11 +117,9 @@
 	"bootm ; "
 
 #define CONFIG_USB_GADGET_PXA2XX
-#define CONFIG_USB_ETHER
 #define CONFIG_USB_ETH_SUBSET
 
 #define CONFIG_USBNET_DEV_ADDR		"de:ad:be:ef:00:01"
-#define CONFIG_USBNET_HOST_ADDR	"de:ad:be:ef:00:02"
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"stdin=serial\0" \
 	"stdout=serial\0" \

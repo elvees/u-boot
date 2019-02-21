@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2015 Freescale Semiconductor, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -11,7 +10,7 @@
 #include <fm_eth.h>
 #include <fsl_mdio.h>
 #include <fsl_dtsec.h>
-#include <libfdt.h>
+#include <linux/libfdt.h>
 #include <malloc.h>
 #include <asm/arch/fsl_serdes.h>
 
@@ -476,6 +475,7 @@ int board_eth_init(bd_t *bis)
 			}
 			break;
 		case PHY_INTERFACE_MODE_RGMII:
+		case PHY_INTERFACE_MODE_RGMII_TXID:
 			if (i == FM1_DTSEC3)
 				mdio_mux[i] = EMI1_RGMII1;
 			else if (i == FM1_DTSEC4)

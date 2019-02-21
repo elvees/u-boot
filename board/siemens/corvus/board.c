@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Board functions for Siemens CORVUS (AT91SAM9G45) based board
  * (C) Copyright 2013 Siemens AG
@@ -7,8 +8,6 @@
  * (C) Copyright 2007-2008
  * Stelian Pop <stelian@popies.net>
  * Lead Tech Design <www.leadtechdesign.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -249,9 +248,6 @@ int board_init(void)
 #endif
 #ifdef CONFIG_ATMEL_SPI
 	at91_spi0_hw_init(1 << 4);
-#endif
-#ifdef CONFIG_HAS_DATAFLASH
-	at91_spi0_hw_init(1 << 0);
 #endif
 #ifdef CONFIG_MACB
 	corvus_macb_hw_init();

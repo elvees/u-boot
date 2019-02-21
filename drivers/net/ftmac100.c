@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Faraday FTMAC100 Ethernet
  *
  * (C) Copyright 2009 Faraday Technology
  * Po-Yu Chuang <ratbert@faraday-tech.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <config.h>
@@ -40,7 +39,12 @@ static void ftmac100_reset(struct ftmac100_data *priv)
 	writel (FTMAC100_MACCR_SW_RST, &ftmac100->maccr);
 
 	while (readl (&ftmac100->maccr) & FTMAC100_MACCR_SW_RST)
-		;
+		mdelay(1);
+	/*
+	 * When soft reset complete, write mac address immediately maybe fail somehow
+	 *  Wait for a while can avoid this problem
+	 */
+	mdelay(1);
 }
 
 /*
@@ -79,7 +83,6 @@ static int _ftmac100_init(struct ftmac100_data *priv, unsigned char enetaddr[6])
 	struct ftmac100_rxdes *rxdes = priv->rxdes;
 	unsigned int maccr;
 	int i;
-
 	debug ("%s()\n", __func__);
 
 	ftmac100_reset(priv);
@@ -101,18 +104,18 @@ static int _ftmac100_init(struct ftmac100_data *priv, unsigned char enetaddr[6])
 
 	for (i = 0; i < PKTBUFSRX; i++) {
 		/* RXBUF_BADR */
-		rxdes[i].rxdes2 = (unsigned int)net_rx_packets[i];
+		rxdes[i].rxdes2 = (unsigned int)(unsigned long)net_rx_packets[i];
 		rxdes[i].rxdes1 |= FTMAC100_RXDES1_RXBUF_SIZE (PKTSIZE_ALIGN);
 		rxdes[i].rxdes0 = FTMAC100_RXDES0_RXDMA_OWN;
 	}
 
 	/* transmit ring */
 
-	writel ((unsigned int)txdes, &ftmac100->txr_badr);
+	writel ((unsigned long)txdes, &ftmac100->txr_badr);
 
 	/* receive ring */
 
-	writel ((unsigned int)rxdes, &ftmac100->rxr_badr);
+	writel ((unsigned long)rxdes, &ftmac100->rxr_badr);
 
 	/* poll receive descriptor automatically */
 
@@ -156,7 +159,6 @@ static int __ftmac100_recv(struct ftmac100_data *priv)
 	unsigned short rxlen;
 
 	curr_des = &priv->rxdes[priv->rx_index];
-
 	if (curr_des->rxdes0 & FTMAC100_RXDES0_RXDMA_OWN)
 		return 0;
 
@@ -169,7 +171,7 @@ static int __ftmac100_recv(struct ftmac100_data *priv)
 	}
 
 	rxlen = FTMAC100_RXDES0_RFL (curr_des->rxdes0);
-
+	invalidate_dcache_range(curr_des->rxdes2,curr_des->rxdes2+rxlen);
 	debug ("%s(): RX buffer %d, %x received\n",
 	       __func__, priv->rx_index, rxlen);
 
@@ -190,13 +192,14 @@ static int _ftmac100_send(struct ftmac100_data *priv, void *packet, int length)
 		return -1;
 	}
 
-	debug ("%s(%x, %x)\n", __func__, (int)packet, length);
+	debug ("%s(%lx, %x)\n", __func__, (unsigned long)packet, length);
 
 	length = (length < ETH_ZLEN) ? ETH_ZLEN : length;
 
 	/* initiate a transmit sequence */
 
-	curr_des->txdes2 = (unsigned int)packet;	/* TXBUF_BADR */
+	flush_dcache_range((unsigned long)packet,(unsigned long)packet+length);
+	curr_des->txdes2 = (unsigned int)(unsigned long)packet;	/* TXBUF_BADR */
 
 	curr_des->txdes1 &= FTMAC100_TXDES1_EDOTR;
 	curr_des->txdes1 |= FTMAC100_TXDES1_FTS |
@@ -340,7 +343,7 @@ static int ftmac100_recv(struct udevice *dev, int flags, uchar **packetp)
 	int len;
 	len = __ftmac100_recv(priv);
 	if (len)
-		*packetp = (void *)curr_des->rxdes2;
+		*packetp = (uchar *)(unsigned long)curr_des->rxdes2;
 
 	return len ? len : -EAGAIN;
 }
@@ -355,7 +358,7 @@ static int ftmac100_free_pkt(struct udevice *dev, uchar *packet, int length)
 int ftmac100_read_rom_hwaddr(struct udevice *dev)
 {
 	struct eth_pdata *pdata = dev_get_platdata(dev);
-	eth_getenv_enetaddr("ethaddr", pdata->enetaddr);
+	eth_env_get_enetaddr("ethaddr", pdata->enetaddr);
 	return 0;
 }
 

@@ -1,16 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2001
  * Hans-Joerg Frieden, Hyperion Entertainment
  * Hans-JoergF@hyperion-entertainment.com
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
 #include <command.h>
 #include <ide.h>
 #include "part_amiga.h"
 
-#ifdef HAVE_BLOCK_DEVICE
+#ifdef CONFIG_HAVE_BLOCK_DEVICE
 
 #undef AMIGA_DEBUG
 
@@ -132,7 +131,7 @@ struct rigid_disk_block *get_rdisk(struct blk_desc *dev_desc)
     int limit;
     char *s;
 
-    s = getenv("amiga_scanlimit");
+    s = env_get("amiga_scanlimit");
     if (s)
 	limit = simple_strtoul(s, NULL, 10);
     else
@@ -172,7 +171,7 @@ struct bootcode_block *get_bootcode(struct blk_desc *dev_desc)
     int limit;
     char *s;
 
-    s = getenv("amiga_scanlimit");
+    s = env_get("amiga_scanlimit");
     if (s)
 	limit = simple_strtoul(s, NULL, 10);
     else

@@ -1,13 +1,12 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright 2013-2014 Freescale Semiconductor, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __IOMUX_VF610_H__
 #define __IOMUX_VF610_H__
 
-#include <asm/imx-common/iomux-v3.h>
+#include <asm/mach-imx/iomux-v3.h>
 
 /* Pad control groupings */
 #define VF610_UART_PAD_CTRL	(PAD_CTL_PUS_100K_UP | PAD_CTL_DSE_25ohm | \
@@ -245,6 +244,8 @@ enum {
 	VF610_PAD_DDR_WE__DDR_WE_B		= IOMUX_PAD(0x02d0, 0x02d0, 0, __NA_, 0, VF610_DDR_PAD_CTRL),
 	VF610_PAD_DDR_ODT1__DDR_ODT_0		= IOMUX_PAD(0x02d4, 0x02d4, 0, __NA_, 0, VF610_DDR_PAD_CTRL),
 	VF610_PAD_DDR_ODT0__DDR_ODT_1		= IOMUX_PAD(0x02d8, 0x02d8, 0, __NA_, 0, VF610_DDR_PAD_CTRL),
+	VF610_PAD_DDR_DDRBYTE1__DDR_DDRBYTE1	= IOMUX_PAD(0x02dc, 0x02dc, 0, __NA_, 0, VF610_DDR_PAD_CTRL),
+	VF610_PAD_DDR_DDRBYTE2__DDR_DDRBYTE2	= IOMUX_PAD(0x02e0, 0x02e0, 0, __NA_, 0, VF610_DDR_PAD_CTRL),
 };
 
 #endif	/* __IOMUX_VF610_H__ */

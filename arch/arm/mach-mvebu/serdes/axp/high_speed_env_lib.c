@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) Marvell International Ltd. and its affiliates
- *
- * SPDX-License-Identifier:	GPL-2.0
  */
 
 #include <common.h>
@@ -354,16 +353,16 @@ int serdes_phy_config(void)
 	}
 
 	info = board_serdes_cfg_get(PEX_MODE_GET(satr11));
-	DEBUG_INIT_FULL_S("info->line0_7= 0x");
-	DEBUG_INIT_FULL_D(info->line0_7, 8);
-	DEBUG_INIT_FULL_S("   info->line8_15= 0x");
-	DEBUG_INIT_FULL_D(info->line8_15, 8);
-	DEBUG_INIT_FULL_S("\n");
 
 	if (info == NULL) {
 		DEBUG_INIT_S("Hight speed PHY Error #1\n");
 		return MV_ERROR;
 	}
+	DEBUG_INIT_FULL_S("info->line0_7= 0x");
+	DEBUG_INIT_FULL_D(info->line0_7, 8);
+	DEBUG_INIT_FULL_S("   info->line8_15= 0x");
+	DEBUG_INIT_FULL_D(info->line8_15, 8);
+	DEBUG_INIT_FULL_S("\n");
 
 	if (config_module & ETM_MODULE_DETECT) {	/* step 0.9 ETM */
 		DEBUG_INIT_FULL_S("ETM module detect Step 0.9:\n");

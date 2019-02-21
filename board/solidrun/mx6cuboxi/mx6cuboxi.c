@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2015 Freescale Semiconductor, Inc.
  *
@@ -10,8 +11,6 @@
  *
  * Derived from EDM_CF_IMX6 code by TechNexion,Inc
  * Ported to SolidRun microSOM by Rabeeh Khoury <rabeeh@solid-run.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm/arch/clock.h>
@@ -21,8 +20,9 @@
 #include <asm/arch/mxc_hdmi.h>
 #include <linux/errno.h>
 #include <asm/gpio.h>
-#include <asm/imx-common/iomux-v3.h>
-#include <asm/imx-common/video.h>
+#include <asm/mach-imx/iomux-v3.h>
+#include <asm/mach-imx/sata.h>
+#include <asm/mach-imx/video.h>
 #include <mmc.h>
 #include <fsl_esdhc.h>
 #include <malloc.h>
@@ -57,9 +57,58 @@ DECLARE_GLOBAL_DATA_PTR;
 #define ETH_PHY_RESET	IMX_GPIO_NR(4, 15)
 #define USB_H1_VBUS	IMX_GPIO_NR(1, 0)
 
+enum board_type {
+	CUBOXI          = 0x00,
+	HUMMINGBOARD    = 0x01,
+	HUMMINGBOARD2   = 0x02,
+	UNKNOWN         = 0x03,
+};
+
+#define MEM_STRIDE 0x4000000
+static u32 get_ram_size_stride_test(u32 *base, u32 maxsize)
+{
+        volatile u32 *addr;
+        u32          save[64];
+        u32          cnt;
+        u32          size;
+        int          i = 0;
+
+        /* First save the data */
+        for (cnt = 0; cnt < maxsize; cnt += MEM_STRIDE) {
+                addr = (volatile u32 *)((u32)base + cnt);       /* pointer arith! */
+                sync ();
+                save[i++] = *addr;
+                sync ();
+        }
+
+        /* First write a signature */
+        * (volatile u32 *)base = 0x12345678;
+        for (size = MEM_STRIDE; size < maxsize; size += MEM_STRIDE) {
+                * (volatile u32 *)((u32)base + size) = size;
+                sync ();
+                if (* (volatile u32 *)((u32)base) == size) {	/* We reached the overlapping address */
+                        break;
+                }
+        }
+
+        /* Restore the data */
+        for (cnt = (maxsize - MEM_STRIDE); i > 0; cnt -= MEM_STRIDE) {
+                addr = (volatile u32 *)((u32)base + cnt);       /* pointer arith! */
+                sync ();
+                *addr = save[i--];
+                sync ();
+        }
+
+        return (size);
+}
+
 int dram_init(void)
 {
-	gd->ram_size = imx_ddr_size();
+	u32 max_size = imx_ddr_size();
+
+	gd->ram_size = get_ram_size_stride_test((u32 *) CONFIG_SYS_SDRAM_BASE,
+						(u32)max_size);
+
 	return 0;
 }
 
@@ -77,10 +126,31 @@ static iomux_v3_cfg_t const usdhc2_pads[] = {
 	IOMUX_PADS(PAD_SD2_DAT3__SD2_DATA3	| MUX_PAD_CTRL(USDHC_PAD_CTRL)),
 };
 
-static iomux_v3_cfg_t const hb_cbi_sense[] = {
+static iomux_v3_cfg_t const usdhc3_pads[] = {
+	IOMUX_PADS(PAD_SD3_CLK__SD3_CLK | MUX_PAD_CTRL(USDHC_PAD_CTRL)),
+	IOMUX_PADS(PAD_SD3_CMD__SD3_CMD | MUX_PAD_CTRL(USDHC_PAD_CTRL)),
+	IOMUX_PADS(PAD_SD3_DAT0__SD3_DATA0 | MUX_PAD_CTRL(USDHC_PAD_CTRL)),
+	IOMUX_PADS(PAD_SD3_DAT1__SD3_DATA1      | MUX_PAD_CTRL(USDHC_PAD_CTRL)),
+	IOMUX_PADS(PAD_SD3_DAT2__SD3_DATA2      | MUX_PAD_CTRL(USDHC_PAD_CTRL)),
+	IOMUX_PADS(PAD_SD3_DAT3__SD3_DATA3      | MUX_PAD_CTRL(USDHC_PAD_CTRL)),
+	IOMUX_PADS(PAD_SD3_DAT4__SD3_DATA4      | MUX_PAD_CTRL(USDHC_PAD_CTRL)),
+	IOMUX_PADS(PAD_SD3_DAT5__SD3_DATA5      | MUX_PAD_CTRL(USDHC_PAD_CTRL)),
+	IOMUX_PADS(PAD_SD3_DAT6__SD3_DATA6      | MUX_PAD_CTRL(USDHC_PAD_CTRL)),
+	IOMUX_PADS(PAD_SD3_DAT7__SD3_DATA7      | MUX_PAD_CTRL(USDHC_PAD_CTRL)),
+	IOMUX_PADS(PAD_SD3_RST__SD3_RESET       | MUX_PAD_CTRL(USDHC_PAD_CTRL)),
+};
+
+static iomux_v3_cfg_t const board_detect[] = {
 	/* These pins are for sensing if it is a CuBox-i or a HummingBoard */
 	IOMUX_PADS(PAD_KEY_ROW1__GPIO4_IO09  | MUX_PAD_CTRL(UART_PAD_CTRL)),
 	IOMUX_PADS(PAD_EIM_DA4__GPIO3_IO04   | MUX_PAD_CTRL(UART_PAD_CTRL)),
+	IOMUX_PADS(PAD_SD4_DAT0__GPIO2_IO08  | MUX_PAD_CTRL(UART_PAD_CTRL)),
+};
+
+static iomux_v3_cfg_t const som_rev_detect[] = {
+	/* These pins are for sensing if it is a CuBox-i or a HummingBoard */
+	IOMUX_PADS(PAD_CSI0_DAT14__GPIO6_IO00  | MUX_PAD_CTRL(UART_PAD_CTRL)),
+	IOMUX_PADS(PAD_CSI0_DAT18__GPIO6_IO04  | MUX_PAD_CTRL(UART_PAD_CTRL)),
 };
 
 static iomux_v3_cfg_t const usb_pads[] = {
@@ -92,23 +162,95 @@ static void setup_iomux_uart(void)
 	SETUP_IOMUX_PADS(uart1_pads);
 }
 
-static struct fsl_esdhc_cfg usdhc_cfg[1] = {
-	{USDHC2_BASE_ADDR},
+static struct fsl_esdhc_cfg usdhc_cfg = {
+	.esdhc_base = USDHC2_BASE_ADDR,
+	.max_bus_width = 4,
 };
+
+static struct fsl_esdhc_cfg emmc_cfg = {
+	.esdhc_base = USDHC3_BASE_ADDR,
+	.max_bus_width = 8,
+};
+
+int board_mmc_get_env_dev(int devno)
+{
+	return devno - 1;
+}
+
+#define USDHC2_CD_GPIO  IMX_GPIO_NR(1, 4)
 
 int board_mmc_getcd(struct mmc *mmc)
 {
-	return 1; /* uSDHC2 is always present */
+	struct fsl_esdhc_cfg *cfg = mmc->priv;
+	int ret = 0;
+
+	switch (cfg->esdhc_base) {
+	case USDHC2_BASE_ADDR:
+		ret = !gpio_get_value(USDHC2_CD_GPIO);
+		break;
+	case USDHC3_BASE_ADDR:
+		ret = (mmc_get_op_cond(mmc) < 0) ? 0 : 1; /* eMMC/uSDHC3 has no CD GPIO */
+		break;
+	}
+
+	return ret;
+}
+
+static int mmc_init_main(bd_t *bis)
+{
+	int ret;
+
+	/*
+	 * Following map is done:
+	 * (U-Boot device node)    (Physical Port)
+	 * mmc0                    Carrier board MicroSD
+	 * mmc1                    SOM eMMC
+	 */
+	SETUP_IOMUX_PADS(usdhc2_pads);
+	usdhc_cfg.sdhc_clk = mxc_get_clock(MXC_ESDHC2_CLK);
+	ret = fsl_esdhc_initialize(bis, &usdhc_cfg);
+	if (ret)
+		return ret;
+
+	SETUP_IOMUX_PADS(usdhc3_pads);
+	emmc_cfg.sdhc_clk = mxc_get_clock(MXC_ESDHC3_CLK);
+	return fsl_esdhc_initialize(bis, &emmc_cfg);
+}
+
+static int mmc_init_spl(bd_t *bis)
+{
+	struct src *psrc = (struct src *)SRC_BASE_ADDR;
+	unsigned reg = readl(&psrc->sbmr1) >> 11;
+
+	/*
+	 * Upon reading BOOT_CFG register the following map is done:
+	 * Bit 11 and 12 of BOOT_CFG register can determine the current
+	 * mmc port
+	 * 0x1                  SD2
+	 * 0x2                  SD3
+	 */
+	switch (reg & 0x3) {
+	case 0x1:
+		SETUP_IOMUX_PADS(usdhc2_pads);
+		usdhc_cfg.sdhc_clk = mxc_get_clock(MXC_ESDHC2_CLK);
+		gd->arch.sdhc_clk = usdhc_cfg.sdhc_clk;
+		return fsl_esdhc_initialize(bis, &usdhc_cfg);
+	case 0x2:
+		SETUP_IOMUX_PADS(usdhc3_pads);
+		emmc_cfg.sdhc_clk = mxc_get_clock(MXC_ESDHC3_CLK);
+		gd->arch.sdhc_clk = emmc_cfg.sdhc_clk;
+		return fsl_esdhc_initialize(bis, &emmc_cfg);
+	}
+
+	return -ENODEV;
 }
 
 int board_mmc_init(bd_t *bis)
 {
-	SETUP_IOMUX_PADS(usdhc2_pads);
-	usdhc_cfg[0].esdhc_base = USDHC2_BASE_ADDR;
-	usdhc_cfg[0].sdhc_clk = mxc_get_clock(MXC_ESDHC2_CLK);
-	gd->arch.sdhc_clk = usdhc_cfg[0].sdhc_clk;
+	if (IS_ENABLED(CONFIG_SPL_BUILD))
+		return mmc_init_spl(bis);
 
-	return fsl_esdhc_initialize(bis, &usdhc_cfg[0]);
+	return mmc_init_main(bis);
 }
 
 static iomux_v3_cfg_t const enet_pads[] = {
@@ -307,78 +449,149 @@ int board_ehci_hcd_init(int port)
 
 int board_early_init_f(void)
 {
-	int ret = 0;
 	setup_iomux_uart();
 
-#ifdef CONFIG_VIDEO_IPUV3
-	ret = setup_display();
+#ifdef CONFIG_CMD_SATA
+	setup_sata();
 #endif
 
 #ifdef CONFIG_USB_EHCI_MX6
 	setup_usb();
 #endif
-	return ret;
+	return 0;
 }
 
 int board_init(void)
 {
+	int ret = 0;
+
 	/* address of boot parameters */
 	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
 
-	return 0;
+#ifdef CONFIG_VIDEO_IPUV3
+	ret = setup_display();
+#endif
+
+	return ret;
 }
 
-static bool is_hummingboard(void)
+static enum board_type board_type(void)
 {
-	int val1, val2;
+	int val1, val2, val3;
 
-	SETUP_IOMUX_PADS(hb_cbi_sense);
-
-	gpio_direction_input(IMX_GPIO_NR(4, 9));
-	gpio_direction_input(IMX_GPIO_NR(3, 4));
-
-	val1 = gpio_get_value(IMX_GPIO_NR(4, 9));
-	val2 = gpio_get_value(IMX_GPIO_NR(3, 4));
+	SETUP_IOMUX_PADS(board_detect);
 
 	/*
 	 * Machine selection -
-	 * Machine        val1, val2
-	 * -------------------------
-	 * HB rev 3.x     x     0
-	 * CBi            0     1
-	 * HB             1     1
+	 * Machine      val1, val2, val3
+	 * ----------------------------
+	 * HB2            x     x    0
+	 * HB rev 3.x     x     0    x
+	 * CBi            0     1    x
+	 * HB             1     1    x
 	 */
 
+	gpio_direction_input(IMX_GPIO_NR(2, 8));
+	val3 = gpio_get_value(IMX_GPIO_NR(2, 8));
+
+	if (val3 == 0)
+		return HUMMINGBOARD2;
+
+	gpio_direction_input(IMX_GPIO_NR(3, 4));
+	val2 = gpio_get_value(IMX_GPIO_NR(3, 4));
+
 	if (val2 == 0)
+		return HUMMINGBOARD;
+
+	gpio_direction_input(IMX_GPIO_NR(4, 9));
+	val1 = gpio_get_value(IMX_GPIO_NR(4, 9));
+
+	if (val1 == 0) {
+		return CUBOXI;
+	} else {
+		return HUMMINGBOARD;
+	}
+}
+
+static bool is_rev_15_som(void)
+{
+	int val1, val2;
+	SETUP_IOMUX_PADS(som_rev_detect);
+
+	val1 = gpio_get_value(IMX_GPIO_NR(6, 0));
+	val2 = gpio_get_value(IMX_GPIO_NR(6, 4));
+
+	if (val1 == 1 && val2 == 0)
 		return true;
-	else if (val1 == 0)
-		return false;
-	else
-		return true;
+
+	return false;
+}
+
+static bool has_emmc(void)
+{
+	struct mmc *mmc;
+	mmc = find_mmc_device(1);
+	if (!mmc)
+		return 0;
+	return (mmc_get_op_cond(mmc) < 0) ? 0 : 1;
 }
 
 int checkboard(void)
 {
-	if (is_hummingboard())
-		puts("Board: MX6 Hummingboard\n");
-	else
-		puts("Board: MX6 Cubox-i\n");
+	switch (board_type()) {
+	case CUBOXI:
+		puts("Board: MX6 Cubox-i");
+		break;
+	case HUMMINGBOARD:
+		puts("Board: MX6 HummingBoard");
+		break;
+	case HUMMINGBOARD2:
+		puts("Board: MX6 HummingBoard2");
+		break;
+	case UNKNOWN:
+	default:
+		puts("Board: Unknown\n");
+		goto out;
+	}
 
+	if (is_rev_15_som())
+		puts(" (som rev 1.5)\n");
+	else
+		puts("\n");
+
+out:
 	return 0;
 }
 
 int board_late_init(void)
 {
 #ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
-	if (is_hummingboard())
-		setenv("board_name", "HUMMINGBOARD");
-	else
-		setenv("board_name", "CUBOXI");
+	switch (board_type()) {
+	case CUBOXI:
+		env_set("board_name", "CUBOXI");
+		break;
+	case HUMMINGBOARD:
+		env_set("board_name", "HUMMINGBOARD");
+		break;
+	case HUMMINGBOARD2:
+		env_set("board_name", "HUMMINGBOARD2");
+		break;
+	case UNKNOWN:
+	default:
+		env_set("board_name", "CUBOXI");
+	}
 
 	if (is_mx6dq())
-		setenv("board_rev", "MX6Q");
+		env_set("board_rev", "MX6Q");
 	else
-		setenv("board_rev", "MX6DL");
+		env_set("board_rev", "MX6DL");
+
+	if (is_rev_15_som())
+		env_set("som_rev", "V15");
+
+	if (has_emmc())
+		env_set("has_emmc", "yes");
+
 #endif
 
 	return 0;
@@ -391,7 +604,7 @@ static const struct mx6dq_iomux_ddr_regs mx6q_ddr_ioregs = {
 	.dram_sdclk_1 =  0x00020030,
 	.dram_cas =  0x00020030,
 	.dram_ras =  0x00020030,
-	.dram_reset =  0x00020030,
+	.dram_reset =  0x000c0030,
 	.dram_sdcke0 =  0x00003000,
 	.dram_sdcke1 =  0x00003000,
 	.dram_sdba2 =  0x00000000,
@@ -547,7 +760,6 @@ static struct mx6_ddr3_cfg mem_ddr_2g = {
 	.trcd      = 1375,
 	.trcmin    = 4875,
 	.trasmin   = 3500,
-	.SRT       = 1,
 };
 
 static struct mx6_ddr3_cfg mem_ddr_4g = {
@@ -555,7 +767,7 @@ static struct mx6_ddr3_cfg mem_ddr_4g = {
 	.density = 4,
 	.width = 16,
 	.banks = 8,
-	.rowaddr = 15,
+	.rowaddr = 16,
 	.coladdr = 10,
 	.pagesz = 2,
 	.trcd = 1375,
@@ -574,17 +786,6 @@ static void ccgr_init(void)
 	writel(0x00FFF300, &ccm->CCGR4);
 	writel(0x0F0000C3, &ccm->CCGR5);
 	writel(0x000003FF, &ccm->CCGR6);
-}
-
-static void gpr_init(void)
-{
-	struct iomuxc *iomux = (struct iomuxc *)IOMUXC_BASE_ADDR;
-
-	/* enable AXI cache for VDOA/VPU/IPU */
-	writel(0xF00000CF, &iomux->gpr[4]);
-	/* set IPU AXI-id0 Qos=0xf(bypass) AXI-id1 Qos=0x7 */
-	writel(0x007F007F, &iomux->gpr[6]);
-	writel(0x007F007F, &iomux->gpr[7]);
 }
 
 static void spl_dram_init(int width)

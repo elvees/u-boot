@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2000
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef	_IDE_H
@@ -14,19 +13,6 @@
 
 #define	ATA_CURR_BASE(dev)	(CONFIG_SYS_ATA_BASE_ADDR+ide_bus_offset[IDE_BUS(dev)])
 extern ulong ide_bus_offset[];
-
-#ifdef CONFIG_IDE_LED
-
-/*
- * LED Port
- */
-#define	LED_PORT	((uchar *)(PER8_BASE + 0x3000))
-#define LED_IDE1	0x01
-#define LED_IDE2	0x02
-#define	DEVICE_LED(d)	((d & 2) | ((d & 2) == 0)) /* depends on bit positions! */
-
-void ide_led(uchar led, uchar status);
-#endif /* CONFIG_IDE_LED */
 
 /*
  * Function Prototypes
@@ -49,10 +35,6 @@ ulong ide_write(struct blk_desc *block_dev, lbaint_t blknr, lbaint_t blkcnt,
 
 #ifdef CONFIG_IDE_PREINIT
 int ide_preinit(void);
-#endif
-
-#ifdef CONFIG_IDE_INIT_POSTRESET
-int ide_init_postreset(void);
 #endif
 
 #if defined(CONFIG_OF_IDE_FIXUP)

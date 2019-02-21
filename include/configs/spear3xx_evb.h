@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2009
  * Vipin Kumar, STMicroelectronics, <vipin.kumar@st.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -22,12 +21,6 @@
 
 #if defined(CONFIG_USBTTY)
 #define CONFIG_SPEAR_USBTTY
-#endif
-
-#if defined(CONFIG_NAND)
-#define CONFIG_ENV_IS_IN_NAND
-#else
-#define CONFIG_ENV_IS_IN_FLASH
 #endif
 
 #include <configs/spear-common.h>
@@ -87,12 +80,7 @@
 #endif
 
 #if defined(CONFIG_SPEAR_EMI)
-
-#define CONFIG_SYS_FLASH_CFI
-#define CONFIG_FLASH_CFI_DRIVER
-
 #if defined(CONFIG_SPEAR310)
-#define CONFIG_SYS_FLASH_PROTECTION
 #define CONFIG_SYS_FLASH_BASE			0x50000000
 #define CONFIG_SYS_CS1_FLASH_BASE		0x60000000
 #define CONFIG_SYS_CS2_FLASH_BASE		0x70000000
@@ -108,7 +96,6 @@
 #define CONFIG_SYS_MAX_FLASH_BANKS		6
 
 #elif defined(CONFIG_SPEAR320)
-#define CONFIG_SYS_FLASH_PROTECTION
 #define CONFIG_SYS_FLASH_BASE			0x44000000
 #define CONFIG_SYS_CS1_FLASH_BASE		0x45000000
 #define CONFIG_SYS_CS2_FLASH_BASE		0x46000000

@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2015 Samsung Electronics
  * Przemyslaw Marczak <p.marczak@samsung.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -25,17 +24,24 @@ static const struct udevice_id board_ids[] = {
 };
 
 /**
- * Odroix XU3/4 board revisions:
+ * Odroix XU3/XU4/HC1/HC2 board revisions (from HC1+_HC2_MAIN_REV0.1_20171017.pdf):
  * Rev   ADCmax  Board
  * 0.1     0     XU3 0.1
- * 0.2   410     XU3 0.2 | XU3L - no DISPLAYPORT (probe I2C0:0x40 / INA231)
- * 0.3  1408     XU4 0.1
- * Use +10 % for ADC value tolerance.
+ * 0.2   372     XU3 0.2 | XU3L - no DISPLAYPORT (probe I2C0:0x40 / INA231)
+ * 0.3  1280     XU4 0.1
+ * 0.4   739     XU4 0.2
+ * 0.5  1016     XU4+Air0.1 (Passive cooling)
+ * 0.6  1309     XU4-HC1 0.1
+ * 0.7  1470     XU4-HC1+ 0.1 (HC2)
+ * Use +1% for ADC value tolerance in the array below, the code loops until
+ * the measured ADC value is lower than then ADCmax from the array.
  */
 struct odroid_rev_info odroid_info[] = {
 	{ EXYNOS5_BOARD_ODROID_XU3_REV01, 1, 10, "xu3" },
-	{ EXYNOS5_BOARD_ODROID_XU3_REV02, 2, 410, "xu3" },
-	{ EXYNOS5_BOARD_ODROID_XU4_REV01, 1, 1408, "xu4" },
+	{ EXYNOS5_BOARD_ODROID_XU3_REV02, 2, 375, "xu3" },
+	{ EXYNOS5_BOARD_ODROID_XU4_REV01, 1, 1293, "xu4" },
+	{ EXYNOS5_BOARD_ODROID_HC1_REV01, 1, 1322, "hc1" },
+	{ EXYNOS5_BOARD_ODROID_HC2_REV01, 1, 1484, "hc1" },
 	{ EXYNOS5_BOARD_ODROID_UNKNOWN, 0, 4095, "unknown" },
 };
 
@@ -61,7 +67,7 @@ static int odroid_get_board_type(void)
 		goto rev_default;
 
 	for (i = 0; i < ARRAY_SIZE(odroid_info); i++) {
-		/* ADC tolerance: +20 % */
+		/* ADC tolerance: +1% */
 		if (adcval < odroid_info[i].adc_val)
 			return odroid_info[i].board_type;
 	}
@@ -127,6 +133,22 @@ bool board_is_odroidxu3(void)
 bool board_is_odroidxu4(void)
 {
 	if (gd->board_type == EXYNOS5_BOARD_ODROID_XU4_REV01)
+		return true;
+
+	return false;
+}
+
+bool board_is_odroidhc1(void)
+{
+	if (gd->board_type == EXYNOS5_BOARD_ODROID_HC1_REV01)
+		return true;
+
+	return false;
+}
+
+bool board_is_odroidhc2(void)
+{
+	if (gd->board_type == EXYNOS5_BOARD_ODROID_HC2_REV01)
 		return true;
 
 	return false;

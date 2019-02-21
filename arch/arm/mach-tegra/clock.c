@@ -1,12 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2010-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * SPDX-License-Identifier:	GPL-2.0
  */
 
 /* Tegra SoC common clock control functions */
 
 #include <common.h>
+#include <div64.h>
+#include <dm.h>
 #include <errno.h>
 #include <asm/io.h>
 #include <asm/arch/clock.h>
@@ -15,8 +16,6 @@
 #include <asm/arch-tegra/clk_rst.h>
 #include <asm/arch-tegra/pmc.h>
 #include <asm/arch-tegra/timer.h>
-#include <div64.h>
-#include <fdtdec.h>
 
 /*
  * This is our record of the current clock rate of each clock. We don't
@@ -655,14 +654,13 @@ void clock_ll_start_uart(enum periph_id periph_id)
 }
 
 #if CONFIG_IS_ENABLED(OF_CONTROL)
-int clock_decode_periph_id(const void *blob, int node)
+int clock_decode_periph_id(struct udevice *dev)
 {
 	enum periph_id id;
 	u32 cell[2];
 	int err;
 
-	err = fdtdec_get_int_array(blob, node, "clocks", cell,
-				   ARRAY_SIZE(cell));
+	err = dev_read_u32_array(dev, "clocks", cell, ARRAY_SIZE(cell));
 	if (err)
 		return -1;
 	id = clk_id_to_periph_id(cell[1]);

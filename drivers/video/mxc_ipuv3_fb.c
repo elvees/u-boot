@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Porting to u-boot:
  *
@@ -7,8 +8,6 @@
  * MX51 Linux framebuffer:
  *
  * (C) Copyright 2004-2010 Freescale Semiconductor, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -570,6 +569,9 @@ void ipuv3_fb_shutdown(void)
 {
 	int i;
 	struct ipu_stat *stat = (struct ipu_stat *)IPU_STAT;
+
+	if (!ipu_clk_enabled())
+		return;
 
 	for (i = 0; i < ARRAY_SIZE(mxcfb_info); i++) {
 		struct fb_info *fbi = mxcfb_info[i];

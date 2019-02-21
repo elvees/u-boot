@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2016 Google, Inc
  * Written by Simon Glass <sjg@chromium.org>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -38,6 +37,13 @@ static struct blk_driver *blk_driver_lookup_typename(const char *if_typename)
 	return NULL;
 }
 
+const char *blk_get_if_type_name(enum if_type if_type)
+{
+	struct blk_driver *drv = blk_driver_lookup_type(if_type);
+
+	return drv ? drv->if_typename : NULL;
+}
+
 /**
  * get_desc() - Get the block device descriptor for the given device number
  *
@@ -62,7 +68,7 @@ static int get_desc(struct blk_driver *drv, int devnum, struct blk_desc **descp)
 	return drv->get_dev(devnum, descp);
 }
 
-#ifdef HAVE_BLOCK_DEVICE
+#ifdef CONFIG_HAVE_BLOCK_DEVICE
 int blk_list_part(enum if_type if_type)
 {
 	struct blk_driver *drv;
@@ -166,7 +172,7 @@ int blk_show_device(enum if_type if_type, int devnum)
 
 	return 0;
 }
-#endif /* HAVE_BLOCK_DEVICE */
+#endif /* CONFIG_HAVE_BLOCK_DEVICE */
 
 struct blk_desc *blk_get_devnum_by_type(enum if_type if_type, int devnum)
 {
@@ -224,9 +230,6 @@ ulong blk_read_devnum(enum if_type if_type, int devnum, lbaint_t start,
 	n = desc->block_read(desc, start, blkcnt, buffer);
 	if (IS_ERR_VALUE(n))
 		return n;
-
-	/* flush cache after read */
-	flush_cache((ulong)buffer, blkcnt * desc->blksz);
 
 	return n;
 }

@@ -1,12 +1,13 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (c) 2015, Linaro Limited
- *
- * SPDX-License-Identifier:	GPL-2.0
  */
 #include <linux/linkage.h>
 
 #include <asm/opcodes-sec.h>
 #include <asm/opcodes-virt.h>
+
+	.section	.text.efi_runtime
 
 #define UNWIND(x...)
 	/*

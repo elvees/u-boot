@@ -1,9 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (c) 2012 The Chromium OS Authors.
  * (C) Copyright 2002-2010
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __ASM_GENERIC_GBL_DATA_H
@@ -36,7 +35,7 @@ typedef struct global_data {
 #if defined(CONFIG_LCD) || defined(CONFIG_VIDEO)
 	unsigned long fb_base;		/* Base address of framebuffer mem */
 #endif
-#if defined(CONFIG_POST) || defined(CONFIG_LOGBUFFER)
+#if defined(CONFIG_POST)
 	unsigned long post_log_word;	/* Record POST activities */
 	unsigned long post_log_res;	/* success of POST test */
 	unsigned long post_init_f_time;	/* When post_init_f started */
@@ -49,8 +48,11 @@ typedef struct global_data {
 	unsigned long precon_buf_idx;	/* Pre-Console buffer index */
 #endif
 	unsigned long env_addr;		/* Address  of Environment struct */
-	unsigned long env_valid;	/* Checksum of Environment valid? */
+	unsigned long env_valid;	/* Environment valid? enum env_valid */
+	unsigned long env_has_init;	/* Bitmask of boolean of struct env_location offsets */
+	int env_load_prio;		/* Priority of the loaded environment */
 
+	unsigned long ram_base;		/* Base address of RAM used by U-Boot */
 	unsigned long ram_top;		/* Top address of RAM used by U-Boot */
 	unsigned long relocaddr;	/* Start address of U-Boot in RAM */
 	phys_size_t ram_size;		/* RAM size */
@@ -75,8 +77,12 @@ typedef struct global_data {
 #ifdef CONFIG_OF_LIVE
 	struct device_node *of_root;
 #endif
+
+#if CONFIG_IS_ENABLED(MULTI_DTB_FIT)
+	const void *multi_dtb_fit;	/* uncompressed multi-dtb FIT image */
+#endif
 	struct jt_funcs *jt;		/* jump table */
-	char env_buf[32];		/* buffer for getenv() before reloc. */
+	char env_buf[32];		/* buffer for env_get() before reloc. */
 #ifdef CONFIG_TRACE
 	void		*trace_buff;	/* The trace buffer */
 #endif
@@ -88,7 +94,7 @@ typedef struct global_data {
 #endif
 	unsigned int timebase_h;
 	unsigned int timebase_l;
-#ifdef CONFIG_SYS_MALLOC_F_LEN
+#if CONFIG_VAL(SYS_MALLOC_F_LEN)
 	unsigned long malloc_base;	/* base address of early malloc() */
 	unsigned long malloc_limit;	/* limit address */
 	unsigned long malloc_ptr;	/* current address */
@@ -113,6 +119,19 @@ typedef struct global_data {
 #ifdef CONFIG_BOOTSTAGE
 	struct bootstage_data *bootstage;	/* Bootstage information */
 	struct bootstage_data *new_bootstage;	/* Relocated bootstage info */
+#endif
+#ifdef CONFIG_LOG
+	int log_drop_count;		/* Number of dropped log messages */
+	int default_log_level;		/* For devices with no filters */
+	struct list_head log_head;	/* List of struct log_device */
+	int log_fmt;			/* Mask containing log format info */
+#endif
+#if CONFIG_IS_ENABLED(BLOBLIST)
+	struct bloblist_hdr *bloblist;	/* Bloblist information */
+	struct bloblist_hdr *new_bloblist;	/* Relocated blolist info */
+# ifdef CONFIG_SPL
+	struct spl_handoff *spl_handoff;
+# endif
 #endif
 } gd_t;
 #endif
@@ -141,5 +160,6 @@ typedef struct global_data {
 #define GD_FLG_RECORD		0x01000	/* Record console		   */
 #define GD_FLG_ENV_DEFAULT	0x02000 /* Default variable flag	   */
 #define GD_FLG_SPL_EARLY_INIT	0x04000 /* Early SPL init is done	   */
+#define GD_FLG_LOG_READY	0x08000 /* Log system is ready for use	   */
 
 #endif /* __ASM_GENERIC_GBL_DATA_H */

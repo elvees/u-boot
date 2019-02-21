@@ -1,12 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2012
  * NVIDIA Inc, <www.nvidia.com>
  *
  * Allen Martin <amartin@nvidia.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
+#include <debug_uart.h>
 #include <spl.h>
 
 #include <asm/io.h>
@@ -32,6 +32,9 @@ void spl_board_init(void)
 	gpio_early_init_uart();
 
 	clock_early_init();
+#ifdef CONFIG_DEBUG_UART
+	debug_uart_init();
+#endif
 	preloader_console_init();
 }
 

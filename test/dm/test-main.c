@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2013 Google, Inc
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -92,10 +91,10 @@ static int dm_do_test(struct unit_test_state *uts, struct unit_test *test,
 	if (test->flags & DM_TESTF_PROBE_TEST)
 		ut_assertok(do_autoprobe(uts));
 	if (test->flags & DM_TESTF_SCAN_FDT)
-		ut_assertok(dm_scan_fdt(gd->fdt_blob, false));
+		ut_assertok(dm_extended_scan_fdt(gd->fdt_blob, false));
 
 	/*
-	 * Silence the console and rely on console reocrding to get
+	 * Silence the console and rely on console recording to get
 	 * our output.
 	 */
 	console_record_reset();

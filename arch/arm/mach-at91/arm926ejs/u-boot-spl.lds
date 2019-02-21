@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2015 Atmel Corporation
  *		      Bo Shen <voice.shen@atmel.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 MEMORY { .sram : ORIGIN = CONFIG_SPL_TEXT_BASE, \
@@ -49,3 +48,13 @@ SECTIONS
 		__bss_end = .;
 	} >.sdram
 }
+
+#if defined(CONFIG_SPL_MAX_SIZE)
+ASSERT(__image_copy_end - __start < (CONFIG_SPL_MAX_SIZE), \
+	"SPL image too big");
+#endif
+
+#if defined(CONFIG_SPL_BSS_MAX_SIZE)
+ASSERT(__bss_end - __bss_start < (CONFIG_SPL_BSS_MAX_SIZE), \
+	"SPL image BSS too big");
+#endif

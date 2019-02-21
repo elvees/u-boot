@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2013-2016 Synopsys, Inc. All rights reserved.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _CONFIG_AXS10X_H_
@@ -29,7 +28,7 @@
 	(CONFIG_SYS_SDRAM_BASE + 0x1000 - GENERATED_GBL_DATA_SIZE)
 
 #define CONFIG_SYS_MALLOC_LEN		SZ_2M
-#define CONFIG_SYS_BOOTM_LEN		SZ_32M
+#define CONFIG_SYS_BOOTM_LEN		SZ_128M
 #define CONFIG_SYS_LOAD_ADDR		0x82000000
 
 /*
@@ -54,8 +53,6 @@
 /*
  * Ethernet PHY configuration
  */
-#define CONFIG_MII
-#define CONFIG_PHY_GIGE
 
 /*
  * USB 1.1 configuration
@@ -64,39 +61,26 @@
 #define CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS 1
 
 /*
- * Commands still not supported in Kconfig
- */
-#define CONFIG_CMD_NAND
-
-#define CONFIG_AUTO_COMPLETE
-#define CONFIG_SYS_MAXARGS		16
-#define CONFIG_CMDLINE_EDITING
-
-/*
  * Environment settings
  */
-#define CONFIG_ENV_IS_IN_FAT
 #define CONFIG_ENV_SIZE			SZ_16K
-#define FAT_ENV_INTERFACE		"mmc"
-#define FAT_ENV_DEVICE_AND_PART		"0:1"
-#define FAT_ENV_FILE			"uboot.env"
-#define CONFIG_FAT_WRITE
+#define CONFIG_EXTRA_ENV_SETTINGS \
+	"upgrade=if mmc rescan && " \
+		"fatload mmc 0:1 ${loadaddr} u-boot-update.img && " \
+		"iminfo ${loadaddr} && source ${loadaddr}; then; else echo " \
+		"\"Fail to upgrade.\n" \
+		"Do you have u-boot-update.img and u-boot.head on first (FAT) SD card partition?\"" \
+		"; fi\0"
 
 /*
  * Environment configuration
  */
 #define CONFIG_BOOTFILE			"uImage"
-#define CONFIG_BOOTARGS			"console=ttyS3,115200n8"
 #define CONFIG_LOADADDR			CONFIG_SYS_LOAD_ADDR
 
 /*
  * Console configuration
  */
-#define CONFIG_SYS_LONGHELP
-#define CONFIG_SYS_CBSIZE		SZ_256
-#define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
-#define CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE + \
-						sizeof(CONFIG_SYS_PROMPT) + 16)
 
 /*
  * Misc utility configuration

@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2014 - 2015 Xilinx, Inc.
  * Michal Simek <michal.simek@xilinx.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _ASM_ARCH_HARDWARE_H
@@ -18,8 +17,8 @@
 
 #define ARASAN_NAND_BASEADDR	0xFF100000
 
-#define ZYNQMP_USB0_XHCI_BASEADDR	0xFE200000
-#define ZYNQMP_USB1_XHCI_BASEADDR	0xFE300000
+#define ZYNQMP_TCM_BASE_ADDR	0xFFE00000
+#define ZYNQMP_TCM_SIZE		0x40000
 
 #define ZYNQMP_CRL_APB_BASEADDR	0xFF5E0000
 #define ZYNQMP_CRL_APB_TIMESTAMP_REF_CTRL_CLKACT	0x1000000
@@ -31,6 +30,14 @@
 #define PS_MODE2	BIT(2)
 #define PS_MODE3	BIT(3)
 
+#define RESET_REASON_DEBUG_SYS	BIT(6)
+#define RESET_REASON_SOFT	BIT(5)
+#define RESET_REASON_SRST	BIT(4)
+#define RESET_REASON_PSONLY	BIT(3)
+#define RESET_REASON_PMU	BIT(2)
+#define RESET_REASON_INTERNAL	BIT(1)
+#define RESET_REASON_EXTERNAL	BIT(0)
+
 struct crlapb_regs {
 	u32 reserved0[36];
 	u32 cpu_r5_ctrl; /* 0x90 */
@@ -38,7 +45,9 @@ struct crlapb_regs {
 	u32 timestamp_ref_ctrl; /* 0x128 */
 	u32 reserved2[53];
 	u32 boot_mode; /* 0x200 */
-	u32 reserved3[14];
+	u32 reserved3_0[7];
+	u32 reset_reason; /* 0x220 */
+	u32 reserved3_1[6];
 	u32 rst_lpd_top; /* 0x23C */
 	u32 reserved4[4];
 	u32 boot_pin_ctrl; /* 0x250 */
@@ -48,17 +57,8 @@ struct crlapb_regs {
 #define crlapb_base ((struct crlapb_regs *)ZYNQMP_CRL_APB_BASEADDR)
 
 #define ZYNQMP_IOU_SCNTR_SECURE	0xFF260000
-#define ZYNQMP_IOU_SCNTR	0xFF250000
 #define ZYNQMP_IOU_SCNTR_COUNTER_CONTROL_REGISTER_EN	0x1
 #define ZYNQMP_IOU_SCNTR_COUNTER_CONTROL_REGISTER_HDBG	0x2
-
-struct iou_scntr {
-	u32 counter_control_register;
-	u32 reserved0[7];
-	u32 base_frequency_id_register;
-};
-
-#define iou_scntr ((struct iou_scntr *)ZYNQMP_IOU_SCNTR)
 
 struct iou_scntr_secure {
 	u32 counter_control_register;
@@ -130,9 +130,9 @@ struct apu_regs {
 /* Board version value */
 #define ZYNQMP_CSU_BASEADDR		0xFFCA0000
 #define ZYNQMP_CSU_VERSION_SILICON	0x0
-#define ZYNQMP_CSU_VERSION_EP108	0x1
-#define ZYNQMP_CSU_VERSION_VELOCE	0x2
 #define ZYNQMP_CSU_VERSION_QEMU		0x3
+
+#define ZYNQMP_CSU_VERSION_EMPTY_SHIFT		20
 
 #define ZYNQMP_SILICON_VER_MASK		0xF000
 #define ZYNQMP_SILICON_VER_SHIFT	12
@@ -152,5 +152,8 @@ struct pmu_regs {
 };
 
 #define pmu_base ((struct pmu_regs *)ZYNQMP_PMU_BASEADDR)
+
+#define ZYNQMP_CSU_IDCODE_ADDR	0xFFCA0040
+#define ZYNQMP_CSU_VER_ADDR	0xFFCA0044
 
 #endif /* _ASM_ARCH_HARDWARE_H */

@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2017 Álvaro Fernández Rojas <noltari@gmail.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -38,7 +37,7 @@ int wdt_reboot_probe(struct udevice *dev)
 	err = uclass_get_device_by_phandle(UCLASS_WDT, dev,
 					   "wdt", &priv->wdt);
 	if (err) {
-		error("unable to find wdt device\n");
+		pr_err("unable to find wdt device\n");
 		return err;
 	}
 

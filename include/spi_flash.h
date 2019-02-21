@@ -1,10 +1,9 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Common SPI flash Interface
  *
  * Copyright (C) 2008 Atmel Corporation
  * Copyright (C) 2013 Jagannadha Sutradharudu Teki, Xilinx Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0
  */
 
 #ifndef _SPI_FLASH_H_
@@ -113,6 +112,19 @@ struct dm_spi_flash_ops {
 	int (*write)(struct udevice *dev, u32 offset, size_t len,
 		     const void *buf);
 	int (*erase)(struct udevice *dev, u32 offset, size_t len);
+	/**
+	 * get_sw_write_prot() - Check state of software write-protect feature
+	 *
+	 * SPI flash chips can lock a region of the flash defined by a
+	 * 'protected area'. This function checks if this protected area is
+	 * defined.
+	 *
+	 * @dev:	SPI flash device
+	 * @return 0 if no region is write-protected, 1 if a region is
+	 *	write-protected, -ENOSYS if the driver does not implement this,
+	 *	other -ve value on error
+	 */
+	int (*get_sw_write_prot)(struct udevice *dev);
 };
 
 /* Access the serial operations for a device */
@@ -154,6 +166,20 @@ int spi_flash_write_dm(struct udevice *dev, u32 offset, size_t len,
  */
 int spi_flash_erase_dm(struct udevice *dev, u32 offset, size_t len);
 
+/**
+ * spl_flash_get_sw_write_prot() - Check state of software write-protect feature
+ *
+ * SPI flash chips can lock a region of the flash defined by a
+ * 'protected area'. This function checks if this protected area is
+ * defined.
+ *
+ * @dev:	SPI flash device
+ * @return 0 if no region is write-protected, 1 if a region is
+ *	write-protected, -ENOSYS if the driver does not implement this,
+ *	other -ve value on error
+ */
+int spl_flash_get_sw_write_prot(struct udevice *dev);
+
 int spi_flash_probe_bus_cs(unsigned int busnum, unsigned int cs,
 			   unsigned int max_hz, unsigned int spi_mode,
 			   struct udevice **devp);
@@ -186,25 +212,13 @@ static inline int spi_flash_erase(struct spi_flash *flash, u32 offset,
 struct sandbox_state;
 
 int sandbox_sf_bind_emul(struct sandbox_state *state, int busnum, int cs,
-			 struct udevice *bus, int of_offset, const char *spec);
+			 struct udevice *bus, ofnode node, const char *spec);
 
 void sandbox_sf_unbind_emul(struct sandbox_state *state, int busnum, int cs);
 
 #else
 struct spi_flash *spi_flash_probe(unsigned int bus, unsigned int cs,
 		unsigned int max_hz, unsigned int spi_mode);
-
-/**
- * Set up a new SPI flash from an fdt node
- *
- * @param blob		Device tree blob
- * @param slave_node	Pointer to this SPI slave node in the device tree
- * @param spi_node	Cached pointer to the SPI interface this node belongs
- *			to
- * @return 0 if ok, -1 on error
- */
-struct spi_flash *spi_flash_probe_fdt(const void *blob, int slave_node,
-				      int spi_node);
 
 void spi_flash_free(struct spi_flash *flash);
 

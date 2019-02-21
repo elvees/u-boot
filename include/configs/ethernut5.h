@@ -1,10 +1,9 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2011
  * egnite GmbH <info@egnite.de>
  *
  * Configuation settings for Ethernut 5 with AT91SAM9XE.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -13,7 +12,6 @@
 #include <asm/hardware.h>
 
 /* The first stage boot loader expects u-boot running at this address. */
-#define CONFIG_SYS_TEXT_BASE	0x27000000	/* 16MB available */
 
 /* The first stage boot loader takes care of low level initialization. */
 #define CONFIG_SKIP_LOWLEVEL_INIT
@@ -35,7 +33,6 @@
 				GENERATED_GBL_DATA_SIZE)
 
 /* 128MB SDRAM in 1 bank */
-#define CONFIG_NR_DRAM_BANKS		1
 #define CONFIG_SYS_SDRAM_BASE		0x20000000
 #define CONFIG_SYS_SDRAM_SIZE		(128 << 20)
 #define CONFIG_SYS_LOAD_ADDR		CONFIG_SYS_SDRAM_BASE
@@ -50,55 +47,20 @@
 # define CONFIG_SYS_FLASH_BASE		0x00200000 /* AT91SAM9XE_FLASH_BASE */
 # define CONFIG_AT91_EFLASH
 # define CONFIG_SYS_MAX_FLASH_SECT	32
-# define CONFIG_SYS_FLASH_PROTECTION	/* First stage loader in sector 0 */
 # define CONFIG_EFLASH_PROTSECTORS	1
 
-/* 512kB DataFlash at NPCS0 */
-#define CONFIG_SYS_MAX_DATAFLASH_BANKS	1
-#define CONFIG_HAS_DATAFLASH
-#define CONFIG_ATMEL_DATAFLASH_SPI
-#define CONFIG_SYS_DATAFLASH_LOGIC_ADDR_CS0	0xC0000000
-#define DATAFLASH_TCSS			(0x1a << 16)
-#define DATAFLASH_TCHS			(0x1 << 24)
 
-#define CONFIG_ENV_IS_IN_SPI_FLASH
-#define CONFIG_ENV_OFFSET		0x3DE000
-#define CONFIG_ENV_SECT_SIZE		(132 << 10)
-#define CONFIG_ENV_SIZE			CONFIG_ENV_SECT_SIZE
-#define CONFIG_ENV_ADDR			(CONFIG_SYS_DATAFLASH_LOGIC_ADDR_CS0 \
-					+ CONFIG_ENV_OFFSET)
-#define CONFIG_SYS_MONITOR_BASE		(CONFIG_SYS_DATAFLASH_LOGIC_ADDR_CS0 \
-					+ 0x042000)
-
-/* SPI */
-#define CONFIG_ATMEL_SPI
-#define AT91_SPI_CLK			15000000
-
-/* Serial port */
-#define CONFIG_ATMEL_USART
-#define CONFIG_USART3			/* USART 3 is DBGU */
-#define CONFIG_USART_BASE		ATMEL_BASE_DBGU
-#define	CONFIG_USART_ID			ATMEL_ID_SYS
-
-/* Misc. hardware drivers */
-#define CONFIG_AT91_GPIO
-
-/* Command line configuration */
-#define CONFIG_CMD_MTDPARTS
-#define CONFIG_CMD_NAND
-
-#ifndef MINIMAL_LOADER
-#define CONFIG_CMD_REISER
-#define CONFIG_CMD_SAVES
-#define CONFIG_CMD_UBIFS
-#endif
+/* bootstrap + u-boot + env + linux in dataflash on CS0 */
+#define CONFIG_ENV_OFFSET	0x3DE000
+#define CONFIG_ENV_SIZE		(132 << 10)
+#define CONFIG_ENV_SECT_SIZE	CONFIG_ENV_SIZE
+#define CONFIG_ENV_SPI_MAX_HZ	15000000
 
 /* NAND flash */
 #ifdef CONFIG_CMD_NAND
 #define CONFIG_SYS_MAX_NAND_DEVICE	1
 #define CONFIG_SYS_NAND_BASE		0x40000000
 #define CONFIG_SYS_NAND_DBW_8
-#define CONFIG_NAND_ATMEL
 /* our ALE is AD21 */
 #define CONFIG_SYS_NAND_MASK_ALE	(1 << 21)
 /* our CLE is AD22 */
@@ -173,40 +135,19 @@
 /* DHCP/BOOTP options */
 #ifdef CONFIG_CMD_DHCP
 #define CONFIG_BOOTP_BOOTFILESIZE
-#define CONFIG_BOOTP_BOOTPATH
-#define CONFIG_BOOTP_GATEWAY
-#define CONFIG_BOOTP_HOSTNAME
 #define CONFIG_SYS_AUTOLOAD	"n"
 #endif
 
 /* File systems */
-#define CONFIG_MTD_DEVICE
-#define CONFIG_MTD_PARTITIONS
-#if defined(CONFIG_CMD_MTDPARTS) || defined(CONFIG_CMD_NAND)
-#define MTDIDS_DEFAULT		"nand0=atmel_nand"
-#define MTDPARTS_DEFAULT	"mtdparts=atmel_nand:-(root)"
-#endif
-#define CONFIG_LZO
-#define CONFIG_RBTREE
 
 /* Boot command */
 #define CONFIG_CMDLINE_TAG
 #define CONFIG_SETUP_MEMORY_TAGS
 #define CONFIG_INITRD_TAG
-#define CONFIG_BOOTCOMMAND	"cp.b 0xC00C6000 ${loadaddr} 0x294000; bootm"
-#if defined(CONFIG_CMD_NAND)
-#define CONFIG_BOOTARGS		"console=ttyS0,115200 " \
-				"root=/dev/mtdblock0 " \
-				MTDPARTS_DEFAULT \
-				" rw rootfstype=jffs2"
-#endif
+#define CONFIG_BOOTCOMMAND	"sf probe 0:0; " \
+				"sf read 0x22000000 0xc6000 0x294000; " \
+				"bootm 0x22000000"
 
 /* Misc. u-boot settings */
-#define CONFIG_SYS_CBSIZE		256
-#define CONFIG_SYS_MAXARGS		16
-#define CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE + 16 \
-					+ sizeof(CONFIG_SYS_PROMPT))
-#define CONFIG_SYS_LONGHELP
-#define CONFIG_CMDLINE_EDITING
 
 #endif

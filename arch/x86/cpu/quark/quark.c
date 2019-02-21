@@ -1,13 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2015, Bin Meng <bmeng.cn@gmail.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <mmc.h>
 #include <asm/io.h>
 #include <asm/ioapic.h>
+#include <asm/irq.h>
 #include <asm/mrccache.h>
 #include <asm/mtrr.h>
 #include <asm/pci.h>
@@ -15,11 +15,6 @@
 #include <asm/arch/device.h>
 #include <asm/arch/msg_port.h>
 #include <asm/arch/quark.h>
-
-static struct pci_device_id mmc_supported[] = {
-	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_QRK_SDIO },
-	{},
-};
 
 static void quark_setup_mtrr(void)
 {
@@ -275,12 +270,6 @@ int print_cpuinfo(void)
 	return default_print_cpuinfo();
 }
 
-void reset_cpu(ulong addr)
-{
-	/* cold reset */
-	x86_full_reset();
-}
-
 static void quark_pcie_init(void)
 {
 	u32 val;
@@ -319,18 +308,38 @@ static void quark_usb_init(void)
 	writel((0xf << 16) | 0xf, bar + USBD_EP_INT_STS);
 }
 
+static void quark_irq_init(void)
+{
+	struct quark_rcba *rcba;
+	u32 base;
+
+	qrk_pci_read_config_dword(QUARK_LEGACY_BRIDGE, LB_RCBA, &base);
+	base &= ~MEM_BAR_EN;
+	rcba = (struct quark_rcba *)base;
+
+	/*
+	 * Route Quark PCI device interrupt pin to PIRQ
+	 *
+	 * Route device#23's INTA/B/C/D to PIRQA/B/C/D
+	 * Route device#20,21's INTA/B/C/D to PIRQE/F/G/H
+	 */
+	writew(PIRQC, &rcba->rmu_ir);
+	writew(PIRQA | (PIRQB << 4) | (PIRQC << 8) | (PIRQD << 12),
+	       &rcba->d23_ir);
+	writew(PIRQD, &rcba->core_ir);
+	writew(PIRQE | (PIRQF << 4) | (PIRQG << 8) | (PIRQH << 12),
+	       &rcba->d20d21_ir);
+}
+
 int arch_early_init_r(void)
 {
 	quark_pcie_init();
 
 	quark_usb_init();
 
-	return 0;
-}
+	quark_irq_init();
 
-int cpu_mmc_init(bd_t *bis)
-{
-	return pci_mmc_init("Quark SDHCI", mmc_supported);
+	return 0;
 }
 
 int arch_misc_init(void)

@@ -1,9 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2013 Samsung Electronics
  *
  * Common configuration settings for the SAMSUNG EXYNOS boards.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __EXYNOS_COMMON_H
@@ -44,11 +43,8 @@
 /* Miscellaneous configurable options */
 #define CONFIG_SYS_CBSIZE		1024	/* Console I/O Buffer Size */
 #define CONFIG_SYS_PBSIZE		1024	/* Print Buffer Size */
-#define CONFIG_SYS_MAXARGS		16	/* max number of command args */
 
 /* Boot Argument Buffer Size */
 #define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
-
-#include <config_distro_defaults.h>
 
 #endif	/* __CONFIG_H */

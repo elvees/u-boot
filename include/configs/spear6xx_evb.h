@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2009
  * Vipin Kumar, STMicroelectronics, <vipin.kumar@st.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -14,12 +13,6 @@
  */
 #if defined(CONFIG_USBTTY)
 #define CONFIG_SPEAR_USBTTY
-#endif
-
-#if defined(CONFIG_NAND)
-#define CONFIG_ENV_IS_IN_NAND
-#else
-#define CONFIG_ENV_IS_IN_FLASH
 #endif
 
 #include <configs/spear-common.h>

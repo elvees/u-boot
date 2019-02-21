@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2008 Stefan Roese <sr@denx.de>, DENX Software Engineering
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -52,7 +51,6 @@
 #define CONFIG_SYS_NS16550_SERIAL
 #define CONFIG_SYS_NS16550_REG_SIZE	-4
 #define CONFIG_SYS_NS16550_COM1		UART_1_BASE
-#define CONFIG_CONS_INDEX		1
 #define CONFIG_SYS_NS16550_CLK		921600
 
 /*
@@ -65,35 +63,13 @@
 #define CONFIG_SYS_LOAD_ADDR		0x80400000	/* default load address */
 
 #if defined(CONFIG_VCT_PREMIUM) || defined(CONFIG_VCT_PLATINUM)
-/*
- * SMSC91C11x Network Card
- */
-#define CONFIG_SMC911X
-#define CONFIG_SMC911X_BASE	0x00000000
-#define CONFIG_SMC911X_32_BIT
 #define CONFIG_NET_RETRY_COUNT		20
 #endif
 
 /*
  * Commands
  */
-
-/*
- * Only Premium/Platinum have ethernet support right now
- */
-#if (defined(CONFIG_VCT_PREMIUM) || defined(CONFIG_VCT_PLATINUM)) && \
-	!defined(CONFIG_VCT_SMALL_IMAGE)
-#endif
-
-/*
- * Only Premium/Platinum have USB-EHCI support right now
- */
-#if (defined(CONFIG_VCT_PREMIUM) || defined(CONFIG_VCT_PLATINUM)) && \
-	!defined(CONFIG_VCT_SMALL_IMAGE)
-#endif
-
 #if defined(CONFIG_CMD_USB)
-#define CONFIG_SUPPORT_VFAT
 
 /*
  * USB/EHCI
@@ -105,39 +81,21 @@
 #define CONFIG_EHCI_HCD_INIT_AFTER_RESET /* re-init HCD after CMD_RESET */
 #endif /* CONFIG_CMD_USB */
 
-#if defined(CONFIG_VCT_NAND)
-#define CONFIG_CMD_NAND
-#endif
-
-#if defined(CONFIG_VCT_ONENAND)
-#define CONFIG_CMD_ONENAND
-#endif
-
 /*
  * BOOTP options
  */
 #define CONFIG_BOOTP_BOOTFILESIZE
-#define CONFIG_BOOTP_BOOTPATH
-#define CONFIG_BOOTP_GATEWAY
-#define CONFIG_BOOTP_HOSTNAME
-#define CONFIG_BOOTP_SUBNETMASK
 
 /*
  * Miscellaneous configurable options
  */
-#define CONFIG_SYS_LONGHELP			/* undef to save memory		*/
 #define CONFIG_SYS_CBSIZE	512		/* Console I/O Buffer Size	*/
-#define CONFIG_SYS_PBSIZE	(CONFIG_SYS_CBSIZE + \
-				 sizeof(CONFIG_SYS_PROMPT) + 16)
-#define CONFIG_SYS_MAXARGS	16		/* max number of command args	*/
 #define CONFIG_TIMESTAMP			/* Print image info with timestamp */
-#define CONFIG_CMDLINE_EDITING			/* add command line history	*/
 
 /*
  * FLASH and environment organization
  */
 #if defined(CONFIG_VCT_NOR)
-#define CONFIG_ENV_IS_IN_FLASH
 #define CONFIG_FLASH_NOT_MEM_MAPPED
 
 /*
@@ -158,8 +116,6 @@
 /*
  * CFI driver settings
  */
-#define CONFIG_SYS_FLASH_CFI			/* The flash is CFI compatible	*/
-#define CONFIG_FLASH_CFI_DRIVER		/* Use common CFI driver	*/
 #define CONFIG_SYS_FLASH_CFI_AMD_RESET	1	/* Use AMD (Spansion) reset cmd */
 #define CONFIG_SYS_FLASH_CFI_WIDTH	FLASH_CFI_16BIT	/* no byte writes on IXP4xx	*/
 
@@ -184,7 +140,6 @@
 
 #if defined(CONFIG_VCT_ONENAND)
 #define CONFIG_USE_ONENAND_BOARD_INIT
-#define	CONFIG_ENV_IS_IN_ONENAND
 #define	CONFIG_SYS_ONENAND_BASE		0x00000000	/* this is not real address */
 #define CONFIG_SYS_FLASH_BASE		0x00000000
 #define CONFIG_ENV_ADDR			(128 << 10)	/* after compr. U-Boot image */
@@ -232,19 +187,6 @@ int vct_gpio_get(int pin);
 /*
  * UBI configuration
  */
-#if defined(CONFIG_VCT_ONENAND)
-#define CONFIG_SYS_USE_UBI
-#define	CONFIG_RBTREE
-#define CONFIG_MTD_DEVICE		/* needed for mtdparts commands */
-#define CONFIG_MTD_PARTITIONS
-#define CONFIG_CMD_MTDPARTS
-
-#define MTDIDS_DEFAULT		"onenand0=onenand"
-#define MTDPARTS_DEFAULT	"mtdparts=onenand:128k(u-boot),"	\
-					"128k(env),"		\
-					"20m(kernel),"		\
-					"-(rootfs)"
-#endif
 
 /*
  * We need a small, stripped down image to fit into the first 128k OneNAND
@@ -252,14 +194,8 @@ int vct_gpio_get(int pin);
  * (NOR/OneNAND) usage and Linux kernel booting.
  */
 #if defined(CONFIG_VCT_SMALL_IMAGE)
-#undef CONFIG_CMD_REGINFO
-#undef CONFIG_CMD_STRINGS
-#undef CONFIG_CMD_TERMINAL
-
-#undef CONFIG_SMC911X
 #undef CONFIG_SYS_I2C_SOFT
 #undef CONFIG_SOURCE
-#undef CONFIG_SYS_LONGHELP
 #undef CONFIG_TIMESTAMP
 #endif /* CONFIG_VCT_SMALL_IMAGE */
 

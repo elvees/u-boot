@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2007 - 2013 Tensilica Inc.
  * (C) Copyright 2014 - 2016 Cadence Design Systems Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -86,14 +85,14 @@ int misc_init_r(void)
 	 * Default MAC address comes from CONFIG_ETHADDR + DIP switches 1-6.
 	 */
 
-	char *s = getenv("ethaddr");
+	char *s = env_get("ethaddr");
 	if (s == 0) {
 		unsigned int x;
 		char s[] = __stringify(CONFIG_ETHBASE);
 		x = (*(volatile u32 *)CONFIG_SYS_FPGAREG_DIPSW)
 			& FPGAREG_MAC_MASK;
 		sprintf(&s[15], "%02x", x);
-		setenv("ethaddr", s);
+		env_set("ethaddr", s);
 	}
 #endif /* CONFIG_CMD_NET */
 

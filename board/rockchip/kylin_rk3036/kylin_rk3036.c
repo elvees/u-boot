@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2015 Rockchip Electronics Co., Ltd
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <common.h>
@@ -10,8 +9,6 @@
 #include <asm/arch/uart.h>
 #include <asm/arch/sdram_rk3036.h>
 #include <asm/gpio.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 void get_ddr_config(struct rk3036_ddr_config *config)
 {
@@ -44,7 +41,7 @@ int rk_board_late_init(void)
 {
 	if (fastboot_key_pressed()) {
 		printf("enter fastboot!\n");
-		setenv("preboot", "setenv preboot; fastboot usb0");
+		env_set("preboot", "setenv preboot; fastboot usb0");
 	}
 
 	return 0;

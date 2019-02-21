@@ -13,25 +13,30 @@
 #include <errno.h>
 #include <linux/ctype.h>
 
+/* from lib/kstrtox.c */
+static const char *_parse_integer_fixup_radix(const char *s, unsigned int *base)
+{
+	if (*base == 0) {
+		if (s[0] == '0') {
+			if (tolower(s[1]) == 'x' && isxdigit(s[2]))
+				*base = 16;
+			else
+				*base = 8;
+		} else
+			*base = 10;
+	}
+	if (*base == 16 && s[0] == '0' && tolower(s[1]) == 'x')
+		s += 2;
+	return s;
+}
+
 unsigned long simple_strtoul(const char *cp, char **endp,
 				unsigned int base)
 {
 	unsigned long result = 0;
 	unsigned long value;
 
-	if (*cp == '0') {
-		cp++;
-		if ((*cp == 'x') && isxdigit(cp[1])) {
-			base = 16;
-			cp++;
-		}
-
-		if (!base)
-			base = 8;
-	}
-
-	if (!base)
-		base = 10;
+	cp = _parse_integer_fixup_radix(cp, &base);
 
 	while (isxdigit(*cp) && (value = isdigit(*cp) ? *cp-'0' : (islower(*cp)
 	    ? toupper(*cp) : *cp)-'A'+10) < base) {
@@ -80,22 +85,20 @@ long simple_strtol(const char *cp, char **endp, unsigned int base)
 unsigned long ustrtoul(const char *cp, char **endp, unsigned int base)
 {
 	unsigned long result = simple_strtoul(cp, endp, base);
-	switch (**endp) {
-	case 'G':
+	switch (tolower(**endp)) {
+	case 'g':
 		result *= 1024;
 		/* fall through */
-	case 'M':
+	case 'm':
 		result *= 1024;
 		/* fall through */
-	case 'K':
 	case 'k':
 		result *= 1024;
-		if ((*endp)[1] == 'i') {
-			if ((*endp)[2] == 'B')
-				(*endp) += 3;
-			else
-				(*endp) += 2;
-		}
+		(*endp)++;
+		if (**endp == 'i')
+			(*endp)++;
+		if (**endp == 'B')
+			(*endp)++;
 	}
 	return result;
 }
@@ -103,22 +106,20 @@ unsigned long ustrtoul(const char *cp, char **endp, unsigned int base)
 unsigned long long ustrtoull(const char *cp, char **endp, unsigned int base)
 {
 	unsigned long long result = simple_strtoull(cp, endp, base);
-	switch (**endp) {
-	case 'G':
+	switch (tolower(**endp)) {
+	case 'g':
 		result *= 1024;
 		/* fall through */
-	case 'M':
+	case 'm':
 		result *= 1024;
 		/* fall through */
-	case 'K':
 	case 'k':
 		result *= 1024;
-		if ((*endp)[1] == 'i') {
-			if ((*endp)[2] == 'B')
-				(*endp) += 3;
-			else
-				(*endp) += 2;
-		}
+		(*endp)++;
+		if (**endp == 'i')
+			(*endp)++;
+		if (**endp == 'B')
+			(*endp)++;
 	}
 	return result;
 }
@@ -128,19 +129,7 @@ unsigned long long simple_strtoull(const char *cp, char **endp,
 {
 	unsigned long long result = 0, value;
 
-	if (*cp == '0') {
-		cp++;
-		if ((*cp == 'x') && isxdigit(cp[1])) {
-			base = 16;
-			cp++;
-		}
-
-		if (!base)
-			base = 8;
-	}
-
-	if (!base)
-		base = 10;
+	cp = _parse_integer_fixup_radix(cp, &base);
 
 	while (isxdigit(*cp) && (value = isdigit(*cp) ? *cp - '0'
 		: (islower(*cp) ? toupper(*cp) : *cp) - 'A' + 10) < base) {

@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2012-2013
  * Texas Instruments, <www.ti.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <config.h>
 #include <palmas.h>
@@ -42,25 +41,21 @@ int lp873x_mmc1_poweron_ldo(uint voltage)
 }
 #endif
 
-int palmas_mmc1_poweron_ldo(uint voltage)
+int palmas_mmc1_poweron_ldo(uint ldo_volt, uint ldo_ctrl, uint voltage)
 {
 	u8 val = 0;
 
 #if defined(CONFIG_DRA7XX)
 	int ret;
-	/*
-	 * Currently valid for the dra7xx_evm board:
-	 * Set TPS659038 LDO1 to 3.0 V
-	 */
-	val = LDO_VOLT_3V0;
-	ret = palmas_i2c_write_u8(TPS65903X_CHIP_P1, LDO1_VOLTAGE, val);
+
+	ret = palmas_i2c_write_u8(TPS65903X_CHIP_P1, ldo_volt, voltage);
 	if (ret) {
 		printf("tps65903x: could not set LDO1 voltage.\n");
 		return ret;
 	}
 	/* TURN ON LDO1 */
 	val = RSC_MODE_SLEEP | RSC_MODE_ACTIVE;
-	ret = palmas_i2c_write_u8(TPS65903X_CHIP_P1, LDO1_CTRL, val);
+	ret = palmas_i2c_write_u8(TPS65903X_CHIP_P1, ldo_ctrl, val);
 	if (ret) {
 		printf("tps65903x: could not turn on LDO1.\n");
 		return ret;
@@ -180,3 +175,42 @@ int twl603x_enable_bb_charge(u8 bb_fields)
 		       val, err);
 	return err;
 }
+
+#ifdef CONFIG_DM_I2C
+int palmas_i2c_write_u8(u8 chip_no, u8 reg, u8 val)
+{
+	struct udevice *dev;
+	int ret;
+
+	ret = i2c_get_chip_for_busnum(0, chip_no, 1, &dev);
+	if (ret) {
+		pr_err("unable to get I2C bus. ret %d\n", ret);
+		return ret;
+	}
+	ret = dm_i2c_reg_write(dev, reg, val);
+	if (ret) {
+		pr_err("writing to palmas failed. ret %d\n", ret);
+		return ret;
+	}
+	return 0;
+}
+
+int palmas_i2c_read_u8(u8 chip_no, u8 reg, u8 *valp)
+{
+	struct udevice *dev;
+	int ret;
+
+	ret = i2c_get_chip_for_busnum(0, chip_no, 1, &dev);
+	if (ret) {
+		pr_err("unable to get I2C bus. ret %d\n", ret);
+		return ret;
+	}
+	ret = dm_i2c_reg_read(dev, reg);
+	if (ret < 0) {
+		pr_err("reading from palmas failed. ret %d\n", ret);
+		return ret;
+	}
+	*valp = (u8)ret;
+	return 0;
+}
+#endif

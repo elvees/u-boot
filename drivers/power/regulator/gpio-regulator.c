@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2016 Texas Instruments Incorporated, <www.ti.com>
  * Keerthy <j-keerthy@ti.com>
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <common.h>
@@ -109,7 +108,7 @@ static int gpio_regulator_set_value(struct udevice *dev, int uV)
 
 	ret = dm_gpio_set_value(&dev_pdata->gpio, enable);
 	if (ret) {
-		error("Can't set regulator : %s gpio to: %d\n", dev->name,
+		pr_err("Can't set regulator : %s gpio to: %d\n", dev->name,
 		      enable);
 		return ret;
 	}

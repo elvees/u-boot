@@ -1,13 +1,12 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2016 Freescale Semiconductor, Inc.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _SYS_PROTO_MX7ULP_H_
 #define _SYS_PROTO_MX7ULP_H_
 
-#include <asm/imx-common/sys_proto.h>
+#include <asm/mach-imx/sys_proto.h>
 
 #define BT0CFG_LPBOOT_MASK 0x1
 #define BT0CFG_DUALBOOT_MASK 0x2

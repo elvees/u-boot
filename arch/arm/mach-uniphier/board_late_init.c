@@ -1,17 +1,18 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2014      Panasonic Corporation
  * Copyright (C) 2015-2016 Socionext Inc.
  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <spl.h>
-#include <libfdt.h>
+#include <linux/libfdt.h>
 #include <nand.h>
+#include <stdio.h>
 #include <linux/io.h>
-#include <../drivers/mtd/nand/denali.h>
+#include <linux/printk.h>
+#include <../drivers/mtd/nand/raw/denali.h>
 
 #include "init.h"
 
@@ -37,7 +38,7 @@ static int uniphier_set_fdt_file(void)
 	char dtb_name[256];
 	int buf_len = sizeof(dtb_name);
 
-	if (getenv("fdt_file"))
+	if (env_get("fdtfile"))
 		return 0;	/* do nothing if it is already set */
 
 	compat = fdt_stringlist_get(gd->fdt_blob, 0, "compatible", 0, NULL);
@@ -55,7 +56,7 @@ static int uniphier_set_fdt_file(void)
 
 	strncat(dtb_name, ".dtb", buf_len);
 
-	return setenv("fdt_file", dtb_name);
+	return env_set("fdtfile", dtb_name);
 }
 
 int board_late_init(void)
@@ -65,20 +66,20 @@ int board_late_init(void)
 	switch (uniphier_boot_device_raw()) {
 	case BOOT_DEVICE_MMC1:
 		printf("eMMC Boot");
-		setenv("bootmode", "emmcboot");
+		env_set("bootdev", "emmc");
 		break;
 	case BOOT_DEVICE_NAND:
 		printf("NAND Boot");
-		setenv("bootmode", "nandboot");
+		env_set("bootdev", "nand");
 		nand_denali_wp_disable();
 		break;
 	case BOOT_DEVICE_NOR:
 		printf("NOR Boot");
-		setenv("bootmode", "norboot");
+		env_set("bootdev", "nor");
 		break;
 	case BOOT_DEVICE_USB:
 		printf("USB Boot");
-		setenv("bootmode", "usbboot");
+		env_set("bootdev", "usb");
 		break;
 	default:
 		printf("Unknown");
@@ -92,7 +93,7 @@ int board_late_init(void)
 	printf("\n");
 
 	if (uniphier_set_fdt_file())
-		printf("fdt_file environment was not set correctly\n");
+		pr_warn("fdt_file environment was not set correctly\n");
 
 	return 0;
 }

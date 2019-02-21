@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2009
  * Marvell Semiconductor <www.marvell.com>
@@ -8,8 +9,6 @@
  *
  * (C) Copyright 2010
  * Heiko Schocher, DENX Software Engineering, hs@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -193,7 +192,7 @@ static void set_bootcount_addr(void)
 	unsigned int bootcountaddr;
 	bootcountaddr = gd->ram_size - BOOTCOUNT_ADDR;
 	sprintf((char *)buf, "0x%x", bootcountaddr);
-	setenv("bootcountaddr", (char *)buf);
+	env_set("bootcountaddr", (char *)buf);
 }
 
 int misc_init_r(void)
@@ -201,7 +200,7 @@ int misc_init_r(void)
 #if defined(CONFIG_KM_MGCOGE3UN)
 	char *wait_for_ne;
 	u8 dip_switch = kw_gpio_get_value(KM_FLASH_ERASE_ENABLE);
-	wait_for_ne = getenv("waitforne");
+	wait_for_ne = env_get("waitforne");
 
 	if ((wait_for_ne != NULL) && (dip_switch == 0)) {
 		if (strcmp(wait_for_ne, "true") == 0) {
@@ -299,7 +298,7 @@ int board_late_init(void)
 	if (dip_switch != 0) {
 		/* start bootloader */
 		puts("DIP:   Enabled\n");
-		setenv("actual_bank", "0");
+		env_set("actual_bank", "0");
 	}
 #endif
 

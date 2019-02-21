@@ -1,14 +1,14 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Board functions for Compulab CM-T54 board
  *
  * Copyright (C) 2014, Compulab Ltd - http://compulab.co.il/
  *
  * Author: Dmitry Lifshitz <lifshitz@compulab.co.il>
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <common.h>
+#include <environment.h>
 #include <fdt_support.h>
 #include <usb.h>
 #include <mmc.h>
@@ -126,7 +126,7 @@ int ft_board_setup(void *blob, bd_t *bd)
 	uint8_t enetaddr[6];
 
 	/* MAC addr */
-	if (eth_getenv_enetaddr("usbethaddr", enetaddr)) {
+	if (eth_env_get_enetaddr("usbethaddr", enetaddr)) {
 		fdt_find_and_setprop(blob, "/smsc95xx@0", "mac-address",
 				     enetaddr, 6, 1);
 	}
@@ -161,7 +161,7 @@ static int handle_mac_address(void)
 	uint8_t enetaddr[6];
 	int ret;
 
-	ret = eth_getenv_enetaddr("usbethaddr", enetaddr);
+	ret = eth_env_get_enetaddr("usbethaddr", enetaddr);
 	if (ret)
 		return 0;
 
@@ -172,7 +172,7 @@ static int handle_mac_address(void)
 	if (!is_valid_ethaddr(enetaddr))
 		return -1;
 
-	return eth_setenv_enetaddr("usbethaddr", enetaddr);
+	return eth_env_set_enetaddr("usbethaddr", enetaddr);
 }
 
 int board_eth_init(bd_t *bis)
@@ -246,7 +246,7 @@ int ehci_hcd_stop(void)
 	return ret;
 }
 
-void usb_hub_reset_devices(int port)
+void usb_hub_reset_devices(struct usb_hub_device *hub, int port)
 {
 	/* The LAN9730 needs to be reset after the port power has been set. */
 	if (port == 3) {

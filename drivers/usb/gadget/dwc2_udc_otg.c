@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * drivers/usb/gadget/dwc2_udc_otg.c
  * Designware DWC2 on-chip full/high speed USB OTG 2.0 device controllers
@@ -14,8 +15,6 @@
  * Ported to u-boot:
  * Marek Szyprowski <m.szyprowski@samsung.com>
  * Lukasz Majewski <l.majewski@samsumg.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 #undef DEBUG
 #include <common.h>
@@ -34,7 +33,6 @@
 
 #include "dwc2_udc_otg_regs.h"
 #include "dwc2_udc_otg_priv.h"
-#include <usb/lin_gadget_compat.h>
 
 /***********************************************************/
 
@@ -835,7 +833,7 @@ int dwc2_udc_probe(struct dwc2_plat_otg_data *pdata)
 			    ROUND(sizeof(struct usb_ctrlrequest),
 				  CONFIG_SYS_CACHELINE_SIZE));
 	if (!usb_ctrl) {
-		error("No memory available for UDC!\n");
+		pr_err("No memory available for UDC!\n");
 		return -ENOMEM;
 	}
 

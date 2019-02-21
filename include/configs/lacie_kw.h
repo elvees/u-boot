@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2011 Simon Guinot <sguinot@lacie.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _CONFIG_LACIE_KW_H
@@ -41,12 +40,6 @@
 #define CONFIG_SKIP_LOWLEVEL_INIT	/* disable board lowlevel_init */
 
 /*
- * Commands configuration
- */
-#ifndef CONFIG_NETSPACE_MINI_V2 /* No USB ports on Network Space v2 Mini */
-#endif
-
-/*
  * Core clock definition
  */
 #define CONFIG_SYS_TCLK			166000000 /* 166MHz */
@@ -54,7 +47,6 @@
 /*
  * SDRAM configuration
  */
-#define CONFIG_NR_DRAM_BANKS		1
 
 /*
  * Different SDRAM configuration and size for some of the boards derived
@@ -73,7 +65,6 @@
 #include "mv-common.h"
 
 /* Remove or override few declarations from mv-common.h */
-#undef CONFIG_RBTREE
 #undef CONFIG_ENV_SPI_MAX_HZ
 #undef CONFIG_SYS_IDE_MAXBUS
 #undef CONFIG_SYS_IDE_MAXDEVICE
@@ -82,7 +73,6 @@
 /*
  * Enable platform initialisation via misc_init_r() function
  */
-#define CONFIG_MISC_INIT_R
 
 /*
  * Ethernet Driver configuration
@@ -137,7 +127,6 @@
 /*
  * Environment variables configurations
  */
-#define CONFIG_ENV_IS_IN_SPI_FLASH
 #define CONFIG_ENV_SECT_SIZE		0x10000	/* 64KB */
 #define CONFIG_ENV_SIZE			0x1000	/* 4KB */
 #define CONFIG_ENV_ADDR			0x70000
@@ -146,8 +135,6 @@
 /*
  * Default environment variables
  */
-#define CONFIG_BOOTARGS "console=ttyS0,115200"
-
 #define CONFIG_BOOTCOMMAND					\
 	"dhcp && run netconsole; "				\
 	"if run usbload || run diskload; then bootm; fi"

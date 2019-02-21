@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2010-2013 NVIDIA Corporation
  * With help from the mpc8xxx SPI driver
  * With more help from omap3_spi SPI driver
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -91,7 +90,7 @@ static int tegra20_sflash_ofdata_to_platdata(struct udevice *bus)
 	int node = dev_of_offset(bus);
 
 	plat->base = devfdt_get_addr(bus);
-	plat->periph_id = clock_decode_periph_id(blob, node);
+	plat->periph_id = clock_decode_periph_id(bus);
 
 	if (plat->periph_id == PERIPH_ID_NONE) {
 		debug("%s: could not decode periph id %d\n", __func__,

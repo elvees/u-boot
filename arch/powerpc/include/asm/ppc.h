@@ -1,11 +1,10 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Ugly header containing required header files. This could  be adjusted
  * so that including asm/arch/hardware includes the correct file.
  *
  * (C) Copyright 2000-2009
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __ASM_PPC_H
@@ -13,8 +12,8 @@
 
 #ifndef __ASSEMBLY__
 
-#if defined(CONFIG_8xx)
-#include <asm/8xx_immap.h>
+#if defined(CONFIG_MPC8xx)
+#include <asm/immap_8xx.h>
 #endif
 #ifdef CONFIG_MPC86xx
 #include <mpc86xx.h>
@@ -38,17 +37,22 @@
 #include <asm/arch/immap_lsch2.h>
 #endif
 
-#if defined(CONFIG_8xx)
-uint get_immr(uint);
-#endif
-uint get_pvr(void);
-uint get_svr(void);
-uint rd_ic_cst(void);
-void wr_ic_cst(uint);
-void wr_ic_adr(uint);
-uint rd_dc_cst(void);
-void wr_dc_cst(uint);
-void wr_dc_adr(uint);
+#include <asm/processor.h>
+
+static inline uint get_immr(void)
+{
+	return mfspr(SPRN_IMMR);
+}
+
+static inline uint get_pvr(void)
+{
+	return mfspr(PVR);
+}
+
+static inline uint get_svr(void)
+{
+	return mfspr(SVR);
+}
 
 #if defined(CONFIG_MPC85xx)	|| \
 	defined(CONFIG_MPC86xx)	|| \
@@ -95,6 +99,28 @@ static inline ulong get_ddr_freq(ulong dummy)
 #else
 ulong get_ddr_freq(ulong);
 #endif
+
+static inline unsigned long get_msr(void)
+{
+	unsigned long msr;
+
+	asm volatile ("mfmsr %0" : "=r" (msr) : );
+
+	return msr;
+}
+
+static inline void set_msr(unsigned long msr)
+{
+	asm volatile ("mtmsr %0" : : "r" (msr));
+}
+
+#ifdef CONFIG_CMD_REGINFO
+void print_reginfo(void);
+#endif
+
+void interrupt_init_cpu(unsigned *);
+void timer_interrupt_cpu(struct pt_regs *);
+unsigned long search_exception_table(unsigned long addr);
 
 #endif /* !__ASSEMBLY__ */
 

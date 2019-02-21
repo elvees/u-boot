@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2016 Amarula Solutions B.V.
  * Copyright (C) 2016 Engicam S.r.l.
  * Author: Jagan Teki <jagan@amarulasolutions.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -21,16 +20,45 @@ static void mmc_late_init(void)
 	char mmcblk[32];
 	u32 dev_no = mmc_get_env_dev();
 
-	setenv_ulong("mmcdev", dev_no);
+	env_set_ulong("mmcdev", dev_no);
 
 	/* Set mmcblk env */
 	sprintf(mmcblk, "/dev/mmcblk%dp2 rootwait rw", dev_no);
-	setenv("mmcroot", mmcblk);
+	env_set("mmcroot", mmcblk);
 
 	sprintf(cmd, "mmc dev %d", dev_no);
 	run_command(cmd, 0);
 }
 #endif
+
+static void setenv_fdt_file(void)
+{
+	const char *cmp_dtb = CONFIG_DEFAULT_DEVICE_TREE;
+
+	if (!strcmp(cmp_dtb, "imx6q-icore")) {
+		if (is_mx6dq())
+			env_set("fdt_file", "imx6q-icore.dtb");
+		else if (is_mx6dl() || is_mx6solo())
+			env_set("fdt_file", "imx6dl-icore.dtb");
+	} else if (!strcmp(cmp_dtb, "imx6q-icore-mipi")) {
+		if (is_mx6dq())
+			env_set("fdt_file", "imx6q-icore-mipi.dtb");
+		else if (is_mx6dl() || is_mx6solo())
+			env_set("fdt_file", "imx6dl-icore-mipi.dtb");
+	} else if (!strcmp(cmp_dtb, "imx6q-icore-rqs")) {
+		if (is_mx6dq())
+			env_set("fdt_file", "imx6q-icore-rqs.dtb");
+		else if (is_mx6dl() || is_mx6solo())
+			env_set("fdt_file", "imx6dl-icore-rqs.dtb");
+	} else if (!strcmp(cmp_dtb, "imx6ul-geam"))
+		env_set("fdt_file", "imx6ul-geam.dtb");
+	else if (!strcmp(cmp_dtb, "imx6ul-isiot-mmc"))
+		env_set("fdt_file", "imx6ul-isiot-emmc.dtb");
+	else if (!strcmp(cmp_dtb, "imx6ul-isiot-emmc"))
+		env_set("fdt_file", "imx6ul-isiot-emmc.dtb");
+	else if (!strcmp(cmp_dtb, "imx6ul-isiot-nand"))
+		env_set("fdt_file", "imx6ul-isiot-nand.dtb");
+}
 
 int board_late_init(void)
 {
@@ -43,20 +71,20 @@ int board_late_init(void)
 #ifdef CONFIG_ENV_IS_IN_MMC
 		mmc_late_init();
 #endif
-		setenv("modeboot", "mmcboot");
+		env_set("modeboot", "mmcboot");
 		break;
-	case IMX6_BMODE_NAND:
-		setenv("modeboot", "nandboot");
+	case IMX6_BMODE_NAND_MIN ... IMX6_BMODE_NAND_MAX:
+		env_set("modeboot", "nandboot");
 		break;
 	default:
-		setenv("modeboot", "");
+		env_set("modeboot", "");
 		break;
 	}
 
 	if (is_mx6ul())
-		setenv("console", "ttymxc0");
+		env_set("console", "ttymxc0");
 	else
-		setenv("console", "ttymxc3");
+		env_set("console", "ttymxc3");
 
 	setenv_fdt_file();
 

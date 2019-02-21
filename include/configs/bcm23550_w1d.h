@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright 2013 Broadcom Corporation.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __BCM23550_W1D_H
@@ -18,11 +17,9 @@
 /*
  * Memory configuration
  */
-#define CONFIG_SYS_TEXT_BASE		0x9f000000
 
 #define CONFIG_SYS_SDRAM_BASE		0x80000000
 #define CONFIG_SYS_SDRAM_SIZE		0x20000000
-#define CONFIG_NR_DRAM_BANKS		1
 
 #define CONFIG_SYS_MALLOC_LEN		SZ_4M	/* see armv7/start.S. */
 
@@ -58,7 +55,6 @@
 #define CONFIG_SYS_TIMER_COUNTER	(TIMER_BASE_ADDR + 4) /* STCLO offset */
 
 /* Init functions */
-#define CONFIG_MISC_INIT_R	/* board's misc_init_r function */
 
 /* Some commands use this as the default load address */
 #define CONFIG_SYS_LOAD_ADDR		CONFIG_SYS_SDRAM_BASE
@@ -77,19 +73,15 @@
 /* Post pad 3 bytes after each reg addr */
 #define CONFIG_SYS_NS16550_REG_SIZE	(-4)
 #define CONFIG_SYS_NS16550_CLK		13000000
-#define CONFIG_CONS_INDEX		1
 #define CONFIG_SYS_NS16550_COM1		0x3e000000
 
 /* must fit into GPT:u-boot-env partition */
-#define CONFIG_ENV_IS_IN_MMC
 #define CONFIG_SYS_MMC_ENV_DEV		0
 #define CONFIG_ENV_OFFSET		(0x00011a00 * 512)
 #define CONFIG_ENV_SIZE			(8 * 512)
 
 /* console configuration */
 #define CONFIG_SYS_CBSIZE		1024	/* Console buffer size */
-#define CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE + \
-			sizeof(CONFIG_SYS_PROMPT) + 16)	/* Printbuffer size */
 #define CONFIG_SYS_MAXARGS		64
 #define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
 
@@ -100,17 +92,12 @@
  */
 
 /* version string, parser, etc */
-#define CONFIG_AUTO_COMPLETE
-#define CONFIG_CMDLINE_EDITING
-#define CONFIG_SYS_LONGHELP
 
 #define CONFIG_MX_CYCLIC
 
 /* Initial upstream - boot to cmd prompt only */
 #define CONFIG_BOOTCOMMAND		""
 
-#undef CONFIG_USB_GADGET_VBUS_DRAW
-#define CONFIG_USB_GADGET_VBUS_DRAW	0
 #define CONFIG_USBID_ADDR		0x34052c46
 
 #define CONFIG_SYS_ICACHE_OFF

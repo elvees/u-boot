@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2013
  * Texas Instruments, <www.ti.com>
  *
  * Dan Murphy <dmurphy@ti.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  *
  * Derived work from spl_usb.c
  */
@@ -17,8 +16,6 @@
 #include <errno.h>
 #include <fat.h>
 #include <image.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 static int spl_sata_load_image(struct spl_image_info *spl_image,
 			       struct spl_boot_device *bootdev)
@@ -34,7 +31,7 @@ static int spl_sata_load_image(struct spl_image_info *spl_image,
 		return err;
 	} else {
 		/* try to recognize storage devices immediately */
-		scsi_scan(0);
+		scsi_scan(false);
 		stor_dev = blk_get_devnum_by_type(IF_TYPE_SCSI, 0);
 		if (!stor_dev)
 			return -ENODEV;

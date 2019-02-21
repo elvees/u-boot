@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2010
  * Texas Instruments Incorporated.
@@ -5,14 +6,10 @@
  * Steve Sakoman  <steve@sakoman.com>
  *
  * TI OMAP4 common configuration settings
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_TI_OMAP4_COMMON_H
 #define __CONFIG_TI_OMAP4_COMMON_H
-
-#define CONFIG_MISC_INIT_R
 
 #ifndef CONFIG_SYS_L2CACHE_OFF
 #define CONFIG_SYS_L2_PL310		1
@@ -53,7 +50,6 @@
 #define CONFIG_SYS_NS16550_REG_SIZE	(-4)
 #define CONFIG_SYS_NS16550_COM3		UART3_BASE
 #endif
-#define CONFIG_CONS_INDEX		3
 
 /* TWL6030 */
 #ifndef CONFIG_SPL_BUILD
@@ -61,8 +57,6 @@
 #endif
 
 /* USB */
-#define CONFIG_USB_MUSB_UDC			1
-#define CONFIG_USB_OMAP3		1
 
 /* USB device configuration */
 #define CONFIG_USB_DEVICE		1
@@ -90,14 +84,6 @@
 	func(LEGACY_MMC, legacy_mmc, 1) \
 	func(PXE, pxe, na) \
 	func(DHCP, dhcp, na)
-
-#define CONFIG_BOOTCOMMAND \
-	"if test ${boot_fit} -eq 1; then "	\
-		"run update_to_fit;"	\
-	"fi;"	\
-	"run findfdt; " \
-	"run envboot; " \
-	"run distro_bootcmd"
 
 #include <config_distro_bootcmd.h>
 #include <environment/ti/mmc.h>
@@ -139,18 +125,12 @@
  * So moving TEXT_BASE down to non-HS limit.
  */
 #define CONFIG_SPL_TEXT_BASE		0x40300000
-#define CONFIG_SPL_LDSCRIPT "arch/arm/mach-omap2/u-boot-spl.lds"
 #define CONFIG_SYS_SPL_ARGS_ADDR	(CONFIG_SYS_SDRAM_BASE + \
 					 (128 << 20))
-
-#ifdef CONFIG_NAND
-#define CONFIG_SPL_NAND_AM33XX_BCH	/* ELM support */
-#endif
 
 #ifdef CONFIG_SPL_BUILD
 /* No need for i2c in SPL mode as we will use SRI2C for PMIC access on OMAP4 */
 #undef CONFIG_SYS_I2C
-#undef CONFIG_SYS_I2C_OMAP24XX
 #endif
 
 #endif /* __CONFIG_TI_OMAP4_COMMON_H */

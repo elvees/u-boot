@@ -1,11 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2001
  * Denis Peter, MPL AG Switzerland
  *
  * Part of this source has been derived from the Linux USB
  * project.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
 #include <console.h>
@@ -14,6 +13,7 @@
 #include <malloc.h>
 #include <memalign.h>
 #include <stdio_dev.h>
+#include <watchdog.h>
 #include <asm/byteorder.h>
 
 #include <usb.h>
@@ -368,7 +368,7 @@ static int usb_kbd_testc(struct stdio_dev *sdev)
 		return 0;
 	kbd_testc_tms = get_timer(0);
 #endif
-	dev = stdio_get_by_name(DEVNAME);
+	dev = stdio_get_by_name(sdev->name);
 	usb_kbd_dev = (struct usb_device *)dev->priv;
 	data = usb_kbd_dev->privptr;
 
@@ -384,12 +384,14 @@ static int usb_kbd_getc(struct stdio_dev *sdev)
 	struct usb_device *usb_kbd_dev;
 	struct usb_kbd_pdata *data;
 
-	dev = stdio_get_by_name(DEVNAME);
+	dev = stdio_get_by_name(sdev->name);
 	usb_kbd_dev = (struct usb_device *)dev->priv;
 	data = usb_kbd_dev->privptr;
 
-	while (data->usb_in_pointer == data->usb_out_pointer)
+	while (data->usb_in_pointer == data->usb_out_pointer) {
+		WATCHDOG_RESET();
 		usb_kbd_poll_for_event(usb_kbd_dev);
+	}
 
 	if (data->usb_out_pointer == USB_KBD_BUFFER_LEN - 1)
 		data->usb_out_pointer = 0;
@@ -515,7 +517,7 @@ static int probe_usb_keyboard(struct usb_device *dev)
 	if (error)
 		return error;
 
-	stdinname = getenv("stdin");
+	stdinname = env_get("stdin");
 #if CONFIG_IS_ENABLED(CONSOLE_MUX)
 	error = iomux_doenv(stdin, stdinname);
 	if (error)
@@ -537,7 +539,7 @@ static int probe_usb_keyboard(struct usb_device *dev)
 	return 0;
 }
 
-#ifndef CONFIG_DM_USB
+#if !CONFIG_IS_ENABLED(DM_USB)
 /* Search for keyboard and register it if found. */
 int drv_usb_kbd_init(void)
 {
@@ -582,7 +584,7 @@ int usb_kbd_deregister(int force)
 		if (stdio_deregister_dev(dev, force) != 0)
 			return 1;
 #if CONFIG_IS_ENABLED(CONSOLE_MUX)
-		if (iomux_doenv(stdin, getenv("stdin")) != 0)
+		if (iomux_doenv(stdin, env_get("stdin")) != 0)
 			return 1;
 #endif
 #ifdef CONFIG_SYS_USB_EVENT_POLL_VIA_INT_QUEUE
@@ -600,7 +602,7 @@ int usb_kbd_deregister(int force)
 
 #endif
 
-#ifdef CONFIG_DM_USB
+#if CONFIG_IS_ENABLED(DM_USB)
 
 static int usb_kbd_probe(struct udevice *dev)
 {
@@ -627,7 +629,7 @@ static int usb_kbd_remove(struct udevice *dev)
 		goto err;
 	}
 #if CONFIG_IS_ENABLED(CONSOLE_MUX)
-	if (iomux_doenv(stdin, getenv("stdin"))) {
+	if (iomux_doenv(stdin, env_get("stdin"))) {
 		ret = -ENOLINK;
 		goto err;
 	}

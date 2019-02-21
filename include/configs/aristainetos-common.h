@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2015
  * (C) Copyright 2014
@@ -7,8 +8,6 @@
  * Copyright (C) 2012 Freescale Semiconductor, Inc.
  *
  * Configuration settings for the Freescale i.MX6Q SabreSD board.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 #ifndef __ARISTAINETOS_COMMON_CONFIG_H
 #define __ARISTAINETOS_COMMON_CONFIG_H
@@ -27,16 +26,11 @@
 #define CONFIG_SYS_FSL_ESDHC_ADDR      0
 
 #define CONFIG_FEC_MXC
-#define CONFIG_MII
 #define IMX_FEC_BASE			ENET_BASE_ADDR
 #define CONFIG_ETHPRIME			"FEC"
 #define CONFIG_FEC_MXC_PHYADDR		0
 
-#define CONFIG_PHYLIB
-#define CONFIG_PHY_MICREL
-
 #define CONFIG_SPI_FLASH_MTD
-#define CONFIG_MXC_SPI
 #define CONFIG_SF_DEFAULT_SPEED		20000000
 #define CONFIG_SF_DEFAULT_MODE		SPI_MODE_0
 #define CONFIG_SYS_SPI_ST_ENABLE_WP_PIN
@@ -138,15 +132,11 @@
 
 #define CONFIG_ARP_TIMEOUT		200UL
 
-/* Print Buffer Size */
-#define CONFIG_SYS_PBSIZE (CONFIG_SYS_CBSIZE + sizeof(CONFIG_SYS_PROMPT) + 16)
-
 #define CONFIG_SYS_MEMTEST_START	PHYS_SDRAM
 #define CONFIG_SYS_MEMTEST_END		(CONFIG_SYS_MEMTEST_START + 0x100000)
 #define CONFIG_SYS_MEMTEST_SCRATCH	0x10800000
 
 /* Physical Memory Map */
-#define CONFIG_NR_DRAM_BANKS		1
 #define PHYS_SDRAM			MMDC0_ARB_BASE_ADDR
 
 #define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM
@@ -160,7 +150,6 @@
 
 /* Environment organization */
 #define CONFIG_ENV_SIZE			(12 * 1024)
-#define CONFIG_ENV_IS_IN_SPI_FLASH
 #define CONFIG_SYS_REDUNDAND_ENVIRONMENT
 #define CONFIG_ENV_SPI_BUS		CONFIG_SF_DEFAULT_BUS
 #define CONFIG_ENV_SPI_CS		CONFIG_SF_DEFAULT_CS
@@ -183,18 +172,12 @@
 #define CONFIG_SYS_I2C_NOPROBES		{ {0, 0x00} }
 
 /* NAND stuff */
-#define CONFIG_CMD_NAND
-#define CONFIG_CMD_NAND_TRIMFFS
-#define CONFIG_NAND_MXS
 #define CONFIG_SYS_MAX_NAND_DEVICE	1
 #define CONFIG_SYS_NAND_BASE		0x40000000
 #define CONFIG_SYS_NAND_5_ADDR_CYCLE
 #define CONFIG_SYS_NAND_ONFI_DETECTION
 
 /* DMA stuff, needed for GPMI/MXS NAND support */
-#define CONFIG_APBH_DMA
-#define CONFIG_APBH_DMA_BURST
-#define CONFIG_APBH_DMA_BURST8
 
 /* RTC */
 #define CONFIG_SYS_I2C_RTC_ADDR	0x68
@@ -208,15 +191,6 @@
 #define CONFIG_MXC_USB_FLAGS	0
 
 /* UBI support */
-#define CONFIG_LZO
-#define CONFIG_CMD_MTDPARTS
-#define CONFIG_MTD_PARTITIONS
-#define CONFIG_MTD_DEVICE
-#define CONFIG_RBTREE
-#define CONFIG_CMD_UBIFS
-
-#define CONFIG_HW_WATCHDOG
-#define CONFIG_IMX_WATCHDOG
 
 /* Framebuffer */
 #define CONFIG_VIDEO_IPUV3
@@ -227,7 +201,6 @@
 #define CONFIG_BMP_16BPP
 #define CONFIG_VIDEO_LOGO
 #define CONFIG_VIDEO_BMP_LOGO
-#define CONFIG_IPUV3_CLK 198000000
 #define CONFIG_IMX_VIDEO_SKIP
 
 #define CONFIG_PWM_IMX

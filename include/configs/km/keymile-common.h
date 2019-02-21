@@ -1,42 +1,26 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2008-2011
  * Heiko Schocher, DENX Software Engineering, hs@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_KEYMILE_H
 #define __CONFIG_KEYMILE_H
 
-#define CONFIG_BOOTCOUNT_LIMIT
-
-/*
- * Command line configuration.
- */
-#define CONFIG_CMD_MTDPARTS
-
 #undef	CONFIG_WATCHDOG		/* disable platform specific watchdog */
-
-#undef	CONFIG_BOOTARGS		/* the boot command will set bootargs */
 
 /*
  * Miscellaneous configurable options
  */
-#define CONFIG_SYS_LONGHELP			/* undef to save memory	  */
 #if defined(CONFIG_CMD_KGDB)
 #define CONFIG_SYS_CBSIZE		1024	/* Console I/O Buffer Size */
 #else
 #define CONFIG_SYS_CBSIZE		512	/* Console I/O Buffer Size  */
 #endif
-#define CONFIG_SYS_PBSIZE (CONFIG_SYS_CBSIZE+sizeof(CONFIG_SYS_PROMPT)+16)
 #define CONFIG_SYS_MAXARGS		32 /* max number of command args */
 #define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
-#define CONFIG_CMDLINE_EDITING
-#define CONFIG_AUTO_COMPLETE
 
 #define CONFIG_HUSH_INIT_VAR
-
-#define CONFIG_SYS_ALT_MEMTEST		/* memory test, takes time */
 
 #define CONFIG_SYS_BAUDRATE_TABLE { 9600, 19200, 38400, 57600, 115200, 230400 }
 
@@ -49,20 +33,12 @@
 #define CONFIG_SYS_IVM_EEPROM_MAX_LEN	0x400
 #define CONFIG_SYS_IVM_EEPROM_PAGE_LEN	0x100
 
-#define	CONFIG_SYS_FLASH_PROTECTION
-
 /*
  * BOOTP options
  */
 #define CONFIG_BOOTP_BOOTFILESIZE
-#define CONFIG_BOOTP_BOOTPATH
-#define CONFIG_BOOTP_GATEWAY
-#define CONFIG_BOOTP_HOSTNAME
 
 /* UBI Support for all Keymile boards */
-#define CONFIG_RBTREE
-#define CONFIG_MTD_PARTITIONS
-#define CONFIG_MTD_DEVICE
 #define CONFIG_MTD_CONCAT
 
 #ifndef CONFIG_KM_DEF_ENV_BOOTPARAMS
@@ -216,7 +192,6 @@
 		"setenv altbootcmd \'setenv boot_bank ${backup_bank}; "	\
 			"run ${subbootcmds}; reset\' && "		\
 		"saveenv && saveenv && boot\0"				\
-	"bootlimit=3\0"							\
 	"cramfsloadfdt="						\
 		"cramfsload ${fdt_addr_r} "				\
 		"fdt_0x${IVM_BoardId}_0x${IVM_HWKey}.dtb\0"		\
@@ -224,8 +199,8 @@
 	"init=/sbin/init-overlay.sh\0"					\
 	"load_addr_r="__stringify(CONFIG_KM_KERNEL_ADDR) "\0"		\
 	"load=tftpboot ${load_addr_r} ${u-boot}\0"			\
-	"mtdids=" MTDIDS_DEFAULT "\0"					\
-	"mtdparts=" MTDPARTS_DEFAULT "\0"				\
+	"mtdids=" CONFIG_MTDIDS_DEFAULT "\0"					\
+	"mtdparts=" CONFIG_MTDPARTS_DEFAULT "\0"				\
 	""
 #endif /* CONFIG_KM_DEF_ENV */
 

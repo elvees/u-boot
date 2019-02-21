@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2014 CompuLab, Ltd. <www.compulab.co.il>
  *
  * Authors: Igor Grinberg <grinberg@compulab.co.il>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -47,9 +46,10 @@ static int splash_sf_read_raw(u32 bmp_load_addr, int offset, size_t read_size)
 #ifdef CONFIG_CMD_NAND
 static int splash_nand_read_raw(u32 bmp_load_addr, int offset, size_t read_size)
 {
-	return nand_read_skip_bad(nand_info[nand_curr_device], offset,
+	struct mtd_info *mtd = get_nand_dev_by_index(nand_curr_device);
+	return nand_read_skip_bad(mtd, offset,
 				  &read_size, NULL,
-				  nand_info[nand_curr_device]->size,
+				  mtd->size,
 				  (u_char *)bmp_load_addr);
 }
 #else
@@ -162,10 +162,10 @@ static inline int splash_init_usb(void)
 }
 #endif
 
-#ifdef CONFIG_CMD_SATA
+#ifdef CONFIG_SATA
 static int splash_init_sata(void)
 {
-	return sata_initialize();
+	return sata_probe(0);
 }
 #else
 static inline int splash_init_sata(void)
@@ -219,7 +219,7 @@ static int splash_load_fs(struct splash_location *location, u32 bmp_load_addr)
 	loff_t actread;
 	char *splash_file;
 
-	splash_file = getenv("splashfile");
+	splash_file = env_get("splashfile");
 	if (!splash_file)
 		splash_file = SPLASH_SOURCE_DEFAULT_FILE_NAME;
 
@@ -285,7 +285,7 @@ static struct splash_location *select_splash_location(
 	if (!locations || size == 0)
 		return NULL;
 
-	env_splashsource = getenv("splashsource");
+	env_splashsource = env_get("splashsource");
 	if (env_splashsource == NULL)
 		return &locations[0];
 
@@ -316,6 +316,11 @@ static int splash_load_fit(struct splash_location *location, u32 bmp_load_addr)
 		return res;
 
 	img_header = (struct image_header *)bmp_load_addr;
+	if (image_get_magic(img_header) != FDT_MAGIC) {
+		printf("Could not find FDT magic\n");
+		return -EINVAL;
+	}
+
 	fit_size = fdt_totalsize(img_header);
 
 	/* Read in entire FIT */
@@ -382,7 +387,7 @@ int splash_source_load(struct splash_location *locations, uint size)
 	char *env_splashimage_value;
 	u32 bmp_load_addr;
 
-	env_splashimage_value = getenv("splashimage");
+	env_splashimage_value = env_get("splashimage");
 	if (env_splashimage_value == NULL)
 		return -ENOENT;
 

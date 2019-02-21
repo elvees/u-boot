@@ -1,10 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0+
 /* Copyright 2013 Freescale Semiconductor, Inc.
- *
- * SPDX-License-Identifier:    GPL-2.0+
  */
 
 #include <common.h>
 #include <console.h>
+#include <environment.h>
 #include <malloc.h>
 #include <ns16550.h>
 #include <nand.h>
@@ -119,7 +119,7 @@ void board_init_r(gd_t *gd, ulong dest_addr)
 			       (uchar *)CONFIG_ENV_ADDR);
 #endif
 	gd->env_addr  = (ulong)(CONFIG_ENV_ADDR);
-	gd->env_valid = 1;
+	gd->env_valid = ENV_VALID;
 
 	i2c_init_all();
 

@@ -1,12 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2015-2017 Socionext Inc.
  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <spl.h>
+#include <stdio.h>
 #include <linux/log2.h>
 
 #include "../init.h"
@@ -26,15 +26,6 @@ struct uniphier_boot_device_info {
 };
 
 static const struct uniphier_boot_device_info uniphier_boot_device_info[] = {
-#if defined(CONFIG_ARCH_UNIPHIER_SLD3)
-	{
-		.soc_id = UNIPHIER_SLD3_ID,
-		.boot_device_sel_shift = 0,
-		.boot_device_table = uniphier_sld3_boot_device_table,
-		.boot_device_count = &uniphier_sld3_boot_device_count,
-		.have_internal_stm = 0,
-	},
-#endif
 #if defined(CONFIG_ARCH_UNIPHIER_LD4)
 	{
 		.soc_id = UNIPHIER_LD4_ID,

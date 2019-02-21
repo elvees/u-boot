@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  *  (C) Copyright 2010,2011
  *  NVIDIA Corporation <www.nvidia.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -31,7 +30,6 @@
 #define CONFIG_SYS_I2C_TEGRA
 
 /* Environment in eMMC, at the end of 2nd "boot sector" */
-#define CONFIG_ENV_IS_IN_MMC
 #define CONFIG_ENV_OFFSET (-CONFIG_ENV_SIZE)
 #define CONFIG_SYS_MMC_ENV_DEV 0
 #define CONFIG_SYS_MMC_ENV_PART 2
@@ -40,15 +38,12 @@
 #define CONFIG_USB_EHCI_TEGRA
 
 /* USB networking support */
-#define CONFIG_USB_HOST_ETHER
-#define CONFIG_USB_ETHER_ASIX
 
 /* Enable keyboard */
 #define CONFIG_TEGRA_KEYBOARD
 #define CONFIG_KEYBOARD
 
 /* NAND support */
-#define CONFIG_CMD_NAND
 #define CONFIG_TEGRA_NAND
 
 /* Max number of NAND devices */

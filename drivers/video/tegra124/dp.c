@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2011-2013, NVIDIA Corporation.
  * Copyright 2014 Google Inc.
- *
- * SPDX-License-Identifier:     GPL-2.0
  */
 
 #include <common.h>
@@ -10,7 +9,6 @@
 #include <dm.h>
 #include <div64.h>
 #include <errno.h>
-#include <fdtdec.h>
 #include <video_bridge.h>
 #include <asm/io.h>
 #include <asm/arch-tegra/dc.h>
@@ -18,8 +16,6 @@
 #include "edid.h"
 #include "sor.h"
 #include "displayport.h"
-
-DECLARE_GLOBAL_DATA_PTR;
 
 #define DO_FAST_LINK_TRAINING		1
 
@@ -1572,7 +1568,7 @@ static int tegra_dp_ofdata_to_platdata(struct udevice *dev)
 {
 	struct tegra_dp_plat *plat = dev_get_platdata(dev);
 
-	plat->base = devfdt_get_addr(dev);
+	plat->base = dev_read_addr(dev);
 
 	return 0;
 }

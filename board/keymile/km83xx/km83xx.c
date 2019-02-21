@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2006 Freescale Semiconductor, Inc.
  *                    Dave Liu <daveliu@freescale.com>
@@ -10,8 +11,6 @@
  *
  * (C) Copyright 2008 - 2010
  * Heiko Schocher, DENX Software Engineering, hs@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -23,7 +22,7 @@
 #include <asm/mmu.h>
 #include <asm/processor.h>
 #include <pci.h>
-#include <libfdt.h>
+#include <linux/libfdt.h>
 #include <post.h>
 
 #include "../common/common.h"
@@ -263,11 +262,11 @@ int last_stage_init(void)
 	mv88e_sw_reset(name, CONFIG_KM_MVEXTSW_ADDR);
 
 	if (piggy_present()) {
-		setenv("ethact", "UEC2");
-		setenv("netdev", "eth1");
+		env_set("ethact", "UEC2");
+		env_set("netdev", "eth1");
 		puts("using PIGGY for network boot\n");
 	} else {
-		setenv("netdev", "eth0");
+		env_set("netdev", "eth0");
 		puts("using frontport for network boot\n");
 	}
 #endif
@@ -280,7 +279,7 @@ int last_stage_init(void)
 	if (dip_switch != 0) {
 		/* start bootloader */
 		puts("DIP:   Enabled\n");
-		setenv("actual_bank", "0");
+		env_set("actual_bank", "0");
 	}
 #endif
 	set_km_env();

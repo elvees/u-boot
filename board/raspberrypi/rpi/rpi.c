@@ -1,13 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * (C) Copyright 2012-2016 Stephen Warren
- *
- * SPDX-License-Identifier:	GPL-2.0
  */
 
 #include <common.h>
-#include <inttypes.h>
 #include <config.h>
 #include <dm.h>
+#include <environment.h>
 #include <efi_loader.h>
 #include <fdt_support.h>
 #include <fdt_simplefb.h>
@@ -24,6 +23,7 @@
 #include <asm/armv8/mmu.h>
 #endif
 #include <watchdog.h>
+#include <dm/pinctrl.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -68,14 +68,7 @@ struct msg_get_clock_rate {
 #endif
 
 /*
- * http://raspberryalphaomega.org.uk/2013/02/06/automatic-raspberry-pi-board-revision-detection-model-a-b1-and-b2/
- * http://www.raspberrypi.org/forums/viewtopic.php?f=63&t=32733
- * http://git.drogon.net/?p=wiringPi;a=blob;f=wiringPi/wiringPi.c;h=503151f61014418b9c42f4476a6086f75cd4e64b;hb=refs/heads/master#l922
- *
- * In http://lists.denx.de/pipermail/u-boot/2016-January/243752.html
- * ("[U-Boot] [PATCH] rpi: fix up Model B entries") Dom Cobley at the RPi
- * Foundation stated that the following source was accurate:
- * https://github.com/AndrewFromMelbourne/raspberry_pi_revision
+ * https://www.raspberrypi.org/documentation/hardware/raspberrypi/revision-codes/README.md
  */
 struct rpi_model {
 	const char *name;
@@ -90,10 +83,35 @@ static const struct rpi_model rpi_model_unknown = {
 };
 
 static const struct rpi_model rpi_models_new_scheme[] = {
+	[0x0] = {
+		"Model A",
+		DTB_DIR "bcm2835-rpi-a.dtb",
+		false,
+	},
+	[0x1] = {
+		"Model B",
+		DTB_DIR "bcm2835-rpi-b.dtb",
+		true,
+	},
+	[0x2] = {
+		"Model A+",
+		DTB_DIR "bcm2835-rpi-a-plus.dtb",
+		false,
+	},
+	[0x3] = {
+		"Model B+",
+		DTB_DIR "bcm2835-rpi-b-plus.dtb",
+		true,
+	},
 	[0x4] = {
 		"2 Model B",
 		DTB_DIR "bcm2836-rpi-2-b.dtb",
 		true,
+	},
+	[0x6] = {
+		"Compute Module",
+		DTB_DIR "bcm2835-rpi-cm.dtb",
+		false,
 	},
 	[0x8] = {
 		"3 Model B",
@@ -103,6 +121,26 @@ static const struct rpi_model rpi_models_new_scheme[] = {
 	[0x9] = {
 		"Zero",
 		DTB_DIR "bcm2835-rpi-zero.dtb",
+		false,
+	},
+	[0xA] = {
+		"Compute Module 3",
+		DTB_DIR "bcm2837-rpi-cm3.dtb",
+		false,
+	},
+	[0xC] = {
+		"Zero W",
+		DTB_DIR "bcm2835-rpi-zero-w.dtb",
+		false,
+	},
+	[0xD] = {
+		"3 Model B+",
+		DTB_DIR "bcm2837-rpi-3-b-plus.dtb",
+		true,
+	},
+	[0xE] = {
+		"3 Model A+",
+		DTB_DIR "bcm2837-rpi-3-a-plus.dtb",
 		false,
 	},
 };
@@ -247,11 +285,11 @@ static void set_fdtfile(void)
 {
 	const char *fdtfile;
 
-	if (getenv("fdtfile"))
+	if (env_get("fdtfile"))
 		return;
 
 	fdtfile = model->fdtfile;
-	setenv("fdtfile", fdtfile);
+	env_set("fdtfile", fdtfile);
 }
 
 /*
@@ -260,13 +298,13 @@ static void set_fdtfile(void)
  */
 static void set_fdt_addr(void)
 {
-	if (getenv("fdt_addr"))
+	if (env_get("fdt_addr"))
 		return;
 
 	if (fdt_magic(fw_dtb_pointer) != FDT_MAGIC)
 		return;
 
-	setenv_hex("fdt_addr", fw_dtb_pointer);
+	env_set_hex("fdt_addr", fw_dtb_pointer);
 }
 
 /*
@@ -287,7 +325,7 @@ static void set_usbethaddr(void)
 	if (!model->has_onboard_eth)
 		return;
 
-	if (getenv("usbethaddr"))
+	if (env_get("usbethaddr"))
 		return;
 
 	BCM2835_MBOX_INIT_HDR(msg);
@@ -300,10 +338,10 @@ static void set_usbethaddr(void)
 		return;
 	}
 
-	eth_setenv_enetaddr("usbethaddr", msg->get_mac_address.body.resp.mac);
+	eth_env_set_enetaddr("usbethaddr", msg->get_mac_address.body.resp.mac);
 
-	if (!getenv("ethaddr"))
-		setenv("ethaddr", getenv("usbethaddr"));
+	if (!env_get("ethaddr"))
+		env_set("ethaddr", env_get("usbethaddr"));
 
 	return;
 }
@@ -314,13 +352,13 @@ static void set_board_info(void)
 	char s[11];
 
 	snprintf(s, sizeof(s), "0x%X", revision);
-	setenv("board_revision", s);
+	env_set("board_revision", s);
 	snprintf(s, sizeof(s), "%d", rev_scheme);
-	setenv("board_rev_scheme", s);
+	env_set("board_rev_scheme", s);
 	/* Can't rename this to board_rev_type since it's an ABI for scripts */
 	snprintf(s, sizeof(s), "0x%X", rev_type);
-	setenv("board_rev", s);
-	setenv("board_name", model->name);
+	env_set("board_rev", s);
+	env_set("board_name", model->name);
 }
 #endif /* CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG */
 
@@ -330,7 +368,7 @@ static void set_serial_number(void)
 	int ret;
 	char serial_string[17] = { 0 };
 
-	if (getenv("serial#"))
+	if (env_get("serial#"))
 		return;
 
 	BCM2835_MBOX_INIT_HDR(msg);
@@ -343,9 +381,9 @@ static void set_serial_number(void)
 		return;
 	}
 
-	snprintf(serial_string, sizeof(serial_string), "%016" PRIx64,
+	snprintf(serial_string, sizeof(serial_string), "%016llx",
 		 msg->get_board_serial.body.resp.serial);
-	setenv("serial#", serial_string);
+	env_set("serial#", serial_string);
 }
 
 int misc_init_r(void)
@@ -414,53 +452,10 @@ static void get_board_rev(void)
 	printf("RPI %s (0x%x)\n", model->name, revision);
 }
 
-#ifndef CONFIG_PL01X_SERIAL
-static bool rpi_is_serial_active(void)
-{
-	int serial_gpio = 15;
-	struct udevice *dev;
-
-	/*
-	 * The RPi3 disables the mini uart by default. The easiest way to find
-	 * out whether it is available is to check if the RX pin is muxed.
-	 */
-
-	if (uclass_first_device(UCLASS_GPIO, &dev) || !dev)
-		return true;
-
-	if (bcm2835_gpio_get_func_id(dev, serial_gpio) != BCM2835_GPIO_ALT5)
-		return false;
-
-	return true;
-}
-
-/* Disable mini-UART I/O if it's not pinmuxed to our pins.
- * The firmware only enables it if explicitly done in config.txt: enable_uart=1
- */
-static void rpi_disable_inactive_uart(void)
-{
-	struct udevice *dev;
-	struct bcm283x_mu_serial_platdata *plat;
-
-	if (uclass_get_device_by_driver(UCLASS_SERIAL,
-					DM_GET_DRIVER(serial_bcm283x_mu),
-					&dev) || !dev)
-		return;
-
-	if (!rpi_is_serial_active()) {
-		plat = dev_get_platdata(dev);
-		plat->disabled = true;
-	}
-}
-#endif
-
 int board_init(void)
 {
 #ifdef CONFIG_HW_WATCHDOG
 	hw_watchdog_init();
-#endif
-#ifndef CONFIG_PL01X_SERIAL
-	rpi_disable_inactive_uart();
 #endif
 
 	get_board_rev();

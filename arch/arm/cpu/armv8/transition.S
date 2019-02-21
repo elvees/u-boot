@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2013
  * David Feng <fenghua@phytium.com.cn>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm-offsets.h>
@@ -10,6 +9,7 @@
 #include <linux/linkage.h>
 #include <asm/macro.h>
 
+.pushsection .text.armv8_switch_to_el2, "ax"
 ENTRY(armv8_switch_to_el2)
 	switch_el x6, 1f, 0f, 0f
 0:
@@ -30,7 +30,9 @@ ENTRY(armv8_switch_to_el2)
 	br x4
 1:	armv8_switch_to_el2_m x4, x5, x6
 ENDPROC(armv8_switch_to_el2)
+.popsection
 
+.pushsection .text.armv8_switch_to_el1, "ax"
 ENTRY(armv8_switch_to_el1)
 	switch_el x6, 0f, 1f, 0f
 0:
@@ -40,7 +42,10 @@ ENTRY(armv8_switch_to_el1)
 	br x4
 1:	armv8_switch_to_el1_m x4, x5, x6
 ENDPROC(armv8_switch_to_el1)
+.popsection
 
+.pushsection .text.armv8_el2_to_aarch32, "ax"
 WEAK(armv8_el2_to_aarch32)
 	ret
 ENDPROC(armv8_el2_to_aarch32)
+.popsection

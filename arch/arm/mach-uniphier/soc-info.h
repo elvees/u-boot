@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2017 Socionext Inc.
  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __UNIPHIER_SOC_INFO_H__
@@ -11,7 +10,6 @@
 #include <linux/kernel.h>
 #include <linux/stddef.h>
 
-#define UNIPHIER_SLD3_ID	0x25
 #define UNIPHIER_LD4_ID		0x26
 #define UNIPHIER_PRO4_ID	0x28
 #define UNIPHIER_SLD8_ID	0x29

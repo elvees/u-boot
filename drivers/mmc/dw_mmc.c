@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2012 SAMSUNG Electronics
  * Jaehoon Chung <jh80.chung@samsung.com>
  * Rajeshawari Shinde <rajeshwari.s@samsung.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <bouncebuf.h>
@@ -93,6 +92,24 @@ static void dwmci_prepare_data(struct dwmci_host *host,
 	dwmci_writel(host, DWMCI_BYTCNT, data->blocksize * data->blocks);
 }
 
+static int dwmci_fifo_ready(struct dwmci_host *host, u32 bit, u32 *len)
+{
+	u32 timeout = 20000;
+
+	*len = dwmci_readl(host, DWMCI_STATUS);
+	while (--timeout && (*len & bit)) {
+		udelay(200);
+		*len = dwmci_readl(host, DWMCI_STATUS);
+	}
+
+	if (!timeout) {
+		debug("%s: FIFO underflow timeout\n", __func__);
+		return -ETIMEDOUT;
+	}
+
+	return 0;
+}
+
 static int dwmci_data_transfer(struct dwmci_host *host, struct mmc_data *data)
 {
 	int ret = 0;
@@ -123,7 +140,12 @@ static int dwmci_data_transfer(struct dwmci_host *host, struct mmc_data *data)
 			if (data->flags == MMC_DATA_READ &&
 			    (mask & DWMCI_INTMSK_RXDR)) {
 				while (size) {
-					len = dwmci_readl(host, DWMCI_STATUS);
+					ret = dwmci_fifo_ready(host,
+							DWMCI_FIFO_EMPTY,
+							&len);
+					if (ret < 0)
+						break;
+
 					len = (len >> DWMCI_FIFO_SHIFT) &
 						    DWMCI_FIFO_MASK;
 					len = min(size, len);
@@ -137,7 +159,12 @@ static int dwmci_data_transfer(struct dwmci_host *host, struct mmc_data *data)
 			} else if (data->flags == MMC_DATA_WRITE &&
 				   (mask & DWMCI_INTMSK_TXDR)) {
 				while (size) {
-					len = dwmci_readl(host, DWMCI_STATUS);
+					ret = dwmci_fifo_ready(host,
+							DWMCI_FIFO_FULL,
+							&len);
+					if (ret < 0)
+						break;
+
 					len = fifo_depth - ((len >>
 						   DWMCI_FIFO_SHIFT) &
 						   DWMCI_FIFO_MASK);
@@ -184,7 +211,7 @@ static int dwmci_set_transfer_mode(struct dwmci_host *host,
 	return mode;
 }
 
-#ifdef CONFIG_DM_MMC_OPS
+#ifdef CONFIG_DM_MMC
 static int dwmci_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 		   struct mmc_data *data)
 {
@@ -290,6 +317,10 @@ static int dwmci_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 	} else if (mask & DWMCI_INTMSK_RE) {
 		debug("%s: Response Error.\n", __func__);
 		return -EIO;
+	} else if ((cmd->resp_type & MMC_RSP_CRC) &&
+		   (mask & DWMCI_INTMSK_RCRC)) {
+		debug("%s: Response CRC Error.\n", __func__);
+		return -EIO;
 	}
 
 
@@ -383,7 +414,7 @@ static int dwmci_setup_bus(struct dwmci_host *host, u32 freq)
 	return 0;
 }
 
-#ifdef CONFIG_DM_MMC_OPS
+#ifdef CONFIG_DM_MMC
 static int dwmci_set_ios(struct udevice *dev)
 {
 	struct mmc *mmc = mmc_get_mmc_dev(dev);
@@ -466,7 +497,7 @@ static int dwmci_init(struct mmc *mmc)
 	return 0;
 }
 
-#ifdef CONFIG_DM_MMC_OPS
+#ifdef CONFIG_DM_MMC
 int dwmci_probe(struct udevice *dev)
 {
 	struct mmc *mmc = mmc_get_mmc_dev(dev);
@@ -491,7 +522,7 @@ void dwmci_setup_cfg(struct mmc_config *cfg, struct dwmci_host *host,
 		u32 max_clk, u32 min_clk)
 {
 	cfg->name = host->name;
-#ifndef CONFIG_DM_MMC_OPS
+#ifndef CONFIG_DM_MMC
 	cfg->ops = &dwmci_ops;
 #endif
 	cfg->f_min = min_clk;

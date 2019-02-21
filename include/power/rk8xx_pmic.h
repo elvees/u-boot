@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2015 Google, Inc
  * Written by Simon Glass <sjg@chromium.org>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _PMIC_RK8XX_H_
@@ -189,5 +188,7 @@ struct rk8xx_priv {
 };
 
 int rk8xx_spl_configure_buck(struct udevice *pmic, int buck, int uvolt);
+int rk818_spl_configure_usb_input_current(struct udevice *pmic, int current_ma);
+int rk818_spl_configure_usb_chrg_shutdown(struct udevice *pmic, int uvolt);
 
 #endif

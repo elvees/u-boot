@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2013, Google Inc.
  *
@@ -5,21 +6,22 @@
  *
  * (C) Copyright 2000-2006
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <fdt_support.h>
 #include <errno.h>
 #include <image.h>
-#include <libfdt.h>
+#include <linux/libfdt.h>
 #include <mapmem.h>
 #include <asm/io.h>
 
 #ifndef CONFIG_SYS_FDT_PAD
 #define CONFIG_SYS_FDT_PAD 0x3000
 #endif
+
+/* adding a ramdisk needs 0x44 bytes in version 2008.10 */
+#define FDT_RAMDISK_OVERHEAD	0x80
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -132,7 +134,7 @@ int boot_relocate_fdt(struct lmb *lmb, char **of_flat_tree, ulong *of_size)
 	of_len = *of_size + CONFIG_SYS_FDT_PAD;
 
 	/* If fdt_high is set use it to select the relocation address */
-	fdt_high = getenv("fdt_high");
+	fdt_high = env_get("fdt_high");
 	if (fdt_high) {
 		void *desired_addr = (void *)simple_strtoul(fdt_high, NULL, 16);
 
@@ -156,8 +158,8 @@ int boot_relocate_fdt(struct lmb *lmb, char **of_flat_tree, ulong *of_size)
 	} else {
 		of_start =
 		    (void *)(ulong) lmb_alloc_base(lmb, of_len, 0x1000,
-						   getenv_bootm_mapsize()
-						   + getenv_bootm_low());
+						   env_get_bootm_mapsize()
+						   + env_get_bootm_low());
 	}
 
 	if (of_start == NULL) {
@@ -191,7 +193,7 @@ int boot_relocate_fdt(struct lmb *lmb, char **of_flat_tree, ulong *of_size)
 	*of_flat_tree = of_start;
 	*of_size = of_len;
 
-	set_working_fdt_addr((ulong)*of_flat_tree);
+	set_working_fdt_addr(map_to_sysmem(*of_flat_tree));
 	return 0;
 
 error:
@@ -294,9 +296,6 @@ int boot_get_fdt(int flag, int argc, char * const argv[], uint8_t arch,
 		debug("## Checking for 'FDT'/'FDT Image' at %08lx\n",
 		      fdt_addr);
 
-		/* copy from dataflash if needed */
-		fdt_addr = genimg_get_image(fdt_addr);
-
 		/*
 		 * Check if there is an FDT image at the
 		 * address provided in the second bootm argument
@@ -356,17 +355,16 @@ int boot_get_fdt(int flag, int argc, char * const argv[], uint8_t arch,
 			if (fit_check_format(buf)) {
 				ulong load, len;
 
-				fdt_noffset = fit_image_load(images,
+				fdt_noffset = boot_get_fdt_fit(images,
 					fdt_addr, &fit_uname_fdt,
 					&fit_uname_config,
-					arch, IH_TYPE_FLATDT,
-					BOOTSTAGE_ID_FIT_FDT_START,
-					FIT_LOAD_OPTIONAL, &load, &len);
+					arch, &load, &len);
 
 				images->fit_hdr_fdt = map_sysmem(fdt_addr, 0);
 				images->fit_uname_fdt = fit_uname_fdt;
 				images->fit_noffset_fdt = fdt_noffset;
 				fdt_addr = load;
+
 				break;
 			} else
 #endif
@@ -456,6 +454,11 @@ error:
 __weak int ft_verify_fdt(void *fdt)
 {
 	return 1;
+}
+
+__weak int arch_fixup_fdt(void *blob)
+{
+	return 0;
 }
 
 int image_setup_libfdt(bootm_headers_t *images, void *blob,

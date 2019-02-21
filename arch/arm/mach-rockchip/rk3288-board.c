@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2015 Google, Inc
- *
- * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <common.h>
@@ -11,6 +10,7 @@
 #include <syscon.h>
 #include <asm/io.h>
 #include <asm/arch/clock.h>
+#include <asm/arch/cru_rk3288.h>
 #include <asm/arch/periph.h>
 #include <asm/arch/pmu_rk3288.h>
 #include <asm/arch/qos_rk3288.h>
@@ -21,31 +21,6 @@
 #include <power/regulator.h>
 
 DECLARE_GLOBAL_DATA_PTR;
-
-#define PMU_BASE	0xff730000
-
-static void setup_boot_mode(void)
-{
-	struct rk3288_pmu *const pmu = (void *)PMU_BASE;
-	int boot_mode = readl(&pmu->sys_reg[0]);
-
-	debug("boot mode %x.\n", boot_mode);
-
-	/* Clear boot mode */
-	writel(BOOT_NORMAL, &pmu->sys_reg[0]);
-
-	switch (boot_mode) {
-	case BOOT_FASTBOOT:
-		printf("enter fastboot!\n");
-		setenv("preboot", "setenv preboot; fastboot usb0");
-		break;
-	case BOOT_UMS:
-		printf("enter UMS!\n");
-		setenv("preboot", "setenv preboot; if mmc dev 0;"
-		       "then ums mmc 0; else ums mmc 1;fi");
-		break;
-	}
-}
 
 __weak int rk_board_late_init(void)
 {
@@ -70,15 +45,53 @@ int rk3288_qos_init(void)
 	return 0;
 }
 
+static void rk3288_detect_reset_reason(void)
+{
+	struct rk3288_cru *cru = rockchip_get_cru();
+	const char *reason;
+
+	if (IS_ERR(cru))
+		return;
+
+	switch (cru->cru_glb_rst_st) {
+	case GLB_POR_RST:
+		reason = "POR";
+		break;
+	case FST_GLB_RST_ST:
+	case SND_GLB_RST_ST:
+		reason = "RST";
+		break;
+	case FST_GLB_TSADC_RST_ST:
+	case SND_GLB_TSADC_RST_ST:
+		reason = "THERMAL";
+		break;
+	case FST_GLB_WDT_RST_ST:
+	case SND_GLB_WDT_RST_ST:
+		reason = "WDOG";
+		break;
+	default:
+		reason = "unknown reset";
+	}
+
+	env_set("reset_reason", reason);
+
+	/*
+	 * Clear cru_glb_rst_st, so we can determine the last reset cause
+	 * for following resets.
+	 */
+	rk_clrreg(&cru->cru_glb_rst_st, GLB_RST_ST_MASK);
+}
+
 int board_late_init(void)
 {
 	setup_boot_mode();
 	rk3288_qos_init();
+	rk3288_detect_reset_reason();
 
 	return rk_board_late_init();
 }
 
-#ifndef CONFIG_ROCKCHIP_SPL_BACK_TO_BROM
+#if !CONFIG_IS_ENABLED(ROCKCHIP_BACK_TO_BROM)
 static int veyron_init(void)
 {
 	struct udevice *dev;
@@ -109,13 +122,29 @@ static int veyron_init(void)
 	if (IS_ERR_VALUE(ret))
 		return ret;
 
+	ret = regulator_get_by_platname("vcc33_sd", &dev);
+	if (ret) {
+		debug("Cannot get regulator name\n");
+		return ret;
+	}
+
+	ret = regulator_set_value(dev, 3300000);
+	if (ret)
+		return ret;
+
+	ret = regulators_enable_boot_on(false);
+	if (ret) {
+		debug("%s: Cannot enable boot on regulators\n", __func__);
+		return ret;
+	}
+
 	return 0;
 }
 #endif
 
 int board_init(void)
 {
-#ifdef CONFIG_ROCKCHIP_SPL_BACK_TO_BROM
+#if CONFIG_IS_ENABLED(ROCKCHIP_BACK_TO_BROM)
 	struct udevice *pinctrl;
 	int ret;
 
@@ -155,28 +184,6 @@ err:
 
 	return 0;
 #endif
-}
-
-int dram_init(void)
-{
-	struct ram_info ram;
-	struct udevice *dev;
-	int ret;
-
-	ret = uclass_get_device(UCLASS_RAM, 0, &dev);
-	if (ret) {
-		debug("DRAM init failed: %d\n", ret);
-		return ret;
-	}
-	ret = ram_get_info(dev, &ram);
-	if (ret) {
-		debug("Cannot get DRAM size: %d\n", ret);
-		return ret;
-	}
-	debug("SDRAM base=%lx, size=%x\n", ram.base, ram.size);
-	gd->ram_size = ram.size;
-
-	return 0;
 }
 
 #ifndef CONFIG_SYS_DCACHE_OFF
@@ -310,10 +317,10 @@ U_BOOT_CMD(
 	""
 );
 
-#define GRF_SOC_CON2 0xff77024c
-
 int board_early_init_f(void)
 {
+	const uintptr_t GRF_SOC_CON0 = 0xff770244;
+	const uintptr_t GRF_SOC_CON2 = 0xff77024c;
 	struct udevice *pinctrl;
 	struct udevice *dev;
 	int ret;
@@ -341,6 +348,12 @@ int board_early_init_f(void)
 		return ret;
 	}
 	rk_setreg(GRF_SOC_CON2, 1 << 0);
+
+	/*
+	 * Disable JTAG on sdmmc0 IO. The SDMMC won't work until this bit is
+	 * cleared
+	 */
+	rk_clrreg(GRF_SOC_CON0, 1 << 12);
 
 	return 0;
 }

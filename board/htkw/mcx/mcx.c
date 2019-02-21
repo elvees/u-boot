@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2011 Ilya Yanok, Emcraft Systems
  *
  * Based on ti/evm/evm.c
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -83,7 +82,7 @@ int board_late_init(void)
 	if (gpio_get_value(HOT_WATER_BUTTON))
 		return 0;
 
-	setenv("bootcmd", "run swupdate");
+	env_set("bootcmd", "run swupdate");
 
 	return 0;
 }

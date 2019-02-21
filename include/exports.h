@@ -3,8 +3,7 @@
 
 #ifndef __ASSEMBLY__
 #ifdef CONFIG_PHY_AQUANTIA
-#include <miiphy.h>
-#include <phy.h>
+#include <phy_interface.h>
 #endif
 
 struct spi_slave;
@@ -27,8 +26,8 @@ unsigned long get_timer(unsigned long);
 int vprintf(const char *, va_list);
 unsigned long simple_strtoul(const char *cp, char **endp, unsigned int base);
 int strict_strtoul(const char *cp, unsigned int base, unsigned long *res);
-char *getenv (const char *name);
-int setenv (const char *varname, const char *varvalue);
+char *env_get(const char *name);
+int env_set(const char *varname, const char *value);
 long simple_strtol(const char *cp, char **endp, unsigned int base);
 int strcmp(const char *cs, const char *ct);
 unsigned long ustrtoul(const char *cp, char **endp, unsigned int base);

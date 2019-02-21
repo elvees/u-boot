@@ -1,9 +1,7 @@
+# SPDX-License-Identifier: GPL-2.0+
 #
 # (C) Copyright 2000 - 2013
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
-#
-# SPDX-License-Identifier:	GPL-2.0+
-#
 
 Summary:
 ========
@@ -143,6 +141,7 @@ Directory Hierarchy:
   /nios2		Files generic to Altera NIOS2 architecture
   /openrisc		Files generic to OpenRISC architecture
   /powerpc		Files generic to PowerPC architecture
+  /riscv		Files generic to RISC-V architecture
   /sandbox		Files generic to HW-independent "sandbox"
   /sh			Files generic to SH architecture
   /x86			Files generic to x86 architecture
@@ -312,17 +311,25 @@ Many of the options are named exactly as the corresponding Linux
 kernel configuration options. The intention is to make it easier to
 build a config tool - later.
 
+- ARM Platform Bus Type(CCI):
+		CoreLink Cache Coherent Interconnect (CCI) is ARM BUS which
+		provides full cache coherency between two clusters of multi-core
+		CPUs and I/O coherency for devices and I/O masters
+
+		CONFIG_SYS_FSL_HAS_CCI400
+
+		Defined For SoC that has cache coherent interconnect
+		CCN-400
+
+		CONFIG_SYS_FSL_HAS_CCN504
+
+		Defined for SoC that has cache coherent interconnect CCN-504
 
 The following options need to be configured:
 
 - CPU Type:	Define exactly one, e.g. CONFIG_MPC85XX.
 
 - Board Type:	Define exactly one, e.g. CONFIG_MPC8540ADS.
-
-- Marvell Family Member
-		CONFIG_SYS_MVFS		- define it if you want to enable
-					  multiple fs option at one time
-					  for marvell soc family
 
 - 85xx CPU Options:
 		CONFIG_SYS_PPC64
@@ -404,12 +411,6 @@ The following options need to be configured:
 		supported, core will start to execute uboot when wakes up.
 
 - Generic CPU options:
-		CONFIG_SYS_GENERIC_GLOBAL_DATA
-		Defines global data is initialized in generic board board_init_f().
-		If this macro is defined, global data is created and cleared in
-		generic board board_init_f(). Without this macro, architecture/board
-		should initialize global data before calling board_init_f().
-
 		CONFIG_SYS_BIG_ENDIAN, CONFIG_SYS_LITTLE_ENDIAN
 
 		Defines the endianess of the CPU. Implementation of those
@@ -526,25 +527,6 @@ The following options need to be configured:
 		Offset relative to CONFIG_SYS_SDRAM_BASE for initial stack
 		pointer. This is needed for the temporary stack before
 		relocation.
-
-		CONFIG_SYS_MIPS_CACHE_MODE
-
-		Cache operation mode for the MIPS CPU.
-		See also arch/mips/include/asm/mipsregs.h.
-		Possible values are:
-			CONF_CM_CACHABLE_NO_WA
-			CONF_CM_CACHABLE_WA
-			CONF_CM_UNCACHED
-			CONF_CM_CACHABLE_NONCOHERENT
-			CONF_CM_CACHABLE_CE
-			CONF_CM_CACHABLE_COW
-			CONF_CM_CACHABLE_CUW
-			CONF_CM_CACHABLE_ACCELERATED
-
-		CONFIG_SYS_XWAY_EBU_BOOTCFG
-
-		Special option for Lantiq XWAY SoCs for booting from NOR flash.
-		See also arch/mips/cpu/mips32/start.S.
 
 		CONFIG_XWAY_SWAP_BYTES
 
@@ -699,32 +681,11 @@ The following options need to be configured:
 		when no character is read on the console interface
 		within "Boot Delay" after reset.
 
-		CONFIG_BOOTARGS
-		This can be used to pass arguments to the bootm
-		command. The value of CONFIG_BOOTARGS goes into the
-		environment value "bootargs".
-
 		CONFIG_RAMBOOT and CONFIG_NFSBOOT
 		The value of these goes into the environment as
 		"ramboot" and "nfsboot" respectively, and can be used
 		as a convenience, when switching between booting from
 		RAM and NFS.
-
-- Bootcount:
-		CONFIG_BOOTCOUNT_LIMIT
-		Implements a mechanism for detecting a repeating reboot
-		cycle, see:
-		http://www.denx.de/wiki/view/DULG/UBootBootCountLimit
-
-		CONFIG_BOOTCOUNT_ENV
-		If no softreset save registers are found on the hardware
-		"bootcount" is stored in the environment. To prevent a
-		saveenv on all reboots, the environment variable
-		"upgrade_available" is used. If "upgrade_available" is
-		0, "bootcount" is always 0, if "upgrade_available" is
-		1 "bootcount" is incremented in the environment.
-		So the Userspace Applikation must set the "upgrade_available"
-		and "bootcount" variable to 0, if a boot was successfully.
 
 - Pre-Boot Commands:
 		CONFIG_PREBOOT
@@ -755,114 +716,6 @@ The following options need to be configured:
 		CONFIG_KGDB_BAUDRATE
 		Select one of the baudrates listed in
 		CONFIG_SYS_BAUDRATE_TABLE, see below.
-
-- Monitor Functions:
-		Monitor commands can be included or excluded
-		from the build by using the #include files
-		<config_cmd_all.h> and #undef'ing unwanted
-		commands, or adding #define's for wanted commands.
-
-		The default command configuration includes all commands
-		except those marked below with a "*".
-
-		CONFIG_CMD_AES		  AES 128 CBC encrypt/decrypt
-		CONFIG_CMD_ASKENV	* ask for env variable
-		CONFIG_CMD_BDI		  bdinfo
-		CONFIG_CMD_BOOTD	  bootd
-		CONFIG_CMD_BOOTI	* ARM64 Linux kernel Image support
-		CONFIG_CMD_CACHE	* icache, dcache
-		CONFIG_CMD_CONSOLE	  coninfo
-		CONFIG_CMD_DHCP		* DHCP support
-		CONFIG_CMD_DIAG		* Diagnostics
-		CONFIG_CMD_ECHO		  echo arguments
-		CONFIG_CMD_EDITENV	  edit env variable
-		CONFIG_CMD_ELF		* bootelf, bootvx
-		CONFIG_CMD_ENV_EXISTS	* check existence of env variable
-		CONFIG_CMD_EXPORTENV	* export the environment
-		CONFIG_CMD_EXT2		* ext2 command support
-		CONFIG_CMD_EXT4		* ext4 command support
-		CONFIG_CMD_FS_GENERIC	* filesystem commands (e.g. load, ls)
-					  that work for multiple fs types
-		CONFIG_CMD_FS_UUID	* Look up a filesystem UUID
-		CONFIG_CMD_SAVEENV	  saveenv
-		CONFIG_CMD_FLASH	  flinfo, erase, protect
-		CONFIG_CMD_FPGA		  FPGA device initialization support
-		CONFIG_CMD_GO		* the 'go' command (exec code)
-		CONFIG_CMD_GREPENV	* search environment
-		CONFIG_CMD_I2C		* I2C serial bus support
-		CONFIG_CMD_IMI		  iminfo
-		CONFIG_CMD_IMLS		  List all images found in NOR flash
-		CONFIG_CMD_IMLS_NAND	* List all images found in NAND flash
-		CONFIG_CMD_IMPORTENV	* import an environment
-		CONFIG_CMD_INI		* import data from an ini file into the env
-		CONFIG_CMD_ITEST	  Integer/string test of 2 values
-		CONFIG_CMD_LDRINFO	* ldrinfo (display Blackfin loader)
-		CONFIG_CMD_LINK_LOCAL	* link-local IP address auto-configuration
-					  (169.254.*.*)
-		CONFIG_CMD_LOADB	  loadb
-		CONFIG_CMD_LOADS	  loads
-		CONFIG_CMD_MD5SUM	* print md5 message digest
-					  (requires CONFIG_CMD_MEMORY and CONFIG_MD5)
-		CONFIG_CMD_MEMINFO	* Display detailed memory information
-		CONFIG_CMD_MEMORY	  md, mm, nm, mw, cp, cmp, crc, base,
-					  loop, loopw
-		CONFIG_CMD_MEMTEST	* mtest
-		CONFIG_CMD_MISC		  Misc functions like sleep etc
-		CONFIG_CMD_MMC		* MMC memory mapped support
-		CONFIG_CMD_MII		* MII utility commands
-		CONFIG_CMD_MTDPARTS	* MTD partition support
-		CONFIG_CMD_NAND		* NAND support
-		CONFIG_CMD_NET		  bootp, tftpboot, rarpboot
-		CONFIG_CMD_NFS		  NFS support
-		CONFIG_CMD_PCA953X	* PCA953x I2C gpio commands
-		CONFIG_CMD_PCA953X_INFO * PCA953x I2C gpio info command
-		CONFIG_CMD_PCI		* pciinfo
-		CONFIG_CMD_PCMCIA		* PCMCIA support
-		CONFIG_CMD_PING		* send ICMP ECHO_REQUEST to network
-					  host
-		CONFIG_CMD_PORTIO	* Port I/O
-		CONFIG_CMD_READ		* Read raw data from partition
-		CONFIG_CMD_REGINFO	* Register dump
-		CONFIG_CMD_RUN		  run command in env variable
-		CONFIG_CMD_SANDBOX	* sb command to access sandbox features
-		CONFIG_CMD_SAVES	* save S record dump
-		CONFIG_SCSI		* SCSI Support
-		CONFIG_CMD_SDRAM	* print SDRAM configuration information
-					  (requires CONFIG_CMD_I2C)
-		CONFIG_CMD_SF		* Read/write/erase SPI NOR flash
-		CONFIG_CMD_SOFTSWITCH	* Soft switch setting command for BF60x
-		CONFIG_CMD_SOURCE	  "source" command Support
-		CONFIG_CMD_SPI		* SPI serial bus support
-		CONFIG_CMD_TFTPSRV	* TFTP transfer in server mode
-		CONFIG_CMD_TFTPPUT	* TFTP put command (upload)
-		CONFIG_CMD_TIME		* run command and report execution time (ARM specific)
-		CONFIG_CMD_TIMER	* access to the system tick timer
-		CONFIG_CMD_USB		* USB support
-		CONFIG_CMD_CDP		* Cisco Discover Protocol support
-		CONFIG_CMD_MFSL		* Microblaze FSL support
-		CONFIG_CMD_XIMG		  Load part of Multi Image
-		CONFIG_CMD_UUID		* Generate random UUID or GUID string
-
-		EXAMPLE: If you want all functions except of network
-		support you can write:
-
-		#include "config_cmd_all.h"
-		#undef CONFIG_CMD_NET
-
-	Other Commands:
-		fdt (flattened device tree) command: CONFIG_OF_LIBFDT
-
-	Note:	Don't enable the "icache" and "dcache" commands
-		(configuration option CONFIG_CMD_CACHE) unless you know
-		what you (and your U-Boot users) are doing. Data
-		cache cannot be enabled on systems like the
-		8xx (where accesses to the IMMR region must be
-		uncached), and it cannot be disabled on all other
-		systems where we (mis-) use the data cache to hold an
-		initial stack and some data.
-
-
-		XXX - this list needs to get updated!
 
 - Removal of commands
 		If no commands are needed to boot, you can disable
@@ -895,7 +748,7 @@ The following options need to be configured:
 		binary in its image. This device tree file should be in the
 		board directory and called <soc>-<board>.dts. The binary file
 		is then picked up in board_init_f() and made available through
-		the global data structure as gd->blob.
+		the global data structure as gd->fdt_blob.
 
 		CONFIG_OF_SEPARATE
 		If this variable is defined, U-Boot will build a device tree
@@ -932,14 +785,6 @@ The following options need to be configured:
 
 		CONFIG_AT91_HW_WDT_TIMEOUT
 		specify the timeout in seconds. default 2 seconds.
-
-- U-Boot Version:
-		CONFIG_VERSION_VARIABLE
-		If this variable is defined, an environment variable
-		named "ver" is created by U-Boot showing the U-Boot
-		version as printed by the "version" command.
-		Any change to this variable will be reverted at the
-		next reset.
 
 - Real-Time Clock:
 
@@ -1010,9 +855,6 @@ The following options need to be configured:
 		CONFIG_EFI_PARTITION   GPT partition table, common when EFI is the
 				       bootloader.  Note 2TB partition limit; see
 				       disk/part_efi.c
-		CONFIG_MTD_PARTITIONS  Memory Technology Device partition table.
-
-		If IDE or SCSI support is enabled (CONFIG_IDE or
 		CONFIG_SCSI) you must configure support for at
 		least one non-MTD partition type as well.
 
@@ -1043,16 +885,11 @@ The following options need to be configured:
 			Default is 32bit.
 
 - SCSI Support:
-		At the moment only there is only support for the
-		SYM53C8XX SCSI controller; define
-		CONFIG_SCSI_SYM53C8XX to enable it.
-
 		CONFIG_SYS_SCSI_MAX_LUN [8], CONFIG_SYS_SCSI_MAX_SCSI_ID [7] and
 		CONFIG_SYS_SCSI_MAX_DEVICE [CONFIG_SYS_SCSI_MAX_SCSI_ID *
 		CONFIG_SYS_SCSI_MAX_LUN] can be adjusted to define the
 		maximum numbers of LUNs, SCSI ID's and target
 		devices.
-		CONFIG_SYS_SCSI_SYM53C8XX_CCF to fix clock timing (80Mhz)
 
 		The environment variable 'scsidevs' is set to the number of
 		SCSI devices found during the last scan.
@@ -1069,10 +906,6 @@ The following options need to be configured:
 		CONFIG_E1000_SPI_GENERIC
 		Allow generic access to the SPI bus on the Intel 8257x, for
 		example with the "sspi" command.
-
-		CONFIG_CMD_E1000
-		Management command for E1000 devices.  When used on devices
-		with SPI support you can reprogram the EEPROM from U-Boot.
 
 		CONFIG_EEPRO100
 		Support for Intel 82557/82559/82559ER chips.
@@ -1125,9 +958,6 @@ The following options need to be configured:
 			Define this to use i/o functions instead of macros
 			(some hardware wont work with macros)
 
-		CONFIG_DRIVER_TI_EMAC
-		Support for davinci emac
-
 			CONFIG_SYS_DAVINCI_EMAC_PHY_COUNT
 			Define this if you have more then 3 PHYs.
 
@@ -1142,21 +972,6 @@ The following options need to be configured:
 			useless data when polling gigabit status and gigabit
 			control registers. This behavior won't affect the
 			correctnessof 10/100 link speed update.
-
-		CONFIG_SMC911X
-		Support for SMSC's LAN911x and LAN921x chips
-
-			CONFIG_SMC911X_BASE
-			Define this to hold the physical address
-			of the device (I/O space)
-
-			CONFIG_SMC911X_32_BIT
-			Define this if data bus is 32 bits
-
-			CONFIG_SMC911X_16_BIT
-			Define this if data bus is 16 bits. If your processor
-			automatically converts one 32 bit word to two 16 bit
-			words you may also try CONFIG_SMC911X_32_BIT.
 
 		CONFIG_SH_ETHER
 		Support for Renesas on-chip Ethernet controller
@@ -1207,11 +1022,6 @@ The following options need to be configured:
 			Base address where the generic TPM device is mapped
 			to. Contemporary x86 systems usually map it at
 			0xfed40000.
-
-		CONFIG_CMD_TPM
-		Add tpm monitor functions.
-		Requires CONFIG_TPM. If CONFIG_TPM_AUTH_SESSIONS is set, also
-		provides monitor access to authorized functions.
 
 		CONFIG_TPM
 		Define this to enable the TPM support library which provides
@@ -1332,19 +1142,9 @@ The following options need to be configured:
 		CONFIG_SUPPORT_EMMC_BOOT
 		Enable some additional features of the eMMC boot partitions.
 
-		CONFIG_SUPPORT_EMMC_RPMB
-		Enable the commands for reading, writing and programming the
-		key for the Replay Protection Memory Block partition in eMMC.
-
 - USB Device Firmware Update (DFU) class support:
-		CONFIG_USB_FUNCTION_DFU
+		CONFIG_DFU_OVER_USB
 		This enables the USB portion of the DFU USB class
-
-		CONFIG_CMD_DFU
-		This enables the command "dfu" which is used to have
-		U-Boot create a DFU class device via USB.  This command
-		requires that the "dfu_alt_info" environment variable be
-		set and define the alt settings to expose to the host.
 
 		CONFIG_DFU_MMC
 		This enables support for exposing (e)MMC devices via DFU.
@@ -1380,57 +1180,6 @@ The following options need to be configured:
 		Poll timeout [ms], which the device sends to the host when
 		entering dfuMANIFEST state. Host waits this timeout, before
 		sending again an USB request to the device.
-
-- USB Device Android Fastboot support:
-		CONFIG_USB_FUNCTION_FASTBOOT
-		This enables the USB part of the fastboot gadget
-
-		CONFIG_CMD_FASTBOOT
-		This enables the command "fastboot" which enables the Android
-		fastboot mode for the platform's USB device. Fastboot is a USB
-		protocol for downloading images, flashing and device control
-		used on Android devices.
-		See doc/README.android-fastboot for more information.
-
-		CONFIG_ANDROID_BOOT_IMAGE
-		This enables support for booting images which use the Android
-		image format header.
-
-		CONFIG_FASTBOOT_BUF_ADDR
-		The fastboot protocol requires a large memory buffer for
-		downloads. Define this to the starting RAM address to use for
-		downloaded images.
-
-		CONFIG_FASTBOOT_BUF_SIZE
-		The fastboot protocol requires a large memory buffer for
-		downloads. This buffer should be as large as possible for a
-		platform. Define this to the size available RAM for fastboot.
-
-		CONFIG_FASTBOOT_FLASH
-		The fastboot protocol includes a "flash" command for writing
-		the downloaded image to a non-volatile storage device. Define
-		this to enable the "fastboot flash" command.
-
-		CONFIG_FASTBOOT_FLASH_MMC_DEV
-		The fastboot "flash" command requires additional information
-		regarding the non-volatile storage device. Define this to
-		the eMMC device that fastboot should use to store the image.
-
-		CONFIG_FASTBOOT_GPT_NAME
-		The fastboot "flash" command supports writing the downloaded
-		image to the Protective MBR and the Primary GUID Partition
-		Table. (Additionally, this downloaded image is post-processed
-		to generate and write the Backup GUID Partition Table.)
-		This occurs when the specified "partition name" on the
-		"fastboot flash" command line matches this value.
-		The default is "gpt" if undefined.
-
-		CONFIG_FASTBOOT_MBR_NAME
-		The fastboot "flash" command supports writing the downloaded
-		image to DOS MBR.
-		This occurs when the "partition name" specified on the
-		"fastboot flash" command line matches this value.
-		If not defined the default value "mbr" is used.
 
 - Journaling Flash filesystem support:
 		CONFIG_JFFS2_NAND
@@ -1626,24 +1375,10 @@ The following options need to be configured:
 		the malloc area (as defined by CONFIG_SYS_MALLOC_LEN) should
 		be at least 4MB.
 
-		CONFIG_LZO
-
-		If this option is set, support for LZO compressed images
-		is included.
-
 - MII/PHY support:
-		CONFIG_PHY_ADDR
-
-		The address of PHY on MII bus.
-
 		CONFIG_PHY_CLOCK_FREQ (ppc4xx)
 
 		The clock frequency of the MII bus
-
-		CONFIG_PHY_GIGE
-
-		If this option is set, support for speed/duplex
-		detection of gigabit PHY is included.
 
 		CONFIG_PHY_RESET_DELAY
 
@@ -1744,14 +1479,8 @@ The following options need to be configured:
 		You can fine tune the DHCP functionality by defining
 		CONFIG_BOOTP_* symbols:
 
-		CONFIG_BOOTP_SUBNETMASK
-		CONFIG_BOOTP_GATEWAY
-		CONFIG_BOOTP_HOSTNAME
 		CONFIG_BOOTP_NISDOMAIN
-		CONFIG_BOOTP_BOOTPATH
 		CONFIG_BOOTP_BOOTFILESIZE
-		CONFIG_BOOTP_DNS
-		CONFIG_BOOTP_DNS2
 		CONFIG_BOOTP_SEND_HOSTNAME
 		CONFIG_BOOTP_NTPSERVER
 		CONFIG_BOOTP_TIMEOFFSET
@@ -1766,15 +1495,6 @@ The following options need to be configured:
 		instead of starting over.  This can be used to fail over
 		to Link-local IP address configuration if the DHCP server
 		is not available.
-
-		CONFIG_BOOTP_DNS2 - If a DHCP client requests the DNS
-		serverip from a DHCP server, it is possible that more
-		than one DNS serverip is offered to the client.
-		If CONFIG_BOOTP_DNS2 is enabled, the secondary DNS
-		serverip will be stored in the additional environment
-		variable "dnsip2". The first DNS serverip is always
-		stored in the variable "dnsip", when CONFIG_BOOTP_DNS
-		is defined.
 
 		CONFIG_BOOTP_SEND_HOSTNAME - Some DHCP servers are capable
 		to do a dynamic update of a DNS server. To do this, they
@@ -1804,6 +1524,15 @@ The following options need to be configured:
 		to exist in all environments that the device must operate.
 
 		See doc/README.link-local for more information.
+
+ - MAC address from environment variables
+
+		FDT_SEQ_MACADDR_FROM_ENV
+
+		Fix-up device tree with MAC addresses fetched sequentially from
+		environment variables. This config work on assumption that
+		non-usable ethernet node of device-tree are either not present
+		or their status has been marked as "disabled".
 
  - CDP Options:
 		CONFIG_CDP_DEVICE_ID
@@ -2193,11 +1922,6 @@ The following options need to be configured:
 		SPI EEPROM, also an instance works with Crystal A/D and
 		D/As on the SACSng board)
 
-		CONFIG_SH_SPI
-
-		Enables the driver for SPI controller on SuperH. Currently
-		only SH7757 is supported.
-
 		CONFIG_SOFT_SPI
 
 		Enables a software (bit-bang) SPI driver rather than
@@ -2207,19 +1931,6 @@ The following options need to be configured:
 		defined, the board configuration must define several
 		SPI configuration items (port pins to use, etc). For
 		an example, see include/configs/sacsng.h.
-
-		CONFIG_HARD_SPI
-
-		Enables a hardware SPI driver for general-purpose reads
-		and writes.  As with CONFIG_SOFT_SPI, the board configuration
-		must define a list of chip-select function pointers.
-		Currently supported on some MPC8xxx processors.	 For an
-		example, see include/configs/mpc8349emds.h.
-
-		CONFIG_MXC_SPI
-
-		Enables the driver for the SPI controllers on i.MX and MXC
-		SoCs. Currently i.MX31/35/51 are supported.
 
 		CONFIG_SYS_SPI_MXC_WAIT
 		Timeout for waiting until spi transfer completed.
@@ -2370,16 +2081,6 @@ The following options need to be configured:
 		currently only supports clearing the memory.
 
 - Error Recovery:
-		CONFIG_PANIC_HANG
-
-		Define this variable to stop the system in case of a
-		fatal error, so that you have to reset it manually.
-		This is probably NOT a good idea for an embedded
-		system where you want the system to reboot
-		automatically as fast as possible, but it may be
-		useful during development since you can try to debug
-		the conditions that lead to the situation.
-
 		CONFIG_NET_RETRY_COUNT
 
 		This variable defines the number of retries for
@@ -2399,10 +2100,6 @@ The following options need to be configured:
 		#define CONFIG_NFS_TIMEOUT 10000UL
 
 - Command Interpreter:
-		CONFIG_AUTO_COMPLETE
-
-		Enable auto completion of commands using TAB.
-
 		CONFIG_SYS_PROMPT_HUSH_PS2
 
 		This defines the secondary prompt string, which is
@@ -2431,12 +2128,6 @@ The following options need to be configured:
 		symbols.
 
 - Command Line Editing and History:
-		CONFIG_CMDLINE_EDITING
-
-		Enable editing and History functions for interactive
-		command line input operations
-
-- Command Line PS1/PS2 support:
 		CONFIG_CMDLINE_PS_SUPPORT
 
 		Enable support for changing the command prompt string
@@ -2470,26 +2161,6 @@ The following options need to be configured:
 		the environment like the "source" command or the
 		boot command first.
 
-		CONFIG_ENV_VARS_UBOOT_CONFIG
-
-		Define this in order to add variables describing the
-		U-Boot build configuration to the default environment.
-		These will be named arch, cpu, board, vendor, and soc.
-
-		Enabling this option will cause the following to be defined:
-
-		- CONFIG_SYS_ARCH
-		- CONFIG_SYS_CPU
-		- CONFIG_SYS_BOARD
-		- CONFIG_SYS_VENDOR
-		- CONFIG_SYS_SOC
-
-		CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
-
-		Define this in order to add variables describing certain
-		run-time determined information about the hardware to the
-		environment.  These will be named board_name, board_rev.
-
 		CONFIG_DELAY_ENVIRONMENT
 
 		Normally the environment is loaded when the board is
@@ -2499,20 +2170,8 @@ The following options need to be configured:
 		this is instead controlled by the value of
 		/config/load-environment.
 
-- DataFlash Support:
-		CONFIG_HAS_DATAFLASH
-
-		Defining this option enables DataFlash features and
-		allows to read/write in Dataflash via the standard
-		commands cp, md...
-
 - Serial Flash support
-		CONFIG_CMD_SF
-
-		Defining this option enables SPI flash commands
-		'sf probe/read/write/erase/update'.
-
-		Usage requires an initial 'probe' to define the serial
+		Usage requires an initial 'sf probe' to define the serial
 		flash parameters, followed by read/write/erase/update
 		commands.
 
@@ -2525,24 +2184,6 @@ The following options need to be configured:
 		CONFIG_SF_DEFAULT_MODE 		(see include/spi.h)
 		CONFIG_SF_DEFAULT_SPEED		in Hz
 
-		CONFIG_CMD_SF_TEST
-
-		Define this option to include a destructive SPI flash
-		test ('sf test').
-
-- SystemACE Support:
-		CONFIG_SYSTEMACE
-
-		Adding this option adds support for Xilinx SystemACE
-		chips attached via some sort of local bus. The address
-		of the chip must also be defined in the
-		CONFIG_SYS_SYSTEMACE_BASE macro. For example:
-
-		#define CONFIG_SYSTEMACE
-		#define CONFIG_SYS_SYSTEMACE_BASE 0xf0000000
-
-		When SystemACE support is added, the "ace" device type
-		becomes available to the fat commands, i.e. fatls.
 
 - TFTP Fixed UDP Port:
 		CONFIG_TFTP_PORT
@@ -2563,25 +2204,6 @@ The following options need to be configured:
 		the remainder of the TFTP transfer to proceed normally.
 		A better solution is to properly configure the firewall,
 		but sometimes that is not allowed.
-
-- bootcount support:
-		CONFIG_BOOTCOUNT_LIMIT
-
-		This enables the bootcounter support, see:
-		http://www.denx.de/wiki/DULG/UBootBootCountLimit
-
-		CONFIG_AT91SAM9XE
-		enable special bootcounter support on at91sam9xe based boards.
-		CONFIG_SOC_DA8XX
-		enable special bootcounter support on da850 based boards.
-		CONFIG_BOOTCOUNT_RAM
-		enable support for the bootcounter in RAM
-		CONFIG_BOOTCOUNT_I2C
-		enable support for the bootcounter on an i2c (like RTC) device.
-			CONFIG_SYS_I2C_RTC_ADDR = i2c chip address
-			CONFIG_SYS_BOOTCOUNT_ADDR = i2c addr which is used for
-						    the bootcounter.
-			CONFIG_BOOTCOUNT_ALEN = address len
 
 - Show boot progress:
 		CONFIG_SHOW_BOOT_PROGRESS
@@ -2747,19 +2369,6 @@ FIT uImage format:
  -150	common/cmd_nand.c	Incorrect FIT image format
   151	common/cmd_nand.c	FIT image format OK
 
-- legacy image format:
-		CONFIG_IMAGE_FORMAT_LEGACY
-		enables the legacy image format support in U-Boot.
-
-		Default:
-		enabled if CONFIG_FIT_SIGNATURE is not defined.
-
-		CONFIG_DISABLE_IMAGE_LEGACY
-		disable the legacy image format
-
-		This define is introduced, as the legacy image format is
-		enabled per default for backward compatibility.
-
 - Standalone program support:
 		CONFIG_STANDALONE_LOAD_ADDR
 
@@ -2791,30 +2400,6 @@ FIT uImage format:
 		for a more detailed description refer to doc/README.update.
 
 - MTD Support (mtdparts command, UBI support)
-		CONFIG_MTD_DEVICE
-
-		Adds the MTD device infrastructure from the Linux kernel.
-		Needed for mtdparts command support.
-
-		CONFIG_MTD_PARTITIONS
-
-		Adds the MTD partitioning infrastructure from the Linux
-		kernel. Needed for UBI support.
-
-- UBI support
-		CONFIG_CMD_UBI
-
-		Adds commands for interacting with MTD partitions formatted
-		with the UBI flash translation layer
-
-		Requires also defining CONFIG_RBTREE
-
-		CONFIG_UBI_SILENCE_MSG
-
-		Make the verbose messages from UBI stop printing.  This leaves
-		warnings and errors enabled.
-
-
 		CONFIG_MTD_UBI_WL_THRESHOLD
 		This parameter defines the maximum difference between the highest
 		erase counter value and the lowest erase counter value of eraseblocks
@@ -2875,19 +2460,6 @@ FIT uImage format:
 		CONFIG_MTD_UBI_FM_DEBUG
 		Enable UBI fastmap debug
 		default: 0
-
-- UBIFS support
-		CONFIG_CMD_UBIFS
-
-		Adds commands for interacting with UBI volumes formatted as
-		UBIFS.  UBIFS is read-only in u-boot.
-
-		Requires UBI support as well as CONFIG_LZO
-
-		CONFIG_UBIFS_SILENCE_MSG
-
-		Make the verbose messages from UBIFS stop printing.  This leaves
-		warnings and errors enabled.
 
 - SPL framework
 		CONFIG_SPL
@@ -2953,11 +2525,6 @@ FIT uImage format:
 		CONFIG_SYS_SPL_MALLOC_SIZE
 		The size of the malloc pool used in SPL.
 
-		CONFIG_SPL_FRAMEWORK
-		Enable the SPL framework under common/.  This framework
-		supports MMC, NAND and YMODEM loading of U-Boot and NAND
-		NAND loading of the Linux Kernel.
-
 		CONFIG_SPL_OS_BOOT
 		Enable booting directly to an OS from SPL.
 		See also: doc/README.falcon
@@ -3014,6 +2581,10 @@ FIT uImage format:
 		CONFIG_SPL_NAND_DRIVERS
 		SPL uses normal NAND drivers, not minimal drivers.
 
+		CONFIG_SPL_NAND_IDENT
+		SPL uses the chip ID list to identify the NAND flash.
+		Requires CONFIG_SPL_NAND_BASE.
+
 		CONFIG_SPL_NAND_ECC
 		Include standard software ECC in the SPL
 
@@ -3060,10 +2631,6 @@ FIT uImage format:
 		Define this if you need to first read the OOB and then the
 		data. This is used, for example, on davinci platforms.
 
-		CONFIG_SPL_OMAP3_ID_NAND
-		Support for an OMAP3-specific set of functions to return the
-		ID and MFR of the first attached NAND chip, if present.
-
 		CONFIG_SPL_RAM_DEVICE
 		Support for running image already present in ram, in SPL binary
 
@@ -3079,7 +2646,7 @@ FIT uImage format:
 		use an arch-specific makefile fragment instead, for
 		example if more than one image needs to be produced.
 
-		CONFIG_FIT_SPL_PRINT
+		CONFIG_SPL_FIT_PRINT
 		Printing information about a FIT image adds quite a bit of
 		code to SPL. So this is normally disabled in SPL. Use this
 		option to re-enable it. This will affect the output of the
@@ -3156,9 +2723,6 @@ Configuration Settings:
 - CONFIG_SYS_MEMTEST_START, CONFIG_SYS_MEMTEST_END:
 		Begin and End addresses of the area used by the
 		simple memory test.
-
-- CONFIG_SYS_ALT_MEMTEST:
-		Enable an alternate, more extensive memory test.
 
 - CONFIG_SYS_MEMTEST_SCRATCH:
 		Scratch address used by the alternate memory test
@@ -3424,11 +2988,6 @@ Configuration Settings:
 	If defined, don't allow the -f switch to env set override variable
 	access flags.
 
-- CONFIG_USE_STDINT
-	If stdint.h is available with your toolchain you can define this
-	option to enable it. You can provide option 'USE_STDINT=1' when
-	building U-Boot to enable this.
-
 The following definitions that deal with the placement and management
 of environment data (variable area); in general, we support the
 following configurations:
@@ -3437,90 +2996,6 @@ following configurations:
 
 	Builds up envcrc with the target environment so that external utils
 	may easily extract it and embed it in final U-Boot images.
-
-- CONFIG_ENV_IS_IN_FLASH:
-
-	Define this if the environment is in flash memory.
-
-	a) The environment occupies one whole flash sector, which is
-	   "embedded" in the text segment with the U-Boot code. This
-	   happens usually with "bottom boot sector" or "top boot
-	   sector" type flash chips, which have several smaller
-	   sectors at the start or the end. For instance, such a
-	   layout can have sector sizes of 8, 2x4, 16, Nx32 kB. In
-	   such a case you would place the environment in one of the
-	   4 kB sectors - with U-Boot code before and after it. With
-	   "top boot sector" type flash chips, you would put the
-	   environment in one of the last sectors, leaving a gap
-	   between U-Boot and the environment.
-
-	- CONFIG_ENV_OFFSET:
-
-	   Offset of environment data (variable area) to the
-	   beginning of flash memory; for instance, with bottom boot
-	   type flash chips the second sector can be used: the offset
-	   for this sector is given here.
-
-	   CONFIG_ENV_OFFSET is used relative to CONFIG_SYS_FLASH_BASE.
-
-	- CONFIG_ENV_ADDR:
-
-	   This is just another way to specify the start address of
-	   the flash sector containing the environment (instead of
-	   CONFIG_ENV_OFFSET).
-
-	- CONFIG_ENV_SECT_SIZE:
-
-	   Size of the sector containing the environment.
-
-
-	b) Sometimes flash chips have few, equal sized, BIG sectors.
-	   In such a case you don't want to spend a whole sector for
-	   the environment.
-
-	- CONFIG_ENV_SIZE:
-
-	   If you use this in combination with CONFIG_ENV_IS_IN_FLASH
-	   and CONFIG_ENV_SECT_SIZE, you can specify to use only a part
-	   of this flash sector for the environment. This saves
-	   memory for the RAM copy of the environment.
-
-	   It may also save flash memory if you decide to use this
-	   when your environment is "embedded" within U-Boot code,
-	   since then the remainder of the flash sector could be used
-	   for U-Boot code. It should be pointed out that this is
-	   STRONGLY DISCOURAGED from a robustness point of view:
-	   updating the environment in flash makes it always
-	   necessary to erase the WHOLE sector. If something goes
-	   wrong before the contents has been restored from a copy in
-	   RAM, your target system will be dead.
-
-	- CONFIG_ENV_ADDR_REDUND
-	  CONFIG_ENV_SIZE_REDUND
-
-	   These settings describe a second storage area used to hold
-	   a redundant copy of the environment data, so that there is
-	   a valid backup copy in case there is a power failure during
-	   a "saveenv" operation.
-
-BE CAREFUL! Any changes to the flash layout, and some changes to the
-source code will make it necessary to adapt <board>/u-boot.lds*
-accordingly!
-
-
-- CONFIG_ENV_IS_IN_NVRAM:
-
-	Define this if you have some non-volatile memory device
-	(NVRAM, battery buffered SRAM) which you want to use for the
-	environment.
-
-	- CONFIG_ENV_ADDR:
-	- CONFIG_ENV_SIZE:
-
-	  These two #defines are used to determine the memory area you
-	  want to use for environment. It is assumed that this memory
-	  can just be read and written to, without any special
-	  provision.
 
 BE CAREFUL! The first access to the environment happens quite early
 in U-Boot initialization (when we try to get the setting of for the
@@ -3532,169 +3007,10 @@ environment in RAM: we could work on NVRAM directly, but we want to
 keep settings there always unmodified except somebody uses "saveenv"
 to save the current settings.
 
-
-- CONFIG_ENV_IS_IN_EEPROM:
-
-	Use this if you have an EEPROM or similar serial access
-	device and a driver for it.
-
-	- CONFIG_ENV_OFFSET:
-	- CONFIG_ENV_SIZE:
-
-	  These two #defines specify the offset and size of the
-	  environment area within the total memory of your EEPROM.
-
-	- CONFIG_SYS_I2C_EEPROM_ADDR:
-	  If defined, specified the chip address of the EEPROM device.
-	  The default address is zero.
-
-	- CONFIG_SYS_I2C_EEPROM_BUS:
-	  If defined, specified the i2c bus of the EEPROM device.
-
-	- CONFIG_SYS_EEPROM_PAGE_WRITE_BITS:
-	  If defined, the number of bits used to address bytes in a
-	  single page in the EEPROM device.  A 64 byte page, for example
-	  would require six bits.
-
-	- CONFIG_SYS_EEPROM_PAGE_WRITE_DELAY_MS:
-	  If defined, the number of milliseconds to delay between
-	  page writes.	The default is zero milliseconds.
-
-	- CONFIG_SYS_I2C_EEPROM_ADDR_LEN:
-	  The length in bytes of the EEPROM memory array address.  Note
-	  that this is NOT the chip address length!
-
-	- CONFIG_SYS_I2C_EEPROM_ADDR_OVERFLOW:
-	  EEPROM chips that implement "address overflow" are ones
-	  like Catalyst 24WC04/08/16 which has 9/10/11 bits of
-	  address and the extra bits end up in the "chip address" bit
-	  slots. This makes a 24WC08 (1Kbyte) chip look like four 256
-	  byte chips.
-
-	  Note that we consider the length of the address field to
-	  still be one byte because the extra address bits are hidden
-	  in the chip address.
-
-	- CONFIG_SYS_EEPROM_SIZE:
-	  The size in bytes of the EEPROM device.
-
-	- CONFIG_ENV_EEPROM_IS_ON_I2C
-	  define this, if you have I2C and SPI activated, and your
-	  EEPROM, which holds the environment, is on the I2C bus.
-
-	- CONFIG_I2C_ENV_EEPROM_BUS
-	  if you have an Environment on an EEPROM reached over
-	  I2C muxes, you can define here, how to reach this
-	  EEPROM. For example:
-
-	  #define CONFIG_I2C_ENV_EEPROM_BUS	  1
-
-	  EEPROM which holds the environment, is reached over
-	  a pca9547 i2c mux with address 0x70, channel 3.
-
-- CONFIG_ENV_IS_IN_DATAFLASH:
-
-	Define this if you have a DataFlash memory device which you
-	want to use for the environment.
-
-	- CONFIG_ENV_OFFSET:
-	- CONFIG_ENV_ADDR:
-	- CONFIG_ENV_SIZE:
-
-	  These three #defines specify the offset and size of the
-	  environment area within the total memory of your DataFlash placed
-	  at the specified address.
-
-- CONFIG_ENV_IS_IN_SPI_FLASH:
-
-	Define this if you have a SPI Flash memory device which you
-	want to use for the environment.
-
-	- CONFIG_ENV_OFFSET:
-	- CONFIG_ENV_SIZE:
-
-	  These two #defines specify the offset and size of the
-	  environment area within the SPI Flash. CONFIG_ENV_OFFSET must be
-	  aligned to an erase sector boundary.
-
-	- CONFIG_ENV_SECT_SIZE:
-
-	  Define the SPI flash's sector size.
-
-	- CONFIG_ENV_OFFSET_REDUND (optional):
-
-	  This setting describes a second storage area of CONFIG_ENV_SIZE
-	  size used to hold a redundant copy of the environment data, so
-	  that there is a valid backup copy in case there is a power failure
-	  during a "saveenv" operation. CONFIG_ENV_OFFSET_REDUND must be
-	  aligned to an erase sector boundary.
-
-	- CONFIG_ENV_SPI_BUS (optional):
-	- CONFIG_ENV_SPI_CS (optional):
-
-	  Define the SPI bus and chip select. If not defined they will be 0.
-
-	- CONFIG_ENV_SPI_MAX_HZ (optional):
-
-	  Define the SPI max work clock. If not defined then use 1MHz.
-
-	- CONFIG_ENV_SPI_MODE (optional):
-
-	  Define the SPI work mode. If not defined then use SPI_MODE_3.
-
-- CONFIG_ENV_IS_IN_REMOTE:
-
-	Define this if you have a remote memory space which you
-	want to use for the local device's environment.
-
-	- CONFIG_ENV_ADDR:
-	- CONFIG_ENV_SIZE:
-
-	  These two #defines specify the address and size of the
-	  environment area within the remote memory space. The
-	  local device can get the environment from remote memory
-	  space by SRIO or PCIE links.
-
 BE CAREFUL! For some special cases, the local device can not use
 "saveenv" command. For example, the local device will get the
 environment stored in a remote NOR flash by SRIO or PCIE link,
 but it can not erase, write this NOR flash by SRIO or PCIE interface.
-
-- CONFIG_ENV_IS_IN_NAND:
-
-	Define this if you have a NAND device which you want to use
-	for the environment.
-
-	- CONFIG_ENV_OFFSET:
-	- CONFIG_ENV_SIZE:
-
-	  These two #defines specify the offset and size of the environment
-	  area within the first NAND device.  CONFIG_ENV_OFFSET must be
-	  aligned to an erase block boundary.
-
-	- CONFIG_ENV_OFFSET_REDUND (optional):
-
-	  This setting describes a second storage area of CONFIG_ENV_SIZE
-	  size used to hold a redundant copy of the environment data, so
-	  that there is a valid backup copy in case there is a power failure
-	  during a "saveenv" operation.	 CONFIG_ENV_OFFSET_REDUND must be
-	  aligned to an erase block boundary.
-
-	- CONFIG_ENV_RANGE (optional):
-
-	  Specifies the length of the region in which the environment
-	  can be written.  This should be a multiple of the NAND device's
-	  block size.  Specifying a range with more erase blocks than
-	  are needed to hold CONFIG_ENV_SIZE allows bad blocks within
-	  the range to be avoided.
-
-	- CONFIG_ENV_OFFSET_OOB (optional):
-
-	  Enables support for dynamically retrieving the offset of the
-	  environment from block zero's out-of-band data.  The
-	  "nand env.oob" command can be used to record this offset.
-	  Currently, CONFIG_ENV_OFFSET_REDUND is not supported when
-	  using CONFIG_ENV_OFFSET_OOB.
 
 - CONFIG_NAND_ENV_DST
 
@@ -3702,118 +3018,9 @@ but it can not erase, write this NOR flash by SRIO or PCIE interface.
 	environment. If redundant environment is used, it will be copied to
 	CONFIG_NAND_ENV_DST + CONFIG_ENV_SIZE.
 
-- CONFIG_ENV_IS_IN_UBI:
-
-	Define this if you have an UBI volume that you want to use for the
-	environment.  This has the benefit of wear-leveling the environment
-	accesses, which is important on NAND.
-
-	- CONFIG_ENV_UBI_PART:
-
-	  Define this to a string that is the mtd partition containing the UBI.
-
-	- CONFIG_ENV_UBI_VOLUME:
-
-	  Define this to the name of the volume that you want to store the
-	  environment in.
-
-	- CONFIG_ENV_UBI_VOLUME_REDUND:
-
-	  Define this to the name of another volume to store a second copy of
-	  the environment in.  This will enable redundant environments in UBI.
-	  It is assumed that both volumes are in the same MTD partition.
-
-	- CONFIG_UBI_SILENCE_MSG
-	- CONFIG_UBIFS_SILENCE_MSG
-
-	  You will probably want to define these to avoid a really noisy system
-	  when storing the env in UBI.
-
-- CONFIG_ENV_IS_IN_FAT:
-       Define this if you want to use the FAT file system for the environment.
-
-       - FAT_ENV_INTERFACE:
-
-         Define this to a string that is the name of the block device.
-
-       - FAT_ENV_DEVICE_AND_PART:
-
-         Define this to a string to specify the partition of the device. It can
-         be as following:
-
-           "D:P", "D:0", "D", "D:" or "D:auto" (D, P are integers. And P >= 1)
-               - "D:P": device D partition P. Error occurs if device D has no
-                        partition table.
-               - "D:0": device D.
-               - "D" or "D:": device D partition 1 if device D has partition
-                              table, or the whole device D if has no partition
-                              table.
-               - "D:auto": first partition in device D with bootable flag set.
-                           If none, first valid partition in device D. If no
-                           partition table then means device D.
-
-       - FAT_ENV_FILE:
-
-         It's a string of the FAT file name. This file use to store the
-         environment.
-
-       - CONFIG_FAT_WRITE:
-         This must be enabled. Otherwise it cannot save the environment file.
-
-- CONFIG_ENV_IS_IN_MMC:
-
-	Define this if you have an MMC device which you want to use for the
-	environment.
-
-	- CONFIG_SYS_MMC_ENV_DEV:
-
-	  Specifies which MMC device the environment is stored in.
-
-	- CONFIG_SYS_MMC_ENV_PART (optional):
-
-	  Specifies which MMC partition the environment is stored in. If not
-	  set, defaults to partition 0, the user area. Common values might be
-	  1 (first MMC boot partition), 2 (second MMC boot partition).
-
-	- CONFIG_ENV_OFFSET:
-	- CONFIG_ENV_SIZE:
-
-	  These two #defines specify the offset and size of the environment
-	  area within the specified MMC device.
-
-	  If offset is positive (the usual case), it is treated as relative to
-	  the start of the MMC partition. If offset is negative, it is treated
-	  as relative to the end of the MMC partition. This can be useful if
-	  your board may be fitted with different MMC devices, which have
-	  different sizes for the MMC partitions, and you always want the
-	  environment placed at the very end of the partition, to leave the
-	  maximum possible space before it, to store other data.
-
-	  These two values are in units of bytes, but must be aligned to an
-	  MMC sector boundary.
-
-	- CONFIG_ENV_OFFSET_REDUND (optional):
-
-	  Specifies a second storage area, of CONFIG_ENV_SIZE size, used to
-	  hold a redundant copy of the environment data. This provides a
-	  valid backup copy in case the other copy is corrupted, e.g. due
-	  to a power failure during a "saveenv" operation.
-
-	  This value may also be positive or negative; this is handled in the
-	  same way as CONFIG_ENV_OFFSET.
-
-	  This value is also in units of bytes, but must also be aligned to
-	  an MMC sector boundary.
-
-	- CONFIG_ENV_SIZE_REDUND (optional):
-
-	  This value need not be set, even when CONFIG_ENV_OFFSET_REDUND is
-	  set. If this value is set, it must be set to the same value as
-	  CONFIG_ENV_SIZE.
-
 Please note that the environment is read-only until the monitor
 has been relocated to RAM and a RAM copy of the environment has been
-created; also, when using EEPROM you will have to use getenv_f()
+created; also, when using EEPROM you will have to use env_get_f()
 until then to read environment variables.
 
 The environment is protected by a CRC32 checksum. Before the monitor
@@ -4022,8 +3229,8 @@ Low Level (hardware related) configuration options:
 		a 16 bit bus.
 		Not all NAND drivers use this symbol.
 		Example of drivers that use it:
-		- drivers/mtd/nand/ndfc.c
-		- drivers/mtd/nand/mxc_nand.c
+		- drivers/mtd/nand/raw/ndfc.c
+		- drivers/mtd/nand/raw/mxc_nand.c
 
 - CONFIG_SYS_NDFC_EBC0_CFG
 		Sets the EBC0_CFG register for the NDFC. If not defined
@@ -4077,7 +3284,7 @@ Low Level (hardware related) configuration options:
 
 - CONFIG_LOOPW
 		Add the "loopw" memory command. This only takes effect if
-		the memory commands are activated globally (CONFIG_CMD_MEM).
+		the memory commands are activated globally (CONFIG_CMD_MEMORY).
 
 - CONFIG_MX_CYCLIC
 		Add the "mdc" and "mwc" memory commands. These are cyclic
@@ -4091,10 +3298,10 @@ Low Level (hardware related) configuration options:
 		This command will write 12345678 to address 100 all 10 ms.
 
 		This only takes effect if the memory commands are activated
-		globally (CONFIG_CMD_MEM).
+		globally (CONFIG_CMD_MEMORY).
 
 - CONFIG_SKIP_LOWLEVEL_INIT
-		[ARM, NDS32, MIPS only] If this variable is defined, then certain
+		[ARM, NDS32, MIPS, RISC-V only] If this variable is defined, then certain
 		low level initializations (like setting up the memory
 		controller) are omitted and/or U-Boot does not
 		relocate itself into RAM.
@@ -4137,13 +3344,10 @@ Low Level (hardware related) configuration options:
 		If defined, the x86 reset vector code is included. This is not
 		needed when U-Boot is running from Coreboot.
 
-- CONFIG_SPL_AM33XX_ENABLE_RTC32K_OSC:
-		Enables the RTC32K OSC on AM33xx based plattforms
-
 - CONFIG_SYS_NAND_NO_SUBPAGE_WRITE
 		Option to disable subpage write in NAND driver
 		driver that uses this:
-		drivers/mtd/nand/davinci_nand.c
+		drivers/mtd/nand/raw/davinci_nand.c
 
 Freescale QE/FMAN Firmware Support:
 -----------------------------------
@@ -4302,6 +3506,11 @@ this behavior and build U-Boot to some external directory:
 Note that the command line "O=" setting overrides the KBUILD_OUTPUT environment
 variable.
 
+User specific CPPFLAGS, AFLAGS and CFLAGS can be passed to the compiler by
+setting the according environment variables KCPPFLAGS, KAFLAGS and KCFLAGS.
+For example to treat all compiler warnings as errors:
+
+	make KCFLAGS=-Werror
 
 Please be aware that the Makefiles assume you are using GNU make, so
 for instance on NetBSD you might need to use "gmake" instead of
@@ -4699,6 +3908,17 @@ If CONFIG_REGEX is defined, the variable_name above is evaluated as a
 regular expression. This allows multiple variables to be connected to
 the same callback without explicitly listing them all out.
 
+The signature of the callback functions is:
+
+    int callback(const char *name, const char *value, enum env_op op, int flags)
+
+* name - changed environment variable
+* value - new value of the environment variable
+* op - operation (create, overwrite, or delete)
+* flags - attributes of the environment variable change, see flags H_* in
+  include/search.h
+
+The return value is 0 if the variable change is accepted and 1 otherwise.
 
 Command Line Parsing:
 =====================
@@ -5548,6 +4768,22 @@ On NDS32, the following registers are used:
 NOTE: DECLARE_GLOBAL_DATA_PTR must be used with file-global scope,
 or current versions of GCC may "optimize" the code too much.
 
+On RISC-V, the following registers are used:
+
+	x0: hard-wired zero (zero)
+	x1: return address (ra)
+	x2:	stack pointer (sp)
+	x3:	global pointer (gp)
+	x4:	thread pointer (tp)
+	x5:	link register (t0)
+	x8:	frame pointer (fp)
+	x10-x11:	arguments/return values (a0-1)
+	x12-x17:	arguments (a2-7)
+	x28-31:	 temporaries (t3-6)
+	pc:	program counter (pc)
+
+    ==> U-Boot will use gp to hold a pointer to the global data
+
 Memory Management:
 ------------------
 
@@ -5709,8 +4945,9 @@ Coding Standards:
 -----------------
 
 All contributions to U-Boot should conform to the Linux kernel
-coding style; see the file "Documentation/CodingStyle" and the script
-"scripts/Lindent" in your Linux kernel source directory.
+coding style; see the kernel coding style guide at
+https://www.kernel.org/doc/html/latest/process/coding-style.html, and the
+script "scripts/Lindent" in your Linux kernel source directory.
 
 Source files originating from a different project (for example the
 MTD subsystem) are generally exempt from these guidelines and are not
@@ -5742,7 +4979,7 @@ may be rejected, even when they contain important and valuable stuff.
 Please see http://www.denx.de/wiki/U-Boot/Patches for details.
 
 Patches shall be sent to the u-boot mailing list <u-boot@lists.denx.de>;
-see http://lists.denx.de/mailman/listinfo/u-boot
+see https://lists.denx.de/listinfo/u-boot
 
 When you send a patch, please include the following information with
 it:

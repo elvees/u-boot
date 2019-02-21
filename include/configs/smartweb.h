@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2007-2008
  * Stelian Pop <stelian@popies.net>
@@ -16,8 +17,6 @@
  * DENX Software Engineering GmbH
  *
  * Configuation settings for the smartweb.
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -35,7 +34,6 @@
  * program. Since the linker has to swallow that define, we must use a pure
  * hex number here!
  */
-#define CONFIG_SYS_TEXT_BASE		0x23000000
 
 /* ARM asynchronous clock */
 #define CONFIG_SYS_AT91_SLOW_CLOCK	32768		/* slow clock xtal */
@@ -52,9 +50,7 @@
 
 /* setting board specific options */
 #define CONFIG_MACH_TYPE		MACH_TYPE_SMARTWEB
-#define CONFIG_AUTO_COMPLETE
 #define CONFIG_ENV_OVERWRITE    1 /* Overwrite ethaddr / serial# */
-#define CONFIG_AUTO_COMPLETE
 #define CONFIG_SYS_AUTOLOAD "yes"
 #define CONFIG_RESET_TO_RETRY
 
@@ -66,7 +62,6 @@
  * SDRAM: 1 bank, 64 MB, base address 0x20000000
  * Already initialized before u-boot gets started.
  */
-#define CONFIG_NR_DRAM_BANKS		1
 #define CONFIG_SYS_SDRAM_BASE		ATMEL_BASE_CS1
 #define CONFIG_SYS_SDRAM_SIZE		(64 * SZ_1M)
 
@@ -82,7 +77,6 @@
 	ROUND(3 * CONFIG_ENV_SIZE + (4 * SZ_1M), 0x1000)
 
 /* NAND flash settings */
-#define CONFIG_NAND_ATMEL
 #define CONFIG_SYS_MAX_NAND_DEVICE	1
 #define CONFIG_SYS_NAND_BASE		ATMEL_BASE_CS3
 #define CONFIG_SYS_NAND_DBW_8
@@ -90,18 +84,6 @@
 #define CONFIG_SYS_NAND_MASK_CLE	(1 << 22)
 #define CONFIG_SYS_NAND_ENABLE_PIN	AT91_PIN_PC14
 #define CONFIG_SYS_NAND_READY_PIN	AT91_PIN_PC13
-
-#define CONFIG_CMD_MTDPARTS
-#define CONFIG_MTD_DEVICE
-#define MTDIDS_NAME_STR		"atmel_nand"
-#define MTDIDS_DEFAULT		"nand0=" MTDIDS_NAME_STR
-#define MTDPARTS_DEFAULT	"mtdparts=" MTDIDS_NAME_STR ":" \
-					"128k(Bootstrap),"		\
-					"896k(U-Boot),"	\
-					"512k(ENV0),"	\
-					"512k(ENV1),"	\
-					"4M(Linux),"	\
-					"-(Root-FS)"
 
 /* general purpose I/O */
 #define CONFIG_ATMEL_LEGACY		/* required until (g)pio is fixed */
@@ -118,31 +100,17 @@
  *
  */
 #define CONFIG_MACB
-#define CONFIG_PHYLIB
-#define CONFIG_USB_HOST_ETHER
-#define CONFIG_USB_ETHER_ASIX
-#define CONFIG_USB_ETHER_MCS7830
 #define CONFIG_RMII			/* use reduced MII inteface */
 #define CONFIG_NET_RETRY_COUNT	20      /* # of DHCP/BOOTP retries */
 #define CONFIG_AT91_WANTS_COMMON_PHY
 
 /* BOOTP and DHCP options */
 #define CONFIG_BOOTP_BOOTFILESIZE
-#define CONFIG_BOOTP_BOOTPATH
-#define CONFIG_BOOTP_GATEWAY
-#define CONFIG_BOOTP_HOSTNAME
 #define CONFIG_NFSBOOTCOMMAND						\
 	"setenv autoload yes; setenv autoboot yes; "			\
 	"setenv bootargs ${basicargs} ${mtdparts} "			\
 	"root=/dev/nfs ip=dhcp nfsroot=${serverip}:/srv/nfs/rootfs; "	\
 	"dhcp"
-
-/* Enable the watchdog */
-#define CONFIG_AT91SAM9_WATCHDOG
-#if !defined(CONFIG_SPL_BUILD)
-#define CONFIG_HW_WATCHDOG
-#endif
-#define CONFIG_AT91_HW_WDT_TIMEOUT	15
 
 #if !defined(CONFIG_SPL_BUILD)
 /* USB configuration */
@@ -155,9 +123,6 @@
 #define CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS	2
 
 /* USB DFU support */
-#define CONFIG_CMD_MTDPARTS
-#define CONFIG_MTD_DEVICE
-#define CONFIG_MTD_PARTITIONS
 
 #define CONFIG_USB_GADGET_AT91
 
@@ -169,10 +134,6 @@
 /* General Boot Parameter */
 #define CONFIG_BOOTCOMMAND		"run flashboot"
 #define CONFIG_SYS_CBSIZE		512
-#define CONFIG_SYS_PBSIZE \
-	(CONFIG_SYS_CBSIZE + sizeof(CONFIG_SYS_PROMPT) + 16)
-#define CONFIG_SYS_LONGHELP
-#define CONFIG_CMDLINE_EDITING
 
 /*
  * RAM Memory address where to put the
@@ -183,7 +144,6 @@
 /*
  * The NAND Flash partitions:
  */
-#define CONFIG_ENV_IS_IN_NAND
 #define CONFIG_ENV_OFFSET		(0x100000)
 #define CONFIG_ENV_OFFSET_REDUND	(0x180000)
 #define CONFIG_ENV_RANGE		(SZ_512K)
@@ -197,23 +157,12 @@
 									\
 	"basicargs=console=ttyS0,115200\0"				\
 									\
-	"mtdparts="MTDPARTS_DEFAULT"\0"
-
-/* Command line & features configuration */
-
-#define CONFIG_CMD_NAND
-
-#ifdef CONFIG_MACB
-#else
-#endif /* CONFIG_MACB */
+	"mtdparts="CONFIG_MTDPARTS_DEFAULT"\0"
 
 #ifdef CONFIG_SPL_BUILD
 #define CONFIG_SYS_INIT_SP_ADDR		0x301000
 #define CONFIG_SPL_STACK_R
 #define CONFIG_SPL_STACK_R_ADDR		CONFIG_SYS_TEXT_BASE
-/* we have only 4k sram in SPL, so cut SYS_MALLOC_F_LEN */
-#undef CONFIG_SYS_MALLOC_F_LEN
-#define CONFIG_SYS_MALLOC_F_LEN 0x400
 #else
 /*
  * Initial stack pointer: 4k - GENERATED_GBL_DATA_SIZE in internal SRAM,
@@ -225,7 +174,6 @@
 #endif
 
 /* Defines for SPL */
-#define CONFIG_SPL_FRAMEWORK
 #define CONFIG_SPL_TEXT_BASE		0x0
 #define CONFIG_SPL_MAX_SIZE		(SZ_4K)
 
@@ -234,7 +182,6 @@
 #define CONFIG_SYS_SPL_MALLOC_START     (CONFIG_SPL_BSS_START_ADDR + \
 					CONFIG_SPL_BSS_MAX_SIZE)
 #define CONFIG_SYS_SPL_MALLOC_SIZE      CONFIG_SYS_MALLOC_LEN
-#define CONFIG_SPL_LDSCRIPT	arch/arm/mach-at91/arm926ejs/u-boot-spl.lds
 
 #define CONFIG_SYS_NAND_ENABLE_PIN_SPL	(2*32 + 14)
 #define CONFIG_SYS_USE_NANDFLASH	1

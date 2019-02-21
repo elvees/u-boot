@@ -1,14 +1,12 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2016-2017
  * Lukasz Majewski, DENX Software Engineering, lukma@denx.de
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
 #define __CONFIG_H
 
-#include <config_distro_defaults.h>
 #include "mx6_common.h"
 
 #define CONFIG_SPL_LIBCOMMON_SUPPORT
@@ -45,7 +43,6 @@
 #define CONFIG_SYS_MEMTEST_START	0x10000000
 #define CONFIG_SYS_MEMTEST_END		(CONFIG_SYS_MEMTEST_START + 500 * SZ_1M)
 
-#define CONFIG_MXC_SPI
 #define CONFIG_SF_DEFAULT_BUS  2
 #define CONFIG_SF_DEFAULT_CS   0
 #define CONFIG_SF_DEFAULT_SPEED 25000000
@@ -64,56 +61,29 @@
 
 /* NOR 16-bit mode */
 #define CONFIG_SYS_FLASH_BASE           WEIM_ARB_BASE_ADDR
-#define CONFIG_SYS_FLASH_PROTECTION
 #define CONFIG_SYS_FLASH_CFI_WIDTH FLASH_CFI_16BIT
-#define CONFIG_SYS_FLASH_CFI            /* Flash memory is CFI compliant */
-#define CONFIG_SYS_FLASH_USE_BUFFER_WRITE /* Use buffered writes*/
 #define CONFIG_SYS_FLASH_EMPTY_INFO
-#define CONFIG_FLASH_CFI_DRIVER         /* Use drivers/cfi_flash.c */
 #define CONFIG_FLASH_VERIFY
 
 /* NOR Flash MTD */
-#define CONFIG_FLASH_CFI_DRIVER
-#define CONFIG_FLASH_CFI_MTD
 #define CONFIG_SYS_MAX_FLASH_BANKS_DETECT 1
 #define CONFIG_SYS_FLASH_BANKS_LIST	{ (CONFIG_SYS_FLASH_BASE) }
 #define CONFIG_SYS_FLASH_BANKS_SIZES	{ (32 * SZ_1M) }
 
 /* MTD support */
-#define CONFIG_CMD_MTDPARTS
-#define CONFIG_MTD_DEVICE
-#define CONFIG_MTD_PARTITIONS
-
-#define MTDIDS_DEFAULT                  "nor0=8000000.nor"
-#define MTDPARTS_DEFAULT  \
-	"mtdparts=8000000.nor:" \
-	"32m@0x0(mccmon6-image.nor)," \
-	"256k@0x40000(u-boot-env.nor)," \
-	"1m@0x80000(u-boot.nor)," \
-	"8m@0x180000(kernel.nor)," \
-	"8m@0x980000(swupdate-kernel.nor)," \
-	"8m@0x1180000(swupdate-rootfs.nor)," \
-	"128k@0x1980000(kernel-dtb.nor)," \
-	"128k@0x19C0000(swupdate-kernel-dtb.nor)"
 
 /* USB Configs */
-#define CONFIG_USB_STORAGE
 #define CONFIG_USB_MAX_CONTROLLER_COUNT	2
 #define CONFIG_MXC_USB_PORTSC		(PORT_PTS_UTMI | PORT_PTS_PTW)
 #define CONFIG_MXC_USB_FLAGS		0
 
 /* Ethernet Configuration */
 #define CONFIG_FEC_MXC
-#define CONFIG_MII
 #define IMX_FEC_BASE			ENET_BASE_ADDR
 #define CONFIG_FEC_XCV_TYPE		RGMII
 #define CONFIG_ETHPRIME			"FEC"
 #define CONFIG_FEC_MXC_PHYADDR		1
-#define CONFIG_PHYLIB
-#define CONFIG_PHY_MICREL
-#define CONFIG_PHY_MICREL_KSZ9031
 
-#define CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"console=ttymxc0,115200 quiet\0" \
 	"fdtfile=imx6q-mccmon6.dtb\0" \
@@ -146,7 +116,7 @@
 		"setenv kernelnor 0x08180000;" \
 		"setenv dtbnor 0x09980000;" \
 		"setenv bootargs console=${console} " \
-		""MTDPARTS_DEFAULT" " \
+		CONFIG_MTDPARTS_DEFAULT " " \
 		"root=/dev/mmcblk1 rootfstype=ext4 rw rootwait noinitrd;" \
 		"cp.l ${dtbnor} ${dtbloadaddr} 0x8000;" \
 		"bootm ${kernelnor} - ${dtbloadaddr};\0" \
@@ -159,7 +129,7 @@
 		"setenv swurootfsnor 0x09180000;" \
 		"setenv swudtbnor 0x099A0000;" \
 		"setenv bootargs console=${console} " \
-		""MTDPARTS_DEFAULT" " \
+		CONFIG_MTDPARTS_DEFAULT " " \
 		"ip=${ipaddr}:${serverip}:${gatewayip}:${netmask}" \
 		    ":${hostname}::off root=/dev/ram rw;" \
 		"cp.l ${swurootfsnor} ${rootfsloadaddr} 0x200000;" \
@@ -191,7 +161,7 @@
 			  "fi;" \
 		     "fi;" \
 		"fi\0" \
-	"mtdparts=" MTDPARTS_DEFAULT "\0" \
+	"mtdparts=" CONFIG_MTDPARTS_DEFAULT "\0" \
 	"fdt_addr=0x18000000\0" \
 	"bootdev=1\0" \
 	"bootpart=1\0" \
@@ -298,7 +268,6 @@
 	    "fi;\0"
 
 /* Physical Memory Map */
-#define CONFIG_NR_DRAM_BANKS		1
 #define PHYS_SDRAM			MMDC0_ARB_BASE_ADDR
 
 #define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM
@@ -314,7 +283,6 @@
 #define CONFIG_ENV_SIZE			(SZ_128K)
 
 /* Envs are stored in NOR flash */
-#define CONFIG_ENV_IS_IN_FLASH
 #define CONFIG_ENV_SECT_SIZE    (SZ_128K)
 #define CONFIG_ENV_ADDR	(CONFIG_SYS_FLASH_BASE + 0x40000)
 

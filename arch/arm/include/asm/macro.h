@@ -1,9 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * include/asm-arm/macro.h
  *
  * Copyright (C) 2009 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __ASM_ARM_MACRO_H__
@@ -131,6 +130,7 @@ lr	.req	x30
 	/* NOTE: MPIDR handling will be erroneous on multi-cluster machines */
 	mrs	\xreg1, mpidr_el1
 	lsr	\xreg2, \xreg1, #32
+	lsl	\xreg2, \xreg2, #32
 	lsl	\xreg1, \xreg1, #40
 	lsr	\xreg1, \xreg1, #40
 	orr	\xreg1, \xreg1, \xreg2
@@ -192,6 +192,10 @@ lr	.req	x30
 	ldr	\tmp, =(SCR_EL3_RW_AARCH64 | SCR_EL3_HCE_EN |\
 			SCR_EL3_SMD_DIS | SCR_EL3_RES1 |\
 			SCR_EL3_NS_EN)
+#endif
+
+#ifdef CONFIG_ARMV8_EA_EL3_FIRST
+	orr	\tmp, \tmp, #SCR_EL3_EA_EN
 #endif
 	msr	scr_el3, \tmp
 

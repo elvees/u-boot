@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2015-2016 Freescale Semiconductor, Inc.
  * Copyright (C) 2016 Grinn
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm/arch/clock.h>
@@ -14,8 +13,8 @@
 #include <asm/arch/mx6-pins.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/gpio.h>
-#include <asm/imx-common/iomux-v3.h>
-#include <asm/imx-common/boot_mode.h>
+#include <asm/mach-imx/iomux-v3.h>
+#include <asm/mach-imx/boot_mode.h>
 #include <asm/io.h>
 #include <common.h>
 #include <fsl_esdhc.h>
@@ -149,7 +148,7 @@ int board_mmc_init(bd_t *bis)
 
 static int check_mmc_autodetect(void)
 {
-	char *autodetect_str = getenv("mmcautodetect");
+	char *autodetect_str = env_get("mmcautodetect");
 
 	if ((autodetect_str != NULL) &&
 	    (strcmp(autodetect_str, "yes") == 0)) {
@@ -168,12 +167,12 @@ void board_late_mmc_init(void)
 	if (!check_mmc_autodetect())
 		return;
 
-	setenv_ulong("mmcdev", dev_no);
+	env_set_ulong("mmcdev", dev_no);
 
 	/* Set mmcblk env */
 	sprintf(mmcblk, "/dev/mmcblk%dp2 rootwait rw",
 		dev_no);
-	setenv("mmcroot", mmcblk);
+	env_set("mmcroot", mmcblk);
 
 	sprintf(cmd, "mmc dev %d", dev_no);
 	run_command(cmd, 0);

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * siemens am33x common board options
  * (C) Copyright 2013 Siemens Schweiz AG
@@ -7,8 +8,6 @@
  * U-Boot file:/include/configs/am335x_evm.h
  *
  * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_SIEMENS_AM33X_COMMON_H
@@ -21,7 +20,6 @@
 
 #define CONFIG_ENV_SIZE			(0x2000)
 #define CONFIG_SYS_MALLOC_LEN		(16 * 1024 * 1024)
-#define CONFIG_SYS_LONGHELP		/* undef to save memory */
 #ifdef CONFIG_SIEMENS_MACH_TYPE
 #define CONFIG_MACH_TYPE		CONFIG_SIEMENS_MACH_TYPE
 #endif
@@ -32,17 +30,12 @@
 
 /* commands to include */
 
-#define CONFIG_ENV_VARS_UBOOT_CONFIG
 #ifndef CONFIG_SPL_BUILD
 #define CONFIG_ROOTPATH		"/opt/eldk"
 #endif
 
 #define CONFIG_ENV_OVERWRITE		1
-#define CONFIG_ENV_IS_NOWHERE
 
-#define CONFIG_SYS_LONGHELP
-#define CONFIG_CMDLINE_EDITING
-#define CONFIG_AUTO_COMPLETE
 #define CONFIG_SYS_AUTOLOAD	"yes"
 
 /* Clock Defines */
@@ -54,10 +47,6 @@
 
 /* Console I/O Buffer Size */
 #define CONFIG_SYS_CBSIZE		1024
-
-/* Print Buffer Size */
-#define CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE \
-					+ sizeof(CONFIG_SYS_PROMPT) + 16)
 
 /* Boot Argument Buffer Size */
 #define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
@@ -72,13 +61,9 @@
 
 #define CONFIG_SYS_LOAD_ADDR		0x81000000 /* Default load address */
 
-#define CONFIG_SPI
-#define CONFIG_OMAP3_SPI
-#define CONFIG_MTD_DEVICE
 #define CONFIG_SF_DEFAULT_SPEED		(75000000)
 
  /* Physical Memory Map */
-#define CONFIG_NR_DRAM_BANKS		1		/*  1 bank of DRAM */
 #define PHYS_DRAM_1			0x80000000	/* DRAM Bank #1 */
 
 #define CONFIG_SYS_SDRAM_BASE		PHYS_DRAM_1
@@ -97,18 +82,12 @@
 #define CONFIG_SYS_NS16550_COM1		0x44e09000
 #define CONFIG_SYS_NS16550_COM4		0x481a6000
 
-#define CONFIG_SERIAL1                  1
-#define CONFIG_CONS_INDEX               1
 
 /* I2C Configuration */
 #define CONFIG_I2C
 #define CONFIG_SYS_I2C
-#define CONFIG_SYS_OMAP24_I2C_SPEED	100000
-#define CONFIG_SYS_OMAP24_I2C_SLAVE	1
-#define CONFIG_SYS_I2C_OMAP24XX
 
 /* Defines for SPL */
-#define CONFIG_SPL_FRAMEWORK
 #define CONFIG_SPL_TEXT_BASE		0x402F0400
 #define CONFIG_SPL_MAX_SIZE		(SRAM_SCRATCH_SPACE_ADDR - \
 					 CONFIG_SPL_TEXT_BASE)
@@ -119,12 +98,8 @@
 #define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION	1
 #define CONFIG_SPL_FS_LOAD_PAYLOAD_NAME	"u-boot.img"
 
-#define CONFIG_SPL_SPI_LOAD
 #define CONFIG_SYS_SPI_U_BOOT_OFFS	0x20000
 
-#define CONFIG_SPL_LDSCRIPT		"arch/arm/mach-omap2/u-boot-spl.lds"
-
-#define CONFIG_SPL_NAND_AM33XX_BCH
 #define CONFIG_SPL_NAND_BASE
 #define CONFIG_SPL_NAND_DRIVERS
 #define CONFIG_SPL_NAND_ECC
@@ -162,7 +137,6 @@
  * header. That is 0x800FFFC0--0x80100000 should not be used for any
  * other needs.
  */
-#define CONFIG_SYS_TEXT_BASE		0x80100000
 #define CONFIG_SYS_SPL_MALLOC_START	0x80208000
 #define CONFIG_SYS_SPL_MALLOC_SIZE	0x100000
 
@@ -178,21 +152,12 @@
 /*
  * USB configuration
  */
-#define CONFIG_USB_MUSB_DSPS
-#define CONFIG_USB_MUSB_PIO_ONLY
 #define CONFIG_USB_MUSB_DISABLE_BULK_COMBINE_SPLIT
-#undef CONFIG_USB_GADGET_DUALSPEED
 
 #define CONFIG_AM335X_USB0
 #define CONFIG_AM335X_USB0_MODE	MUSB_PERIPHERAL
 #define CONFIG_AM335X_USB1
 #define CONFIG_AM335X_USB1_MODE MUSB_HOST
-
-#ifdef CONFIG_USB_MUSB_GADGET
-#define CONFIG_USB_ETHER
-#define CONFIG_USB_ETH_RNDIS
-#define CONFIG_USBNET_HOST_ADDR	"de:ad:be:af:00:00"
-#endif /* CONFIG_USB_MUSB_GADGET */
 
 /* USB DRACO ID as default */
 #define CONFIG_USBD_HS
@@ -216,39 +181,19 @@
  * 0x442000 - 0x800000 : Userland
  */
 #if defined(CONFIG_SPI_BOOT)
-# undef CONFIG_ENV_IS_NOWHERE
-# define CONFIG_ENV_IS_IN_SPI_FLASH
 # define CONFIG_ENV_SPI_MAX_HZ		CONFIG_SF_DEFAULT_SPEED
 # define CONFIG_ENV_OFFSET		(892 << 10) /* 892 KiB in */
 # define CONFIG_ENV_SECT_SIZE		(4 << 10) /* 4 KB sectors */
 #endif /* SPI support */
 
-#define CONFIG_DRIVER_TI_CPSW
-#define CONFIG_MII
-#define CONFIG_PHY_GIGE
-#define CONFIG_PHYLIB
 #define CONFIG_BOOTP_DEFAULT
-#define CONFIG_BOOTP_DNS
 #define CONFIG_BOOTP_DNS2
 #define CONFIG_BOOTP_SEND_HOSTNAME
-#define CONFIG_BOOTP_GATEWAY
-#define CONFIG_BOOTP_SUBNETMASK
 #define CONFIG_NET_RETRY_COUNT         10
 
-#define CONFIG_NAND
 /* NAND support */
 #ifdef CONFIG_NAND
-#define CONFIG_CMD_NAND
-
 /* UBI Support */
-#ifndef CONFIG_SPL_BUILD
-#define CONFIG_CMD_MTDPARTS
-#define CONFIG_MTD_PARTITIONS
-#define CONFIG_MTD_DEVICE
-#define CONFIG_RBTREE
-#define CONFIG_LZO
-#define CONFIG_CMD_UBIFS
-#endif
 
 /* Commen environment */
 #define CONFIG_PREBOOT
@@ -291,7 +236,6 @@
 	"project_dir=targetdir\0" \
 	"upgrade_available=0\0" \
 	"altbootcmd=run bootcmd\0" \
-	"bootlimit=3\0" \
 	"partitionset_active=A\0" \
 	"loadaddr=0x82000000\0" \
 	"kloadaddr=0x81000000\0" \
@@ -333,10 +277,8 @@
  *|      mtdoops |   8.000 MiB | 0x  c80000..0x 147ffff |
  *|       rootfs | 235.500 MiB | 0x 1480000..0x fffffff |
  *-------------------------------------------------------
- */
-#define MTDIDS_NAME_STR		"omap2-nand.0"
-#define MTDIDS_DEFAULT		"nand0=" MTDIDS_NAME_STR
-#define MTDPARTS_DEFAULT_V1	"mtdparts=" MTDIDS_NAME_STR ":" \
+
+					"mtdparts=omap2-nand.0:" \
 					"128k(spl),"		\
 					"128k(spl.backup1),"	\
 					"128k(spl.backup2),"	\
@@ -347,6 +289,7 @@
 					"5120k(kernel_b),"	\
 					"8192k(mtdoops),"	\
 					"-(rootfs)"
+ */
 
 #define DFU_ALT_INFO_NAND_V1 \
 	"spl part 0 1;" \
@@ -409,7 +352,7 @@
 		"bootm ${kloadaddr}\0"
 
 /*
- * Variant 2 partition layout
+ * Variant 2 partition layout (default)
  * chip-size = 256MiB or 512 MiB
  *|         name |        size |           address area |
  *-------------------------------------------------------
@@ -425,17 +368,6 @@
  *| (512) rootfs | 508.125 MiB | 0x  3E0000..0x1fffffff |
  *-------------------------------------------------------
  */
-
-#define MTDPARTS_DEFAULT_V2	"mtdparts=" MTDIDS_NAME_STR ":" \
-					"128k(spl)," \
-					"128k(spl.backup1)," \
-					"128k(spl.backup2)," \
-					"128k(spl.backup3)," \
-					"1920k(u-boot)," \
-					"512k(u-boot.env0)," \
-					"512k(u-boot.env1)," \
-					"512k(mtdoops)," \
-					"-(rootfs)"
 
 #define DFU_ALT_INFO_NAND_V2 \
 	"spl part 0 1;" \
@@ -514,9 +446,8 @@
  *|      mtdoops | 512.000 KiB | 0x12f60000..0x12fdffff |
  *|configuration | 104.125 MiB | 0x12fe0000..0x1fffffff |
  *-------------------------------------------------------
- */
 
-#define MTDPARTS_DEFAULT_V3	"mtdparts=" MTDIDS_NAME_STR ":" \
+					"mtdparts=omap2-nand.0:" \
 					"128k(spl),"		\
 					"128k(spl.backup1),"	\
 					"128k(spl.backup2),"	\
@@ -528,16 +459,14 @@
 					"512k(mtdoops),"	\
 					"-(configuration)"
 
-#define CONFIG_NAND_OMAP_GPMC
-#define CONFIG_NAND_OMAP_ELM
+ */
+
 #define CONFIG_SYS_NAND_BASE		(0x08000000)	/* physical address */
 							/* to access nand at */
 							/* CS0 */
 #define CONFIG_SYS_MAX_NAND_DEVICE	1		/* Max number of NAND
 							   devices */
 #if !defined(CONFIG_SPI_BOOT)
-#undef CONFIG_ENV_IS_NOWHERE
-#define CONFIG_ENV_IS_IN_NAND
 #define CONFIG_ENV_OFFSET		0x260000 /* environment starts here */
 #define CONFIG_SYS_ENV_SECT_SIZE	(128 << 10)	/* 128 KiB */
 #endif
@@ -546,8 +475,5 @@
 /* Reboot after 60 sec if bootcmd fails */
 #define CONFIG_RESET_TO_RETRY
 #define CONFIG_BOOT_RETRY_TIME 60
-
-#define CONFIG_BOOTCOUNT_LIMIT
-#define CONFIG_BOOTCOUNT_ENV
 
 #endif	/* ! __CONFIG_SIEMENS_AM33X_COMMON_H */

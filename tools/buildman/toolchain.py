@@ -1,6 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0+
 # Copyright (c) 2012 The Chromium OS Authors.
-#
-# SPDX-License-Identifier:	GPL-2.0+
 #
 
 import re
@@ -33,7 +32,7 @@ class MyHTMLParser(HTMLParser):
         HTMLParser.__init__(self)
         self.arch_link = None
         self.links = []
-        self._match = '_%s-' % arch
+        self.re_arch = re.compile('[-_]%s-' % arch)
 
     def handle_starttag(self, tag, attrs):
         if tag == 'a':
@@ -41,7 +40,7 @@ class MyHTMLParser(HTMLParser):
                 if tag == 'href':
                     if value and value.endswith('.xz'):
                         self.links.append(value)
-                        if self._match in value:
+                        if self.re_arch.search(value):
                             self.arch_link = value
 
 
@@ -431,7 +430,7 @@ class Toolchains:
         """
         arch = command.OutputOneLine('uname', '-m')
         base = 'https://www.kernel.org/pub/tools/crosstool/files/bin'
-        versions = ['4.9.0', '4.6.3', '4.6.2', '4.5.1', '4.2.4']
+        versions = ['7.3.0', '6.4.0', '4.9.4']
         links = []
         for version in versions:
             url = '%s/%s/%s/' % (base, arch, version)
@@ -503,7 +502,8 @@ class Toolchains:
             trailing /
         """
         stdout = command.Output('tar', 'xvfJ', fname, '-C', dest)
-        return stdout.splitlines()[0][:-1]
+        dirs = stdout.splitlines()[1].split('/')[:2]
+        return '/'.join(dirs)
 
     def TestSettingsHasPath(self, path):
         """Check if buildman will find this toolchain
@@ -517,13 +517,14 @@ class Toolchains:
     def ListArchs(self):
         """List architectures with available toolchains to download"""
         host_arch, archives = self.LocateArchUrl('list')
-        re_arch = re.compile('[-a-z0-9.]*_([^-]*)-.*')
+        re_arch = re.compile('[-a-z0-9.]*[-_]([^-]*)-.*')
         arch_set = set()
         for archive in archives:
             # Remove the host architecture from the start
             arch = re_arch.match(archive[len(host_arch):])
             if arch:
-                arch_set.add(arch.group(1))
+                if arch.group(1) != '2.0' and arch.group(1) != '64':
+                    arch_set.add(arch.group(1))
         return sorted(arch_set)
 
     def FetchAndInstall(self, arch):
