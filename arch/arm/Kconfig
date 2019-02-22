@@ -659,7 +659,7 @@ config ARCH_OMAP2PLUS
 
 config ARCH_MCOM
 	bool "Support MCom (Elvees) SoCs"
-	select CPU_V7
+	select CPU_V7A
 	select CPU_V7_HAS_VIRT
 
 config ARCH_MESON

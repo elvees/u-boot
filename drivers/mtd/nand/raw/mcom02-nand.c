@@ -1,10 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2014 - 2015 Xilinx, Inc.
  * Copyright (C) 2015 ELVEES NeoTek, CJSC
  * Copyright 2018 RnD Center "ELVEES", JSC
  * Based on the Linux version of Arasan NFC driver.
  *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm/io.h>

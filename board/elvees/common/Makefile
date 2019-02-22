@@ -6,4 +6,7 @@
 #
 
 obj-y += board.o
-obj-y += cmd-ddrctl.o
+
+ifneq ($(CONFIG_SPL_BUILD),y)
+	obj-y += cmd-ddrctl.o
+endif

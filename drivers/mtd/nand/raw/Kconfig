@@ -51,6 +51,7 @@ config NAND_LPC32XX_SLC
 
 config NAND_MCOM02
 	bool "Support for MCom-02 NFC"
+	select SYS_NAND_SELF_INIT
 	help
 	  This enables driver support for MCom-02 NAND flash
 	  controller. This uses the hardware ECC for read and

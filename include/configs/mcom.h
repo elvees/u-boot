@@ -55,14 +55,12 @@
 
 #define CONFIG_SYS_SDRAM_BASE		0x40000000
 
-#define CONFIG_NR_DRAM_BANKS		2
 #define PHYS_SDRAM_0			CONFIG_SYS_SDRAM_BASE
 #define PHYS_SDRAM_0_SIZE		SZ_1G
 #define PHYS_SDRAM_1			0xA0000000
 #define PHYS_SDRAM_1_SIZE		SZ_1G
 
 /* The first 64 bytes are reserved for the U-Boot image header. */
-#define CONFIG_SYS_TEXT_BASE		0x40000040
 #define CONFIG_SYS_INIT_SP_ADDR		0x40400000
 
 #define CONFIG_SYS_MALLOC_LEN		SZ_8M
@@ -108,13 +106,9 @@
 
 #ifdef CONFIG_NAND_MCOM02
 #define CONFIG_SYS_MAX_NAND_DEVICE	1
-#define CONFIG_SYS_NAND_SELF_INIT
 #define CONFIG_SYS_NAND_ONFI_DETECTION
 #define CONFIG_MTD_DEVICE
 #define CONFIG_CMD_MTDPARTS
-#define CONFIG_MTD_PARTITIONS
-#define CONFIG_RBTREE
-#define CONFIG_LZO
 #define MTDIDS_DEFAULT		"nand0=mcom02-nand"
 #define MTDPARTS_DEFAULT	"mtdparts=mcom02-nand:-(allnand)"
 #endif
@@ -142,14 +136,12 @@
 #define CONFIG_CMD_SF_TEST
 
 /* Environment storage */
-#define CONFIG_ENV_IS_IN_SPI_FLASH
 #define CONFIG_ENV_OFFSET		SZ_64K
 #define CONFIG_ENV_SECT_SIZE		SZ_64K
 #define CONFIG_ENV_SIZE			CONFIG_ENV_SECT_SIZE
 #define CONFIG_ENV_SPI_MAX_HZ		CONFIG_SF_DEFAULT_SPEED
 
 #ifndef CONFIG_SPL_BUILD
-#include <config_distro_defaults.h>
 
 /* Default environment */
 #define CONFIG_BOOTFILE			"zImage"
@@ -248,13 +240,7 @@
 	"mcomboot=run set_bootargs;bootz ${loadaddr} - ${fdtcontroladdr}\0"
 #endif
 
-#define CONFIG_USB_DWC2
-#ifdef CONFIG_CMD_USB_MASS_STORAGE
-#define CONFIG_USB_FUNCTION_MASS_STORAGE
-#endif
-
 /* SPL framework */
-#define CONFIG_SPL_FRAMEWORK
 #define CONFIG_SPL_SPI_LOAD
 
 #define CONFIG_SPL_MAX_SIZE		0x0000E000	/* 56 KB */

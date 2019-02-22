@@ -44,10 +44,9 @@ static int do_ddrctl(cmd_tbl_t *cmdtp, int flag, int argc,
 }
 
 /***************************************************/
-#ifndef CONFIG_SPL_BUILD
 static char ddrctl_help_text[] =
 	"disable 0|1 - Disable DDR controller # 0|1\n";
-#endif
+
 U_BOOT_CMD(
 	ddrctl,	3,	0,	do_ddrctl,
 	"commands to control DDRMC on MCom Platform",
