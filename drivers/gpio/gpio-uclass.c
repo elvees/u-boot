@@ -761,7 +761,7 @@ int gpio_get_list_count(struct udevice *dev, const char *list_name)
 	ret = fdtdec_parse_phandle_with_args(gd->fdt_blob, dev_of_offset(dev),
 					     list_name, "#gpio-cells", 0, -1,
 					     NULL);
-	if (ret) {
+	if (ret < 0) {
 		debug("%s: Node '%s', property '%s', GPIO count failed: %d\n",
 		      __func__, dev->name, list_name, ret);
 	}
