@@ -3,6 +3,7 @@
 # Copyright 2019 RnD Center "ELVEES", JSC
 
 set -o errexit
+set -o pipefail
 
 function help {
     echo "Description:
