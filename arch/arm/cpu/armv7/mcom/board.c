@@ -43,6 +43,9 @@
 #define SDMMC_BASE_CLK_FREQ(x) ((((x) < 100000000) ? ((x) / 1000000) : 32) \
 			       << 24)
 
+#define SDMMC_INIT_CONFIG_SIGNALS_OTAPDLYENA BIT(20)
+#define SDMMC_INIT_CONFIG_SIGNALS_OTAPDLYSEL GENMASK(24, 21)
+
 #ifdef CONFIG_SPL_BUILD
 static void cpu_poweroff(const u32 cpu)
 {
@@ -176,6 +179,10 @@ void board_init_f(ulong dummy)
 	sys.CMCTR->GATE_SYS_CTR |= CMCTR_GATE_SYS_CTR_SDMMC0_EN;
 	sys.CMCTR->GATE_SYS_CTR |= CMCTR_GATE_SYS_CTR_SDMMC1_EN;
 
+	/* Enable and set otapdly */
+	sys.SDMMC0->EXT_REG_0 |= SDMMC_INIT_CONFIG_SIGNALS_OTAPDLYENA;
+	sys.SDMMC0->EXT_REG_0 |= SDMMC_INIT_CONFIG_SIGNALS_OTAPDLYSEL;
+
 	sys.SDMMC0->EXT_REG_1 = (sys.SDMMC0->EXT_REG_1 & 0x00FFFFFF) |
 			SDMMC_BASE_CLK_FREQ(SPLL_FREQ);
 	sys.SDMMC0->EXT_REG_1 &= ~0x00010000;  /* disable SDMA */
@@ -183,19 +190,16 @@ void board_init_f(ulong dummy)
 	sys.SDMMC0->EXT_REG_2 &= ~0x38000000;  /* disable SDR50, SDR104, DDR50 */
 	sys.SDMMC0->EXT_REG_6 &= ~0x39000000;  /* disable 1.8V mode */
 
+	/* Enable and set otapdly */
+	sys.SDMMC1->EXT_REG_0 |= SDMMC_INIT_CONFIG_SIGNALS_OTAPDLYENA;
+	sys.SDMMC1->EXT_REG_0 |= SDMMC_INIT_CONFIG_SIGNALS_OTAPDLYSEL;
+
 	sys.SDMMC1->EXT_REG_1 = (sys.SDMMC1->EXT_REG_1 & 0x00FFFFFF) |
 			SDMMC_BASE_CLK_FREQ(SPLL_FREQ);
 	sys.SDMMC1->EXT_REG_1 &= ~0x00010000;  /* disable SDMA */
 	sys.SDMMC1->EXT_REG_1 &= ~0x00008000;  /* disable ADMA2 */
 	sys.SDMMC1->EXT_REG_2 &= ~0x38000000;  /* disable SDR50, SDR104, DDR50 */
 	sys.SDMMC1->EXT_REG_6 &= ~0x39000000;  /* disable 1.8V mode */
-
-	/*
-	 * HACK: Write operations fails with some SD cards in HighSpeed mode.
-	 * Disable HighSpeed mode for workaround as a dirty hack.
-	 */
-	sys.SDMMC0->EXT_REG_2 &= ~0x04000000;
-	sys.SDMMC1->EXT_REG_2 &= ~0x04000000;
 
 	/* Workaround for bug on some boards: SDMMC1 Card Detect pin
 	 * is left floating */
