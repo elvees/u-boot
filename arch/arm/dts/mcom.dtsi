@@ -1008,8 +1008,6 @@
 		reg = <0x38095000 0x1000>;
 
 		domains {
-			#address-cells = <1>;
-			#size-cells = <0>;
 			pd_vpu: domain@1 {
 				#power-domain-cells = <0>;
 				pwr-mask = <0x4>;
