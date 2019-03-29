@@ -55,6 +55,10 @@
 	};
 };
 
+&cpllclk {
+	clock-mult = <21>;
+};
+
 &spi0 {
 	status = "okay";
 	num-cs = <2>;
