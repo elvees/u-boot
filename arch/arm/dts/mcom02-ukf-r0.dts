@@ -117,7 +117,7 @@
 };
 
 &gpiod {
-	skip-gpios = <13>;
+	skip-gpio-list = <13>;
 };
 
 &spllclk {

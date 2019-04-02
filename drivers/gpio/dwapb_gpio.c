@@ -213,13 +213,13 @@ static int gpio_dwapb_bind(struct udevice *dev)
 			plat->name = fdt_get_name(blob, node, NULL);
 		}
 
-		if (fdt_getprop(blob, node, "skip-gpios", &skip_count)) {
+		if (fdt_getprop(blob, node, "skip-gpio-list", &skip_count)) {
 			skip_count /= sizeof(u32);
 			if (skip_count > ARRAY_SIZE(skip_list)) {
-				printf("Error: skip-gpios is too large\n");
+				printf("Error: skip-gpio-list is too large\n");
 				return -EINVAL;
 			}
-			fdtdec_get_int_array(blob, node, "skip-gpios",
+			fdtdec_get_int_array(blob, node, "skip-gpio-list",
 					     skip_list, skip_count);
 			for (i = 0; i < skip_count; i++)
 				skip_mask |= BIT(skip_list[i]);

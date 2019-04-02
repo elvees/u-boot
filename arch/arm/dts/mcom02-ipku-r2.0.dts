@@ -69,7 +69,7 @@
 };
 
 &gpioc {
-	skip-gpios = <14>;
+	skip-gpio-list = <14>;
 };
 
 &framebuffer {
