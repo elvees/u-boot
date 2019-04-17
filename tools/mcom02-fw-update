@@ -11,7 +11,7 @@ function help {
     /etc/fw_env.config is used to detect U-Boot environment variables location.
     mtd-utils are required.
 Usage:
-    $(basename "$0") IMAGE [OPTION]
+    $(basename "$0") [OPTION] IMAGE
 Arguments:
     IMAGE      U-Boot image file
 Options:
