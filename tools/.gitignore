@@ -17,6 +17,8 @@
 /img2srec
 /kwboot
 /lib/
+/libfdt.py
+/libfdt_wrap.c
 /mips-relocs
 /mkenvimage
 /mkexynosspl
