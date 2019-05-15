@@ -19,6 +19,10 @@ Options:
     -h         print this message"
 }
 
+function read_uboot_version {
+    head $DEV -c 65536 | strings | grep 'U-Boot SPL'
+}
+
 while getopts "hr" arg; do
     case "$arg" in
     h)
@@ -87,11 +91,13 @@ readonly ALIGNED_IMAGE_SIZE=$(( (IMAGE_SIZE + BLOCK_SIZE - 1) / BLOCK_SIZE * BLO
 
 echo "Flashing firmware. Do not terminate process!"
 echo "Erasing old firmware..."
+echo "U-Boot version on device: $(read_uboot_version)"
 LOG=$(mtd_debug erase "$DEV" 0 "$ALIGNED_IMAGE_SIZE" 2>&1)
 echo "Writing firmware..."
 LOG=$(mtd_debug write "$DEV" 0 "$IMAGE_SIZE" "$IMAGE" 2>&1)
 
 echo "Verifying firmware..."
+echo "U-Boot version on device: $(read_uboot_version)"
 CHECK_IMAGE=$TEMPFILES/check.image
 LOG=$(mtd_debug read "$DEV" 0 "$IMAGE_SIZE" "$CHECK_IMAGE" 2>&1)
 if cmp "$IMAGE" "$CHECK_IMAGE" &> /dev/null; then
