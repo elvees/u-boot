@@ -126,7 +126,6 @@ static const struct mcom02_nand_ecc_matrix ecc_matrix[] = {
 	{512,	512,	8,	1,	0xD},
 	/* 2K byte page */
 	{2048,	512,	1,	0,	0xC},
-	{2048,	512,	4,	1,	0x1A},
 	{2048,	512,	8,	1,	0x34},
 	{2048,	512,	12,	1,	0x4E},
 	{2048,	512,	16,	1,	0x68},
