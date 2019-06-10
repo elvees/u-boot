@@ -124,9 +124,14 @@
 };
 
 &sd0 {
-	/* Connected to eMMC */
+	/*
+	 * Connected to eMMC
+	 *
+	 * BUG: eMMC supports DDR only in Linux, not in U-Boot
+	 */
 	status = "okay";
 	non-removable;
+	mmc-ddr-3_3v;
 };
 
 &spi0 {
