@@ -1,0 +1,8 @@
+if ARCH_MCOM03
+
+source "board/elvees/Kconfig"
+
+config SYS_SOC
+        default "mcom03"
+
+endif

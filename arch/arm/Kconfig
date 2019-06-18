@@ -718,6 +718,13 @@ config ARCH_OMAP2PLUS
 	select SUPPORT_SPL
 	imply FIT
 
+config ARCH_MCOM03
+	bool "ELVEES MCom-03 SoC"
+	select ARM64
+	select DM
+	select DM_SERIAL
+	select OF_CONTROL
+
 config ARCH_MESON
 	bool "Amlogic Meson"
 	imply DISTRO_DEFAULTS
@@ -1599,6 +1606,8 @@ source "arch/arm/mach-k3/Kconfig"
 source "arch/arm/mach-keystone/Kconfig"
 
 source "arch/arm/mach-kirkwood/Kconfig"
+
+source "arch/arm/mach-mcom03/Kconfig"
 
 source "arch/arm/cpu/arm926ejs/lpc32xx/Kconfig"
 

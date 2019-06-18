@@ -1,0 +1,35 @@
+
+config SYS_VENDOR
+	default "elvees"
+
+if ARCH_MCOM03
+
+choice
+	prompt "MCom-03 board select"
+
+config TARGET_HAPS
+	bool "HAPS"
+	help
+	  Support for the following boards:
+	    HAPS prototype for MCom-03
+
+endchoice
+
+source "board/elvees/haps/Kconfig"
+
+config SETUP_MEMORY_TAGS
+	bool "Enable memory tag"
+	depends on !ENV_IS_IN_UBI
+	default y
+	help
+	  Describe memory regions for the kernel.
+
+config CMDLINE_TAG
+	bool "Enable passing of ATAGs"
+	default y
+	help
+	  This ensures that U-Boot will boot the kernel with
+	  a command-line tag that incorporates the kernel options
+	  you set in the "bootargs" environment variable.
+
+endif
