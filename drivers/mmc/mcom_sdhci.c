@@ -5,13 +5,21 @@
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
-
 #include <common.h>
 #include <dm.h>
+#include <linux/bitfield.h>
+
 #include <fdtdec.h>
 #include <sdhci.h>
 
 DECLARE_GLOBAL_DATA_PTR;
+
+#define SDMMC_INIT_CONFIG_1	0x100
+#define SDMMC_INIT_CONFIG_ITAPDLYSEL	GENMASK(31, 27)
+#define SDMMC_INIT_CONFIG_ITAPDLYENA	BIT(26)
+#define SDMMC_INIT_CONFIG_ITAPCHGWIN	BIT(25)
+#define SDMMC_INIT_CONFIG_OTAPDLYSEL	GENMASK(24, 21)
+#define SDMMC_INIT_CONFIG_OTAPDLYENA	BIT(20)
 
 struct arasan_sdhci_plat {
 	struct mmc_config cfg;
@@ -37,8 +45,103 @@ static int arasan_sdhci_get_cd(struct sdhci_host *host)
 	return 0;
 }
 
+static void arasan_sdhci_set_tapdelay(struct sdhci_host *host)
+{
+	struct mmc *mmc = host->mmc;
+	struct udevice *dev = mmc->dev;
+	u32 reg;
+	s32 clk_phase[2] = { -1, -1 };
+
+	switch (mmc->selected_mode) {
+	case MMC_HS:
+	case MMC_HS_52:
+		if (dev_read_prop(dev, "mcom02,clk-phase-mmc-hs", NULL))
+			dev_read_u32_array(dev, "clk-phase-mmc-hs",
+					   (u32 *)clk_phase, 2);
+		break;
+	case SD_HS:
+		if (dev_read_prop(dev, "mcom02,clk-phase-sd-hs", NULL))
+			dev_read_u32_array(dev, "clk-phase-sd-hs",
+					   (u32 *)clk_phase, 2);
+		break;
+	case MMC_DDR_52:
+		if (dev_read_prop(dev, "mcom02,clk-phase-mmc-ddr52", NULL))
+			dev_read_u32_array(dev, "clk-phase-mmc-ddr52",
+					   (u32 *)clk_phase, 2);
+		break;
+	case UHS_SDR12:
+		if (dev_read_prop(dev, "mcom02,clk-phase-uhs-sdr12", NULL))
+			dev_read_u32_array(dev, "clk-phase-uhs-sdr12",
+					   (u32 *)clk_phase, 2);
+		break;
+	case UHS_SDR25:
+		if (dev_read_prop(dev, "mcom02,clk-phase-uhs-sdr25", NULL))
+			dev_read_u32_array(dev, "clk-phase-uhs-sdr25",
+					   (u32 *)clk_phase, 2);
+		break;
+	case UHS_SDR50:
+		if (dev_read_prop(dev, "mcom02,clk-phase-uhs-sdr50", NULL))
+			dev_read_u32_array(dev, "clk-phase-uhs-sdr50",
+					   (u32 *)clk_phase, 2);
+		break;
+	case UHS_DDR50:
+		if (dev_read_prop(dev, "mcom02,clk-phase-uhs-ddr50", NULL))
+			dev_read_u32_array(dev, "clk-phase-uhs-ddr50",
+					   (u32 *)clk_phase, 2);
+		break;
+	case UHS_SDR104:
+		if (dev_read_prop(dev, "mcom02,clk-phase-uhs-sdr104", NULL))
+			dev_read_u32_array(dev, "clk-phase-uhs-sdr104",
+					   (u32 *)clk_phase, 2);
+		break;
+	case MMC_HS_200:
+		if (dev_read_prop(dev, "mcom02,clk-phase-mmc-hs200", NULL))
+			dev_read_u32_array(dev, "clk-phase-mmc-hs200",
+					   (u32 *)clk_phase, 2);
+		break;
+	default:
+		break;
+	}
+
+	/* Set Tap Delay Lines */
+	reg = sdhci_readl(host, SDMMC_INIT_CONFIG_1);
+	if (clk_phase[0] != -1) {
+		/* This signal should be asserted few clocks before
+		 * the corectrl_itapdlysel changes and should be
+		 * asserted for few clocks after.
+		 */
+		reg |= SDMMC_INIT_CONFIG_ITAPCHGWIN;
+		sdhci_writel(host, reg, SDMMC_INIT_CONFIG_1);
+
+		reg &= ~SDMMC_INIT_CONFIG_ITAPDLYSEL;
+		reg |= FIELD_PREP(SDMMC_INIT_CONFIG_ITAPDLYSEL, clk_phase[0]);
+		reg |= SDMMC_INIT_CONFIG_ITAPDLYENA;
+		udelay(1); /* Asserted few clocks before */
+		sdhci_writel(host, reg, SDMMC_INIT_CONFIG_1);
+
+		reg &= ~SDMMC_INIT_CONFIG_ITAPCHGWIN;
+		udelay(1); /* Asserted few clocks after */
+		sdhci_writel(host, reg, SDMMC_INIT_CONFIG_1);
+	} else if (reg & SDMMC_INIT_CONFIG_ITAPDLYENA) {
+		reg &= ~SDMMC_INIT_CONFIG_ITAPDLYENA;
+		sdhci_writel(host, reg, SDMMC_INIT_CONFIG_1);
+	}
+
+	reg = sdhci_readl(host, SDMMC_INIT_CONFIG_1);
+	if (clk_phase[1] != -1) {
+		reg &= ~SDMMC_INIT_CONFIG_OTAPDLYSEL;
+		reg |= FIELD_PREP(SDMMC_INIT_CONFIG_OTAPDLYSEL, clk_phase[1]);
+		reg |= SDMMC_INIT_CONFIG_OTAPDLYENA;
+		sdhci_writel(host, reg, SDMMC_INIT_CONFIG_1);
+	} else if (reg & SDMMC_INIT_CONFIG_OTAPDLYENA) {
+		reg &= ~SDMMC_INIT_CONFIG_OTAPDLYENA;
+		sdhci_writel(host, reg, SDMMC_INIT_CONFIG_1);
+	}
+}
+
 static const struct sdhci_ops arasan_sdhci_ops = {
 	.get_cd = arasan_sdhci_get_cd,
+	.set_delay = arasan_sdhci_set_tapdelay,
 };
 
 static int arasan_sdhci_bind(struct udevice *dev)
