@@ -152,6 +152,7 @@
 		"ddrctl ${ddrctl_cmd} ${ddrctl_cid};" \
 	"fi;"
 
+#undef CONFIG_BOOTCOMMAND
 #ifdef CONFIG_BOOT_ELF_FROM_SPI
 #define CONFIG_BOOTCOMMAND \
 	"sf probe ${bootelf_spibus};" \
@@ -159,15 +160,28 @@
 	"bootelf ${bootelf_addr};"
 #else
 #define CONFIG_BOOTCOMMAND \
-	"if run prep_bootdev; then " \
-		"if test -n ${bootenvcmd}; then " \
-			"run bootenvcmd;" \
-		"fi;" \
-		"if run loadbootfile; then " \
-			"run mcomboot;" \
-		"fi;" \
-	"fi;"
+	"run findfdt; run distro_bootcmd;"
 #endif
+
+#define BOOTENV_DEV_LEGACY_MMC		BOOTENV_DEV_BLKDEV
+#define BOOTENV_DEV_LEGACY_USB		BOOTENV_DEV_BLKDEV
+#define BOOTENV_DEV_LEGACY_UBIFS	BOOTENV_DEV_BLKDEV
+
+#define BOOTENV_DEV_NAME_LEGACY_MMC	BOOTENV_DEV_NAME_BLKDEV
+#define BOOTENV_DEV_NAME_LEGACY_USB	BOOTENV_DEV_NAME_BLKDEV
+#define BOOTENV_DEV_NAME_LEGACY_UBIFS	BOOTENV_DEV_NAME_BLKDEV
+
+#define BOOT_TARGET_DEVICES(func) \
+	func(MMC, mmc, 0) \
+	func(LEGACY_MMC, legacy_mmc, 0) \
+	func(MMC, mmc, 1) \
+	func(LEGACY_MMC, legacy_mmc, 1) \
+	func(USB, usb, 0) \
+	func(LEGACY_USB, legacy_usb, 0) \
+	func(UBIFS, ubifs, 0) \
+	func(LEGACY_UBIFS, legacy_ubifs, 0)
+
+#include <config_distro_bootcmd.h>
 
 #ifdef CONFIG_TARGET_SALUTE_PM
 #define DDRCTL_CMD "ddrctl_cmd=enable\0"
@@ -201,43 +215,55 @@
 	"bootenvcmd=\0" \
 	"console=ttyS0,115200\0" \
 	"cmdline=" BLACKLIST VIDEO_MODE "\0" \
-	"bootsource=mmc\0" \
-	"mmcdev=0\0" \
 	"bootpartnum=1\0" \
 	"rootpartnum=2\0" \
-	"rootfstype=ext4\0" \
-	"rootfsdev=\0" \
-	"loadcmd=load\0" \
-	"loaddev=\0" \
-	"loadpart=\0" \
 	"usb_pgood_delay=5000\0" \
-	"prep_bootdev=" \
-		"if test ${bootsource} = usb; then " \
-			"rootfsdev=/dev/sda${rootpartnum};" \
-			"loaddev=${bootsource};" \
-			"loadpart=0:${bootpartnum};" \
-			"usb start;" \
-		"elif test ${bootsource} = mmc; then " \
-			"rootfsdev=/dev/mmcblk${mmcdev}p${rootpartnum};" \
-			"loaddev=${bootsource};" \
-			"loadpart=${mmcdev}:${bootpartnum};" \
-			"mmc dev ${mmcdev};"\
-			"mmc rescan;" \
-		"elif test ${bootsource} = nand; then " \
-			"rootfsdev=ubi0:root;" \
-			"setenv loadcmd ubifsload;" \
-			"setenv rootfstype ubifs;" \
-			"setenv cmdline ${cmdline} ubi.mtd=arasan_nfc;" \
-			"mtdparts default;" \
-			"ubi part allnand;" \
-			"ubifsmount ubi:boot;" \
-		"fi;\0" \
-	"loadbootfile=${loadcmd} ${loaddev} ${loadpart} " \
-		"${loadaddr} ${bootfile}\0" \
+	"bootubipart=allnand\0" \
+	"loadbootfile=load ${loaddev} ${loadpart} ${loadaddr} ${bootfile}\0" \
 	"set_bootargs=setenv bootargs console=${console} " \
 		"root=${rootfsdev} rootfstype=${rootfstype} rw rootwait " \
 		"${cmdline}\0" \
-	"mcomboot=run set_bootargs;bootz ${loadaddr} - ${fdtcontroladdr}\0"
+	"mcomboot=run set_bootargs;bootz ${loadaddr} - ${fdtcontroladdr}\0" \
+	"legacy_bootcmd=" \
+		"if test -n ${bootenvcmd}; then " \
+			"run bootenvcmd;" \
+		"fi;" \
+		"setenv bootfile " CONFIG_BOOTFILE ";" \
+		"if run loadbootfile; then " \
+			"run mcomboot;" \
+		"fi;\0" \
+	"legacy_mmc_boot=" \
+		"setenv rootfsdev /dev/mmcblk${devnum}p${rootpartnum};" \
+		"setenv loaddev mmc;" \
+		"setenv loadpart ${devnum}:${bootpartnum};" \
+		"setenv rootfstype ext4;" \
+		"mmc dev ${devnum};" \
+		"mmc rescan;" \
+		"run legacy_bootcmd\0" \
+	"legacy_usb_boot=" \
+		"setenv rootfsdev /dev/sda${rootpartnum};" \
+		"setenv loaddev usb;" \
+		"setenv loadpart 0:${bootpartnum};" \
+		"setenv rootfstype ext4;" \
+		"usb start;" \
+		"run legacy_bootcmd\0" \
+	"legacy_ubifs_boot=" \
+		"setenv rootfsdev ubi0:root;" \
+		"setenv loaddev ubi;" \
+		"setenv loadpart ubi:boot;" \
+		"setenv rootfstype ubifs;" \
+		"setenv cmdline ${cmdline} ubi.mtd=arasan_nfc;" \
+		"mtdparts default;" \
+		"ubi part ${bootubipart};" \
+		"ubifsmount ubi:boot;" \
+		"run legacy_bootcmd\0" \
+	"fdt_addr_r=0x48000000\0" \
+	"pxefile_addr_r=0x49000000\0" \
+	"scriptaddr=0x49000000\0" \
+	"kernel_addr_r=0x40000000\0" \
+	"findfdt=" \
+		"setenv fdt_addr ${fdtcontroladdr};\0" \
+	BOOTENV
 #endif
 
 /* SPL framework */
