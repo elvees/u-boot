@@ -1,0 +1,13 @@
+How to update U-Boot from running OS
+====================================
+
+#. Install u-boot-mcom02-firmware-tools package.
+
+#. Choose U-Boot image for your board. To list available images::
+
+     ls -lh /usr/share/u-boot/salute*/
+     export IMAGE=/usr/share/u-boot/salutepm/mcom02-salute-el24pm2-r1.0-1.1-om1-r1.2-uboot.img
+
+#. Update U-Boot::
+
+     mcom02-fw-update $IMAGE
