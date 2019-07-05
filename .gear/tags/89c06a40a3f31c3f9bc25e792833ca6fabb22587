@@ -1,0 +1,6 @@
+object 3471a28536749462a049c466ee975a343cd63708
+type commit
+tag mcom02/2019.01.0.5
+tagger Dmitriy Zagrebin <dzagrebin@elvees.com> 1562239484 +0300
+
+Release v2019.01.0.5 for MCom-02
