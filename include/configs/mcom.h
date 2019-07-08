@@ -261,6 +261,7 @@
 	"pxefile_addr_r=0x49000000\0" \
 	"scriptaddr=0x49000000\0" \
 	"kernel_addr_r=0x40000000\0" \
+	"ramdisk_addr_r=0x50000000\0" \
 	"findfdt=" \
 		"setenv fdt_addr ${fdtcontroladdr};\0" \
 	BOOTENV
