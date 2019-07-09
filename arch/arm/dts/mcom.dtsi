@@ -891,7 +891,7 @@
 				clocks = <&xti24m>;
 				#clock-cells = <0>;
 				reg = <0x114>;
-				clk-mult-initial = <13>;
+				clk-mult-initial = <15>;
 			};
 
 			vpu_sclk: vpu_sclk {
