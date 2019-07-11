@@ -57,8 +57,53 @@
 	};
 };
 
+&vinc {
+	status = "okay";
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+
+			vinc_endpoint0: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&tc358762_endpoint>;
+				elvees,ifacenum = /bits/ 8 <0>;
+			};
+		};
+
+		port@1 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1>;
+
+			vinc_endpoint1: endpoint@1 {
+				reg = <1>;
+				remote-endpoint = <&tc358748_endpoint>;
+				elvees,ifacenum = /bits/ 8 <2>;
+			};
+		};
+	};
+};
+
 &i2c0 {
 	status = "okay";
+
+	tc358748@0e {
+		compatible = "toshiba,tc358748";
+		reg = <0x0e>;
+		clock-frequency = <40000000>;
+		pixel-frequency = <126000000>;
+		vvalid-invert;
+		port {
+			tc358748_endpoint: endpoint {
+				remote = <&vinc_endpoint1>;
+			};
+		};
+	};
 };
 
 &i2c1 {
@@ -67,6 +112,18 @@
 
 &i2c2 {
 	status = "okay";
+
+	tc358762@0b {
+		compatible = "toshiba,tc358762";
+		reg = <0x0b>;
+		clock-frequency = <40000000>;
+		pixel-frequency = <16000000>;
+		port {
+			tc358762_endpoint: endpoint {
+				remote = <&vinc_endpoint0>;
+			};
+		};
+	};
 };
 
 &ethernet {
