@@ -161,7 +161,7 @@
 	};
 
 	dsp@0 {
-		dsp_num = <2>;
+		ncores = <2>;
 		compatible = "elvees,delcore30m";
 		reg = <0x37001000 0x1000>, <0x37000000 0x1000>,
 		      <0x37010000 0x1000>, <0x3a600000 0x20000>,
