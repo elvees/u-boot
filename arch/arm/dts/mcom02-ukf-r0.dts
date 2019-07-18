@@ -35,10 +35,6 @@
 	};
 };
 
-&cpllclk {
-	clock-mult = <14>;
-};
-
 &spi0 {
 	status = "okay";
 	num-cs = <1>;
@@ -177,10 +173,26 @@
 	skip-gpio-list = <13>;
 };
 
+&cpu0 {
+	operating-points = <840000 1100000>;
+};
+
+&cpllclk {
+	clock-mult = <14>;
+};
+
+&dpllclk {
+	clk-mult-initial = <29>;
+};
+
 &spllclk {
-	clk-mult-initial = <6>;
+	clk-mult-initial = <12>;
+};
+
+&upllclk {
+	clk-mult-initial = <16>;
 };
 
 &l3_pclk {
-	clock-div = <1>;
+	clock-div = <2>;
 };

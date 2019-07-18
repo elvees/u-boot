@@ -46,8 +46,8 @@ int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 	/* Parameters have been chosen manually */
 	cfg->impedance.ods_mc = 34;
 	cfg->impedance.ods_dram = 34;
-	cfg->impedance.odt_mc = 40;
-	cfg->impedance.odt_dram = 40;
+	cfg->impedance.odt_mc = 60;
+	cfg->impedance.odt_dram = 60;
 #else
 	cfg->impedance.ods_mc = 40;
 	cfg->impedance.ods_dram = 40;
