@@ -175,6 +175,9 @@
 
 &sd0 {
 	status = "okay";
+	sd-uhs-sdr50;
+	sd-uhs-sdr104;
+	sd-uhs-ddr50;
 };
 
 &sd1 {
