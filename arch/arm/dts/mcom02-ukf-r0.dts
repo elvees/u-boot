@@ -100,10 +100,24 @@
 			};
 		};
 	};
+
+	fram@51 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "atmel,24c128", "i2c-eeprom";
+		reg = <0x51>;
+	};
 };
 
 &i2c1 {
 	status = "okay";
+
+	fram@51 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "atmel,24c128", "i2c-eeprom";
+		reg = <0x51>;
+	};
 };
 
 &i2c2 {
@@ -119,6 +133,13 @@
 				remote = <&vinc_endpoint0>;
 			};
 		};
+	};
+
+	fram@51 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "atmel,24c128", "i2c-eeprom";
+		reg = <0x51>;
 	};
 };
 
