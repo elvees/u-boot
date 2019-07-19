@@ -16,6 +16,14 @@
 		     "elvees,salute-el24pm2",
 		     "elvees,mcom02";
 
+	leds {
+		dbgled2 {
+			label = "salute:green:dbgled2";
+			gpios = <&gpioa 6 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "heartbeat";
+		};
+	};
+
 	aliases {
 		spi0 = &spi0;
 	};
