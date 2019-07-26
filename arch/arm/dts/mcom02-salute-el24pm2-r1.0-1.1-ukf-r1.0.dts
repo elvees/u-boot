@@ -70,6 +70,14 @@
 	bus-width = <4>;
 };
 
+&swic0 {
+	status = "okay";
+};
+
+&swic1 {
+	status = "okay";
+};
+
 &vinc {
 	status = "okay";
 	ports {
