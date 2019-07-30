@@ -488,6 +488,16 @@ static inline void pre_console_puts(const char *s) {}
 static inline void print_pre_console_buffer(int flushpoint) {}
 #endif
 
+#ifdef CONFIG_TARGET_RTL
+void putc_to_memory(const char c)
+{
+	/* FIXME: move this to a specialized driver */
+	writeb(c, CONFIG_MTRAN_ADDRESS + 0x800);
+	writeb(0, CONFIG_MTRAN_ADDRESS + 0x801);
+	writel(CONFIG_MTRAN_ADDRESS + 0x800, CONFIG_MTRAN_ADDRESS + 0xC);
+}
+#endif
+
 void putc(const char c)
 {
 #ifdef CONFIG_SANDBOX
@@ -504,6 +514,10 @@ void putc(const char c)
 		return;
 	}
 #endif
+
+#ifdef CONFIG_TARGET_RTL
+	putc_to_memory(c);
+#else
 	if (!gd)
 		return;
 #ifdef CONFIG_CONSOLE_RECORD
@@ -531,7 +545,21 @@ void putc(const char c)
 		pre_console_putc(c);
 		serial_putc(c);
 	}
+#endif /* CONFIG_TARGET_RTL */
 }
+
+#ifdef CONFIG_TARGET_RTL
+void puts_to_memory(const char *s)
+{
+	/* FIXME: move this to a specialized driver */
+	unsigned long i, n = strlen(s);
+
+	for (i = 0; i < n; i++, s++)
+		writeb(*s, CONFIG_MTRAN_ADDRESS + 0x800 + i);
+	writeb(0, CONFIG_MTRAN_ADDRESS + 0x800 + n);
+	writel(CONFIG_MTRAN_ADDRESS + 0x800, CONFIG_MTRAN_ADDRESS + 0xC);
+}
+#endif
 
 void puts(const char *s)
 {
@@ -552,6 +580,10 @@ void puts(const char *s)
 		return;
 	}
 #endif
+
+#ifdef CONFIG_TARGET_RTL
+	puts_to_memory(s);
+#else
 	if (!gd)
 		return;
 #ifdef CONFIG_CONSOLE_RECORD
@@ -579,6 +611,7 @@ void puts(const char *s)
 		pre_console_puts(s);
 		serial_puts(s);
 	}
+#endif /* CONFIG_TARGET_RTL */
 }
 
 #ifdef CONFIG_CONSOLE_RECORD

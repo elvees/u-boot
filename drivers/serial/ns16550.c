@@ -304,6 +304,7 @@ DEBUG_UART_FUNCS
 #ifdef CONFIG_DM_SERIAL
 static int ns16550_serial_putc(struct udevice *dev, const char ch)
 {
+#ifndef CONFIG_TARGET_RTL
 	struct NS16550 *const com_port = dev_get_priv(dev);
 
 	if (!(serial_in(&com_port->lsr) & UART_LSR_THRE))
@@ -319,31 +320,39 @@ static int ns16550_serial_putc(struct udevice *dev, const char ch)
 	if (ch == '\n')
 		WATCHDOG_RESET();
 
+#endif
 	return 0;
 }
 
 static int ns16550_serial_pending(struct udevice *dev, bool input)
 {
+#ifndef CONFIG_TARGET_RTL
 	struct NS16550 *const com_port = dev_get_priv(dev);
 
 	if (input)
 		return (serial_in(&com_port->lsr) & UART_LSR_DR) ? 1 : 0;
 	else
 		return (serial_in(&com_port->lsr) & UART_LSR_THRE) ? 0 : 1;
+#endif
+	return 0;
 }
 
 static int ns16550_serial_getc(struct udevice *dev)
 {
+#ifndef CONFIG_TARGET_RTL
 	struct NS16550 *const com_port = dev_get_priv(dev);
 
 	if (!(serial_in(&com_port->lsr) & UART_LSR_DR))
 		return -EAGAIN;
 
 	return serial_in(&com_port->rbr);
+#endif
+	return 0;
 }
 
 static int ns16550_serial_setbrg(struct udevice *dev, int baudrate)
 {
+#ifndef CONFIG_TARGET_RTL
 	struct NS16550 *const com_port = dev_get_priv(dev);
 	struct ns16550_platdata *plat = com_port->plat;
 	int clock_divisor;
@@ -352,11 +361,13 @@ static int ns16550_serial_setbrg(struct udevice *dev, int baudrate)
 
 	NS16550_setbrg(com_port, clock_divisor);
 
+#endif
 	return 0;
 }
 
 static int ns16550_serial_setconfig(struct udevice *dev, uint serial_config)
 {
+#ifndef CONFIG_TARGET_RTL
 	struct NS16550 *const com_port = dev_get_priv(dev);
 	int lcr_val = UART_LCR_WLS_8;
 	uint parity = SERIAL_GET_PARITY(serial_config);
@@ -385,12 +396,14 @@ static int ns16550_serial_setconfig(struct udevice *dev, uint serial_config)
 	}
 
 	serial_out(lcr_val, &com_port->lcr);
+#endif
 	return 0;
 }
 
 static int ns16550_serial_getinfo(struct udevice *dev,
 				  struct serial_device_info *info)
 {
+#ifndef CONFIG_TARGET_RTL
 	struct NS16550 *const com_port = dev_get_priv(dev);
 	struct ns16550_platdata *plat = com_port->plat;
 
@@ -404,11 +417,13 @@ static int ns16550_serial_getinfo(struct udevice *dev,
 	info->reg_width = plat->reg_width;
 	info->reg_shift = plat->reg_shift;
 	info->reg_offset = plat->reg_offset;
+#endif
 	return 0;
 }
 
 int ns16550_serial_probe(struct udevice *dev)
 {
+#ifndef CONFIG_TARGET_RTL
 	struct NS16550 *const com_port = dev_get_priv(dev);
 	struct reset_ctl_bulk reset_bulk;
 	int ret;
@@ -420,6 +435,7 @@ int ns16550_serial_probe(struct udevice *dev)
 	com_port->plat = dev_get_platdata(dev);
 	NS16550_init(com_port, -1);
 
+#endif
 	return 0;
 }
 
@@ -433,6 +449,7 @@ enum {
 #if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
 int ns16550_serial_ofdata_to_platdata(struct udevice *dev)
 {
+#ifndef CONFIG_TARGET_RTL
 	struct ns16550_platdata *plat = dev->platdata;
 	const u32 port_type = dev_get_driver_data(dev);
 	fdt_addr_t addr;
@@ -505,6 +522,7 @@ int ns16550_serial_ofdata_to_platdata(struct udevice *dev)
 	if (port_type == PORT_JZ4780)
 		plat->fcr |= UART_FCR_UME;
 
+#endif
 	return 0;
 }
 #endif
