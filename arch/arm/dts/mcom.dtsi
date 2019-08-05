@@ -168,7 +168,7 @@
 		      <0x3a620000 0x20000>, <0x38081000 0x1000>;
 		reg-names = "cmn_regs", "dsp0_regs", "dsp1_regs",
 			    "dsp0_pram", "dsp1_pram", "spinlock";
-		sdma_regs = <&sdma>;
+		sdma = <&sdma>;
 		xyram = <&xyram0>, <&xyram1>;
 		interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&dsp_aclk>, <&dsp_pclk>, <&enc_clk>,
