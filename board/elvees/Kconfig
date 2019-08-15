@@ -13,9 +13,15 @@ config TARGET_HAPS
 	  Support for the following boards:
 	    HAPS prototype for MCom-03
 
+config TARGET_RTL
+	bool "RTL"
+	help
+	  Support for RTL
+
 endchoice
 
 source "board/elvees/haps/Kconfig"
+source "board/elvees/rtl/Kconfig"
 
 config SETUP_MEMORY_TAGS
 	bool "Enable memory tag"

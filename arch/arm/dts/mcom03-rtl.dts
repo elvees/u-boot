@@ -1,0 +1,64 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright 2019 RnD Center "ELVEES", JSC
+ */
+
+/dts-v1/;
+
+#include "mcom03.dtsi"
+
+/ {
+	model = "RTL for MCom-03";
+	compatible = "elvees,mcom03-rtl";
+
+	aliases {
+		serial1 = &uart1;
+	};
+
+	chosen {
+		stdout-path = "serial1:115200n8";
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0xC0000000 0x100000>; /* 1 MiB */
+	};
+
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		cpu_reserved: cpu_reserved@C0000000 {
+			reg = <0xC0000000 0x1000>;
+			no-map;
+		};
+	};
+
+	cpu_clk: cpu_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <10000000>;
+	};
+};
+
+&uart1 {
+	status = "okay";
+	clock-frequency = <14750000>;
+};
+
+&cpu0 {
+	clocks = <&cpu_clk>;
+};
+
+&cpu1 {
+	status = "disabled";
+};
+
+&cpu2 {
+	status = "disabled";
+};
+
+&cpu3 {
+	status = "disabled";
+};
