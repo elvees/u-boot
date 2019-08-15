@@ -56,47 +56,47 @@ static void arasan_sdhci_set_tapdelay(struct sdhci_host *host)
 	case MMC_HS:
 	case MMC_HS_52:
 		if (dev_read_prop(dev, "mcom02,clk-phase-mmc-hs", NULL))
-			dev_read_u32_array(dev, "clk-phase-mmc-hs",
+			dev_read_u32_array(dev, "mcom02,clk-phase-mmc-hs",
 					   (u32 *)clk_phase, 2);
 		break;
 	case SD_HS:
 		if (dev_read_prop(dev, "mcom02,clk-phase-sd-hs", NULL))
-			dev_read_u32_array(dev, "clk-phase-sd-hs",
+			dev_read_u32_array(dev, "mcom02,clk-phase-sd-hs",
 					   (u32 *)clk_phase, 2);
 		break;
 	case MMC_DDR_52:
 		if (dev_read_prop(dev, "mcom02,clk-phase-mmc-ddr52", NULL))
-			dev_read_u32_array(dev, "clk-phase-mmc-ddr52",
+			dev_read_u32_array(dev, "mcom02,clk-phase-mmc-ddr52",
 					   (u32 *)clk_phase, 2);
 		break;
 	case UHS_SDR12:
 		if (dev_read_prop(dev, "mcom02,clk-phase-uhs-sdr12", NULL))
-			dev_read_u32_array(dev, "clk-phase-uhs-sdr12",
+			dev_read_u32_array(dev, "mcom02,clk-phase-uhs-sdr12",
 					   (u32 *)clk_phase, 2);
 		break;
 	case UHS_SDR25:
 		if (dev_read_prop(dev, "mcom02,clk-phase-uhs-sdr25", NULL))
-			dev_read_u32_array(dev, "clk-phase-uhs-sdr25",
+			dev_read_u32_array(dev, "mcom02,clk-phase-uhs-sdr25",
 					   (u32 *)clk_phase, 2);
 		break;
 	case UHS_SDR50:
 		if (dev_read_prop(dev, "mcom02,clk-phase-uhs-sdr50", NULL))
-			dev_read_u32_array(dev, "clk-phase-uhs-sdr50",
+			dev_read_u32_array(dev, "mcom02,clk-phase-uhs-sdr50",
 					   (u32 *)clk_phase, 2);
 		break;
 	case UHS_DDR50:
 		if (dev_read_prop(dev, "mcom02,clk-phase-uhs-ddr50", NULL))
-			dev_read_u32_array(dev, "clk-phase-uhs-ddr50",
+			dev_read_u32_array(dev, "mcom02,clk-phase-uhs-ddr50",
 					   (u32 *)clk_phase, 2);
 		break;
 	case UHS_SDR104:
 		if (dev_read_prop(dev, "mcom02,clk-phase-uhs-sdr104", NULL))
-			dev_read_u32_array(dev, "clk-phase-uhs-sdr104",
+			dev_read_u32_array(dev, "mcom02,clk-phase-uhs-sdr104",
 					   (u32 *)clk_phase, 2);
 		break;
 	case MMC_HS_200:
 		if (dev_read_prop(dev, "mcom02,clk-phase-mmc-hs200", NULL))
-			dev_read_u32_array(dev, "clk-phase-mmc-hs200",
+			dev_read_u32_array(dev, "mcom02,clk-phase-mmc-hs200",
 					   (u32 *)clk_phase, 2);
 		break;
 	default:
