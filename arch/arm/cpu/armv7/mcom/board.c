@@ -99,6 +99,7 @@ void board_init_f(ulong dummy)
 	 * to avoid large current on DDRx_VDDQ (see rf#1160).
 	 */
 	sys.PMCTR->DDR_PIN_RET = 0;
+	bootrom_uart_config(BAUD115200);
 	bootrom_uart_putstr("DDR retention disabled\n");
 
 	/* Set ALWAYS_MISC0 to start address of bootrom _cold_reset
