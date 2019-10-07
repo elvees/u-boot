@@ -8,20 +8,21 @@
 #include "mcom03.dtsi"
 
 / {
-	model = "RTL for MCom-03";
+	model = "RTL model of MCom-03";
 	compatible = "elvees,mcom03-rtl";
 
 	aliases {
-		serial1 = &uart1;
+		serial1 = &uart_mtran;
 	};
 
 	chosen {
 		stdout-path = "serial1:115200n8";
+		bootargs = "earlycon console=ttyP2M0,115200";
 	};
 
 	memory@0 {
 		device_type = "memory";
-		reg = <0xC0000000 0x100000>; /* 1 MiB */
+		reg = <0xC0000000 0x3000000>; /* 48 MiB */
 	};
 
 	reserved-memory {
@@ -35,30 +36,8 @@
 		};
 	};
 
-	cpu_clk: cpu_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <10000000>;
+	uart_mtran: serial@f000 {
+		compatible = "elvees,p2m";
+		reg = <0xF000 0x2000>;
 	};
-};
-
-&uart1 {
-	status = "okay";
-	clock-frequency = <14750000>;
-};
-
-&cpu0 {
-	clocks = <&cpu_clk>;
-};
-
-&cpu1 {
-	status = "disabled";
-};
-
-&cpu2 {
-	status = "disabled";
-};
-
-&cpu3 {
-	status = "disabled";
 };
