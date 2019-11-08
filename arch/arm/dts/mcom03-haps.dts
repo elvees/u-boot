@@ -22,7 +22,7 @@
 
 	memory@0 {
 		device_type = "memory";
-		reg = <0xC0000000 0x10000000>; /* 256 MiB */
+		reg = <0xC0080000 0x10000000>; /* 256 MiB */
 	};
 
 	reserved-memory {
@@ -31,7 +31,7 @@
 		ranges;
 
 		cpu_reserved: cpu_reserved@C0000000 {
-			reg = <0xC0000000 0x1000>;
+			reg = <0xC0080000 0x1000>;
 			no-map;
 		};
 	};
