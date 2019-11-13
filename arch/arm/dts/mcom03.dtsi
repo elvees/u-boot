@@ -105,7 +105,7 @@
 		uart1: serial0@1640000 {
 			compatible = "snps,dw-apb-uart";
 			reg = <0x1640000 0x1000>;
-			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
 			reg-shift = <2>;
 			reg-io-width = <4>;
 			status = "disabled";
@@ -114,7 +114,7 @@
 		uart2: serial0@1650000 {
 			compatible = "snps,dw-apb-uart";
 			reg = <0x1650000 0x1000>;
-			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
 			reg-shift = <2>;
 			reg-io-width = <4>;
 			status = "disabled";
@@ -123,7 +123,7 @@
 		uart3: serial0@1660000 {
 			compatible = "snps,dw-apb-uart";
 			reg = <0x1660000 0x1000>;
-			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
 			reg-shift = <2>;
 			reg-io-width = <4>;
 			status = "disabled";
