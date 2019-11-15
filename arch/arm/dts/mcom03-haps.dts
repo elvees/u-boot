@@ -48,18 +48,3 @@
 	clock-frequency = <14750000>;
 };
 
-&cpu0 {
-	clocks = <&cpu_clk>;
-};
-
-&cpu1 {
-	status = "disabled";
-};
-
-&cpu2 {
-	status = "disabled";
-};
-
-&cpu3 {
-	status = "disabled";
-};
