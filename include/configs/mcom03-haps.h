@@ -24,9 +24,9 @@
 
 /* Default environment */
 #define CONFIG_BOOTFILE			"Image"
-#define CONFIG_LOADADDR			0xC0080000
+#define CONFIG_LOADADDR			CONFIG_SYS_LOAD_ADDR
 
 #define CONFIG_BOOTCOMMAND \
-	"booti"
+	"booti ${loadaddr} - ${fdtcontroladdr}"
 
 #endif
