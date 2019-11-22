@@ -88,6 +88,8 @@
 
 	ethernet_phy: ethernet-phy@1 {
 		reg = <0x1>;
+		interrupt-parent = <&gpioa>;
+		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
 	};
 };
 
