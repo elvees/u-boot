@@ -92,6 +92,12 @@
 			     <GIC_PPI 10 IRQ_TYPE_LEVEL_HIGH>;
 	};
 
+	gpu@0x1200000 {
+		compatible = "img,gpu";
+		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
+		reg = <0x1200000 0x80000>;
+	};
+
 	gic: interrupt-controller@1100000 {
 		compatible = "arm,gic-v3";
 		#interrupt-cells = <3>;
