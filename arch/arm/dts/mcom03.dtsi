@@ -98,6 +98,12 @@
 		reg = <0x1200000 0x80000>;
 	};
 
+	vpu@0x1280000 {
+		compatible = "arm,mali-v500";
+		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+		reg = <0x1280000 0x10000>;
+	};
+
 	gic: interrupt-controller@1100000 {
 		compatible = "arm,gic-v3";
 		#interrupt-cells = <3>;
