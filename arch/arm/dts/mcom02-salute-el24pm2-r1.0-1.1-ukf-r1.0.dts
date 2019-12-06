@@ -30,10 +30,6 @@
 
 };
 
-&cpu0 {
-	operating-points = <840000 1100000>;
-};
-
 &dpllclk {
 	clk-mult-initial = <29>;
 };
