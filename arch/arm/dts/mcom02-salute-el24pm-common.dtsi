@@ -17,6 +17,26 @@
 		      <0xa0000000 0x40000000>;
 	};
 
+	/*
+	 * VPU decoder must use memory in DDR0 and DDR1 in order to implement
+	 * workaround #1 to prevent DDR-VDMA deadlock (issue rf#1382).
+	 */
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		vpu_ddr0_reserved: vpu_ddr0@0x7f800000 {
+			no-map;
+			reg = <0x7f800000 0x800000>;
+		};
+
+		vpu_ddr1_reserved: vpu_ddr1@0xdf800000 {
+			no-map;
+			reg = <0xdf800000 0x800000>;
+		};
+	};
+
 	clocks {
 		audio_codec_clk: audio_codec_clk {
 			#clock-cells = <0>;
@@ -154,5 +174,15 @@
 		spi-max-frequency = <36000000>;
 		m25p,fast-read;
 		u-boot,dm-pre-reloc;
+	};
+};
+
+&vpu {
+	mem0 {
+		memory-region = <&vpu_ddr0_reserved>;
+	};
+
+	mem1 {
+		memory-region = <&vpu_ddr1_reserved>;
 	};
 };
