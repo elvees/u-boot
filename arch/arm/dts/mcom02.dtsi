@@ -419,8 +419,13 @@
 	/* This node is used by the vpout-drm driver. */
 	vpout: vpout@38004000 {
 		compatible = "elvees,mcom02-vpout";
-		reg = <0x38004000 0x1000>;
-		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+		reg = <0x38004000 0x1000>,
+		      <0x38005000 0x1000>;
+		reg-names = "lcd", "dsi";
+		elvees,smctr = <&smctr>;
+		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "lcd", "dsi";
 		clocks = <&vpout_aclk>;
 		status = "disabled";
 	};

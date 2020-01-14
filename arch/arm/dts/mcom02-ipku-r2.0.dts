@@ -31,6 +31,30 @@
 		reg = <0x40000000 0x40000000
 		       0xa0000000 0x40000000>;
 	};
+
+	ls059t1sx01: dsi-panel {
+		compatible = "elvees,mcom02-vpout-dsi";
+
+		display-timings {
+			1080x1920p60 {
+				clock-frequency = <143592000>;
+				hactive = <1080>;
+				vactive = <1920>;
+				hfront-porch = <100>;
+				hback-porch = <50>;
+				hsync-len = <10>;
+				vfront-porch = <4>;
+				vback-porch = <4>;
+				vsync-len = <2>;
+			};
+		};
+
+		port {
+			dsi_in: endpoint {
+				remote-endpoint = <&dsi_out>;
+			};
+		};
+	};
 };
 
 &cpllclk {
@@ -72,10 +96,6 @@
 	skip-gpio-list = <14>;
 };
 
-&framebuffer {
-	status = "okay";
-};
-
 /* IP-KU hangs at high SPLL values, so we should decrease it. */
 &spllclk {
 	clk-mult-initial = <6>;
@@ -83,4 +103,22 @@
 
 &l3_pclk {
 	clock-div = <1>;
+};
+
+&vpout {
+	status = "okay";
+
+	port {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		dsi_out: endpoint@0 {
+			reg = <0>;
+			remote-endpoint = <&dsi_in>;
+			info {
+				label = "DSI";
+				bpp = <24>;
+			};
+		};
+	};
 };
