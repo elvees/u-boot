@@ -1032,7 +1032,7 @@
 	};
 
 	smctr: smctr@38096000 {
-		compatible = "elvees,mcom-smctr";
+		compatible = "elvees,mcom-smctr", "syscon";
 		reg = <0x38096000 0x1000>;
 	};
 
