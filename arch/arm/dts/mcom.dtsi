@@ -680,6 +680,36 @@
 				clk-div-initial = <1>;
 			};
 
+			clkout_clk_mux: clkout_clk_mux {
+				compatible = "elvees,mcom-clk-mux";
+				clocks = <&spllclk>, <&cpllclk>, <&apllclk>,
+					 <&dpllclk>, <&vpllclk>, <&swic0pllclk>,
+					 <&swic1pllclk>;
+				#clock-cells = <0>;
+				reg = <0x80>;
+				reg-shift = <0>;
+				reg-width = <3>;
+				clk-mux-initial = <0>;
+			};
+
+			clkout_clk_div: clkout_clk_div {
+				compatible = "elvees,mcom-clk-divider";
+				clocks = <&clkout_clk_mux>;
+				#clock-cells = <0>;
+				reg = <0x84>;
+				reg-shift = <0>;
+				reg-width = <2>;
+				clk-div-initial = <0>;
+			};
+
+			clkout_clk: clkout_clk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&clkout_clk_div>;
+				#clock-cells = <0>;
+				reg = <0x88>;
+				reg-bit = <0>;
+			};
+
 			gpu_aclk: gpu_aclk {
 				compatible = "elvees,mcom-clk-gate";
 				clocks = <&gpu_aclk_div>;
