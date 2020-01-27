@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2017 RnD Center "ELVEES", JSC
+ * Copyright 2017-2020 RnD Center "ELVEES", JSC
  *
  * Arasan Gigabit Ethernet MAC driver
  */
@@ -273,7 +273,11 @@ static void arasan_gemac_adjust_link(struct udevice *dev)
 
 	writel(mac_global_ctrl, priv->base + MAC_GLOBAL_CTRL);
 
-	dm_gpio_set_value(&priv->phy_txclk, phydev->speed == SPEED_1000);
+#ifdef CONFIG_DM_GPIO
+	if (dm_gpio_is_valid(&priv->phy_txclk))
+		dm_gpio_set_value(&priv->phy_txclk,
+				  phydev->speed == SPEED_1000);
+#endif
 }
 
 static int arasan_gemac_start(struct udevice *dev)
@@ -463,6 +467,7 @@ static int arasan_gemac_mdio_write(struct mii_dev *bus, int addr, int devad,
 
 static int arasan_gemac_mdio_reset(struct mii_dev *bus)
 {
+#ifdef CONFIG_DM_GPIO
 	struct arasan_gemac_priv *priv = bus->priv;
 
 	if (dm_gpio_is_valid(&priv->phy_reset)) {
@@ -470,7 +475,7 @@ static int arasan_gemac_mdio_reset(struct mii_dev *bus)
 		udelay(1000);
 		dm_gpio_set_value(&priv->phy_reset, 0);
 	}
-
+#endif
 	return 0;
 }
 
@@ -533,6 +538,7 @@ static int arasan_gemac_probe(struct udevice *dev)
 	if (priv->phy_addr < 0)
 		return -EINVAL;
 
+#ifdef CONFIG_DM_GPIO
 	ret = gpio_request_by_name(dev, "phy-reset-gpios", 0,
 				   &priv->phy_reset, GPIOD_IS_OUT);
 	if (ret != 0 && ret != -ENOENT)
@@ -542,7 +548,7 @@ static int arasan_gemac_probe(struct udevice *dev)
 				   &priv->phy_txclk, GPIOD_IS_OUT);
 	if (ret != 0 && ret != -ENOENT)
 		return ret;
-
+#endif
 	ret = arasan_gemac_mdio_init(dev);
 	if (ret != 0)
 		return ret;
