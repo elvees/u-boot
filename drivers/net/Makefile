@@ -4,6 +4,7 @@
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
 
 obj-$(CONFIG_ALTERA_TSE) += altera_tse.o
+obj-$(CONFIG_ARASAN_GEMAC) += arasan-gemac.o
 obj-$(CONFIG_AG7XXX) += ag7xxx.o
 obj-$(CONFIG_ARMADA100_FEC) += armada100_fec.o
 obj-$(CONFIG_BCM6348_ETH) += bcm6348-eth.o
