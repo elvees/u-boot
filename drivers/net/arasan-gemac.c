@@ -335,7 +335,7 @@ static int arasan_gemac_send(struct udevice *dev, void *packet, int length)
 	if (desc->status & DMA_DESC_STATUS_OWN)
 		return -EAGAIN;
 
-	memcpy((void *)desc->addr1, packet, length);
+	memcpy((void *)(ulong)desc->addr1, packet, length);
 
 	arasan_gemac_flush_dcache(desc->addr1, length);
 
@@ -371,7 +371,7 @@ static int arasan_gemac_recv(struct udevice *dev, int flags, uchar **packetp)
 
 	arasan_gemac_invalidate_dcache(desc->addr1, length);
 
-	*packetp = (uchar *)desc->addr1;
+	*packetp = (uchar *)(ulong)desc->addr1;
 
 	return length;
 }
