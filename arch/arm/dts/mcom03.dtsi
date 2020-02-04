@@ -92,16 +92,18 @@
 			     <GIC_PPI 10 IRQ_TYPE_LEVEL_HIGH>;
 	};
 
-	gpu@0x1200000 {
+	gpu: gpu@1200000 {
 		compatible = "img,gpu";
 		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
 		reg = <0x1200000 0x80000>;
+		status = "disabled";
 	};
 
-	vpu@0x1280000 {
+	vpu: vpu@1280000 {
 		compatible = "arm,mali-v500";
 		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
 		reg = <0x1280000 0x10000>;
+		status = "disabled";
 	};
 
 	gic: interrupt-controller@1100000 {

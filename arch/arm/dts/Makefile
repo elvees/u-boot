@@ -781,7 +781,11 @@ dtb-$(CONFIG_TARGET_VEXPRESS_CA5X2) += vexpress-v2p-ca5s.dtb
 dtb-$(CONFIG_TARGET_VEXPRESS_CA9X4) += vexpress-v2p-ca9.dtb
 dtb-$(CONFIG_TARGET_VEXPRESS_CA15_TC2) += vexpress-v2p-ca15_a7.dtb
 
-dtb-$(CONFIG_ARCH_MCOM03) += mcom03-haps.dtb \
+dtb-$(CONFIG_ARCH_MCOM03) += \
+	mcom03-haps-cpu.dtb \
+	mcom03-haps-sdr.dtb \
+	mcom03-haps-media.dtb \
+	mcom03-haps-full.dtb \
 	mcom03-rtl.dtb
 
 targets += $(dtb-y)

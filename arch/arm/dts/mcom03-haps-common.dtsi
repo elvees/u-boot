@@ -8,7 +8,6 @@
 #include "mcom03.dtsi"
 
 / {
-	model = "HAPS Prototype for MCom-03";
 	compatible = "elvees,mcom03-haps";
 
 	aliases {
@@ -35,16 +34,9 @@
 			no-map;
 		};
 	};
-
-	cpu_clk: cpu_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <10000000>;
-	};
 };
 
 &uart1 {
 	status = "okay";
 	clock-frequency = <14750000>;
 };
-

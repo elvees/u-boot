@@ -1,0 +1,20 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright 2020 RnD Center "ELVEES", JSC
+ */
+
+/dts-v1/;
+
+#include "mcom03-haps-common.dtsi"
+
+/ {
+	model = "MCom-03 HAPS, full configuration";
+};
+
+&gpu {
+	status = "okay";
+};
+
+&vpu {
+	status = "okay";
+};
