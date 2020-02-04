@@ -9,6 +9,9 @@
 #include <asm/sections.h>
 #include <linux/kernel.h>
 
+#define DDR_SUBS_URB_BASE		0xC000000
+#define HSPERIPH_BAR			0xDC
+
 DECLARE_GLOBAL_DATA_PTR;
 
 void reset_cpu(ulong addr)
@@ -45,6 +48,11 @@ int dram_init(void)
 
 int board_init(void)
 {
+	/* DDR high memory range is not available on HAPS. It means that
+	 * GEMAC DMA has access to DDR only if HSPERIPH_BAR is set to 0.
+	 */
+	writel(0, DDR_SUBS_URB_BASE + HSPERIPH_BAR);
+
 	return 0;
 }
 
