@@ -153,4 +153,33 @@
 			status = "disabled";
 		};
 	};
+
+	hsperiph@0 {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		hsreset: reset-controller@10400008 {
+			compatible = "elvees,mcom03-reset";
+			reg = <0x10400008 0x4>;
+			#reset-cells = <1>;
+		};
+
+		emac0: ethernet@10200000 {
+			compatible = "elvees,arasan-gemac";
+			reg = <0x10200000 0x1000>;
+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+			resets = <&hsreset 8>;
+			status = "disabled";
+		};
+
+		emac1: ethernet@10210000 {
+			compatible = "elvees,arasan-gemac";
+			reg = <0x10210000 0x1000>;
+			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+			resets = <&hsreset 9>;
+			status = "disabled";
+		};
+	};
 };

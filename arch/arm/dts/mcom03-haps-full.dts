@@ -13,6 +13,12 @@
 	acptest {
 		compatible = "elvees,acptest";
 	};
+
+	common_clk: common_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <5000000>;
+	};
 };
 
 &gpu {
@@ -21,4 +27,17 @@
 
 &vpu {
 	status = "okay";
+};
+
+&emac0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	phy-mode = "gmii";
+	status = "okay";
+	phy-handle = <&ethernet_phy>;
+	clocks = <&common_clk>;
+
+	ethernet_phy: ethernet-phy@0 {
+		reg = <0x0>;
+	};
 };
