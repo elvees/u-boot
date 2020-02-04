@@ -9,6 +9,10 @@
 
 / {
 	model = "MCom-03 HAPS, full configuration";
+
+	acptest {
+		compatible = "elvees,acptest";
+	};
 };
 
 &gpu {

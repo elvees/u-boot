@@ -9,4 +9,8 @@
 
 / {
 	model = "MCom-03 HAPS, SDR configuration";
+
+	acptest {
+		compatible = "elvees,acptest";
+	};
 };
