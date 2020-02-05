@@ -127,4 +127,10 @@ config RESET_HISILICON
 	help
 	  Support for reset controller on HiSilicon SoCs.
 
+config RESET_MCOM03
+	bool "Reset controller driver for MCom-03 SoC"
+	depends on DM_RESET
+	help
+	  Support for reset controller on MCom-03 SoC.
+
 endmenu
