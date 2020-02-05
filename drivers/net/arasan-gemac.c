@@ -13,6 +13,7 @@
 #include <miiphy.h>
 #include <net.h>
 #include <phy.h>
+#include <reset.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -127,6 +128,7 @@ struct arasan_gemac_dma_desc {
 
 struct arasan_gemac_priv {
 	void *base;
+	struct reset_ctl rst_ctl;
 	struct mii_dev *bus;
 	struct phy_device *phydev;
 	int phy_addr;
@@ -549,9 +551,20 @@ static int arasan_gemac_probe(struct udevice *dev)
 	if (ret != 0 && ret != -ENOENT)
 		return ret;
 #endif
-	ret = arasan_gemac_mdio_init(dev);
+	ret = reset_get_by_index(dev, 0, &priv->rst_ctl);
+	if (ret != 0 && ret != -ENOTSUPP)
+		return ret;
+
+	ret = reset_deassert(&priv->rst_ctl);
 	if (ret != 0)
 		return ret;
+
+	/* TODO: Is it really required ? */
+	mdelay(100);
+
+	ret = arasan_gemac_mdio_init(dev);
+	if (ret != 0)
+		goto error_assert_reset;
 
 	ret = arasan_gemac_phy_init(dev);
 	if (ret != 0)
@@ -572,6 +585,8 @@ error_phy_init:
 	mdio_unregister(priv->bus);
 	mdio_free(priv->bus);
 
+error_assert_reset:
+	reset_assert(&priv->rst_ctl);
 	return ret;
 }
 
@@ -586,7 +601,7 @@ int arasan_gemac_remove(struct udevice *dev)
 	mdio_unregister(priv->bus);
 	mdio_free(priv->bus);
 
-	return 0;
+	return reset_assert(&priv->rst_ctl);
 }
 
 static const struct udevice_id arasan_gemac_match_table[] = {
