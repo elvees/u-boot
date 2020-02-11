@@ -228,4 +228,75 @@
 			status = "disabled";
 		};
 	};
+
+	lsperiph1@1700000 {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		timer0: timer@1790000 {
+			compatible = "snps,dw-apb-timer";
+			reg = <0x1790000 0x14>;
+			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+			clock-names = "timer";
+			status = "disabled";
+		};
+
+		timer1: timer@1790014 {
+			compatible = "snps,dw-apb-timer";
+			reg = <0x1790014 0x14>;
+			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+			clock-names = "timer";
+			status = "disabled";
+		};
+
+		timer2: timer@1790028 {
+			compatible = "snps,dw-apb-timer";
+			reg = <0x1790028 0x14>;
+			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
+			clock-names = "timer";
+			status = "disabled";
+		};
+
+		timer3: timer@179003c {
+			compatible = "snps,dw-apb-timer";
+			reg = <0x179003C 0x14>;
+			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+			clock-names = "timer";
+			status = "disabled";
+		};
+
+		timer4: timer@1790050 {
+			compatible = "snps,dw-apb-timer";
+			reg = <0x1790050 0x14>;
+			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
+			clock-names = "timer";
+			status = "disabled";
+		};
+
+		timer5: timer@1790064 {
+			compatible = "snps,dw-apb-timer";
+			reg = <0x1790064 0x14>;
+			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
+			clock-names = "timer";
+			status = "disabled";
+		};
+
+		timer6: timer@1790078 {
+			compatible = "snps,dw-apb-timer";
+			reg = <0x1790078 0x14>;
+			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+			clock-names = "timer";
+			status = "disabled";
+		};
+
+		timer7: timer@179008c {
+			compatible = "snps,dw-apb-timer";
+			reg = <0x179008C 0x14>;
+			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+			clock-names = "timer";
+			status = "disabled";
+		};
+	};
 };

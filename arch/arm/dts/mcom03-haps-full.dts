@@ -53,3 +53,43 @@
 &elcore1 {
 	status = "okay";
 };
+
+&timer0 {
+	clocks = <&common_clk>;
+	status = "okay";
+};
+
+&timer1 {
+	clocks = <&common_clk>;
+	status = "okay";
+};
+
+&timer2 {
+	clocks = <&common_clk>;
+	status = "okay";
+};
+
+&timer3 {
+	clocks = <&common_clk>;
+	status = "okay";
+};
+
+&timer4 {
+	clocks = <&common_clk>;
+	status = "okay";
+};
+
+&timer5 {
+	clocks = <&common_clk>;
+	status = "okay";
+};
+
+&timer6 {
+	clocks = <&common_clk>;
+	status = "okay";
+};
+
+&timer7 {
+	clocks = <&common_clk>;
+	status = "okay";
+};
