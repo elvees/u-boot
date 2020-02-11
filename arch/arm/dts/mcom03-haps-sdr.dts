@@ -14,3 +14,11 @@
 		compatible = "elvees,acptest";
 	};
 };
+
+&qlic0 {
+	status = "okay";
+};
+
+&elcore0 {
+	status = "okay";
+};

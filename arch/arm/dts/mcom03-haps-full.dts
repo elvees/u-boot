@@ -41,3 +41,11 @@
 		reg = <0x0>;
 	};
 };
+
+&qlic0 {
+	status = "okay";
+};
+
+&elcore0 {
+	status = "okay";
+};
