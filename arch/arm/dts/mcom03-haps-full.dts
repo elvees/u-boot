@@ -101,3 +101,13 @@
 &wdt0 {
 	clocks = <&common_clk>;
 };
+
+&sdhci0 {
+	/* SDHCI0 is connected to eMMC on HAPS */
+	clocks = <&common_clk>, <&common_clk>;
+	bus-width = <8>;
+	no-1-8-v;
+	non-removable;
+	status = "okay";
+	elvees,broken-hs;
+};

@@ -166,6 +166,11 @@
 		#size-cells = <1>;
 		ranges;
 
+		hsurb: urb@10400000 {
+			compatible = "elvees,mcom03-urb", "syscon";
+			reg = <0x10400000 0x200>;
+		};
+
 		hsreset: reset-controller@10400008 {
 			compatible = "elvees,mcom03-reset";
 			reg = <0x10400008 0x4>;
@@ -185,6 +190,31 @@
 			reg = <0x10210000 0x1000>;
 			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
 			resets = <&hsreset 9>;
+			status = "disabled";
+		};
+
+		sdhci0: sdhci0@10220000 {
+			compatible = "elvees,mcom03-sdhci-8.9a";
+			reg = <0x10220000 0x10000>;
+			arasan,soc-ctl-syscon = <&hsurb>;
+			interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+			/* Linux driver requires the following clock names */
+			clock-names = "clk_xin", "clk_ahb";
+			/* TODO: Add clocks property here */
+			resets = <&hsreset 4>;
+			elvees,ctrl-id = <0>;
+			status = "disabled";
+		};
+
+		sdhci1: sdhci1@10230000 {
+			compatible = "elvees,mcom03-sdhci-8.9a";
+			reg = <0x10230000 0x10000>;
+			arasan,soc-ctl-syscon = <&hsurb>;
+			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
+			clock-names = "clk_xin", "clk_ahb";
+			/* TODO: Add clocks property here */
+			resets = <&hsreset 5>;
+			elvees,ctrl-id = <1>;
 			status = "disabled";
 		};
 	};
