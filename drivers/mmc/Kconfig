@@ -472,6 +472,16 @@ config MMC_SDHCI_KONA
 
 	  If you have a controller with this interface, say Y here.
 
+config MMC_SDHCI_MCOM03
+	bool "Arasan SDHCI controller support on MCom-03 SoC"
+	select SYSCON
+	select REGMAP
+	select CLK
+	depends on DM_MMC && BLK
+	depends on MMC_SDHCI
+	help
+	  Support for Arasan SDHCI host controller on MCom-03 SoC
+
 config MMC_SDHCI_MSM
 	bool "Qualcomm SDHCI controller"
 	depends on BLK && DM_MMC

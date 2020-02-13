@@ -10,6 +10,7 @@ choice
 config TARGET_HAPS
 	bool "HAPS"
 	select DM_ETH
+	select DM_MMC
 	help
 	  Support for the following boards:
 	    HAPS prototype for MCom-03
