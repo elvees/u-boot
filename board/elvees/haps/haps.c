@@ -4,9 +4,10 @@
  */
 
 #include <common.h>
-#include <asm/io.h>
-#include <linux/kernel.h>
 #include <asm/armv8/mmu.h>
+#include <asm/io.h>
+#include <asm/sections.h>
+#include <linux/kernel.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -45,4 +46,19 @@ int dram_init(void)
 int board_init(void)
 {
 	return 0;
+}
+
+/* If external DTB is passed to U-Boot, use it. Otherwise use
+ * DTB appended to U-Boot image (default U-Boot behavior).
+ */
+void *board_fdt_blob_setup(void)
+{
+	void *fdt_blob = NULL;
+
+	if (fdt_magic(CONFIG_MCOM03_EXTERNAL_DTB_ADDR) == FDT_MAGIC)
+		fdt_blob = (ulong *)CONFIG_MCOM03_EXTERNAL_DTB_ADDR;
+	else
+		fdt_blob = (ulong *)&_end;
+
+	return fdt_blob;
 }
