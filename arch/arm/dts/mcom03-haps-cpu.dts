@@ -25,6 +25,10 @@
 	phy-handle = <&ethernet_phy>;
 	clocks = <&common_clk>;
 
+	/* These two are required on HAPS due to its low frequency  */
+	arasan,max-mdc-freq = <150000>;
+	arasan,tx-start-threshold = <1518>;
+
 	ethernet_phy: ethernet-phy@0 {
 		reg = <0x0>;
 	};
