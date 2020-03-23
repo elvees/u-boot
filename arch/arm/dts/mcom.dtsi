@@ -1046,6 +1046,14 @@
 				reg = <0x4c>;
 				reg-bit = <22>;
 			};
+
+			mcc_clk: mcc_clk {
+				compatible = "elvees,mcom-clk-gate";
+				clocks = <&xtimcc>;
+				#clock-cells = <0>;
+				reg = <0x4c>;
+				reg-bit = <6>;
+			};
 		};
 	};
 
@@ -1064,6 +1072,14 @@
 	smctr: smctr@38096000 {
 		compatible = "elvees,mcom-smctr", "syscon";
 		reg = <0x38096000 0x1000>;
+	};
+
+	mcc: mcc@38091000 {
+		compatible = "elvees,mcom-mcc";
+		reg = <0x38091000 0x1000>;
+		interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&mcc_clk>;
+		status = "disabled";
 	};
 
 	vpu: codec@37100000 {
