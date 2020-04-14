@@ -49,3 +49,7 @@
 &elcore0 {
 	status = "okay";
 };
+
+&elcore1 {
+	status = "okay";
+};
