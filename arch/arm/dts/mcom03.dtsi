@@ -240,9 +240,10 @@
 		qlic0: interrupt-controller@1940000 {
 			compatible = "elvees,qlic";
 			interrupt-controller;
+			targets = <16>;
+			#interrupt-cells = <1>;
 			interrupt-parent = <&gic>;
-			pin-ranges = <16 15 1>;
-			#interrupt-cells = <4>;
+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0x1940000 0x40000>;
 			status = "disabled";
 		};
@@ -252,11 +253,8 @@
 			reg = <0x1980000 0x40000>,
 			      <0x3000000 0x200000>;
 			interrupt-parent = <&qlic0>;
-			interrupts = <1 16 2 16>,
-				     <1 17 2 16>,
-				     <1 18 2 16>,
-				     <1 19 2 16>,
-				     <1 20 2 16>;
+			interrupts = <16>, <17>, <18>,
+				     <19>, <20>;
 			status = "disabled";
 		};
 
@@ -265,11 +263,8 @@
 			reg = <0x1C80000 0x40000>,
 			      <0x3200000 0x200000>;
 			interrupt-parent = <&qlic0>;
-			interrupts = <1 23 2 16>,
-				     <1 24 2 16>,
-				     <1 25 2 16>,
-				     <1 26 1 16>,
-				     <1 27 2 16>;
+			interrupts = <23>, <24>, <25>,
+				     <26>, <27>;
 			status = "disabled";
 		};
 	};
