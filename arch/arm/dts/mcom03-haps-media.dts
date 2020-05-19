@@ -18,3 +18,7 @@
 &vpu {
 	status = "okay";
 };
+
+&wdt0 {
+	status = "disabled";
+};

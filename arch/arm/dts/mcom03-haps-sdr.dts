@@ -22,3 +22,7 @@
 &elcore0 {
 	status = "okay";
 };
+
+&wdt0 {
+	status = "disabled";
+};

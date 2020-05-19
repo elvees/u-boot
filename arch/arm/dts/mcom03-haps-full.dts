@@ -97,3 +97,7 @@
 	clocks = <&common_clk>;
 	status = "okay";
 };
+
+&wdt0 {
+	clocks = <&common_clk>;
+};
