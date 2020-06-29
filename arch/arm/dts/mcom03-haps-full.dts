@@ -27,6 +27,21 @@
 	};
 };
 
+/* To workaround bug MCOM03SW-382 "carveout" memory allocator is used
+   in ISP driver. This is temporary solution. */
+&reserved_memory {
+	isp_reserved: isp_reserved@0xf0000000 {
+		no-map;
+		reg = <0xf0000000 0x8000000>;
+	};
+};
+
+&isp {
+	status = "okay";
+	img,carveout-memory = <&isp_reserved>;
+	clocks = <&common_clk>;
+};
+
 &gpu {
 	status = "okay";
 };

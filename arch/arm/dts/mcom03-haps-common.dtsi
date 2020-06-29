@@ -24,7 +24,7 @@
 		reg = <0xC0080000 0x30000000>; /* 768 MiB */
 	};
 
-	reserved-memory {
+	reserved_memory: reserved-memory {
 		#address-cells = <1>;
 		#size-cells = <1>;
 		ranges;

@@ -103,6 +103,15 @@
 		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
 	};
 
+	isp: isp@12a0000 {
+		compatible = "img,v2505-isp";
+		interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
+		reg = <0x12a0000 0x10000>;
+		/* TODO: Add clocks property here */
+		clock-names = "core";
+		status = "disabled";
+	};
+
 	gpu: gpu@1200000 {
 		compatible = "img,gpu";
 		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
