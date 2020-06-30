@@ -218,7 +218,7 @@ void board_init_f(ulong dummy)
 }
 #endif
 
-void reset_cpu(ulong addr)
+__weak void reset_cpu(ulong addr)
 {
 }
 

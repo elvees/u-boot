@@ -1058,6 +1058,7 @@
 	};
 
 	pmctr: pmctr@38095000 {
+		u-boot,dm-spl;
 		compatible = "elvees,mcom-pmctr";
 		reg = <0x38095000 0x1000>;
 

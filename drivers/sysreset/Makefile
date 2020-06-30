@@ -9,6 +9,7 @@ obj-$(CONFIG_ARCH_STI) += sysreset_sti.o
 obj-$(CONFIG_SANDBOX) += sysreset_sandbox.o
 obj-$(CONFIG_SYSRESET_GPIO) += sysreset_gpio.o
 obj-$(CONFIG_SYSRESET_MCP83XX) += sysreset_mpc83xx.o
+obj-$(CONFIG_SYSRESET_MCOM02) += sysreset-mcom02.o
 obj-$(CONFIG_SYSRESET_MICROBLAZE) += sysreset_microblaze.o
 obj-$(CONFIG_SYSRESET_PSCI) += sysreset_psci.o
 obj-$(CONFIG_SYSRESET_TI_SCI) += sysreset-ti-sci.o

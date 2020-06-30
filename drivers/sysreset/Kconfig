@@ -69,4 +69,9 @@ config SYSRESET_MCP83XX
 	help
 	  Reboot support for NXP MPC83xx SoCs.
 
+config SYSRESET_MCOM02
+	bool "Enable support MCom-02 SoC reboot driver"
+	help
+	  Reboot support for MCom-02 SoCs.
+
 endmenu
