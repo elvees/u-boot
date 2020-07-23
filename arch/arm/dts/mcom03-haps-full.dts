@@ -14,6 +14,12 @@
 		compatible = "elvees,acptest";
 	};
 
+	cpu_clk: cpu_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <10000000>;
+	};
+
 	common_clk: common_clk {
 		#clock-cells = <0>;
 		compatible = "fixed-clock";
