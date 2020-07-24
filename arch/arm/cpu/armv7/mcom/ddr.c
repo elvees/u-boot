@@ -624,6 +624,15 @@ static u16 set_impedance_lpddr2(struct impedance_params *impedance,
 	}
 	PHY->ZQ0CR1 = tmp;
 
+	/* When using LPDDR/LPDDR2 this bits must be set to 0 since
+	 * LPDDR/LPDDR2 does not require ODT to be on.
+	 * Default sets to 1.
+	 */
+	PHY->DX0GCR &= ~(DXGCR_DQRTT | DXGCR_DQSRTT);
+	PHY->DX1GCR &= ~(DXGCR_DQRTT | DXGCR_DQSRTT);
+	PHY->DX2GCR &= ~(DXGCR_DQRTT | DXGCR_DQSRTT);
+	PHY->DX3GCR &= ~(DXGCR_DQRTT | DXGCR_DQSRTT);
+
 	return 0;
 }
 
@@ -964,6 +973,7 @@ static void ddr_dump_regs(int ctl_id)
 	printf("%s : 0x%x\n", "MR0", DDRPHY[ctl_id]->MR0);
 	printf("%s : 0x%x\n", "MR1", DDRPHY[ctl_id]->MR1);
 	printf("%s : 0x%x\n", "MR2", DDRPHY[ctl_id]->MR2);
+	printf("%s : 0x%x\n", "MR3", DDRPHY[ctl_id]->MR3);
 	printf("%s : 0x%x\n", "ZQ0CR0", DDRPHY[ctl_id]->ZQ0CR0);
 	printf("%s : 0x%x\n", "ZQ0CR1", DDRPHY[ctl_id]->ZQ0CR1);
 	printf("%s : 0x%x\n", "ZQ0SR0", DDRPHY[ctl_id]->ZQ0SR0);

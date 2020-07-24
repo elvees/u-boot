@@ -51,11 +51,18 @@ config TARGET_SALUTE_PM
 	help
 	  Support for Salute-EL24PM1 board
 
+config TARGET_ECAM02DM
+	bool "ECAM02DM"
+	select SUPPORT_SPL
+	help
+	  Support for ECAM02DM board
+
 endchoice
 
+source "board/elvees/ecam02dm/Kconfig"
+source "board/elvees/ipku/Kconfig"
 source "board/elvees/salute-d1/Kconfig"
 source "board/elvees/salute-d2/Kconfig"
-source "board/elvees/ipku/Kconfig"
 source "board/elvees/salute-pm/Kconfig"
 
 config FDTFILE

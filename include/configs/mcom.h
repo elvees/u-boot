@@ -37,7 +37,13 @@
 	defined(CONFIG_TARGET_IPKU2)
 #define CPLL_VALUE			0x0D
 #else
+
+#if defined(CONFIG_TARGET_ECAM02DM)
+#define CPLL_VALUE			0x0A	/* 264 MHz */
+#else
 #define CPLL_VALUE			0x0F
+#endif  /* CONFIG_TARGET_ECAM02DM */
+
 #endif  /* CONFIG_TARGET_MCOM02_UKF||CONFIG_TARGET_IPKU||CONFIG_TARGET_IPKU2 */
 
 #endif  /* CONFIG_TARGET_SALUTE_PM */
@@ -55,9 +61,17 @@
 #define CONFIG_SYS_SDRAM_BASE		0x40000000
 
 #define PHYS_SDRAM_0			CONFIG_SYS_SDRAM_BASE
+#if defined(CONFIG_TARGET_ECAM02DM)
+#define PHYS_SDRAM_0_SIZE		SZ_256M
+#else
 #define PHYS_SDRAM_0_SIZE		SZ_1G
+#endif
 #define PHYS_SDRAM_1			0xA0000000
+#if defined(CONFIG_TARGET_ECAM02DM)
+#define PHYS_SDRAM_1_SIZE		SZ_256M
+#else
 #define PHYS_SDRAM_1_SIZE		SZ_1G
+#endif
 
 /* The first 64 bytes are reserved for the U-Boot image header. */
 #define CONFIG_SYS_INIT_SP_ADDR		0x40400000
@@ -194,7 +208,7 @@
 
 #include <config_distro_bootcmd.h>
 
-#ifdef CONFIG_TARGET_SALUTE_PM
+#if defined(CONFIG_TARGET_SALUTE_PM) || defined(CONFIG_TARGET_ECAM02DM)
 #define DDRCTL_CMD "ddrctl_cmd=enable\0"
 #else
 #define DDRCTL_CMD "ddrctl_cmd=disable\0"

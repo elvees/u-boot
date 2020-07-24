@@ -1,0 +1,9 @@
+if TARGET_ECAM02DM
+
+config SYS_BOARD
+	default "ecam02dm"
+
+config SYS_CONFIG_NAME
+	default "mcom"
+
+endif
