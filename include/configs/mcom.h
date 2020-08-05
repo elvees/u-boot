@@ -219,6 +219,7 @@
 	"bootelf_spibus=0\0" \
 	"bootelf_addr=0x50000000\0" \
 	"bootelf_elfsize=0x200000\0" \
+	"bootfile=" CONFIG_BOOTFILE "\0" \
 	"stdout=serial\0" \
 	"stderr=serial\0" \
 	DDRCTL_CMD \
@@ -239,7 +240,6 @@
 		"if test -n ${bootenvcmd}; then " \
 			"run bootenvcmd;" \
 		"fi;" \
-		"setenv bootfile " CONFIG_BOOTFILE ";" \
 		"if run loadbootfile; then " \
 			"run mcomboot;" \
 		"fi;\0" \
