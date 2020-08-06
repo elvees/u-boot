@@ -78,6 +78,7 @@
 			"ubifsmount ubi${devnum}:${bootubivol}; " \
 		"then " \
 			"devtype=ubi; " \
+			"distro_bootpart=${bootubivol}; " \
 			"run scan_dev_for_boot; " \
 		"fi\0"
 #define BOOTENV_DEV_UBIFS	BOOTENV_DEV_BLKDEV
