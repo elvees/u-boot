@@ -12,6 +12,24 @@
 	compatible = "elvees,mcom02";
 	interrupt-parent = <&gic>;
 
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		vinc_reserved: vinc-pool {
+			compatible = "shared-dma-pool";
+			reusable;
+			size = <0x4000000>; // 64 MiB
+		};
+
+		vpu_reserved: vpu-pool {
+			compatible = "shared-dma-pool";
+			reusable;
+			size = <0x4000000>; // 64 MiB
+		};
+	};
+
 	aliases {
 		ethernet0 = &ethernet;
 	};
@@ -406,6 +424,7 @@
 	};
 
 	vinc: vinc@37200000 {
+		memory-region = <&vinc_reserved>;
 		compatible = "elvees,vinc";
 		reg = <0x37200000 0x4000>;
 		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
@@ -1086,6 +1105,7 @@
 	};
 
 	vpu: codec@37100000 {
+		memory-region = <&vpu_reserved>;
 		compatible = "elvees,avico";
 		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&vpu_pclk>, <&vpu_aclk>, <&vpu_sclk>, <&dsp_aclk>;
