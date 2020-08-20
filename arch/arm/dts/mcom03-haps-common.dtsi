@@ -21,7 +21,7 @@
 
 	memory@0 {
 		device_type = "memory";
-		reg = <0xC0080000 0x30000000>; /* 768 MiB */
+		reg = <0xC0080000 0x3FF00000>; /* 1023 MiB */
 	};
 
 	reserved_memory: reserved-memory {
