@@ -56,6 +56,17 @@ int board_init(void)
 	return 0;
 }
 
+int dram_init_banksize(void)
+{
+	gd->bd->bi_dram[0].start = PHYS_SDRAM_0;
+	gd->bd->bi_dram[0].size = PHYS_SDRAM_0_SIZE;
+
+	gd->bd->bi_dram[1].start = PHYS_SDRAM_1;
+	gd->bd->bi_dram[1].size = PHYS_SDRAM_1_SIZE;
+
+	return 0;
+}
+
 /* If external DTB is passed to U-Boot, use it. Otherwise use
  * DTB appended to U-Boot image (default U-Boot behavior).
  */
