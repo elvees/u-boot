@@ -10,6 +10,9 @@
 
 #include <linux/sizes.h>
 
+/* Specify available DDR memory.
+ * These macros are also used for specifying DDR size available for Linux.
+ */
 #define CONFIG_SYS_SDRAM_BASE		0xC0000000
 #define PHYS_SDRAM_0			CONFIG_SYS_SDRAM_BASE
 #define PHYS_SDRAM_0_SIZE		SZ_1G
