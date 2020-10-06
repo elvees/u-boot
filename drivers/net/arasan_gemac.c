@@ -478,6 +478,8 @@ static int arasan_gemac_mdio_reset(struct mii_dev *bus)
 static int arasan_gemac_mdio_init(struct udevice *dev)
 {
 	struct arasan_gemac_priv *priv = dev_get_priv(dev);
+	u32 divisor;
+
 
 	priv->bus = mdio_alloc();
 	if (!priv->bus)
@@ -488,6 +490,15 @@ static int arasan_gemac_mdio_init(struct udevice *dev)
 	priv->bus->read = arasan_gemac_mdio_read;
 	priv->bus->write = arasan_gemac_mdio_write;
 	priv->bus->reset = arasan_gemac_mdio_reset;
+
+	/* Maximum allowed MDC clock is 2.5 MHz */
+	divisor = DIV_ROUND_UP(SPLL_FREQ, 2500000);
+
+	/* Only even value is supported by GEMAC */
+	if (divisor % 2)
+		divisor++;
+
+	writel(divisor, priv->base + MAC_MDIO_CLK_DIV_CTRL);
 
 	mdio_register(priv->bus);
 
