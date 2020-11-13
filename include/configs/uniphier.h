@@ -45,10 +45,6 @@
  * MMU and Cache Setting
  *----------------------------------------------------------------------*/
 
-/* Comment out the following to enable L1 cache */
-/* #define CONFIG_SYS_ICACHE_OFF */
-/* #define CONFIG_SYS_DCACHE_OFF */
-
 #define CONFIG_SYS_MALLOC_LEN		(4 * 1024 * 1024)
 
 #define CONFIG_TIMESTAMP
@@ -94,9 +90,6 @@
 #define CONFIG_SYS_NAND_DATA_BASE			0x68000000
 #define CONFIG_SYS_NAND_BAD_BLOCK_POS			0
 
-/* SD/MMC */
-#define CONFIG_SUPPORT_EMMC_BOOT
-
 /* memtest works on */
 #define CONFIG_SYS_MEMTEST_START	CONFIG_SYS_SDRAM_BASE
 #define CONFIG_SYS_MEMTEST_END		(CONFIG_SYS_SDRAM_BASE + 0x01000000)
@@ -123,8 +116,6 @@
 	"second_image=u-boot-spl.bin\0" \
 	"third_image=u-boot.bin\0"
 #endif
-
-#define CONFIG_PREBOOT			"env exist ${bootdev}preboot && run ${bootdev}preboot"
 
 #define CONFIG_ROOTPATH			"/nfs/root/path"
 #define CONFIG_NFSBOOTCOMMAND						\
@@ -231,9 +222,6 @@
 /* only for SPL */
 #if defined(CONFIG_ARCH_UNIPHIER_LD4) || \
 	defined(CONFIG_ARCH_UNIPHIER_SLD8)
-#define CONFIG_SPL_TEXT_BASE		0x00040000
-#else
-#define CONFIG_SPL_TEXT_BASE		0x00100000
 #endif
 
 #define CONFIG_SPL_STACK		(0x00200000)

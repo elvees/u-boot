@@ -22,6 +22,7 @@
 #include <linux/compiler.h>
 #include <fdt_support.h>
 #include <bootcount.h>
+#include <wdt.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -194,10 +195,12 @@ static int spl_load_fit_image(struct spl_image_info *spl_image,
 #ifdef CONFIG_SPL_FIT_SIGNATURE
 	images.verify = 1;
 #endif
-	fit_image_load(&images, (ulong)header,
+	ret = fit_image_load(&images, (ulong)header,
 		       &fit_uname_fdt, &fit_uname_config,
 		       IH_ARCH_DEFAULT, IH_TYPE_FLATDT, -1,
 		       FIT_LOAD_OPTIONAL, &dt_data, &dt_len);
+	if (ret >= 0)
+		spl_image->fdt_addr = (void *)dt_data;
 
 	conf_noffset = fit_conf_get_node((const void *)header,
 					 fit_uname_config);
@@ -239,6 +242,14 @@ int spl_parse_image_header(struct spl_image_info *spl_image,
 #ifdef CONFIG_SPL_LEGACY_IMAGE_SUPPORT
 		u32 header_size = sizeof(struct image_header);
 
+#ifdef CONFIG_SPL_LEGACY_IMAGE_CRC_CHECK
+		/* check uImage header CRC */
+		if (!image_check_hcrc(header)) {
+			puts("SPL: Image header CRC check failed!\n");
+			return -EINVAL;
+		}
+#endif
+
 		if (spl_image->flags & SPL_COPY_PAYLOAD_ONLY) {
 			/*
 			 * On some system (e.g. powerpc), the load-address and
@@ -256,6 +267,13 @@ int spl_parse_image_header(struct spl_image_info *spl_image,
 			spl_image->size = image_get_data_size(header) +
 				header_size;
 		}
+#ifdef CONFIG_SPL_LEGACY_IMAGE_CRC_CHECK
+		/* store uImage data length and CRC to check later */
+		spl_image->dcrc_data = image_get_load(header);
+		spl_image->dcrc_length = image_get_data_size(header);
+		spl_image->dcrc = image_get_dcrc(header);
+#endif
+
 		spl_image->os = image_get_os(header);
 		spl_image->name = image_get_name(header);
 		debug(SPL_TPL_PROMPT
@@ -495,12 +513,25 @@ static struct spl_image_loader *spl_ll_find_loader(uint boot_device)
 static int spl_load_image(struct spl_image_info *spl_image,
 			  struct spl_image_loader *loader)
 {
+	int ret;
 	struct spl_boot_device bootdev;
 
 	bootdev.boot_device = loader->boot_device;
 	bootdev.boot_device_name = NULL;
 
-	return loader->load_image(spl_image, &bootdev);
+	ret = loader->load_image(spl_image, &bootdev);
+#ifdef CONFIG_SPL_LEGACY_IMAGE_CRC_CHECK
+	if (!ret && spl_image->dcrc_length) {
+		/* check data crc */
+		ulong dcrc = crc32_wd(0, (unsigned char *)spl_image->dcrc_data,
+				      spl_image->dcrc_length, CHUNKSZ_CRC32);
+		if (dcrc != spl_image->dcrc) {
+			puts("SPL: Image data CRC check failed!\n");
+			ret = -EINVAL;
+		}
+	}
+#endif
+	return ret;
 }
 
 /**
@@ -570,6 +601,10 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
 
 #if CONFIG_IS_ENABLED(BOARD_INIT)
 	spl_board_init();
+#endif
+
+#if defined(CONFIG_SPL_WATCHDOG_SUPPORT) && defined(CONFIG_WDT)
+	initr_watchdog();
 #endif
 
 	if (IS_ENABLED(CONFIG_SPL_OS_BOOT) || CONFIG_IS_ENABLED(HANDOFF))
@@ -700,6 +735,8 @@ ulong spl_relocate_stack_gd(void)
 
 #if defined(CONFIG_SPL_SYS_MALLOC_SIMPLE) && CONFIG_VAL(SYS_MALLOC_F_LEN)
 	if (CONFIG_SPL_STACK_R_MALLOC_SIMPLE_LEN) {
+		debug("SPL malloc() before relocation used 0x%lx bytes (%ld KB)\n",
+		      gd->malloc_ptr, gd->malloc_ptr / 1024);
 		ptr -= CONFIG_SPL_STACK_R_MALLOC_SIMPLE_LEN;
 		gd->malloc_base = ptr;
 		gd->malloc_limit = CONFIG_SPL_STACK_R_MALLOC_SIMPLE_LEN;

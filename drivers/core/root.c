@@ -25,10 +25,6 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-struct root_priv {
-	fdt_addr_t translation_offset;	/* optional translation offset */
-};
-
 static const struct driver_info root_info = {
 	.name		= "root_driver",
 };
@@ -50,22 +46,6 @@ void dm_fixup_for_gd_move(struct global_data *new_gd)
 		new_gd->uclass_root.next->prev = &new_gd->uclass_root;
 		new_gd->uclass_root.prev->next = &new_gd->uclass_root;
 	}
-}
-
-fdt_addr_t dm_get_translation_offset(void)
-{
-	struct udevice *root = dm_root();
-	struct root_priv *priv = dev_get_priv(root);
-
-	return priv->translation_offset;
-}
-
-void dm_set_translation_offset(fdt_addr_t offs)
-{
-	struct udevice *root = dm_root();
-	struct root_priv *priv = dev_get_priv(root);
-
-	priv->translation_offset = offs;
 }
 
 #if defined(CONFIG_NEEDS_MANUAL_RELOC)
@@ -362,7 +342,7 @@ int dm_extended_scan_fdt(const void *blob, bool pre_reloc_only)
 {
 	int ret;
 
-	ret = dm_scan_fdt(gd->fdt_blob, pre_reloc_only);
+	ret = dm_scan_fdt(blob, pre_reloc_only);
 	if (ret) {
 		debug("dm_scan_fdt() failed: %d\n", ret);
 		return ret;
@@ -420,7 +400,6 @@ int dm_init_and_scan(bool pre_reloc_only)
 U_BOOT_DRIVER(root_driver) = {
 	.name	= "root_driver",
 	.id	= UCLASS_ROOT,
-	.priv_auto_alloc_size = sizeof(struct root_priv),
 };
 
 /* This is the root uclass */

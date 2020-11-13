@@ -145,7 +145,8 @@ static void get_name(dir_entry *dirent, char *s_name)
 }
 
 static int flush_dirty_fat_buffer(fsdata *mydata);
-#if !defined(CONFIG_FAT_WRITE)
+
+#if !CONFIG_IS_ENABLED(FAT_WRITE)
 /* Stub for read only operation */
 int flush_dirty_fat_buffer(fsdata *mydata)
 {
@@ -305,9 +306,6 @@ get_cluster(fsdata *mydata, __u32 clustnum, __u8 *buffer, unsigned long size)
  * into 'buffer'.
  * Update the number of bytes read in *gotsize or return -1 on fatal errors.
  */
-__u8 get_contents_vfatname_block[MAX_CLUSTSIZE]
-	__aligned(ARCH_DMA_MINALIGN);
-
 static int get_contents(fsdata *mydata, dir_entry *dentptr, loff_t pos,
 			__u8 *buffer, loff_t maxsize, loff_t *gotsize)
 {
@@ -350,15 +348,24 @@ static int get_contents(fsdata *mydata, dir_entry *dentptr, loff_t pos,
 
 	/* align to beginning of next cluster if any */
 	if (pos) {
+		__u8 *tmp_buffer;
+
 		actsize = min(filesize, (loff_t)bytesperclust);
-		if (get_cluster(mydata, curclust, get_contents_vfatname_block,
-				(int)actsize) != 0) {
+		tmp_buffer = malloc_cache_aligned(actsize);
+		if (!tmp_buffer) {
+			debug("Error: allocating buffer\n");
+			return -ENOMEM;
+		}
+
+		if (get_cluster(mydata, curclust, tmp_buffer, actsize) != 0) {
 			printf("Error reading cluster\n");
+			free(tmp_buffer);
 			return -1;
 		}
 		filesize -= actsize;
 		actsize -= pos;
-		memcpy(buffer, get_contents_vfatname_block + pos, actsize);
+		memcpy(buffer, tmp_buffer + pos, actsize);
+		free(tmp_buffer);
 		*gotsize += actsize;
 		if (!filesize)
 			return 0;
@@ -595,8 +602,13 @@ static int get_fs_info(fsdata *mydata)
 		mydata->data_begin = mydata->rootdir_sect +
 					mydata->rootdir_size -
 					(mydata->clust_size * 2);
-		mydata->root_cluster =
-			sect_to_clust(mydata, mydata->rootdir_sect);
+
+		/*
+		 * The root directory is not cluster-aligned and may be on a
+		 * "negative" cluster, this will be handled specially in
+		 * next_cluster().
+		 */
+		mydata->root_cluster = 0;
 	}
 
 	mydata->fatbufnum = -1;
@@ -726,20 +738,38 @@ static void fat_itr_child(fat_itr *itr, fat_itr *parent)
 	itr->last_cluster = 0;
 }
 
-static void *next_cluster(fat_itr *itr)
+static void *next_cluster(fat_itr *itr, unsigned *nbytes)
 {
 	fsdata *mydata = itr->fsdata;  /* for silly macros */
 	int ret;
 	u32 sect;
+	u32 read_size;
 
 	/* have we reached the end? */
 	if (itr->last_cluster)
 		return NULL;
 
-	sect = clust_to_sect(itr->fsdata, itr->next_clust);
+	if (itr->is_root && itr->fsdata->fatsize != 32) {
+		/*
+		 * The root directory is located before the data area and
+		 * cannot be indexed using the regular unsigned cluster
+		 * numbers (it may start at a "negative" cluster or not at a
+		 * cluster boundary at all), so consider itr->next_clust to be
+		 * a offset in cluster-sized units from the start of rootdir.
+		 */
+		unsigned sect_offset = itr->next_clust * itr->fsdata->clust_size;
+		unsigned remaining_sects = itr->fsdata->rootdir_size - sect_offset;
+		sect = itr->fsdata->rootdir_sect + sect_offset;
+		/* do not read past the end of rootdir */
+		read_size = min_t(u32, itr->fsdata->clust_size,
+				  remaining_sects);
+	} else {
+		sect = clust_to_sect(itr->fsdata, itr->next_clust);
+		read_size = itr->fsdata->clust_size;
+	}
 
-	debug("FAT read(sect=%d), clust_size=%d, DIRENTSPERBLOCK=%zd\n",
-	      sect, itr->fsdata->clust_size, DIRENTSPERBLOCK);
+	debug("FAT read(sect=%d), clust_size=%d, read_size=%u, DIRENTSPERBLOCK=%zd\n",
+	      sect, itr->fsdata->clust_size, read_size, DIRENTSPERBLOCK);
 
 	/*
 	 * NOTE: do_fat_read_at() had complicated logic to deal w/
@@ -750,18 +780,17 @@ static void *next_cluster(fat_itr *itr)
 	 * dent at a time and iteratively constructing the vfat long
 	 * name.
 	 */
-	ret = disk_read(sect, itr->fsdata->clust_size,
-			itr->block);
+	ret = disk_read(sect, read_size, itr->block);
 	if (ret < 0) {
 		debug("Error: reading block\n");
 		return NULL;
 	}
 
+	*nbytes = read_size * itr->fsdata->sect_size;
 	itr->clust = itr->next_clust;
 	if (itr->is_root && itr->fsdata->fatsize != 32) {
 		itr->next_clust++;
-		sect = clust_to_sect(itr->fsdata, itr->next_clust);
-		if (sect - itr->fsdata->rootdir_sect >=
+		if (itr->next_clust * itr->fsdata->clust_size >=
 		    itr->fsdata->rootdir_size) {
 			debug("nextclust: 0x%x\n", itr->next_clust);
 			itr->last_cluster = 1;
@@ -780,9 +809,8 @@ static void *next_cluster(fat_itr *itr)
 static dir_entry *next_dent(fat_itr *itr)
 {
 	if (itr->remaining == 0) {
-		struct dir_entry *dent = next_cluster(itr);
-		unsigned nbytes = itr->fsdata->sect_size *
-			itr->fsdata->clust_size;
+		unsigned nbytes;
+		struct dir_entry *dent = next_cluster(itr, &nbytes);
 
 		/* have we reached the last cluster? */
 		if (!dent) {
@@ -1106,11 +1134,12 @@ int fat_size(const char *filename, loff_t *size)
 		 * expected to fail if passed a directory path:
 		 */
 		free(fsdata.fatbuf);
-		fat_itr_root(itr, &fsdata);
-		if (!fat_itr_resolve(itr, filename, TYPE_DIR)) {
+		ret = fat_itr_root(itr, &fsdata);
+		if (ret)
+			goto out_free_itr;
+		ret = fat_itr_resolve(itr, filename, TYPE_DIR);
+		if (!ret)
 			*size = 0;
-			ret = 0;
-		}
 		goto out_free_both;
 	}
 
@@ -1141,7 +1170,15 @@ int file_fat_read_at(const char *filename, loff_t pos, void *buffer,
 		goto out_free_both;
 
 	debug("reading %s at pos %llu\n", filename, pos);
-	ret = get_contents(&fsdata, itr->dent, pos, buffer, maxsize, actread);
+
+	/* For saving default max clustersize memory allocated to malloc pool */
+	dir_entry *dentptr = itr->dent;
+
+	free(itr);
+
+	itr = NULL;
+
+	ret = get_contents(&fsdata, dentptr, pos, buffer, maxsize, actread);
 
 out_free_both:
 	free(fsdata.fatbuf);

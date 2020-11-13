@@ -42,7 +42,9 @@ void lynxkdi_boot(image_header_t *hdr);
 
 boot_os_fn *bootm_os_get_boot_func(int os);
 
+#if defined(CONFIG_FIT_SIGNATURE)
 int bootm_host_load_images(const void *fit, int cfg_noffset);
+#endif
 
 int boot_selected_os(int argc, char * const argv[], int state,
 		     bootm_headers_t *images, boot_os_fn *boot_fn);
@@ -81,5 +83,10 @@ int bootm_decomp_image(int comp, ulong load, ulong image_start, int type,
  * TODO(sjg@chromium.org>): Update this to use driver model's device_remove().
  */
 void board_quiesce_devices(void);
+
+/**
+ * switch_to_non_secure_mode() - switch to non-secure mode
+ */
+void switch_to_non_secure_mode(void);
 
 #endif

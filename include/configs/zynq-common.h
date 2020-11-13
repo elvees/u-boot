@@ -14,6 +14,8 @@
 # define CONFIG_CPU_FREQ_HZ	800000000
 #endif
 
+#define CONFIG_REMAKE_ELF
+
 /* Cache options */
 #define CONFIG_SYS_L2CACHE_OFF
 #ifndef CONFIG_SYS_L2CACHE_OFF
@@ -40,9 +42,6 @@
 #endif
 
 /* QSPI */
-#ifdef CONFIG_ZYNQ_QSPI
-# define CONFIG_SF_DEFAULT_SPEED	30000000
-#endif
 
 /* NOR */
 #ifdef CONFIG_MTD_NOR_FLASH
@@ -70,7 +69,7 @@
 # define CONFIG_THOR_RESET_OFF
 # define DFU_ALT_INFO_RAM \
 	"dfu_ram_info=" \
-	"set dfu_alt_info " \
+	"setenv dfu_alt_info " \
 	"${kernel_image} ram 0x3000000 0x500000\\\\;" \
 	"${devicetree_image} ram 0x2A00000 0x20000\\\\;" \
 	"${ramdisk_image} ram 0x2000000 0x600000\0" \
@@ -80,7 +79,7 @@
 # if defined(CONFIG_MMC_SDHCI_ZYNQ)
 #  define DFU_ALT_INFO_MMC \
 	"dfu_mmc_info=" \
-	"set dfu_alt_info " \
+	"setenv dfu_alt_info " \
 	"${kernel_image} fat 0 1\\\\;" \
 	"${devicetree_image} fat 0 1\\\\;" \
 	"${ramdisk_image} fat 0 1\0" \
@@ -98,20 +97,6 @@
 
 #if !defined(DFU_ALT_INFO)
 # define DFU_ALT_INFO
-#endif
-
-/* I2C */
-#if defined(CONFIG_SYS_I2C_ZYNQ)
-# define CONFIG_SYS_I2C
-#endif
-
-/* EEPROM */
-#ifdef CONFIG_ZYNQ_EEPROM
-# define CONFIG_SYS_I2C_EEPROM_ADDR_LEN		1
-# define CONFIG_SYS_I2C_EEPROM_ADDR		0x54
-# define CONFIG_SYS_EEPROM_PAGE_WRITE_BITS	4
-# define CONFIG_SYS_EEPROM_PAGE_WRITE_DELAY_MS	5
-# define CONFIG_SYS_EEPROM_SIZE			1024 /* Bytes */
 #endif
 
 /* Allow to overwrite serial and ethaddr */
@@ -151,11 +136,62 @@
 #define BOOT_TARGET_DEVICES_DHCP(func)
 #endif
 
+#if defined(CONFIG_ZYNQ_QSPI)
+# define BOOT_TARGET_DEVICES_QSPI(func)	func(QSPI, qspi, na)
+#else
+# define BOOT_TARGET_DEVICES_QSPI(func)
+#endif
+
+#if defined(CONFIG_NAND_ZYNQ)
+# define BOOT_TARGET_DEVICES_NAND(func)	func(NAND, nand, na)
+#else
+# define BOOT_TARGET_DEVICES_NAND(func)
+#endif
+
+#if defined(CONFIG_MTD_NOR_FLASH)
+# define BOOT_TARGET_DEVICES_NOR(func)	func(NOR, nor, na)
+#else
+# define BOOT_TARGET_DEVICES_NOR(func)
+#endif
+
+#define BOOTENV_DEV_XILINX(devtypeu, devtypel, instance) \
+	"bootcmd_xilinx=run $modeboot\0"
+
+#define BOOTENV_DEV_NAME_XILINX(devtypeu, devtypel, instance) \
+	"xilinx "
+
+#define BOOTENV_DEV_QSPI(devtypeu, devtypel, instance) \
+	"bootcmd_qspi=sf probe 0 0 0 && " \
+		      "sf read $scriptaddr $script_offset_f $script_size_f && " \
+		      "source ${scriptaddr}; echo SCRIPT FAILED: continuing...;\0"
+
+#define BOOTENV_DEV_NAME_QSPI(devtypeu, devtypel, instance) \
+	"qspi "
+
+#define BOOTENV_DEV_NAND(devtypeu, devtypel, instance) \
+	"bootcmd_nand=nand info && " \
+		      "nand read $scriptaddr $script_offset_f $script_size_f && " \
+		      "source ${scriptaddr}; echo SCRIPT FAILED: continuing...;\0"
+
+#define BOOTENV_DEV_NAME_NAND(devtypeu, devtypel, instance) \
+	"nand "
+
+#define BOOTENV_DEV_NOR(devtypeu, devtypel, instance) \
+	"bootcmd_nor=cp.b $scropt_offset_nor $scriptaddr $script_size_f && " \
+		     "source ${scriptaddr}; echo SCRIPT FAILED: continuing...;\0"
+
+#define BOOTENV_DEV_NAME_NOR(devtypeu, devtypel, instance) \
+	"nor "
+
 #define BOOT_TARGET_DEVICES(func) \
 	BOOT_TARGET_DEVICES_MMC(func) \
+	BOOT_TARGET_DEVICES_QSPI(func) \
+	BOOT_TARGET_DEVICES_NAND(func) \
+	BOOT_TARGET_DEVICES_NOR(func) \
 	BOOT_TARGET_DEVICES_USB(func) \
 	BOOT_TARGET_DEVICES_PXE(func) \
-	BOOT_TARGET_DEVICES_DHCP(func)
+	BOOT_TARGET_DEVICES_DHCP(func) \
+	func(XILINX, xilinx, na)
 
 #include <config_distro_bootcmd.h>
 #endif /* CONFIG_SPL_BUILD */
@@ -170,6 +206,10 @@
 	"nor_flash_off=0xE2100000\0"	\
 	"fdt_high=0x20000000\0"		\
 	"initrd_high=0x20000000\0"	\
+	"scriptaddr=0x20000\0"	\
+	"script_offser_nor=0xE2FC0000\0"	\
+	"script_offset_f=0xFC0000\0"	\
+	"script_size_f=0x40000\0"	\
 	"loadbootenv_addr=0x2000000\0" \
 	"fdt_addr_r=0x1f00000\0"        \
 	"pxefile_addr_r=0x2000000\0"    \
@@ -187,9 +227,9 @@
 				"env run importbootenv; " \
 			"fi; " \
 		"fi; \0" \
-	"sd_loadbootenv=set bootenv_dev mmc && " \
+	"sd_loadbootenv=setenv bootenv_dev mmc && " \
 			"run setbootenv \0" \
-	"usb_loadbootenv=set bootenv_dev usb && usb start && run setbootenv \0" \
+	"usb_loadbootenv=setenv bootenv_dev usb && usb start && run setbootenv \0" \
 	"preboot=if test $modeboot = sdboot; then " \
 			"run sd_loadbootenv; " \
 			"echo Checking if uenvcmd is set ...; " \
@@ -236,17 +276,10 @@
 /* Boot FreeBSD/vxWorks from an ELF image */
 #define CONFIG_SYS_MMC_MAX_DEVICE	1
 
-#define CONFIG_SYS_LDSCRIPT  "arch/arm/mach-zynq/u-boot.lds"
-
 /* MMC support */
 #ifdef CONFIG_MMC_SDHCI_ZYNQ
 #define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION     1
 #define CONFIG_SPL_FS_LOAD_PAYLOAD_NAME     "u-boot.img"
-#endif
-
-/* Disable dcache for SPL just for sure */
-#ifdef CONFIG_SPL_BUILD
-#define CONFIG_SYS_DCACHE_OFF
 #endif
 
 /* Address in RAM where the parameters must be copied by SPL. */
@@ -270,7 +303,6 @@
 #endif
 
 /* SP location before relocation, must use scratch RAM */
-#define CONFIG_SPL_TEXT_BASE	0x0
 
 /* 3 * 64kB blocks of OCM - one is on the top because of bootrom */
 #define CONFIG_SPL_MAX_SIZE	0x30000

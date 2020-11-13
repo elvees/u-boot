@@ -22,8 +22,6 @@
 #define CONFIG_ETHPRIME                 "FEC"
 #define CONFIG_FEC_MXC_PHYADDR          0
 
-#define CONFIG_IP_DEFRAG
-#define CONFIG_TFTP_BLOCKSIZE		16352
 #define CONFIG_TFTP_TSIZE
 
 /* ENET1 */
@@ -35,8 +33,6 @@
 #define CONFIG_SYS_FSL_USDHC_NUM	1
 #elif CONFIG_TARGET_COLIBRI_IMX7_EMMC
 #define CONFIG_SYS_FSL_USDHC_NUM	2
-
-#define CONFIG_SUPPORT_EMMC_BOOT
 #endif
 
 #undef CONFIG_BOOTM_PLAN9
@@ -51,14 +47,22 @@
 #define CONFIG_SERVERIP			192.168.10.1
 
 #define EMMC_BOOTCMD \
-	"emmcargs=ip=off root=/dev/mmcblk0p2 ro rootfstype=ext4 rootwait\0" \
-	"emmcboot=run setup; " \
+	"set_emmcargs=setenv emmcargs ip=off root=PARTUUID=${uuid} ro " \
+		"rootfstype=ext4 rootwait\0" \
+	"emmcboot=run setup; run emmcfinduuid; run set_emmcargs; " \
 		"setenv bootargs ${defargs} ${emmcargs} ${setupargs} " \
 		"${vidargs}; echo Booting from internal eMMC chip...; " \
 		"run m4boot && " \
-		"load mmc 0:1 ${fdt_addr_r} ${soc}-colibri-emmc-${fdt_board}.dtb && " \
-		"load mmc 0:1 ${kernel_addr_r} ${boot_file} && " \
-		"run fdt_fixup && bootz ${kernel_addr_r} - ${fdt_addr_r}\0"
+		"load mmc ${emmcdev}:${emmcbootpart} ${fdt_addr_r} " \
+		"${soc}-colibri-emmc-${fdt_board}.dtb && " \
+		"load mmc ${emmcdev}:${emmcbootpart} ${kernel_addr_r} " \
+		"${boot_file} && run fdt_fixup && " \
+		"bootz ${kernel_addr_r} - ${fdt_addr_r}\0" \
+	"emmcbootpart=1\0" \
+	"emmcdev=0\0" \
+	"emmcfinduuid=part uuid mmc ${emmcdev}:${emmcrootpart} uuid\0" \
+	"emmcrootpart=2\0"
+
 
 #define MEM_LAYOUT_ENV_SETTINGS \
 	"bootm_size=0x10000000\0" \
@@ -69,24 +73,25 @@
 	"ramdisk_addr_r=0x82100000\0"
 
 #if defined(CONFIG_TARGET_COLIBRI_IMX7_NAND)
-#define SD_BOOTCMD \
-	"sdargs=root=/dev/mmcblk0p2 ro rootwait\0" \
-	"sdboot=run setup; setenv bootargs ${defargs} ${sdargs} " \
-	"${setupargs} ${vidargs}; echo Booting from MMC/SD card...; " \
-	"run m4boot && " \
-	"load mmc 0:1 ${kernel_addr_r} ${kernel_file} && " \
-	"load mmc 0:1 ${fdt_addr_r} ${soc}-colibri-${fdt_board}.dtb && " \
-	"run fdt_fixup && bootz ${kernel_addr_r} - ${fdt_addr_r}\0"
+#define SD_BOOTDEV 0
 #elif defined(CONFIG_TARGET_COLIBRI_IMX7_EMMC)
+#define SD_BOOTDEV 1
+#endif
+
 #define SD_BOOTCMD \
-	"sdargs=root=/dev/mmcblk1p2 ro rootwait\0" \
-	"sdboot=run setup; setenv bootargs ${defargs} ${sdargs} " \
+	"set_sdargs=setenv sdargs root=PARTUUID=${uuid} ro rootwait\0" \
+	"sdboot=run setup; run sdfinduuid; run set_sdargs; " \
+	"setenv bootargs ${defargs} ${sdargs} " \
 	"${setupargs} ${vidargs}; echo Booting from MMC/SD card...; " \
 	"run m4boot && " \
-	"load mmc 1:1 ${kernel_addr_r} ${kernel_file} && " \
-	"load mmc 1:1 ${fdt_addr_r} ${soc}-colibri-${fdt_board}.dtb && " \
-	"run fdt_fixup && bootz ${kernel_addr_r} - ${fdt_addr_r}\0"
-#endif
+	"load mmc ${sddev}:${sdbootpart} ${kernel_addr_r} ${kernel_file} && " \
+	"load mmc ${sddev}:${sdbootpart} ${fdt_addr_r} " \
+	"${soc}-colibri-${fdt_board}.dtb && " \
+	"run fdt_fixup && bootz ${kernel_addr_r} - ${fdt_addr_r}\0" \
+	"sdbootpart=1\0" \
+	"sddev=" __stringify(SD_BOOTDEV) "\0" \
+	"sdfinduuid=part uuid mmc ${sddev}:${sdrootpart} uuid\0" \
+	"sdrootpart=2\0"
 
 
 #define NFS_BOOTCMD \
@@ -110,13 +115,13 @@
 		"run fdt_fixup && bootz ${kernel_addr_r} - ${fdt_addr_r}\0" \
 
 #if defined(CONFIG_TARGET_COLIBRI_IMX7_NAND)
-#define CONFIG_BOOTCOMMAND "run emmcboot ; echo ; echo emmcboot failed ; " \
+#define CONFIG_BOOTCOMMAND "run ubiboot ; echo ; echo ubiboot failed ; " \
 	"setenv fdtfile ${soc}-colibri-${fdt_board}.dtb && run distro_bootcmd;"
 #define MODULE_EXTRA_ENV_SETTINGS \
 	"mtdparts=" CONFIG_MTDPARTS_DEFAULT "\0" \
 	UBI_BOOTCMD
 #elif defined(CONFIG_TARGET_COLIBRI_IMX7_EMMC)
-#define CONFIG_BOOTCOMMAND "run ubiboot ; echo ; echo ubiboot failed ; " \
+#define CONFIG_BOOTCOMMAND "run emmcboot ; echo ; echo emmcboot failed ; " \
 	"setenv fdtfile ${soc}-colibri-emmc-${fdt_board}.dtb && run distro_bootcmd;"
 #define MODULE_EXTRA_ENV_SETTINGS \
 	"variant=-emmc\0" \
@@ -143,6 +148,7 @@
 	NFS_BOOTCMD \
 	SD_BOOTCMD \
 	MODULE_EXTRA_ENV_SETTINGS \
+	"boot_file=zImage\0" \
 	"console=ttymxc0\0" \
 	"defargs=\0" \
 	"fdt_board=eval-v3\0" \
@@ -226,7 +232,7 @@
 #define CONFIG_SYS_DFU_DATA_BUF_SIZE	SZ_16M
 #define DFU_DEFAULT_POLL_TIMEOUT	300
 
-#ifdef CONFIG_VIDEO
+#if defined(CONFIG_VIDEO) || defined(CONFIG_DM_VIDEO)
 #define CONFIG_VIDEO_MXS
 #define CONFIG_VIDEO_LOGO
 #define CONFIG_SPLASH_SCREEN

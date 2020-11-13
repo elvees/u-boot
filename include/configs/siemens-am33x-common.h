@@ -61,8 +61,6 @@
 
 #define CONFIG_SYS_LOAD_ADDR		0x81000000 /* Default load address */
 
-#define CONFIG_SF_DEFAULT_SPEED		(75000000)
-
  /* Physical Memory Map */
 #define PHYS_DRAM_1			0x80000000	/* DRAM Bank #1 */
 
@@ -88,7 +86,6 @@
 #define CONFIG_SYS_I2C
 
 /* Defines for SPL */
-#define CONFIG_SPL_TEXT_BASE		0x402F0400
 #define CONFIG_SPL_MAX_SIZE		(SRAM_SCRATCH_SPACE_ADDR - \
 					 CONFIG_SPL_TEXT_BASE)
 
@@ -152,8 +149,6 @@
 /*
  * USB configuration
  */
-#define CONFIG_USB_MUSB_DISABLE_BULK_COMBINE_SPLIT
-
 #define CONFIG_AM335X_USB0
 #define CONFIG_AM335X_USB0_MODE	MUSB_PERIPHERAL
 #define CONFIG_AM335X_USB1
@@ -181,7 +176,6 @@
  * 0x442000 - 0x800000 : Userland
  */
 #if defined(CONFIG_SPI_BOOT)
-# define CONFIG_ENV_SPI_MAX_HZ		CONFIG_SF_DEFAULT_SPEED
 # define CONFIG_ENV_OFFSET		(892 << 10) /* 892 KiB in */
 # define CONFIG_ENV_SECT_SIZE		(4 << 10) /* 4 KB sectors */
 #endif /* SPI support */

@@ -141,10 +141,18 @@ config PHY_STM32_USBPHYC
 
 config MESON_GXL_USB_PHY
 	bool "Amlogic Meson GXL USB PHYs"
-	depends on PHY && ARCH_MESON && MESON_GXL
+	depends on PHY && ARCH_MESON && (MESON_GXL || MESON_GXM)
 	imply REGMAP
 	help
 	  This is the generic phy driver for the Amlogic Meson GXL
+	  USB2 and USB3 PHYS.
+
+config MESON_G12A_USB_PHY
+	bool "Amlogic Meson G12A USB PHYs"
+	depends on PHY && ARCH_MESON && MESON_G12A
+	imply REGMAP
+	help
+	  This is the generic phy driver for the Amlogic Meson G12A
 	  USB2 and USB3 PHYS.
 
 config MSM8916_USB_PHY
@@ -173,5 +181,13 @@ config KEYSTONE_USB_PHY
 	  Support for the USB PHY found on some Keystone (k2) processors
 
 	  This PHY is found on some Keystone (K2) devices supporting USB.
+
+config MT76X8_USB_PHY
+	bool "MediaTek MT76x8 (7628/88) USB PHY support"
+	depends on PHY
+	help
+          Support the USB PHY in MT76x8 SoCs
+
+	  This PHY is found on MT76x8 devices supporting USB.
 
 endmenu

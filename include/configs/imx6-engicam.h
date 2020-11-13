@@ -56,6 +56,7 @@
 	"loadimage=fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${image}\0" \
 	"loadfdt=fatload mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${fdt_file}\0" \
 	"loadfit=fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${fit_image}\0" \
+	"altbootcmd=run recoveryboot\0"\
 	"fitboot=echo Booting FIT image from mmc ...; " \
 		"run mmcargs; " \
 		"bootm ${loadaddr}\0" \
@@ -97,7 +98,12 @@
 		"run ubiargs; " \
 		"nand read ${loadaddr} kernel 0x800000; " \
 		"nand read ${fdt_addr} dtb 0x100000; " \
-		"bootm ${loadaddr} - ${fdt_addr}\0"
+		"bootm ${loadaddr} - ${fdt_addr}\0" \
+	"recoveryboot=if test ${modeboot} = mmcboot; then " \
+			"run mmcboot; " \
+		"else " \
+			"run nandboot; " \
+		"fi\0"
 
 #define CONFIG_BOOTCOMMAND		"run $modeboot"
 

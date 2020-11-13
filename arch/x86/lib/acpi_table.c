@@ -342,18 +342,22 @@ static void acpi_create_spcr(struct acpi_spcr *spcr)
 	struct acpi_table_header *header = &(spcr->header);
 	struct serial_device_info serial_info = {0};
 	ulong serial_address, serial_offset;
+	struct udevice *dev;
 	uint serial_config;
 	uint serial_width;
 	int access_size;
 	int space_id;
-	int ret;
+	int ret = -ENODEV;
 
 	/* Fill out header fields */
 	acpi_fill_header(header, "SPCR");
 	header->length = sizeof(struct acpi_spcr);
 	header->revision = 2;
 
-	ret = serial_getinfo(&serial_info);
+	/* Read the device once, here. It is reused below */
+	dev = gd->cur_serial_dev;
+	if (dev)
+		ret = serial_getinfo(dev, &serial_info);
 	if (ret)
 		serial_info.type = SERIAL_CHIP_UNKNOWN;
 
@@ -431,9 +435,9 @@ static void acpi_create_spcr(struct acpi_spcr *spcr)
 		break;
 	}
 
-	ret = serial_getconfig(&serial_config);
-	if (ret)
-		serial_config = SERIAL_DEFAULT_CONFIG;
+	serial_config = SERIAL_DEFAULT_CONFIG;
+	if (dev)
+		ret = serial_getconfig(dev, &serial_config);
 
 	spcr->parity = SERIAL_GET_PARITY(serial_config);
 	spcr->stop_bits = SERIAL_GET_STOP(serial_config);

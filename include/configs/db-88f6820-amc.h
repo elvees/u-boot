@@ -16,16 +16,10 @@
  * Commands configuration
  */
 
-/* SPI NOR flash default params, used by sf commands */
-#define CONFIG_SF_DEFAULT_BUS		1
-#define CONFIG_SF_DEFAULT_SPEED		1000000
-#define CONFIG_SF_DEFAULT_MODE		SPI_MODE_3
-
 /* USB/EHCI configuration */
 #define CONFIG_EHCI_IS_TDI
 
 /* Environment in SPI NOR flash */
-#define CONFIG_ENV_SPI_BUS		1
 #define CONFIG_ENV_OFFSET		(1 << 20) /* 1MiB in */
 #define CONFIG_ENV_SIZE			(64 << 10) /* 64KiB */
 #define CONFIG_ENV_SECT_SIZE		(256 << 10) /* 256KiB sectors */
@@ -34,7 +28,6 @@
 
 /* PCIe support */
 #ifndef CONFIG_SPL_BUILD
-#define CONFIG_PCI_MVEBU
 #define CONFIG_PCI_SCAN_SHOW
 #endif
 
@@ -62,7 +55,6 @@
 
 /* Defines for SPL */
 #define CONFIG_SPL_SIZE			(140 << 10)
-#define CONFIG_SPL_TEXT_BASE		0x40000030
 #define CONFIG_SPL_MAX_SIZE		(CONFIG_SPL_SIZE - 0x0030)
 
 #define CONFIG_SPL_BSS_START_ADDR	(0x40000000 + CONFIG_SPL_SIZE)

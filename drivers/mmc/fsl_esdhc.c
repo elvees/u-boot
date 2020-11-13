@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2007, 2010-2011 Freescale Semiconductor, Inc
+ * Copyright 2019 NXP Semiconductors
  * Andy Fleming
  *
  * Based vaguely on the pxa mmc code:
@@ -25,6 +26,10 @@
 #include <asm-generic/gpio.h>
 #include <dm/pinctrl.h>
 
+#if !CONFIG_IS_ENABLED(BLK)
+#include "mmc_private.h"
+#endif
+
 DECLARE_GLOBAL_DATA_PTR;
 
 #define SDHCI_IRQ_EN_BITS		(IRQSTATEN_CC | IRQSTATEN_TC | \
@@ -34,6 +39,7 @@ DECLARE_GLOBAL_DATA_PTR;
 				IRQSTATEN_DEBE | IRQSTATEN_BRR | IRQSTATEN_BWR | \
 				IRQSTATEN_DINT)
 #define MAX_TUNING_LOOP 40
+#define ESDHC_DRIVER_STAGE_VALUE 0xffffffff
 
 struct fsl_esdhc {
 	uint    dsaddr;		/* SDMA system address register */
@@ -297,6 +303,13 @@ static int esdhc_setup_data(struct fsl_esdhc_priv *priv, struct mmc *mmc,
 				printf("\nThe SD card is locked. Can not write to a locked card.\n\n");
 				return -ETIMEDOUT;
 			}
+		} else {
+#ifdef CONFIG_DM_GPIO
+			if (dm_gpio_is_valid(&priv->wp_gpio) && dm_gpio_get_value(&priv->wp_gpio)) {
+				printf("\nThe SD card is locked. Can not write to a locked card.\n\n");
+				return -ETIMEDOUT;
+			}
+#endif
 		}
 
 		esdhc_clrsetbits32(&regs->wml, WML_WR_WML_MASK,
@@ -383,6 +396,25 @@ static void check_and_invalidate_dcache_range
 	end = start + size;
 	invalidate_dcache_range(start, end);
 }
+
+#ifdef CONFIG_MCF5441x
+/*
+ * Swaps 32-bit words to little-endian byte order.
+ */
+static inline void sd_swap_dma_buff(struct mmc_data *data)
+{
+	int i, size = data->blocksize >> 2;
+	u32 *buffer = (u32 *)data->dest;
+	u32 sw;
+
+	while (data->blocks--) {
+		for (i = 0; i < size; i++) {
+			sw = __sw32(*buffer);
+			*buffer++ = sw;
+		}
+	}
+}
+#endif
 
 /*
  * Sends a command out on the bus.  Takes the mmc pointer,
@@ -546,8 +578,12 @@ static int esdhc_send_cmd_common(struct fsl_esdhc_priv *priv, struct mmc *mmc,
 		 * cache-fill during the DMA operations such as the
 		 * speculative pre-fetching etc.
 		 */
-		if (data->flags & MMC_DATA_READ)
+		if (data->flags & MMC_DATA_READ) {
 			check_and_invalidate_dcache_range(cmd, data);
+#ifdef CONFIG_MCF5441x
+			sd_swap_dma_buff(data);
+#endif
+		}
 #endif
 	}
 
@@ -781,7 +817,7 @@ static int esdhc_set_voltage(struct mmc *mmc)
 	case MMC_SIGNAL_VOLTAGE_330:
 		if (priv->vs18_enable)
 			return -EIO;
-#ifdef CONFIG_DM_REGULATOR
+#if CONFIG_IS_ENABLED(DM_REGULATOR)
 		if (!IS_ERR_OR_NULL(priv->vqmmc_dev)) {
 			ret = regulator_set_value(priv->vqmmc_dev, 3300000);
 			if (ret) {
@@ -800,7 +836,7 @@ static int esdhc_set_voltage(struct mmc *mmc)
 
 		return -EAGAIN;
 	case MMC_SIGNAL_VOLTAGE_180:
-#ifdef CONFIG_DM_REGULATOR
+#if CONFIG_IS_ENABLED(DM_REGULATOR)
 		if (!IS_ERR_OR_NULL(priv->vqmmc_dev)) {
 			ret = regulator_set_value(priv->vqmmc_dev, 1800000);
 			if (ret) {
@@ -1029,8 +1065,12 @@ static int esdhc_init_common(struct fsl_esdhc_priv *priv, struct mmc *mmc)
 	/* Disable the BRR and BWR bits in IRQSTAT */
 	esdhc_clrbits32(&regs->irqstaten, IRQSTATEN_BRR | IRQSTATEN_BWR);
 
+#ifdef CONFIG_MCF5441x
+	esdhc_write32(&regs->proctl, PROCTL_INIT | PROCTL_D3CD);
+#else
 	/* Put the PROCTL reg back to the default */
 	esdhc_write32(&regs->proctl, PROCTL_INIT);
+#endif
 
 	/* Set timout to the maximum value */
 	esdhc_clrsetbits32(&regs->sysctl, SYSCTL_TIMEOUT_MASK, 14 << 16);
@@ -1138,6 +1178,11 @@ static int fsl_esdhc_init(struct fsl_esdhc_priv *priv,
 	if (ret)
 		return ret;
 
+#ifdef CONFIG_MCF5441x
+	/* ColdFire, using SDHC_DATA[3] for card detection */
+	esdhc_write32(&regs->proctl, PROCTL_INIT | PROCTL_D3CD);
+#endif
+
 #ifndef CONFIG_FSL_USDHC
 	esdhc_setbits32(&regs->sysctl, SYSCTL_PEREN | SYSCTL_HCKEN
 				| SYSCTL_IPGEN | SYSCTL_CKEN);
@@ -1161,6 +1206,15 @@ static int fsl_esdhc_init(struct fsl_esdhc_priv *priv,
 
 	voltage_caps = 0;
 	caps = esdhc_read32(&regs->hostcapblt);
+
+#ifdef CONFIG_MCF5441x
+	/*
+	 * MCF5441x RM declares in more points that sdhc clock speed must
+	 * never exceed 25 Mhz. From this, the HS bit needs to be disabled
+	 * from host capabilities.
+	 */
+	caps &= ~ESDHC_HOSTCAPBLT_HSS;
+#endif
 
 #ifdef CONFIG_SYS_FSL_ERRATUM_ESDHC135
 	caps = caps & ~(ESDHC_HOSTCAPBLT_SRS |
@@ -1387,7 +1441,9 @@ void fdt_fixup_esdhc(void *blob, bd_t *bd)
 #endif
 
 #if CONFIG_IS_ENABLED(DM_MMC)
+#ifndef CONFIG_PPC
 #include <asm/arch/clock.h>
+#endif
 __weak void init_clk_usdhc(u32 index)
 {
 }
@@ -1401,19 +1457,25 @@ static int fsl_esdhc_probe(struct udevice *dev)
 	int node = dev_of_offset(dev);
 	struct esdhc_soc_data *data =
 		(struct esdhc_soc_data *)dev_get_driver_data(dev);
-#ifdef CONFIG_DM_REGULATOR
+#if CONFIG_IS_ENABLED(DM_REGULATOR)
 	struct udevice *vqmmc_dev;
 #endif
 	fdt_addr_t addr;
 	unsigned int val;
 	struct mmc *mmc;
+#if !CONFIG_IS_ENABLED(BLK)
+	struct blk_desc *bdesc;
+#endif
 	int ret;
 
 	addr = dev_read_addr(dev);
 	if (addr == FDT_ADDR_T_NONE)
 		return -EINVAL;
-
+#ifdef CONFIG_PPC
+	priv->esdhc_regs = (struct fsl_esdhc *)lower_32_bits(addr);
+#else
 	priv->esdhc_regs = (struct fsl_esdhc *)addr;
+#endif
 	priv->dev = dev;
 	priv->mode = -1;
 	if (data) {
@@ -1448,18 +1510,19 @@ static int fsl_esdhc_probe(struct udevice *dev)
 #endif
 	}
 
-	priv->wp_enable = 1;
-
-#ifdef CONFIG_DM_GPIO
-	ret = gpio_request_by_name(dev, "wp-gpios", 0, &priv->wp_gpio,
-				   GPIOD_IS_IN);
-	if (ret)
+	if (dev_read_prop(dev, "fsl,wp-controller", NULL)) {
+		priv->wp_enable = 1;
+	} else {
 		priv->wp_enable = 0;
+#ifdef CONFIG_DM_GPIO
+		gpio_request_by_name(dev, "wp-gpios", 0, &priv->wp_gpio,
+				   GPIOD_IS_IN);
 #endif
+	}
 
 	priv->vs18_enable = 0;
 
-#ifdef CONFIG_DM_REGULATOR
+#if CONFIG_IS_ENABLED(DM_REGULATOR)
 	/*
 	 * If emmc I/O has a fixed voltage at 1.8V, this must be provided,
 	 * otherwise, emmc will work abnormally.
@@ -1519,7 +1582,11 @@ static int fsl_esdhc_probe(struct udevice *dev)
 
 		priv->sdhc_clk = clk_get_rate(&priv->per_clk);
 	} else {
+#ifndef CONFIG_PPC
 		priv->sdhc_clk = mxc_get_clock(MXC_ESDHC_CLK + dev->seq);
+#else
+		priv->sdhc_clk = gd->arch.sdhc_clk;
+#endif
 		if (priv->sdhc_clk <= 0) {
 			dev_err(dev, "Unable to get clk for %s\n", dev->name);
 			return -EINVAL;
@@ -1535,6 +1602,26 @@ static int fsl_esdhc_probe(struct udevice *dev)
 	mmc = &plat->mmc;
 	mmc->cfg = &plat->cfg;
 	mmc->dev = dev;
+#if !CONFIG_IS_ENABLED(BLK)
+	mmc->priv = priv;
+
+	/* Setup dsr related values */
+	mmc->dsr_imp = 0;
+	mmc->dsr = ESDHC_DRIVER_STAGE_VALUE;
+	/* Setup the universal parts of the block interface just once */
+	bdesc = mmc_get_blk_desc(mmc);
+	bdesc->if_type = IF_TYPE_MMC;
+	bdesc->removable = 1;
+	bdesc->devnum = mmc_get_next_devnum();
+	bdesc->block_read = mmc_bread;
+	bdesc->block_write = mmc_bwrite;
+	bdesc->block_erase = mmc_berase;
+
+	/* setup initial part type */
+	bdesc->part_type = mmc->cfg->part_type;
+	mmc_list_add(mmc);
+#endif
+
 	upriv->mmc = mmc;
 
 	return esdhc_init_common(priv, mmc);
@@ -1545,7 +1632,6 @@ static int fsl_esdhc_get_cd(struct udevice *dev)
 {
 	struct fsl_esdhc_priv *priv = dev_get_priv(dev);
 
-	return true;
 	return esdhc_getcd_common(priv);
 }
 
@@ -1585,6 +1671,7 @@ static struct esdhc_soc_data usdhc_imx7d_data = {
 };
 
 static const struct udevice_id fsl_esdhc_ids[] = {
+	{ .compatible = "fsl,imx53-esdhc", },
 	{ .compatible = "fsl,imx6ul-usdhc", },
 	{ .compatible = "fsl,imx6sx-usdhc", },
 	{ .compatible = "fsl,imx6sl-usdhc", },

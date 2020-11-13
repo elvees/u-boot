@@ -593,6 +593,29 @@ int i2c_chip_ofdata_to_platdata(struct udevice *dev, struct dm_i2c_chip *chip)
 }
 #endif
 
+static int i2c_pre_probe(struct udevice *dev)
+{
+#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+	struct dm_i2c_bus *i2c = dev_get_uclass_priv(dev);
+	unsigned int max = 0;
+	ofnode node;
+	int ret;
+
+	i2c->max_transaction_bytes = 0;
+	dev_for_each_subnode(node, dev) {
+		ret = ofnode_read_u32(node,
+				      "u-boot,i2c-transaction-bytes",
+				      &max);
+		if (!ret && max > i2c->max_transaction_bytes)
+			i2c->max_transaction_bytes = max;
+	}
+
+	debug("%s: I2C bus: %s max transaction bytes: %d\n", __func__,
+	      dev->name, i2c->max_transaction_bytes);
+#endif
+	return 0;
+}
+
 static int i2c_post_probe(struct udevice *dev)
 {
 #if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
@@ -619,13 +642,62 @@ static int i2c_child_post_bind(struct udevice *dev)
 #endif
 }
 
+struct i2c_priv {
+	int max_id;
+};
+
+static int i2c_post_bind(struct udevice *dev)
+{
+	struct uclass *class = dev->uclass;
+	struct i2c_priv *priv = class->priv;
+	int ret = 0;
+
+	/* Just for sure */
+	if (!priv)
+		return -ENOMEM;
+
+	debug("%s: %s, req_seq=%d\n", __func__, dev->name, dev->req_seq);
+
+	/* if there is no alias ID, use the first free */
+	if (dev->req_seq == -1)
+		dev->req_seq = ++priv->max_id;
+
+	debug("%s: %s, new req_seq=%d\n", __func__, dev->name, dev->req_seq);
+
+#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+	ret = dm_scan_fdt_dev(dev);
+#endif
+	return ret;
+}
+
+int i2c_uclass_init(struct uclass *class)
+{
+	struct i2c_priv *priv = class->priv;
+
+	/* Just for sure */
+	if (!priv)
+		return -ENOMEM;
+
+	/* Get the last allocated alias. */
+#if CONFIG_IS_ENABLED(OF_CONTROL)
+	priv->max_id = dev_read_alias_highest_id("i2c");
+#else
+	priv->max_id = -1;
+#endif
+
+	debug("%s: highest alias id is %d\n", __func__, priv->max_id);
+
+	return 0;
+}
+
 UCLASS_DRIVER(i2c) = {
 	.id		= UCLASS_I2C,
 	.name		= "i2c",
 	.flags		= DM_UC_FLAG_SEQ_ALIAS,
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
-	.post_bind	= dm_scan_fdt_dev,
-#endif
+	.post_bind	= i2c_post_bind,
+	.init		= i2c_uclass_init,
+	.priv_auto_alloc_size = sizeof(struct i2c_priv),
+	.pre_probe      = i2c_pre_probe,
 	.post_probe	= i2c_post_probe,
 	.per_device_auto_alloc_size = sizeof(struct dm_i2c_bus),
 	.per_child_platdata_auto_alloc_size = sizeof(struct dm_i2c_chip),

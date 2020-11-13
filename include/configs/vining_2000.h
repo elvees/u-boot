@@ -17,9 +17,6 @@
 /* Size of malloc() pool */
 #define CONFIG_SYS_MALLOC_LEN		(3 * SZ_1M)
 
-#define CONFIG_MXC_UART
-#define CONFIG_MXC_UART_BASE		UART1_BASE
-
 #define BOOT_TARGET_DEVICES(func) \
 	func(MMC, mmc, 0) \
 	func(MMC, mmc, 1) \
@@ -95,7 +92,6 @@
 #define CONFIG_ENV_SIZE_REDUND		CONFIG_ENV_SIZE
 
 #ifdef CONFIG_ENV_IS_IN_MMC
-#define CONFIG_SUPPORT_EMMC_BOOT
 #define CONFIG_SYS_MMC_ENV_DEV		0 /* USDHC4 eMMC */
 /* 0=user, 1=boot0, 2=boot1, * 4..7=general0..3. */
 #define CONFIG_SYS_MMC_ENV_PART		1 /* boot0 */

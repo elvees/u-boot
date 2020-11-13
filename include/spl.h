@@ -67,13 +67,18 @@ struct spl_image_info {
 	u8 os;
 	uintptr_t load_addr;
 	uintptr_t entry_point;
-#if CONFIG_IS_ENABLED(LOAD_FIT)
+#if CONFIG_IS_ENABLED(LOAD_FIT) || CONFIG_IS_ENABLED(LOAD_FIT_FULL)
 	void *fdt_addr;
 #endif
 	u32 boot_device;
 	u32 size;
 	u32 flags;
 	void *arg;
+#ifdef CONFIG_SPL_LEGACY_IMAGE_CRC_CHECK
+	ulong dcrc_data;
+	ulong dcrc_length;
+	ulong dcrc;
+#endif
 };
 
 /*

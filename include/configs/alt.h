@@ -39,10 +39,10 @@
 #define CONFIG_SYS_CLK_FREQ	RMOBILE_XTAL_CLK
 
 #define CONFIG_EXTRA_ENV_SETTINGS	\
-	"bootm_size=0x10000000\0"
+	"bootm_size=0x10000000\0"	\
+	"usb_pgood_delay=2000\0"
 
 /* SPL support */
-#define CONFIG_SPL_TEXT_BASE		0xe6300000
 #define CONFIG_SPL_STACK		0xe6340000
 #define CONFIG_SPL_MAX_SIZE		0x4000
 #define CONFIG_SYS_SPI_U_BOOT_OFFS	0x140000

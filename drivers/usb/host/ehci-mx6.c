@@ -18,6 +18,7 @@
 #include <dm.h>
 #include <asm/mach-types.h>
 #include <power/regulator.h>
+#include <linux/usb/otg.h>
 
 #include "ehci.h"
 
@@ -404,6 +405,7 @@ static int mx6_init_after_reset(struct ehci_ctrl *dev)
 	if (ret)
 		return ret;
 
+#if CONFIG_IS_ENABLED(DM_REGULATOR)
 	if (priv->vbus_supply) {
 		ret = regulator_set_enable(priv->vbus_supply,
 					   (type == USB_INIT_DEVICE) ?
@@ -413,6 +415,7 @@ static int mx6_init_after_reset(struct ehci_ctrl *dev)
 			return ret;
 		}
 	}
+#endif
 
 	if (type == USB_INIT_DEVICE)
 		return 0;
@@ -481,23 +484,59 @@ static int ehci_usb_phy_mode(struct udevice *dev)
 static int ehci_usb_ofdata_to_platdata(struct udevice *dev)
 {
 	struct usb_platdata *plat = dev_get_platdata(dev);
-	const char *mode;
+	enum usb_dr_mode dr_mode;
 
-	mode = fdt_getprop(gd->fdt_blob, dev_of_offset(dev), "dr_mode", NULL);
-	if (mode) {
-		if (strcmp(mode, "peripheral") == 0)
-			plat->init_type = USB_INIT_DEVICE;
-		else if (strcmp(mode, "host") == 0)
-			plat->init_type = USB_INIT_HOST;
-		else if (strcmp(mode, "otg") == 0)
-			return ehci_usb_phy_mode(dev);
-		else
-			return -EINVAL;
+	dr_mode = usb_get_dr_mode(dev_of_offset(dev));
 
-		return 0;
-	}
+	switch (dr_mode) {
+	case USB_DR_MODE_HOST:
+		plat->init_type = USB_INIT_HOST;
+		break;
+	case USB_DR_MODE_PERIPHERAL:
+		plat->init_type = USB_INIT_DEVICE;
+		break;
+	case USB_DR_MODE_OTG:
+	case USB_DR_MODE_UNKNOWN:
+		return ehci_usb_phy_mode(dev);
+	};
 
-	return ehci_usb_phy_mode(dev);
+	return 0;
+}
+
+static int ehci_usb_bind(struct udevice *dev)
+{
+	/*
+	 * TODO:
+	 * This driver is only partly converted to DT probing and still uses
+	 * a tremendous amount of hard-coded addresses. To make things worse,
+	 * the driver depends on specific sequential indexing of controllers,
+	 * from which it derives offsets in the PHY and ANATOP register sets.
+	 *
+	 * Here we attempt to calculate these indexes from DT information as
+	 * well as we can. The USB controllers on all existing iMX6/iMX7 SoCs
+	 * are placed next to each other, at addresses incremented by 0x200.
+	 * Thus, the index is derived from the multiple of 0x200 offset from
+	 * the first controller address.
+	 *
+	 * However, to complete conversion of this driver to DT probing, the
+	 * following has to be done:
+	 * - DM clock framework support for iMX must be implemented
+	 * - usb_power_config() has to be converted to clock framework
+	 *   -> Thus, the ad-hoc "index" variable goes away.
+	 * - USB PHY handling has to be factored out into separate driver
+	 *   -> Thus, the ad-hoc "index" variable goes away from the PHY
+	 *      code, the PHY driver must parse it's address from DT. This
+	 *      USB driver must find the PHY driver via DT phandle.
+	 *   -> usb_power_config() shall be moved to PHY driver
+	 * With these changes in place, the ad-hoc indexing goes away and
+	 * the driver is fully converted to DT probing.
+	 */
+	fdt_size_t size;
+	fdt_addr_t addr = devfdt_get_addr_size_index(dev, 0, &size);
+
+	dev->req_seq = (addr - USB_BASE_ADDR) / size;
+
+	return 0;
 }
 
 static int ehci_usb_probe(struct udevice *dev)
@@ -514,15 +553,17 @@ static int ehci_usb_probe(struct udevice *dev)
 	priv->portnr = dev->seq;
 	priv->init_type = type;
 
+#if CONFIG_IS_ENABLED(DM_REGULATOR)
 	ret = device_get_supply_regulator(dev, "vbus-supply",
 					  &priv->vbus_supply);
 	if (ret)
 		debug("%s: No vbus supply\n", dev->name);
-
+#endif
 	ret = ehci_mx6_common_init(ehci, priv->portnr);
 	if (ret)
 		return ret;
 
+#if CONFIG_IS_ENABLED(DM_REGULATOR)
 	if (priv->vbus_supply) {
 		ret = regulator_set_enable(priv->vbus_supply,
 					   (type == USB_INIT_DEVICE) ?
@@ -532,6 +573,7 @@ static int ehci_usb_probe(struct udevice *dev)
 			return ret;
 		}
 	}
+#endif
 
 	if (priv->init_type == USB_INIT_HOST) {
 		setbits_le32(&ehci->usbmode, CM_HOST);
@@ -558,6 +600,7 @@ U_BOOT_DRIVER(usb_mx6) = {
 	.id	= UCLASS_USB,
 	.of_match = mx6_usb_ids,
 	.ofdata_to_platdata = ehci_usb_ofdata_to_platdata,
+	.bind	= ehci_usb_bind,
 	.probe	= ehci_usb_probe,
 	.remove = ehci_deregister,
 	.ops	= &ehci_usb_ops,

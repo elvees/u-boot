@@ -117,8 +117,8 @@ def pytest_configure(config):
     mkdir_p(persistent_data_dir)
 
     gdbserver = config.getoption('gdbserver')
-    if gdbserver and board_type != 'sandbox':
-        raise Exception('--gdbserver only supported with sandbox')
+    if gdbserver and not board_type.startswith('sandbox'):
+        raise Exception('--gdbserver only supported with sandbox targets')
 
     import multiplexed_log
     log = multiplexed_log.Logfile(result_dir + '/test-log.html')
@@ -460,11 +460,15 @@ def setup_buildconfigspec(item):
     """
 
     mark = item.get_marker('buildconfigspec')
-    if not mark:
-        return
-    for option in mark.args:
-        if not ubconfig.buildconfig.get('config_' + option.lower(), None):
-            pytest.skip('.config feature "%s" not enabled' % option.lower())
+    if mark:
+        for option in mark.args:
+            if not ubconfig.buildconfig.get('config_' + option.lower(), None):
+                pytest.skip('.config feature "%s" not enabled' % option.lower())
+    notmark = item.get_marker('notbuildconfigspec')
+    if notmark:
+        for option in notmark.args:
+            if ubconfig.buildconfig.get('config_' + option.lower(), None):
+                pytest.skip('.config feature "%s" enabled' % option.lower())
 
 def tool_is_in_path(tool):
     for path in os.environ["PATH"].split(os.pathsep):

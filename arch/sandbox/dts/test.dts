@@ -203,6 +203,14 @@
 			#clock-cells = <0>;
 			clock-frequency = <1234>;
 		};
+
+		clk_fixed_factor: clk-fixed-factor {
+			compatible = "fixed-factor-clock";
+			#clock-cells = <0>;
+			clock-div = <3>;
+			clock-mult = <2>;
+			clocks = <&clk_fixed>;
+		};
 	};
 
 	clk_sandbox: clk-sbox {
@@ -315,6 +323,12 @@
 		};
 	};
 
+	bootcount@0 {
+		compatible = "u-boot,bootcount-rtc";
+		rtc = <&rtc_1>;
+		offset = <0x13>;
+	};
+
 	adc@0 {
 		compatible = "sandbox,adc";
 		vdd-supply = <&buck2>;
@@ -383,6 +397,19 @@
 	i2s: i2s {
 		compatible = "sandbox,i2s";
 		#sound-dai-cells = <1>;
+		sandbox,silent;	/* Don't emit sounds while testing */
+	};
+
+	nop-test_0 {
+		compatible = "sandbox,nop_sandbox1";
+		nop-test_1 {
+			compatible = "sandbox,nop_sandbox2";
+			bind = "True";
+		};
+		nop-test_2 {
+			compatible = "sandbox,nop_sandbox2";
+			bind = "False";
+		};
 	};
 
 	misc-test {
@@ -399,6 +426,10 @@
 
 	mmc0 {
 		compatible = "sandbox,mmc";
+	};
+
+	pch {
+		compatible = "sandbox,pch";
 	};
 
 	pci0: pci-controller0 {
@@ -474,6 +505,7 @@
 			compatible = "denx,u-boot-probe-test";
 			first-syscon = <&syscon0>;
 			second-sys-ctrl = <&another_system_controller>;
+			third-syscon = <&syscon2>;
 		};
 	};
 
@@ -559,7 +591,7 @@
 		cs-gpios = <0>, <&gpio_a 0>;
 		spi.bin@0 {
 			reg = <0>;
-			compatible = "spansion,m25p16", "spi-flash";
+			compatible = "spansion,m25p16", "jedec,spi-nor";
 			spi-max-frequency = <40000000>;
 			sandbox,filename = "spi.bin";
 		};
@@ -578,7 +610,7 @@
 			0x38 8>;
 	};
 
-	syscon@2 {
+	syscon2: syscon@2 {
 		compatible = "simple-mfd", "syscon";
 		reg = <0x40 5
 			0x48 6

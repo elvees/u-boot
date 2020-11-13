@@ -4,7 +4,7 @@
  */
 
 #include <common.h>
-#include <asm/arch/timer.h>
+#include <asm/arch-rockchip/timer.h>
 #include <asm/io.h>
 #include <linux/types.h>
 
@@ -18,13 +18,6 @@ static uint64_t rockchip_get_ticks(void)
 	timebase_h = readl(&timer_ptr->timer_curr_value1);
 
 	return timebase_h << 32 | timebase_l;
-}
-
-static uint64_t usec_to_tick(unsigned int usec)
-{
-	uint64_t tick = usec;
-	tick *= CONFIG_SYS_TIMER_RATE / (1000 * 1000);
-	return tick;
 }
 
 void rockchip_udelay(unsigned int usec)

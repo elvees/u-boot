@@ -381,7 +381,7 @@ static int reserve_round_4k(void)
 #ifdef CONFIG_ARM
 __weak int reserve_mmu(void)
 {
-#if !(defined(CONFIG_SYS_ICACHE_OFF) && defined(CONFIG_SYS_DCACHE_OFF))
+#if !(CONFIG_IS_ENABLED(SYS_ICACHE_OFF) && CONFIG_IS_ENABLED(SYS_DCACHE_OFF))
 	/* reserve TLB table */
 	gd->arch.tlb_size = PGTABLE_SIZE;
 	gd->relocaddr -= gd->arch.tlb_size;
@@ -714,7 +714,7 @@ static int setup_reloc(void)
 	 * just after the default vector table location, so at 0x400
 	 */
 	gd->reloc_off = gd->relocaddr - (CONFIG_SYS_TEXT_BASE + 0x400);
-#else
+#elif !defined(CONFIG_SANDBOX)
 	gd->reloc_off = gd->relocaddr - CONFIG_SYS_TEXT_BASE;
 #endif
 #endif

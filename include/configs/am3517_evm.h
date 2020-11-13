@@ -71,6 +71,7 @@
 #define CONFIG_SYS_NAND_MAX_ECCPOS	56
 #define CONFIG_SYS_NAND_U_BOOT_START	CONFIG_SYS_TEXT_BASE
 #define CONFIG_SYS_NAND_U_BOOT_OFFS	0x80000
+#define CONFIG_SYS_NAND_SPL_KERNEL_OFFS 0x2a0000
 /* NAND block size is 128 KiB.  Synchronize these values with
  * corresponding Device Tree entries in Linux:
  *  MLO(SPL)             4 * NAND_BLOCK_SIZE = 512 KiB  @ 0x000000
@@ -188,8 +189,6 @@
 #define CONFIG_ENV_ADDR			0x260000
 
 /* Defines for SPL */
-#undef CONFIG_SPL_TEXT_BASE
-#define CONFIG_SPL_TEXT_BASE		0x40200000
 
 #define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION	1
 #define CONFIG_SPL_FS_LOAD_PAYLOAD_NAME		"u-boot.img"

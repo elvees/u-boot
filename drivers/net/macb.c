@@ -143,7 +143,7 @@ struct macb_device {
 
 static int macb_is_gem(struct macb_device *macb)
 {
-	return MACB_BFEXT(IDNUM, macb_readl(macb, MID)) == 0x2;
+	return MACB_BFEXT(IDNUM, macb_readl(macb, MID)) >= 0x2;
 }
 
 #ifndef cpu_is_sama5d2
@@ -488,15 +488,58 @@ static int macb_phy_find(struct macb_device *macb, const char *name)
 
 /**
  * macb_linkspd_cb - Linkspeed change callback function
- * @regs:	Base Register of MACB devices
+ * @dev/@regs:	MACB udevice (DM version) or
+ *		Base Register of MACB devices (non-DM version)
  * @speed:	Linkspeed
  * Returns 0 when operation success and negative errno number
  * when operation failed.
  */
+#ifdef CONFIG_DM_ETH
+int __weak macb_linkspd_cb(struct udevice *dev, unsigned int speed)
+{
+#ifdef CONFIG_CLK
+	struct clk tx_clk;
+	ulong rate;
+	int ret;
+
+	/*
+	 * "tx_clk" is an optional clock source for MACB.
+	 * Ignore if it does not exist in DT.
+	 */
+	ret = clk_get_by_name(dev, "tx_clk", &tx_clk);
+	if (ret)
+		return 0;
+
+	switch (speed) {
+	case _10BASET:
+		rate = 2500000;		/* 2.5 MHz */
+		break;
+	case _100BASET:
+		rate = 25000000;	/* 25 MHz */
+		break;
+	case _1000BASET:
+		rate = 125000000;	/* 125 MHz */
+		break;
+	default:
+		/* does not change anything */
+		return 0;
+	}
+
+	if (tx_clk.dev) {
+		ret = clk_set_rate(&tx_clk, rate);
+		if (ret)
+			return ret;
+	}
+#endif
+
+	return 0;
+}
+#else
 int __weak macb_linkspd_cb(void *regs, unsigned int speed)
 {
 	return 0;
 }
+#endif
 
 #ifdef CONFIG_DM_ETH
 static int macb_phy_init(struct udevice *dev, const char *name)
@@ -550,8 +593,14 @@ static int macb_phy_init(struct macb_device *macb, const char *name)
 
 		for (i = 0; i < MACB_AUTONEG_TIMEOUT / 100; i++) {
 			status = macb_mdio_read(macb, MII_BMSR);
-			if (status & BMSR_LSTATUS)
+			if (status & BMSR_LSTATUS) {
+				/*
+				 * Delay a bit after the link is established,
+				 * so that the next xfer does not fail
+				 */
+				mdelay(10);
 				break;
+			}
 			udelay(100);
 		}
 	}
@@ -583,7 +632,11 @@ static int macb_phy_init(struct macb_device *macb, const char *name)
 
 			macb_writel(macb, NCFGR, ncfgr);
 
+#ifdef CONFIG_DM_ETH
+			ret = macb_linkspd_cb(dev, _1000BASET);
+#else
 			ret = macb_linkspd_cb(macb->regs, _1000BASET);
+#endif
 			if (ret)
 				return ret;
 
@@ -608,9 +661,17 @@ static int macb_phy_init(struct macb_device *macb, const char *name)
 	ncfgr &= ~(MACB_BIT(SPD) | MACB_BIT(FD) | GEM_BIT(GBE));
 	if (speed) {
 		ncfgr |= MACB_BIT(SPD);
+#ifdef CONFIG_DM_ETH
+		ret = macb_linkspd_cb(dev, _100BASET);
+#else
 		ret = macb_linkspd_cb(macb->regs, _100BASET);
+#endif
 	} else {
+#ifdef CONFIG_DM_ETH
+		ret = macb_linkspd_cb(dev, _10BASET);
+#else
 		ret = macb_linkspd_cb(macb->regs, _10BASET);
+#endif
 	}
 
 	if (ret)
@@ -1061,14 +1122,13 @@ static int macb_enable_clk(struct udevice *dev)
 		return -EINVAL;
 
 	/*
-	 * Zynq clock driver didn't support for enable or disable
-	 * clock. Hence, clk_enable() didn't apply for Zynq
+	 * If clock driver didn't support enable or disable then
+	 * we get -ENOSYS from clk_enable(). To handle this, we
+	 * don't fail for ret == -ENOSYS.
 	 */
-#ifndef CONFIG_MACB_ZYNQ
 	ret = clk_enable(&clk);
-	if (ret)
+	if (ret && ret != -ENOSYS)
 		return ret;
-#endif
 
 	clk_rate = clk_get_rate(&clk);
 	if (!clk_rate)
@@ -1151,7 +1211,9 @@ static int macb_eth_ofdata_to_platdata(struct udevice *dev)
 {
 	struct eth_pdata *pdata = dev_get_platdata(dev);
 
-	pdata->iobase = devfdt_get_addr(dev);
+	pdata->iobase = (phys_addr_t)dev_remap_addr(dev);
+	if (!pdata->iobase)
+		return -EINVAL;
 
 	return macb_late_eth_ofdata_to_platdata(dev);
 }

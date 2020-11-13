@@ -39,7 +39,7 @@ int ofnode_read_u32(ofnode node, const char *propname, u32 *outp)
 	return 0;
 }
 
-int ofnode_read_u32_default(ofnode node, const char *propname, u32 def)
+u32 ofnode_read_u32_default(ofnode node, const char *propname, u32 def)
 {
 	assert(ofnode_valid(node));
 	ofnode_read_u32(node, propname, &def);
@@ -251,17 +251,16 @@ int ofnode_read_size(ofnode node, const char *propname)
 	return -EINVAL;
 }
 
-fdt_addr_t ofnode_get_addr_index(ofnode node, int index)
+fdt_addr_t ofnode_get_addr_size_index(ofnode node, int index, fdt_size_t *size)
 {
 	int na, ns;
-	fdt_size_t size;
 
 	if (ofnode_is_np(node)) {
 		const __be32 *prop_val;
 		uint flags;
 
 		prop_val = of_get_address(ofnode_to_np(node), index,
-					  (u64 *)&size, &flags);
+					  (u64 *)size, &flags);
 		if (!prop_val)
 			return FDT_ADDR_T_NONE;
 
@@ -278,10 +277,17 @@ fdt_addr_t ofnode_get_addr_index(ofnode node, int index)
 		ns = ofnode_read_simple_size_cells(ofnode_get_parent(node));
 		return fdtdec_get_addr_size_fixed(gd->fdt_blob,
 						  ofnode_to_offset(node), "reg",
-						  index, na, ns, &size, true);
+						  index, na, ns, size, true);
 	}
 
 	return FDT_ADDR_T_NONE;
+}
+
+fdt_addr_t ofnode_get_addr_index(ofnode node, int index)
+{
+	fdt_size_t size;
+
+	return ofnode_get_addr_size_index(node, index, &size);
 }
 
 fdt_addr_t ofnode_get_addr(ofnode node)
@@ -547,7 +553,7 @@ fdt_addr_t ofnode_get_addr_size(ofnode node, const char *property,
 		ns = of_n_size_cells(np);
 		*sizep = of_read_number(prop + na, ns);
 
-		if (IS_ENABLED(CONFIG_OF_TRANSLATE) && ns > 0)
+		if (CONFIG_IS_ENABLED(OF_TRANSLATE) && ns > 0)
 			return of_translate_address(np, prop);
 		else
 			return of_read_number(prop, na);
@@ -700,18 +706,18 @@ int ofnode_read_simple_size_cells(ofnode node)
 
 bool ofnode_pre_reloc(ofnode node)
 {
+#if defined(CONFIG_SPL_BUILD) || defined(CONFIG_TPL_BUILD)
+	/* for SPL and TPL the remaining nodes after the fdtgrep 1st pass
+	 * had property dm-pre-reloc or u-boot,dm-spl/tpl.
+	 * They are removed in final dtb (fdtgrep 2nd pass)
+	 */
+	return true;
+#else
 	if (ofnode_read_bool(node, "u-boot,dm-pre-reloc"))
 		return true;
 	if (ofnode_read_bool(node, "u-boot,dm-pre-proper"))
 		return true;
 
-#ifdef CONFIG_TPL_BUILD
-	if (ofnode_read_bool(node, "u-boot,dm-tpl"))
-		return true;
-#elif defined(CONFIG_SPL_BUILD)
-	if (ofnode_read_bool(node, "u-boot,dm-spl"))
-		return true;
-#else
 	/*
 	 * In regular builds individual spl and tpl handling both
 	 * count as handled pre-relocation for later second init.
@@ -719,9 +725,9 @@ bool ofnode_pre_reloc(ofnode node)
 	if (ofnode_read_bool(node, "u-boot,dm-spl") ||
 	    ofnode_read_bool(node, "u-boot,dm-tpl"))
 		return true;
-#endif
 
 	return false;
+#endif
 }
 
 int ofnode_read_resource(ofnode node, uint index, struct resource *res)

@@ -14,6 +14,8 @@ source "drivers/block/Kconfig"
 
 source "drivers/bootcount/Kconfig"
 
+source "drivers/cache/Kconfig"
+
 source "drivers/clk/Kconfig"
 
 source "drivers/cpu/Kconfig"
@@ -64,6 +66,8 @@ source "drivers/nvme/Kconfig"
 
 source "drivers/pci/Kconfig"
 
+source "drivers/pch/Kconfig"
+
 source "drivers/pcmcia/Kconfig"
 
 source "drivers/phy/Kconfig"
@@ -95,6 +99,8 @@ source "drivers/serial/Kconfig"
 source "drivers/smem/Kconfig"
 
 source "drivers/sound/Kconfig"
+
+source "drivers/soc/Kconfig"
 
 source "drivers/spi/Kconfig"
 

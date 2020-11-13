@@ -32,7 +32,6 @@ config X86_RUN_32BIT
 config X86_RUN_64BIT
 	bool "64-bit"
 	select X86_64
-	select SUPPORT_SPL
 	select SPL
 	select SPL_SEPARATE_BSS
 	help
@@ -177,9 +176,16 @@ config X86_16BIT_INIT
 config SPL_X86_16BIT_INIT
 	bool
 	depends on X86_RESET_VECTOR
-	default y if X86_RESET_VECTOR && SPL
+	default y if X86_RESET_VECTOR && SPL && !TPL
 	help
 	  This is enabled when 16-bit init is in SPL
+
+config TPL_X86_16BIT_INIT
+	bool
+	depends on X86_RESET_VECTOR
+	default y if X86_RESET_VECTOR && TPL
+	help
+	  This is enabled when 16-bit init is in TPL
 
 config X86_32BIT_INIT
 	bool
@@ -415,7 +421,7 @@ config ENABLE_MRC_CACHE
 	  For platforms that use Intel FSP for the memory initialization,
 	  please check FSP output HOB via U-Boot command 'fsp hob' to see
 	  if there is FSP_NON_VOLATILE_STORAGE_HOB_GUID (asm/fsp/fsp_hob.h).
-	  If such GUID does not exist, MRC cache is not avaiable on such
+	  If such GUID does not exist, MRC cache is not available on such
 	  platform (eg: Intel Queensbay), which means selecting this option
 	  here does not make any difference.
 

@@ -66,7 +66,7 @@ struct dhcp {
 static struct efi_boot_services *boottime;
 static struct efi_simple_network *net;
 static struct efi_event *timer;
-static const efi_guid_t efi_net_guid = EFI_SIMPLE_NETWORK_GUID;
+static const efi_guid_t efi_net_guid = EFI_SIMPLE_NETWORK_PROTOCOL_GUID;
 /* IP packet ID */
 static unsigned int net_ip_id;
 
@@ -334,9 +334,8 @@ static int execute(void)
 		 * Unfortunately QEMU ignores the broadcast flag.
 		 * So we have to check for broadcasts too.
 		 */
-		if (efi_st_memcmp(&destaddr, &net->mode->current_address,
-				  ARP_HLEN) &&
-		    efi_st_memcmp(&destaddr, BROADCAST_MAC, ARP_HLEN))
+		if (memcmp(&destaddr, &net->mode->current_address, ARP_HLEN) &&
+		    memcmp(&destaddr, BROADCAST_MAC, ARP_HLEN))
 			continue;
 		/*
 		 * Check this is a DHCP reply
@@ -360,7 +359,7 @@ static int execute(void)
 	addr = (u8 *)&buffer.p.ip_udp.ip_src;
 	efi_st_printf("DHCP reply received from %u.%u.%u.%u (%pm) ",
 		      addr[0], addr[1], addr[2], addr[3], &srcaddr);
-	if (!efi_st_memcmp(&destaddr, BROADCAST_MAC, ARP_HLEN))
+	if (!memcmp(&destaddr, BROADCAST_MAC, ARP_HLEN))
 		efi_st_printf("as broadcast message.\n");
 	else
 		efi_st_printf("as unicast message.\n");
@@ -427,4 +426,12 @@ EFI_UNIT_TEST(snp) = {
 	.setup = setup,
 	.execute = execute,
 	.teardown = teardown,
+#ifdef CONFIG_SANDBOX
+	/*
+	 * Running this test on the sandbox requires setting environment
+	 * variable ethact to a network interface connected to a DHCP server and
+	 * ethrotate to 'no'.
+	 */
+	.on_request = true,
+#endif
 };

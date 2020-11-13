@@ -16,6 +16,7 @@
 #include <asm/arch/misc.h>
 #include <asm/pl310.h>
 #include <linux/libfdt.h>
+#include <asm/arch/mailbox_s10.h>
 
 #include <dt-bindings/reset/altr,rst-mgr-s10.h>
 
@@ -150,7 +151,18 @@ int arch_early_init_r(void)
 	return 0;
 }
 
-void do_bridge_reset(int enable)
+void do_bridge_reset(int enable, unsigned int mask)
 {
+	/* Check FPGA status before bridge enable */
+	if (enable) {
+		int ret = mbox_get_fpga_config_status(MBOX_RECONFIG_STATUS);
+
+		if (ret && ret != MBOX_CFGSTAT_STATE_CONFIG)
+			ret = mbox_get_fpga_config_status(MBOX_CONFIG_STATUS);
+
+		if (ret)
+			return;
+	}
+
 	socfpga_bridges_reset(enable);
 }

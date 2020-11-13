@@ -20,6 +20,7 @@
  */
 
 #ifndef __ASSEMBLY__
+#include <fdtdec.h>
 #include <membuff.h>
 #include <linux/list.h>
 
@@ -133,6 +134,12 @@ typedef struct global_data {
 	struct spl_handoff *spl_handoff;
 # endif
 #endif
+#if defined(CONFIG_TRANSLATION_OFFSET)
+	fdt_addr_t translation_offset;	/* optional translation offset */
+#endif
+#if defined(CONFIG_WDT)
+	struct udevice *watchdog_dev;
+#endif
 } gd_t;
 #endif
 
@@ -161,5 +168,6 @@ typedef struct global_data {
 #define GD_FLG_ENV_DEFAULT	0x02000 /* Default variable flag	   */
 #define GD_FLG_SPL_EARLY_INIT	0x04000 /* Early SPL init is done	   */
 #define GD_FLG_LOG_READY	0x08000 /* Log system is ready for use	   */
+#define GD_FLG_WDT_READY	0x10000 /* Watchdog is ready for use	   */
 
 #endif /* __ASM_GENERIC_GBL_DATA_H */

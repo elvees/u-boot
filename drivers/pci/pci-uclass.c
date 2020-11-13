@@ -918,6 +918,11 @@ static void decode_regions(struct pci_controller *hose, ofnode parent_node,
 		return;
 
 	for (i = 0; i < CONFIG_NR_DRAM_BANKS; ++i) {
+		if (hose->region_count == MAX_PCI_REGIONS) {
+			pr_err("maximum number of regions parsed, aborting\n");
+			break;
+		}
+
 		if (bd->bi_dram[i].size) {
 			pci_set_region(hose->regions + hose->region_count++,
 				       bd->bi_dram[i].start,
@@ -1007,11 +1012,25 @@ static int pci_uclass_post_probe(struct udevice *bus)
 	return 0;
 }
 
+int pci_get_devfn(struct udevice *dev)
+{
+	struct fdt_pci_addr addr;
+	int ret;
+
+	/* Extract the devfn from fdt_pci_addr */
+	ret = ofnode_read_pci_addr(dev_ofnode(dev), FDT_PCI_SPACE_CONFIG,
+				   "reg", &addr);
+	if (ret) {
+		if (ret != -ENOENT)
+			return -EINVAL;
+	}
+
+	return addr.phys_hi & 0xff00;
+}
+
 static int pci_uclass_child_post_bind(struct udevice *dev)
 {
 	struct pci_child_platdata *pplat;
-	struct fdt_pci_addr addr;
-	int ret;
 
 	if (!dev_of_valid(dev))
 		return 0;
@@ -1022,14 +1041,7 @@ static int pci_uclass_child_post_bind(struct udevice *dev)
 	ofnode_read_pci_vendev(dev_ofnode(dev), &pplat->vendor, &pplat->device);
 
 	/* Extract the devfn from fdt_pci_addr */
-	ret = ofnode_read_pci_addr(dev_ofnode(dev), FDT_PCI_SPACE_CONFIG, "reg",
-				   &addr);
-	if (ret) {
-		if (ret != -ENOENT)
-			return -EINVAL;
-	} else {
-		pplat->devfn = addr.phys_hi & 0xff00;
-	}
+	pplat->devfn = pci_get_devfn(dev);
 
 	return 0;
 }

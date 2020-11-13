@@ -17,6 +17,7 @@
 #include <asm/io.h>
 #include <div64.h>
 #include <linux/math64.h>
+#include <efi_loader.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -90,6 +91,11 @@ static inline int fs_write_unsupported(const char *filename, void *buf,
 	return -1;
 }
 
+static inline int fs_ln_unsupported(const char *filename, const char *target)
+{
+	return -1;
+}
+
 static inline void fs_close_unsupported(void)
 {
 }
@@ -154,6 +160,7 @@ struct fstype_info {
 	void (*closedir)(struct fs_dir_stream *dirs);
 	int (*unlink)(const char *filename);
 	int (*mkdir)(const char *dirname);
+	int (*ln)(const char *filename, const char *target);
 };
 
 static struct fstype_info fstypes[] = {
@@ -168,7 +175,7 @@ static struct fstype_info fstypes[] = {
 		.exists = fat_exists,
 		.size = fat_size,
 		.read = fat_read_file,
-#ifdef CONFIG_FAT_WRITE
+#if CONFIG_IS_ENABLED(FAT_WRITE)
 		.write = file_fat_write,
 		.unlink = fat_unlink,
 		.mkdir = fat_mkdir,
@@ -181,9 +188,11 @@ static struct fstype_info fstypes[] = {
 		.opendir = fat_opendir,
 		.readdir = fat_readdir,
 		.closedir = fat_closedir,
+		.ln = fs_ln_unsupported,
 	},
 #endif
-#ifdef CONFIG_FS_EXT4
+
+#if CONFIG_IS_ENABLED(FS_EXT4)
 	{
 		.fstype = FS_TYPE_EXT,
 		.name = "ext4",
@@ -196,8 +205,10 @@ static struct fstype_info fstypes[] = {
 		.read = ext4_read_file,
 #ifdef CONFIG_CMD_EXT4_WRITE
 		.write = ext4_write_file,
+		.ln = ext4fs_create_link,
 #else
 		.write = fs_write_unsupported,
+		.ln = fs_ln_unsupported,
 #endif
 		.uuid = ext4fs_uuid,
 		.opendir = fs_opendir_unsupported,
@@ -221,6 +232,7 @@ static struct fstype_info fstypes[] = {
 		.opendir = fs_opendir_unsupported,
 		.unlink = fs_unlink_unsupported,
 		.mkdir = fs_mkdir_unsupported,
+		.ln = fs_ln_unsupported,
 	},
 #endif
 #ifdef CONFIG_CMD_UBIFS
@@ -239,6 +251,7 @@ static struct fstype_info fstypes[] = {
 		.opendir = fs_opendir_unsupported,
 		.unlink = fs_unlink_unsupported,
 		.mkdir = fs_mkdir_unsupported,
+		.ln = fs_ln_unsupported,
 	},
 #endif
 #ifdef CONFIG_FS_BTRFS
@@ -257,6 +270,7 @@ static struct fstype_info fstypes[] = {
 		.opendir = fs_opendir_unsupported,
 		.unlink = fs_unlink_unsupported,
 		.mkdir = fs_mkdir_unsupported,
+		.ln = fs_ln_unsupported,
 	},
 #endif
 	{
@@ -274,6 +288,7 @@ static struct fstype_info fstypes[] = {
 		.opendir = fs_opendir_unsupported,
 		.unlink = fs_unlink_unsupported,
 		.mkdir = fs_mkdir_unsupported,
+		.ln = fs_ln_unsupported,
 	},
 };
 
@@ -429,12 +444,55 @@ int fs_size(const char *filename, loff_t *size)
 	return ret;
 }
 
-int fs_read(const char *filename, ulong addr, loff_t offset, loff_t len,
-	    loff_t *actread)
+#ifdef CONFIG_LMB
+/* Check if a file may be read to the given address */
+static int fs_read_lmb_check(const char *filename, ulong addr, loff_t offset,
+			     loff_t len, struct fstype_info *info)
+{
+	struct lmb lmb;
+	int ret;
+	loff_t size;
+	loff_t read_len;
+
+	/* get the actual size of the file */
+	ret = info->size(filename, &size);
+	if (ret)
+		return ret;
+	if (offset >= size) {
+		/* offset >= EOF, no bytes will be written */
+		return 0;
+	}
+	read_len = size - offset;
+
+	/* limit to 'len' if it is smaller */
+	if (len && len < read_len)
+		read_len = len;
+
+	lmb_init_and_reserve(&lmb, gd->bd, (void *)gd->fdt_blob);
+	lmb_dump_all(&lmb);
+
+	if (lmb_alloc_addr(&lmb, addr, read_len) == addr)
+		return 0;
+
+	printf("** Reading file would overwrite reserved memory **\n");
+	return -ENOSPC;
+}
+#endif
+
+static int _fs_read(const char *filename, ulong addr, loff_t offset, loff_t len,
+		    int do_lmb_check, loff_t *actread)
 {
 	struct fstype_info *info = fs_get_info(fs_type);
 	void *buf;
 	int ret;
+
+#ifdef CONFIG_LMB
+	if (do_lmb_check) {
+		ret = fs_read_lmb_check(filename, addr, offset, len, info);
+		if (ret)
+			return ret;
+	}
+#endif
 
 	/*
 	 * We don't actually know how many bytes are being read, since len==0
@@ -450,6 +508,12 @@ int fs_read(const char *filename, ulong addr, loff_t offset, loff_t len,
 	fs_close();
 
 	return ret;
+}
+
+int fs_read(const char *filename, ulong addr, loff_t offset, loff_t len,
+	    loff_t *actread)
+{
+	return _fs_read(filename, addr, offset, len, 0, actread);
 }
 
 int fs_write(const char *filename, ulong addr, loff_t offset, loff_t len,
@@ -552,6 +616,22 @@ int fs_mkdir(const char *dirname)
 	return ret;
 }
 
+int fs_ln(const char *fname, const char *target)
+{
+	struct fstype_info *info = fs_get_info(fs_type);
+	int ret;
+
+	ret = info->ln(fname, target);
+
+	if (ret < 0) {
+		printf("** Unable to create link %s -> %s **\n", fname, target);
+		ret = -1;
+	}
+	fs_close();
+
+	return ret;
+}
+
 int do_size(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 		int fstype)
 {
@@ -621,8 +701,12 @@ int do_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	else
 		pos = 0;
 
+#ifdef CONFIG_CMD_BOOTEFI
+	efi_set_bootdev(argv[1], (argc > 2) ? argv[2] : "",
+			(argc > 4) ? argv[4] : "");
+#endif
 	time = get_timer(0);
-	ret = fs_read(filename, addr, pos, bytes, &len_read);
+	ret = _fs_read(filename, addr, pos, bytes, 1, &len_read);
 	time = get_timer(time);
 	if (ret < 0)
 		return 1;
@@ -751,6 +835,8 @@ int do_fs_type(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	else
 		printf("%s\n", info->name);
 
+	fs_close();
+
 	return CMD_RET_SUCCESS;
 }
 
@@ -785,6 +871,21 @@ int do_mkdir(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 		printf("** Unable to create a directory \"%s\" **\n", argv[3]);
 		return 1;
 	}
+
+	return 0;
+}
+
+int do_ln(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
+	  int fstype)
+{
+	if (argc != 5)
+		return CMD_RET_USAGE;
+
+	if (fs_set_blk_dev(argv[1], argv[2], fstype))
+		return 1;
+
+	if (fs_ln(argv[3], argv[4]))
+		return 1;
 
 	return 0;
 }

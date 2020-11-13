@@ -240,10 +240,12 @@ uint32_t sunxi_get_boot_device(void)
 	boot_source = readb(SPL_ADDR + 0x28);
 	switch (boot_source) {
 	case SUNXI_BOOTED_FROM_MMC0:
+	case SUNXI_BOOTED_FROM_MMC0_HIGH:
 		return BOOT_DEVICE_MMC1;
 	case SUNXI_BOOTED_FROM_NAND:
 		return BOOT_DEVICE_NAND;
 	case SUNXI_BOOTED_FROM_MMC2:
+	case SUNXI_BOOTED_FROM_MMC2_HIGH:
 		return BOOT_DEVICE_MMC2;
 	case SUNXI_BOOTED_FROM_SPI:
 		return BOOT_DEVICE_SPI;
@@ -287,9 +289,14 @@ void reset_cpu(ulong addr)
 		writel(WDT_MODE_RESET_EN | WDT_MODE_EN, &wdog->mode);
 	}
 #elif defined(CONFIG_SUNXI_GEN_SUN6I) || defined(CONFIG_MACH_SUN50I_H6)
+#if defined(CONFIG_MACH_SUN50I_H6)
+	/* WDOG is broken for some H6 rev. use the R_WDOG instead */
 	static const struct sunxi_wdog *wdog =
-		 ((struct sunxi_timer_reg *)SUNXI_TIMER_BASE)->wdog;
-
+		(struct sunxi_wdog *)SUNXI_R_WDOG_BASE;
+#else
+	static const struct sunxi_wdog *wdog =
+		((struct sunxi_timer_reg *)SUNXI_TIMER_BASE)->wdog;
+#endif
 	/* Set the watchdog for its shortest interval (.5s) and wait */
 	writel(WDT_CFG_RESET, &wdog->cfg);
 	writel(WDT_MODE_EN, &wdog->mode);
@@ -298,7 +305,7 @@ void reset_cpu(ulong addr)
 #endif
 }
 
-#if !defined(CONFIG_SYS_DCACHE_OFF) && !defined(CONFIG_ARM64)
+#if !CONFIG_IS_ENABLED(SYS_DCACHE_OFF) && !defined(CONFIG_ARM64)
 void enable_caches(void)
 {
 	/* Enable D-cache. I-cache is already enabled in start.S */

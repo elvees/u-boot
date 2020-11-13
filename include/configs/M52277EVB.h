@@ -103,17 +103,6 @@
 /* DSPI and Serial Flash */
 #define CONFIG_CF_DSPI
 #define CONFIG_SYS_SBFHDR_SIZE		0x7
-#ifdef CONFIG_CMD_SPI
-#	define CONFIG_SYS_DSPI_CS2
-
-#	define CONFIG_SYS_DSPI_CTAR0	(DSPI_CTAR_TRSZ(7) | \
-					 DSPI_CTAR_PCSSCK_1CLK | \
-					 DSPI_CTAR_PASC(0) | \
-					 DSPI_CTAR_PDT(0) | \
-					 DSPI_CTAR_CSSCK(0) | \
-					 DSPI_CTAR_ASC(0) | \
-					 DSPI_CTAR_DT(1))
-#endif
 
 /* Input, PCI, Flexbus, and VCO */
 #define CONFIG_EXTRA_CLOCK
@@ -177,9 +166,6 @@
  * Environment is not embedded in u-boot. First time runing may have env
  * crc error warning if there is no correct environment on the flash.
  */
-#ifdef CONFIG_CF_SBF
-#	define CONFIG_ENV_SPI_CS	2
-#endif
 #define CONFIG_ENV_OVERWRITE		1
 
 /*-----------------------------------------------------------------------

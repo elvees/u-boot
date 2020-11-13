@@ -5,8 +5,6 @@
  * (C) Copyright 2017 Rob Clark
  */
 
-#define LOG_CATEGORY LOGL_ERR
-
 #include <common.h>
 #include <blk.h>
 #include <dm.h>
@@ -336,6 +334,9 @@ struct efi_device_path *efi_dp_create_device_node(const u8 type,
 						  const u16 length)
 {
 	struct efi_device_path *ret;
+
+	if (length < sizeof(struct efi_device_path))
+		return NULL;
 
 	ret = dp_alloc(length);
 	if (!ret)
@@ -910,15 +911,23 @@ struct efi_device_path *efi_dp_from_mem(uint32_t memory_type,
 	return start;
 }
 
-/*
- * Helper to split a full device path (containing both device and file
- * parts) into it's constituent parts.
+/**
+ * efi_dp_split_file_path() - split of relative file path from device path
+ *
+ * Given a device path indicating a file on a device, separate the device
+ * path in two: the device path of the actual device and the file path
+ * relative to this device.
+ *
+ * @full_path:		device path including device and file path
+ * @device_path:	path of the device
+ * @file_path:		relative path of the file or NULL if there is none
+ * Return:		status code
  */
 efi_status_t efi_dp_split_file_path(struct efi_device_path *full_path,
 				    struct efi_device_path **device_path,
 				    struct efi_device_path **file_path)
 {
-	struct efi_device_path *p, *dp, *fp;
+	struct efi_device_path *p, *dp, *fp = NULL;
 
 	*device_path = NULL;
 	*file_path = NULL;
@@ -929,7 +938,7 @@ efi_status_t efi_dp_split_file_path(struct efi_device_path *full_path,
 	while (!EFI_DP_TYPE(p, MEDIA_DEVICE, FILE_PATH)) {
 		p = efi_dp_next(p);
 		if (!p)
-			return EFI_OUT_OF_RESOURCES;
+			goto out;
 	}
 	fp = efi_dp_dup(p);
 	if (!fp)
@@ -938,6 +947,7 @@ efi_status_t efi_dp_split_file_path(struct efi_device_path *full_path,
 	p->sub_type = DEVICE_PATH_SUB_TYPE_END;
 	p->length = sizeof(*p);
 
+out:
 	*device_path = dp;
 	*file_path = fp;
 	return EFI_SUCCESS;
@@ -962,7 +972,7 @@ efi_status_t efi_dp_from_name(const char *dev, const char *devnr,
 	if (!is_net) {
 		part = blk_get_device_part_str(dev, devnr, &desc, &fs_partition,
 					       1);
-		if (part < 0)
+		if (part < 0 || !desc)
 			return EFI_INVALID_PARAMETER;
 
 		if (device)
@@ -977,12 +987,7 @@ efi_status_t efi_dp_from_name(const char *dev, const char *devnr,
 	if (!path)
 		return EFI_SUCCESS;
 
-	if (!is_net) {
-		/* Add leading / to fs paths, because they're absolute */
-		snprintf(filename, sizeof(filename), "/%s", path);
-	} else {
-		snprintf(filename, sizeof(filename), "%s", path);
-	}
+	snprintf(filename, sizeof(filename), "%s", path);
 	/* DOS style file path: */
 	s = filename;
 	while ((s = strchr(s, '/')))

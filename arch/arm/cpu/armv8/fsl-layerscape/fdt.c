@@ -327,7 +327,7 @@ static int _fdt_fixup_pci_msi(void *blob, const char *name, int rev)
 	memcpy((char *)tmp, p, len);
 
 	val = fdt32_to_cpu(tmp[0][6]);
-	if (rev > REV1_0) {
+	if (rev == REV1_0) {
 		tmp[1][6] = cpu_to_fdt32(val + 1);
 		tmp[2][6] = cpu_to_fdt32(val + 2);
 		tmp[3][6] = cpu_to_fdt32(val + 3);
@@ -435,7 +435,7 @@ void ft_cpu_setup(void *blob, bd_t *bd)
 	do_fixup_by_path_u32(blob, "/sysclk", "clock-frequency",
 			     CONFIG_SYS_CLK_FREQ, 1);
 
-#ifdef CONFIG_PCI
+#ifdef CONFIG_PCI_LAYERSCAPE
 	ft_pci_setup(blob, bd);
 #endif
 

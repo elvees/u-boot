@@ -5,7 +5,7 @@
 #ifndef __CONFIG_RK3036_COMMON_H
 #define __CONFIG_RK3036_COMMON_H
 
-#include <asm/arch/hardware.h>
+#include <asm/arch-rockchip/hardware.h>
 #include "rockchip-common.h"
 
 #define CONFIG_SYS_MALLOC_LEN		(32 << 20)
@@ -19,21 +19,15 @@
 #define CONFIG_SYS_INIT_SP_ADDR		0x60100000
 #define CONFIG_SYS_LOAD_ADDR		0x60800800
 #define CONFIG_SPL_STACK		0x10081fff
-#define CONFIG_SPL_TEXT_BASE		0x10081000
 
 #define CONFIG_ROCKCHIP_MAX_INIT_SIZE	(4 << 10)
 #define CONFIG_ROCKCHIP_CHIP_TAG	"RK30"
-
-/* MMC/SD IP block */
-#define CONFIG_BOUNCE_BUFFER
 
 #define CONFIG_SYS_SDRAM_BASE		0x60000000
 #define SDRAM_BANK_SIZE			(512UL << 20UL)
 #define SDRAM_MAX_SIZE                  (CONFIG_NR_DRAM_BANKS * SDRAM_BANK_SIZE)
 
-#define CONFIG_SPI_FLASH
 #define CONFIG_SPI_FLASH_GIGADEVICE
-#define CONFIG_SF_DEFAULT_SPEED 20000000
 
 #ifndef CONFIG_SPL_BUILD
 /* usb otg */

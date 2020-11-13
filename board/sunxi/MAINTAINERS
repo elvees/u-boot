@@ -137,6 +137,13 @@ M:	Jagan Teki <jagan@amarulasolutions.com>
 S:	Maintained
 F:	configs/bananapi_m2_berry_defconfig
 
+BANANAPI M2 PLUS BOARDS
+M:	Icenowy Zheng <icenowy@aosc.io>
+M:	Chen-Yu Tsai <wens@csie.org>
+S:	Maintained
+F:	configs/bananapi_m2_plus_h3_defconfig
+F:	configs/bananapi_m2_plus_h5_defconfig
+
 BANANAPI M2 ULTRA BOARD
 M:	Chen-Yu Tsai <wens@csie.org>
 S:	Maintained
@@ -158,6 +165,12 @@ BANANAPI M64
 M:	Jagan Teki <jagan@amarulasolutions.com>
 S:	Maintained
 F:	configs/bananapi_m64_defconfig
+
+BEELINK GS1
+M:	Clément Péron <peron.clem@gmail.com>
+S:	Maintained
+F:	configs/beelink_gs1_defconfig
+F:	arch/arm/dts/sun50i-h6-beelink-gs1.dts
 
 COLOMBUS BOARD
 M:	Maxime Ripard <maxime.ripard@bootlin.com>
@@ -181,6 +194,11 @@ CUBIETRUCK-PLUS BOARD
 M:	Chen-Yu Tsai <wens@csie.org>
 S:	Maintained
 F:	configs/Cubietruck_plus_defconfig
+
+EMLID NEUTIS N5 DEV BOARD
+M:	Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
+S:	Maintained
+F:	configs/emlid_neutis_n5_devboard_defconfig
 
 GEMEI-G9 TABLET
 M:	Priit Laes <plaes@plaes.org>
@@ -329,14 +347,25 @@ M:	FUKAUMI Naoki <naobsd@gmail.com>
 S:	Maintained
 F:	configs/Nintendo_NES_Classic_Edition_defconfig
 
+OCEANIC 5205 5INMFD BOARD
+M:	Jagan Teki <jagan@amarulasolutions.com>
+S:	Maintained
+F:	configs/oceanic_5205_5inmfd_defconfig
+
 OLIMEX A20-SOM204 BOARD
 M:	Stefan Mavrodiev <stefan@olimex.com>
 S:	Maintained
 F:	configs/A20-Olimex-SOM204-EVB_defconfig
 F:	configs/A20-Olimex-SOM204-EVB-eMMC_defconfig
 
+OLIMEX TERES-I BOARD
+M:	Jonas Smedegaard <dr@jones.dk>
+M:	Icenowy Zheng <icenowy@aosc.io>
+S:	Maintained
+F:	configs/teres_i_defconfig
+
 ORANGEPI LITE2 BOARD
-M:	Jagan Teki <jagan@openedev.com>
+M:	Jagan Teki <jagan@amarulasolutions.com>
 S:	Maintained
 F:	configs/orangepi_lite2_defconfig
 
@@ -412,11 +441,6 @@ M:	Chen-Yu Tsai <wens@csie.org>
 S:	Maintained
 F:	configs/Sinlinx_SinA33_defconfig
 W:	http://linux-sunxi.org/Sinlinx_SinA33
-
-SINOVOIP BPI M2 PLUS H3 BOARD
-M:	Icenowy Zheng <icenowy@aosc.io>
-S:	Maintained
-F:	configs/Sinovoip_BPI_M2_Plus_defconfig
 
 SINOVOIP BPI M3 A83T BOARD
 M:	VishnuPatekar <vishnupatekar0510@gmail.com>

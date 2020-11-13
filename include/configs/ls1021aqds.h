@@ -51,7 +51,6 @@ unsigned long get_board_ddr_clk(void);
 	board/freescale/ls1021aqds/ls102xa_rcw_sd_ifc.cfg
 #endif
 
-#define CONFIG_SPL_TEXT_BASE		0x10000000
 #define CONFIG_SPL_MAX_SIZE		0x1a000
 #define CONFIG_SPL_STACK		0x1001d000
 #define CONFIG_SPL_PAD_TO		0x1c000
@@ -67,7 +66,6 @@ unsigned long get_board_ddr_clk(void);
 #ifdef CONFIG_NAND_BOOT
 #define CONFIG_SYS_FSL_PBL_RCW	board/freescale/ls1021aqds/ls102xa_rcw_nand.cfg
 
-#define CONFIG_SPL_TEXT_BASE		0x10000000
 #define CONFIG_SPL_MAX_SIZE		0x1a000
 #define CONFIG_SPL_STACK		0x1001d000
 #define CONFIG_SPL_PAD_TO		0x1c000
@@ -89,7 +87,6 @@ unsigned long get_board_ddr_clk(void);
 #define SPD_EEPROM_ADDRESS		0x51
 #define CONFIG_SYS_SPD_BUS_NUM		0
 
-#define CONFIG_FSL_DDR_INTERACTIVE	/* Interactive debugging */
 #ifndef CONFIG_SYS_FSL_DDR4
 #define CONFIG_SYS_DDR_RAW_TIMING
 #endif
@@ -103,11 +100,6 @@ unsigned long get_board_ddr_clk(void);
 #ifdef CONFIG_DDR_ECC
 #define CONFIG_ECC_INIT_VIA_DDRCONTROLLER
 #define CONFIG_MEM_INIT_VALUE           0xdeadbeef
-#endif
-
-#if !defined(CONFIG_SD_BOOT) && !defined(CONFIG_NAND_BOOT) && \
-	!defined(CONFIG_QSPI_BOOT)
-#define CONFIG_SYS_QE_FMAN_FW_IN_NOR
 #endif
 
 /*

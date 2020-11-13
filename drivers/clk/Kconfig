@@ -101,9 +101,12 @@ config CLK_STM32MP1
 source "drivers/clk/at91/Kconfig"
 source "drivers/clk/exynos/Kconfig"
 source "drivers/clk/imx/Kconfig"
+source "drivers/clk/meson/Kconfig"
 source "drivers/clk/mvebu/Kconfig"
 source "drivers/clk/owl/Kconfig"
 source "drivers/clk/renesas/Kconfig"
+source "drivers/clk/sunxi/Kconfig"
+source "drivers/clk/sifive/Kconfig"
 source "drivers/clk/tegra/Kconfig"
 source "drivers/clk/uniphier/Kconfig"
 

@@ -23,7 +23,7 @@ config ALTERA_PIO
 
 config BCM6345_GPIO
 	bool "BCM6345 GPIO driver"
-	depends on DM_GPIO && ARCH_BMIPS
+	depends on DM_GPIO && (ARCH_BMIPS || ARCH_BCM6858 || ARCH_BCM63158)
 	help
 	  This driver supports the GPIO banks on BCM6345 SoCs.
 
@@ -99,12 +99,16 @@ config LPC32XX_GPIO
 	help
 	  Support for the LPC32XX GPIO driver.
 
-config MSCC_BITBANG_SPI_GPIO
-	bool "Microsemi bitbang spi GPIO driver"
+config MSCC_SGPIO
+	bool "Microsemi Serial GPIO driver"
 	depends on DM_GPIO && SOC_VCOREIII
 	help
-	  Support controlling the GPIO used for SPI bitbang by software. Can
-	  be used by the VCoreIII SoCs, but it was mainly useful for Luton.
+	  Support for the VCoreIII SoC serial GPIO device. By using a
+          serial interface, the SIO controller significantly extends
+          the number of available GPIOs with a minimum number of
+          additional pins on the device. The primary purpose of the
+          SIO controller is to connect control signals from SFP
+          modules and to act as an LED controller.
 
 config MSM_GPIO
 	bool "Qualcomm GPIO driver"
@@ -164,6 +168,12 @@ config RCAR_GPIO
 	depends on DM_GPIO && ARCH_RMOBILE
 	help
 	  This driver supports the GPIO banks on Renesas RCar SoCs.
+
+config RZA1_GPIO
+	bool "Renesas RZ/A1 GPIO driver"
+	depends on DM_GPIO && RZA1
+	help
+	  This driver supports the GPIO banks on Renesas RZ/A1 R7S72100 SoCs.
 
 config ROCKCHIP_GPIO
 	bool "Rockchip GPIO driver"
@@ -299,6 +309,29 @@ config DM_PCA953X
 	  Now, max 24 bits chips and PCA953X compatible chips are
 	  supported
 
+config SPL_DM_PCA953X
+	bool "PCA95[357]x, PCA9698, TCA64xx, and MAX7310 I/O ports in SPL"
+	depends on DM_GPIO
+	help
+	  Say yes here to provide access to several register-oriented
+	  SMBus I/O expanders, made mostly by NXP or TI.  Compatible
+	  models include:
+
+	  4 bits:	pca9536, pca9537
+
+	  8 bits:	max7310, max7315, pca6107, pca9534, pca9538, pca9554,
+			pca9556, pca9557, pca9574, tca6408, xra1202
+
+	  16 bits:	max7312, max7313, pca9535, pca9539, pca9555, pca9575,
+			tca6416
+
+	  24 bits:	tca6424
+
+	  40 bits:	pca9505, pca9698
+
+	  Now, max 24 bits chips and PCA953X compatible chips are
+	  supported
+
 config MPC8XXX_GPIO
 	bool "Freescale MPC8XXX GPIO driver"
 	depends on DM_GPIO
@@ -324,7 +357,7 @@ config MPC8XXX_GPIO
 
 config MT7621_GPIO
 	bool "MediaTek MT7621 GPIO driver"
-	depends on DM_GPIO && ARCH_MT7620
+	depends on DM_GPIO && SOC_MT7628
 	default y
 	help
 	  Say yes here to support MediaTek MT7621 compatible GPIOs.

@@ -120,7 +120,7 @@ config CONSOLE_TRUETYPE_SIZE
 
 config SYS_WHITE_ON_BLACK
 	bool "Display console as white on a black background"
-	default y if ARCH_AT91 || ARCH_EXYNOS || ARCH_ROCKCHIP || TEGRA || X86
+	default y if ARCH_AT91 || ARCH_EXYNOS || ARCH_ROCKCHIP || TEGRA || X86 || ARCH_SUNXI
 	help
 	 Normally the display is black on a white background, Enable this
 	 option to invert this, i.e. white on a black background. This can be
@@ -401,6 +401,8 @@ config VIDEO_LCD_SPI_MISO
 	option takes a string in the format understood by 'name_to_gpio'
 	function, e.g. PH1 for pin 1 of port H.
 
+source "drivers/video/meson/Kconfig"
+
 config VIDEO_MVEBU
 	bool "Armada XP LCD controller"
 	default n
@@ -536,6 +538,8 @@ config VIDEO_TEGRA124
 
 source "drivers/video/bridge/Kconfig"
 
+source "drivers/video/imx/Kconfig"
+
 config VIDEO
 	bool "Enable legacy video support"
 	depends on !DM_VIDEO
@@ -544,13 +548,6 @@ config VIDEO
 	  drivers use this because they are not yet converted to driver
 	  model. Video drivers typically provide a colour text console and
 	  cursor.
-
-config VIDEO_IPUV3
-	bool "i.MX IPUv3 Core video support"
-	depends on VIDEO && MX6
-	help
-	  This enables framebuffer driver for i.MX processors working
-	  on the IPUv3(Image Processing Unit) internal graphic processor.
 
 config CFB_CONSOLE
 	bool "Enable colour frame buffer console"

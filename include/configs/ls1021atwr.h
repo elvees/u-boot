@@ -74,7 +74,6 @@
 #define CONFIG_U_BOOT_HDR_SIZE				(16 << 10)
 #endif /* ifdef CONFIG_SECURE_BOOT */
 
-#define CONFIG_SPL_TEXT_BASE		0x10000000
 #define CONFIG_SPL_MAX_SIZE		0x1a000
 #define CONFIG_SPL_STACK		0x1001d000
 #define CONFIG_SPL_PAD_TO		0x1c000
@@ -104,10 +103,7 @@
 #define CONFIG_SYS_DDR_SDRAM_BASE      0x80000000UL
 #define CONFIG_SYS_SDRAM_BASE          CONFIG_SYS_DDR_SDRAM_BASE
 
-#if !defined(CONFIG_SD_BOOT) && !defined(CONFIG_NAND_BOOT) && \
-	!defined(CONFIG_QSPI_BOOT)
-#define CONFIG_SYS_QE_FMAN_FW_IN_NOR
-#endif
+#define CONFIG_CHIP_SELECTS_PER_CTRL	4
 
 /*
  * IFC Definitions
@@ -315,7 +311,8 @@
 
 #define BOOT_TARGET_DEVICES(func) \
 	func(MMC, mmc, 0) \
-	func(USB, usb, 0)
+	func(USB, usb, 0) \
+	func(DHCP, dhcp, na)
 #include <config_distro_bootcmd.h>
 
 #ifdef CONFIG_LPUART
@@ -361,7 +358,8 @@
 			"${scriptaddr} ${prefix}${script}; "    \
 		"env exists secureboot && load ${devtype} "     \
 			"${devnum}:${distro_bootpart} "		\
-			"${scripthdraddr} ${prefix}${boot_script_hdr} " \
+			"${scripthdraddr} ${prefix}${boot_script_hdr}; " \
+			"env exists secureboot "	\
 			"&& esbc_validate ${scripthdraddr};"    \
 		"source ${scriptaddr}\0"	  \
 	"installer=load mmc 0:2 $load_addr "	\

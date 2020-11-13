@@ -118,7 +118,6 @@
  * USB
  */
 #ifdef CONFIG_CMD_USB
-#define CONFIG_USB_EHCI_MX5
 #define CONFIG_MXC_USB_PORT		1
 #define CONFIG_MXC_USB_PORTSC		(PORT_PTS_UTMI | PORT_PTS_PTW)
 #define CONFIG_MXC_USB_FLAGS		0
@@ -137,8 +136,6 @@
 /*
  * LCD
  */
-#ifdef CONFIG_VIDEO
-#define CONFIG_VIDEO_IPUV3
 #define CONFIG_VIDEO_BMP_RLE8
 #define CONFIG_VIDEO_BMP_GZIP
 #define CONFIG_SPLASH_SCREEN
@@ -147,7 +144,6 @@
 #define CONFIG_BMP_16BPP
 #define CONFIG_VIDEO_LOGO
 #define CONFIG_SYS_VIDEO_LOGO_MAX_SIZE	(2 << 20)
-#endif
 
 /* LVDS display */
 #define CONFIG_SYS_LDB_CLOCK			33260000
@@ -176,7 +172,6 @@
  * NAND SPL
  */
 #define CONFIG_SPL_TARGET		"u-boot-with-nand-spl.imx"
-#define CONFIG_SPL_TEXT_BASE		0x70008000
 #define CONFIG_SPL_PAD_TO		0x8000
 #define CONFIG_SPL_STACK		0x70004000
 
@@ -205,9 +200,11 @@
 	"mtdparts=" CONFIG_MTDPARTS_DEFAULT "\0"			\
 	"netdev=eth0\0"							\
 	"splashsource=mmc_fs\0"						\
-	"splashfile=usplash.bmp.gz\0"					\
+	"splashfile=boot/usplash.bmp.gz\0"				\
 	"splashimage=0x88000000\0"					\
 	"splashpos=m,m\0"						\
+	"stdout=serial,vidconsole\0"					\
+	"stderr=serial,vidconsole\0"					\
 	"addcons="							\
 		"setenv bootargs ${bootargs} "				\
 		"console=${consdev},${baudrate}\0"			\
@@ -215,7 +212,7 @@
 		"setenv bootargs ${bootargs} "				\
 		"ip=${ipaddr}:${serverip}:${gatewayip}:${netmask}"	\
 		":${hostname}:${netdev}:off\0"				\
-	"addmtd=setenv bootargs ${bootargs} mtdparts=${mtdparts}\0"	\
+	"addmtd=setenv bootargs ${bootargs} ${mtdparts}\0"		\
 	"addmisc="							\
 		"setenv bootargs ${bootargs} ${miscargs}\0"		\
 	"addargs=run addcons addmisc addmtd\0"				\

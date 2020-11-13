@@ -34,6 +34,7 @@ addons:
     - liblz4-tool
     - libisl15
     - clang-7
+    - srecord
 
 install:
  # Clone uboot-test-hooks
@@ -49,6 +50,7 @@ install:
  - . /tmp/venv/bin/activate
  - pip install pytest==2.8.7
  - pip install python-subunit
+ - pip install pyelftools
  - grub-mkimage -o ~/grub_x86.efi -O i386-efi normal  echo lsefimmap lsefi lsefisystab efinet tftp minicmd
  - grub-mkimage -o ~/grub_x64.efi -O x86_64-efi normal  echo lsefimmap lsefi lsefisystab efinet tftp minicmd
  - mkdir ~/grub2-arm
@@ -63,6 +65,7 @@ env:
     - BUILD_DIR=build
     - HOSTCC="cc"
     - HOSTCXX="c++"
+    - QEMU_VERSION="v3.1.0"
 
 before_script:
   # install toolchains based on TOOLCHAIN} variable
@@ -77,6 +80,11 @@ before_script:
   - if [[ "${TOOLCHAIN}" == arc ]]; then
        wget https://github.com/foss-for-synopsys-dwc-arc-processors/toolchain/releases/download/arc-2018.09-release/arc_gnu_2018.09_prebuilt_uclibc_le_archs_linux_install.tar.gz &&
        tar -C /tmp -xf arc_gnu_2018.09_prebuilt_uclibc_le_archs_linux_install.tar.gz;
+    fi
+  - if [[ "${TOOLCHAIN}" == "nds32" ]]; then
+       wget https://github.com/vincentzwc/prebuilt-nds32-toolchain/releases/download/20180521/nds32le-linux-glibc-v3-upstream.tar.gz &&
+       tar -C /tmp -xf nds32le-linux-glibc-v3-upstream.tar.gz &&
+       echo -e "\n[toolchain-prefix]\nnds32 = /tmp/nds32le-linux-glibc-v3-upstream/bin/nds32le-linux-" >> ~/.buildman;
     fi
   - if [[ "${TOOLCHAIN}" == *xtensa* ]]; then
        wget https://github.com/foss-xtensa/toolchain/releases/download/2018.02/x86_64-2018.02-${TOOLCHAIN}.tar.gz &&
@@ -97,7 +105,7 @@ before_script:
        git clone git://git.qemu.org/qemu.git /tmp/qemu;
        pushd /tmp/qemu;
        git submodule update --init dtc &&
-       git checkout v3.0.0 &&
+       git checkout ${QEMU_VERSION} &&
        ./configure --prefix=/tmp/qemu-install --target-list=${QEMU_TARGET} &&
        make -j4 all install;
        popd;
@@ -109,16 +117,9 @@ script:
  #
  # From buildman, exit code 129 means warnings only.  If we've been asked to
  # use clang only do one configuration.
- - if [[ "${TOOLCHAIN}" == "clang" ]]; then
+ - if [[ "${BUILDMAN}" != "" ]]; then
      ret=0;
-     make O=../.bm-work/${TEST_PY_BD} HOSTCC=clang-7 CC=clang-7 -j$(nproc)
-       KCFLAGS=-Werror sandbox_config all || ret=$?;
-     if [[ $ret -ne 0 ]]; then
-       exit $ret;
-     fi;
-   elif [[ "${BUILDMAN}" != "" ]]; then
-     ret=0;
-     tools/buildman/buildman -P -E ${BUILDMAN} || ret=$?;
+     tools/buildman/buildman -P -E ${BUILDMAN} ${OVERRIDE}|| ret=$?;
      if [[ $ret -ne 0 && $ret -ne 129 ]]; then
        tools/buildman/buildman -sdeP ${BUILDMAN};
        exit $ret;
@@ -164,29 +165,44 @@ matrix:
     - name: "buildman arm11 arm7 arm920t arm946es"
       env:
         - BUILDMAN="arm11 arm7 arm920t arm946es"
-    - name: "buildman arm926ejs (non-freescale,siemens,atmel,kirkwood,spear)"
+    - name: "buildman arm926ejs (non-NXP,siemens,at91,kirkwood,spear)"
       env:
         - JOB="arm926ejs"
-          BUILDMAN="arm926ejs -x freescale,siemens,atmel,kirkwood,spear"
-    - name: "buildman atmel"
+          BUILDMAN="arm926ejs -x freescale,siemens,at91,kirkwood,spear,omap"
+    - name: "buildman at91 (non arm v7)"
       env:
-        - BUILDMAN="atmel"
+        - BUILDMAN="at91 -x armv7"
+    - name: "buildman at91 (non arm926ejs)"
+      env:
+        - BUILDMAN="at91 -x arm926ejs"
     - name: "buildman boundary engicam toradex"
       env:
         - BUILDMAN="boundary engicam toradex"
-    - name: "buildman Freescale ARM32"
+    - name: "buildman NXP ARM32"
       env:
         - BUILDMAN="freescale -x powerpc,m68k,aarch64"
-    - name: "buildman Freescale AArch64 LS10xx"
+    - name: "buildman NXP AArch64 LS101x"
       env:
-        - BUILDMAN="freescale&aarch64&&ls1"
-    - name: "buildman Freescale AArch64 LS20xx"
+        - BUILDMAN="freescale&aarch64&ls101"
+    - name: "buildman NXP AArch64 LS102x"
       env:
-        - BUILDMAN="freescale&aarch64&&ls2"
-    - name: "buildman i.MX6 (non-Freescale)"
+        - BUILDMAN="freescale&aarch64&ls102"
+    - name: "buildman NXP AArch64 LS104x"
+      env:
+        - BUILDMAN="freescale&aarch64&ls104"
+    - name: "buildman NXP AArch64 LS108x"
+      env:
+        - BUILDMAN="freescale&aarch64&ls108"
+    - name: "buildman NXP AArch64 LS20xx"
+      env:
+        - BUILDMAN="freescale&aarch64&&ls20"
+    - name: "buildman NXP AArch64 LX216x"
+      env:
+        - BUILDMAN="freescale&aarch64&lx216"
+    - name: "buildman i.MX6 (non-NXP)"
       env:
         - BUILDMAN="mx6 -x freescale,toradex,boundary,engicam"
-    - name: "buildman i.MX (non-Freescale,i.MX6,toradex)"
+    - name: "buildman i.MX (non-NXP,i.MX6,toradex)"
       env:
         - BUILDMAN="mx -x freescale,mx6,toradex"
     - name: "buildman k2"
@@ -221,14 +237,14 @@ matrix:
         - BUILDMAN="sun50i"
     - name: "buildman catch-all ARM"
       env:
-        - BUILDMAN="arm -x arm11,arm7,arm9,aarch64,atmel,freescale,kirkwood,mvebu,siemens,tegra,uniphier,mx,samsung,sunxi,am33xx,omap,pxa,rockchip,toradex,socfpga,k2,xilinx"
+        - BUILDMAN="arm -x arm11,arm7,arm9,aarch64,at91,freescale,kirkwood,mvebu,siemens,tegra,uniphier,mx,samsung,sunxi,am33xx,omap,pxa,rockchip,toradex,socfpga,k2,xilinx"
     - name: "buildman sandbox x86"
       env:
         - BUILDMAN="sandbox x86"
           TOOLCHAIN="i386"
-    - name: "buildman kirkwood (excluding openrd)"
+    - name: "buildman kirkwood"
       env:
-        - BUILDMAN="kirkwood -x openrd"
+        - BUILDMAN="kirkwood"
     - name: "buildman mvebu"
       env:
         - BUILDMAN="mvebu"
@@ -311,6 +327,10 @@ matrix:
       env:
         - BUILDMAN="riscv"
           TOOLCHAIN="riscv"
+    - name: "buildman nds32"
+      env:
+        - BUILDMAN="nds32"
+          TOOLCHAIN="nds32"
 
     # QA jobs for code analytics
     # static code analysis with cppcheck (we can add --enable=all later)
@@ -351,7 +371,7 @@ matrix:
       env:
         - TEST_PY_BD="sandbox"
           BUILDMAN="^sandbox$"
-          TOOLCHAIN="clang"
+          OVERRIDE="clang-7"
     - name: "test/py sandbox_spl"
       env:
         - TEST_PY_BD="sandbox_spl"
@@ -369,6 +389,7 @@ matrix:
         - TEST_PY_BD="vexpress_ca15_tc2"
           TEST_PY_ID="--id qemu"
           QEMU_TARGET="arm-softmmu"
+          QEMU_VERSION="v3.0.0"
           BUILDMAN="^vexpress_ca15_tc2$"
     - name: "test/py vexpress_ca9x4"
       env:
@@ -453,6 +474,13 @@ matrix:
           QEMU_TARGET="arm-softmmu"
           TEST_PY_ID="--id qemu"
           BUILDMAN="^zynq_zc702$"
+    - name: "test/py xilinx_versal_virt"
+      env:
+        - TEST_PY_BD="xilinx_versal_virt"
+          TEST_PY_TEST_SPEC="not sleep"
+          QEMU_TARGET="aarch64-softmmu"
+          TEST_PY_ID="--id qemu"
+          BUILDMAN="^xilinx_versal_virt$"
     - name: "test/py xtfpga"
       env:
         - TEST_PY_BD="xtfpga"

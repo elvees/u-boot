@@ -147,7 +147,7 @@ config SPL_TINY_MEMSET
 	  The faster memset() is the arch-specific one (if available) enabled
 	  by CONFIG_USE_ARCH_MEMSET. If that is not enabled, we can still get
 	  better performance by writing a word at a time. But in very
-	  size-constrained envrionments even this may be too big. Enable this
+	  size-constrained environments even this may be too big. Enable this
 	  option to reduce code size slightly at the cost of some speed.
 
 config TPL_TINY_MEMSET
@@ -156,7 +156,7 @@ config TPL_TINY_MEMSET
 	  The faster memset() is the arch-specific one (if available) enabled
 	  by CONFIG_USE_ARCH_MEMSET. If that is not enabled, we can still get
 	  better performance by writing a word at a time. But in very
-	  size-constrained envrionments even this may be too big. Enable this
+	  size-constrained environments even this may be too big. Enable this
 	  option to reduce code size slightly at the cost of some speed.
 
 config RBTREE
@@ -164,6 +164,63 @@ config RBTREE
 
 config BITREVERSE
 	bool "Bit reverse library from Linux"
+
+config TRACE
+	bool "Support for tracing of function calls and timing"
+	imply CMD_TRACE
+	help
+	  Enables function tracing within U-Boot. This allows recording of call
+	  traces including timing information. The command can write data to
+	  memory for exporting for analysis (e.g. using bootchart).
+	  See doc/README.trace for full details.
+
+config TRACE_BUFFER_SIZE
+	hex "Size of trace buffer in U-Boot"
+	depends on TRACE
+	default 0x01000000
+	help
+	  Sets the size of the trace buffer in U-Boot. This is allocated from
+	  memory during relocation. If this buffer is too small, the trace
+	  history will be truncated, with later records omitted.
+
+	  If early trace is enabled (i.e. before relocation), this buffer must
+	  be large enough to include all the data from the early trace buffer as
+	  well, since this is copied over to the main buffer during relocation.
+
+	  A trace record is emitted for each function call and each record is
+	  12 bytes (see struct trace_call). A suggested minimum size is 1MB. If
+	  the size is too small then 'trace stats' will show a message saying
+	  how many records were dropped due to buffer overflow.
+
+config TRACE_EARLY
+	bool "Enable tracing before relocation"
+	depends on TRACE
+	help
+	  Sometimes it is helpful to trace execution of U-Boot before
+	  relocation. This is possible by using a arch-specific, fixed buffer
+	  position in memory. Enable this option to start tracing as early as
+	  possible after U-Boot starts.
+
+config TRACE_EARLY_SIZE
+	hex "Size of early trace buffer in U-Boot"
+	depends on TRACE_EARLY
+	default 0x00100000
+	help
+	  Sets the size of the early trace buffer in bytes. This is used to hold
+	  tracing information before relocation.
+
+config TRACE_EARLY_ADDR
+	hex "Address of early trace buffer in U-Boot"
+	depends on TRACE_EARLY
+	default 0x00100000
+	help
+	  Sets the address of the early trace buffer in U-Boot. This memory
+	  must be accessible before relocation.
+
+	  A trace record is emitted for each function call and each record is
+	  12 bytes (see struct trace_call). A suggested minimum size is 1MB. If
+	  the size is too small then the message which says the amount of early
+	  data being coped will the the same as the
 
 source lib/dhry/Kconfig
 
@@ -270,6 +327,9 @@ config MD5
 config CRC32C
 	bool
 
+config XXHASH
+	bool
+
 endmenu
 
 menu "Compression Support"
@@ -301,6 +361,25 @@ config LZO
 	help
 	  This enables support for LZO compression algorithm.r
 
+config GZIP
+	bool "Enable gzip decompression support"
+	select ZLIB
+	default y
+	help
+	  This enables support for GZIP compression algorithm.
+
+config ZLIB
+	bool
+	default y
+	help
+	  This enables ZLIB compression lib.
+
+config ZSTD
+	bool "Enable Zstandard decompression support"
+	select XXHASH
+	help
+	  This enables Zstandard decompression library.
+
 config SPL_LZ4
 	bool "Enable LZ4 decompression support in SPL"
 	help
@@ -324,6 +403,12 @@ config SPL_ZLIB
 	bool
 	help
 	  This enables compression lib for SPL boot.
+
+config SPL_ZSTD
+	bool "Enable Zstandard decompression support in SPL"
+	select XXHASH
+	help
+	  This enables Zstandard decompression library in the SPL.
 
 endmenu
 
@@ -422,5 +507,9 @@ endmenu
 source lib/efi/Kconfig
 source lib/efi_loader/Kconfig
 source lib/optee/Kconfig
+
+config TEST_FDTDEC
+	bool "enable fdtdec test"
+	depends on OF_LIBFDT
 
 endmenu

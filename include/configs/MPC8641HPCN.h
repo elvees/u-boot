@@ -45,7 +45,6 @@
 #define CONFIG_ENV_OVERWRITE
 
 #define CONFIG_BAT_RW		1	/* Use common BAT rw code */
-#define CONFIG_HIGH_BATS	1	/* High BATs supported and enabled */
 #define CONFIG_SYS_NUM_ADDR_MAP 8	/* Number of addr map slots = 8 dbats */
 
 #define CONFIG_ALTIVEC		1
@@ -97,7 +96,6 @@ extern unsigned long get_board_sys_clk(unsigned long dummy);
 /*
  * DDR Setup
  */
-#define CONFIG_FSL_DDR_INTERACTIVE
 #define CONFIG_SPD_EEPROM		/* Use SPD EEPROM for DDR setup */
 #define CONFIG_DDR_SPD
 

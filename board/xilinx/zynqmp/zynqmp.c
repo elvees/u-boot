@@ -20,14 +20,9 @@
 #include <usb.h>
 #include <dwc3-uboot.h>
 #include <zynqmppl.h>
-#include <i2c.h>
 #include <g_dnl.h>
 
 DECLARE_GLOBAL_DATA_PTR;
-
-#if !defined(CONFIG_SPL_BUILD) && defined(CONFIG_WDT)
-static struct udevice *watchdog_dev;
-#endif
 
 #if defined(CONFIG_FPGA) && defined(CONFIG_FPGA_ZYNQMPPL) && \
     !defined(CONFIG_SPL_BUILD)
@@ -170,6 +165,10 @@ static const struct {
 	{
 		.id = 0x62,
 		.name = "29dr",
+	},
+	{
+		.id = 0x66,
+		.name = "39dr",
 	},
 };
 #endif
@@ -323,11 +322,6 @@ int board_early_init_f(void)
 	ret = psu_init();
 #endif
 
-#if defined(CONFIG_WDT) && !defined(CONFIG_SPL_BUILD)
-	/* bss is not cleared at time when watchdog_reset() is called */
-	watchdog_dev = NULL;
-#endif
-
 	return ret;
 }
 
@@ -346,43 +340,8 @@ int board_init(void)
 	}
 #endif
 
-#if !defined(CONFIG_SPL_BUILD) && defined(CONFIG_WDT)
-	if (uclass_get_device_by_seq(UCLASS_WDT, 0, &watchdog_dev)) {
-		debug("Watchdog: Not found by seq!\n");
-		if (uclass_get_device(UCLASS_WDT, 0, &watchdog_dev)) {
-			puts("Watchdog: Not found!\n");
-			return 0;
-		}
-	}
-
-	wdt_start(watchdog_dev, 0, 0);
-	puts("Watchdog: Started\n");
-#endif
-
 	return 0;
 }
-
-#ifdef CONFIG_WATCHDOG
-/* Called by macro WATCHDOG_RESET */
-void watchdog_reset(void)
-{
-# if !defined(CONFIG_SPL_BUILD)
-	static ulong next_reset;
-	ulong now;
-
-	if (!watchdog_dev)
-		return;
-
-	now = timer_get_us();
-
-	/* Do not reset the watchdog too often */
-	if (now > next_reset) {
-		wdt_reset(watchdog_dev);
-		next_reset = now + 1000;
-	}
-# endif
-}
-#endif
 
 int board_early_init_r(void)
 {
@@ -406,22 +365,6 @@ int board_early_init_r(void)
 		writel(ZYNQMP_IOU_SCNTR_COUNTER_CONTROL_REGISTER_EN,
 		       &iou_scntr_secure->counter_control_register);
 	}
-	return 0;
-}
-
-int zynq_board_read_rom_ethaddr(unsigned char *ethaddr)
-{
-#if defined(CONFIG_ZYNQ_GEM_EEPROM_ADDR) && \
-    defined(CONFIG_ZYNQ_GEM_I2C_MAC_OFFSET) && \
-    defined(CONFIG_ZYNQ_EEPROM_BUS)
-	i2c_set_bus_num(CONFIG_ZYNQ_EEPROM_BUS);
-
-	if (eeprom_read(CONFIG_ZYNQ_GEM_EEPROM_ADDR,
-			CONFIG_ZYNQ_GEM_I2C_MAC_OFFSET,
-			ethaddr, 6))
-		printf("I2C EEPROM MAC address read failed\n");
-#endif
-
 	return 0;
 }
 
@@ -489,6 +432,7 @@ void reset_cpu(ulong addr)
 {
 }
 
+#if defined(CONFIG_BOARD_LATE_INIT)
 static const struct {
 	u32 bit;
 	const char *name;
@@ -503,18 +447,20 @@ static const struct {
 	{}
 };
 
-static u32 reset_reason(void)
+static int reset_reason(void)
 {
-	u32 ret;
-	int i;
+	u32 reg;
+	int i, ret;
 	const char *reason = NULL;
 
-	ret = readl(&crlapb_base->reset_reason);
+	ret = zynqmp_mmio_read((ulong)&crlapb_base->reset_reason, &reg);
+	if (ret)
+		return -EINVAL;
 
 	puts("Reset reason:\t");
 
 	for (i = 0; i < ARRAY_SIZE(reset_reasons); i++) {
-		if (ret & reset_reasons[i].bit) {
+		if (reg & reset_reasons[i].bit) {
 			reason = reset_reasons[i].name;
 			printf("%s ", reset_reasons[i].name);
 			break;
@@ -525,9 +471,41 @@ static u32 reset_reason(void)
 
 	env_set("reset_reason", reason);
 
-	writel(~0, &crlapb_base->reset_reason);
+	ret = zynqmp_mmio_write(~0, ~0, (ulong)&crlapb_base->reset_reason);
+	if (ret)
+		return -EINVAL;
 
 	return ret;
+}
+
+static int set_fdtfile(void)
+{
+	char *compatible, *fdtfile;
+	const char *suffix = ".dtb";
+	const char *vendor = "xilinx/";
+
+	if (env_get("fdtfile"))
+		return 0;
+
+	compatible = (char *)fdt_getprop(gd->fdt_blob, 0, "compatible", NULL);
+	if (compatible) {
+		debug("Compatible: %s\n", compatible);
+
+		/* Discard vendor prefix */
+		strsep(&compatible, ",");
+
+		fdtfile = calloc(1, strlen(vendor) + strlen(compatible) +
+				 strlen(suffix) + 1);
+		if (!fdtfile)
+			return -ENOMEM;
+
+		sprintf(fdtfile, "%s%s%s", vendor, compatible, suffix);
+
+		env_set("fdtfile", fdtfile);
+		free(fdtfile);
+	}
+
+	return 0;
 }
 
 int board_late_init(void)
@@ -551,6 +529,10 @@ int board_late_init(void)
 		debug("Saved variables - Skipping\n");
 		return 0;
 	}
+
+	ret = set_fdtfile();
+	if (ret)
+		return ret;
 
 	ret = zynqmp_mmio_read((ulong)&crlapb_base->boot_mode, &reg);
 	if (ret)
@@ -587,6 +569,8 @@ int board_late_init(void)
 	case SD_MODE:
 		puts("SD_MODE\n");
 		if (uclass_get_device_by_name(UCLASS_MMC,
+					      "mmc@ff160000", &dev) &&
+		    uclass_get_device_by_name(UCLASS_MMC,
 					      "sdhci@ff160000", &dev)) {
 			puts("Boot from SD0 but without SD0 enabled!\n");
 			return -1;
@@ -603,6 +587,8 @@ int board_late_init(void)
 	case SD_MODE1:
 		puts("SD_MODE1\n");
 		if (uclass_get_device_by_name(UCLASS_MMC,
+					      "mmc@ff170000", &dev) &&
+		    uclass_get_device_by_name(UCLASS_MMC,
 					      "sdhci@ff170000", &dev)) {
 			puts("Boot from SD1 but without SD1 enabled!\n");
 			return -1;
@@ -655,6 +641,7 @@ int board_late_init(void)
 
 	return 0;
 }
+#endif
 
 int checkboard(void)
 {

@@ -15,8 +15,6 @@
  * We are only ever GP parts and will utilize all of the "downloaded image"
  * area in SRAM which starts at 0x40200000 and ends at 0x4020FFFF (64KB).
  */
-#undef CONFIG_SPL_TEXT_BASE
-#define CONFIG_SPL_TEXT_BASE		0x40200000
 
 #define CONFIG_REVISION_TAG		1
 
@@ -31,16 +29,6 @@
 #define IGEP0030_USB_TRANSCEIVER_RESET		54
 #define GPIO_IGEP00X0_BOARD_DETECTION		28
 #define GPIO_IGEP00X0_REVISION_DETECTION	129
-
-/* USB device configuration */
-#define CONFIG_USB_DEVICE		1
-#define CONFIG_USB_TTY			1
-
-/* Change these to suit your needs */
-#define CONFIG_USBD_VENDORID		0x0451
-#define CONFIG_USBD_PRODUCTID		0x5678
-#define CONFIG_USBD_MANUFACTURER	"Texas Instruments"
-#define CONFIG_USBD_PRODUCT_NAME	"IGEP"
 
 #ifndef CONFIG_SPL_BUILD
 

@@ -225,7 +225,7 @@ int uclass_find_first_device(enum uclass_id id, struct udevice **devp)
 	if (ret)
 		return ret;
 	if (list_empty(&uc->dev_head))
-		return 0;
+		return -ENODEV;
 
 	*devp = list_first_entry(&uc->dev_head, struct udevice, uclass_node);
 
@@ -757,3 +757,8 @@ int uclass_pre_remove_device(struct udevice *dev)
 	return 0;
 }
 #endif
+
+UCLASS_DRIVER(nop) = {
+	.id		= UCLASS_NOP,
+	.name		= "nop",
+};

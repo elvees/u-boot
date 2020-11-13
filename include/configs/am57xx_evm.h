@@ -35,11 +35,22 @@
 
 #define CONFIG_SYS_OMAP_ABE_SYSCK
 
+#ifdef CONFIG_SPL_DFU
+#ifndef CONFIG_SPL_BUILD
 #define DFUARGS \
 	"dfu_bufsiz=0x10000\0" \
 	DFU_ALT_INFO_MMC \
 	DFU_ALT_INFO_EMMC \
 	DFU_ALT_INFO_RAM \
+	DFU_ALT_INFO_QSPI
+#else
+#undef CONFIG_CMD_BOOTD
+#define CONFIG_SPL_LOAD_FIT_ADDRESS 0x80200000
+#define DFUARGS \
+	"dfu_bufsiz=0x10000\0" \
+	DFU_ALT_INFO_RAM
+#endif
+#endif
 
 #include <configs/ti_omap5_common.h>
 
@@ -51,8 +62,6 @@
 #define CONFIG_BOOTP_SEND_HOSTNAME
 #define CONFIG_NET_RETRY_COUNT		10
 #define PHY_ANEG_TIMEOUT	8000	/* PHY needs longer aneg time at 1G */
-
-#define CONFIG_SUPPORT_EMMC_BOOT
 
 /* USB xHCI HOST */
 #define CONFIG_USB_XHCI_OMAP
@@ -81,13 +90,6 @@
 #define CONFIG_SYS_SPI_ARGS_SIZE        0x80000
 
 /* SPI SPL */
-#define CONFIG_TI_EDMA3
 #define CONFIG_SYS_SPI_U_BOOT_OFFS     0x40000
-
-/* SPI */
-#define CONFIG_TI_SPI_MMAP
-#define CONFIG_SF_DEFAULT_SPEED                76800000
-#define CONFIG_SF_DEFAULT_MODE                 SPI_MODE_0
-#define CONFIG_QSPI_QUAD_SUPPORT
 
 #endif /* __CONFIG_AM57XX_EVM_H */

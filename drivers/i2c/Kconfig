@@ -157,11 +157,14 @@ config SYS_I2C_MESON
 config SYS_I2C_MXC
 	bool "NXP MXC I2C driver"
 	help
-	  Add support for the NXP I2C driver. This supports upto for bus
-	  channels and operating on standard mode upto 100 kbits/s and fast
-	  mode upto 400 kbits/s.
+	  Add support for the NXP I2C driver. This supports up to four bus
+	  channels and operating on standard mode up to 100 kbits/s and fast
+	  mode up to 400 kbits/s.
 
-if SYS_I2C_MXC
+# These settings are not used with DM_I2C, however SPL doesn't use
+# DM_I2C even if DM_I2C is enabled, and so might use these settings even
+# when main u-boot does not!
+if SYS_I2C_MXC && (!DM_I2C || SPL)
 config SYS_I2C_MXC_I2C1
 	bool "NXP MXC I2C1"
 	help
@@ -363,7 +366,7 @@ config SYS_I2C_ROCKCHIP
 	help
 	  Add support for the Rockchip I2C driver. This is used with various
 	  Rockchip parts such as RK3126, RK3128, RK3036 and RK3288. All chips
-	  have several I2C ports and all are provided, controled by the
+	  have several I2C ports and all are provided, controlled by the
 	  device tree.
 
 config SYS_I2C_SANDBOX
@@ -399,6 +402,12 @@ config SYS_I2C_STM32F7
 	   _ Easy to use event management
 	   _ Optional clock stretching
 	   _ Software reset
+
+config SYS_I2C_TEGRA
+	bool "NVIDIA Tegra internal I2C controller"
+	depends on TEGRA
+	help
+	  Support for NVIDIA I2C controller available in Tegra SoCs.
 
 config SYS_I2C_UNIPHIER
 	bool "UniPhier I2C driver"
@@ -450,37 +459,11 @@ config SYS_I2C_BUS_MAX
 	help
 	  Define the maximum number of available I2C buses.
 
-config SYS_I2C_ZYNQ
-	bool "Xilinx I2C driver"
-	depends on ARCH_ZYNQMP || ARCH_ZYNQ
+config SYS_I2C_XILINX_XIIC
+	bool "Xilinx AXI I2C driver"
+	depends on DM_I2C
 	help
-	  Support for Xilinx I2C controller.
-
-config SYS_I2C_ZYNQ_SLAVE
-	hex "Set slave addr"
-	depends on SYS_I2C_ZYNQ
-	default 0
-	help
-	  Set CONFIG_SYS_I2C_ZYNQ_SLAVE for slave addr.
-
-config SYS_I2C_ZYNQ_SPEED
-	int "Set I2C speed"
-	depends on SYS_I2C_ZYNQ
-	default 100000
-	help
-	  Set CONFIG_SYS_I2C_ZYNQ_SPEED for speed setting.
-
-config ZYNQ_I2C0
-	bool "Xilinx I2C0 controller"
-	depends on SYS_I2C_ZYNQ
-	help
-	  Enable Xilinx I2C0 controller.
-
-config ZYNQ_I2C1
-	bool "Xilinx I2C1 controller"
-	depends on SYS_I2C_ZYNQ
-	help
-	  Enable Xilinx I2C1 controller.
+	  Support for Xilinx AXI I2C controller.
 
 config SYS_I2C_IHS
         bool "gdsys IHS I2C driver"

@@ -56,15 +56,11 @@ static void boot_start_lmb(bootm_headers_t *images)
 	ulong		mem_start;
 	phys_size_t	mem_size;
 
-	lmb_init(&images->lmb);
-
 	mem_start = env_get_bootm_low();
 	mem_size = env_get_bootm_size();
 
-	lmb_add(&images->lmb, (phys_addr_t)mem_start, mem_size);
-
-	arch_lmb_reserve(&images->lmb);
-	board_lmb_reserve(&images->lmb);
+	lmb_init_and_reserve_range(&images->lmb, (phys_addr_t)mem_start,
+				   mem_size, NULL);
 }
 #else
 #define lmb_reserve(lmb, base, size)
@@ -158,7 +154,7 @@ static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 #ifdef CONFIG_ANDROID_BOOT_IMAGE
 	case IMAGE_FORMAT_ANDROID:
 		images.os.type = IH_TYPE_KERNEL;
-		images.os.comp = IH_COMP_NONE;
+		images.os.comp = android_image_get_kcomp(os_hdr);
 		images.os.os = IH_OS_LINUX;
 
 		images.os.end = android_image_get_end(os_hdr);
@@ -262,7 +258,8 @@ int bootm_find_images(int flag, int argc, char * const argv[])
 		puts("Could not find a valid device tree\n");
 		return 1;
 	}
-	set_working_fdt_addr(map_to_sysmem(images.ft_addr));
+	if (CONFIG_IS_ENABLED(CMD_FDT))
+		set_working_fdt_addr(map_to_sysmem(images.ft_addr));
 #endif
 
 #if IMAGE_ENABLE_FIT
@@ -453,7 +450,6 @@ static int bootm_load_os(bootm_headers_t *images, int boot_progress)
 	ulong image_start = os.image_start;
 	ulong image_len = os.image_len;
 	ulong flush_start = ALIGN_DOWN(load, ARCH_DMA_MINALIGN);
-	ulong flush_len;
 	bool no_overlap;
 	void *load_buf, *image_buf;
 	int err;
@@ -468,11 +464,7 @@ static int bootm_load_os(bootm_headers_t *images, int boot_progress)
 		return err;
 	}
 
-	flush_len = load_end - load;
-	if (flush_start < load)
-		flush_len += load - flush_start;
-
-	flush_cache(flush_start, ALIGN(flush_len, ARCH_DMA_MINALIGN));
+	flush_cache(flush_start, ALIGN(load_end, ARCH_DMA_MINALIGN) - flush_start);
 
 	debug("   kernel loaded at 0x%08lx, end = 0x%08lx\n", load, load_end);
 	bootstage_mark(BOOTSTAGE_ID_KERNEL_LOADED);
@@ -915,6 +907,16 @@ static const void *boot_get_kernel(cmd_tbl_t *cmdtp, int flag, int argc,
 
 	return buf;
 }
+
+/**
+ * switch_to_non_secure_mode() - switch to non-secure mode
+ *
+ * This routine is overridden by architectures requiring this feature.
+ */
+void __weak switch_to_non_secure_mode(void)
+{
+}
+
 #else /* USE_HOSTCC */
 
 void memmove_wd(void *to, void *from, size_t len, ulong chunksz)
@@ -922,6 +924,7 @@ void memmove_wd(void *to, void *from, size_t len, ulong chunksz)
 	memmove(to, from, len);
 }
 
+#if defined(CONFIG_FIT_SIGNATURE)
 static int bootm_host_load_image(const void *fit, int req_image_type)
 {
 	const char *fit_uname_config = NULL;
@@ -986,5 +989,6 @@ int bootm_host_load_images(const void *fit, int cfg_noffset)
 	/* Return the first error we found */
 	return err;
 }
+#endif
 
 #endif /* ndef USE_HOSTCC */

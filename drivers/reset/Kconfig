@@ -106,4 +106,25 @@ config RESET_SOCFPGA
 	help
 	  Support for reset controller on SoCFPGA platform.
 
+config RESET_MEDIATEK
+	bool "Reset controller driver for MediaTek SoCs"
+	depends on DM_RESET && ARCH_MEDIATEK && CLK
+	default y
+	help
+	  Support for reset controller on MediaTek SoCs.
+
+config RESET_SUNXI
+	bool "RESET support for Allwinner SoCs"
+	depends on DM_RESET && ARCH_SUNXI
+	default y
+	help
+	  This enables support for common reset driver for
+	  Allwinner SoCs.
+
+config RESET_HISILICON
+	bool "Reset controller driver for HiSilicon SoCs"
+	depends on DM_RESET
+	help
+	  Support for reset controller on HiSilicon SoCs.
+
 endmenu

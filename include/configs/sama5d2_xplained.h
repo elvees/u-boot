@@ -25,11 +25,6 @@
 #define CONFIG_SYS_LOAD_ADDR		0x22000000 /* load address */
 
 /* SerialFlash */
-#ifdef CONFIG_CMD_SF
-#define CONFIG_SF_DEFAULT_BUS		0
-#define CONFIG_SF_DEFAULT_CS		0
-#define CONFIG_SF_DEFAULT_SPEED		30000000
-#endif
 
 #ifdef CONFIG_SD_BOOT
 
@@ -52,7 +47,6 @@
 #endif
 
 /* SPL */
-#define CONFIG_SPL_TEXT_BASE		0x200000
 #define CONFIG_SPL_MAX_SIZE		0x10000
 #define CONFIG_SPL_BSS_START_ADDR	0x20000000
 #define CONFIG_SPL_BSS_MAX_SIZE		0x80000

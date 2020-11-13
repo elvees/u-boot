@@ -5,7 +5,7 @@
 #ifndef __CONFIG_RV1108_COMMON_H
 #define __CONFIG_RV1108_COMMON_H
 
-#include <asm/arch/hardware.h>
+#include <asm/arch-rockchip/hardware.h>
 #include "rockchip-common.h"
 
 #define CONFIG_SYS_MALLOC_LEN		(32 << 20)
@@ -16,9 +16,6 @@
 /* TIMER1,initialized by ddr initialize code */
 #define CONFIG_SYS_TIMER_BASE		0x10350020
 #define CONFIG_SYS_TIMER_COUNTER	(CONFIG_SYS_TIMER_BASE + 8)
-
-/* MMC/SD IP block */
-#define CONFIG_BOUNCE_BUFFER
 
 #define CONFIG_SYS_SDRAM_BASE		0x60000000
 #define CONFIG_SYS_INIT_SP_ADDR		(CONFIG_SYS_TEXT_BASE + 0x100000)

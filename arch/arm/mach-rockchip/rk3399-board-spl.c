@@ -5,18 +5,23 @@
  */
 
 #include <common.h>
-#include <asm/arch/bootrom.h>
-#include <asm/arch/clock.h>
-#include <asm/arch/grf_rk3399.h>
-#include <asm/arch/hardware.h>
-#include <asm/arch/periph.h>
-#include <asm/io.h>
 #include <debug_uart.h>
 #include <dm.h>
-#include <dm/pinctrl.h>
 #include <ram.h>
 #include <spl.h>
+#include <spl_gpio.h>
 #include <syscon.h>
+#include <asm/gpio.h>
+#include <asm/io.h>
+#include <asm/arch-rockchip/bootrom.h>
+#include <asm/arch-rockchip/clock.h>
+#include <asm/arch-rockchip/cru_rk3399.h>
+#include <asm/arch-rockchip/grf_rk3399.h>
+#include <asm/arch-rockchip/hardware.h>
+#include <asm/arch-rockchip/periph.h>
+#include <asm/arch-rockchip/sys_proto.h>
+#include <power/regulator.h>
+#include <dm/pinctrl.h>
 
 void board_return_to_bootrom(void)
 {
@@ -125,33 +130,6 @@ void secure_timer_init(void)
 	writel(TIMER_EN | TIMER_FMODE, TIMER_CHN10_BASE + TIMER_CONTROL_REG);
 }
 
-void board_debug_uart_init(void)
-{
-#define GRF_BASE	0xff770000
-	struct rk3399_grf_regs * const grf = (void *)GRF_BASE;
-
-#if defined(CONFIG_DEBUG_UART_BASE) && (CONFIG_DEBUG_UART_BASE == 0xff180000)
-	/* Enable early UART0 on the RK3399 */
-	rk_clrsetreg(&grf->gpio2c_iomux,
-		     GRF_GPIO2C0_SEL_MASK,
-		     GRF_UART0BT_SIN << GRF_GPIO2C0_SEL_SHIFT);
-	rk_clrsetreg(&grf->gpio2c_iomux,
-		     GRF_GPIO2C1_SEL_MASK,
-		     GRF_UART0BT_SOUT << GRF_GPIO2C1_SEL_SHIFT);
-#else
-	/* Enable early UART2 channel C on the RK3399 */
-	rk_clrsetreg(&grf->gpio4c_iomux,
-		     GRF_GPIO4C3_SEL_MASK,
-		     GRF_UART2DGBC_SIN << GRF_GPIO4C3_SEL_SHIFT);
-	rk_clrsetreg(&grf->gpio4c_iomux,
-		     GRF_GPIO4C4_SEL_MASK,
-		     GRF_UART2DBGC_SOUT << GRF_GPIO4C4_SEL_SHIFT);
-	/* Set channel C as UART2 input */
-	rk_clrsetreg(&grf->soc_con7,
-		     GRF_UART_DBG_SEL_MASK,
-		     GRF_UART_DBG_SEL_C << GRF_UART_DBG_SEL_SHIFT);
-#endif
-}
 
 void board_init_f(ulong dummy)
 {
@@ -161,8 +139,23 @@ void board_init_f(ulong dummy)
 	struct rk3399_grf_regs *grf;
 	int ret;
 
-#define EARLY_UART
-#ifdef EARLY_UART
+#ifdef CONFIG_DEBUG_UART
+	debug_uart_init();
+
+# ifdef CONFIG_TARGET_CHROMEBOOK_BOB
+	int sum, i;
+
+	/*
+	 * Add a delay and ensure that the compiler does not optimise this out.
+	 * This is needed since the power rails tail a while to turn on, and
+	 * we get garbage serial output otherwise.
+	 */
+	sum = 0;
+	for (i = 0; i < 150000; i++)
+		sum += i;
+	gru_dummy_function(sum);
+#endif /* CONFIG_TARGET_CHROMEBOOK_BOB */
+
 	/*
 	 * Debug UART can be used from here if required:
 	 *
@@ -171,8 +164,7 @@ void board_init_f(ulong dummy)
 	 * printhex8(0x1234);
 	 * printascii("string");
 	 */
-	debug_uart_init();
-	printascii("U-Boot SPL board init\n");
+	debug("U-Boot SPL board init\n");
 #endif
 
 	ret = spl_early_init();
@@ -211,6 +203,66 @@ void board_init_f(ulong dummy)
 		pr_err("DRAM init failed: %d\n", ret);
 		return;
 	}
+}
+
+#if defined(SPL_GPIO_SUPPORT)
+static void rk3399_force_power_on_reset(void)
+{
+	ofnode node;
+	struct gpio_desc sysreset_gpio;
+
+	debug("%s: trying to force a power-on reset\n", __func__);
+
+	node = ofnode_path("/config");
+	if (!ofnode_valid(node)) {
+		debug("%s: no /config node?\n", __func__);
+		return;
+	}
+
+	if (gpio_request_by_name_nodev(node, "sysreset-gpio", 0,
+				       &sysreset_gpio, GPIOD_IS_OUT)) {
+		debug("%s: could not find a /config/sysreset-gpio\n", __func__);
+		return;
+	}
+
+	dm_gpio_set_value(&sysreset_gpio, 1);
+}
+#endif
+
+void spl_board_init(void)
+{
+#if defined(SPL_GPIO_SUPPORT)
+	struct rk3399_cru *cru = rockchip_get_cru();
+
+	/*
+	 * The RK3399 resets only 'almost all logic' (see also in the TRM
+	 * "3.9.4 Global software reset"), when issuing a software reset.
+	 * This may cause issues during boot-up for some configurations of
+	 * the application software stack.
+	 *
+	 * To work around this, we test whether the last reset reason was
+	 * a power-on reset and (if not) issue an overtemp-reset to reset
+	 * the entire module.
+	 *
+	 * While this was previously fixed by modifying the various places
+	 * that could generate a software reset (e.g. U-Boot's sysreset
+	 * driver, the ATF or Linux), we now have it here to ensure that
+	 * we no longer have to track this through the various components.
+	 */
+	if (cru->glb_rst_st != 0)
+		rk3399_force_power_on_reset();
+#endif
+
+#if defined(SPL_DM_REGULATOR)
+	/*
+	 * Turning the eMMC and SPI back on (if disabled via the Qseven
+	 * BIOS_ENABLE) signal is done through a always-on regulator).
+	 */
+	if (regulators_enable_boot_on(false))
+		debug("%s: Cannot enable boot on regulator\n", __func__);
+#endif
+
+	preloader_console_init();
 }
 
 #ifdef CONFIG_SPL_LOAD_FIT

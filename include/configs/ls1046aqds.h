@@ -28,10 +28,6 @@ unsigned long get_board_ddr_clk(void);
 #define SPD_EEPROM_ADDRESS		0x51
 #define CONFIG_SYS_SPD_BUS_NUM		0
 
-#ifndef CONFIG_SPL
-#define CONFIG_FSL_DDR_INTERACTIVE	/* Interactive debugging */
-#endif
-
 #define CONFIG_DDR_ECC
 #ifdef CONFIG_DDR_ECC
 #define CONFIG_ECC_INIT_VIA_DDRCONTROLLER
@@ -43,10 +39,6 @@ unsigned long get_board_ddr_clk(void);
 #define CONFIG_SPI_FLASH_STMICRO	/* cs0 */
 #define CONFIG_SPI_FLASH_SST		/* cs1 */
 #define CONFIG_SPI_FLASH_EON		/* cs2 */
-#if !defined(CONFIG_QSPI_BOOT) && !defined(CONFIG_SD_BOOT_QSPI)
-#define CONFIG_SF_DEFAULT_BUS		1
-#define CONFIG_SF_DEFAULT_CS		0
-#endif
 #endif
 
 /* QSPI */
@@ -60,7 +52,6 @@ unsigned long get_board_ddr_clk(void);
 #endif
 
 #ifdef CONFIG_SYS_DPAA_FMAN
-#define CONFIG_FMAN_ENET
 #define CONFIG_PHY_VITESSE
 #define CONFIG_PHY_REALTEK
 #define CONFIG_PHYLIB_10G

@@ -19,26 +19,6 @@
 #define CONFIG_FEC_MXC
 #endif
 
-/* SPI */
-#ifdef CONFIG_CMD_SPI
-#define CONFIG_DEFAULT_SPI_BUS		2
-#define CONFIG_DEFAULT_SPI_MODE		SPI_MODE_0
-
-/* SPI FLASH */
-#ifdef CONFIG_CMD_SF
-#define CONFIG_SF_DEFAULT_BUS		2
-#define CONFIG_SF_DEFAULT_CS		0
-#define CONFIG_SF_DEFAULT_SPEED		40000000
-#define CONFIG_SF_DEFAULT_MODE		SPI_MODE_0
-
-#define CONFIG_ENV_SPI_BUS		2
-#define CONFIG_ENV_SPI_CS		0
-#define CONFIG_ENV_SPI_MAX_HZ		40000000
-#define CONFIG_ENV_SPI_MODE		SPI_MODE_0
-#endif
-
-#endif
-
 /* Boot Linux */
 #define CONFIG_BOOTFILE		"uImage"
 #define CONFIG_BOOTCOMMAND	"bootm"

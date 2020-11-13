@@ -13,7 +13,6 @@
 #define CONFIG_KW88F6281	1	/* SOC Name */
 #define CONFIG_SKIP_LOWLEVEL_INIT	/* disable board lowlevel_init */
 #define CONFIG_SYS_KWD_CONFIG	$(CONFIG_BOARDDIR)/kwbimage.cfg
-#define CONFIG_BUILD_TARGET	"u-boot.kwb"
 
 /* additions for new ARM relocation support */
 #define CONFIG_SYS_SDRAM_BASE	0x00000000
@@ -57,10 +56,6 @@
 /*
  *  Environment variables configurations
  */
-#define CONFIG_ENV_SPI_BUS		0
-#define CONFIG_ENV_SPI_CS		0
-#define CONFIG_ENV_SPI_MAX_HZ		20000000	/* 20Mhz */
-#define CONFIG_ENV_SPI_MODE		CONFIG_SF_DEFAULT_MODE
 #define CONFIG_ENV_SECT_SIZE		0x40000		/* 256K */
 #define CONFIG_ENV_SIZE			0x02000
 #define CONFIG_ENV_OFFSET		0xc0000		/* env starts here - 768K */

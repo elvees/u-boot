@@ -8,13 +8,13 @@
 #include <dm.h>
 #include <ram.h>
 #include <syscon.h>
-#include <asm/io.h>
-#include <asm/arch/clock.h>
-#include <asm/arch/grf_rk3188.h>
-#include <asm/arch/periph.h>
-#include <asm/arch/pmu_rk3288.h>
-#include <asm/arch/boot_mode.h>
 #include <asm/gpio.h>
+#include <asm/io.h>
+#include <asm/arch-rockchip/clock.h>
+#include <asm/arch-rockchip/grf_rk3188.h>
+#include <asm/arch-rockchip/periph.h>
+#include <asm/arch-rockchip/pmu_rk3288.h>
+#include <asm/arch-rockchip/boot_mode.h>
 #include <dm/pinctrl.h>
 
 __weak int rk_board_late_init(void)
@@ -75,7 +75,7 @@ err:
 #endif
 }
 
-#ifndef CONFIG_SYS_DCACHE_OFF
+#if !CONFIG_IS_ENABLED(SYS_DCACHE_OFF)
 void enable_caches(void)
 {
 	/* Enable D-cache. I-cache is already enabled in start.S */

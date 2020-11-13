@@ -486,10 +486,6 @@ The following options need to be configured:
 		PBI commands can be used to configure SoC before it starts the execution.
 		Please refer doc/README.pblimage for more details
 
-		CONFIG_SPL_FSL_PBL
-		It adds a target to create boot binary having SPL binary in PBI format
-		concatenated with u-boot binary.
-
 		CONFIG_SYS_FSL_DDR_BE
 		Defines the DDR controller register space as Big Endian
 
@@ -634,8 +630,6 @@ The following options need to be configured:
 		the defaults discussed just above.
 
 - Cache Configuration:
-		CONFIG_SYS_ICACHE_OFF - Do not enable instruction cache in U-Boot
-		CONFIG_SYS_DCACHE_OFF - Do not enable data cache in U-Boot
 		CONFIG_SYS_L2CACHE_OFF- Do not enable L2 cache in U-Boot
 
 - Cache Configuration for ARM:
@@ -686,22 +680,6 @@ The following options need to be configured:
 		"ramboot" and "nfsboot" respectively, and can be used
 		as a convenience, when switching between booting from
 		RAM and NFS.
-
-- Pre-Boot Commands:
-		CONFIG_PREBOOT
-
-		When this option is #defined, the existence of the
-		environment variable "preboot" will be checked
-		immediately before starting the CONFIG_BOOTDELAY
-		countdown and/or running the auto-boot command resp.
-		entering interactive mode.
-
-		This feature is especially useful when "preboot" is
-		automatically generated or modified. For an example
-		see the LWMON board specific code: here "preboot" is
-		modified when the user holds down a certain
-		combination of keys on the (special) keyboard when
-		booting the systems
 
 - Serial Download Echo Mode:
 		CONFIG_LOADS_ECHO
@@ -782,9 +760,6 @@ The following options need to be configured:
 		When using a watchdog circuitry external to the used
 		SoC, then define this variable and provide board
 		specific code for the "hw_watchdog_reset" function.
-
-		CONFIG_AT91_HW_WDT_TIMEOUT
-		specify the timeout in seconds. default 2 seconds.
 
 - Real-Time Clock:
 
@@ -1139,15 +1114,9 @@ The following options need to be configured:
 			CONFIG_SH_MMCIF_CLK
 			Define the clock frequency for MMCIF
 
-		CONFIG_SUPPORT_EMMC_BOOT
-		Enable some additional features of the eMMC boot partitions.
-
 - USB Device Firmware Update (DFU) class support:
 		CONFIG_DFU_OVER_USB
 		This enables the USB portion of the DFU USB class
-
-		CONFIG_DFU_MMC
-		This enables support for exposing (e)MMC devices via DFU.
 
 		CONFIG_DFU_NAND
 		This enables support for exposing NAND devices via DFU.
@@ -1429,15 +1398,6 @@ The following options need to be configured:
 		forwarded through a router.
 		(Environment variable "netmask")
 
-- Multicast TFTP Mode:
-		CONFIG_MCAST_TFTP
-
-		Defines whether you want to support multicast TFTP as per
-		rfc-2090; for example to work with atftp.  Lets lots of targets
-		tftp down the same boot image concurrently.  Note: the Ethernet
-		driver in use must provide a function: mcast() to join/leave a
-		multicast group.
-
 - BOOTP Recovery Mode:
 		CONFIG_BOOTP_RANDOM_DELAY
 
@@ -1707,11 +1667,6 @@ The following options need to be configured:
 		  - CONFIG_SYS_OMAP24_I2C_SLAVE3 slave addr channel 3
 		  - CONFIG_SYS_OMAP24_I2C_SPEED4 speed channel 4
 		  - CONFIG_SYS_OMAP24_I2C_SLAVE4 slave addr channel 4
-
-		- drivers/i2c/zynq_i2c.c
-		  - activate this driver with CONFIG_SYS_I2C_ZYNQ
-		  - set CONFIG_SYS_I2C_ZYNQ_SPEED for speed setting
-		  - set CONFIG_SYS_I2C_ZYNQ_SLAVE for slave addr
 
 		- drivers/i2c/s3c24x0_i2c.c:
 		  - activate this driver with CONFIG_SYS_I2C_S3C24X0
@@ -1998,13 +1953,6 @@ The following options need to be configured:
 		200 ms.
 
 - Configuration Management:
-		CONFIG_BUILD_TARGET
-
-		Some SoCs need special image types (e.g. U-Boot binary
-		with a special header) as build targets. By defining
-		CONFIG_BUILD_TARGET in the SoC / board header, this
-		special image will be automatically built upon calling
-		make / buildman.
 
 		CONFIG_IDENT_STRING
 
@@ -2169,21 +2117,6 @@ The following options need to be configured:
 		explicitly loaded later by U-Boot code. With CONFIG_OF_CONTROL
 		this is instead controlled by the value of
 		/config/load-environment.
-
-- Serial Flash support
-		Usage requires an initial 'sf probe' to define the serial
-		flash parameters, followed by read/write/erase/update
-		commands.
-
-		The following defaults may be provided by the platform
-		to handle the common case when only a single serial
-		flash is present on the system.
-
-		CONFIG_SF_DEFAULT_BUS		Bus identifier
-		CONFIG_SF_DEFAULT_CS		Chip-select
-		CONFIG_SF_DEFAULT_MODE 		(see include/spi.h)
-		CONFIG_SF_DEFAULT_SPEED		in Hz
-
 
 - TFTP Fixed UDP Port:
 		CONFIG_TFTP_PORT
@@ -2481,9 +2414,6 @@ FIT uImage format:
 		When defined, the linker checks that the actual size does
 		not exceed it.
 
-		CONFIG_SPL_TEXT_BASE
-		TEXT_BASE for linking the SPL binary.
-
 		CONFIG_SPL_RELOC_TEXT_BASE
 		Address to relocate to.  If unspecified, this is equal to
 		CONFIG_SPL_TEXT_BASE (i.e. no relocation is done).
@@ -2611,9 +2541,6 @@ FIT uImage format:
 		CONFIG_SYS_NAND_ECCBYTES
 		Defines the size and behavior of the NAND that SPL uses
 		to read U-Boot
-
-		CONFIG_SPL_NAND_BOOT
-		Add support NAND boot
 
 		CONFIG_SYS_NAND_U_BOOT_OFFS
 		Location in NAND to read U-Boot from
@@ -3360,12 +3287,12 @@ within that device.
 
 - CONFIG_SYS_FMAN_FW_ADDR
 	The address in the storage device where the FMAN microcode is located.  The
-	meaning of this address depends on which CONFIG_SYS_QE_FW_IN_xxx macro
+	meaning of this address depends on which CONFIG_SYS_QE_FMAN_FW_IN_xxx macro
 	is also specified.
 
 - CONFIG_SYS_QE_FW_ADDR
 	The address in the storage device where the QE microcode is located.  The
-	meaning of this address depends on which CONFIG_SYS_QE_FW_IN_xxx macro
+	meaning of this address depends on which CONFIG_SYS_QE_FMAN_FW_IN_xxx macro
 	is also specified.
 
 - CONFIG_SYS_QE_FMAN_FW_LENGTH

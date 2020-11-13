@@ -456,12 +456,6 @@ int fdt_fixup_memory_banks(void *blob, u64 start[], u64 size[], int banks)
 	if (!banks)
 		return 0;
 
-	for (i = 0; i < banks; i++)
-		if (start[i] == 0 && size[i] == 0)
-			break;
-
-	banks = i;
-
 	len = fdt_pack_reg(blob, tmp, start, size, banks);
 
 	err = fdt_setprop(blob, nodeoffset, "reg", tmp, len);
@@ -603,6 +597,7 @@ int fdt_shrink_to_minimum(void *blob, uint extrasize)
 	uint64_t addr, size;
 	int total, ret;
 	uint actualsize;
+	int fdt_memrsv = 0;
 
 	if (!blob)
 		return 0;
@@ -612,6 +607,7 @@ int fdt_shrink_to_minimum(void *blob, uint extrasize)
 		fdt_get_mem_rsv(blob, i, &addr, &size);
 		if (addr == (uintptr_t)blob) {
 			fdt_del_mem_rsv(blob, i);
+			fdt_memrsv = 1;
 			break;
 		}
 	}
@@ -633,10 +629,12 @@ int fdt_shrink_to_minimum(void *blob, uint extrasize)
 	/* Change the fdt header to reflect the correct size */
 	fdt_set_totalsize(blob, actualsize);
 
-	/* Add the new reservation */
-	ret = fdt_add_mem_rsv(blob, map_to_sysmem(blob), actualsize);
-	if (ret < 0)
-		return ret;
+	if (fdt_memrsv) {
+		/* Add the new reservation */
+		ret = fdt_add_mem_rsv(blob, map_to_sysmem(blob), actualsize);
+		if (ret < 0)
+			return ret;
+	}
 
 	return actualsize;
 }
@@ -724,11 +722,6 @@ int fdt_increase_size(void *fdt, int add_len)
 #include <jffs2/load_kernel.h>
 #include <mtd_node.h>
 
-struct reg_cell {
-	unsigned int r0;
-	unsigned int r1;
-};
-
 static int fdt_del_subnodes(const void *blob, int parent_offset)
 {
 	int off, ndepth;
@@ -787,14 +780,21 @@ int fdt_node_set_part_info(void *blob, int parent_offset,
 {
 	struct list_head *pentry;
 	struct part_info *part;
-	struct reg_cell cell;
 	int off, ndepth = 0;
 	int part_num, ret;
+	int sizecell;
 	char buf[64];
 
 	ret = fdt_del_partitions(blob, parent_offset);
 	if (ret < 0)
 		return ret;
+
+	/*
+	 * Check if size/address is 1 or 2 cells.
+	 * We assume #address-cells and #size-cells have same value.
+	 */
+	sizecell = fdt_getprop_u32_default_node(blob, parent_offset,
+						0, "#size-cells", 1);
 
 	/*
 	 * Check if it is nand {}; subnode, adjust
@@ -844,10 +844,21 @@ add_ro:
 				goto err_prop;
 		}
 
-		cell.r0 = cpu_to_fdt32(part->offset);
-		cell.r1 = cpu_to_fdt32(part->size);
 add_reg:
-		ret = fdt_setprop(blob, newoff, "reg", &cell, sizeof(cell));
+		if (sizecell == 2) {
+			ret = fdt_setprop_u64(blob, newoff,
+					      "reg", part->offset);
+			if (!ret)
+				ret = fdt_appendprop_u64(blob, newoff,
+							 "reg", part->size);
+		} else {
+			ret = fdt_setprop_u32(blob, newoff,
+					      "reg", part->offset);
+			if (!ret)
+				ret = fdt_appendprop_u32(blob, newoff,
+							 "reg", part->size);
+		}
+
 		if (ret == -FDT_ERR_NOSPACE) {
 			ret = fdt_increase_size(blob, 512);
 			if (!ret)
@@ -1025,7 +1036,7 @@ static u64 of_bus_default_map(fdt32_t *addr, const fdt32_t *range,
 	s  = fdt_read_number(range + na + pna, ns);
 	da = fdt_read_number(addr, na);
 
-	debug("OF: default map, cp=%llu, s=%llu, da=%llu\n", cp, s, da);
+	debug("OF: default map, cp=%llx, s=%llx, da=%llx\n", cp, s, da);
 
 	if (da < cp || da >= (cp + s))
 		return OF_BAD_ADDR;
@@ -1080,7 +1091,7 @@ static u64 of_bus_isa_map(fdt32_t *addr, const fdt32_t *range,
 	s  = fdt_read_number(range + na + pna, ns);
 	da = fdt_read_number(addr + 1, na - 1);
 
-	debug("OF: ISA map, cp=%llu, s=%llu, da=%llu\n", cp, s, da);
+	debug("OF: ISA map, cp=%llx, s=%llx, da=%llx\n", cp, s, da);
 
 	if (da < cp || da >= (cp + s))
 		return OF_BAD_ADDR;

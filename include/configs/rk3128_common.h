@@ -23,9 +23,6 @@
 
 #define CONFIG_SYS_BOOTM_LEN	(64 << 20)	/* 64M */
 
-/* MMC/SD IP block */
-#define CONFIG_BOUNCE_BUFFER
-
 /* RAW SD card / eMMC locations. */
 #define CONFIG_SYS_SPI_U_BOOT_OFFS	(128 << 10)
 
@@ -33,8 +30,6 @@
 #define CONFIG_SYS_SDRAM_BASE		0x60000000
 #define SDRAM_MAX_SIZE			0x80000000
 
-#define CONFIG_SPI_FLASH
-#define CONFIG_SF_DEFAULT_SPEED 20000000
 #define CONFIG_USB_OHCI_NEW
 #define CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS     1
 

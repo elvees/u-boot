@@ -20,7 +20,7 @@ static const char *const clkname[] = {
 	"ddrphyc" /* LAST clock => used for get_rate() */
 };
 
-int stm32mp1_ddr_clk_enable(struct ddr_info *priv, uint16_t mem_speed)
+int stm32mp1_ddr_clk_enable(struct ddr_info *priv, uint32_t mem_speed)
 {
 	unsigned long ddrphy_clk;
 	unsigned long ddr_clk;
@@ -43,13 +43,13 @@ int stm32mp1_ddr_clk_enable(struct ddr_info *priv, uint16_t mem_speed)
 	priv->clk = clk;
 	ddrphy_clk = clk_get_rate(&priv->clk);
 
-	debug("DDR: mem_speed (%d MHz), RCC %d MHz\n",
-	      mem_speed, (u32)(ddrphy_clk / 1000 / 1000));
+	debug("DDR: mem_speed (%d kHz), RCC %d kHz\n",
+	      mem_speed, (u32)(ddrphy_clk / 1000));
 	/* max 10% frequency delta */
-	ddr_clk = abs(ddrphy_clk - mem_speed * 1000 * 1000);
-	if (ddr_clk > (mem_speed * 1000 * 100)) {
-		pr_err("DDR expected freq %d MHz, current is %d MHz\n",
-		       mem_speed, (u32)(ddrphy_clk / 1000 / 1000));
+	ddr_clk = abs(ddrphy_clk - mem_speed * 1000);
+	if (ddr_clk > (mem_speed * 100)) {
+		pr_err("DDR expected freq %d kHz, current is %d kHz\n",
+		       mem_speed, (u32)(ddrphy_clk / 1000));
 		return -EINVAL;
 	}
 
@@ -102,8 +102,8 @@ static __maybe_unused int stm32mp1_ddr_setup(struct udevice *dev)
 		debug("%s: %s[0x%x] = %d\n", __func__,
 		      param[idx].name, param[idx].size, ret);
 		if (ret) {
-			pr_err("%s: Cannot read %s\n",
-			       __func__, param[idx].name);
+			pr_err("%s: Cannot read %s, error=%d\n",
+			       __func__, param[idx].name, ret);
 			return -EINVAL;
 		}
 	}
@@ -157,7 +157,8 @@ static int stm32mp1_ddr_probe(struct udevice *dev)
 
 	priv->info.base = STM32_DDR_BASE;
 
-#if !defined(CONFIG_SPL) || defined(CONFIG_SPL_BUILD)
+#if !defined(CONFIG_STM32MP1_TRUSTED) && \
+	(!defined(CONFIG_SPL) || defined(CONFIG_SPL_BUILD))
 	priv->info.size = 0;
 	return stm32mp1_ddr_setup(dev);
 #else

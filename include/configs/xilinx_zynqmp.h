@@ -47,10 +47,6 @@
 #define CONFIG_BOOTP_BOOTFILESIZE
 #define CONFIG_BOOTP_MAY_FAIL
 
-#if defined(CONFIG_MMC_SDHCI_ZYNQ)
-# define CONFIG_SUPPORT_EMMC_BOOT
-#endif
-
 #ifdef CONFIG_NAND_ARASAN
 # define CONFIG_SYS_MAX_NAND_DEVICE	1
 # define CONFIG_SYS_NAND_ONFI_DETECTION
@@ -108,20 +104,6 @@
 # define PHY_ANEG_TIMEOUT       20000
 #endif
 
-/* I2C */
-#if defined(CONFIG_SYS_I2C_ZYNQ)
-# define CONFIG_SYS_I2C
-#endif
-
-/* EEPROM */
-#ifdef CONFIG_ZYNQMP_EEPROM
-# define CONFIG_SYS_I2C_EEPROM_ADDR_LEN		2
-# define CONFIG_SYS_I2C_EEPROM_ADDR		0x54
-# define CONFIG_SYS_EEPROM_PAGE_WRITE_BITS	4
-# define CONFIG_SYS_EEPROM_PAGE_WRITE_DELAY_MS	5
-# define CONFIG_SYS_EEPROM_SIZE			(64 * 1024)
-#endif
-
 #define CONFIG_SYS_BOOTM_LEN	(60 * 1024 * 1024)
 
 #define CONFIG_CLOCKS
@@ -134,6 +116,8 @@
 	"kernel_addr_r=0x18000000\0" \
 	"scriptaddr=0x02000000\0" \
 	"ramdisk_addr_r=0x02100000\0" \
+	"script_offset_f=0x3e80000\0" \
+	"script_size_f=0x80000\0" \
 
 #if defined(CONFIG_MMC_SDHCI_ZYNQ)
 # define BOOT_TARGET_DEVICES_MMC(func)	func(MMC, mmc, 0) func(MMC, mmc, 1)
@@ -165,8 +149,38 @@
 # define BOOT_TARGET_DEVICES_DHCP(func)
 #endif
 
+#if defined(CONFIG_ZYNQMP_GQSPI)
+# define BOOT_TARGET_DEVICES_QSPI(func)	func(QSPI, qspi, 0)
+#else
+# define BOOT_TARGET_DEVICES_QSPI(func)
+#endif
+
+#if defined(CONFIG_NAND_ARASAN)
+# define BOOT_TARGET_DEVICES_NAND(func)	func(NAND, nand, 0)
+#else
+# define BOOT_TARGET_DEVICES_NAND(func)
+#endif
+
+#define BOOTENV_DEV_QSPI(devtypeu, devtypel, instance) \
+	"bootcmd_" #devtypel #instance "=sf probe " #instance " 0 0 && " \
+		       "sf read $scriptaddr $script_offset_f $script_size_f && " \
+		       "source ${scriptaddr}; echo SCRIPT FAILED: continuing...;\0"
+
+#define BOOTENV_DEV_NAME_QSPI(devtypeu, devtypel, instance) \
+	#devtypel #instance " "
+
+#define BOOTENV_DEV_NAND(devtypeu, devtypel, instance) \
+	"bootcmd_" #devtypel #instance "= nand info && " \
+		       "nand read $scriptaddr $script_offset_f $script_size_f && " \
+		       "source ${scriptaddr}; echo SCRIPT FAILED: continuing...;\0"
+
+#define BOOTENV_DEV_NAME_NAND(devtypeu, devtypel, instance) \
+	#devtypel #instance " "
+
 #define BOOT_TARGET_DEVICES(func) \
 	BOOT_TARGET_DEVICES_MMC(func) \
+	BOOT_TARGET_DEVICES_QSPI(func) \
+	BOOT_TARGET_DEVICES_NAND(func) \
 	BOOT_TARGET_DEVICES_USB(func) \
 	BOOT_TARGET_DEVICES_SCSI(func) \
 	BOOT_TARGET_DEVICES_PXE(func) \
@@ -183,7 +197,7 @@
 #endif
 
 /* SPL can't handle all huge variables - define just DFU */
-#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_DFU_SUPPORT)
+#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_DFU)
 #undef CONFIG_EXTRA_ENV_SETTINGS
 # define CONFIG_EXTRA_ENV_SETTINGS \
 	"dfu_alt_info_ram=uboot.bin ram 0x8000000 0x1000000;" \
@@ -193,7 +207,6 @@
 	"dfu_bufsiz=0x1000\0"
 #endif
 
-#define CONFIG_SPL_TEXT_BASE		0xfffc0000
 #define CONFIG_SPL_STACK		0xfffffffc
 #define CONFIG_SPL_MAX_SIZE		0x40000
 
@@ -228,7 +241,7 @@
 # define CONFIG_SPL_FS_LOAD_PAYLOAD_NAME	"u-boot.img"
 #endif
 
-#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_DFU_SUPPORT)
+#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_DFU)
 # undef CONFIG_CMD_BOOTD
 # define CONFIG_SPL_ENV_SUPPORT
 # define CONFIG_SPL_HASH_SUPPORT

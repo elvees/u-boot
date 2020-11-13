@@ -17,8 +17,6 @@
 #include <errno.h>
 #include <reset.h>
 
-DECLARE_GLOBAL_DATA_PTR;
-
 #define GPIO_SWPORT_DR(p)	(0x00 + (p) * 0xc)
 #define GPIO_SWPORT_DDR(p)	(0x04 + (p) * 0xc)
 #define GPIO_SWPORT_CTL(p)	(0x08 + (p) * 0xc)
@@ -169,14 +167,14 @@ static int gpio_dwapb_probe(struct udevice *dev)
 static int gpio_dwapb_bind(struct udevice *dev)
 {
 	struct gpio_dwapb_platdata *plat = dev_get_platdata(dev);
-	const void *blob = gd->fdt_blob;
 	struct udevice *subdev;
 	fdt_addr_t base;
 	u32 skip_list[32];
 	u32 skip_mask;
 	int skip_count;
-	int ret, node, i;
+	int ret, i;
 	u32 reg;
+	ofnode node;
 
 	/* If this is a child device, there is nothing to do here */
 	if (plat)
@@ -188,12 +186,9 @@ static int gpio_dwapb_bind(struct udevice *dev)
 		return -ENXIO;
 	}
 
-	for (node = fdt_first_subnode(blob, dev_of_offset(dev));
-	     node > 0;
-	     node = fdt_next_subnode(blob, node)) {
-		skip_mask = 0;
-
-		if (!fdtdec_get_bool(blob, node, "gpio-controller"))
+	for (node = dev_read_first_subnode(dev); ofnode_valid(node);
+	     node = dev_read_next_subnode(node)) {
+		if (!ofnode_read_bool(node, "gpio-controller"))
 			continue;
 
 		plat = devm_kcalloc(dev, 1, sizeof(*plat), GFP_KERNEL);
@@ -201,37 +196,35 @@ static int gpio_dwapb_bind(struct udevice *dev)
 			return -ENOMEM;
 
 		plat->base = base;
-		plat->bank = fdtdec_get_int(blob, node, "reg", 0);
-		plat->pins = fdtdec_get_int(blob, node, "snps,nr-gpios", 0);
-		plat->name = fdt_stringlist_get(blob, node, "bank-name", 0,
-						NULL);
-		if (!plat->name) {
+		plat->bank = ofnode_read_u32_default(node, "reg", 0);
+		plat->pins = ofnode_read_u32_default(node, "snps,nr-gpios", 0);
+
+		if (ofnode_read_string_index(node, "bank-name", 0,
+					     &plat->name)) {
 			/*
 			 * Fall back to node name. This means accessing pins
 			 * via bank name won't work.
 			 */
-			plat->name = fdt_get_name(blob, node, NULL);
+			plat->name = ofnode_get_name(node);
 		}
 
-		if (fdt_getprop(blob, node, "skip-gpio-list", &skip_count)) {
+		skip_mask = 0;
+		if (ofnode_get_property(node, "skip-gpio-list", &skip_count)) {
 			skip_count /= sizeof(u32);
 			if (skip_count > ARRAY_SIZE(skip_list)) {
 				printf("Error: skip-gpio-list is too large\n");
 				return -EINVAL;
 			}
-			fdtdec_get_int_array(blob, node, "skip-gpio-list",
+			ofnode_read_u32_array(node, "skip-gpio-list",
 					     skip_list, skip_count);
 			for (i = 0; i < skip_count; i++)
 				skip_mask |= BIT(skip_list[i]);
 		}
 
-		ret = device_bind(dev, dev->driver, plat->name,
-				  plat, -1, &subdev);
+		ret = device_bind_ofnode(dev, dev->driver, plat->name,
+					 plat, node, &subdev);
 		if (ret)
 			return ret;
-
-		dev_set_of_offset(subdev, node);
-
 		reg = readl(plat->base + GPIO_SWPORT_CTL(plat->bank));
 		reg |= ~skip_mask;
 		setbits_le32(plat->base + GPIO_SWPORT_CTL(plat->bank), reg);

@@ -31,11 +31,6 @@
 /*#define CONFIG_MACH_TYPE		3589*/
 #define CONFIG_MACH_TYPE		0xFFFFFFFF /* TODO: check with kernel*/
 
-/* MMC/SD IP block */
-#if defined(CONFIG_EMMC_BOOT)
- #define CONFIG_SUPPORT_EMMC_BOOT
-#endif /* CONFIG_EMMC_BOOT */
-
 /*
  * When we have NAND flash we expect to be making use of mtdparts,
  * both for ease of use in U-Boot and for passing information on to
@@ -71,7 +66,8 @@
 #define NANDTGTS \
 "mtdids=" CONFIG_MTDIDS_DEFAULT "\0" \
 "mtdparts=" CONFIG_MTDPARTS_DEFAULT "\0" \
-"cfgscr=nand read ${cfgaddr} cfgscr && source ${cfgaddr}\0" \
+"cfgscr=mw ${dtbaddr} 0; nand read ${cfgaddr} cfgscr && source ${cfgaddr};" \
+" fdt addr ${dtbaddr} || cp ${fdtcontroladdr} ${dtbaddr} 4000\0" \
 "nandargs=setenv bootargs console=${console} ${optargs} ${optargs_rot} " \
 	"root=mtd6 rootfstype=jffs2 b_mode=${b_mode}\0" \
 "b_nand=nand read ${loadaddr} kernel; nand read ${dtbaddr} dtb; " \
@@ -109,7 +105,9 @@
 #ifdef CONFIG_ENV_IS_IN_MMC
 #define MMCTGTS \
 MMCSPI_TGTS \
-"cfgscr=mmc dev 1; mmc read ${cfgaddr} 200 80; source ${cfgaddr}\0"
+"cfgscr=mw ${dtbaddr} 0;" \
+" mmc dev 1; mmc read ${cfgaddr} 200 80; source ${cfgaddr};" \
+" fdt addr ${dtbaddr} || cp ${fdtcontroladdr} ${dtbaddr} 4000\0"
 #else
 #define MMCTGTS ""
 #endif /* CONFIG_MMC */
@@ -117,7 +115,9 @@ MMCSPI_TGTS \
 #ifdef CONFIG_SPI
 #define SPITGTS \
 MMCSPI_TGTS \
-"cfgscr=sf probe; sf read ${cfgaddr} 0xC0000 10000; source ${cfgaddr}\0"
+"cfgscr=mw ${dtbaddr} 0;" \
+" sf probe; sf read ${cfgaddr} 0xC0000 10000; source ${cfgaddr};" \
+" fdt addr ${dtbaddr} || cp ${fdtcontroladdr} ${dtbaddr} 4000\0"
 #else
 #define SPITGTS ""
 #endif /* CONFIG_SPI */
@@ -182,16 +182,11 @@ NANDTGTS \
 #define CONFIG_NAND_OMAP_GPMC_WSCFG	1
 #endif /* CONFIG_NAND */
 
-/* USB configuration */
-#define CONFIG_USB_MUSB_DISABLE_BULK_COMBINE_SPLIT
-
 #if defined(CONFIG_SPI)
 /* SPI Flash */
-#define CONFIG_SF_DEFAULT_SPEED			24000000
 #define CONFIG_SYS_SPI_U_BOOT_OFFS		0x40000
 /* Environment */
 #define CONFIG_SYS_REDUNDAND_ENVIRONMENT
-#define CONFIG_ENV_SPI_MAX_HZ			CONFIG_SF_DEFAULT_SPEED
 #define CONFIG_ENV_SECT_SIZE			CONFIG_ENV_SIZE
 #define CONFIG_ENV_OFFSET			0x20000
 #define CONFIG_ENV_OFFSET_REDUND		(CONFIG_ENV_OFFSET + \

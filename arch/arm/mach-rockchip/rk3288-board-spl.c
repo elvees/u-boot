@@ -14,15 +14,15 @@
 #include <spl.h>
 #include <asm/gpio.h>
 #include <asm/io.h>
-#include <asm/arch/bootrom.h>
-#include <asm/arch/clock.h>
-#include <asm/arch/hardware.h>
-#include <asm/arch/periph.h>
-#include <asm/arch/pmu_rk3288.h>
-#include <asm/arch/sdram.h>
-#include <asm/arch/sdram_common.h>
-#include <asm/arch/sys_proto.h>
-#include <asm/arch/timer.h>
+#include <asm/arch-rockchip/bootrom.h>
+#include <asm/arch-rockchip/clock.h>
+#include <asm/arch-rockchip/hardware.h>
+#include <asm/arch-rockchip/periph.h>
+#include <asm/arch-rockchip/pmu_rk3288.h>
+#include <asm/arch-rockchip/sdram.h>
+#include <asm/arch-rockchip/sdram_common.h>
+#include <asm/arch-rockchip/sys_proto.h>
+#include <asm/arch-rockchip/timer.h>
 #include <dm/pinctrl.h>
 #include <dm/root.h>
 #include <dm/test.h>
@@ -71,50 +71,12 @@ u32 spl_boot_device(void)
 fallback:
 #elif defined(CONFIG_TARGET_CHROMEBOOK_JERRY) || \
 		defined(CONFIG_TARGET_CHROMEBIT_MICKEY) || \
-		defined(CONFIG_TARGET_CHROMEBOOK_MINNIE)
+		defined(CONFIG_TARGET_CHROMEBOOK_MINNIE) || \
+		defined(CONFIG_TARGET_CHROMEBOOK_SPEEDY)
 	return BOOT_DEVICE_SPI;
 #endif
 	return BOOT_DEVICE_MMC1;
 }
-
-#ifdef CONFIG_SPL_MMC_SUPPORT
-static int configure_emmc(struct udevice *pinctrl)
-{
-#if defined(CONFIG_TARGET_CHROMEBOOK_JERRY)
-
-	struct gpio_desc desc;
-	int ret;
-
-	pinctrl_request_noflags(pinctrl, PERIPH_ID_EMMC);
-
-	/*
-	 * TODO(sjg@chromium.org): Pick this up from device tree or perhaps
-	 * use the EMMC_PWREN setting.
-	 */
-	ret = dm_gpio_lookup_name("D9", &desc);
-	if (ret) {
-		debug("gpio ret=%d\n", ret);
-		return ret;
-	}
-	ret = dm_gpio_request(&desc, "emmc_pwren");
-	if (ret) {
-		debug("gpio_request ret=%d\n", ret);
-		return ret;
-	}
-	ret = dm_gpio_set_dir_flags(&desc, GPIOD_IS_OUT);
-	if (ret) {
-		debug("gpio dir ret=%d\n", ret);
-		return ret;
-	}
-	ret = dm_gpio_set_value(&desc, 1);
-	if (ret) {
-		debug("gpio value ret=%d\n", ret);
-		return ret;
-	}
-#endif
-	return 0;
-}
-#endif
 
 #if !defined(CONFIG_SPL_OF_PLATDATA)
 static int phycore_init(void)
@@ -144,20 +106,10 @@ static int phycore_init(void)
 
 void board_init_f(ulong dummy)
 {
-	struct udevice *pinctrl;
 	struct udevice *dev;
 	int ret;
 
-	/* Example code showing how to enable the debug UART on RK3288 */
-#include <asm/arch/grf_rk3288.h>
-	/* Enable early UART on the RK3288 */
-#define GRF_BASE	0xff770000
-	struct rk3288_grf * const grf = (void *)GRF_BASE;
-
-	rk_clrsetreg(&grf->gpio7ch_iomux, GPIO7C7_MASK << GPIO7C7_SHIFT |
-		     GPIO7C6_MASK << GPIO7C6_SHIFT,
-		     GPIO7C7_UART2DBG_SOUT << GPIO7C7_SHIFT |
-		     GPIO7C6_UART2DBG_SIN << GPIO7C6_SHIFT);
+#ifdef CONFIG_DEBUG_UART
 	/*
 	 * Debug UART can be used from here if required:
 	 *
@@ -168,6 +120,7 @@ void board_init_f(ulong dummy)
 	 */
 	debug_uart_init();
 	debug("\nspl:debug uart enabled in %s\n", __func__);
+#endif
 	ret = spl_early_init();
 	if (ret) {
 		debug("spl_early_init() failed: %d\n", ret);
@@ -180,12 +133,6 @@ void board_init_f(ulong dummy)
 	ret = rockchip_get_clk(&dev);
 	if (ret) {
 		debug("CLK init failed: %d\n", ret);
-		return;
-	}
-
-	ret = uclass_get_device(UCLASS_PINCTRL, 0, &pinctrl);
-	if (ret) {
-		debug("Pinctrl init failed: %d\n", ret);
 		return;
 	}
 
@@ -239,40 +186,12 @@ static int setup_led(void)
 
 void spl_board_init(void)
 {
-	struct udevice *pinctrl;
 	int ret;
 
 	ret = setup_led();
-
 	if (ret) {
 		debug("LED ret=%d\n", ret);
 		hang();
-	}
-
-	ret = uclass_get_device(UCLASS_PINCTRL, 0, &pinctrl);
-	if (ret) {
-		debug("%s: Cannot find pinctrl device\n", __func__);
-		goto err;
-	}
-
-#ifdef CONFIG_SPL_MMC_SUPPORT
-	ret = pinctrl_request_noflags(pinctrl, PERIPH_ID_SDCARD);
-	if (ret) {
-		debug("%s: Failed to set up SD card\n", __func__);
-		goto err;
-	}
-	ret = configure_emmc(pinctrl);
-	if (ret) {
-		debug("%s: Failed to set up eMMC\n", __func__);
-		goto err;
-	}
-#endif
-
-	/* Enable debug UART */
-	ret = pinctrl_request_noflags(pinctrl, PERIPH_ID_UART_DBG);
-	if (ret) {
-		debug("%s: Failed to set up console UART\n", __func__);
-		goto err;
 	}
 
 	preloader_console_init();
@@ -280,11 +199,6 @@ void spl_board_init(void)
 	back_to_bootrom(BROM_BOOT_NEXTSTAGE);
 #endif
 	return;
-err:
-	printf("spl_board_init: Error %d\n", ret);
-
-	/* No way to report error here */
-	hang();
 }
 
 #ifdef CONFIG_SPL_OS_BOOT

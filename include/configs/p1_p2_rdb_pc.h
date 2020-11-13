@@ -74,7 +74,6 @@
 #if defined(CONFIG_TARGET_P1021RDB)
 #define CONFIG_BOARDNAME "P1021RDB-PC"
 #define CONFIG_NAND_FSL_ELBC
-#define CONFIG_QE
 #define CONFIG_VSC7385_ENET
 #define CONFIG_SYS_LBC_LBCR	0x00080000	/* Implement conversion of
 						addresses in the LBC */
@@ -105,7 +104,6 @@
 #if defined(CONFIG_TARGET_P1025RDB)
 #define CONFIG_BOARDNAME "P1025RDB"
 #define CONFIG_NAND_FSL_ELBC
-#define CONFIG_QE
 #define CONFIG_SLIC
 
 #define CONFIG_SYS_LBC_LBCR	0x00080000	/* Implement conversion of
@@ -137,7 +135,6 @@
 #ifdef CONFIG_SDCARD
 #define CONFIG_SPL_FLUSH_IMAGE
 #define CONFIG_SPL_TARGET		"u-boot-with-spl.bin"
-#define CONFIG_SPL_TEXT_BASE		0xf8f81000
 #define CONFIG_SPL_PAD_TO		0x20000
 #define CONFIG_SPL_MAX_SIZE		(128 * 1024)
 #define CONFIG_SYS_MMC_U_BOOT_SIZE	(768 << 10)
@@ -145,8 +142,6 @@
 #define CONFIG_SYS_MMC_U_BOOT_START	(0x11000000)
 #define CONFIG_SYS_MMC_U_BOOT_OFFS	(128 << 10)
 #define CONFIG_SYS_MPC85XX_NO_RESETVEC
-#define CONFIG_SYS_LDSCRIPT	"arch/powerpc/cpu/mpc85xx/u-boot.lds"
-#define CONFIG_SPL_MMC_BOOT
 #ifdef CONFIG_SPL_BUILD
 #define CONFIG_SPL_COMMON_INIT_DDR
 #endif
@@ -156,7 +151,6 @@
 #define CONFIG_SPL_SPI_FLASH_MINIMAL
 #define CONFIG_SPL_FLUSH_IMAGE
 #define CONFIG_SPL_TARGET		"u-boot-with-spl.bin"
-#define CONFIG_SPL_TEXT_BASE		0xf8f81000
 #define CONFIG_SPL_PAD_TO		0x20000
 #define CONFIG_SPL_MAX_SIZE		(128 * 1024)
 #define CONFIG_SYS_SPI_FLASH_U_BOOT_SIZE	(768 << 10)
@@ -164,8 +158,6 @@
 #define CONFIG_SYS_SPI_FLASH_U_BOOT_START	(0x11000000)
 #define CONFIG_SYS_SPI_FLASH_U_BOOT_OFFS	(128 << 10)
 #define CONFIG_SYS_MPC85XX_NO_RESETVEC
-#define CONFIG_SYS_LDSCRIPT	"arch/powerpc/cpu/mpc85xx/u-boot.lds"
-#define CONFIG_SPL_SPI_BOOT
 #ifdef CONFIG_SPL_BUILD
 #define CONFIG_SPL_COMMON_INIT_DDR
 #endif
@@ -173,12 +165,11 @@
 
 #ifdef CONFIG_NAND
 #ifdef CONFIG_TPL_BUILD
-#define CONFIG_SPL_NAND_BOOT
 #define CONFIG_SPL_FLUSH_IMAGE
 #define CONFIG_SPL_NAND_INIT
 #define CONFIG_SPL_COMMON_INIT_DDR
 #define CONFIG_SPL_MAX_SIZE		(128 << 10)
-#define CONFIG_SPL_TEXT_BASE		0xf8f81000
+#define CONFIG_TPL_TEXT_BASE		0xf8f81000
 #define CONFIG_SYS_MPC85XX_NO_RESETVEC
 #define CONFIG_SYS_NAND_U_BOOT_SIZE	(832 << 10)
 #define CONFIG_SYS_NAND_U_BOOT_DST	(0x11000000)
@@ -188,7 +179,6 @@
 #define CONFIG_SPL_INIT_MINIMAL
 #define CONFIG_SPL_FLUSH_IMAGE
 #define CONFIG_SPL_TARGET		"u-boot-with-spl.bin"
-#define CONFIG_SPL_TEXT_BASE		0xff800000
 #define CONFIG_SPL_MAX_SIZE		4096
 #define CONFIG_SYS_NAND_U_BOOT_SIZE	(128 << 10)
 #define CONFIG_SYS_NAND_U_BOOT_DST	0xf8f80000
@@ -199,7 +189,6 @@
 #define CONFIG_SPL_PAD_TO		0x20000
 #define CONFIG_TPL_PAD_TO		0x20000
 #define CONFIG_SPL_TARGET		"u-boot-with-spl.bin"
-#define CONFIG_SYS_LDSCRIPT	"arch/powerpc/cpu/mpc85xx/u-boot-nand.lds"
 #endif
 
 #ifndef CONFIG_RESET_VECTOR_ADDRESS
@@ -207,7 +196,9 @@
 #endif
 
 #ifndef CONFIG_SYS_MONITOR_BASE
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_TPL_BUILD
+#define CONFIG_SYS_MONITOR_BASE	CONFIG_TPL_TEXT_BASE
+#elif defined(CONFIG_SPL_BUILD)
 #define CONFIG_SYS_MONITOR_BASE	CONFIG_SPL_TEXT_BASE
 #else
 #define CONFIG_SYS_MONITOR_BASE	CONFIG_SYS_TEXT_BASE	/* start of monitor */
@@ -218,7 +209,6 @@
 #define CONFIG_PCIE2	/* PCIE controller 2 (slot 2) */
 #define CONFIG_FSL_PCI_INIT	/* Use common FSL init code */
 #define CONFIG_PCI_INDIRECT_BRIDGE	/* indirect PCI bridge support */
-#define CONFIG_FSL_PCIE_RESET	/* need PCIe reset errata */
 #define CONFIG_SYS_PCI_64BIT	/* enable 64-bit PCI resources */
 
 #define CONFIG_ENV_OVERWRITE
@@ -264,7 +254,6 @@
 #define CONFIG_DDR_SPD
 #define CONFIG_SYS_SPD_BUS_NUM 1
 #define SPD_EEPROM_ADDRESS 0x52
-#undef CONFIG_FSL_DDR_INTERACTIVE
 
 #if (defined(CONFIG_TARGET_P1020MBG) || defined(CONFIG_TARGET_P1020RDB_PD))
 #define CONFIG_SYS_SDRAM_SIZE_LAW	LAW_SIZE_2G
@@ -576,11 +565,6 @@
 #define CONFIG_SYS_EEPROM_PAGE_WRITE_BITS 3
 #define CONFIG_SYS_EEPROM_PAGE_WRITE_DELAY_MS 5
 
-#if defined(CONFIG_SPI_FLASH)
-#define CONFIG_SF_DEFAULT_SPEED	10000000
-#define CONFIG_SF_DEFAULT_MODE	0
-#endif
-
 #if defined(CONFIG_PCI)
 /*
  * General PCI
@@ -659,7 +643,6 @@
 
 #ifdef CONFIG_QE
 /* QE microcode/firmware address */
-#define CONFIG_SYS_QE_FMAN_FW_IN_NOR
 #define CONFIG_SYS_QE_FW_ADDR	0xefec0000
 #define CONFIG_SYS_QE_FMAN_FW_LENGTH	0x10000
 #endif /* CONFIG_QE */
@@ -704,10 +687,6 @@
  * Environment
  */
 #ifdef CONFIG_SPIFLASH
-#define CONFIG_ENV_SPI_BUS	0
-#define CONFIG_ENV_SPI_CS	0
-#define CONFIG_ENV_SPI_MAX_HZ	10000000
-#define CONFIG_ENV_SPI_MODE	0
 #define CONFIG_ENV_SIZE		0x2000	/* 8KB */
 #define CONFIG_ENV_OFFSET	0x100000	/* 1MB */
 #define CONFIG_ENV_SECT_SIZE	0x10000

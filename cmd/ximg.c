@@ -143,7 +143,7 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 			return 1;
 		}
 
-		if (fit_image_check_comp(fit_hdr, noffset, IH_COMP_NONE)
+		if (!fit_image_check_comp(fit_hdr, noffset, IH_COMP_NONE)
 		    && (argc < 4)) {
 			printf("Must specify load address for %s command "
 				"with compressed image\n",
@@ -159,9 +159,9 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 			}
 		}
 
-		/* get subimage data address and length */
-		if (fit_image_get_data(fit_hdr, noffset,
-					&fit_data, &fit_len)) {
+		/* get subimage/external data address and length */
+		if (fit_image_get_data_and_size(fit_hdr, noffset,
+					       &fit_data, &fit_len)) {
 			puts("Could not find script subimage data\n");
 			return 1;
 		}

@@ -13,9 +13,9 @@
 #include <syscon.h>
 #include <bitfield.h>
 #include <asm/io.h>
-#include <asm/arch/clock.h>
-#include <asm/arch/cru_rk3399.h>
-#include <asm/arch/hardware.h>
+#include <asm/arch-rockchip/clock.h>
+#include <asm/arch-rockchip/cru_rk3399.h>
+#include <asm/arch-rockchip/hardware.h>
 #include <dm/lists.h>
 #include <dt-bindings/clock/rk3399-cru.h>
 
@@ -912,7 +912,9 @@ static ulong rk3399_clk_get_rate(struct clk *clk)
 		rate = rk3399_spi_get_clk(priv->cru, clk->id);
 		break;
 	case SCLK_UART0:
+	case SCLK_UART1:
 	case SCLK_UART2:
+	case SCLK_UART3:
 		return 24000000;
 		break;
 	case PCLK_HDMI_CTRL:
@@ -925,7 +927,13 @@ static ulong rk3399_clk_get_rate(struct clk *clk)
 	case SCLK_SARADC:
 		rate = rk3399_saradc_get_clk(priv->cru);
 		break;
+	case ACLK_VIO:
+	case ACLK_HDCP:
+	case ACLK_GIC_PRE:
+	case PCLK_DDR:
+		break;
 	default:
+		log_debug("Unknown clock %lu\n", clk->id);
 		return -ENOENT;
 	}
 
@@ -993,7 +1001,13 @@ static ulong rk3399_clk_set_rate(struct clk *clk, ulong rate)
 	case SCLK_SARADC:
 		ret = rk3399_saradc_set_clk(priv->cru, rate);
 		break;
+	case ACLK_VIO:
+	case ACLK_HDCP:
+	case ACLK_GIC_PRE:
+	case PCLK_DDR:
+		return 0;
 	default:
+		log_debug("Unknown clock %lu\n", clk->id);
 		return -ENOENT;
 	}
 

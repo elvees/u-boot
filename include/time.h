@@ -4,6 +4,7 @@
 #define _TIME_H
 
 #include <linux/typecheck.h>
+#include <linux/types.h>
 
 unsigned long get_timer(unsigned long base);
 
@@ -12,6 +13,22 @@ unsigned long get_timer(unsigned long base);
  * Granularity may be larger than 1us if hardware does not support this.
  */
 unsigned long timer_get_us(void);
+
+/*
+ * timer_test_add_offset()
+ *
+ * Allow tests to add to the time reported through lib/time.c functions
+ * offset: number of milliseconds to advance the system time
+ */
+void timer_test_add_offset(unsigned long offset);
+
+/**
+ * usec_to_tick() - convert microseconds to clock ticks
+ *
+ * @usec:	duration in microseconds
+ * Return:	duration in clock ticks
+ */
+uint64_t usec_to_tick(unsigned long usec);
 
 /*
  *	These inlines deal with timer wrapping correctly. You are

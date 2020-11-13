@@ -16,9 +16,7 @@
 #define CONFIG_PCIE1		1	/* PCIE controller */
 #define CONFIG_FSL_PCI_INIT	1	/* use common fsl pci init code */
 #define CONFIG_PCI_INDIRECT_BRIDGE 1	/* indirect PCI bridge support */
-#define CONFIG_FSL_PCIE_RESET	1	/* need PCIe reset errata */
 #define CONFIG_SYS_PCI_64BIT	1	/* enable 64-bit PCI resources */
-#define CONFIG_QE			/* Enable QE */
 #define CONFIG_ENV_OVERWRITE
 
 #ifndef __ASSEMBLY__
@@ -44,7 +42,6 @@ extern unsigned long get_clock_freq(void);
 #define CONFIG_SYS_CCSRBAR_PHYS_LOW	CONFIG_SYS_CCSRBAR
 
 /* DDR Setup */
-#undef CONFIG_FSL_DDR_INTERACTIVE
 #define CONFIG_SPD_EEPROM		/* Use SPD EEPROM for DDR setup*/
 #define CONFIG_DDR_SPD
 #define CONFIG_ECC_INIT_VIA_DDRCONTROLLER	/* DDR controller or DMA? */

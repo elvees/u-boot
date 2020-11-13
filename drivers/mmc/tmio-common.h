@@ -119,6 +119,7 @@ struct tmio_sd_priv {
 	void __iomem			*regbase;
 	unsigned int			version;
 	u32				caps;
+	u32				read_poll_flag;
 #define TMIO_SD_CAP_NONREMOVABLE	BIT(0)	/* Nonremovable e.g. eMMC */
 #define TMIO_SD_CAP_DMA_INTERNAL	BIT(1)	/* have internal DMA engine */
 #define TMIO_SD_CAP_DIV1024		BIT(2)	/* divisor 1024 is available */
@@ -138,6 +139,10 @@ struct tmio_sd_priv {
 #if CONFIG_IS_ENABLED(RENESAS_SDHI)
 	u8				tap_set;
 	u8				nrtaps;
+	bool				needs_adjust_hs400;
+	bool				adjust_hs400_enable;
+	u8				adjust_hs400_offset;
+	u8				adjust_hs400_calibrate;
 #endif
 	ulong (*clk_get_rate)(struct tmio_sd_priv *);
 };

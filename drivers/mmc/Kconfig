@@ -78,6 +78,12 @@ config SUPPORT_EMMC_RPMB
 	  Enable support for reading, writing and programming the
 	  key for the Replay Protection Memory Block partition in eMMC.
 
+config SUPPORT_EMMC_BOOT
+	bool "Support some additional features of the eMMC boot partitions"
+	help
+	  Enable support for eMMC boot partitions. This also enables
+	  extensions within the mmc command.
+
 config MMC_IO_VOLTAGE
 	bool "Support IO voltage configuration"
 	help
@@ -178,6 +184,7 @@ config MMC_DAVINCI
 
 config MMC_DW
 	bool "Synopsys DesignWare Memory Card Interface"
+	select BOUNCE_BUFFER
 	help
 	  This selects support for the Synopsys DesignWare Mobile Storage IP
 	  block, this provides host support for SD and MMC interfaces, in both
@@ -221,6 +228,16 @@ config MMC_DW_SOCFPGA
 	  Synopsys DesignWare Memory Card Interface driver. Select this option
 	  for platforms based on Altera SOCFPGA.
 
+config MMC_DW_SNPS
+	bool "Extensions for DW Memory Card Interface used in Synopsys ARC devboards"
+	depends on MMC_DW
+	depends on DM_MMC
+	depends on OF_CONTROL
+	depends on CLK
+	help
+	  This selects support for Synopsys DesignWare Memory Card Interface driver
+	  extensions used in various Synopsys ARC devboards.
+
 config MMC_MESON_GX
 	bool "Meson GX EMMC controller support"
 	depends on DM_MMC && BLK && ARCH_MESON
@@ -239,6 +256,7 @@ config MMC_MXC
 config MMC_MXS
 	bool "Freescale MXS Multimedia Card Interface support"
 	depends on MX23 || MX28 || MX6 || MX7
+	select BOUNCE_BUFFER
 	select APBH_DMA
 	select APBH_DMA_BURST if ARCH_MX6 || ARCH_MX7
 	select APBH_DMA_BURST8 if ARCH_MX6 || ARCH_MX7
@@ -372,6 +390,20 @@ config MMC_SDHCI_SDMA
 	help
 	  This enables support for the SDMA (Single Operation DMA) defined
 	  in the SD Host Controller Standard Specification Version 1.00 .
+
+config MMC_SDHCI_ADMA
+	bool "Support SDHCI ADMA2"
+	depends on MMC_SDHCI
+	help
+	  This enables support for the ADMA (Advanced DMA) defined
+	  in the SD Host Controller Standard Specification Version 3.00
+
+config SPL_MMC_SDHCI_ADMA
+	bool "Support SDHCI ADMA2 in SPL"
+	depends on MMC_SDHCI
+	help
+	  This enables support for the ADMA (Advanced DMA) defined
+	  in the SD Host Controller Standard Specification Version 3.00 in SPL.
 
 config MMC_SDHCI_ATMEL
 	bool "Atmel SDHCI controller support"
@@ -542,6 +574,7 @@ config MMC_SDHCI_TANGIER
 config MMC_SDHCI_TEGRA
 	bool "SDHCI platform support for the Tegra SD/MMC Controller"
 	depends on TEGRA
+	select BOUNCE_BUFFER
 	default y
 	help
 	  This selects the Tegra SD/MMC controller. If you have a Tegra

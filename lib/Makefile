@@ -35,13 +35,11 @@ obj-$(CONFIG_TEST_FDTDEC) += fdtdec_test.o
 obj-$(CONFIG_GZIP_COMPRESSED) += gzip.o
 obj-$(CONFIG_GENERATE_SMBIOS_TABLE) += smbios.o
 obj-$(CONFIG_IMAGE_SPARSE) += image-sparse.o
-obj-y += initcall.o
-obj-$(CONFIG_LMB) += lmb.o
 obj-y += ldiv.o
 obj-$(CONFIG_MD5) += md5.o
+obj-$(CONFIG_XXHASH) += xxhash.o
 obj-y += net_utils.o
 obj-$(CONFIG_PHYSMEM) += physmem.o
-obj-y += qsort.o
 obj-y += rc4.o
 obj-$(CONFIG_SUPPORT_EMMC_RPMB) += sha256.o
 obj-$(CONFIG_RBTREE)	+= rbtree.o
@@ -61,13 +59,13 @@ obj-$(CONFIG_SHA1) += sha1.o
 obj-$(CONFIG_SHA256) += sha256.o
 
 obj-$(CONFIG_$(SPL_)ZLIB) += zlib/
+obj-$(CONFIG_$(SPL_)ZSTD) += zstd/
 obj-$(CONFIG_$(SPL_)GZIP) += gunzip.o
 obj-$(CONFIG_$(SPL_)LZO) += lzo/
 obj-$(CONFIG_$(SPL_)LZ4) += lz4_wrapper.o
 
 obj-$(CONFIG_LIBAVB) += libavb/
 
-obj-$(CONFIG_$(SPL_TPL_)SAVEENV) += qsort.o
 obj-$(CONFIG_$(SPL_TPL_)OF_LIBFDT) += libfdt/
 ifneq ($(CONFIG_$(SPL_TPL_)BUILD)$(CONFIG_$(SPL_TPL_)OF_PLATDATA),yy)
 obj-$(CONFIG_$(SPL_TPL_)OF_CONTROL) += fdtdec_common.o
@@ -80,6 +78,7 @@ obj-$(CONFIG_$(SPL_TPL_)HASH_SUPPORT) += crc16.o
 obj-$(CONFIG_SPL_NET_SUPPORT) += net_utils.o
 endif
 obj-$(CONFIG_ADDR_MAP) += addr_map.o
+obj-y += qsort.o
 obj-y += hashtable.o
 obj-y += errno.o
 obj-y += display_options.o
@@ -89,9 +88,11 @@ obj-y += crc32.o
 obj-$(CONFIG_CRC32C) += crc32c.o
 obj-y += ctype.o
 obj-y += div64.o
+obj-$(CONFIG_$(SPL_TPL_)OF_LIBFDT) += fdtdec.o fdtdec_common.o
 obj-y += hang.o
 obj-y += linux_compat.o
 obj-y += linux_string.o
+obj-$(CONFIG_LMB) += lmb.o
 obj-y += membuff.o
 obj-$(CONFIG_REGEX) += slre.o
 obj-y += string.o

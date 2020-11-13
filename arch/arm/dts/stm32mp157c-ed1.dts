@@ -8,18 +8,22 @@
 #include "stm32mp157c.dtsi"
 #include "stm32mp157-pinctrl.dtsi"
 #include <dt-bindings/gpio/gpio.h>
-#include <dt-bindings/mfd/st,stpmu1.h>
+#include <dt-bindings/mfd/st,stpmic1.h>
 
 / {
 	model = "STMicroelectronics STM32MP157C eval daughter";
 	compatible = "st,stm32mp157c-ed1", "st,stm32mp157";
 
 	chosen {
-		stdout-path = "serial3:115200n8";
+		stdout-path = "serial0:115200n8";
 	};
 
 	memory@c0000000 {
 		reg = <0xC0000000 0x40000000>;
+	};
+
+	aliases {
+		serial0 = &uart4;
 	};
 
 	sd_switch: regulator-sd_switch {
@@ -36,15 +40,8 @@
 	};
 };
 
-&rng1 {
+&hwspinlock {
 	status = "okay";
-};
-
-&timers6 {
-	status = "okay";
-	timer@5 {
-		status = "okay";
-	};
 };
 
 &i2c4 {
@@ -54,8 +51,8 @@
 	i2c-scl-falling-time-ns = <20>;
 	status = "okay";
 
-	pmic: stpmu1@33 {
-		compatible = "st,stpmu1";
+	pmic: stpmic1@33 {
+		compatible = "st,stpmic1";
 		reg = <0x33>;
 		interrupts = <0 2>;
 		interrupt-parent = <&gpioa>;
@@ -68,7 +65,7 @@
 		st,usb_control_register = <0x30>;
 
 		regulators {
-			compatible = "st,stpmu1-regulators";
+			compatible = "st,stpmic1-regulators";
 
 			ldo1-supply = <&v3v3>;
 			ldo2-supply = <&v3v3>;
@@ -321,16 +318,33 @@
 	};
 };
 
+&iwdg2 {
+	timeout-sec = <32>;
+	status = "okay";
+};
+
+&pinctrl {
+	hwlocks = <&hwspinlock 0>;
+};
+
 &pwr {
 	pwr-supply = <&vdd>;
+};
+
+&rng1 {
+	status = "okay";
+};
+
+&rtc {
+	status = "okay";
 };
 
 &sdmmc1 {
 	pinctrl-0 = <&sdmmc1_b4_pins_a &sdmmc1_dir_pins_a>;
 	broken-cd;
-	st,dirpol;
-	st,negedge;
-	st,pin-ckin;
+	st,sig-dir;
+	st,neg-edge;
+	st,use-ckin;
 	bus-width = <4>;
 	vmmc-supply = <&vdd_sd>;
 	vqmmc-supply = <&sd_switch>;
@@ -347,12 +361,19 @@
 	non-removable;
 	no-sd;
 	no-sdio;
-	st,dirpol;
-	st,negedge;
+	st,sig-dir;
+	st,neg-edge;
 	bus-width = <8>;
 	vmmc-supply = <&v3v3>;
 	vqmmc-supply = <&vdd>;
 	status = "okay";
+};
+
+&timers6 {
+	status = "okay";
+	timer@5 {
+		status = "okay";
+	};
 };
 
 &uart4 {
@@ -361,26 +382,10 @@
 	status = "okay";
 };
 
-&usbotg_hs {
-	usb33d-supply = <&usb33>;
-};
-
-&hwspinlock {
-	status = "okay";
-};
-
-&pinctrl {
-	hwlocks = <&hwspinlock 0>;
-};
-
 &usbphyc_port0 {
 	phy-supply = <&vdd_usb>;
-	vdda1v1-supply = <&reg11>;
-	vdda1v8-supply = <&reg18>;
 };
 
 &usbphyc_port1 {
 	phy-supply = <&vdd_usb>;
-	vdda1v1-supply = <&reg11>;
-	vdda1v8-supply = <&reg18>;
 };

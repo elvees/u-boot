@@ -57,14 +57,9 @@
  */
  #ifdef CONFIG_CADENCE_QSPI
 /* Enable it if you want to use dual-stacked mode */
-#undef CONFIG_SF_DUAL_FLASH
 /*#define CONFIG_QSPI_RBF_ADDR		0x720000*/
 
 /* Flash device info */
-#define CONFIG_SF_DEFAULT_SPEED		(50000000)
-#define CONFIG_SF_DEFAULT_MODE		(SPI_MODE_3 | SPI_RX_QUAD)
-#define CONFIG_SF_DEFAULT_BUS		0
-#define CONFIG_SF_DEFAULT_CS		0
 
 /*#define CONFIG_ENV_IS_IN_SPI_FLASH*/
 #ifdef CONFIG_ENV_IS_IN_SPI_FLASH
@@ -135,11 +130,6 @@ unsigned int cm_get_qspi_controller_clk_hz(void);
 #define CONFIG_SYS_MEMTEST_END		PHYS_SDRAM_1_SIZE - 0x200000
 
 /*
- * SDRAM controller
- */
-#define CONFIG_ALTERA_SDRAM
-
-/*
  * Serial / UART configurations
  */
 #define CONFIG_SYS_NS16550_CLK		100000000
@@ -154,7 +144,6 @@ unsigned int cm_get_qspi_controller_clk_hz(void);
  * SDMMC configurations
  */
 #ifdef CONFIG_CMD_MMC
-#define CONFIG_BOUNCE_BUFFER
 #define CONFIG_SYS_MMC_MAX_BLK_COUNT	256
 #endif
 /*
@@ -203,7 +192,6 @@ unsigned int cm_get_l4_sys_free_clk_hz(void);
  *
  */
 #define CONFIG_SPL_TARGET		"spl/u-boot-spl.hex"
-#define CONFIG_SPL_TEXT_BASE		CONFIG_SYS_INIT_RAM_ADDR
 #define CONFIG_SPL_MAX_SIZE		CONFIG_SYS_INIT_RAM_SIZE
 #define CONFIG_SPL_STACK		CONFIG_SYS_INIT_SP_ADDR
 #define CONFIG_SPL_BSS_MAX_SIZE		0x100000	/* 1 MB */

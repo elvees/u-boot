@@ -103,17 +103,17 @@ typedef lbaint_t lba512_t;
 #endif
 
 /*
- * Overflowless variant of (block_count * mul_by / div_by)
+ * Overflowless variant of (block_count * mul_by / 2**div_by)
  * when div_by > mul_by
  */
-static lba512_t lba512_muldiv(lba512_t block_count, lba512_t mul_by, lba512_t div_by)
+static lba512_t lba512_muldiv(lba512_t block_count, lba512_t mul_by, int div_by)
 {
 	lba512_t bc_quot, bc_rem;
 
 	/* x * m / d == x / d * m + (x % d) * m / d */
-	bc_quot = block_count / div_by;
-	bc_rem  = block_count - div_by * bc_quot;
-	return bc_quot * mul_by + (bc_rem * mul_by) / div_by;
+	bc_quot = block_count >> div_by;
+	bc_rem  = block_count - (bc_quot << div_by);
+	return bc_quot * mul_by + ((bc_rem * mul_by) >> div_by);
 }
 
 void dev_print (struct blk_desc *dev_desc)
@@ -193,7 +193,7 @@ void dev_print (struct blk_desc *dev_desc)
 		lba512 = (lba * (dev_desc->blksz/512));
 		/* round to 1 digit */
 		/* 2048 = (1024 * 1024) / 512 MB */
-		mb = lba512_muldiv(lba512, 10, 2048);
+		mb = lba512_muldiv(lba512, 10, 11);
 
 		mb_quot	= mb / 10;
 		mb_rem	= mb - (10 * mb_quot);
@@ -414,11 +414,10 @@ int blk_get_device_by_str(const char *ifname, const char *dev_hwpart_str,
 #ifdef CONFIG_HAVE_BLOCK_DEVICE
 	/*
 	 * Updates the partition table for the specified hw partition.
-	 * Does not need to be done for hwpart 0 since it is default and
-	 * already loaded.
+	 * Always should be done, otherwise hw partition 0 will return stale
+	 * data after displaying a non-zero hw partition.
 	 */
-	if(hwpart != 0)
-		part_init(*dev_desc);
+	part_init(*dev_desc);
 #endif
 
 cleanup:
@@ -468,7 +467,7 @@ int blk_get_device_part_str(const char *ifname, const char *dev_part_str,
 
 #ifdef CONFIG_CMD_UBIFS
 	/*
-	 * Special-case ubi, ubi goes through a mtd, rathen then through
+	 * Special-case ubi, ubi goes through a mtd, rather than through
 	 * a regular block device.
 	 */
 	if (0 == strcmp(ifname, "ubi")) {

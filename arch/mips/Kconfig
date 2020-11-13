@@ -74,8 +74,8 @@ config ARCH_BMIPS
 	select SYSRESET
 	imply CMD_DM
 
-config ARCH_MT7620
-	bool "Support MT7620/7688 SoCs"
+config ARCH_MTMIPS
+	bool "Support MediaTek MIPS platforms"
 	imply CMD_DM
 	select DISPLAY_CPUINFO
 	select DM
@@ -84,7 +84,7 @@ config ARCH_MT7620
 	select DM_SERIAL
 	imply DM_SPI
 	imply DM_SPI_FLASH
-	select ARCH_MISC_INIT
+	select LAST_STAGE_INIT
 	select MIPS_TUNE_24KC
 	select OF_CONTROL
 	select ROM_EXCEPTION_VECTORS
@@ -153,7 +153,7 @@ source "arch/mips/mach-mscc/Kconfig"
 source "arch/mips/mach-bmips/Kconfig"
 source "arch/mips/mach-jz47xx/Kconfig"
 source "arch/mips/mach-pic32/Kconfig"
-source "arch/mips/mach-mt7620/Kconfig"
+source "arch/mips/mach-mtmips/Kconfig"
 
 if MIPS
 

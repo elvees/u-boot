@@ -24,16 +24,6 @@
 #define CONFIG_SYS_I2C_SPEED		100000
 
 /*
- * SPI Flash configuration for the environemnt access
- */
-#define CONFIG_ENV_SPI_BUS		0
-#define CONFIG_ENV_SPI_CS		0
-
-/* SPI NOR flash default params, used by sf commands */
-#define CONFIG_SF_DEFAULT_SPEED		1000000
-#define CONFIG_SF_DEFAULT_MODE		SPI_MODE_3
-
-/*
  * SDIO/MMC Card Configuration
  */
 #define CONFIG_SYS_MMC_BASE		MVEBU_SDIO_BASE
@@ -59,7 +49,6 @@
 
 /* PCIe support */
 #ifndef CONFIG_SPL_BUILD
-#define CONFIG_PCI_MVEBU
 #define CONFIG_PCI_SCAN_SHOW
 #endif
 
@@ -82,7 +71,6 @@
 
 /* Defines for SPL */
 #define CONFIG_SPL_SIZE			(140 << 10)
-#define CONFIG_SPL_TEXT_BASE		0x40000030
 #define CONFIG_SPL_MAX_SIZE		(CONFIG_SPL_SIZE - 0x0030)
 
 #define CONFIG_SPL_BSS_START_ADDR	(0x40000000 + CONFIG_SPL_SIZE)

@@ -29,8 +29,6 @@
 #define CONFIG_SYS_I2C_SPEED		100000
 
 /* SPI NOR flash default params, used by sf commands */
-#define CONFIG_SF_DEFAULT_SPEED		1000000
-#define CONFIG_SF_DEFAULT_MODE		SPI_MODE_3
 
 /* Environment in SPI NOR flash */
 #define CONFIG_ENV_OFFSET		(1 << 20) /* 1MiB in */
@@ -60,7 +58,6 @@
 
 /* SPL */
 /* Defines for SPL */
-#define CONFIG_SPL_TEXT_BASE		0x40004030
 #define CONFIG_SPL_MAX_SIZE		((128 << 10) - 0x4030)
 
 #define CONFIG_SPL_BSS_START_ADDR	(0x40000000 + (128 << 10))

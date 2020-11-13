@@ -41,9 +41,6 @@
 #define CONFIG_BOOTP_BOOTFILESIZE
 #define CONFIG_BOOTP_MAY_FAIL
 
-#define CONFIG_IP_DEFRAG
-#define CONFIG_TFTP_BLOCKSIZE	4096
-
 /* Miscellaneous configurable options */
 #define CONFIG_SYS_LOAD_ADDR		0x8000000
 
@@ -73,9 +70,33 @@
 	"pxefile_addr_r=0x10000000\0" \
 	"kernel_addr_r=0x18000000\0" \
 	"scriptaddr=0x02000000\0" \
-	"ramdisk_addr_r=0x02100000\0"
+	"ramdisk_addr_r=0x02100000\0" \
+	"script_offset_f=0x3f80000\0" \
+	"script_size_f=0x80000\0"
+
+#if defined(CONFIG_MMC_SDHCI_ZYNQ)
+# define BOOT_TARGET_DEVICES_MMC(func)	func(MMC, mmc, 0) func(MMC, mmc, 1)
+#else
+# define BOOT_TARGET_DEVICES_MMC(func)
+#endif
+
+#if defined(CONFIG_ZYNQMP_GQSPI) || defined(CONFIG_CADENCE_OSPI_VERSAL)
+# define BOOT_TARGET_DEVICES_XSPI(func)	func(XSPI, xspi, 0)
+#else
+# define BOOT_TARGET_DEVICES_XSPI(func)
+#endif
+
+#define BOOTENV_DEV_XSPI(devtypeu, devtypel, instance) \
+	"bootcmd_xspi0=sf probe 0 0 0 && " \
+	"sf read $scriptaddr $script_offset_f $script_size_f && " \
+	"source ${scriptaddr}; echo SCRIPT FAILED: continuing...;\0"
+
+#define BOOTENV_DEV_NAME_XSPI(devtypeu, devtypel, instance) \
+	"xspi "
 
 #define BOOT_TARGET_DEVICES(func) \
+	BOOT_TARGET_DEVICES_MMC(func) \
+	BOOT_TARGET_DEVICES_XSPI(func) \
 	func(PXE, pxe, na) \
 	func(DHCP, dhcp, na)
 

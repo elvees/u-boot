@@ -24,6 +24,7 @@
 
 /* Size of malloc() pool */
 #define CONFIG_SYS_MALLOC_LEN		SZ_4M
+#define CONFIG_SYS_NONCACHED_MEMORY	SZ_1M
 
 /* Environment */
 #define CONFIG_ENV_SIZE			SZ_4K
@@ -32,7 +33,6 @@
 
 /* Defines for SPL */
 #define CONFIG_SPL_STACK		0x106000
-#define CONFIG_SPL_TEXT_BASE		0x201000
 #define CONFIG_SPL_MAX_SIZE		SZ_64K
 #define CONFIG_SPL_MAX_FOOTPRINT	SZ_64K
 #define CONFIG_SPL_PAD_TO		0x10000
@@ -53,5 +53,9 @@
 
 /* DRAM */
 #define CONFIG_SYS_SDRAM_BASE		0x40000000
+
+/* Ethernet */
+#define CONFIG_IPADDR			192.168.1.1
+#define CONFIG_SERVERIP			192.168.1.2
 
 #endif

@@ -19,8 +19,6 @@
  */
 #define CONFIG_MACH_TYPE		736
 
-#define CONFIG_SYS_ICACHE_OFF
-#define CONFIG_SYS_DCACHE_OFF
 #if !defined(CONFIG_SPL_BUILD)
 #define CONFIG_SKIP_LOWLEVEL_INIT
 #endif
@@ -138,7 +136,6 @@
  */
 
 /* SPL will be executed at offset 0 */
-#define CONFIG_SPL_TEXT_BASE 0x00000000
 /* SPL will use SRAM as stack */
 #define CONFIG_SPL_STACK     0x0000FFF8
 /* Use the framework and generic lib */

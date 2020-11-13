@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * Copyright 2017 NXP
+ * Copyright 2017, 2019 NXP
  * Copyright 2015 Freescale Semiconductor
  */
 
@@ -42,7 +42,6 @@ unsigned long get_board_ddr_clk(void);
 #ifdef CONFIG_SYS_FSL_HAS_DP_DDR
 #define CONFIG_DP_DDR_DIMM_SLOTS_PER_CTLR	1
 #endif
-#define CONFIG_FSL_DDR_BIST	/* enable built-in memory test */
 
 /* SATA */
 #define CONFIG_SCSI_AHCI_PLAT
@@ -55,7 +54,14 @@ unsigned long get_board_ddr_clk(void);
 #define CONFIG_SYS_SCSI_MAX_DEVICE		(CONFIG_SYS_SCSI_MAX_SCSI_ID * \
 						CONFIG_SYS_SCSI_MAX_LUN)
 
-/* undefined CONFIG_FSL_DDR_SYNC_REFRESH for simulator */
+#ifdef CONFIG_TFABOOT
+#define CONFIG_SYS_MMC_ENV_DEV		0
+#define CONFIG_ENV_SIZE			0x20000
+#define CONFIG_ENV_OFFSET		0x500000
+#define CONFIG_ENV_ADDR			(CONFIG_SYS_FLASH_BASE + \
+					 CONFIG_ENV_OFFSET)
+#define CONFIG_ENV_SECT_SIZE		0x20000
+#endif
 
 #define CONFIG_SYS_NOR0_CSPR_EXT	(0x0)
 #define CONFIG_SYS_NOR_AMASK		IFC_AMASK(128*1024*1024)
@@ -261,7 +267,7 @@ unsigned long get_board_ddr_clk(void);
 #define CONFIG_SYS_CS2_FTIM2		CONFIG_SYS_NAND_FTIM2
 #define CONFIG_SYS_CS2_FTIM3		CONFIG_SYS_NAND_FTIM3
 
-#ifndef CONFIG_QSPI_BOOT
+#if !defined(CONFIG_QSPI_BOOT) && !defined(CONFIG_TFABOOT)
 #define CONFIG_ENV_ADDR			(CONFIG_SYS_FLASH_BASE + 0x300000)
 #define CONFIG_ENV_SECT_SIZE		0x20000
 #define CONFIG_ENV_SIZE			0x2000
@@ -285,8 +291,6 @@ unsigned long get_board_ddr_clk(void);
 
 /* SPI */
 #if defined(CONFIG_FSL_QSPI) || defined(CONFIG_FSL_DSPI)
-#define CONFIG_SPI_FLASH
-
 #ifdef CONFIG_FSL_DSPI
 #define CONFIG_SPI_FLASH_STMICRO
 #define CONFIG_SPI_FLASH_SST
@@ -361,6 +365,47 @@ unsigned long get_board_ddr_clk(void);
 	"esbc_validate 0x580740000;"            \
 	"fsl_mc start mc 0x580a00000"           \
 	" 0x580e00000 \0"
+#else
+#ifdef CONFIG_TFABOOT
+#define SD_MC_INIT_CMD				\
+	"mmcinfo;mmc read 0x80a00000 0x5000 0x1200;"  \
+	"mmc read 0x80e00000 0x7000 0x800;" \
+	"fsl_mc start mc 0x80a00000 0x80e00000\0"
+#define IFC_MC_INIT_CMD				\
+	"fsl_mc start mc 0x580a00000" \
+	" 0x580e00000 \0"
+#define CONFIG_EXTRA_ENV_SETTINGS		\
+	"hwconfig=fsl_ddr:bank_intlv=auto\0"    \
+	"loadaddr=0x80100000\0"                 \
+	"loadaddr_sd=0x90100000\0"                 \
+	"kernel_addr=0x581000000\0"		          \
+	"kernel_addr_sd=0x8000\0"                \
+	"ramdisk_addr=0x800000\0"               \
+	"ramdisk_size=0x2000000\0"              \
+	"fdt_high=0xa0000000\0"                 \
+	"initrd_high=0xffffffffffffffff\0"      \
+	"kernel_start=0x581000000\0"            \
+	"kernel_start_sd=0x8000\0"              \
+	"kernel_load=0xa0000000\0"              \
+	"kernel_size=0x2800000\0"               \
+	"kernel_size_sd=0x14000\0"               \
+	"load_addr=0xa0000000\0"		            \
+	"kernelheader_addr=0x580800000\0"	\
+	"kernelheader_addr_r=0x80200000\0"	\
+	"kernelheader_size=0x40000\0"		\
+	"BOARD=ls2088aqds\0" \
+	"mcmemsize=0x70000000 \0" \
+	IFC_MC_INIT_CMD				\
+	"nor_bootcmd=echo Trying load from nor..;"		\
+		"cp.b $kernel_addr $load_addr "			\
+		"$kernel_size ; env exists secureboot && "	\
+		"cp.b $kernelheader_addr $kernelheader_addr_r "	\
+		"$kernelheader_size && esbc_validate ${kernelheader_addr_r}; "\
+		"bootm $load_addr#$BOARD\0"	\
+	"sd_bootcmd=echo Trying load from SD ..;" \
+	"mmcinfo; mmc read $load_addr "		\
+	"$kernel_addr_sd $kernel_size_sd && "	\
+	"bootm $load_addr#$BOARD\0"
 #elif defined(CONFIG_SD_BOOT)
 #define CONFIG_EXTRA_ENV_SETTINGS		\
 	"hwconfig=fsl_ddr:bank_intlv=auto\0"    \
@@ -392,8 +437,27 @@ unsigned long get_board_ddr_clk(void);
 	"mcmemsize=0x40000000\0"		\
 	"mcinitcmd=fsl_mc start mc 0x580a00000" \
 	" 0x580e00000 \0"
+#endif /* CONFIG_TFABOOT */
 #endif /* CONFIG_SECURE_BOOT */
 
+#ifdef CONFIG_TFABOOT
+#define SD_BOOTCOMMAND						\
+			"env exists mcinitcmd && env exists secureboot "\
+			"&& mmcinfo && mmc read $load_addr 0x3c00 0x800 " \
+			"&& esbc_validate $load_addr; "			\
+			"env exists mcinitcmd && run mcinitcmd "	\
+			"&& mmc read 0x80d00000 0x6800 0x800 "		\
+			"&& fsl_mc lazyapply dpl 0x80d00000; "		\
+			"run sd_bootcmd; "		\
+			"env exists secureboot && esbc_halt;"
+
+#define IFC_NOR_BOOTCOMMAND						\
+			"env exists mcinitcmd && env exists secureboot "\
+			"&& esbc_validate 0x580780000; env exists mcinitcmd "\
+			"&& fsl_mc lazyapply dpl 0x580d00000;"		\
+			"run nor_bootcmd; "		\
+			"env exists secureboot && esbc_halt;"
+#endif
 
 #if defined(CONFIG_FSL_MC_ENET) && !defined(CONFIG_SPL_BUILD)
 #define CONFIG_FSL_MEMAC

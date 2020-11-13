@@ -51,11 +51,14 @@ static struct cpu_type cpu_type_list[] = {
 	CPU_TYPE_ENTRY(LS2081A, LS2081A, 8),
 	CPU_TYPE_ENTRY(LS2041A, LS2041A, 4),
 	CPU_TYPE_ENTRY(LS1043A, LS1043A, 4),
+	CPU_TYPE_ENTRY(LS1043A, LS1043A_P23, 4),
 	CPU_TYPE_ENTRY(LS1023A, LS1023A, 2),
+	CPU_TYPE_ENTRY(LS1023A, LS1023A_P23, 2),
 	CPU_TYPE_ENTRY(LS1046A, LS1046A, 4),
 	CPU_TYPE_ENTRY(LS1026A, LS1026A, 2),
 	CPU_TYPE_ENTRY(LS2040A, LS2040A, 4),
 	CPU_TYPE_ENTRY(LS1012A, LS1012A, 1),
+	CPU_TYPE_ENTRY(LS1028A, LS1028A, 2),
 	CPU_TYPE_ENTRY(LS1088A, LS1088A, 8),
 	CPU_TYPE_ENTRY(LS1084A, LS1084A, 8),
 	CPU_TYPE_ENTRY(LS1048A, LS1048A, 4),
@@ -244,14 +247,30 @@ static struct mm_region final_map[] = {
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
+#ifdef CONFIG_SYS_PCIE3_PHYS_ADDR
 	{ CONFIG_SYS_PCIE3_PHYS_ADDR, CONFIG_SYS_PCIE3_PHYS_ADDR,
 	  CONFIG_SYS_PCIE3_PHYS_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-#if defined(CONFIG_ARCH_LS2080A) || defined(CONFIG_ARCH_LX2160A)
+#endif
+#ifdef CONFIG_SYS_PCIE4_PHYS_ADDR
 	{ CONFIG_SYS_PCIE4_PHYS_ADDR, CONFIG_SYS_PCIE4_PHYS_ADDR,
 	  CONFIG_SYS_PCIE4_PHYS_SIZE,
+	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
+	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
+	},
+#endif
+#ifdef SYS_PCIE5_PHYS_ADDR
+	{ SYS_PCIE5_PHYS_ADDR, SYS_PCIE5_PHYS_ADDR,
+	  SYS_PCIE5_PHYS_SIZE,
+	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
+	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
+	},
+#endif
+#ifdef SYS_PCIE6_PHYS_ADDR
+	{ SYS_PCIE6_PHYS_ADDR, SYS_PCIE6_PHYS_ADDR,
+	  SYS_PCIE6_PHYS_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
@@ -339,11 +358,13 @@ static struct mm_region final_map[] = {
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
+#ifdef CONFIG_SYS_PCIE3_PHYS_ADDR
 	{ CONFIG_SYS_PCIE3_PHYS_ADDR, CONFIG_SYS_PCIE3_PHYS_ADDR,
 	  CONFIG_SYS_PCIE3_PHYS_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
+#endif
 	{ CONFIG_SYS_FSL_DRAM_BASE3, CONFIG_SYS_FSL_DRAM_BASE3,
 	  CONFIG_SYS_FSL_DRAM_SIZE3,
 	  PTE_BLOCK_MEMTYPE(MT_NORMAL) |
@@ -386,7 +407,7 @@ void cpu_name(char *name)
 		strcpy(name, "unknown");
 }
 
-#ifndef CONFIG_SYS_DCACHE_OFF
+#if !CONFIG_IS_ENABLED(SYS_DCACHE_OFF)
 /*
  * To start MMU before DDR is available, we create MMU table in SRAM.
  * The base address of SRAM is CONFIG_SYS_FSL_OCRAM_BASE. We use three
@@ -446,16 +467,20 @@ static void fix_pcie_mmu_map(void)
 				final_map[i].virt = 0x2800000000ULL;
 				final_map[i].size = 0x800000000ULL;
 				break;
+#ifdef CONFIG_SYS_PCIE3_PHYS_ADDR
 			case CONFIG_SYS_PCIE3_PHYS_ADDR:
 				final_map[i].phys = 0x3000000000ULL;
 				final_map[i].virt = 0x3000000000ULL;
 				final_map[i].size = 0x800000000ULL;
 				break;
+#endif
+#ifdef CONFIG_SYS_PCIE4_PHYS_ADDR
 			case CONFIG_SYS_PCIE4_PHYS_ADDR:
 				final_map[i].phys = 0x3800000000ULL;
 				final_map[i].virt = 0x3800000000ULL;
 				final_map[i].size = 0x800000000ULL;
 				break;
+#endif
 			default:
 				break;
 			}
@@ -609,7 +634,7 @@ void enable_caches(void)
 	icache_enable();
 	dcache_enable();
 }
-#endif	/* CONFIG_SYS_DCACHE_OFF */
+#endif	/* !CONFIG_IS_ENABLED(SYS_DCACHE_OFF) */
 
 #ifdef CONFIG_TFABOOT
 enum boot_src __get_boot_src(u32 porsr1)
@@ -675,7 +700,7 @@ enum boot_src __get_boot_src(u32 porsr1)
 			break;
 		case RCW_SRC_EMMC_VAL:
 		/* RCW SRC EMMC */
-			src = BOOT_SOURCE_SD_MMC2;
+			src = BOOT_SOURCE_SD_MMC;
 			break;
 		case RCW_SRC_I2C1_VAL:
 		/* RCW SRC I2C1 Extended */
@@ -783,12 +808,8 @@ enum env_location env_get_location(enum env_operation op, int prio)
 	if (prio)
 		return ENVL_UNKNOWN;
 
-#ifdef CONFIG_CHAIN_OF_TRUST
-	/* Check Boot Mode
-	 * If Boot Mode is Secure, return ENVL_NOWHERE
-	 */
-	if (fsl_check_boot_mode_secure() == 1)
-		goto done;
+#ifdef	CONFIG_ENV_IS_NOWHERE
+	return env_loc;
 #endif
 
 	switch (src) {
@@ -818,9 +839,6 @@ enum env_location env_get_location(enum env_operation op, int prio)
 		break;
 	}
 
-#ifdef CONFIG_CHAIN_OF_TRUST
-done:
-#endif
 	return env_loc;
 }
 #endif	/* CONFIG_TFABOOT */
@@ -1097,14 +1115,28 @@ int arch_early_init_r(void)
 			printf("Did not wake secondary cores\n");
 	}
 
-#ifdef CONFIG_SYS_FSL_HAS_RGMII
-	fsl_rgmii_init();
-#endif
-
 	config_core_prefetch();
 
 #ifdef CONFIG_SYS_HAS_SERDES
 	fsl_serdes_init();
+#endif
+#ifdef CONFIG_SYS_FSL_HAS_RGMII
+	/* some dpmacs in armv8a based freescale layerscape SOCs can be
+	 * configured via both serdes(sgmii, xfi, xlaui etc) bits and via
+	 * EC*_PMUX(rgmii) bits in RCW.
+	 * e.g. dpmac 17 and 18 in LX2160A can be configured as SGMII from
+	 * serdes bits and as RGMII via EC1_PMUX/EC2_PMUX bits
+	 * Now if a dpmac is enabled by serdes bits then it takes precedence
+	 * over EC*_PMUX bits. i.e. in LX2160A if we select serdes protocol
+	 * that configures dpmac17 as SGMII and set the EC1_PMUX as RGMII,
+	 * then the dpmac is SGMII and not RGMII.
+	 *
+	 * Therefore, move the fsl_rgmii_init after fsl_serdes_init. in
+	 * fsl_rgmii_init function of SOC, we will check if the dpmac is enabled
+	 * or not? if it is (fsl_serdes_init has already enabled the dpmac),
+	 * then don't enable it.
+	 */
+	fsl_rgmii_init();
 #endif
 #ifdef CONFIG_FMAN_ENET
 	fman_enet_init();

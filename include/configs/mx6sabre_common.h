@@ -28,13 +28,6 @@
 
 #define CONFIG_PHY_ATHEROS
 
-#ifdef CONFIG_CMD_SF
-#define CONFIG_SF_DEFAULT_BUS		0
-#define CONFIG_SF_DEFAULT_CS		0
-#define CONFIG_SF_DEFAULT_SPEED		20000000
-#define CONFIG_SF_DEFAULT_MODE		SPI_MODE_0
-#endif
-
 #ifdef CONFIG_SUPPORT_EMMC_BOOT
 #define EMMC_ENV \
 	"emmcdev=2\0" \
@@ -192,7 +185,6 @@
 #endif
 
 /* Framebuffer */
-#define CONFIG_VIDEO_IPUV3
 #define CONFIG_VIDEO_BMP_RLE8
 #define CONFIG_SPLASH_SCREEN
 #define CONFIG_SPLASH_SCREEN_ALIGN

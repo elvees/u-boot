@@ -9,6 +9,29 @@
 #include <linux/sizes.h>
 #include <asm/arch/imx-regs.h>
 
+#ifdef CONFIG_SPL_BUILD
+#define CONFIG_SPL_MAX_SIZE				(124 * 1024)
+#define CONFIG_SYS_MONITOR_LEN				(1024 * 1024)
+#define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_USE_SECTOR
+#define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR		0x250
+#define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION		0
+
+#define CONFIG_SPL_LDSCRIPT		"arch/arm/cpu/armv8/u-boot-spl.lds"
+#define CONFIG_SPL_STACK		0x013E000
+#define CONFIG_SPL_BSS_START_ADDR	0x00128000
+#define CONFIG_SPL_BSS_MAX_SIZE		0x1000	/* 4 KB */
+#define CONFIG_SYS_SPL_MALLOC_START	0x00120000
+#define CONFIG_SYS_SPL_MALLOC_SIZE	0x3000	/* 12 KB */
+#define CONFIG_SERIAL_LPUART_BASE	0x5a060000
+#define CONFIG_MALLOC_F_ADDR		0x00120000
+
+#define CONFIG_SPL_RAW_IMAGE_ARM_TRUSTED_FIRMWARE
+
+#define CONFIG_SPL_ABORT_ON_RAW_IMAGE
+
+#define CONFIG_OF_EMBED
+#endif
+
 #define CONFIG_REMAKE_ELF
 
 #define CONFIG_BOARD_EARLY_INIT_F
@@ -28,7 +51,6 @@
 #define CONFIG_SYS_FSL_ESDHC_ADDR       0
 #define USDHC1_BASE_ADDR                0x5B010000
 #define USDHC2_BASE_ADDR                0x5B020000
-#define CONFIG_SUPPORT_EMMC_BOOT	/* eMMC specific */
 
 #define CONFIG_ENV_OVERWRITE
 
@@ -39,11 +61,11 @@
 	"script=boot.scr\0" \
 	"image=Image\0" \
 	"panel=NULL\0" \
-	"console=ttyLP0,${baudrate} earlycon=lpuart32,0x5a060000,${baudrate}\0" \
+	"console=ttyLP0,${baudrate} earlycon\0" \
 	"fdt_addr=0x83000000\0"			\
 	"fdt_high=0xffffffffffffffff\0"		\
 	"boot_fdt=try\0" \
-	"fdt_file=fsl-imx8qxp-mek.dtb\0" \
+	"fdt_file=imx8qxp-mek.dtb\0" \
 	"initrd_addr=0x83800000\0"		\
 	"initrd_high=0xffffffffffffffff\0" \
 	"mmcdev="__stringify(CONFIG_SYS_MMC_ENV_DEV)"\0" \
@@ -131,15 +153,6 @@
 
 /* Serial */
 #define CONFIG_BAUDRATE			115200
-
-/* Monitor Command Prompt */
-#define CONFIG_HUSH_PARSER
-#define CONFIG_SYS_PROMPT_HUSH_PS2     "> "
-#define CONFIG_SYS_CBSIZE              2048
-#define CONFIG_SYS_MAXARGS             64
-#define CONFIG_SYS_BARGSIZE CONFIG_SYS_CBSIZE
-#define CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE + \
-					sizeof(CONFIG_SYS_PROMPT) + 16)
 
 /* Generic Timer Definitions */
 #define COUNTER_FREQUENCY		8000000	/* 8MHz */

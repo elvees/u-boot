@@ -23,13 +23,7 @@ U-Boot for Renesas SuperH
 	2.2. Renesas SH7722
 		This CPU has the SH4AL-DSP core.
 
-	2.3. Renesas SH7720
-		This CPU has the SH3 core.
-
-	2.4. Renesas SH7710/SH7712
-		This CPU has the SH3-DSP core and Ethernet controller.
-
-	2.5. Renesas SH7780
+	2.3. Renesas SH7780
 		This CPU has the SH4A core.
 
 ================================================================================
@@ -94,7 +88,6 @@ U-Boot for Renesas SuperH
 	I plan to support the following CPUs and boards.
 		5.1. CPUs
 			- SH7751R(SH4)
-			- SH7785(SH4)
 
 		5.2. Boards
 			- Many boards ;-)

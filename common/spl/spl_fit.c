@@ -333,7 +333,7 @@ static int spl_fit_record_loadable(const void *fit, int images, int index,
 
 static int spl_fit_image_get_os(const void *fit, int noffset, uint8_t *os)
 {
-#if CONFIG_IS_ENABLED(FIT_IMAGE_TINY)
+#if CONFIG_IS_ENABLED(FIT_IMAGE_TINY) && !defined(CONFIG_SPL_OS_BOOT)
 	return -ENOTSUPP;
 #else
 	return fit_image_get_os(fit, noffset, os);
@@ -491,6 +491,10 @@ int spl_load_simple_fit(struct spl_image_info *spl_image,
 
 		if (!spl_fit_image_get_os(fit, node, &os_type))
 			debug("Loadable is %s\n", genimg_get_os_name(os_type));
+#if CONFIG_IS_ENABLED(FIT_IMAGE_TINY)
+		else
+			os_type = IH_OS_U_BOOT;
+#endif
 
 		if (os_type == IH_OS_U_BOOT) {
 			spl_fit_append_fdt(&image_info, info, sector,

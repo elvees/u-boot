@@ -89,6 +89,30 @@ struct elf_rela {
  * handle a good number of runtime callbacks
  */
 
+efi_status_t efi_init_runtime_supported(void)
+{
+	u16 efi_runtime_services_supported = 0;
+
+	/*
+	 * This value must be synced with efi_runtime_detach_list
+	 * as well as efi_runtime_services.
+	 */
+#if CONFIG_IS_ENABLED(ARCH_BCM283X) || \
+    CONFIG_IS_ENABLED(FSL_LAYERSCAPE) || \
+    CONFIG_IS_ENABLED(SYSRESET_X86) || \
+    CONFIG_IS_ENABLED(PSCI_RESET)
+	efi_runtime_services_supported |= EFI_RT_SUPPORTED_RESET_SYSTEM;
+#endif
+	efi_runtime_services_supported |=
+				EFI_RT_SUPPORTED_SET_VIRTUAL_ADDRESS_MAP;
+	return EFI_CALL(efi_set_variable(L"RuntimeServicesSupported",
+					 &efi_global_variable_guid,
+					 EFI_VARIABLE_BOOTSERVICE_ACCESS |
+					 EFI_VARIABLE_RUNTIME_ACCESS,
+					 sizeof(efi_runtime_services_supported),
+					 &efi_runtime_services_supported));
+}
+
 /**
  * efi_update_table_header_crc32() - Update crc32 in table header
  *
@@ -130,7 +154,7 @@ static void EFIAPI efi_reset_system_boottime(
 		if (evt->group &&
 		    !guidcmp(evt->group,
 			     &efi_guid_event_group_reset_system)) {
-			efi_signal_event(evt, false);
+			efi_signal_event(evt);
 			break;
 		}
 	}
@@ -167,9 +191,8 @@ static efi_status_t EFIAPI efi_get_time_boottime(
 			struct efi_time *time,
 			struct efi_time_cap *capabilities)
 {
-#ifdef CONFIG_DM_RTC
+#ifdef CONFIG_EFI_GET_TIME
 	efi_status_t ret = EFI_SUCCESS;
-	int r;
 	struct rtc_time tm;
 	struct udevice *dev;
 
@@ -179,11 +202,12 @@ static efi_status_t EFIAPI efi_get_time_boottime(
 		ret = EFI_INVALID_PARAMETER;
 		goto out;
 	}
-
-	r = uclass_get_device(UCLASS_RTC, 0, &dev);
-	if (!r)
-		r = dm_rtc_get(dev, &tm);
-	if (r) {
+	if (uclass_get_device(UCLASS_RTC, 0, &dev) ||
+	    dm_rtc_get(dev, &tm)) {
+		ret = EFI_UNSUPPORTED;
+		goto out;
+	}
+	if (dm_rtc_get(dev, &tm)) {
 		ret = EFI_DEVICE_ERROR;
 		goto out;
 	}
@@ -195,9 +219,9 @@ static efi_status_t EFIAPI efi_get_time_boottime(
 	time->hour = tm.tm_hour;
 	time->minute = tm.tm_min;
 	time->second = tm.tm_sec;
-	time->daylight = EFI_TIME_ADJUST_DAYLIGHT;
-	if (tm.tm_isdst > 0)
-		time->daylight |= EFI_TIME_IN_DAYLIGHT;
+	if (tm.tm_isdst)
+		time->daylight =
+			EFI_TIME_ADJUST_DAYLIGHT | EFI_TIME_IN_DAYLIGHT;
 	time->timezone = EFI_UNSPECIFIED_TIMEZONE;
 
 	if (capabilities) {
@@ -210,11 +234,86 @@ out:
 	return EFI_EXIT(ret);
 #else
 	EFI_ENTRY("%p %p", time, capabilities);
-	return EFI_EXIT(EFI_DEVICE_ERROR);
+	return EFI_EXIT(EFI_UNSUPPORTED);
 #endif
 }
 
+#ifdef CONFIG_EFI_SET_TIME
 
+/**
+ * efi_validate_time() - checks if timestamp is valid
+ *
+ * @time:	timestamp to validate
+ * Returns:	0 if timestamp is valid, 1 otherwise
+ */
+static int efi_validate_time(struct efi_time *time)
+{
+	return (!time ||
+		time->year < 1900 || time->year > 9999 ||
+		!time->month || time->month > 12 || !time->day ||
+		time->day > rtc_month_days(time->month - 1, time->year) ||
+		time->hour > 23 || time->minute > 59 || time->second > 59 ||
+		time->nanosecond > 999999999 ||
+		time->daylight &
+		~(EFI_TIME_IN_DAYLIGHT | EFI_TIME_ADJUST_DAYLIGHT) ||
+		((time->timezone < -1440 || time->timezone > 1440) &&
+		time->timezone != EFI_UNSPECIFIED_TIMEZONE));
+}
+
+#endif
+
+/**
+ * efi_set_time_boottime() - set current time
+ *
+ * This function implements the SetTime() runtime service before
+ * SetVirtualAddressMap() is called.
+ *
+ * See the Unified Extensible Firmware Interface (UEFI) specification
+ * for details.
+ *
+ * @time:		pointer to structure to with current time
+ * Returns:		status code
+ */
+static efi_status_t EFIAPI efi_set_time_boottime(struct efi_time *time)
+{
+#ifdef CONFIG_EFI_SET_TIME
+	efi_status_t ret = EFI_SUCCESS;
+	struct rtc_time tm;
+	struct udevice *dev;
+
+	EFI_ENTRY("%p", time);
+
+	if (efi_validate_time(time)) {
+		ret = EFI_INVALID_PARAMETER;
+		goto out;
+	}
+
+	if (uclass_get_device(UCLASS_RTC, 0, &dev)) {
+		ret = EFI_UNSUPPORTED;
+		goto out;
+	}
+
+	memset(&tm, 0, sizeof(tm));
+	tm.tm_year = time->year;
+	tm.tm_mon = time->month;
+	tm.tm_mday = time->day;
+	tm.tm_hour = time->hour;
+	tm.tm_min = time->minute;
+	tm.tm_sec = time->second;
+	tm.tm_isdst = time->daylight ==
+		      (EFI_TIME_ADJUST_DAYLIGHT | EFI_TIME_IN_DAYLIGHT);
+	/* Calculate day of week */
+	rtc_calc_weekday(&tm);
+
+	if (dm_rtc_set(dev, &tm))
+		ret = EFI_DEVICE_ERROR;
+out:
+	return EFI_EXIT(ret);
+#else
+	EFI_ENTRY("%p", time);
+	return EFI_EXIT(EFI_UNSUPPORTED);
+#endif
+}
 /**
  * efi_reset_system() - reset system
  *
@@ -267,8 +366,25 @@ efi_status_t __weak __efi_runtime EFIAPI efi_get_time(
 			struct efi_time *time,
 			struct efi_time_cap *capabilities)
 {
-	/* Nothing we can do */
-	return EFI_DEVICE_ERROR;
+	return EFI_UNSUPPORTED;
+}
+
+/**
+ * efi_set_time() - set current time
+ *
+ * This function implements the SetTime runtime service after
+ * SetVirtualAddressMap() is called. As the U-Boot driver are not available
+ * anymore only an error code is returned.
+ *
+ * See the Unified Extensible Firmware Interface (UEFI) specification
+ * for details.
+ *
+ * @time:		pointer to structure to with current time
+ * Returns:		status code
+ */
+efi_status_t __weak __efi_runtime EFIAPI efi_set_time(struct efi_time *time)
+{
+	return EFI_UNSUPPORTED;
 }
 
 struct efi_runtime_detach_list_struct {
@@ -289,6 +405,9 @@ static const struct efi_runtime_detach_list_struct efi_runtime_detach_list[] = {
 		/* RTC accessors are gone */
 		.ptr = &efi_runtime_services.get_time,
 		.patchto = &efi_get_time,
+	}, {
+		.ptr = &efi_runtime_services.set_time,
+		.patchto = &efi_set_time,
 	}, {
 		/* Clean up system table */
 		.ptr = &systab.con_in,
@@ -530,7 +649,8 @@ static efi_status_t EFIAPI efi_set_virtual_address_map(
  * This function adds a memory-mapped IO region to the memory map to make it
  * available at runtime.
  *
- * @mmio_ptr:		address of the memory-mapped IO region
+ * @mmio_ptr:		pointer to a pointer to the start of the memory-mapped
+ *			IO region
  * @len:		size of the memory-mapped IO region
  * Returns:		status code
  */
@@ -696,7 +816,7 @@ struct efi_runtime_services __efi_runtime_data efi_runtime_services = {
 		.headersize = sizeof(struct efi_runtime_services),
 	},
 	.get_time = &efi_get_time_boottime,
-	.set_time = (void *)&efi_device_error,
+	.set_time = &efi_set_time_boottime,
 	.get_wakeup_time = (void *)&efi_unimplemented,
 	.set_wakeup_time = (void *)&efi_unimplemented,
 	.set_virtual_address_map = &efi_set_virtual_address_map,

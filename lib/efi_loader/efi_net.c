@@ -9,8 +9,8 @@
 #include <efi_loader.h>
 #include <malloc.h>
 
-static const efi_guid_t efi_net_guid = EFI_SIMPLE_NETWORK_GUID;
-static const efi_guid_t efi_pxe_guid = EFI_PXE_GUID;
+static const efi_guid_t efi_net_guid = EFI_SIMPLE_NETWORK_PROTOCOL_GUID;
+static const efi_guid_t efi_pxe_guid = EFI_PXE_BASE_CODE_PROTOCOL_GUID;
 static struct efi_pxe_packet *dhcp_ack;
 static bool new_rx_packet;
 static void *new_tx_packet;
@@ -392,7 +392,7 @@ static efi_status_t EFIAPI efi_net_transmit
 	efi_timer_check();
 
 	/* Check parameters */
-	if (!this) {
+	if (!this || !buffer) {
 		ret = EFI_INVALID_PARAMETER;
 		goto out;
 	}
@@ -408,7 +408,7 @@ static efi_status_t EFIAPI efi_net_transmit
 		 * TODO: We would need to create the header
 		 * if header_size != 0
 		 */
-		ret = EFI_INVALID_PARAMETER;
+		ret = EFI_UNSUPPORTED;
 		goto out;
 	}
 
@@ -466,7 +466,7 @@ static efi_status_t EFIAPI efi_net_receive
 	efi_timer_check();
 
 	/* Check parameters */
-	if (!this) {
+	if (!this || !buffer || !buffer_size) {
 		ret = EFI_INVALID_PARAMETER;
 		goto out;
 	}

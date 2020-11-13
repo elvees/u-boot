@@ -6,7 +6,7 @@
 #ifndef __CONFIG_RK3288_COMMON_H
 #define __CONFIG_RK3288_COMMON_H
 
-#include <asm/arch/hardware.h>
+#include <asm/arch-rockchip/hardware.h>
 #include "rockchip-common.h"
 
 #define CONFIG_SKIP_LOWLEVEL_INIT_ONLY
@@ -23,14 +23,6 @@
 #define CONFIG_SYS_INIT_SP_ADDR		0x00100000
 #define CONFIG_SYS_LOAD_ADDR		0x00800800
 #define CONFIG_SPL_STACK		0xff718000
-#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_TPL_BOOTROM_SUPPORT)
-# define CONFIG_SPL_TEXT_BASE		0x0
-#else
-# define CONFIG_SPL_TEXT_BASE		0xff704000
-#endif
-
-/* MMC/SD IP block */
-#define CONFIG_BOUNCE_BUFFER
 
 /* RAW SD card / eMMC locations. */
 #define CONFIG_SYS_SPI_U_BOOT_OFFS	(128 << 10)
@@ -42,9 +34,6 @@
 #define CONFIG_SYS_SDRAM_BASE		0
 #define SDRAM_BANK_SIZE			(2UL << 30)
 #define SDRAM_MAX_SIZE			0xfe000000
-
-#define CONFIG_SPI_FLASH
-#define CONFIG_SF_DEFAULT_SPEED 20000000
 
 #ifndef CONFIG_SPL_BUILD
 /* usb otg */

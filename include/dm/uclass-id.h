@@ -34,6 +34,7 @@ enum uclass_id {
 	UCLASS_BLK,		/* Block device */
 	UCLASS_BOARD,		/* Device information from hardware */
 	UCLASS_BOOTCOUNT,       /* Bootcount backing store */
+	UCLASS_CACHE,		/* Cache controller */
 	UCLASS_CLK,		/* Clock source, e.g. used by peripherals */
 	UCLASS_CPU,		/* CPU, typically part of an SoC */
 	UCLASS_CROS_EC,		/* Chrome OS EC */
@@ -61,6 +62,7 @@ enum uclass_id {
 	UCLASS_MMC,		/* SD / MMC card or chip */
 	UCLASS_MOD_EXP,		/* RSA Mod Exp device */
 	UCLASS_MTD,		/* Memory Technology Device (MTD) device */
+	UCLASS_NOP,		/* No-op devices */
 	UCLASS_NORTHBRIDGE,	/* Intel Northbridge / SDRAM controller */
 	UCLASS_NVME,		/* NVM Express device */
 	UCLASS_PANEL,		/* Display panel, such as an LCD */
@@ -106,7 +108,7 @@ enum uclass_id {
 	UCLASS_VIRTIO,		/* VirtIO transport device */
 	UCLASS_W1,		/* Dallas 1-Wire bus */
 	UCLASS_W1_EEPROM,	/* one-wire EEPROMs */
-	UCLASS_WDT,		/* Watchdot Timer driver */
+	UCLASS_WDT,		/* Watchdog Timer driver */
 
 	UCLASS_COUNT,
 	UCLASS_INVALID = -1,

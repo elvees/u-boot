@@ -21,8 +21,6 @@
 
 #ifndef CONFIG_SPL
 #define CONFIG_SYS_DDR_RAW_TIMING
-#define CONFIG_FSL_DDR_INTERACTIVE	/* Interactive debugging */
-#define CONFIG_FSL_DDR_BIST
 #define CONFIG_ECC_INIT_VIA_DDRCONTROLLER
 #define CONFIG_MEM_INIT_VALUE           0xdeadbeef
 #endif
@@ -279,8 +277,6 @@
 #endif
 
 #ifdef CONFIG_SYS_DPAA_FMAN
-#define CONFIG_FMAN_ENET
-
 #define RGMII_PHY1_ADDR			0x1
 #define RGMII_PHY2_ADDR			0x2
 

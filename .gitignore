@@ -10,6 +10,7 @@
 *.bin
 *.cfgout
 *.dtb
+*.dtbo
 *.dtb.S
 *.elf
 *.exe
@@ -34,12 +35,13 @@
 #
 # Top-level generic files
 #
-fit-dtb.blob
+fit-dtb.blob*
 /MLO*
 /SPL*
 /System.map
 /u-boot*
 /boards.cfg
+/*.log
 
 #
 # git files that we don't want to ignore even it they are dot-files

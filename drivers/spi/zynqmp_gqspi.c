@@ -267,7 +267,7 @@ void zynqmp_qspi_set_tapdelay(struct udevice *bus, u32 baudrateval)
 		zynqmp_mmio_read(IOU_TAPDLY_BYPASS_OFST, &tapdlybypass);
 		tapdlybypass |= (TAP_DLY_BYPASS_LQSPI_RX_VALUE <<
 				TAP_DLY_BYPASS_LQSPI_RX_SHIFT);
-	} else if (reqhz < GQSPI_FREQ_100MHZ) {
+	} else if (reqhz <= GQSPI_FREQ_100MHZ) {
 		zynqmp_mmio_read(IOU_TAPDLY_BYPASS_OFST, &tapdlybypass);
 		tapdlybypass |= (TAP_DLY_BYPASS_LQSPI_RX_VALUE <<
 				TAP_DLY_BYPASS_LQSPI_RX_SHIFT);
@@ -277,7 +277,7 @@ void zynqmp_qspi_set_tapdelay(struct udevice *bus, u32 baudrateval)
 		datadlyadj |= ((GQSPI_USE_DATA_DLY << GQSPI_USE_DATA_DLY_SHIFT)
 				| (GQSPI_DATA_DLY_ADJ_VALUE <<
 					GQSPI_DATA_DLY_ADJ_SHIFT));
-	} else if (reqhz < GQSPI_FREQ_150MHZ) {
+	} else if (reqhz <= GQSPI_FREQ_150MHZ) {
 		lpbkdlyadj = readl(&regs->lpbkdly);
 		lpbkdlyadj |= ((GQSPI_LPBK_DLY_ADJ_LPBK_MASK) |
 				GQSPI_LPBK_DLY_ADJ_DLY_0);
@@ -714,6 +714,7 @@ static const struct dm_spi_ops zynqmp_qspi_ops = {
 
 static const struct udevice_id zynqmp_qspi_ids[] = {
 	{ .compatible = "xlnx,zynqmp-qspi-1.0" },
+	{ .compatible = "xlnx,versal-qspi-1.0" },
 	{ }
 };
 

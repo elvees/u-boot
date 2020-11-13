@@ -39,10 +39,6 @@
 #define CONFIG_SYS_DPAA_RMAN		/* RMan */
 
 /* Environment in SPI Flash */
-#define CONFIG_ENV_SPI_BUS              0
-#define CONFIG_ENV_SPI_CS               0
-#define CONFIG_ENV_SPI_MAX_HZ           20000000
-#define CONFIG_ENV_SPI_MODE             0
 #define CONFIG_ENV_OFFSET               0x100000	/* 1MB for u-boot */
 #define CONFIG_ENV_SIZE			0x004000	/* 16K env */
 #define CONFIG_ENV_SECT_SIZE            0x010000
@@ -94,7 +90,6 @@ unsigned long get_board_sys_clk(unsigned long dummy);
 #define CONFIG_CHIP_SELECTS_PER_CTRL	(4 * CONFIG_DIMM_SLOTS_PER_CTLR)
 
 #define CONFIG_DDR_SPD
-#define CONFIG_FSL_DDR_INTERACTIVE
 
 #define CONFIG_SYS_SPD_BUS_NUM	0
 #define SPD_EEPROM_ADDRESS	0x54
@@ -253,9 +248,6 @@ int get_scl(void);
 /*
  * eSPI - Enhanced SPI
  */
-#define CONFIG_SPI_FLASH_BAR	/* 4 byte-addressing */
-#define CONFIG_SF_DEFAULT_SPEED         20000000
-#define CONFIG_SF_DEFAULT_MODE          0
 
 /*
  * General PCI
@@ -314,12 +306,10 @@ int get_scl(void);
  * env is stored at 0x100000, sector size is 0x10000, x2 (redundant)
  * ucode is stored after env, so we got 0x120000.
  */
-#define CONFIG_SYS_QE_FW_IN_SPIFLASH
 #define CONFIG_SYS_FMAN_FW_ADDR	0x120000
 #define CONFIG_SYS_QE_FMAN_FW_LENGTH	0x10000
 #define CONFIG_SYS_FDT_PAD		(0x3000 + CONFIG_SYS_QE_FMAN_FW_LENGTH)
 
-#define CONFIG_FMAN_ENET
 #define CONFIG_PHYLIB_10G
 
 #define CONFIG_PCI_INDIRECT_BRIDGE

@@ -17,7 +17,7 @@
 #define ALIGN_SIZE		0x1000
 #define MX6DQ_PU_IROM_MMU_EN_VAR	0x009024a8
 #define MX6DLS_PU_IROM_MMU_EN_VAR	0x00901dd0
-#define MX6SL_PU_IROM_MMU_EN_VAR	0x00900a18
+#define MX6SL_PU_IROM_MMU_EN_VAR	0x00901c60
 #define IS_HAB_ENABLED_BIT \
 	(is_soc_type(MXC_SOC_MX7ULP) ? 0x80000000 :	\
 	 (is_soc_type(MXC_SOC_MX7) ? 0x2000000 : 0x2))
@@ -585,8 +585,10 @@ int imx_hab_authenticate_image(uint32_t ddr_start, uint32_t image_size,
 	}
 
 	/* Verify if IVT DCD pointer is NULL */
-	if (ivt->dcd)
-		puts("Warning: DCD pointer should be NULL\n");
+	if (ivt->dcd) {
+		puts("Error: DCD pointer must be NULL\n");
+		goto hab_authentication_exit;
+	}
 
 	start = ddr_start;
 	bytes = image_size;
