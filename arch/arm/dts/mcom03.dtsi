@@ -226,6 +226,19 @@
 			elvees,ctrl-id = <1>;
 			status = "disabled";
 		};
+
+		qspi: spi@10260000 {
+			compatible = "silvaco,axi-qspi";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0x10260000 0x10000>;
+			clock-names = "clk_axi", "clk_ext";
+			/* TODO: Add clocks property here */
+			resets = <&hsreset 2>;
+			arasan,soc-ctl-syscon = <&hsurb>;
+			num-cs = <4>;
+			status = "disabled";
+		};
 	};
 
 	sdr@1900000 {

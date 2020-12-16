@@ -224,6 +224,12 @@ config SANDBOX_SPI
 		};
 	  };
 
+config SILVACO_QSPI
+	bool "Silvaco QSPI driver"
+	help
+	  Enable Silvaco AXI QSPI Controller which is used to
+	  communicate with SPI flash devices.
+
 config SPI_SUNXI
 	bool "Allwinner SoC SPI controllers"
 	help
