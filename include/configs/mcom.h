@@ -225,6 +225,12 @@
 #define VIDEO_MODE
 #endif
 
+#ifdef CONFIG_FIT
+#define KERNEL_ADDR_R "kernel_addr_r=0xC0000000\0"
+#else
+#define KERNEL_ADDR_R "kernel_addr_r=0x40000000\0"
+#endif
+
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"bootm_size=0x10000000\0" \
 	"stdin=serial\0" \
@@ -284,7 +290,7 @@
 	"fdt_addr_r=0x48000000\0" \
 	"pxefile_addr_r=0x49000000\0" \
 	"scriptaddr=0x49000000\0" \
-	"kernel_addr_r=0x40000000\0" \
+	KERNEL_ADDR_R \
 	"ramdisk_addr_r=0x50000000\0" \
 	"findfdt=" \
 		"setenv fdt_addr ${fdtcontroladdr};\0" \
