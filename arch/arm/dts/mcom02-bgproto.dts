@@ -39,6 +39,6 @@
 		 * device ID to autoload spidev module. */
 		compatible = "spidev";
 		reg = <0x0>;
-		spi-max-frequency = <10000000>;
+		spi-max-frequency = <2000000>;
 	};
 };
