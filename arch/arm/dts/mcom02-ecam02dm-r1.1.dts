@@ -176,3 +176,7 @@
 &nfc {
 	status = "okay";
 };
+
+&sdma {
+	memcpy-max-burst-length = <1>;
+};
