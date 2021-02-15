@@ -3,9 +3,15 @@
  * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
  */
 
+#define LOG_CATEGORY LOGC_CORE
+
+#include <command.h>
 #include <config.h>
 #include <errno.h>
 #include <common.h>
+#include <env.h>
+#include <lmb.h>
+#include <log.h>
 #include <mapmem.h>
 #include <part.h>
 #include <ext4fs.h>
@@ -18,18 +24,19 @@
 #include <div64.h>
 #include <linux/math64.h>
 #include <efi_loader.h>
+#include <squashfs.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
 static struct blk_desc *fs_dev_desc;
 static int fs_dev_part;
-static disk_partition_t fs_partition;
+static struct disk_partition fs_partition;
 static int fs_type = FS_TYPE_ANY;
 
 static inline int fs_probe_unsupported(struct blk_desc *fs_dev_desc,
-				      disk_partition_t *fs_partition)
+				      struct disk_partition *fs_partition)
 {
-	printf("** Unrecognized filesystem type **\n");
+	log_err("** Unrecognized filesystem type **\n");
 	return -1;
 }
 
@@ -54,6 +61,9 @@ static int fs_ls_generic(const char *dirname)
 		if (dent->type == FS_DT_DIR) {
 			printf("            %s/\n", dent->name);
 			ndirs++;
+		} else if (dent->type == FS_DT_LNK) {
+			printf("    <SYM>   %s\n", dent->name);
+			nfiles++;
 		} else {
 			printf(" %8lld   %s\n", dent->size, dent->name);
 			nfiles++;
@@ -134,7 +144,7 @@ struct fstype_info {
 	 */
 	bool null_dev_desc_ok;
 	int (*probe)(struct blk_desc *fs_dev_desc,
-		     disk_partition_t *fs_partition);
+		     struct disk_partition *fs_partition);
 	int (*ls)(const char *dirname);
 	int (*exists)(const char *filename);
 	int (*size)(const char *filename, loff_t *size);
@@ -273,6 +283,27 @@ static struct fstype_info fstypes[] = {
 		.ln = fs_ln_unsupported,
 	},
 #endif
+#if IS_ENABLED(CONFIG_FS_SQUASHFS)
+	{
+		.fstype = FS_TYPE_SQUASHFS,
+		.name = "squashfs",
+		.null_dev_desc_ok = false,
+		.probe = sqfs_probe,
+		.opendir = sqfs_opendir,
+		.readdir = sqfs_readdir,
+		.ls = fs_ls_generic,
+		.read = sqfs_read,
+		.size = sqfs_size,
+		.close = sqfs_close,
+		.closedir = sqfs_closedir,
+		.exists = sqfs_exists,
+		.uuid = fs_uuid_unsupported,
+		.write = fs_write_unsupported,
+		.ln = fs_ln_unsupported,
+		.unlink = fs_unlink_unsupported,
+		.mkdir = fs_mkdir_unsupported,
+	},
+#endif
 	{
 		.fstype = FS_TYPE_ANY,
 		.name = "unsupported",
@@ -304,6 +335,19 @@ static struct fstype_info *fs_get_info(int fstype)
 
 	/* Return the 'unsupported' sentinel */
 	return info;
+}
+
+/**
+ * fs_get_type() - Get type of current filesystem
+ *
+ * Return: filesystem type
+ *
+ * Returns filesystem type representing the current filesystem, or
+ * FS_TYPE_ANY for any unrecognised filesystem.
+ */
+int fs_get_type(void)
+{
+	return fs_type;
 }
 
 /**
@@ -388,7 +432,7 @@ int fs_set_blk_dev_with_part(struct blk_desc *desc, int part)
 	return -1;
 }
 
-static void fs_close(void)
+void fs_close(void)
 {
 	struct fstype_info *info = fs_get_info(fs_type);
 
@@ -412,7 +456,6 @@ int fs_ls(const char *dirname)
 
 	ret = info->ls(dirname);
 
-	fs_type = FS_TYPE_ANY;
 	fs_close();
 
 	return ret;
@@ -474,7 +517,7 @@ static int fs_read_lmb_check(const char *filename, ulong addr, loff_t offset,
 	if (lmb_alloc_addr(&lmb, addr, read_len) == addr)
 		return 0;
 
-	printf("** Reading file would overwrite reserved memory **\n");
+	log_err("** Reading file would overwrite reserved memory **\n");
 	return -ENOSPC;
 }
 #endif
@@ -504,7 +547,7 @@ static int _fs_read(const char *filename, ulong addr, loff_t offset, loff_t len,
 
 	/* If we requested a specific number of bytes, check we got it */
 	if (ret == 0 && len && *actread != len)
-		debug("** %s shorter than offset + len **\n", filename);
+		log_debug("** %s shorter than offset + len **\n", filename);
 	fs_close();
 
 	return ret;
@@ -528,7 +571,7 @@ int fs_write(const char *filename, ulong addr, loff_t offset, loff_t len,
 	unmap_sysmem(buf);
 
 	if (ret < 0 && len != *actwrite) {
-		printf("** Unable to write file %s **\n", filename);
+		log_err("** Unable to write file %s **\n", filename);
 		ret = -1;
 	}
 	fs_close();
@@ -596,7 +639,6 @@ int fs_unlink(const char *filename)
 
 	ret = info->unlink(filename);
 
-	fs_type = FS_TYPE_ANY;
 	fs_close();
 
 	return ret;
@@ -610,7 +652,6 @@ int fs_mkdir(const char *dirname)
 
 	ret = info->mkdir(dirname);
 
-	fs_type = FS_TYPE_ANY;
 	fs_close();
 
 	return ret;
@@ -624,7 +665,7 @@ int fs_ln(const char *fname, const char *target)
 	ret = info->ln(fname, target);
 
 	if (ret < 0) {
-		printf("** Unable to create link %s -> %s **\n", fname, target);
+		log_err("** Unable to create link %s -> %s **\n", fname, target);
 		ret = -1;
 	}
 	fs_close();
@@ -632,8 +673,8 @@ int fs_ln(const char *fname, const char *target)
 	return ret;
 }
 
-int do_size(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
-		int fstype)
+int do_size(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[],
+	    int fstype)
 {
 	loff_t size;
 
@@ -651,8 +692,8 @@ int do_size(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	return 0;
 }
 
-int do_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
-		int fstype)
+int do_load(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[],
+	    int fstype)
 {
 	unsigned long addr;
 	const char *addr_str;
@@ -701,15 +742,17 @@ int do_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	else
 		pos = 0;
 
-#ifdef CONFIG_CMD_BOOTEFI
-	efi_set_bootdev(argv[1], (argc > 2) ? argv[2] : "",
-			(argc > 4) ? argv[4] : "");
-#endif
 	time = get_timer(0);
 	ret = _fs_read(filename, addr, pos, bytes, 1, &len_read);
 	time = get_timer(time);
-	if (ret < 0)
+	if (ret < 0) {
+		log_err("Failed to load '%s'\n", filename);
 		return 1;
+	}
+
+	if (IS_ENABLED(CONFIG_CMD_BOOTEFI))
+		efi_set_bootdev(argv[1], (argc > 2) ? argv[2] : "",
+				(argc > 4) ? argv[4] : "");
 
 	printf("%llu bytes read in %lu ms", len_read, time);
 	if (time > 0) {
@@ -725,8 +768,8 @@ int do_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	return 0;
 }
 
-int do_ls(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
-	int fstype)
+int do_ls(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[],
+	  int fstype)
 {
 	if (argc < 2)
 		return CMD_RET_USAGE;
@@ -751,8 +794,8 @@ int file_exists(const char *dev_type, const char *dev_part, const char *file,
 	return fs_exists(file);
 }
 
-int do_save(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
-		int fstype)
+int do_save(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[],
+	    int fstype)
 {
 	unsigned long addr;
 	const char *filename;
@@ -793,8 +836,8 @@ int do_save(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	return 0;
 }
 
-int do_fs_uuid(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
-		int fstype)
+int do_fs_uuid(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[],
+	       int fstype)
 {
 	int ret;
 	char uuid[37];
@@ -818,7 +861,7 @@ int do_fs_uuid(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	return CMD_RET_SUCCESS;
 }
 
-int do_fs_type(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+int do_fs_type(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	struct fstype_info *info;
 
@@ -840,7 +883,7 @@ int do_fs_type(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	return CMD_RET_SUCCESS;
 }
 
-int do_rm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
+int do_rm(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[],
 	  int fstype)
 {
 	if (argc != 4)
@@ -855,7 +898,7 @@ int do_rm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	return 0;
 }
 
-int do_mkdir(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
+int do_mkdir(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[],
 	     int fstype)
 {
 	int ret;
@@ -868,14 +911,14 @@ int do_mkdir(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 
 	ret = fs_mkdir(argv[3]);
 	if (ret) {
-		printf("** Unable to create a directory \"%s\" **\n", argv[3]);
+		log_err("** Unable to create a directory \"%s\" **\n", argv[3]);
 		return 1;
 	}
 
 	return 0;
 }
 
-int do_ln(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
+int do_ln(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[],
 	  int fstype)
 {
 	if (argc != 5)
@@ -888,4 +931,24 @@ int do_ln(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 		return 1;
 
 	return 0;
+}
+
+int do_fs_types(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
+{
+	struct fstype_info *drv = fstypes;
+	const int n_ents = ARRAY_SIZE(fstypes);
+	struct fstype_info *entry;
+	int i = 0;
+
+	puts("Supported filesystems");
+	for (entry = drv; entry != drv + n_ents; entry++) {
+		if (entry->fstype != FS_TYPE_ANY) {
+			printf("%c %s", i ? ',' : ':', entry->name);
+			i++;
+		}
+	}
+	if (!i)
+		puts(": <none>");
+	puts("\n");
+	return CMD_RET_SUCCESS;
 }

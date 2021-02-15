@@ -7,19 +7,23 @@
  */
 
 #include <common.h>
+#include <init.h>
+#include <log.h>
+#include <net.h>
 #include <asm/io.h>
 #include <asm/gpio.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/iomux-mx51.h>
+#include <env.h>
+#include <linux/delay.h>
 #include <linux/errno.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/arch/crm_regs.h>
 #include <asm/arch/clock.h>
 #include <asm/mach-imx/mx5_video.h>
-#include <environment.h>
 #include <mmc.h>
 #include <input.h>
-#include <fsl_esdhc.h>
+#include <fsl_esdhc_imx.h>
 #include <mc13892.h>
 
 #include <malloc.h>
@@ -29,7 +33,7 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#ifdef CONFIG_FSL_ESDHC
+#ifdef CONFIG_FSL_ESDHC_IMX
 struct fsl_esdhc_cfg esdhc_cfg[2] = {
 	{MMC_SDHC1_BASE_ADDR},
 	{MMC_SDHC2_BASE_ADDR},
@@ -96,7 +100,7 @@ static void setup_iomux_fec(void)
 	imx_iomux_v3_setup_multiple_pads(fec_pads, ARRAY_SIZE(fec_pads));
 }
 
-#ifdef CONFIG_FSL_ESDHC
+#ifdef CONFIG_FSL_ESDHC_IMX
 int board_mmc_getcd(struct mmc *mmc)
 {
 	struct fsl_esdhc_cfg *cfg = (struct fsl_esdhc_cfg *)mmc->priv;
@@ -117,7 +121,7 @@ int board_mmc_getcd(struct mmc *mmc)
 	return ret;
 }
 
-int board_mmc_init(bd_t *bis)
+int board_mmc_init(struct bd_info *bis)
 {
 	static const iomux_v3_cfg_t sd1_pads[] = {
 		NEW_PAD_CTRL(MX51_PAD_SD1_CMD__SD1_CMD, PAD_CTL_DSE_MAX |
@@ -187,7 +191,7 @@ static int fec_get_mac_from_register(uint32_t base_addr)
 }
 
 #define TS4800_GPIO_FEC_PHY_RES         IMX_GPIO_NR(2, 14)
-int board_eth_init(bd_t *bd)
+int board_eth_init(struct bd_info *bd)
 {
 	int dev_id = -1;
 	int phy_id = 0xFF;

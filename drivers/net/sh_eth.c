@@ -10,11 +10,15 @@
 
 #include <config.h>
 #include <common.h>
-#include <environment.h>
+#include <cpu_func.h>
+#include <env.h>
+#include <log.h>
 #include <malloc.h>
 #include <net.h>
 #include <netdev.h>
 #include <miiphy.h>
+#include <asm/cache.h>
+#include <linux/delay.h>
 #include <linux/errno.h>
 #include <asm/io.h>
 
@@ -37,8 +41,8 @@
 #if defined(CONFIG_SH_ETHER_CACHE_WRITEBACK) && \
 	!CONFIG_IS_ENABLED(SYS_DCACHE_OFF)
 #define flush_cache_wback(addr, len)    \
-		flush_dcache_range((u32)addr, \
-		(u32)(addr + ALIGN(len, CONFIG_SH_ETHER_ALIGNE_SIZE)))
+		flush_dcache_range((unsigned long)addr, \
+		(unsigned long)(addr + ALIGN(len, CONFIG_SH_ETHER_ALIGNE_SIZE)))
 #else
 #define flush_cache_wback(...)
 #endif
@@ -46,11 +50,11 @@
 #if defined(CONFIG_SH_ETHER_CACHE_INVALIDATE) && defined(CONFIG_ARM)
 #define invalidate_cache(addr, len)		\
 	{	\
-		u32 line_size = CONFIG_SH_ETHER_ALIGNE_SIZE;	\
-		u32 start, end;	\
+		unsigned long line_size = CONFIG_SH_ETHER_ALIGNE_SIZE;	\
+		unsigned long start, end;	\
 		\
-		start = (u32)addr;	\
-		end = start + len;	\
+		start = (unsigned long)addr;	\
+		end = start + len;		\
 		start &= ~(line_size - 1);	\
 		end = ((end + line_size - 1) & ~(line_size - 1));	\
 		\
@@ -74,7 +78,7 @@ static int sh_eth_send_common(struct sh_eth_dev *eth, void *packet, int len)
 	}
 
 	/* packet must be a 4 byte boundary */
-	if ((int)packet & 3) {
+	if ((uintptr_t)packet & 3) {
 		printf(SHETHER_NAME ": %s: packet not 4 byte aligned\n"
 				, __func__);
 		ret = -EFAULT;
@@ -211,7 +215,7 @@ static int sh_eth_tx_desc_init(struct sh_eth_dev *eth)
 
 	/* Make sure we use a P2 address (non-cacheable) */
 	port_info->tx_desc_base =
-		(struct tx_desc_s *)ADDR_TO_P2((u32)port_info->tx_desc_alloc);
+		(struct tx_desc_s *)ADDR_TO_P2((uintptr_t)port_info->tx_desc_alloc);
 	port_info->tx_desc_cur = port_info->tx_desc_base;
 
 	/* Initialize all descriptors */
@@ -265,7 +269,7 @@ static int sh_eth_rx_desc_init(struct sh_eth_dev *eth)
 
 	/* Make sure we use a P2 address (non-cacheable) */
 	port_info->rx_desc_base =
-		(struct rx_desc_s *)ADDR_TO_P2((u32)port_info->rx_desc_alloc);
+		(struct rx_desc_s *)ADDR_TO_P2((uintptr_t)port_info->rx_desc_alloc);
 
 	port_info->rx_desc_cur = port_info->rx_desc_base;
 
@@ -281,7 +285,7 @@ static int sh_eth_rx_desc_init(struct sh_eth_dev *eth)
 		goto err_buf_alloc;
 	}
 
-	port_info->rx_buf_base = (u8 *)ADDR_TO_P2((u32)port_info->rx_buf_alloc);
+	port_info->rx_buf_base = (u8 *)ADDR_TO_P2((uintptr_t)port_info->rx_buf_alloc);
 
 	/* Initialize all descriptors */
 	for (cur_rx_desc = port_info->rx_desc_base,
@@ -374,10 +378,16 @@ static void sh_eth_write_hwaddr(struct sh_eth_info *port_info,
 static void sh_eth_mac_regs_config(struct sh_eth_dev *eth, unsigned char *mac)
 {
 	struct sh_eth_info *port_info = &eth->port_info[eth->port];
+	unsigned long edmr;
 
 	/* Configure e-dmac registers */
-	sh_eth_write(port_info, (sh_eth_read(port_info, EDMR) & ~EMDR_DESC_R) |
-			(EMDR_DESC | EDMR_EL), EDMR);
+	edmr = sh_eth_read(port_info, EDMR);
+	edmr &= ~EMDR_DESC_R;
+	edmr |= EMDR_DESC | EDMR_EL;
+#if defined(CONFIG_R8A77980)
+	edmr |= EDMR_NBST;
+#endif
+	sh_eth_write(port_info, edmr, EDMR);
 
 	sh_eth_write(port_info, 0, EESIPR);
 	sh_eth_write(port_info, 0, TRSCER);
@@ -407,7 +417,7 @@ static void sh_eth_mac_regs_config(struct sh_eth_dev *eth, unsigned char *mac)
 
 #if defined(CONFIG_CPU_SH7734) || defined(CONFIG_R8A7740)
 	sh_eth_write(port_info, CONFIG_SH_ETHER_SH7734_MII, RMII_MII);
-#elif defined(CONFIG_RCAR_GEN2)
+#elif defined(CONFIG_RCAR_GEN2) || defined(CONFIG_R8A77980)
 	sh_eth_write(port_info, sh_eth_read(port_info, RMIIMR) | 0x1, RMIIMR);
 #endif
 }
@@ -426,7 +436,7 @@ static int sh_eth_phy_regs_config(struct sh_eth_dev *eth)
 		sh_eth_write(port_info, GECMR_100B, GECMR);
 #elif defined(CONFIG_CPU_SH7757) || defined(CONFIG_CPU_SH7752)
 		sh_eth_write(port_info, 1, RTRATE);
-#elif defined(CONFIG_RCAR_GEN2)
+#elif defined(CONFIG_RCAR_GEN2) || defined(CONFIG_R8A77980)
 		val = ECMR_RTM;
 #endif
 	} else if (phy->speed == 10) {
@@ -567,7 +577,7 @@ static int sh_eth_recv_legacy(struct eth_device *dev)
 	return sh_eth_recv_common(eth);
 }
 
-static int sh_eth_init_legacy(struct eth_device *dev, bd_t *bd)
+static int sh_eth_init_legacy(struct eth_device *dev, struct bd_info *bd)
 {
 	struct sh_eth_dev *eth = dev->priv;
 	int ret;
@@ -601,7 +611,7 @@ void sh_eth_halt_legacy(struct eth_device *dev)
 	sh_eth_stop(eth);
 }
 
-int sh_eth_initialize(bd_t *bd)
+int sh_eth_initialize(struct bd_info *bd)
 {
 	int ret = 0;
 	struct sh_eth_dev *eth = NULL;
@@ -694,7 +704,7 @@ static int sh_ether_recv(struct udevice *dev, int flags, uchar **packetp)
 	struct sh_ether_priv *priv = dev_get_priv(dev);
 	struct sh_eth_dev *eth = &priv->shdev;
 	struct sh_eth_info *port_info = &eth->port_info[eth->port];
-	uchar *packet = (uchar *)ADDR_TO_P2(port_info->rx_desc_cur->rd2);
+	uchar *packet = (uchar *)ADDR_TO_P2((uintptr_t)port_info->rx_desc_cur->rd2);
 	int len;
 
 	len = sh_eth_recv_start(eth);
@@ -844,13 +854,17 @@ static int sh_ether_probe(struct udevice *udev)
 	eth->port = CONFIG_SH_ETHER_USE_PORT;
 	eth->port_info[eth->port].phy_addr = CONFIG_SH_ETHER_PHY_ADDR;
 	eth->port_info[eth->port].iobase =
-		(void __iomem *)(BASE_IO_ADDR + 0x800 * eth->port);
+		(void __iomem *)(uintptr_t)(BASE_IO_ADDR + 0x800 * eth->port);
 
 #if CONFIG_IS_ENABLED(CLK)
 	ret = clk_enable(&priv->clk);
 	if (ret)
 		goto err_mdio_register;
 #endif
+
+	ret = sh_eth_init_common(eth, pdata->enetaddr);
+	if (ret)
+		goto err_phy_config;
 
 	ret = sh_eth_phy_config(udev);
 	if (ret) {
@@ -904,7 +918,7 @@ int sh_ether_ofdata_to_platdata(struct udevice *dev)
 	const fdt32_t *cell;
 	int ret = 0;
 
-	pdata->iobase = devfdt_get_addr(dev);
+	pdata->iobase = dev_read_addr(dev);
 	pdata->phy_interface = -1;
 	phy_mode = fdt_getprop(gd->fdt_blob, dev_of_offset(dev), "phy-mode",
 			       NULL);
@@ -931,6 +945,7 @@ static const struct udevice_id sh_ether_ids[] = {
 	{ .compatible = "renesas,ether-r8a7791" },
 	{ .compatible = "renesas,ether-r8a7793" },
 	{ .compatible = "renesas,ether-r8a7794" },
+	{ .compatible = "renesas,gether-r8a77980" },
 	{ }
 };
 

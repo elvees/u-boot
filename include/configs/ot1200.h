@@ -13,7 +13,6 @@
 #define CONFIG_SYS_MALLOC_LEN           (10 * 1024 * 1024)
 
 /* UART Configs */
-#define CONFIG_MXC_UART
 #define CONFIG_MXC_UART_BASE           UART1_BASE
 
 /* SF Configs */
@@ -59,7 +58,6 @@
 /* SPL */
 #ifdef CONFIG_SPL
 #include "imx6_spl.h"
-#define CONFIG_SYS_SPI_U_BOOT_OFFS     (64 * 1024)
 #endif
 
 #define CONFIG_FEC_MXC
@@ -67,7 +65,6 @@
 #define CONFIG_FEC_XCV_TYPE             MII100
 #define CONFIG_ETHPRIME                 "FEC"
 #define CONFIG_FEC_MXC_PHYADDR          0x5
-#define CONFIG_PHY_SMSC
 
 #ifndef CONFIG_SPL
 #define CONFIG_ENV_EEPROM_IS_ON_I2C
@@ -76,11 +73,6 @@
 #define CONFIG_SYS_EEPROM_PAGE_WRITE_BITS     3
 #define CONFIG_SYS_EEPROM_PAGE_WRITE_DELAY_MS 5
 #endif
-
-#define CONFIG_PREBOOT                 ""
-
-/* Thermal support */
-#define CONFIG_IMX_THERMAL
 
 /* Physical Memory Map */
 #define PHYS_SDRAM                     MMDC0_ARB_BASE_ADDR
@@ -95,10 +87,7 @@
 	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
 
 /* Environment organization */
-#define CONFIG_ENV_SIZE                 (64 * 1024)	/* 64 kb */
-#define CONFIG_ENV_OFFSET               (1024 * 1024)
 /* M25P16 has an erase size of 64 KiB */
-#define CONFIG_ENV_SECT_SIZE            (64 * 1024)
 
 #define CONFIG_BOOTP_SERVERIP
 #define CONFIG_BOOTP_BOOTFILE

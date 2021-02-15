@@ -33,26 +33,21 @@
 #define CONFIG_SYS_BAUDRATE_TABLE  \
 	{300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400}
 
-#define CONFIG_ARM_DCC
-
 /* Ethernet driver */
 #if defined(CONFIG_ZYNQ_GEM)
 # define CONFIG_SYS_FAULT_ECHO_LINK_DOWN
 # define CONFIG_BOOTP_MAY_FAIL
 #endif
 
-/* QSPI */
-
 /* NOR */
 #ifdef CONFIG_MTD_NOR_FLASH
-# define CONFIG_SYS_FLASH_BASE		0xE2000000
-# define CONFIG_SYS_FLASH_SIZE		(16 * 1024 * 1024)
 # define CONFIG_SYS_MAX_FLASH_BANKS	1
 # define CONFIG_SYS_MAX_FLASH_SECT	512
 # define CONFIG_SYS_FLASH_ERASE_TOUT	1000
 # define CONFIG_SYS_FLASH_WRITE_TOUT	5000
 # define CONFIG_FLASH_SHOW_PROGRESS	10
 # undef CONFIG_SYS_FLASH_EMPTY_INFO
+# define CONFIG_SYS_FLASH_QUIET_TEST
 #endif
 
 #ifdef CONFIG_NAND_ZYNQ
@@ -65,7 +60,6 @@
 
 # define CONFIG_SYS_DFU_DATA_BUF_SIZE	0x600000
 # define DFU_DEFAULT_POLL_TIMEOUT	300
-# define CONFIG_USB_CABLE_CHECK
 # define CONFIG_THOR_RESET_OFF
 # define DFU_ALT_INFO_RAM \
 	"dfu_ram_info=" \
@@ -99,11 +93,7 @@
 # define DFU_ALT_INFO
 #endif
 
-/* Allow to overwrite serial and ethaddr */
-#define CONFIG_ENV_OVERWRITE
-
 /* enable preboot to be loaded before CONFIG_BOOTDELAY */
-#define CONFIG_PREBOOT
 
 /* Boot configuration */
 #define CONFIG_SYS_LOAD_ADDR		0 /* default? */
@@ -113,13 +103,13 @@
 #else
 
 #ifdef CONFIG_CMD_MMC
-#define BOOT_TARGET_DEVICES_MMC(func) func(MMC, mmc, 0)
+#define BOOT_TARGET_DEVICES_MMC(func) func(MMC, mmc, 0) func(MMC, mmc, 1)
 #else
 #define BOOT_TARGET_DEVICES_MMC(func)
 #endif
 
 #ifdef CONFIG_CMD_USB
-#define BOOT_TARGET_DEVICES_USB(func) func(USB, usb, 0)
+#define BOOT_TARGET_DEVICES_USB(func) func(USB, usb, 0) func(USB, usb, 1)
 #else
 #define BOOT_TARGET_DEVICES_USB(func)
 #endif
@@ -154,44 +144,51 @@
 # define BOOT_TARGET_DEVICES_NOR(func)
 #endif
 
-#define BOOTENV_DEV_XILINX(devtypeu, devtypel, instance) \
-	"bootcmd_xilinx=run $modeboot\0"
-
-#define BOOTENV_DEV_NAME_XILINX(devtypeu, devtypel, instance) \
-	"xilinx "
-
 #define BOOTENV_DEV_QSPI(devtypeu, devtypel, instance) \
 	"bootcmd_qspi=sf probe 0 0 0 && " \
-		      "sf read $scriptaddr $script_offset_f $script_size_f && " \
-		      "source ${scriptaddr}; echo SCRIPT FAILED: continuing...;\0"
+		      "sf read ${scriptaddr} ${script_offset_f} ${script_size_f} && " \
+		      "echo QSPI: Trying to boot script at ${scriptaddr} && " \
+		      "source ${scriptaddr}; echo QSPI: SCRIPT FAILED: continuing...;\0"
 
 #define BOOTENV_DEV_NAME_QSPI(devtypeu, devtypel, instance) \
 	"qspi "
 
 #define BOOTENV_DEV_NAND(devtypeu, devtypel, instance) \
 	"bootcmd_nand=nand info && " \
-		      "nand read $scriptaddr $script_offset_f $script_size_f && " \
-		      "source ${scriptaddr}; echo SCRIPT FAILED: continuing...;\0"
+		      "nand read ${scriptaddr} ${script_offset_f} ${script_size_f} && " \
+		      "echo NAND: Trying to boot script at ${scriptaddr} && " \
+		      "source ${scriptaddr}; echo NAND: SCRIPT FAILED: continuing...;\0"
 
 #define BOOTENV_DEV_NAME_NAND(devtypeu, devtypel, instance) \
 	"nand "
 
 #define BOOTENV_DEV_NOR(devtypeu, devtypel, instance) \
-	"bootcmd_nor=cp.b $scropt_offset_nor $scriptaddr $script_size_f && " \
-		     "source ${scriptaddr}; echo SCRIPT FAILED: continuing...;\0"
+	"script_offset_nor=0xE2FC0000\0"        \
+	"bootcmd_nor=cp.b ${script_offset_nor} ${scriptaddr} ${script_size_f} && " \
+		     "echo NOR: Trying to boot script at ${scriptaddr} && " \
+		     "source ${scriptaddr}; echo NOR: SCRIPT FAILED: continuing...;\0"
 
 #define BOOTENV_DEV_NAME_NOR(devtypeu, devtypel, instance) \
 	"nor "
 
+#define BOOT_TARGET_DEVICES_JTAG(func)  func(JTAG, jtag, na)
+
+#define BOOTENV_DEV_JTAG(devtypeu, devtypel, instance) \
+	"bootcmd_jtag=echo JTAG: Trying to boot script at ${scriptaddr} && " \
+		"source ${scriptaddr}; echo JTAG: SCRIPT FAILED: continuing...;\0"
+
+#define BOOTENV_DEV_NAME_JTAG(devtypeu, devtypel, instance) \
+	"jtag "
+
 #define BOOT_TARGET_DEVICES(func) \
+	BOOT_TARGET_DEVICES_JTAG(func) \
 	BOOT_TARGET_DEVICES_MMC(func) \
 	BOOT_TARGET_DEVICES_QSPI(func) \
 	BOOT_TARGET_DEVICES_NAND(func) \
 	BOOT_TARGET_DEVICES_NOR(func) \
 	BOOT_TARGET_DEVICES_USB(func) \
 	BOOT_TARGET_DEVICES_PXE(func) \
-	BOOT_TARGET_DEVICES_DHCP(func) \
-	func(XILINX, xilinx, na)
+	BOOT_TARGET_DEVICES_DHCP(func)
 
 #include <config_distro_bootcmd.h>
 #endif /* CONFIG_SPL_BUILD */
@@ -199,72 +196,25 @@
 /* Default environment */
 #ifndef CONFIG_EXTRA_ENV_SETTINGS
 #define CONFIG_EXTRA_ENV_SETTINGS	\
-	"fit_image=fit.itb\0"		\
-	"load_addr=0x2000000\0"		\
-	"fit_size=0x800000\0"		\
-	"flash_off=0x100000\0"		\
-	"nor_flash_off=0xE2100000\0"	\
-	"fdt_high=0x20000000\0"		\
-	"initrd_high=0x20000000\0"	\
 	"scriptaddr=0x20000\0"	\
-	"script_offser_nor=0xE2FC0000\0"	\
-	"script_offset_f=0xFC0000\0"	\
 	"script_size_f=0x40000\0"	\
-	"loadbootenv_addr=0x2000000\0" \
 	"fdt_addr_r=0x1f00000\0"        \
 	"pxefile_addr_r=0x2000000\0"    \
 	"kernel_addr_r=0x2000000\0"     \
 	"scriptaddr=0x3000000\0"        \
 	"ramdisk_addr_r=0x3100000\0"    \
-	"bootenv=uEnv.txt\0" \
-	"bootenv_dev=mmc\0" \
-	"loadbootenv=load ${bootenv_dev} 0 ${loadbootenv_addr} ${bootenv}\0" \
-	"importbootenv=echo Importing environment from ${bootenv_dev} ...; " \
-		"env import -t ${loadbootenv_addr} $filesize\0" \
-	"bootenv_existence_test=test -e ${bootenv_dev} 0 /${bootenv}\0" \
-	"setbootenv=if env run bootenv_existence_test; then " \
-			"if env run loadbootenv; then " \
-				"env run importbootenv; " \
-			"fi; " \
-		"fi; \0" \
-	"sd_loadbootenv=setenv bootenv_dev mmc && " \
-			"run setbootenv \0" \
-	"usb_loadbootenv=setenv bootenv_dev usb && usb start && run setbootenv \0" \
-	"preboot=if test $modeboot = sdboot; then " \
-			"run sd_loadbootenv; " \
-			"echo Checking if uenvcmd is set ...; " \
-			"if test -n $uenvcmd; then " \
-				"echo Running uenvcmd ...; " \
-				"run uenvcmd; " \
-			"fi; " \
-		"fi; \0" \
-	"norboot=echo Copying FIT from NOR flash to RAM... && " \
-		"cp.b ${nor_flash_off} ${load_addr} ${fit_size} && " \
-		"bootm ${load_addr}\0" \
-	"sdboot=echo Copying FIT from SD to RAM... && " \
-		"load mmc 0 ${load_addr} ${fit_image} && " \
-		"bootm ${load_addr}\0" \
-	"jtagboot=echo TFTPing FIT to RAM... && " \
-		"tftpboot ${load_addr} ${fit_image} && " \
-		"bootm ${load_addr}\0" \
-	"usbboot=if usb start; then " \
-			"echo Copying FIT from USB to RAM... && " \
-			"load usb 0 ${load_addr} ${fit_image} && " \
-			"bootm ${load_addr}; fi\0" \
-		DFU_ALT_INFO \
-		BOOTENV
+	DFU_ALT_INFO \
+	BOOTENV
 #endif
 
 /* Miscellaneous configurable options */
 
 #define CONFIG_CLOCKS
 #define CONFIG_SYS_MAXARGS		32 /* max number of command args */
-
-#define CONFIG_SYS_MEMTEST_START	0
-#define CONFIG_SYS_MEMTEST_END		0x1000
+#define CONFIG_SYS_CBSIZE		2048 /* Console I/O Buffer Size */
 
 #define CONFIG_SYS_INIT_RAM_ADDR	0xFFFF0000
-#define CONFIG_SYS_INIT_RAM_SIZE	0x1000
+#define CONFIG_SYS_INIT_RAM_SIZE	0x2000
 #define CONFIG_SYS_INIT_SP_ADDR		(CONFIG_SYS_INIT_RAM_ADDR + \
 					CONFIG_SYS_INIT_RAM_SIZE - \
 					GENERATED_GBL_DATA_SIZE)
@@ -278,7 +228,6 @@
 
 /* MMC support */
 #ifdef CONFIG_MMC_SDHCI_ZYNQ
-#define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION     1
 #define CONFIG_SPL_FS_LOAD_PAYLOAD_NAME     "u-boot.img"
 #endif
 
@@ -295,7 +244,6 @@
 
 /* qspi mode is working fine */
 #ifdef CONFIG_ZYNQ_QSPI
-#define CONFIG_SYS_SPI_U_BOOT_OFFS	0x100000
 #define CONFIG_SYS_SPI_ARGS_OFFS	0x200000
 #define CONFIG_SYS_SPI_ARGS_SIZE	0x80000
 #define CONFIG_SYS_SPI_KERNEL_OFFS	(CONFIG_SYS_SPI_ARGS_OFFS + \
@@ -321,9 +269,5 @@
 /* BSS setup */
 #define CONFIG_SPL_BSS_START_ADDR	0x100000
 #define CONFIG_SPL_BSS_MAX_SIZE		0x100000
-
-#define CONFIG_SPL_LOAD_FIT_ADDRESS 0x10000000
-
-#define CONFIG_SYS_UBOOT_START	CONFIG_SYS_TEXT_BASE
 
 #endif /* __CONFIG_ZYNQ_COMMON_H */

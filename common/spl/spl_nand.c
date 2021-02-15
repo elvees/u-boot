@@ -5,11 +5,19 @@
  */
 #include <common.h>
 #include <config.h>
+#include <fdt_support.h>
+#include <image.h>
+#include <log.h>
 #include <spl.h>
 #include <asm/io.h>
 #include <nand.h>
 #include <linux/libfdt_env.h>
 #include <fdt.h>
+
+uint32_t __weak spl_nand_get_uboot_raw_page(void)
+{
+	return CONFIG_SYS_NAND_U_BOOT_OFFS;
+}
 
 #if defined(CONFIG_SPL_NAND_RAW_ONLY)
 static int spl_nand_load_image(struct spl_image_info *spl_image,
@@ -21,7 +29,7 @@ static int spl_nand_load_image(struct spl_image_info *spl_image,
 	       CONFIG_SYS_NAND_U_BOOT_OFFS, CONFIG_SYS_NAND_U_BOOT_SIZE,
 	       CONFIG_SYS_NAND_U_BOOT_DST);
 
-	nand_spl_load_image(CONFIG_SYS_NAND_U_BOOT_OFFS,
+	nand_spl_load_image(spl_nand_get_uboot_raw_page(),
 			    CONFIG_SYS_NAND_U_BOOT_SIZE,
 			    (void *)CONFIG_SYS_NAND_U_BOOT_DST);
 	spl_set_header_raw_uboot(spl_image);
@@ -34,13 +42,16 @@ static int spl_nand_load_image(struct spl_image_info *spl_image,
 static ulong spl_nand_fit_read(struct spl_load_info *load, ulong offs,
 			       ulong size, void *dst)
 {
-	int ret;
+	ulong sector;
+	int err;
 
-	ret = nand_spl_load_image(offs, size, dst);
-	if (!ret)
-		return size;
-	else
+	sector = *(int *)load->priv;
+	offs = sector + nand_spl_adjust_offset(sector, offs - sector);
+	err = nand_spl_load_image(offs, size, dst);
+	if (err)
 		return 0;
+
+	return size;
 }
 
 static int spl_nand_load_element(struct spl_image_info *spl_image,
@@ -58,11 +69,20 @@ static int spl_nand_load_element(struct spl_image_info *spl_image,
 
 		debug("Found FIT\n");
 		load.dev = NULL;
-		load.priv = NULL;
+		load.priv = &offset;
 		load.filename = NULL;
 		load.bl_len = 1;
 		load.read = spl_nand_fit_read;
 		return spl_load_simple_fit(spl_image, &load, offset, header);
+	} else if (IS_ENABLED(CONFIG_SPL_LOAD_IMX_CONTAINER)) {
+		struct spl_load_info load;
+
+		load.dev = NULL;
+		load.priv = NULL;
+		load.filename = NULL;
+		load.bl_len = 1;
+		load.read = spl_nand_fit_read;
+		return spl_load_imx_container(spl_image, &load, offset);
 	} else {
 		err = spl_parse_image_header(spl_image, header);
 		if (err)
@@ -139,7 +159,7 @@ static int spl_nand_load_image(struct spl_image_info *spl_image,
 #endif
 #endif
 	/* Load u-boot */
-	err = spl_nand_load_element(spl_image, CONFIG_SYS_NAND_U_BOOT_OFFS,
+	err = spl_nand_load_element(spl_image, spl_nand_get_uboot_raw_page(),
 				    header);
 #ifdef CONFIG_SYS_NAND_U_BOOT_OFFS_REDUND
 #if CONFIG_SYS_NAND_U_BOOT_OFFS != CONFIG_SYS_NAND_U_BOOT_OFFS_REDUND

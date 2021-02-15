@@ -5,8 +5,11 @@
 # Entry-type module for a Flash map, as used by the flashrom SPI flash tool
 #
 
-from entry import Entry
-import fmap_util
+from binman.entry import Entry
+from binman import fmap_util
+from patman import tools
+from patman.tools import ToHexSize
+from patman import tout
 
 
 class Entry_fmap(Entry):
@@ -25,10 +28,11 @@ class Entry_fmap(Entry):
 
     When used, this entry will be populated with an FMAP which reflects the
     entries in the current image. Note that any hierarchy is squashed, since
-    FMAP does not support this.
+    FMAP does not support this. Also, CBFS entries appear as a single entry -
+    the sub-entries are ignored.
     """
     def __init__(self, section, etype, node):
-        Entry.__init__(self, section, etype, node)
+        super().__init__(section, etype, node)
 
     def _GetFmap(self):
         """Build an FMAP from the entries in the current image
@@ -38,7 +42,9 @@ class Entry_fmap(Entry):
         """
         def _AddEntries(areas, entry):
             entries = entry.GetEntries()
-            if entries:
+            tout.Debug("fmap: Add entry '%s' type '%s' (%s subentries)" %
+                       (entry.GetPath(), entry.etype, ToHexSize(entries)))
+            if entries and entry.etype != 'cbfs':
                 for subentry in entries.values():
                     _AddEntries(areas, subentry)
             else:
@@ -46,9 +52,9 @@ class Entry_fmap(Entry):
                 if pos is not None:
                     pos -= entry.section.GetRootSkipAtStart()
                 areas.append(fmap_util.FmapArea(pos or 0, entry.size or 0,
-                                                entry.name, 0))
+                                            tools.FromUnicode(entry.name), 0))
 
-        entries = self.section._image.GetEntries()
+        entries = self.GetImage().GetEntries()
         areas = []
         for entry in entries.values():
             _AddEntries(areas, entry)
@@ -61,4 +67,4 @@ class Entry_fmap(Entry):
         return True
 
     def ProcessContents(self):
-        self.SetContents(self._GetFmap())
+        return self.ProcessContentsUpdate(self._GetFmap())

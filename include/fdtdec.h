@@ -54,7 +54,7 @@ struct bd_info;
 #define SPL_BUILD	0
 #endif
 
-#if CONFIG_IS_ENABLED(OF_PRIOR_STAGE)
+#ifdef CONFIG_OF_PRIOR_STAGE
 extern phys_addr_t prior_stage_fdt_address;
 #endif
 
@@ -110,6 +110,9 @@ struct fdt_pci_addr {
 	u32	phys_mid;
 	u32	phys_lo;
 };
+
+extern u8 __dtb_dt_begin[];	/* embedded device tree blob */
+extern u8 __dtb_dt_spl_begin[];	/* embedded device tree blob for SPL/TPL */
 
 /**
  * Compute the size of a resource.
@@ -417,23 +420,6 @@ fdt_addr_t fdtdec_get_addr_size(const void *blob, int node,
 		const char *prop_name, fdt_size_t *sizep);
 
 /**
- * Look at an address property in a node and return the pci address which
- * corresponds to the given type in the form of fdt_pci_addr.
- * The property must hold one fdt_pci_addr with a lengh.
- *
- * @param blob		FDT blob
- * @param node		node to examine
- * @param type		pci address type (FDT_PCI_SPACE_xxx)
- * @param prop_name	name of property to find
- * @param addr		returns pci address in the form of fdt_pci_addr
- * @return 0 if ok, -ENOENT if the property did not exist, -EINVAL if the
- *		format of the property was invalid, -ENXIO if the requested
- *		address type was not found
- */
-int fdtdec_get_pci_addr(const void *blob, int node, enum fdt_pci_space type,
-		const char *prop_name, struct fdt_pci_addr *addr);
-
-/**
  * Look at the compatible property of a device node that represents a PCI
  * device and extract pci vendor id and device id from it.
  *
@@ -455,8 +441,21 @@ int fdtdec_get_pci_vendev(const void *blob, int node,
  * @param bar		returns base address of the pci device's registers
  * @return 0 if ok, negative on error
  */
-int fdtdec_get_pci_bar32(struct udevice *dev, struct fdt_pci_addr *addr,
+int fdtdec_get_pci_bar32(const struct udevice *dev, struct fdt_pci_addr *addr,
 			 u32 *bar);
+
+/**
+ * Look at the bus range property of a device node and return the pci bus
+ * range for this node.
+ * The property must hold one fdt_pci_addr with a length.
+ * @param blob		FDT blob
+ * @param node		node to examine
+ * @param res		the resource structure to return the bus range
+ * @return 0 if ok, negative on error
+ */
+
+int fdtdec_get_pci_bus_range(const void *blob, int node,
+			     struct fdt_resource *res);
 
 /**
  * Look up a 32-bit integer property in a node and return it. The property
@@ -923,26 +922,6 @@ int fdtdec_decode_display_timing(const void *blob, int node, int index,
 				 struct display_timing *config);
 
 /**
- * fdtdec_setup_mem_size_base_fdt() - decode and setup gd->ram_size and
- * gd->ram_start
- *
- * Decode the /memory 'reg' property to determine the size and start of the
- * first memory bank, populate the global data with the size and start of the
- * first bank of memory.
- *
- * This function should be called from a boards dram_init(). This helper
- * function allows for boards to query the device tree for DRAM size and start
- * address instead of hard coding the value in the case where the memory size
- * and start address cannot be detected automatically.
- *
- * @param blob		FDT blob
- *
- * @return 0 if OK, -EINVAL if the /memory node or reg property is missing or
- * invalid
- */
-int fdtdec_setup_mem_size_base_fdt(const void *blob);
-
-/**
  * fdtdec_setup_mem_size_base() - decode and setup gd->ram_size and
  * gd->ram_start
  *
@@ -961,23 +940,21 @@ int fdtdec_setup_mem_size_base_fdt(const void *blob);
 int fdtdec_setup_mem_size_base(void);
 
 /**
- * fdtdec_setup_memory_banksize_fdt() - decode and populate gd->bd->bi_dram
+ * fdtdec_setup_mem_size_base_lowest() - decode and setup gd->ram_size and
+ * gd->ram_start by lowest available memory base
  *
- * Decode the /memory 'reg' property to determine the address and size of the
- * memory banks. Use this data to populate the global data board info with the
- * phys address and size of memory banks.
+ * Decode the /memory 'reg' property to determine the lowest start of the memory
+ * bank bank and populate the global data with it.
  *
- * This function should be called from a boards dram_init_banksize(). This
- * helper function allows for boards to query the device tree for memory bank
- * information instead of hard coding the information in cases where it cannot
- * be detected automatically.
- *
- * @param blob		FDT blob
+ * This function should be called from a boards dram_init(). This helper
+ * function allows for boards to query the device tree for DRAM size and start
+ * address instead of hard coding the value in the case where the memory size
+ * and start address cannot be detected automatically.
  *
  * @return 0 if OK, -EINVAL if the /memory node or reg property is missing or
  * invalid
  */
-int fdtdec_setup_memory_banksize_fdt(const void *blob);
+int fdtdec_setup_mem_size_base_lowest(void);
 
 /**
  * fdtdec_setup_memory_banksize() - decode and populate gd->bd->bi_dram
@@ -1052,7 +1029,7 @@ static inline int fdtdec_set_phandle(void *blob, int node, uint32_t phandle)
  *     };
  *     uint32_t phandle;
  *
- *     fdtdec_add_reserved_memory(fdt, "framebuffer", &fb, &phandle);
+ *     fdtdec_add_reserved_memory(fdt, "framebuffer", &fb, &phandle, false);
  *
  * This results in the following subnode being added to the top-level
  * /reserved-memory node:
@@ -1078,11 +1055,13 @@ static inline int fdtdec_set_phandle(void *blob, int node, uint32_t phandle)
  * @param basename	base name of the node to create
  * @param carveout	information about the carveout region
  * @param phandlep	return location for the phandle of the carveout region
+ *			can be NULL if no phandle should be added
+ * @param no_map	add "no-map" property if true
  * @return 0 on success or a negative error code on failure
  */
 int fdtdec_add_reserved_memory(void *blob, const char *basename,
 			       const struct fdt_memory *carveout,
-			       uint32_t *phandlep);
+			       uint32_t *phandlep, bool no_map);
 
 /**
  * fdtdec_get_carveout() - reads a carveout from an FDT
@@ -1167,6 +1146,11 @@ int fdtdec_set_carveout(void *blob, const char *node, const char *prop_name,
  * Set up the device tree ready for use
  */
 int fdtdec_setup(void);
+
+/**
+ * Perform board-specific early DT adjustments
+ */
+int fdtdec_board_setup(const void *fdt_blob);
 
 #if CONFIG_IS_ENABLED(MULTI_DTB_FIT)
 /**

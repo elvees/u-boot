@@ -17,10 +17,6 @@
  */
 #define CONFIG_SYS_TCLK		250000000	/* 250MHz */
 
-/*
- * Commands configuration
- */
-
 /* I2C */
 #define CONFIG_SYS_I2C
 #define CONFIG_SYS_I2C_MVTWSI
@@ -29,9 +25,6 @@
 #define CONFIG_SYS_I2C_SPEED		100000
 
 /* Environment in SPI NOR flash */
-#define CONFIG_ENV_OFFSET		0x7E0000   /* RedBoot config partition in DTS */
-#define CONFIG_ENV_SIZE			(64 << 10) /* 64KiB */
-#define CONFIG_ENV_SECT_SIZE		(64 << 10) /* 64KiB sectors */
 
 #define CONFIG_SYS_NETA_INTERFACE_TYPE	PHY_INTERFACE_MODE_RGMII
 
@@ -90,8 +83,10 @@
 #define CONFIG_SPL_STACK		(0x40000000 + ((192 - 16) << 10))
 #define CONFIG_SPL_BOOTROM_SAVE		(CONFIG_SPL_STACK + 4)
 
+#if defined(CONFIG_MVEBU_SPL_BOOT_DEVICE_SPI)
 /* SPL related SPI defines */
-#define CONFIG_SYS_SPI_U_BOOT_OFFS	0x24000
+#define CONFIG_SYS_U_BOOT_OFFS		CONFIG_SYS_SPI_U_BOOT_OFFS
+#endif
 
 /* DS414 bus width is 32bits */
 #define CONFIG_DDR_32BIT
@@ -99,7 +94,5 @@
 /* Default Environment */
 #define CONFIG_BOOTCOMMAND	"sf read ${loadaddr} 0xd0000 0x700000; bootm"
 #define CONFIG_LOADADDR		0x80000
-#undef CONFIG_PREBOOT		/* override preboot for USB and SPI flash init */
-#define CONFIG_PREBOOT		"usb start; sf probe"
 
 #endif /* _CONFIG_SYNOLOGY_DS414_H */

@@ -5,6 +5,10 @@
 
 #include <common.h>
 #include <command.h>
+#include <env.h>
+#include <fdt_support.h>
+#include <image.h>
+#include <init.h>
 #include <netdev.h>
 #include <linux/compiler.h>
 #include <asm/mmu.h>
@@ -77,7 +81,7 @@ int misc_init_r(void)
 	return 0;
 }
 
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	phys_addr_t base;
 	phys_size_t size;

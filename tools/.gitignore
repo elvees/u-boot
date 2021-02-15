@@ -1,3 +1,4 @@
+/asn1_compiler
 /atmel_pmecc_params
 /bin2header
 /bmp_logo
@@ -14,6 +15,7 @@
 /gen_eth_addr
 /gen_ethaddr_crc
 /ifdtool
+/ifwitool
 /img2srec
 /kwboot
 /lib/
@@ -30,4 +32,6 @@
 /spl_size_limit
 /sunxi-spl-image-builder
 /ubsha1
+/update_octeon_header
+/version.h
 /xway-swap-bytes

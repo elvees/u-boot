@@ -2,6 +2,23 @@ if RCAR_GEN3
 
 menu "Select Target SoC"
 
+config R8A774A1
+	bool "Renesas SoC R8A774A1"
+
+config R8A774B1
+	bool "Renesas SoC R8A774B1"
+	imply CLK_R8A774B1
+	imply PINCTRL_PFC_R8A774B1
+
+config R8A774C0
+	bool "Renesas SoC R8A774C0"
+	imply CLK_R8A774C0
+
+config R8A774E1
+	bool "Renesas SoC R8A774E1"
+	imply CLK_R8A774E1
+	imply PINCTRL_PFC_R8A774E1
+
 config R8A7795
 	bool "Renesas SoC R8A7795"
 	imply CLK_R8A7795
@@ -22,6 +39,11 @@ config R8A77970
 	imply CLK_R8A77970
 	imply PINCTRL_PFC_R8A77970
 
+config R8A77980
+	bool "Renesas SoC R8A77980"
+	imply CLK_R8A77980
+	imply PINCTRL_PFC_R8A77980
+
 config R8A77990
 	bool "Renesas SoC R8A77990"
 	imply CLK_R8A77990
@@ -37,6 +59,17 @@ endmenu
 choice
 	prompt "Renesas ARM64 SoCs board select"
 	optional
+
+config TARGET_BEACON_RZG2M
+	bool "Beacon EmbeddedWorks RZ/G2M Dev Kit"
+	select R8A774A1
+	select PINCTRL_PFC_R8A774A1
+
+config TARGET_CONDOR
+	bool "Condor board"
+	imply R8A77980
+	help
+          Support for Renesas R-Car Gen3 Condor platform
 
 config TARGET_DRAAK
 	bool "Draak board"
@@ -83,11 +116,13 @@ endchoice
 config SYS_SOC
 	default "rmobile"
 
+source "board/renesas/condor/Kconfig"
 source "board/renesas/draak/Kconfig"
 source "board/renesas/eagle/Kconfig"
 source "board/renesas/ebisu/Kconfig"
 source "board/renesas/salvator-x/Kconfig"
 source "board/renesas/ulcb/Kconfig"
+source "board/beacon/beacon-rzg2m/Kconfig"
 
 config MULTI_DTB_FIT_UNCOMPRESS_SZ
 	default 0x80000 if TARGET_SALVATOR_X

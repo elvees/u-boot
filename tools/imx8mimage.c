@@ -21,14 +21,17 @@ static uint32_t sld_header_off;
 static uint32_t ivt_offset;
 static uint32_t using_fit;
 
+#define ROM_V1 1
+#define ROM_V2 2
+
+static uint32_t rom_version = ROM_V1;
+
 #define CSF_SIZE 0x2000
 #define HDMI_IVT_ID 0
 #define IMAGE_IVT_ID 1
 
 #define HDMI_FW_SIZE		0x17000 /* Use Last 0x1000 for IVT and CSF */
 #define ALIGN_SIZE		0x1000
-#define ALIGN(x,a)	__ALIGN_MASK((x), (__typeof__(x))(a) - 1, a)
-#define __ALIGN_MASK(x,mask,mask2) (((x) + (mask)) / (mask2) * (mask2))
 
 static uint32_t get_cfg_value(char *token, char *name,  int linenr)
 {
@@ -71,6 +74,7 @@ static table_entry_t imx8mimage_cmds[] = {
 	{CMD_LOADER,            "LOADER",               "loader image",       },
 	{CMD_SECOND_LOADER,     "SECOND_LOADER",        "2nd loader image",   },
 	{CMD_DDR_FW,            "DDR_FW",               "ddr firmware",       },
+	{CMD_ROM_VERSION,       "ROM_VERSION",          "rom version",        },
 	{-1,                    "",                     "",	              },
 };
 
@@ -90,6 +94,9 @@ static void parse_cfg_cmd(int32_t cmd, char *token, char *name, int lineno)
 						token);
 		if (!strncmp(token, "sd", 2))
 			rom_image_offset = 0x8000;
+
+		if (rom_version == ROM_V2)
+			ivt_offset = 0;
 		break;
 	case CMD_LOADER:
 		ap_img = token;
@@ -99,12 +106,19 @@ static void parse_cfg_cmd(int32_t cmd, char *token, char *name, int lineno)
 		break;
 	case CMD_SIGNED_HDMI:
 		signed_hdmi = token;
-	case CMD_FIT:
-		using_fit = 1;
 		break;
 	case CMD_DDR_FW:
 		/* Do nothing */
 		break;
+	case CMD_ROM_VERSION:
+		if (!strncmp(token, "v2", 2)) {
+			rom_version = ROM_V2;
+			ivt_offset = 0;
+		} else if (!strncmp(token, "v1", 2)) {
+			rom_version = ROM_V1;
+		}
+		break;
+
 	}
 }
 
@@ -119,6 +133,11 @@ static void parse_cfg_fld(int32_t *cmd, char *token,
 			fprintf(stderr, "Error: %s[%d] - Invalid command" "(%s)\n",
 				name, lineno, token);
 			exit(EXIT_FAILURE);
+		}
+		switch (*cmd) {
+		case CMD_FIT:
+			using_fit = 1;
+			break;
 		}
 		break;
 	case CFG_REG_SIZE:
@@ -322,7 +341,6 @@ static int generate_ivt_for_fit(int fd, int fit_offset, uint32_t ep,
 	}
 
 	fit_size = fdt_totalsize(&image_header);
-	fit_size = (fit_size + 3) & ~3;
 
 	fit_size = ALIGN(fit_size, ALIGN_SIZE);
 
@@ -488,8 +506,10 @@ void build_image(int ofd)
 			 * Record the second bootloader relative offset in
 			 * image's IVT reserved1
 			 */
-			imx_header[IMAGE_IVT_ID].fhdr.reserved1 =
-				sld_header_off - header_image_off;
+			if (rom_version == ROM_V1) {
+				imx_header[IMAGE_IVT_ID].fhdr.reserved1 =
+					sld_header_off - header_image_off;
+			}
 			sld_fd = open(sld_img, O_RDONLY | O_BINARY);
 			if (sld_fd < 0) {
 				fprintf(stderr, "%s: Can't open: %s\n",

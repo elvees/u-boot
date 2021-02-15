@@ -12,9 +12,28 @@
 	chosen {
 		stdout-path = "serial0:115200n8";
 		u-boot,spl-boot-order = &emmc, &sdmmc;
-		tick-timer = "/timer@ff810000";
 	};
 
+	smbios {
+		compatible = "u-boot,sysinfo-smbios";
+
+		smbios {
+			system {
+				manufacturer = "rockchip";
+				product = "sheep_rk3368";
+			};
+
+			baseboard {
+				manufacturer = "rockchip";
+				product = "sheep_rk3368";
+			};
+
+			chassis {
+				manufacturer = "rockchip";
+				product = "sheep_rk3368";
+			};
+		};
+	};
 };
 
 &pinctrl {

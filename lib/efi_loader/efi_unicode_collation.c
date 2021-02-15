@@ -43,11 +43,6 @@ const efi_guid_t efi_guid_unicode_collation_protocol2 =
  * See the Unified Extensible Firmware Interface (UEFI) specification for
  * details.
  *
- * TODO:
- * The implementation does not follow the Unicode collation algorithm.
- * For ASCII characters it results in the same sort order as EDK2.
- * We could use table UNICODE_CAPITALIZATION_TABLE for better results.
- *
  * Return:	0: s1 == s2, > 0: s1 > s2, < 0: s1 < s2
  */
 static efi_intn_t EFIAPI efi_stri_coll(
@@ -174,8 +169,8 @@ static bool metai_match(const u16 *string, const u16 *pattern)
  *		       case-insenitively
  *
  * @this:	unicode collation protocol instance
- * @s:		string to compare
- * @p:		pattern string
+ * @string:	string to compare
+ * @pattern:	pattern string
  *
  * The pattern string may use these:
  *	- * matches >= 0 characters
@@ -204,7 +199,6 @@ static bool EFIAPI efi_metai_match(struct efi_unicode_collation_protocol *this,
  *
  * @this:	unicode collation protocol instance
  * @string:	string to convert
- * @p:		pattern string
  *
  * The conversion is done in place. As long as upper and lower letters use the
  * same number of words this does not pose a problem.
@@ -226,7 +220,6 @@ static void EFIAPI efi_str_lwr(struct efi_unicode_collation_protocol *this,
  *
  * @this:	unicode collation protocol instance
  * @string:	string to convert
- * @p:		pattern string
  *
  * The conversion is done in place. As long as upper and lower letters use the
  * same number of words this does not pose a problem.

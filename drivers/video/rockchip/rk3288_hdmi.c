@@ -9,6 +9,8 @@
 #include <dm.h>
 #include <dw_hdmi.h>
 #include <edid.h>
+#include <log.h>
+#include <malloc.h>
 #include <regmap.h>
 #include <syscon.h>
 #include <asm/gpio.h>
@@ -33,7 +35,7 @@ static int rk3288_hdmi_enable(struct udevice *dev, int panel_bpp,
 	/* hdmi data from vop id */
 	rk_clrsetreg(&grf->soc_con6, 1 << 4, (vop_id == 1) ? (1 << 4) : 0);
 
-	return 0;
+	return dw_hdmi_enable(&priv->hdmi, edid);
 }
 
 static int rk3288_hdmi_ofdata_to_platdata(struct udevice *dev)

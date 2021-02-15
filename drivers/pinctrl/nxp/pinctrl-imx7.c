@@ -9,7 +9,7 @@
 
 #include "pinctrl-imx.h"
 
-static struct imx_pinctrl_soc_info imx7_pinctrl_soc_info;
+static struct imx_pinctrl_soc_info imx7_pinctrl_soc_info __attribute__((section(".data")));
 
 static struct imx_pinctrl_soc_info imx7_lpsr_pinctrl_soc_info = {
 	.flags = ZERO_OFFSET_VALID,
@@ -37,7 +37,5 @@ U_BOOT_DRIVER(imx7_pinctrl) = {
 	.remove = imx_pinctrl_remove,
 	.priv_auto_alloc_size = sizeof(struct imx_pinctrl_priv),
 	.ops = &imx_pinctrl_ops,
-#if !CONFIG_IS_ENABLED(OF_CONTROL)
 	.flags = DM_FLAG_PRE_RELOC,
-#endif
 };

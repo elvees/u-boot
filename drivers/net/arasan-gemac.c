@@ -14,6 +14,8 @@
 #include <net.h>
 #include <phy.h>
 #include <reset.h>
+#include <linux/delay.h>
+#include <cpu_func.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 

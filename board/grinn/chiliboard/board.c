@@ -5,6 +5,8 @@
  */
 
 #include <common.h>
+#include <init.h>
+#include <net.h>
 #include <asm/arch/chilisom.h>
 #include <asm/arch/cpu.h>
 #include <asm/arch/hardware.h>
@@ -16,7 +18,7 @@
 #include <asm/emif.h>
 #include <asm/io.h>
 #include <cpsw.h>
-#include <environment.h>
+#include <env.h>
 #include <errno.h>
 #include <miiphy.h>
 #include <spl.h>

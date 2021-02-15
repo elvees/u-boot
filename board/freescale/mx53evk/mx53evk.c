@@ -4,6 +4,7 @@
  */
 
 #include <common.h>
+#include <init.h>
 #include <asm/io.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/sys_proto.h>
@@ -15,7 +16,7 @@
 #include <netdev.h>
 #include <i2c.h>
 #include <mmc.h>
-#include <fsl_esdhc.h>
+#include <fsl_esdhc_imx.h>
 #include <power/pmic.h>
 #include <fsl_pmic.h>
 #include <asm/gpio.h>
@@ -137,7 +138,7 @@ static void setup_iomux_fec(void)
 	imx_iomux_v3_setup_multiple_pads(fec_pads, ARRAY_SIZE(fec_pads));
 }
 
-#ifdef CONFIG_FSL_ESDHC
+#ifdef CONFIG_FSL_ESDHC_IMX
 struct fsl_esdhc_cfg esdhc_cfg[2] = {
 	{MMC_SDHC1_BASE_ADDR},
 	{MMC_SDHC3_BASE_ADDR},
@@ -166,7 +167,7 @@ int board_mmc_getcd(struct mmc *mmc)
 #define SD_PAD_CTRL		(PAD_CTL_HYS | PAD_CTL_PUS_47K_UP | \
 				 PAD_CTL_DSE_HIGH)
 
-int board_mmc_init(bd_t *bis)
+int board_mmc_init(struct bd_info *bis)
 {
 	static const iomux_v3_cfg_t sd1_pads[] = {
 		NEW_PAD_CTRL(MX53_PAD_SD1_CMD__ESDHC1_CMD, SD_CMD_PAD_CTRL),

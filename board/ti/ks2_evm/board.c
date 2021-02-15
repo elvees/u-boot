@@ -8,6 +8,10 @@
 
 #include <common.h>
 #include "board.h"
+#include <env.h>
+#include <hang.h>
+#include <image.h>
+#include <init.h>
 #include <spl.h>
 #include <exports.h>
 #include <fdt_support.h>
@@ -66,20 +70,7 @@ struct image_header *spl_get_load_buffer(ssize_t offset, size_t size)
 
 int board_init(void)
 {
-#if CONFIG_IS_ENABLED(DM_USB)
-	int rc = psc_enable_module(KS2_LPSC_USB);
-
-	if (rc)
-		puts("Cannot enable USB0 module");
-#ifdef KS2_LPSC_USB_1
-	rc = psc_enable_module(KS2_LPSC_USB_1);
-	if (rc)
-		puts("Cannot enable USB1 module");
-#endif
-#endif
-
 	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
-
 	return 0;
 }
 
@@ -102,7 +93,7 @@ u32 spl_boot_device(void)
 #endif
 
 #ifdef CONFIG_OF_BOARD_SETUP
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	int lpae;
 	char *env;
@@ -154,7 +145,7 @@ int ft_board_setup(void *blob, bd_t *bd)
 	return 0;
 }
 
-void ft_board_setup_ex(void *blob, bd_t *bd)
+void ft_board_setup_ex(void *blob, struct bd_info *bd)
 {
 	int lpae;
 	u64 size;

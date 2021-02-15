@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
+ * Copyright 2019 NXP
  * Copyright 2013 Freescale Semiconductor, Inc.
  */
 
@@ -7,9 +8,12 @@
 #include <clk.h>
 #include <dm.h>
 #include <fsl_lpuart.h>
+#include <log.h>
 #include <watchdog.h>
 #include <asm/io.h>
 #include <serial.h>
+#include <dm/device_compat.h>
+#include <linux/bitops.h>
 #include <linux/compiler.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/clock.h>
@@ -48,7 +52,7 @@
 #define FIFO_RXSIZE_MASK	0x7
 #define FIFO_RXSIZE_OFF	0
 #define FIFO_TXFE		0x80
-#ifdef CONFIG_ARCH_IMX8
+#if defined(CONFIG_ARCH_IMX8) || defined(CONFIG_ARCH_IMXRT)
 #define FIFO_RXFE		0x08
 #else
 #define FIFO_RXFE		0x40
@@ -66,7 +70,8 @@ enum lpuart_devtype {
 	DEV_VF610 = 1,
 	DEV_LS1021A,
 	DEV_MX7ULP,
-	DEV_IMX8
+	DEV_IMX8,
+	DEV_IMXRT,
 };
 
 struct lpuart_serial_platdata {
@@ -105,7 +110,7 @@ u32 __weak get_lpuart_clk(void)
 	return CONFIG_SYS_CLK_FREQ;
 }
 
-#if IS_ENABLED(CONFIG_CLK)
+#if CONFIG_IS_ENABLED(CLK)
 static int get_lpuart_clk_rate(struct udevice *dev, u32 *clk)
 {
 	struct clk per_clk;
@@ -147,7 +152,7 @@ static void _lpuart_serial_setbrg(struct udevice *dev,
 	u16 sbr;
 	int ret;
 
-	if (IS_ENABLED(CONFIG_CLK)) {
+	if (CONFIG_IS_ENABLED(CLK)) {
 		ret = get_lpuart_clk_rate(dev, &clk);
 		if (ret)
 			return;
@@ -236,7 +241,7 @@ static void _lpuart32_serial_setbrg_7ulp(struct udevice *dev,
 	u32 clk;
 	int ret;
 
-	if (IS_ENABLED(CONFIG_CLK)) {
+	if (CONFIG_IS_ENABLED(CLK)) {
 		ret = get_lpuart_clk_rate(dev, &clk);
 		if (ret)
 			return;
@@ -305,7 +310,7 @@ static void _lpuart32_serial_setbrg(struct udevice *dev,
 	u32 sbr;
 	int ret;
 
-	if (IS_ENABLED(CONFIG_CLK)) {
+	if (CONFIG_IS_ENABLED(CLK)) {
 		ret = get_lpuart_clk_rate(dev, &clk);
 		if (ret)
 			return;
@@ -408,7 +413,8 @@ static int _lpuart32_serial_init(struct udevice *dev)
 
 	lpuart_write32(plat->flags, &base->match, 0);
 
-	if (plat->devtype == DEV_MX7ULP || plat->devtype == DEV_IMX8) {
+	if (plat->devtype == DEV_MX7ULP || plat->devtype == DEV_IMX8 ||
+	    plat->devtype == DEV_IMXRT) {
 		_lpuart32_serial_setbrg_7ulp(dev, gd->baudrate);
 	} else {
 		/* provide data bits, parity, stop bit, etc */
@@ -425,7 +431,8 @@ static int lpuart_serial_setbrg(struct udevice *dev, int baudrate)
 	struct lpuart_serial_platdata *plat = dev_get_platdata(dev);
 
 	if (is_lpuart32(dev)) {
-		if (plat->devtype == DEV_MX7ULP || plat->devtype == DEV_IMX8)
+		if (plat->devtype == DEV_MX7ULP || plat->devtype == DEV_IMX8 ||
+		    plat->devtype == DEV_IMXRT)
 			_lpuart32_serial_setbrg_7ulp(dev, baudrate);
 		else
 			_lpuart32_serial_setbrg(dev, baudrate);
@@ -482,6 +489,22 @@ static int lpuart_serial_pending(struct udevice *dev, bool input)
 
 static int lpuart_serial_probe(struct udevice *dev)
 {
+#if CONFIG_IS_ENABLED(CLK)
+	struct clk per_clk;
+	int ret;
+
+	ret = clk_get_by_name(dev, "per", &per_clk);
+	if (!ret) {
+		ret = clk_enable(&per_clk);
+		if (ret) {
+			dev_err(dev, "Failed to get per clk: %d\n", ret);
+			return ret;
+		}
+	} else {
+		debug("%s: Failed to get per clk: %d\n", __func__, ret);
+	}
+#endif
+
 	if (is_lpuart32(dev))
 		return _lpuart32_serial_init(dev);
 	else
@@ -495,12 +518,15 @@ static int lpuart_serial_ofdata_to_platdata(struct udevice *dev)
 	int node = dev_of_offset(dev);
 	fdt_addr_t addr;
 
-	addr = devfdt_get_addr(dev);
+	addr = dev_read_addr(dev);
 	if (addr == FDT_ADDR_T_NONE)
 		return -EINVAL;
 
 	plat->reg = (void *)addr;
 	plat->flags = dev_get_driver_data(dev);
+
+	if (fdtdec_get_bool(blob, node, "little-endian"))
+		plat->flags &= ~LPUART_FLAG_REGMAP_ENDIAN_BIG;
 
 	if (!fdt_node_check_compatible(blob, node, "fsl,ls1021a-lpuart"))
 		plat->devtype = DEV_LS1021A;
@@ -510,6 +536,8 @@ static int lpuart_serial_ofdata_to_platdata(struct udevice *dev)
 		plat->devtype = DEV_VF610;
 	else if (!fdt_node_check_compatible(blob, node, "fsl,imx8qm-lpuart"))
 		plat->devtype = DEV_IMX8;
+	else if (!fdt_node_check_compatible(blob, node, "fsl,imxrt-lpuart"))
+		plat->devtype = DEV_IMXRT;
 
 	return 0;
 }
@@ -528,6 +556,8 @@ static const struct udevice_id lpuart_serial_ids[] = {
 		.data = LPUART_FLAG_REGMAP_32BIT_REG },
 	{ .compatible = "fsl,vf610-lpuart"},
 	{ .compatible = "fsl,imx8qm-lpuart",
+		.data = LPUART_FLAG_REGMAP_32BIT_REG },
+	{ .compatible = "fsl,imxrt-lpuart",
 		.data = LPUART_FLAG_REGMAP_32BIT_REG },
 	{ }
 };

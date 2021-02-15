@@ -8,6 +8,8 @@
 
 #include <common.h>
 #include <dm.h>
+#include <init.h>
+#include <malloc.h>
 #include <asm/io.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/sys_proto.h>
@@ -18,10 +20,13 @@
 #include <asm/mach-imx/video.h>
 #include <asm/gpio.h>
 #include <asm/spl.h>
+#include <env.h>
 #include <fdt_support.h>
-#include <fsl_esdhc.h>
+#include <fsl_esdhc_imx.h>
+#include <gzip.h>
 #include <i2c.h>
 #include <ipu_pixfmt.h>
+#include <linux/bitops.h>
 #include <linux/errno.h>
 #include <linux/fb.h>
 #include <mmc.h>
@@ -125,6 +130,43 @@ static void setup_iomux_fec(void)
 	imx_iomux_v3_setup_multiple_pads(fec_pads, ARRAY_SIZE(fec_pads));
 }
 
+#ifdef CONFIG_FSL_ESDHC_IMX
+struct fsl_esdhc_cfg esdhc_cfg = {
+	MMC_SDHC1_BASE_ADDR,
+};
+
+int board_mmc_getcd(struct mmc *mmc)
+{
+	imx_iomux_v3_setup_pad(MX53_PAD_GPIO_1__GPIO1_1);
+	gpio_direction_input(IMX_GPIO_NR(1, 1));
+
+	return !gpio_get_value(IMX_GPIO_NR(1, 1));
+}
+
+#define SD_CMD_PAD_CTRL		(PAD_CTL_HYS | PAD_CTL_DSE_HIGH | \
+				 PAD_CTL_PUS_100K_UP)
+#define SD_PAD_CTRL		(PAD_CTL_HYS | PAD_CTL_PUS_47K_UP | \
+				 PAD_CTL_DSE_HIGH)
+
+int board_mmc_init(struct bd_info *bis)
+{
+	static const iomux_v3_cfg_t sd1_pads[] = {
+		NEW_PAD_CTRL(MX53_PAD_SD1_CMD__ESDHC1_CMD, SD_CMD_PAD_CTRL),
+		NEW_PAD_CTRL(MX53_PAD_SD1_CLK__ESDHC1_CLK, SD_PAD_CTRL),
+		NEW_PAD_CTRL(MX53_PAD_SD1_DATA0__ESDHC1_DAT0, SD_PAD_CTRL),
+		NEW_PAD_CTRL(MX53_PAD_SD1_DATA1__ESDHC1_DAT1, SD_PAD_CTRL),
+		NEW_PAD_CTRL(MX53_PAD_SD1_DATA2__ESDHC1_DAT2, SD_PAD_CTRL),
+		NEW_PAD_CTRL(MX53_PAD_SD1_DATA3__ESDHC1_DAT3, SD_PAD_CTRL),
+	};
+
+	esdhc_cfg.sdhc_clk = mxc_get_clock(MXC_ESDHC_CLK);
+
+	imx_iomux_v3_setup_multiple_pads(sd1_pads, ARRAY_SIZE(sd1_pads));
+
+	return fsl_esdhc_initialize(bis, &esdhc_cfg);
+}
+#endif
+
 static void enable_lvds_clock(struct display_info_t const *dev, const u8 hclk)
 {
 	static struct mxc_ccm_reg *mxc_ccm = (struct mxc_ccm_reg *)MXC_CCM_BASE;
@@ -215,7 +257,7 @@ void board_preboot_os(void)
 	gpio_direction_output(IMX_GPIO_NR(6, 0), 0);
 }
 
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	if (lvds_compat_string)
 		do_fixup_by_path_string(blob, "/panel", "compatible",
@@ -311,24 +353,28 @@ int board_late_init(void)
 
 	ret = splash_screen_prepare();
 	if (ret < 0)
-		return ret;
+		goto splasherr;
 
 	len = CONFIG_SYS_VIDEO_LOGO_MAX_SIZE;
 	ret = gunzip(dst + 2, CONFIG_SYS_VIDEO_LOGO_MAX_SIZE - 2,
 		     (uchar *)addr, &len);
 	if (ret) {
 		printf("Error: no valid bmp or bmp.gz image at %lx\n", addr);
-		free(dst);
-		return ret;
+		goto splasherr;
 	}
 
 	ret = uclass_get_device(UCLASS_VIDEO, 0, &dev);
 	if (ret)
-		return ret;
+		goto splasherr;
 
 	ret = video_bmp_display(dev, (ulong)dst + 2, xpos, ypos, true);
 	if (ret)
-		return ret;
+		goto splasherr;
+
+	return 0;
+
+splasherr:
+	free(dst);
 #endif
 	return 0;
 }

@@ -4,6 +4,7 @@
  */
 
 #include "mkimage.h"
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <image.h>
@@ -134,12 +135,26 @@ static int rsa_engine_get_pub_key(const char *keydir, const char *name,
 
 	if (engine_id && !strcmp(engine_id, "pkcs11")) {
 		if (keydir)
-			snprintf(key_id, sizeof(key_id),
-				 "pkcs11:%s;object=%s;type=public",
-				 keydir, name);
+			if (strstr(keydir, "object="))
+				snprintf(key_id, sizeof(key_id),
+					 "pkcs11:%s;type=public",
+					 keydir);
+			else
+				snprintf(key_id, sizeof(key_id),
+					 "pkcs11:%s;object=%s;type=public",
+					 keydir, name);
 		else
 			snprintf(key_id, sizeof(key_id),
 				 "pkcs11:object=%s;type=public",
+				 name);
+	} else if (engine_id) {
+		if (keydir)
+			snprintf(key_id, sizeof(key_id),
+				 "%s%s",
+				 keydir, name);
+		else
+			snprintf(key_id, sizeof(key_id),
+				 "%s",
 				 name);
 	} else {
 		fprintf(stderr, "Engine not supported\n");
@@ -245,12 +260,26 @@ static int rsa_engine_get_priv_key(const char *keydir, const char *name,
 
 	if (engine_id && !strcmp(engine_id, "pkcs11")) {
 		if (keydir)
-			snprintf(key_id, sizeof(key_id),
-				 "pkcs11:%s;object=%s;type=private",
-				 keydir, name);
+			if (strstr(keydir, "object="))
+				snprintf(key_id, sizeof(key_id),
+					 "pkcs11:%s;type=private",
+					 keydir);
+			else
+				snprintf(key_id, sizeof(key_id),
+					 "pkcs11:%s;object=%s;type=private",
+					 keydir, name);
 		else
 			snprintf(key_id, sizeof(key_id),
 				 "pkcs11:object=%s;type=private",
+				 name);
+	} else if (engine_id) {
+		if (keydir)
+			snprintf(key_id, sizeof(key_id),
+				 "%s%s",
+				 keydir, name);
+		else
+			snprintf(key_id, sizeof(key_id),
+				 "%s",
 				 name);
 	} else {
 		fprintf(stderr, "Engine not supported\n");
@@ -679,7 +708,7 @@ static int fdt_add_bignum(void *blob, int noffset, const char *prop_name,
 		return -ENOMEM;
 	}
 	ctx = BN_CTX_new();
-	if (!tmp) {
+	if (!ctx) {
 		fprintf(stderr, "Out of memory (bignum context)\n");
 		return -ENOMEM;
 	}
@@ -773,8 +802,8 @@ int rsa_add_verify_data(struct image_sign_info *info, void *keydest)
 	}
 
 	if (!ret) {
-		ret = fdt_setprop_string(keydest, node, "key-name-hint",
-				 info->keyname);
+		ret = fdt_setprop_string(keydest, node, FIT_KEY_HINT,
+					 info->keyname);
 	}
 	if (!ret)
 		ret = fdt_setprop_u32(keydest, node, "rsa,num-bits", bits);
@@ -796,7 +825,7 @@ int rsa_add_verify_data(struct image_sign_info *info, void *keydest)
 					 info->name);
 	}
 	if (!ret && info->require_keys) {
-		ret = fdt_setprop_string(keydest, node, "required",
+		ret = fdt_setprop_string(keydest, node, FIT_KEY_REQUIRED,
 					 info->require_keys);
 	}
 done:

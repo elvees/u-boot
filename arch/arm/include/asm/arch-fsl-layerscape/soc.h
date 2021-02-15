@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * Copyright 2017 NXP
+ * Copyright 2017-2020 NXP
  * Copyright 2015 Freescale Semiconductor
  */
 
@@ -83,6 +83,9 @@ enum boot_src get_boot_src(void);
 /* LS1043A/LS1023A 23x23 package silicon has different value of VAR_PER */
 #define SVR_LS1043A_P23		0x879202
 #define SVR_LS1023A_P23		0x87920A
+#define SVR_LS1017A		0x870B24
+#define SVR_LS1018A		0x870B20
+#define SVR_LS1027A		0x870B04
 #define SVR_LS1028A		0x870B00
 #define SVR_LS1046A		0x870700
 #define SVR_LS1026A		0x870708
@@ -100,17 +103,23 @@ enum boot_src get_boot_src(void);
 #define SVR_LS2044A		0x870930
 #define SVR_LS2081A		0x870918
 #define SVR_LS2041A		0x870914
-#define SVR_LX2160A		0x873601
-#define SVR_LX2120A		0x873621
-#define SVR_LX2080A		0x873603
+#define SVR_LX2160A		0x873600
+#define SVR_LX2120A		0x873620
+#define SVR_LX2080A		0x873602
+#define SVR_LX2162A		0x873608
+#define SVR_LX2122A		0x873628
+#define SVR_LX2082A		0x87360A
 
 #define SVR_MAJ(svr)		(((svr) >> 4) & 0xf)
 #define SVR_MIN(svr)		(((svr) >> 0) & 0xf)
 #define SVR_REV(svr)		(((svr) >> 0) & 0xff)
 #define SVR_SOC_VER(svr)	(((svr) >> 8) & SVR_WO_E)
 #define IS_E_PROCESSOR(svr)	(!((svr >> 8) & 0x1))
-#ifdef CONFIG_ARCH_LX2160A
+#if defined(CONFIG_ARCH_LX2160A) || defined(CONFIG_ARCH_LX2162A)
 #define IS_C_PROCESSOR(svr)	(!((svr >> 12) & 0x1))
+#endif
+#ifdef CONFIG_ARCH_LS1028A
+#define IS_MULTIMEDIA_EN(svr)	(!((svr >> 10) & 0x1))
 #endif
 #define IS_SVR_REV(svr, maj, min) \
 		((SVR_MAJ(svr) == (maj)) && (SVR_MIN(svr) == (min)))
@@ -134,6 +143,13 @@ void init_pfe_scfg_dcfg_regs(void);
 int qspi_ahb_init(void);
 #endif
 
+#ifdef CONFIG_FSPI_AHB_EN_4BYTE
+#define SYS_NXP_FSPI_LUTCR_LOCK			0x00000001
+#define SYS_NXP_FSPI_LUTCR_UNLOCK		0x00000002
+#define SYS_NXP_FSPI_LUTKEY			0x5AF05AF0
+int fspi_ahb_init(void);
+#endif
+
 void cpu_name(char *name);
 #ifdef CONFIG_SYS_FSL_ERRATUM_A009635
 void erratum_a009635(void);
@@ -145,6 +161,10 @@ void erratum_a010315(void);
 
 bool soc_has_dp_ddr(void);
 bool soc_has_aiop(void);
+
+#ifdef CONFIG_GIC_V3_ITS
+int ls_gic_rd_tables_init(void *blob);
+#endif
 #endif
 
 #endif /* _ASM_ARMV8_FSL_LAYERSCAPE_SOC_H_ */

@@ -6,6 +6,9 @@
  */
 
 #include <common.h>
+#include <init.h>
+#include <log.h>
+#include <net.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/crm_regs.h>
 #include <asm/arch/iomux.h>
@@ -21,17 +24,19 @@
 #include <asm/setup.h>
 #include <dm.h>
 #include <dm/platform_data/serial_mxc.h>
-#include <environment.h>
+#include <env.h>
 #include <hwconfig.h>
 #include <i2c.h>
 #include <fdt_support.h>
-#include <fsl_esdhc.h>
+#include <fsl_esdhc_imx.h>
 #include <jffs2/load_kernel.h>
 #include <linux/ctype.h>
 #include <miiphy.h>
 #include <mtd_node.h>
 #include <netdev.h>
 #include <pci.h>
+#include <linux/delay.h>
+#include <linux/libfdt.h>
 #include <power/pmic.h>
 #include <power/ltc3676_pmic.h>
 #include <power/pfuze100_pmic.h>
@@ -278,7 +283,7 @@ int mv88e61xx_hw_reset(struct phy_device *phydev)
 }
 #endif // CONFIG_MV88E61XX_SWITCH
 
-int board_eth_init(bd_t *bis)
+int board_eth_init(struct bd_info *bis)
 {
 #ifdef CONFIG_FEC_MXC
 	struct ventana_board_info *info = &ventana_info;
@@ -1062,7 +1067,7 @@ int fdt_fixup_sky2(void *blob, int np, struct pci_dev *dev)
  * we will walk the PCI bus and add bridge nodes up to the device receiving
  * the fixup.
  */
-void ft_board_pci_fixup(void *blob, bd_t *bd)
+void ft_board_pci_fixup(void *blob, struct bd_info *bd)
 {
 	int i, np;
 	struct pci_dev *dev;
@@ -1120,7 +1125,7 @@ void ft_board_wdog_fixup(void *blob, phys_addr_t addr)
 #define GPIO3_ADDR	0x20a4000
 #define USDHC3_ADDR	0x2198000
 #define PWM0_ADDR	0x2080000
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	struct ventana_board_info *info = &ventana_info;
 	struct ventana_eeprom_config *cfg;

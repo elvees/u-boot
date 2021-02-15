@@ -7,7 +7,10 @@
  */
 
 #include <common.h>
+#include <env.h>
+#include <log.h>
 #include <mapmem.h>
+#include <net.h>
 #include <stdio_dev.h>
 #include <linux/ctype.h>
 #include <linux/types.h>
@@ -466,6 +469,41 @@ int fdt_fixup_memory_banks(void *blob, u64 start[], u64 size[], int banks)
 	}
 	return 0;
 }
+
+int fdt_set_usable_memory(void *blob, u64 start[], u64 size[], int areas)
+{
+	int err, nodeoffset;
+	int len;
+	u8 tmp[8 * 16]; /* Up to 64-bit address + 64-bit size */
+
+	if (areas > 8) {
+		printf("%s: num areas %d exceeds hardcoded limit %d\n",
+		       __func__, areas, 8);
+		return -1;
+	}
+
+	err = fdt_check_header(blob);
+	if (err < 0) {
+		printf("%s: %s\n", __func__, fdt_strerror(err));
+		return err;
+	}
+
+	/* find or create "/memory" node. */
+	nodeoffset = fdt_find_or_add_subnode(blob, 0, "memory");
+	if (nodeoffset < 0)
+		return nodeoffset;
+
+	len = fdt_pack_reg(blob, tmp, start, size, areas);
+
+	err = fdt_setprop(blob, nodeoffset, "linux,usable-memory", tmp, len);
+	if (err < 0) {
+		printf("WARNING: could not set %s %s.\n",
+		       "reg", fdt_strerror(err));
+		return err;
+	}
+
+	return 0;
+}
 #endif
 
 int fdt_fixup_memory(void *blob, u64 start, u64 size)
@@ -573,14 +611,9 @@ int fdt_record_loadable(void *blob, u32 index, const char *name,
 	if (node < 0)
 		return node;
 
-	/*
-	 * We record these as 32bit entities, possibly truncating addresses.
-	 * However, spl_fit.c is not 64bit safe either: i.e. we should not
-	 * have an issue here.
-	 */
-	fdt_setprop_u32(blob, node, "load-addr", load_addr);
+	fdt_setprop_u64(blob, node, "load", load_addr);
 	if (entry_point != -1)
-		fdt_setprop_u32(blob, node, "entry-point", entry_point);
+		fdt_setprop_u64(blob, node, "entry", entry_point);
 	fdt_setprop_u32(blob, node, "size", size);
 	if (type)
 		fdt_setprop_string(blob, node, "type", type);
@@ -671,30 +704,33 @@ int fdt_pci_dma_ranges(void *blob, int phb_off, struct pci_controller *hose) {
 
 		dma_range[0] = 0;
 		if (size >= 0x100000000ull)
-			dma_range[0] |= FDT_PCI_MEM64;
+			dma_range[0] |= cpu_to_fdt32(FDT_PCI_MEM64);
 		else
-			dma_range[0] |= FDT_PCI_MEM32;
+			dma_range[0] |= cpu_to_fdt32(FDT_PCI_MEM32);
 		if (hose->regions[r].flags & PCI_REGION_PREFETCH)
-			dma_range[0] |= FDT_PCI_PREFETCH;
+			dma_range[0] |= cpu_to_fdt32(FDT_PCI_PREFETCH);
 #ifdef CONFIG_SYS_PCI_64BIT
-		dma_range[1] = bus_start >> 32;
+		dma_range[1] = cpu_to_fdt32(bus_start >> 32);
 #else
 		dma_range[1] = 0;
 #endif
-		dma_range[2] = bus_start & 0xffffffff;
+		dma_range[2] = cpu_to_fdt32(bus_start & 0xffffffff);
 
 		if (addrcell == 2) {
-			dma_range[3] = phys_start >> 32;
-			dma_range[4] = phys_start & 0xffffffff;
+			dma_range[3] = cpu_to_fdt32(phys_start >> 32);
+			dma_range[4] = cpu_to_fdt32(phys_start & 0xffffffff);
 		} else {
-			dma_range[3] = phys_start & 0xffffffff;
+			dma_range[3] = cpu_to_fdt32(phys_start & 0xffffffff);
 		}
 
 		if (sizecell == 2) {
-			dma_range[3 + addrcell + 0] = size >> 32;
-			dma_range[3 + addrcell + 1] = size & 0xffffffff;
+			dma_range[3 + addrcell + 0] =
+				cpu_to_fdt32(size >> 32);
+			dma_range[3 + addrcell + 1] =
+				cpu_to_fdt32(size & 0xffffffff);
 		} else {
-			dma_range[3 + addrcell + 0] = size & 0xffffffff;
+			dma_range[3 + addrcell + 0] =
+				cpu_to_fdt32(size & 0xffffffff);
 		}
 
 		dma_range += (3 + addrcell + sizecell);
@@ -775,8 +811,8 @@ static int fdt_del_partitions(void *blob, int parent_offset)
 	return 0;
 }
 
-int fdt_node_set_part_info(void *blob, int parent_offset,
-			   struct mtd_device *dev)
+static int fdt_node_set_part_info(void *blob, int parent_offset,
+				  struct mtd_device *dev)
 {
 	struct list_head *pentry;
 	struct part_info *part;
@@ -910,27 +946,35 @@ void fdt_fixup_mtdparts(void *blob, const struct node_info *node_info,
 	struct mtd_device *dev;
 	int i, idx;
 	int noff;
-
-	if (mtdparts_init() != 0)
-		return;
+	bool inited = false;
 
 	for (i = 0; i < node_info_size; i++) {
 		idx = 0;
-		noff = fdt_node_offset_by_compatible(blob, -1,
-						     node_info[i].compat);
-		while (noff != -FDT_ERR_NOTFOUND) {
+		noff = -1;
+
+		while ((noff = fdt_node_offset_by_compatible(blob, noff,
+						node_info[i].compat)) >= 0) {
+			const char *prop;
+
+			prop = fdt_getprop(blob, noff, "status", NULL);
+			if (prop && !strcmp(prop, "disabled"))
+				continue;
+
 			debug("%s: %s, mtd dev type %d\n",
 				fdt_get_name(blob, noff, 0),
 				node_info[i].compat, node_info[i].type);
+
+			if (!inited) {
+				if (mtdparts_init() != 0)
+					return;
+				inited = true;
+			}
+
 			dev = device_find(node_info[i].type, idx++);
 			if (dev) {
 				if (fdt_node_set_part_info(blob, noff, dev))
 					return; /* return on error */
 			}
-
-			/* Jump to next flash node */
-			noff = fdt_node_offset_by_compatible(blob, noff,
-							     node_info[i].compat);
 		}
 	}
 }
@@ -1292,6 +1336,12 @@ u64 fdt_translate_address(const void *blob, int node_offset,
 	return __of_translate_address(blob, node_offset, in_addr, "ranges");
 }
 
+u64 fdt_translate_dma_address(const void *blob, int node_offset,
+			      const fdt32_t *in_addr)
+{
+	return __of_translate_address(blob, node_offset, in_addr, "dma-ranges");
+}
+
 /**
  * fdt_node_offset_by_compat_reg: Find a node that matches compatiable and
  * who's reg property matches a physical cpu address
@@ -1546,7 +1596,7 @@ u64 fdt_get_base_address(const void *fdt, int node)
 
 	prop = fdt_getprop(fdt, node, "reg", &size);
 
-	return prop ? fdt_translate_address(fdt, node, prop) : 0;
+	return prop ? fdt_translate_address(fdt, node, prop) : OF_BAD_ADDR;
 }
 
 /*
@@ -1556,7 +1606,7 @@ static int fdt_read_prop(const fdt32_t *prop, int prop_len, int cell_off,
 			 uint64_t *val, int cells)
 {
 	const fdt32_t *prop32 = &prop[cell_off];
-	const fdt64_t *prop64 = (const fdt64_t *)&prop[cell_off];
+	const unaligned_fdt64_t *prop64 = (const fdt64_t *)&prop[cell_off];
 
 	if ((cell_off + cells) > prop_len)
 		return -FDT_ERR_NOSPACE;

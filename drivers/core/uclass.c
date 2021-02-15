@@ -6,9 +6,12 @@
  * Pavel Herrmann <morpheus.ibis@gmail.com>
  */
 
+#define LOG_CATEGORY LOGC_DM
+
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
+#include <log.h>
 #include <malloc.h>
 #include <dm/device.h>
 #include <dm/device-internal.h>
@@ -116,12 +119,12 @@ int uclass_destroy(struct uclass *uc)
 	while (!list_empty(&uc->dev_head)) {
 		dev = list_first_entry(&uc->dev_head, struct udevice,
 				       uclass_node);
-		ret = device_remove(dev, DM_REMOVE_NORMAL);
+		ret = device_remove(dev, DM_REMOVE_NORMAL | DM_REMOVE_NO_PD);
 		if (ret)
-			return ret;
+			return log_msg_ret("remove", ret);
 		ret = device_unbind(dev);
 		if (ret)
-			return ret;
+			return log_msg_ret("unbind", ret);
 	}
 
 	uc_drv = uc->uc_drv;
@@ -225,7 +228,7 @@ int uclass_find_first_device(enum uclass_id id, struct udevice **devp)
 	if (ret)
 		return ret;
 	if (list_empty(&uc->dev_head))
-		return -ENODEV;
+		return 0;
 
 	*devp = list_first_entry(&uc->dev_head, struct udevice, uclass_node);
 
@@ -260,7 +263,7 @@ int uclass_find_device_by_name(enum uclass_id id, const char *name,
 		return ret;
 
 	uclass_foreach_dev(dev, uc) {
-		if (!strncmp(dev->name, name, strlen(name))) {
+		if (!strcmp(dev->name, name)) {
 			*devp = dev;
 			return 0;
 		}
@@ -269,7 +272,6 @@ int uclass_find_device_by_name(enum uclass_id id, const char *name,
 	return -ENODEV;
 }
 
-#if !CONFIG_IS_ENABLED(OF_CONTROL) || CONFIG_IS_ENABLED(OF_PLATDATA)
 int uclass_find_next_free_req_seq(enum uclass_id id)
 {
 	struct uclass *uc;
@@ -291,7 +293,6 @@ int uclass_find_next_free_req_seq(enum uclass_id id)
 
 	return max + 1;
 }
-#endif
 
 int uclass_find_device_by_seq(enum uclass_id id, int seq_or_req_seq,
 			      bool find_req_seq, struct udevice **devp)
@@ -301,7 +302,7 @@ int uclass_find_device_by_seq(enum uclass_id id, int seq_or_req_seq,
 	int ret;
 
 	*devp = NULL;
-	debug("%s: %d %d\n", __func__, find_req_seq, seq_or_req_seq);
+	log_debug("%d %d\n", find_req_seq, seq_or_req_seq);
 	if (seq_or_req_seq == -1)
 		return -ENODEV;
 	ret = uclass_get(id, &uc);
@@ -309,15 +310,16 @@ int uclass_find_device_by_seq(enum uclass_id id, int seq_or_req_seq,
 		return ret;
 
 	uclass_foreach_dev(dev, uc) {
-		debug("   - %d %d '%s'\n", dev->req_seq, dev->seq, dev->name);
+		log_debug("   - %d %d '%s'\n",
+			  dev->req_seq, dev->seq, dev->name);
 		if ((find_req_seq ? dev->req_seq : dev->seq) ==
 				seq_or_req_seq) {
 			*devp = dev;
-			debug("   - found\n");
+			log_debug("   - found\n");
 			return 0;
 		}
 	}
-	debug("   - not found\n");
+	log_debug("   - not found\n");
 
 	return -ENODEV;
 }
@@ -624,6 +626,23 @@ int uclass_next_device_check(struct udevice **devp)
 	return device_probe(*devp);
 }
 
+int uclass_first_device_drvdata(enum uclass_id id, ulong driver_data,
+				struct udevice **devp)
+{
+	struct udevice *dev;
+	struct uclass *uc;
+
+	uclass_id_foreach_dev(id, dev, uc) {
+		if (dev_get_driver_data(dev) == driver_data) {
+			*devp = dev;
+
+			return device_probe(dev);
+		}
+	}
+
+	return -ENODEV;
+}
+
 int uclass_bind_device(struct udevice *dev)
 {
 	struct uclass *uc;
@@ -670,13 +689,14 @@ int uclass_unbind_device(struct udevice *dev)
 
 int uclass_resolve_seq(struct udevice *dev)
 {
+	struct uclass *uc = dev->uclass;
+	struct uclass_driver *uc_drv = uc->uc_drv;
 	struct udevice *dup;
-	int seq;
+	int seq = 0;
 	int ret;
 
 	assert(dev->seq == -1);
-	ret = uclass_find_device_by_seq(dev->uclass->uc_drv->id, dev->req_seq,
-					false, &dup);
+	ret = uclass_find_device_by_seq(uc_drv->id, dev->req_seq, false, &dup);
 	if (!ret) {
 		dm_warn("Device '%s': seq %d is in use by '%s'\n",
 			dev->name, dev->req_seq, dup->name);
@@ -688,9 +708,17 @@ int uclass_resolve_seq(struct udevice *dev)
 		return ret;
 	}
 
-	for (seq = 0; seq < DM_MAX_SEQ; seq++) {
-		ret = uclass_find_device_by_seq(dev->uclass->uc_drv->id, seq,
-						false, &dup);
+	if (CONFIG_IS_ENABLED(OF_CONTROL) && CONFIG_IS_ENABLED(DM_SEQ_ALIAS) &&
+	    (uc_drv->flags & DM_UC_FLAG_SEQ_ALIAS)) {
+		/*
+		 * dev_read_alias_highest_id() will return -1 if there no
+		 * alias. Thus we can always add one.
+		 */
+		seq = dev_read_alias_highest_id(uc_drv->name) + 1;
+	}
+
+	for (; seq < DM_MAX_SEQ; seq++) {
+		ret = uclass_find_device_by_seq(uc_drv->id, seq, false, &dup);
 		if (ret == -ENODEV)
 			break;
 		if (ret)
@@ -714,8 +742,11 @@ int uclass_pre_probe_device(struct udevice *dev)
 	if (!dev->parent)
 		return 0;
 	uc_drv = dev->parent->uclass->uc_drv;
-	if (uc_drv->child_pre_probe)
-		return uc_drv->child_pre_probe(dev);
+	if (uc_drv->child_pre_probe) {
+		ret = uc_drv->child_pre_probe(dev);
+		if (ret)
+			return ret;
+	}
 
 	return 0;
 }
@@ -735,8 +766,11 @@ int uclass_post_probe_device(struct udevice *dev)
 	}
 
 	uc_drv = dev->uclass->uc_drv;
-	if (uc_drv->post_probe)
-		return uc_drv->post_probe(dev);
+	if (uc_drv->post_probe) {
+		ret = uc_drv->post_probe(dev);
+		if (ret)
+			return ret;
+	}
 
 	return 0;
 }

@@ -4,8 +4,11 @@
  */
 
 #include <common.h>
+#include <init.h>
+#include <log.h>
 #include <asm/io.h>
 #include <asm/mach-types.h>
+#include <env.h>
 #include <mmc.h>
 #include <asm/kona-common/kona_sdhci.h>
 #include <asm/kona-common/clk.h>
@@ -73,7 +76,7 @@ int dram_init_banksize(void)
 /*
  * mmc_init - Initializes mmc
  */
-int board_mmc_init(bd_t *bis)
+int board_mmc_init(struct bd_info *bis)
 {
 	int ret = 0;
 

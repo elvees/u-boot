@@ -15,8 +15,12 @@
  */
 
 #include <common.h>
+#include <init.h>
+#include <log.h>
+#include <linux/delay.h>
 
 #include <command.h>
+#include <env.h>
 #include <errno.h>
 #include <asm/processor.h>
 #include <asm/io.h>

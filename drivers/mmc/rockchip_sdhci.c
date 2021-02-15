@@ -8,6 +8,7 @@
 #include <common.h>
 #include <dm.h>
 #include <dt-structs.h>
+#include <linux/err.h>
 #include <linux/libfdt.h>
 #include <malloc.h>
 #include <mapmem.h>
@@ -45,7 +46,7 @@ static int arasan_sdhci_probe(struct udevice *dev)
 	host->name = dev->name;
 	host->ioaddr = map_sysmem(dtplat->reg[0], dtplat->reg[1]);
 	max_frequency = dtplat->max_frequency;
-	ret = clk_get_by_index_platdata(dev, 0, dtplat->clocks, &clk);
+	ret = clk_get_by_driver_info(dev, dtplat->clocks, &clk);
 #else
 	max_frequency = dev_read_u32_default(dev, "max-frequency", 0);
 	ret = clk_get_by_index(dev, 0, &clk);
@@ -68,14 +69,14 @@ static int arasan_sdhci_probe(struct udevice *dev)
 	if (host->bus_width == 8)
 		host->host_caps |= MMC_MODE_8BIT;
 
-	ret = sdhci_setup_cfg(&plat->cfg, host, 0, EMMC_MIN_FREQ);
-
 	host->mmc = &plat->mmc;
-	if (ret)
-		return ret;
 	host->mmc->priv = &prv->host;
 	host->mmc->dev = dev;
 	upriv->mmc = host->mmc;
+
+	ret = sdhci_setup_cfg(&plat->cfg, host, 0, EMMC_MIN_FREQ);
+	if (ret)
+		return ret;
 
 	return sdhci_probe(dev);
 }

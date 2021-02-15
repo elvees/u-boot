@@ -7,6 +7,7 @@
 #include <asm/io.h>
 #include <linux/kernel.h>
 #include <asm/armv8/mmu.h>
+#include <cpu_func.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 

@@ -1,19 +1,27 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
- * Author(s): Patrice Chotard, <patrice.chotard@st.com> for STMicroelectronics.
+ * Author(s): Patrice Chotard, <patrice.chotard@foss.st.com> for STMicroelectronics.
  */
 
 #include <common.h>
 #include <clk.h>
+#include <cpu_func.h>
 #include <dm.h>
 #include <fdtdec.h>
+#include <log.h>
+#include <malloc.h>
+#include <asm/bitops.h>
+#include <asm/cache.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
 #include <linux/libfdt.h>
 #include <mmc.h>
 #include <reset.h>
 #include <asm/io.h>
 #include <asm/gpio.h>
 #include <linux/iopoll.h>
+#include <watchdog.h>
 
 struct stm32_sdmmc2_plat {
 	struct mmc_config cfg;
@@ -190,7 +198,7 @@ struct stm32_sdmmc2_ctx {
 #define SDMMC_IDMACTRL_IDMAEN		BIT(0)
 
 #define SDMMC_CMD_TIMEOUT		0xFFFFFFFF
-#define SDMMC_BUSYD0END_TIMEOUT_US	1000000
+#define SDMMC_BUSYD0END_TIMEOUT_US	2000000
 
 static void stm32_sdmmc2_start_data(struct stm32_sdmmc2_priv *priv,
 				    struct mmc_data *data,
@@ -432,6 +440,8 @@ static int stm32_sdmmc2_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 	u32 cmdat = data ? SDMMC_CMD_CMDTRANS : 0;
 	int ret, retry = 3;
 
+	WATCHDOG_RESET();
+
 retry_cmd:
 	ctx.data_length = 0;
 	ctx.dpsm_abort = false;
@@ -521,8 +531,6 @@ static void stm32_sdmmc2_pwrcycle(struct stm32_sdmmc2_priv *priv)
 		return;
 
 	stm32_sdmmc2_reset(priv);
-	writel(SDMMC_POWER_PWRCTRL_CYCLE | priv->pwr_reg_msk,
-	       priv->base + SDMMC_POWER);
 }
 
 /*
@@ -616,10 +624,21 @@ static int stm32_sdmmc2_getcd(struct udevice *dev)
 	return 1;
 }
 
+static int stm32_sdmmc2_host_power_cycle(struct udevice *dev)
+{
+	struct stm32_sdmmc2_priv *priv = dev_get_priv(dev);
+
+	writel(SDMMC_POWER_PWRCTRL_CYCLE | priv->pwr_reg_msk,
+	       priv->base + SDMMC_POWER);
+
+	return 0;
+}
+
 static const struct dm_mmc_ops stm32_sdmmc2_ops = {
 	.send_cmd = stm32_sdmmc2_send_cmd,
 	.set_ios = stm32_sdmmc2_set_ios,
 	.get_cd = stm32_sdmmc2_getcd,
+	.host_power_cycle = stm32_sdmmc2_host_power_cycle,
 };
 
 static int stm32_sdmmc2_probe(struct udevice *dev)
@@ -657,26 +676,13 @@ static int stm32_sdmmc2_probe(struct udevice *dev)
 			     GPIOD_IS_IN);
 
 	cfg->f_min = 400000;
-	cfg->f_max = dev_read_u32_default(dev, "max-frequency", 52000000);
 	cfg->voltages = MMC_VDD_32_33 | MMC_VDD_33_34 | MMC_VDD_165_195;
 	cfg->b_max = CONFIG_SYS_MMC_MAX_BLK_COUNT;
-	cfg->name = "STM32 SDMMC2";
+	cfg->name = "STM32 SD/MMC";
 
 	cfg->host_caps = 0;
-	if (cfg->f_max > 25000000)
-		cfg->host_caps |= MMC_MODE_HS_52MHz | MMC_MODE_HS;
-
-	switch (dev_read_u32_default(dev, "bus-width", 1)) {
-	case 8:
-		cfg->host_caps |= MMC_MODE_8BIT;
-	case 4:
-		cfg->host_caps |= MMC_MODE_4BIT;
-		break;
-	case 1:
-		break;
-	default:
-		pr_err("invalid \"bus-width\" property, force to 1\n");
-	}
+	cfg->f_max = 52000000;
+	mmc_of_parse(dev, cfg);
 
 	upriv->mmc = &plat->mmc;
 
@@ -692,7 +698,7 @@ clk_free:
 	return ret;
 }
 
-int stm32_sdmmc_bind(struct udevice *dev)
+static int stm32_sdmmc_bind(struct udevice *dev)
 {
 	struct stm32_sdmmc2_plat *plat = dev_get_platdata(dev);
 

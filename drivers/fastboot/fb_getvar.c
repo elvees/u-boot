@@ -4,22 +4,23 @@
  */
 
 #include <common.h>
+#include <env.h>
 #include <fastboot.h>
 #include <fastboot-internal.h>
 #include <fb_mmc.h>
 #include <fb_nand.h>
 #include <fs.h>
+#include <part.h>
 #include <version.h>
 
 static void getvar_version(char *var_parameter, char *response);
-static void getvar_bootloader_version(char *var_parameter, char *response);
+static void getvar_version_bootloader(char *var_parameter, char *response);
 static void getvar_downloadsize(char *var_parameter, char *response);
 static void getvar_serialno(char *var_parameter, char *response);
 static void getvar_version_baseband(char *var_parameter, char *response);
 static void getvar_product(char *var_parameter, char *response);
 static void getvar_platform(char *var_parameter, char *response);
 static void getvar_current_slot(char *var_parameter, char *response);
-static void getvar_slot_suffixes(char *var_parameter, char *response);
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 static void getvar_has_slot(char *var_parameter, char *response);
 #endif
@@ -29,6 +30,7 @@ static void getvar_partition_type(char *part_name, char *response);
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 static void getvar_partition_size(char *part_name, char *response);
 #endif
+static void getvar_is_userspace(char *var_parameter, char *response);
 
 static const struct {
 	const char *variable;
@@ -38,11 +40,8 @@ static const struct {
 		.variable = "version",
 		.dispatch = getvar_version
 	}, {
-		.variable = "bootloader-version",
-		.dispatch = getvar_bootloader_version
-	}, {
 		.variable = "version-bootloader",
-		.dispatch = getvar_bootloader_version
+		.dispatch = getvar_version_bootloader
 	}, {
 		.variable = "downloadsize",
 		.dispatch = getvar_downloadsize
@@ -64,9 +63,6 @@ static const struct {
 	}, {
 		.variable = "current-slot",
 		.dispatch = getvar_current_slot
-	}, {
-		.variable = "slot-suffixes",
-		.dispatch = getvar_slot_suffixes
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 	}, {
 		.variable = "has-slot",
@@ -82,6 +78,9 @@ static const struct {
 		.variable = "partition-size",
 		.dispatch = getvar_partition_size
 #endif
+	}, {
+		.variable = "is-userspace",
+		.dispatch = getvar_is_userspace
 	}
 };
 
@@ -96,7 +95,7 @@ static const struct {
  *
  * @param[in] part_name Info for which partition name to look for
  * @param[in,out] response Pointer to fastboot response buffer
- * @param[out] size If not NULL, will contain partition size (in blocks)
+ * @param[out] size If not NULL, will contain partition size
  * @return Partition number or negative value on error
  */
 static int getvar_get_part_info(const char *part_name, char *response,
@@ -105,12 +104,12 @@ static int getvar_get_part_info(const char *part_name, char *response,
 	int r;
 # if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
 	struct blk_desc *dev_desc;
-	disk_partition_t part_info;
+	struct disk_partition part_info;
 
 	r = fastboot_mmc_get_part_info(part_name, &dev_desc, &part_info,
 				       response);
 	if (r >= 0 && size)
-		*size = part_info.size;
+		*size = part_info.size * part_info.blksz;
 # elif CONFIG_IS_ENABLED(FASTBOOT_FLASH_NAND)
 	struct part_info *part_info;
 
@@ -131,7 +130,7 @@ static void getvar_version(char *var_parameter, char *response)
 	fastboot_okay(FASTBOOT_VERSION, response);
 }
 
-static void getvar_bootloader_version(char *var_parameter, char *response)
+static void getvar_version_bootloader(char *var_parameter, char *response)
 {
 	fastboot_okay(U_BOOT_VERSION, response);
 }
@@ -182,11 +181,6 @@ static void getvar_current_slot(char *var_parameter, char *response)
 	fastboot_okay("a", response);
 }
 
-static void getvar_slot_suffixes(char *var_parameter, char *response)
-{
-	fastboot_okay("a,b", response);
-}
-
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH)
 static void getvar_has_slot(char *part_name, char *response)
 {
@@ -226,7 +220,7 @@ static void getvar_partition_type(char *part_name, char *response)
 {
 	int r;
 	struct blk_desc *dev_desc;
-	disk_partition_t part_info;
+	struct disk_partition part_info;
 
 	r = fastboot_mmc_get_part_info(part_name, &dev_desc, &part_info,
 				       response);
@@ -251,6 +245,11 @@ static void getvar_partition_size(char *part_name, char *response)
 		fastboot_response("OKAY", response, "0x%016zx", size);
 }
 #endif
+
+static void getvar_is_userspace(char *var_parameter, char *response)
+{
+	fastboot_okay("no", response);
+}
 
 /**
  * fastboot_getvar() - Writes variable indicated by cmd_parameter to response.

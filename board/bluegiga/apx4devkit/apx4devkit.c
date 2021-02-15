@@ -14,6 +14,8 @@
  */
 
 #include <common.h>
+#include <init.h>
+#include <net.h>
 #include <asm/gpio.h>
 #include <asm/io.h>
 #include <asm/setup.h>
@@ -21,6 +23,7 @@
 #include <asm/arch/iomux-mx28.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/sys_proto.h>
+#include <env.h>
 #include <linux/mii.h>
 #include <miiphy.h>
 #include <netdev.h>
@@ -56,7 +59,7 @@ int board_init(void)
 }
 
 #ifdef CONFIG_CMD_MMC
-int board_mmc_init(bd_t *bis)
+int board_mmc_init(struct bd_info *bis)
 {
 	return mxsmmc_initialize(bis, 0, NULL, NULL);
 }
@@ -74,7 +77,7 @@ int fecmxc_mii_postcall(int phy)
 	return 0;
 }
 
-int board_eth_init(bd_t *bis)
+int board_eth_init(struct bd_info *bis)
 {
 	int ret;
 	struct eth_device *dev;

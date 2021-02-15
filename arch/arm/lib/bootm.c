@@ -12,9 +12,15 @@
  */
 
 #include <common.h>
+#include <bootstage.h>
 #include <command.h>
+#include <cpu_func.h>
 #include <dm.h>
+#include <hang.h>
+#include <lmb.h>
+#include <log.h>
 #include <dm/root.h>
+#include <env.h>
 #include <image.h>
 #include <u-boot/zlib.h>
 #include <asm/byteorder.h>
@@ -26,6 +32,7 @@
 #include <linux/compiler.h>
 #include <bootm.h>
 #include <vxworks.h>
+#include <asm/cache.h>
 
 #ifdef CONFIG_ARMV7_NONSEC
 #include <asm/armv7.h>
@@ -72,6 +79,9 @@ void arch_lmb_reserve(struct lmb *lmb)
 			gd->bd->bi_dram[bank].size - 1;
 		if (sp > bank_end)
 			continue;
+		if (bank_end > gd->ram_top)
+			bank_end = gd->ram_top - 1;
+
 		lmb_reserve(lmb, sp, bank_end - sp + 1);
 		break;
 	}
@@ -114,7 +124,7 @@ static void announce_and_cleanup(int fake)
 	cleanup_before_linux();
 }
 
-static void setup_start_tag (bd_t *bd)
+static void setup_start_tag (struct bd_info *bd)
 {
 	params = (struct tag *)bd->bi_boot_params;
 
@@ -128,7 +138,7 @@ static void setup_start_tag (bd_t *bd)
 	params = tag_next (params);
 }
 
-static void setup_memory_tags(bd_t *bd)
+static void setup_memory_tags(struct bd_info *bd)
 {
 	int i;
 
@@ -143,7 +153,7 @@ static void setup_memory_tags(bd_t *bd)
 	}
 }
 
-static void setup_commandline_tag(bd_t *bd, char *commandline)
+static void setup_commandline_tag(struct bd_info *bd, char *commandline)
 {
 	char *p;
 
@@ -168,7 +178,8 @@ static void setup_commandline_tag(bd_t *bd, char *commandline)
 	params = tag_next (params);
 }
 
-static void setup_initrd_tag(bd_t *bd, ulong initrd_start, ulong initrd_end)
+static void setup_initrd_tag(struct bd_info *bd, ulong initrd_start,
+			     ulong initrd_end)
 {
 	/* an ATAG_INITRD node tells the kernel where the compressed
 	 * ramdisk can be found. ATAG_RDIMG is a better name, actually.
@@ -207,7 +218,7 @@ static void setup_revision_tag(struct tag **in_params)
 	params = tag_next (params);
 }
 
-static void setup_end_tag(bd_t *bd)
+static void setup_end_tag(struct bd_info *bd)
 {
 	params->hdr.tag = ATAG_NONE;
 	params->hdr.size = 0;
@@ -222,6 +233,8 @@ static void do_nonsec_virt_switch(void)
 	dcache_disable();	/* flush cache before swtiching to EL2 */
 }
 #endif
+
+__weak void board_prep_linux(bootm_headers_t *images) { }
 
 /* Subcommand: PREP */
 static void boot_prep_linux(bootm_headers_t *images)
@@ -269,6 +282,8 @@ static void boot_prep_linux(bootm_headers_t *images)
 		printf("FDT and ATAGS support not compiled in - hanging\n");
 		hang();
 	}
+
+	board_prep_linux(images);
 }
 
 __weak bool armv7_boot_nonsec_default(void)
@@ -409,7 +424,7 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
  * DIFFERENCE: Instead of calling prep and go at the end
  * they are called if subcommand is equal 0.
  */
-int do_bootm_linux(int flag, int argc, char * const argv[],
+int do_bootm_linux(int flag, int argc, char *const argv[],
 		   bootm_headers_t *images)
 {
 	/* No need for those on ARM */

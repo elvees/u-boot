@@ -6,6 +6,8 @@
 
 #include <common.h>
 #include <debug_uart.h>
+#include <env.h>
+#include <init.h>
 #include <led.h>
 #include <asm/arch/at91_common.h>
 #include <asm/arch/clk.h>

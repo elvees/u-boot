@@ -51,7 +51,7 @@ static int mcom03_reset_request(struct reset_ctl *rst)
 
 static const struct reset_ops mcom03_reset_reset_ops = {
 	.request = mcom03_reset_request,
-	.free = mcom03_reset_free,
+	.rfree = mcom03_reset_free,
 	.rst_assert = mcom03_reset_assert,
 	.rst_deassert = mcom03_reset_deassert,
 };

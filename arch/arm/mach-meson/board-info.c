@@ -5,11 +5,14 @@
  */
 
 #include <common.h>
+#include <init.h>
 #include <asm/io.h>
 #include <dm.h>
 #include <linux/bitfield.h>
 #include <regmap.h>
 #include <syscon.h>
+#include <linux/bitops.h>
+#include <linux/err.h>
 
 #define AO_SEC_SD_CFG8		0xe0
 #define AO_SEC_SOCINFO_OFFSET	AO_SEC_SD_CFG8
@@ -34,6 +37,8 @@ static const struct meson_gx_soc_id {
 	{ "TXHD",   0x27 },
 	{ "G12A",   0x28 },
 	{ "G12B",   0x29 },
+	{ "SM1",    0x2b },
+	{ "A1",	    0x2c },
 };
 
 static const struct meson_gx_package_id {
@@ -59,7 +64,13 @@ static const struct meson_gx_package_id {
 	{ "A113D",  0x25, 0x22, 0xff },
 	{ "S905D2", 0x28, 0x10, 0xf0 },
 	{ "S905X2", 0x28, 0x40, 0xf0 },
+	{ "A311D",  0x29, 0x10, 0xf0 },
 	{ "S922X",  0x29, 0x40, 0xf0 },
+	{ "S905D3", 0x2b, 0x4, 0xf5 },
+	{ "S905X3", 0x2b, 0x5, 0xf5 },
+	{ "S905X3", 0x2b, 0x10, 0x3f },
+	{ "S905D3", 0x2b, 0x30, 0x3f },
+	{ "A113L", 0x2c, 0x0, 0xf8 },
 };
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -154,7 +165,7 @@ int show_board_info(void)
 
 	/* print board information */
 	print_board_model();
-	printf("Soc:   Amlogic Meson %s (%s) Revision %x:%x (%x:%x)\n",
+	printf("SoC:   Amlogic Meson %s (%s) Revision %x:%x (%x:%x)\n",
 	       socinfo_to_soc_id(socinfo),
 	       socinfo_to_package_id(socinfo),
 	       socinfo_to_major(socinfo),

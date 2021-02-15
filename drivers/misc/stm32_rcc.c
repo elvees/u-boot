@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
- * Author(s): Patrice Chotard, <patrice.chotard@st.com> for STMicroelectronics.
+ * Author(s): Patrice Chotard, <patrice.chotard@foss.st.com> for STMicroelectronics.
  */
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <misc.h>
 #include <stm32_rcc.h>
 #include <dm/device-internal.h>
+#include <dm/device_compat.h>
 #include <dm/lists.h>
 
 struct stm32_rcc_clk stm32_rcc_clk_f42x = {
@@ -68,8 +70,6 @@ static int stm32_rcc_bind(struct udevice *dev)
 					    dev_ofnode(dev), &child);
 }
 
-static const struct misc_ops stm32_rcc_ops = {
-};
 
 static const struct udevice_id stm32_rcc_ids[] = {
 	{.compatible = "st,stm32f42xx-rcc", .data = (ulong)&stm32_rcc_clk_f42x },
@@ -82,8 +82,7 @@ static const struct udevice_id stm32_rcc_ids[] = {
 
 U_BOOT_DRIVER(stm32_rcc) = {
 	.name		= "stm32-rcc",
-	.id		= UCLASS_MISC,
+	.id		= UCLASS_NOP,
 	.of_match	= stm32_rcc_ids,
 	.bind		= stm32_rcc_bind,
-	.ops		= &stm32_rcc_ops,
 };

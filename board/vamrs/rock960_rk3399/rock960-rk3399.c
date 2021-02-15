@@ -4,16 +4,25 @@
  */
 
 #include <common.h>
-#include <dm.h>
-#include <power/regulator.h>
+#include <syscon.h>
+#include <asm/io.h>
+#include <asm/arch-rockchip/clock.h>
+#include <asm/arch-rockchip/grf_rk3399.h>
+#include <asm/arch-rockchip/hardware.h>
+#include <linux/bitops.h>
 
-int board_init(void)
+#ifdef CONFIG_MISC_INIT_R
+int misc_init_r(void)
 {
-	int ret;
+	struct rk3399_grf_regs *grf =
+	    syscon_get_first_range(ROCKCHIP_SYSCON_GRF);
 
-	ret = regulators_enable_boot_on(false);
-	if (ret)
-		debug("%s: Cannot enable boot on regulator\n", __func__);
+	/**
+	 * Some SSD's to work on rock960 would require explicit
+	 * domain voltage change, so BT565 is in 1.8v domain
+	 */
+	rk_setreg(&grf->io_vsel, BIT(0));
 
 	return 0;
 }
+#endif

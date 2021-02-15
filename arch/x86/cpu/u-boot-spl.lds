@@ -17,7 +17,10 @@ SECTIONS
 
 	. = IMAGE_TEXT_BASE;	/* Location of bootcode in flash */
 	__text_start = .;
-	.text  : { *(.text*); }
+	.text  : {
+		__image_copy_start = .;
+		*(.text*);
+	}
 
 	. = ALIGN(4);
 
@@ -35,6 +38,12 @@ SECTIONS
 	. = ALIGN(4);
 	__data_end = .;
 	__init_end = .;
+	. = ALIGN(4);
+	.binman_sym_table : {
+		__binman_sym_start = .;
+		KEEP(*(SORT(.binman_sym*)));
+		__binman_sym_end = .;
+	}
 
         _image_binary_end = .;
 

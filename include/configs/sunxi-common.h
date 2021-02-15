@@ -118,10 +118,6 @@
 #define CONFIG_SYS_MAX_NAND_DEVICE 8
 #endif
 
-#ifdef CONFIG_SPL_SPI_SUNXI
-#define CONFIG_SYS_SPI_U_BOOT_OFFS	0x8000
-#endif
-
 /* mmc config */
 #ifdef CONFIG_MMC
 #define CONFIG_MMC_SUNXI_SLOT		0
@@ -140,10 +136,8 @@
 
 #if CONFIG_MMC_SUNXI_SLOT_EXTRA != -1
 /* If we have two devices (most likely eMMC + MMC), favour the eMMC */
-#define CONFIG_SYS_MMC_ENV_DEV		1
 #else
 /* Otherwise, use the only device we have */
-#define CONFIG_SYS_MMC_ENV_DEV		0
 #endif
 #define CONFIG_SYS_MMC_MAX_DEVICE	4
 #endif
@@ -257,9 +251,6 @@ extern int soft_i2c_gpio_scl;
 #endif
 #endif /* ifdef CONFIG_REQUIRE_SERIAL_CONSOLE */
 
-/* GPIO */
-#define CONFIG_SUNXI_GPIO
-
 #ifdef CONFIG_VIDEO_SUNXI
 /*
  * The amount of RAM to keep free at the top of RAM when relocating u-boot,
@@ -279,17 +270,9 @@ extern int soft_i2c_gpio_scl;
 
 /* Ethernet support */
 
-#ifdef CONFIG_SUN7I_GMAC
-#define CONFIG_PHY_REALTEK
-#endif
-
 #ifdef CONFIG_USB_EHCI_HCD
 #define CONFIG_USB_OHCI_NEW
 #define CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS 1
-#endif
-
-#ifdef CONFIG_USB_KEYBOARD
-#define CONFIG_PREBOOT
 #endif
 
 #ifndef CONFIG_SPL_BUILD
@@ -440,7 +423,6 @@ extern int soft_i2c_gpio_scl;
 
 #ifdef CONFIG_USB_KEYBOARD
 #define CONSOLE_STDIN_SETTINGS \
-	"preboot=usb start\0" \
 	"stdin=serial,usbkbd\0"
 #else
 #define CONSOLE_STDIN_SETTINGS \

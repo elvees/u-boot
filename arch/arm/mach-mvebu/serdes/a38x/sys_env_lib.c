@@ -256,3 +256,46 @@ u8 sys_env_device_rev_get(void)
 	value = reg_read(DEV_VERSION_ID_REG);
 	return (value & (REVISON_ID_MASK)) >> REVISON_ID_OFFS;
 }
+
+void mv_rtc_config(void)
+{
+	u32 i, val;
+
+	if (!(IS_ENABLED(CONFIG_ARMADA_38X) || IS_ENABLED(CONFIG_ARMADA_39X)))
+		return;
+
+	/* Activate pipe0 for read/write transaction, and set XBAR client number #1 */
+	val = 0x1 << DFX_PIPE_SELECT_PIPE0_ACTIVE_OFFS |
+	      0x1 << DFX_PIPE_SELECT_XBAR_CLIENT_SEL_OFFS;
+	writel(val, MVEBU_DFX_BASE);
+
+	/* Set new RTC value for all memory wrappers */
+	for (i = 0; i < RTC_MEMORY_WRAPPER_COUNT; i++)
+		reg_write(RTC_MEMORY_WRAPPER_REG(i), RTC_MEMORY_WRAPPER_CTRL_VAL);
+}
+
+void mv_avs_init(void)
+{
+	u32 sar_freq;
+
+	if (!(IS_ENABLED(CONFIG_ARMADA_38X) || IS_ENABLED(CONFIG_ARMADA_39X)))
+		return;
+
+	reg_write(AVS_DEBUG_CNTR_REG, AVS_DEBUG_CNTR_DEFAULT_VALUE);
+	reg_write(AVS_DEBUG_CNTR_REG, AVS_DEBUG_CNTR_DEFAULT_VALUE);
+
+	sar_freq = reg_read(DEVICE_SAMPLE_AT_RESET1_REG);
+	sar_freq = sar_freq >> SAR_FREQ_OFFSET & SAR_FREQ_MASK;
+
+	/* Set AVS value only for core frequency of 1600MHz or less.
+	 * For higher frequency leave the default value.
+	 */
+	if (sar_freq <= 0xd) {
+		u32 avs_reg_data = reg_read(AVS_ENABLED_CONTROL);
+
+		avs_reg_data &= ~(AVS_LOW_VDD_LIMIT_MASK
+				| AVS_HIGH_VDD_LIMIT_MASK);
+		avs_reg_data |= AVS_LOW_VDD_SLOW_VAL | AVS_HIGH_VDD_SLOW_VAL;
+		reg_write(AVS_ENABLED_CONTROL, avs_reg_data);
+	}
+}

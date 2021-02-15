@@ -55,14 +55,33 @@ cat << __HEADER_EOF
 	images {
 		uboot@1 {
 			description = "U-Boot (64-bit)";
+			os = "u-boot";
 			data = /incbin/("$BL33");
 			type = "standalone";
 			arch = "arm64";
 			compression = "none";
 			load = <$BL33_LOAD_ADDR>;
 		};
+__HEADER_EOF
+
+cnt=1
+for dtname in $*
+do
+	cat << __FDT_IMAGE_EOF
+		fdt@$cnt {
+			description = "$(basename $dtname .dtb)";
+			data = /incbin/("$dtname");
+			type = "flat_dt";
+			compression = "none";
+		};
+__FDT_IMAGE_EOF
+cnt=$((cnt+1))
+done
+
+cat << __HEADER_EOF
 		atf@1 {
 			description = "ARM Trusted Firmware";
+			os = "arm-trusted-firmware";
 			data = /incbin/("$BL31");
 			type = "firmware";
 			arch = "arm64";
@@ -85,20 +104,6 @@ cat << __HEADER_EOF
 		};
 __HEADER_EOF
 fi
-
-cnt=1
-for dtname in $*
-do
-	cat << __FDT_IMAGE_EOF
-		fdt@$cnt {
-			description = "$(basename $dtname .dtb)";
-			data = /incbin/("$dtname");
-			type = "flat_dt";
-			compression = "none";
-		};
-__FDT_IMAGE_EOF
-cnt=$((cnt+1))
-done
 
 cat << __CONF_HEADER_EOF
 	};

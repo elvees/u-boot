@@ -7,12 +7,13 @@
  */
 
 #include <common.h>
+#include <command.h>
 #include <thor.h>
 #include <dfu.h>
 #include <g_dnl.h>
 #include <usb.h>
 
-int do_thor_down(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+int do_thor_down(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	if (argc < 4)
 		return CMD_RET_USAGE;
@@ -37,7 +38,12 @@ int do_thor_down(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		goto exit;
 	}
 
-	g_dnl_register("usb_dnl_thor");
+	ret = g_dnl_register("usb_dnl_thor");
+	if (ret) {
+		pr_err("g_dnl_register failed %d\n", ret);
+		ret = CMD_RET_FAILURE;
+		goto exit;
+	}
 
 	ret = thor_init();
 	if (ret) {

@@ -8,17 +8,12 @@
 #define __PCM058_CONFIG_H
 
 #ifdef CONFIG_SPL
-#define CONFIG_SYS_SPI_U_BOOT_OFFS	(64 * 1024)
 #include "imx6_spl.h"
 #endif
 
 #include "mx6_common.h"
 
-/* Thermal */
-#define CONFIG_IMX_THERMAL
-
 /* Serial */
-#define CONFIG_MXC_UART
 #define CONFIG_MXC_UART_BASE	       UART4_BASE
 #define CONSOLE_DEV		"ttymxc3"
 
@@ -42,15 +37,11 @@
 #define CONFIG_SYS_I2C_MXC_I2C1		/* enable I2C bus 0 */
 #define CONFIG_SYS_I2C_SPEED		  100000
 
-#ifndef CONFIG_SPL_BUILD
-#define CONFIG_CMD_NAND
 /* Enable NAND support */
-#define CONFIG_CMD_NAND_TRIMFFS
 #define CONFIG_SYS_MAX_NAND_DEVICE	1
 #define CONFIG_SYS_NAND_BASE		0x40000000
 #define CONFIG_SYS_NAND_5_ADDR_CYCLE
 #define CONFIG_SYS_NAND_ONFI_DETECTION
-#endif
 
 /* DMA stuff, needed for GPMI/MXS NAND support */
 
@@ -75,19 +66,6 @@
 #define CONFIG_SYS_FSL_USDHC_NUM	2
 
 /* Environment organization */
-#define CONFIG_ENV_IS_IN_SPI_FLASH
-#define CONFIG_ENV_SIZE                (16 * 1024)
-#define CONFIG_ENV_OFFSET		(1024 * SZ_1K)
-#define CONFIG_ENV_SECT_SIZE		(64 * SZ_1K)
-#define CONFIG_SYS_REDUNDAND_ENVIRONMENT
-#define CONFIG_ENV_OFFSET_REDUND       (CONFIG_ENV_OFFSET + \
-						CONFIG_ENV_SECT_SIZE)
-#define CONFIG_ENV_SIZE_REDUND         CONFIG_ENV_SIZE
-
-#ifdef CONFIG_ENV_IS_IN_NAND
-#define CONFIG_ENV_OFFSET              (0x1E0000)
-#define CONFIG_ENV_SECT_SIZE           (128 * SZ_1K)
-#endif
 
 /* Default environment */
 #define CONFIG_EXTRA_ENV_SETTINGS \

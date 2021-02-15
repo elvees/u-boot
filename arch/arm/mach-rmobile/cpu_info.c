@@ -4,7 +4,11 @@
  * (C) Copyright 2012 Renesas Solutions Corp.
  */
 #include <common.h>
+#include <cpu_func.h>
+#include <asm/cache.h>
+#include <init.h>
 #include <asm/io.h>
+#include <env.h>
 #include <linux/ctype.h>
 
 #ifdef CONFIG_ARCH_CPU_INIT
@@ -64,6 +68,7 @@ static const struct {
 	{ RMOBILE_CPU_TYPE_R8A7796, "R8A7796" },
 	{ RMOBILE_CPU_TYPE_R8A77965, "R8A77965" },
 	{ RMOBILE_CPU_TYPE_R8A77970, "R8A77970" },
+	{ RMOBILE_CPU_TYPE_R8A77980, "R8A77980" },
 	{ RMOBILE_CPU_TYPE_R8A77990, "R8A77990" },
 	{ RMOBILE_CPU_TYPE_R8A77995, "R8A77995" },
 	{ 0x0, "CPU" },
