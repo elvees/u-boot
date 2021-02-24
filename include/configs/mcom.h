@@ -156,7 +156,12 @@
 #ifndef CONFIG_SPL_BUILD
 
 /* Default environment */
+#if defined(CONFIG_TARGET_ECAM02DM)
+#define CONFIG_BOOTFILE			"/boot/zImage"
+#else
 #define CONFIG_BOOTFILE			"zImage"
+#endif  /* CONFIG_TARGET_ECAM02DM */
+
 #define CONFIG_LOADADDR			0x40000000
 
 /* It's not possible to extend currently used DTB, as U-Boot drivers
@@ -195,6 +200,11 @@
 #define BOOTENV_DEV_NAME_LEGACY_USB	BOOTENV_DEV_NAME_BLKDEV
 #define BOOTENV_DEV_NAME_LEGACY_UBIFS	BOOTENV_DEV_NAME_BLKDEV
 
+#if defined(CONFIG_TARGET_ECAM02DM)
+#define BOOTENV_DEV_ECAM02DM		BOOTENV_DEV_BLKDEV
+#define BOOTENV_DEV_NAME_ECAM02DM	BOOTENV_DEV_NAME_BLKDEV
+#define BOOT_TARGET_DEVICES(func)	func(ECAM02DM, ecam02dm, 0)
+#else
 #define BOOT_TARGET_DEVICES(func) \
 	func(MMC, mmc, 0) \
 	func(LEGACY_MMC, legacy_mmc, 0) \
@@ -204,6 +214,7 @@
 	func(LEGACY_USB, legacy_usb, 0) \
 	func(UBIFS, ubifs, 0) \
 	func(LEGACY_UBIFS, legacy_ubifs, 0)
+#endif  /* CONFIG_TARGET_ECAM02DM */
 
 #include <config_distro_bootcmd.h>
 
@@ -231,6 +242,29 @@
 #define KERNEL_ADDR_R "kernel_addr_r=0x40000000\0"
 #endif
 
+#if defined(CONFIG_TARGET_ECAM02DM)
+#define ROOTFS_OPTIONS "ro UPPER_DEV=/dev/ubi0_2 init=/sbin/init-overlay-rootfs.sh"
+
+#define BOOTUBIVOL "bootubivol=system_a\0"
+
+#define EXTRA_BOOTENV "ecam02dm_boot=" \
+	"setenv rootfsdev ubi0:${bootubivol};" \
+	"setenv loaddev ubi;" \
+	"setenv loadpart ubi:${bootubivol};"\
+	"setenv rootfstype ubifs;" \
+	"setenv cmdline ${cmdline} ubi.mtd=arasan_nfc;" \
+	"mtdparts default;" \
+	"ubi part ${bootubipart};" \
+	"ubifsmount ubi:${bootubivol};" \
+	"run legacy_bootcmd\0"
+#else
+#define ROOTFS_OPTIONS "rw"
+
+#define BOOTUBIVOL
+
+#define EXTRA_BOOTENV
+#endif  /* CONFIG_TARGET_ECAM02DM */
+
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"bootm_size=0x10000000\0" \
 	"stdin=serial\0" \
@@ -245,15 +279,17 @@
 	"ddrctl_cid=1\0" \
 	"bootenvcmd=\0" \
 	"console=ttyS0,115200\0" \
+	"rootfs_options=" ROOTFS_OPTIONS "\0" \
 	"cmdline=" BLACKLIST VIDEO_MODE "\0" \
 	"bootpartnum=1\0" \
 	"rootpartnum=2\0" \
 	"usb_pgood_delay=5000\0" \
 	"bootubipart=allnand\0" \
+	BOOTUBIVOL \
 	"loadbootfile=load ${loaddev} ${loadpart} ${loadaddr} ${bootfile}\0" \
 	"set_bootargs=setenv bootargs console=${console} " \
-		"root=${rootfsdev} rootfstype=${rootfstype} rw rootwait " \
-		"${cmdline}\0" \
+		"root=${rootfsdev} rootfstype=${rootfstype} rootwait " \
+		"${rootfs_options} ${cmdline}\0" \
 	"mcomboot=run set_bootargs;bootz ${loadaddr} - ${fdtcontroladdr}\0" \
 	"legacy_bootcmd=" \
 		"if test -n ${bootenvcmd}; then " \
@@ -294,7 +330,8 @@
 	"ramdisk_addr_r=0x50000000\0" \
 	"findfdt=" \
 		"setenv fdt_addr ${fdtcontroladdr};\0" \
-	BOOTENV
+	BOOTENV \
+	EXTRA_BOOTENV
 #endif
 
 /* SPL framework */
