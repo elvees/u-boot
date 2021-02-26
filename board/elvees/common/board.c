@@ -188,10 +188,11 @@ u32 spl_boot_mode(const u32 boot_device)
 {
 	switch (boot_device) {
 	case BOOT_DEVICE_MMC1:
+	case BOOT_DEVICE_MMC2:
 		return MMCSD_MODE_RAW;
 	}
 
-	return 0;
+	return MMCSD_MODE_UNDEFINED;
 }
 #endif
 

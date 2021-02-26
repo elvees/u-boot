@@ -88,4 +88,16 @@ int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 
 	return 0;
 }
+
+void board_boot_order(u32 *spl_boot_list)
+{
+  spl_boot_list[0] = spl_boot_device();
+
+  switch (spl_boot_list[0]) {
+  case BOOT_DEVICE_MMC1:
+    spl_boot_list[0] = BOOT_DEVICE_MMC1;
+    spl_boot_list[1] = BOOT_DEVICE_MMC2;
+    break;
+  }
+}
 #endif
