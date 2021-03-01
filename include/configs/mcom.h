@@ -257,12 +257,15 @@
 	"ubi part ${bootubipart};" \
 	"ubifsmount ubi:${bootubivol};" \
 	"run legacy_bootcmd\0"
+#define UBI_FM_AUTOCONVERT " ubi.fm_autoconvert=1"
 #else
 #define ROOTFS_OPTIONS "rw"
 
 #define BOOTUBIVOL
 
 #define EXTRA_BOOTENV
+
+#define UBI_FM_AUTOCONVERT
 #endif  /* CONFIG_TARGET_ECAM02DM */
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
@@ -280,7 +283,7 @@
 	"bootenvcmd=\0" \
 	"console=ttyS0,115200\0" \
 	"rootfs_options=" ROOTFS_OPTIONS "\0" \
-	"cmdline=" BLACKLIST VIDEO_MODE "\0" \
+	"cmdline=" BLACKLIST VIDEO_MODE UBI_FM_AUTOCONVERT "\0" \
 	"bootpartnum=1\0" \
 	"rootpartnum=2\0" \
 	"usb_pgood_delay=5000\0" \
