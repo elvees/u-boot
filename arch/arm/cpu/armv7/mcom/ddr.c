@@ -368,7 +368,7 @@ static u16 ctl_set_regs_lpddr2(struct ddr_cfg *cfg, struct ddr_freq *freq)
 
 	tmp = cfg->common.cwl + cfg->common.bl / 2 + cfg->common.twtr + 1;
 	tmp2 = cfg->common.cl + cfg->common.bl / 2 + 1 - cfg->common.cwl
-		+ to_clocks(cfg->lpddr2.tdqsck_max, tck);
+		+ cfg->lpddr2.tdqsck_max;
 	MC->DRAMTMG2 = FIELD_PREP(DRAMTMG2_WR2RD, tmp) |
 		       FIELD_PREP(DRAMTMG2_RD2WR, tmp2) |
 		       FIELD_PREP(DRAMTMG2_READ_LAT, cfg->common.cl) |
@@ -397,7 +397,7 @@ static u16 ctl_set_regs_lpddr2(struct ddr_cfg *cfg, struct ddr_freq *freq)
 	tmp = MC->ZQCTL1 & ~ZQCTL1_TZQRESET;
 	MC->ZQCTL1 = tmp | FIELD_PREP(ZQCTL1_TZQRESET, cfg->lpddr2.tzqreset);
 
-	tmp = cfg->common.cl - 2 + to_clocks(cfg->lpddr2.tdqsck, tck);
+	tmp = cfg->common.cl + cfg->lpddr2.tdqsck - 2;
 	MC->DFITMG0 = FIELD_PREP(DFITMG0_TPHY_WRLAT, cfg->common.cwl) |
 		      FIELD_PREP(DFITMG0_TPHY_WRDATA, 1) |
 		      FIELD_PREP(DFITMG0_RDDATA_EN, tmp) |
@@ -651,10 +651,10 @@ static u16 phy_set_regs_lpddr2(struct ddr_cfg *cfg, struct ddr_freq *freq)
 		     FIELD_PREP(PGCR_RANKEN, cfg->common.ranks) |
 		     FIELD_PREP(PGCR_RFSHDT, REFRESH_NUM_DUR_TRAIN);
 
-	PHY->PTR0 = FIELD_PREP(PTR0_TDLLSRST,
-			       to_clocks(DLL_SRST_TIME_PS, tck)) |
-		    FIELD_PREP(PTR0_TDLLLOCK,
-			       to_clocks(DLL_LOCK_TIME_PS, tck)) |
+	tmp = to_clocks(DLL_SRST_TIME_PS, tck);
+	tmp2 = to_clocks(DLL_LOCK_TIME_PS, tck);
+	PHY->PTR0 = FIELD_PREP(PTR0_TDLLSRST, tmp) |
+		    FIELD_PREP(PTR0_TDLLLOCK, tmp2) |
 		    FIELD_PREP(PTR0_TITMSRST, ITM_SRST_TIME_CK);
 
 	tmp = to_clocks(TDINIT0_LPDDR2_PS, tck);
@@ -670,7 +670,7 @@ static u16 phy_set_regs_lpddr2(struct ddr_cfg *cfg, struct ddr_freq *freq)
 	PHY->DXCCR = FIELD_PREP(DXCCR_DQSRES, cfg->ctl.dqsres) |
 		     FIELD_PREP(DXCCR_DQSNRES, cfg->ctl.dqsnres);
 
-	tmp = to_clocks(cfg->lpddr2.tdqsck_max - cfg->lpddr2.tdqsck, tck);
+	tmp = cfg->lpddr2.tdqsck_max - cfg->lpddr2.tdqsck;
 	PHY->DSGCR &= ~(DSGCR_DQSGX | DSGCR_DQSGE | DSGCR_NL2OE);
 	PHY->DSGCR |= FIELD_PREP(DSGCR_DQSGX, tmp) |
 		      FIELD_PREP(DSGCR_DQSGE, tmp) |
@@ -690,11 +690,10 @@ static u16 phy_set_regs_lpddr2(struct ddr_cfg *cfg, struct ddr_freq *freq)
 		     FIELD_PREP(DTPR0_TRC, cfg->common.trc) |
 		     FIELD_PREP(DTPR0_TCCD, (cfg->common.tccd <= 4) ? 0 : 1);
 
-	tmp = to_clocks(cfg->lpddr2.tdqsck_max, tck);
 	PHY->DTPR1 = FIELD_PREP(DTPR1_TFAW, cfg->common.tfaw) |
 		     FIELD_PREP(DTPR1_TRFC, cfg->lpddr2.trfcab) |
-		     FIELD_PREP(DTPR1_TDQSMIN, cfg->lpddr2.tdqsck / tck) |
-		     FIELD_PREP(DTPR1_TDQSMAX, tmp);
+		     FIELD_PREP(DTPR1_TDQSMIN, cfg->lpddr2.tdqsck) |
+		     FIELD_PREP(DTPR1_TDQSMAX, cfg->lpddr2.tdqsck_max);
 
 	PHY->DTPR2 = FIELD_PREP(DTPR2_TXS, cfg->lpddr2.txsr) |
 		     FIELD_PREP(DTPR2_TXP, cfg->common.txp) |

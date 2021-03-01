@@ -101,9 +101,10 @@ enum lpddr2_device_type {
 
 /**
  * struct sdram_params_lpddr2 - Parameters for LPDDR2 SDRAMs
- * @device_type:     tRP (min) timing parameter
- * @tdqsck:          tDQSCK (min) in ps
- * @tdqsck_max:      tDQSCK (max) in ps
+ * All timing parameters are set in DDR clock ticks.
+ * @device_type:     DDR type
+ * @tdqsck:          tDQSCK (min)
+ * @tdqsck_max:      tDQSCK (max)
  * @tmrw:            tMRW (min)
  * @trpab:           tRPab (min)
  * @trppb:           tRPpb (min)
