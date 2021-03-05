@@ -115,6 +115,8 @@
 &i2c2 {
 	status = "okay";
 	clock-frequency = <100000>;
+	/* For correct work of Si514 generator */
+	i2c-sda-hold-time-ns = <700>;
 };
 
 &mfbsp0 {
