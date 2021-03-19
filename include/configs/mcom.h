@@ -245,9 +245,20 @@
 #if defined(CONFIG_TARGET_ECAM02DM)
 #define ROOTFS_OPTIONS "ro UPPER_DEV=/dev/ubi0_2 init=/sbin/init-overlay-rootfs.sh"
 
-#define BOOTUBIVOL "bootubivol=system_a\0"
+#define BOOTUBIVOL "bootubivol=system_a\0" \
+	"safe_bootubivol=system_a\0"
 
 #define EXTRA_BOOTENV "ecam02dm_boot=" \
+	"if test \"${bootubivol}\" != \"${safe_bootubivol}\"; then " \
+		"if env exists tried_to_boot; then " \
+			"setenv bootubivol ${safe_bootubivol};" \
+			"setenv tried_to_boot;" \
+			"saveenv;" \
+		"else " \
+			"setenv tried_to_boot true;" \
+			"saveenv;" \
+		"fi;" \
+	"fi;" \
 	"setenv rootfsdev ubi0:${bootubivol};" \
 	"setenv loaddev ubi;" \
 	"setenv loadpart ubi:${bootubivol};"\
@@ -257,7 +268,10 @@
 	"ubi part ${bootubipart};" \
 	"ubifsmount ubi:${bootubivol};" \
 	"run legacy_bootcmd\0"
+
 #define UBI_FM_AUTOCONVERT " ubi.fm_autoconvert=1"
+
+#define PANIC_REBOOT " panic=1"
 #else
 #define ROOTFS_OPTIONS "rw"
 
@@ -266,6 +280,8 @@
 #define EXTRA_BOOTENV
 
 #define UBI_FM_AUTOCONVERT
+
+#define PANIC_REBOOT
 #endif  /* CONFIG_TARGET_ECAM02DM */
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
@@ -283,7 +299,7 @@
 	"bootenvcmd=\0" \
 	"console=ttyS0,115200\0" \
 	"rootfs_options=" ROOTFS_OPTIONS "\0" \
-	"cmdline=" BLACKLIST VIDEO_MODE UBI_FM_AUTOCONVERT "\0" \
+	"cmdline=" BLACKLIST VIDEO_MODE UBI_FM_AUTOCONVERT PANIC_REBOOT "\0" \
 	"bootpartnum=1\0" \
 	"rootpartnum=2\0" \
 	"usb_pgood_delay=5000\0" \
