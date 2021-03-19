@@ -376,8 +376,7 @@ static u16 ctl_set_regs_lpddr2(struct ddr_cfg *cfg, struct ddr_freq *freq)
 
 	MC->DRAMTMG3 = FIELD_PREP(DRAMTMG3_TMRW, cfg->lpddr2.tmrw);
 
-	tmp = max(cfg->lpddr2.trpab, cfg->lpddr2.trppb);
-	MC->DRAMTMG4 = FIELD_PREP(DRAMTMG4_TRP, tmp) |
+	MC->DRAMTMG4 = FIELD_PREP(DRAMTMG4_TRP, cfg->lpddr2.trppb + 1) |
 		       FIELD_PREP(DRAMTMG4_TRRD, cfg->common.trrd) |
 		       FIELD_PREP(DRAMTMG4_TCCD, cfg->common.tccd) |
 		       FIELD_PREP(DRAMTMG4_TRCD, cfg->common.trcd);
@@ -680,10 +679,9 @@ static u16 phy_set_regs_lpddr2(struct ddr_cfg *cfg, struct ddr_freq *freq)
 		   FIELD_PREP(DCR_DDR8BANK, (cfg->common.banks == 8) ? 1 : 0) |
 		   FIELD_PREP(DCR_DDRTYPE, cfg->lpddr2.device_type);
 
-	tmp = max(cfg->lpddr2.trpab, cfg->lpddr2.trppb);
 	PHY->DTPR0 = FIELD_PREP(DTPR0_TRTP, cfg->common.trtp) |
 		     FIELD_PREP(DTPR0_TWTR, cfg->common.twtr) |
-		     FIELD_PREP(DTPR0_TRP, tmp) |
+		     FIELD_PREP(DTPR0_TRP, cfg->lpddr2.trppb + 1) |
 		     FIELD_PREP(DTPR0_TRCD, cfg->common.trcd) |
 		     FIELD_PREP(DTPR0_TRAS, cfg->common.tras) |
 		     FIELD_PREP(DTPR0_TRRD, cfg->common.trrd) |
