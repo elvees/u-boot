@@ -39,7 +39,7 @@
 #else
 
 #if defined(CONFIG_TARGET_ECAM02DM)
-#define CPLL_VALUE			0x0A	/* 264 MHz */
+#define CPLL_VALUE			0x10	/* 408 MHz */
 #else
 #define CPLL_VALUE			0x0F
 #endif  /* CONFIG_TARGET_ECAM02DM */
