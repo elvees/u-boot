@@ -53,6 +53,8 @@
 #define DRAMTMG6_TCKDPDX          GENMASK(19, 16)
 #define DRAMTMG6_TCKDPDE          GENMASK(27, 24)
 
+#define DRAMTMG8_POST_SELFREF_GAP GENMASK(6, 0)
+
 #define ZQCTL0_TZQSHORT           GENMASK(9, 0)
 #define ZQCTL0_TZQLONG            GENMASK(25, 16)
 

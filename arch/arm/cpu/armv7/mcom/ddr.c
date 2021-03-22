@@ -390,6 +390,9 @@ static u16 ctl_set_regs_lpddr2(struct ddr_cfg *cfg, struct ddr_freq *freq)
 	tmp = MC->DRAMTMG6 & ~DRAMTMG6_TCKCSX;
 	MC->DRAMTMG6 = tmp | FIELD_PREP(DRAMTMG6_TCKCSX, cfg->common.txp + 2);
 
+	MC->DRAMTMG8 = FIELD_PREP(DRAMTMG8_POST_SELFREF_GAP,
+				  cfg->lpddr2.txsr / 32 + 2);
+
 	MC->ZQCTL0 = FIELD_PREP(ZQCTL0_TZQSHORT, cfg->common.tzqcs) |
 		     FIELD_PREP(ZQCTL0_TZQLONG, cfg->lpddr2.tzqcl);
 
