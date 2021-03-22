@@ -36,22 +36,22 @@ int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 
 	/* This is the best combination of ODS/ODT parameters.
 	 * It was found during DDR calibration for board types:
-	 * None
+	 * ECAM02DM r1.0.
 	 */
-	cfg->impedance.ods_mc = 48;
-	cfg->impedance.ods_dram = 48;
+	cfg->impedance.ods_mc = 34;
+	cfg->impedance.ods_dram = 40;
 
 	cfg->ctl.dqs_gating_override = 0;
-	cfg->ctl.dqsres = 1;
-	cfg->ctl.dqsnres = 9;
+	cfg->ctl.dqsres = 5;
+	cfg->ctl.dqsnres = 13;
 
 	cfg->common.ranks = MCOM_SDRAM_ONE_RANK;
 	cfg->common.banks = 8;
 	cfg->common.columns = 512;
 	cfg->common.rows = 16384;
 	cfg->common.bl = 8;
-	cfg->common.cl = 4;
-	cfg->common.cwl = 2;
+	cfg->common.cl = 8;
+	cfg->common.cwl = 4;
 	cfg->common.twr = to_clocks(max(3 * tck, 15000), tck);
 	cfg->common.tfaw = to_clocks(max(8 * tck, 50000), tck);
 	cfg->common.tras = to_clocks(max(3 * tck, 42000), tck);
