@@ -399,7 +399,7 @@ typedef struct {
 	volatile uint32_t PTR0;
 	volatile uint32_t PTR1;
 	volatile uint32_t PTR2;
-	volatile uint8_t RESERVED1[4];
+	volatile uint32_t ACIOCR;
 	volatile uint32_t DXCCR;
 	volatile uint32_t DSGCR;
 	volatile uint32_t DCR;

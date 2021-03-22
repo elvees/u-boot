@@ -669,14 +669,22 @@ static u16 phy_set_regs_lpddr2(struct ddr_cfg *cfg, struct ddr_freq *freq)
 	PHY->PTR2 = FIELD_PREP(PTR2_TDINIT2, tmp) |
 		    FIELD_PREP(PTR2_TDINIT3, tmp2);
 
+	PHY->ACIOCR |= FIELD_PREP(ACIOCR_CKPDD, 0b110) |
+		       FIELD_PREP(ACIOCR_CSPDD, 0b1100) |
+		       FIELD_PREP(ACIOCR_RSTPDD, 1);
+
 	PHY->DXCCR = FIELD_PREP(DXCCR_DQSRES, cfg->ctl.dqsres) |
 		     FIELD_PREP(DXCCR_DQSNRES, cfg->ctl.dqsnres);
 
 	tmp = cfg->lpddr2.tdqsck_max - cfg->lpddr2.tdqsck;
-	PHY->DSGCR &= ~(DSGCR_DQSGX | DSGCR_DQSGE | DSGCR_NL2OE);
+	PHY->DSGCR &= ~(DSGCR_DQSGX | DSGCR_DQSGE | DSGCR_NL2OE |
+			DSGCR_TPDOE | DSGCR_ODTOE | DSGCR_RSTOE);
 	PHY->DSGCR |= FIELD_PREP(DSGCR_DQSGX, tmp) |
 		      FIELD_PREP(DSGCR_DQSGE, tmp) |
-		      FIELD_PREP(DSGCR_NL2PD, 1);
+		      FIELD_PREP(DSGCR_CKEPDD, 0b1100) |
+		      FIELD_PREP(DSGCR_ODTPDD, 0b1111) |
+		      FIELD_PREP(DSGCR_NL2PD, 1) |
+		      FIELD_PREP(DSGCR_TPDPD, 1);
 
 	PHY->DCR = FIELD_PREP(DCR_DDRMD, 4) |
 		   FIELD_PREP(DCR_DDR8BANK, (cfg->common.banks == 8) ? 1 : 0) |

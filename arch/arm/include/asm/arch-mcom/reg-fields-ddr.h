@@ -150,6 +150,10 @@
 #define PTR2_TDINIT2              GENMASK(16, 0)
 #define PTR2_TDINIT3              GENMASK(26, 17)
 
+#define ACIOCR_CKPDD              GENMASK(10, 8)
+#define ACIOCR_CSPDD              GENMASK(21, 18)
+#define ACIOCR_RSTPDD             BIT(27)
+
 #define DXCCR_DXODT               BIT(0)
 #define DXCCR_DQSRES              GENMASK(7, 4)
 #define DXCCR_DQSNRES             GENMASK(11, 8)
@@ -157,8 +161,14 @@
 
 #define DSGCR_DQSGX               GENMASK(7, 5)
 #define DSGCR_DQSGE               GENMASK(10, 8)
+#define DSGCR_CKEPDD              GENMASK(19, 16)
+#define DSGCR_ODTPDD              GENMASK(23, 20)
 #define DSGCR_NL2PD               BIT(24)
 #define DSGCR_NL2OE               BIT(25)
+#define DSGCR_TPDPD               BIT(26)
+#define DSGCR_TPDOE               BIT(27)
+#define DSGCR_ODTOE               BIT(29)
+#define DSGCR_RSTOE               BIT(30)
 
 #define DCR_DDRMD                 GENMASK(2, 0)
 #define DCR_DDR8BANK              BIT(3)
