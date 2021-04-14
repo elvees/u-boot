@@ -101,14 +101,9 @@ static u16 create_column_mapping(struct ctl_address_mapping *mapping,
 		return MCOM_DDR_CFG_ERR;
 	}
 
-	for (i = COLUMN_ADDR_BITS_MIN; i < COLUMN_ADDR_BITS_MAX; i++) {
-		if ((1 << i) >= par->columns) {
-			if (par->bl == 4)
-				mapping->column[i] = BIT_UNUSED_VALUE;
-			if (par->bl == 8)
-				mapping->column[i - 1] = BIT_UNUSED_VALUE;
-		}
-	}
+	for (i = COLUMN_ADDR_BITS_MIN; i < COLUMN_ADDR_BITS_MAX; i++)
+		if ((1 << i) >= par->columns)
+			mapping->column[i - 1] = BIT_UNUSED_VALUE;
 
 	return 0;
 }
