@@ -17,6 +17,13 @@
 		#size-cells = <1>;
 		ranges;
 
+		linux_cma: linux,cma {
+			compatible = "shared-dma-pool";
+			reusable;
+			size = <0x8000000>; // 128 MiB
+			linux,cma-default;
+		};
+
 		vinc_reserved: vinc-pool {
 			compatible = "shared-dma-pool";
 			reusable;

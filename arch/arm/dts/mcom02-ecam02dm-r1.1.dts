@@ -180,3 +180,7 @@
 &sdma {
 	memcpy-max-burst-length = <1>;
 };
+
+&linux_cma {
+	status = "disabled";
+};
