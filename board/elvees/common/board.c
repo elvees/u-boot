@@ -172,13 +172,27 @@ int dram_init(void)
 #ifdef CONFIG_SPL_BUILD
 u32 spl_boot_device(void)
 {
-	smctr_t *SMCTR = (smctr_t *)SMCTR_BASE;
+	const smctr_t *SMCTR = (smctr_t *)SMCTR_BASE;
+	const u32 boot = SMCTR->BOOT;
+	int sdnum;
 
-	switch (SMCTR->BOOT) {
+	switch (boot) {
 	case SMCTR_BOOT_SPI0:
 		return BOOT_DEVICE_SPI;
 	case SMCTR_BOOT_SDMMC0:
-		return BOOT_DEVICE_MMC1;
+		sdnum = bootrom_sd_get_nom();
+		switch (sdnum) {
+		case 0:
+			return BOOT_DEVICE_MMC1;
+		case 1:
+			return BOOT_DEVICE_MMC2;
+		default:
+			printf("Unexpected SDMMC controller number: %d\n",
+			       sdnum);
+		}
+		break;
+	default:
+		printf("Unexpected boot device in SMCTR: %u\n", boot);
 	}
 
 	return BOOT_DEVICE_NONE;
@@ -188,10 +202,11 @@ u32 spl_boot_mode(const u32 boot_device)
 {
 	switch (boot_device) {
 	case BOOT_DEVICE_MMC1:
+	case BOOT_DEVICE_MMC2:
 		return MMCSD_MODE_RAW;
 	}
 
-	return 0;
+	return MMCSD_MODE_UNDEFINED;
 }
 #endif
 
