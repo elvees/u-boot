@@ -15,6 +15,14 @@ config TARGET_HAPS
 	  Support for the following boards:
 	    HAPS prototype for MCom-03
 
+config TARGET_MCOM03_BUB
+	bool "MCom-03 BuB"
+	select DM_ETH
+	select DM_MMC
+	help
+	  Support for the following boards:
+	    MCom-03 Bring-Up Board r1.3.0
+
 config TARGET_RTL
 	bool "RTL"
 	help
@@ -23,6 +31,7 @@ config TARGET_RTL
 endchoice
 
 source "board/elvees/haps/Kconfig"
+source "board/elvees/mcom03-bub/Kconfig"
 source "board/elvees/rtl/Kconfig"
 
 config SETUP_MEMORY_TAGS

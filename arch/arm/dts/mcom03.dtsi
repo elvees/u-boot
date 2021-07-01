@@ -288,6 +288,15 @@
 		#size-cells = <1>;
 		ranges;
 
+		uart0: serial0@1750000 {
+			compatible = "snps,dw-apb-uart";
+			reg = <0x1750000 0x1000>;
+			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			status = "disabled";
+		};
+
 		timer0: timer@1790000 {
 			compatible = "snps,dw-apb-timer";
 			reg = <0x1790000 0x14>;
