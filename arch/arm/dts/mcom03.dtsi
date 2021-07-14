@@ -234,6 +234,7 @@
 			reg = <0x10200000 0x1000>;
 			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
 			resets = <&hsreset 8>;
+			elvees,ctrl-id = <0>;
 			status = "disabled";
 		};
 
@@ -242,6 +243,7 @@
 			reg = <0x10210000 0x1000>;
 			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
 			resets = <&hsreset 9>;
+			elvees,ctrl-id = <1>;
 			status = "disabled";
 		};
 

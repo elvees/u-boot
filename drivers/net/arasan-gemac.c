@@ -128,6 +128,8 @@ struct arasan_gemac_dma_desc {
 #define TX_DESC_NUMBER		16
 #define RX_DESC_NUMBER		16
 
+#define HSP_EMAC_PADCFG(i)    (0x10400144UL + 0x20 * (i))
+
 struct arasan_gemac_priv {
 	void *base;
 	struct reset_ctl rst_ctl;
@@ -143,6 +145,7 @@ struct arasan_gemac_priv {
 	struct arasan_gemac_dma_desc *rx_desc_ptr;
 	struct arasan_gemac_dma_desc *tx_desc_ring;
 	struct arasan_gemac_dma_desc *rx_desc_ring;
+	u32 ctrl_id;
 };
 
 static inline void arasan_gemac_flush_dcache(uintptr_t start, size_t size)
@@ -570,6 +573,13 @@ static int arasan_gemac_probe(struct udevice *dev)
 	ret = arasan_gemac_mdio_init(dev);
 	if (ret != 0)
 		goto error_assert_reset;
+
+	ret = dev_read_u32(dev, "elvees,ctrl-id", &priv->ctrl_id);
+	if (ret < 0)
+		goto error_assert_reset;
+
+	/* TODO: Pads should be enabled using pinctrl driver */
+	writel(1, HSP_EMAC_PADCFG(priv->ctrl_id));
 
 	ret = arasan_gemac_phy_init(dev);
 	if (ret != 0)
