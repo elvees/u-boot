@@ -148,4 +148,5 @@
 	non-removable;
 	status = "okay";
 	elvees,broken-hs;
+	elvees,haps;
 };

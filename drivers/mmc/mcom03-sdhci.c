@@ -9,6 +9,7 @@
 #include <dm.h>
 #include <fdtdec.h>
 #include <linux/bitfield.h>
+#include <linux/iopoll.h>
 #include <sdhci.h>
 #include <syscon.h>
 #include <regmap.h>
@@ -17,10 +18,21 @@
 #define SDMMC_PADCFG(ctrl_id)			(0x2C + (ctrl_id) * 0x3C)
 #define SDMMC_PADCFG_EN				BIT(0)
 
+#define SDMMC_CLK_PADCFG(ctrl_id)		(0x30 + (ctrl_id) * 0x3C)
+#define SDMMC_CMD_PADCFG(ctrl_id)		(0x34 + (ctrl_id) * 0x3C)
+#define SDMMC_DAT_PADCFG(ctrl_id)		(0x38 + (ctrl_id) * 0x3C)
+#define SDMMC_CLK_PADCFG_PU			BIT(1)
+
 #define SDMMC_CORECFG1(ctrl_id)			(0x40 + (ctrl_id) * 0x3C)
 #define SDMMC_CORECFG1_BASECLKFREQ		GENMASK(15, 8)
 #define SDMMC_CORECFG1_HSEN			BIT(21)
 #define SDMMC_CORECFG1_SLOT_NONREMOVABLE	BIT(30)
+
+#define MISC_PADCFG				0x1a4
+#define MISC_PADCFG_EN				BIT(8)
+
+/* Debounce time for removable slot in Arasan SDMMC controller is 1024 ms. */
+#define DEBOUNCE_TIMEOUT_US			1100000
 
 #define SDMMC_SET_FIELD(m, v)			((v) << (ffs(m) - 1))
 
@@ -36,6 +48,7 @@ struct mcom03_sdhci_priv {
 	u32 freq;
 	u32 ctrl_id;
 	bool broken_hs;
+	bool haps;
 	bool non_removable;
 };
 
@@ -59,6 +72,7 @@ static int mcom03_sdhci_of_parse(struct udevice *dev)
 		return ret;
 
 	priv->broken_hs = dev_read_bool(dev, "elvees,broken-hs");
+	priv->haps = dev_read_bool(dev, "elvees,haps");
 
 	/* Remove it after U-Boot will be updated at least to 2019.10 */
 	priv->non_removable = dev_read_bool(dev, "non-removable");
@@ -106,10 +120,50 @@ static int mcom03_sdhci_set_soc_regs(struct udevice *dev)
 			return ret;
 	}
 
+	ret = regmap_update_bits(regmap, SDMMC_CLK_PADCFG(priv->ctrl_id),
+				 SDMMC_CLK_PADCFG_PU, SDMMC_CLK_PADCFG_PU);
+	if (ret)
+		return ret;
+
+	ret = regmap_update_bits(regmap, SDMMC_CMD_PADCFG(priv->ctrl_id),
+				 SDMMC_CLK_PADCFG_PU, SDMMC_CLK_PADCFG_PU);
+	if (ret)
+		return ret;
+
+	ret = regmap_update_bits(regmap, SDMMC_DAT_PADCFG(priv->ctrl_id),
+				 SDMMC_CLK_PADCFG_PU, SDMMC_CLK_PADCFG_PU);
+	if (ret)
+		return ret;
+
 	ret = regmap_update_bits(regmap, SDMMC_PADCFG(priv->ctrl_id),
 				 SDMMC_PADCFG_EN, SDMMC_PADCFG_EN);
+	if (ret)
+		return ret;
+
+	ret = regmap_update_bits(regmap, MISC_PADCFG,
+				 MISC_PADCFG_EN, MISC_PADCFG_EN);
 
 	return ret;
+}
+
+/*
+ * If slot set as removable then SDHCI_CARD_PRESENT bit will be set
+ * after ~1 second after card insertion or reset deassertion.
+ * This function waits debounce completion.
+ */
+static void mcom03_wait_card_detect_debounce(struct sdhci_host *host)
+{
+	const u32 mask = SDHCI_CARD_DETECT_PIN_LEVEL | SDHCI_CARD_PRESENT;
+	u32 ret;
+	u32 val;
+
+	ret = readl_poll_timeout(host->ioaddr + SDHCI_PRESENT_STATE,
+				 val,
+				 (val & mask) != SDHCI_CARD_DETECT_PIN_LEVEL,
+				 DEBOUNCE_TIMEOUT_US);
+
+	if (ret)
+		printf("SD card detect debounce timeout\n");
 }
 
 static int mcom03_sdhci_probe(struct udevice *dev)
@@ -142,12 +196,12 @@ static int mcom03_sdhci_probe(struct udevice *dev)
 	if (ret < 0)
 		goto disable_clk;
 
-	/* TODO: 100 ms may be too much */
-	mdelay(100);
-
 	ret = mcom03_sdhci_of_parse(dev);
 	if (ret)
 		goto assert_reset;
+
+	if (priv->haps)
+		mdelay(100);  /* TODO: 100 ms may be too much */
 
 	ret = mcom03_sdhci_set_soc_regs(dev);
 	if (ret)
@@ -160,14 +214,16 @@ static int mcom03_sdhci_probe(struct udevice *dev)
 	if (priv->broken_hs)
 		host->quirks |= SDHCI_QUIRK_BROKEN_HISPD_MODE;
 
-	ret = sdhci_setup_cfg(&plat->cfg, host, 0, 400000);
-	if (ret)
-		goto assert_reset;
-
 	host->mmc = &plat->mmc;
 	host->mmc->dev = dev;
 	host->mmc->priv = &priv->host;
 	upriv->mmc = host->mmc;
+
+	ret = sdhci_setup_cfg(&plat->cfg, host, 0, 400000);
+	if (ret)
+		goto assert_reset;
+
+	mcom03_wait_card_detect_debounce(host);
 
 	return sdhci_probe(dev);
 

@@ -27,6 +27,12 @@
 		clock-frequency = <27000000>;
 	};
 
+	sdmmc_clk: sdmmc_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <125000000>;
+	};
+
 	chosen {
 		stdout-path = "serial0:115200n8";
 		bootargs = "earlycon console=ttyS0,115200";
@@ -47,6 +53,25 @@
 &uart0 {
 	status = "okay";
 	clock-frequency = <27000000>;
+};
+
+&sdhci0 {
+	status = "okay";
+	clocks = <&sdmmc_clk>, <&sdmmc_clk>;
+
+	/* Disable High Speed support
+	 * Disable 1.8V support
+	 * Disable SDR50, SDR104 and DDR50 support
+	 */
+	sdhci-caps-mask = <0x7 0x4200000>;
+	sdhci-caps = <0x0 0x0>;
+};
+
+&sdhci1 {
+	status = "okay";
+	clocks = <&sdmmc_clk>, <&sdmmc_clk>;
+	non-removable;
+	bus-width = <8>;
 };
 
 &timer0 {
