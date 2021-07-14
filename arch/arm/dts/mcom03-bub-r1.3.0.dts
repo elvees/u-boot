@@ -99,6 +99,7 @@
 	ethernet_phy0: ethernet-phy@0 {
 		reg = <0x1>;
 		txc-skew-ps = <2000>;
+		max-speed = <100>;
 	};
 };
 
@@ -114,5 +115,6 @@
 	ethernet_phy1: ethernet-phy@5 {
 		reg = <0x5>;
 		txc-skew-ps = <2000>;
+		max-speed = <100>;
 	};
 };
