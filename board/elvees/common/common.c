@@ -8,6 +8,8 @@
 #include <asm/io.h>
 #include <linux/kernel.h>
 
+#include "mcom03-clk.h"
+
 #define DDR_SUBS_URB_BASE		0xC000000
 #define HSPERIPH_BAR			0xDC
 
@@ -52,5 +54,5 @@ int board_init(void)
 	 */
 	writel(0, DDR_SUBS_URB_BASE + HSPERIPH_BAR);
 
-	return 0;
+	return clk_cfg();
 }

@@ -4,5 +4,5 @@
 #
 
 ifneq ($(CONFIG_TARGET_RTL),y)
-	obj-y += common.o
+	obj-y += common.o mcom03-clk.o
 endif

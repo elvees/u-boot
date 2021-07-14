@@ -57,3 +57,7 @@ config MCOM03_EXTERNAL_DTB_ADDR
 	  find external DTB, which can be passed by previous bootloader.
 
 endif
+
+config MCOM03_XTAL_FREQ
+	int "XTAL frequency"
+	default 27000000
