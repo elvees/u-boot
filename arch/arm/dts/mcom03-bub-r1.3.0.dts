@@ -5,6 +5,8 @@
 
 /dts-v1/;
 
+#include <dt-bindings/gpio/gpio.h>
+
 #include "mcom03.dtsi"
 
 / {	model = "MCom-03 Bring-Up Board r1.3.0";
@@ -25,6 +27,12 @@
 		#clock-cells = <0>;
 		compatible = "fixed-clock";
 		clock-frequency = <27000000>;
+	};
+
+	eth_bus_clk: eth_bus_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <125000000>;
 	};
 
 	sdmmc_clk: sdmmc_clk {
@@ -77,4 +85,34 @@
 &timer0 {
 	clocks = <&common_clk>;
 	status = "okay";
+};
+
+&emac0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	phy-mode = "rgmii";
+	status = "okay";
+	phy-handle = <&ethernet_phy0>;
+	clocks = <&eth_bus_clk>;
+	phy-reset-gpios = <&gpio0c 6 GPIO_ACTIVE_HIGH>;
+
+	ethernet_phy0: ethernet-phy@0 {
+		reg = <0x1>;
+		txc-skew-ps = <2000>;
+	};
+};
+
+&emac1 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	phy-mode = "rgmii";
+	status = "okay";
+	phy-handle = <&ethernet_phy1>;
+	clocks = <&eth_bus_clk>;
+	phy-reset-gpios = <&gpio0c 7 GPIO_ACTIVE_HIGH>;
+
+	ethernet_phy1: ethernet-phy@5 {
+		reg = <0x5>;
+		txc-skew-ps = <2000>;
+	};
 };

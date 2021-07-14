@@ -167,6 +167,49 @@
 			reg-io-width = <4>;
 			status = "disabled";
 		};
+
+		gpio0: gpio@1610000 {
+			compatible = "snps,dw-apb-gpio";
+			reg = <0x1610000 0x10000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			gpio0a: gpio-controller@0 {
+				compatible = "snps,dw-apb-gpio-port";
+				gpio-controller;
+				#gpio-cells = <2>;
+				snps,nr-gpios = <8>;
+				reg = <0>;
+				bank-name = "gpioa";
+			};
+
+			gpio0b: gpio-controller@1 {
+				compatible = "snps,dw-apb-gpio-port";
+				gpio-controller;
+				#gpio-cells = <2>;
+				snps,nr-gpios = <8>;
+				reg = <1>;
+				bank-name = "gpiob";
+			};
+
+			gpio0c: gpio-controller@2 {
+				compatible = "snps,dw-apb-gpio-port";
+				gpio-controller;
+				#gpio-cells = <2>;
+				snps,nr-gpios = <8>;
+				reg = <2>;
+				bank-name = "gpioc";
+			};
+
+			gpio0d: gpio-controller@3 {
+				compatible = "snps,dw-apb-gpio-port";
+				gpio-controller;
+				#gpio-cells = <2>;
+				snps,nr-gpios = <8>;
+				reg = <3>;
+				bank-name = "gpiod";
+			};
+		};
 	};
 
 	hsperiph@0 {
@@ -359,6 +402,49 @@
 			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
 			status = "disabled";
+		};
+
+		gpio1: gpio@1780000 {
+			compatible = "snps,dw-apb-gpio";
+			reg = <0x1780000 0x10000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			gpio1a: gpio-controller@0 {
+				compatible = "snps,dw-apb-gpio-port";
+				gpio-controller;
+				#gpio-cells = <2>;
+				snps,nr-gpios = <8>;
+				reg = <0>;
+				bank-name = "gpioa";
+			};
+
+			gpio1b: gpio-controller@1 {
+				compatible = "snps,dw-apb-gpio-port";
+				gpio-controller;
+				#gpio-cells = <2>;
+				snps,nr-gpios = <8>;
+				reg = <1>;
+				bank-name = "gpiob";
+			};
+
+			gpio1c: gpio-controller@2 {
+				compatible = "snps,dw-apb-gpio-port";
+				gpio-controller;
+				#gpio-cells = <2>;
+				snps,nr-gpios = <8>;
+				reg = <2>;
+				bank-name = "gpioc";
+			};
+
+			gpio1d: gpio-controller@3 {
+				compatible = "snps,dw-apb-gpio-port";
+				gpio-controller;
+				#gpio-cells = <2>;
+				snps,nr-gpios = <8>;
+				reg = <3>;
+				bank-name = "gpiod";
+			};
 		};
 	};
 };
