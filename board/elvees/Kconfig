@@ -19,6 +19,7 @@ config TARGET_MCOM03_BUB
 	bool "MCom-03 BuB"
 	select DM_ETH
 	select DM_MMC
+	select DM_GPIO
 	help
 	  Support for the following boards:
 	    MCom-03 Bring-Up Board r1.3.0
