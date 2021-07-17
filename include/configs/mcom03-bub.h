@@ -29,7 +29,18 @@
 #define CONFIG_BOOTFILE			"Image"
 #define CONFIG_LOADADDR			CONFIG_SYS_LOAD_ADDR
 
-#define CONFIG_BOOTCOMMAND \
-	"booti ${loadaddr} - ${fdtcontroladdr}"
+#define BOOT_TARGET_DEVICES(func) \
+	func(MMC, mmc, 0)
+
+#include <config_distro_bootcmd.h>
+
+#define CONFIG_EXTRA_ENV_SETTINGS \
+	"disable_giga=0x1\0" \
+	"kernel_addr_r=0xc2000000\0" \
+	"scriptaddr=0xc8000000\0" \
+	"ramdisk_addr_r=0xc900000\0" \
+	"pxefile_addr_r=0xc800000\0" \
+	"fdt_addr_r=0xc8800000\0" \
+	BOOTENV
 
 #endif
