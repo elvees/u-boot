@@ -49,7 +49,6 @@ struct mcom03_sdhci_priv {
 	u32 ctrl_id;
 	bool broken_hs;
 	bool haps;
-	bool non_removable;
 };
 
 static int mcom03_sdhci_bind(struct udevice *dev)
@@ -73,9 +72,6 @@ static int mcom03_sdhci_of_parse(struct udevice *dev)
 
 	priv->broken_hs = dev_read_bool(dev, "elvees,broken-hs");
 	priv->haps = dev_read_bool(dev, "elvees,haps");
-
-	/* Remove it after U-Boot will be updated at least to 2019.10 */
-	priv->non_removable = dev_read_bool(dev, "non-removable");
 
 	return mmc_of_parse(dev, &plat->cfg);
 }
@@ -108,14 +104,6 @@ static int mcom03_sdhci_set_soc_regs(struct udevice *dev)
 	if (priv->broken_hs) {
 		ret = regmap_update_bits(regmap, SDMMC_CORECFG1(priv->ctrl_id),
 					 SDMMC_CORECFG1_HSEN, 0);
-		if (ret)
-			return ret;
-	}
-
-	if (priv->non_removable) {
-		ret = regmap_update_bits(regmap, SDMMC_CORECFG1(priv->ctrl_id),
-					 SDMMC_CORECFG1_SLOT_NONREMOVABLE,
-					 SDMMC_CORECFG1_SLOT_NONREMOVABLE);
 		if (ret)
 			return ret;
 	}
