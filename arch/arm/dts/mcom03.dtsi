@@ -284,6 +284,36 @@
 			num-cs = <4>;
 			status = "disabled";
 		};
+
+		usb0: usb@10000000 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+			compatible = "elvees,mcom03-dwc3";
+			resets = <&hsreset 6>;
+			status = "disabled";
+
+			dwc3@10000000 {
+				compatible = "snps,dwc3";
+				reg = <0x10000000 0x100000>;
+				interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+			};
+		};
+
+		usb1: usb@10100000 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+			compatible = "elvees,mcom03-dwc3";
+			resets = <&hsreset 7>;
+			status = "disabled";
+
+			dwc3@10100000 {
+				compatible = "snps,dwc3";
+				reg = <0x10100000 0x100000>;
+				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+			};
+		};
 	};
 
 	sdr@1900000 {
