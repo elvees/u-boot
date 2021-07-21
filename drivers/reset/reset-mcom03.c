@@ -7,22 +7,26 @@
 #include <common.h>
 #include <dm.h>
 #include <reset-uclass.h>
+#include <syscon.h>
+#include <regmap.h>
 
 #define WRITE_ENABLE_OFFSET	16
 
 struct mcom03_reset_priv {
-	void __iomem *base;
+	struct regmap *urb;
+	unsigned long offset;
 };
 
 static int mcom03_reset_deassert(struct reset_ctl *rst)
 {
 	struct mcom03_reset_priv *priv = dev_get_priv(rst->dev);
-	u32 val;
+	u32 mask = BIT(rst->id) | BIT(rst->id + WRITE_ENABLE_OFFSET);
+	int ret;
 
-	val = readl(priv->base);
-	val &= ~BIT(rst->id);
-	val |= BIT(rst->id + WRITE_ENABLE_OFFSET);
-	writel(val, priv->base);
+	ret = regmap_update_bits(priv->urb, priv->offset, mask,
+				 BIT(rst->id + WRITE_ENABLE_OFFSET));
+	if (ret < 0)
+		return ret;
 
 	return 0;
 }
@@ -30,11 +34,12 @@ static int mcom03_reset_deassert(struct reset_ctl *rst)
 static int mcom03_reset_assert(struct reset_ctl *rst)
 {
 	struct mcom03_reset_priv *priv = dev_get_priv(rst->dev);
-	u32 val;
+	u32 mask = BIT(rst->id) | BIT(rst->id + WRITE_ENABLE_OFFSET);
+	int ret;
 
-	val = readl(priv->base);
-	val |= BIT(rst->id) | BIT(rst->id + WRITE_ENABLE_OFFSET);
-	writel(val, priv->base);
+	ret = regmap_update_bits(priv->urb, priv->offset, mask, mask);
+	if (ret < 0)
+		return ret;
 
 	return 0;
 }
@@ -57,16 +62,26 @@ static const struct reset_ops mcom03_reset_reset_ops = {
 };
 
 static const struct udevice_id mcom03_reset_ids[] = {
-	{ .compatible = "elvees,mcom03-reset" },
+	{ .compatible = "elvees,mcom03-hsperiph-reset" },
 	{ /* sentinel */ }
 };
 
 static int mcom03_reset_probe(struct udevice *dev)
 {
 	struct mcom03_reset_priv *priv = dev_get_priv(dev);
+	struct ofnode_phandle_args args;
+	int ret;
 
-	priv->base = dev_remap_addr(dev);
-	if (!priv->base)
+	ret = dev_read_phandle_with_args(dev, "urb", NULL, 0, 0, &args);
+	if (ret)
+		return ret;
+
+	priv->urb = syscon_node_to_regmap(args.node);
+	if (IS_ERR(priv->urb))
+		return PTR_ERR(priv->urb);
+
+	priv->offset = devfdt_get_addr(dev);
+	if (!priv->offset)
 		return -ENOMEM;
 
 	return 0;

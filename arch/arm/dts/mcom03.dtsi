@@ -223,9 +223,10 @@
 			reg = <0x10400000 0x200>;
 		};
 
-		hsreset: reset-controller@10400008 {
-			compatible = "elvees,mcom03-reset";
-			reg = <0x10400008 0x4>;
+		hsreset: reset-controller@8 {
+			compatible = "elvees,mcom03-hsperiph-reset";
+			reg = <0x8 0x4>;
+			urb = <&hsurb>;
 			#reset-cells = <1>;
 		};
 
