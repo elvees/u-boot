@@ -12,6 +12,13 @@
 
 #define HSP_PLL_ADDR 0x10400000
 #define HSP_REFCLK_ADDR 0x1040000c
+#define LSP1_PLL_ADDR 0x17e0000
+#define MEDIA_PLL0_ADDR 0x1320000
+#define MEDIA_PLL1_ADDR 0x1320010
+#define MEDIA_PLL2_ADDR 0x1320020
+#define MEDIA_PLL3_ADDR 0x1320030
+#define LSP1_I2S_UCG_RSTN_PPOLICY 0x17e0008
+#define LSP1_I2S_UCG_RSTN_PSTATUS 0x17e000c
 
 #define PLL_CFG_SEL GENMASK(7, 0)
 #define PLL_CFG_MAN BIT(9)
@@ -28,9 +35,16 @@
 #define UCG_CTR_DIV_COEFF GENMASK(29, 10)
 #define UCG_CTR_DIV_LOCK BIT(30)
 
+#define PP_ON 0x10
+
 enum pll_id {
 	HSP_PLL,
-	LSP0_PLL
+	LSP0_PLL,
+	LSP1_PLL,
+	MEDIA_PLL0,
+	MEDIA_PLL1,
+	MEDIA_PLL2,
+	MEDIA_PLL3,
 };
 
 struct pll_settings {
@@ -44,12 +58,17 @@ struct pll_settings {
 
 static struct pll_settings pll_settings[] = {
 	{ HSP_PLL, 27000000, 1125000000, 2, 249, 1 },
+	{ LSP1_PLL, 27000000, 614250000, 0, 90, 3 },
+	{ MEDIA_PLL0, 27000000, 1998000000, 0, 73, 0 },
+	{ MEDIA_PLL1, 27000000, 594000000, 0, 131, 5 },
+	{ MEDIA_PLL2, 27000000, 495000000, 0, 109, 5 },
+	{ MEDIA_PLL3, 27000000, 600000000, 2, 399, 5 },
 };
 
 struct ucg_channel {
 	int ucg_id;
 	int chan_id;
-	u32 div;
+	int div;
 };
 
 static struct ucg_channel ucg_hsp_channels[] = {
@@ -81,6 +100,40 @@ static struct ucg_channel ucg_hsp_channels[] = {
 	{3, 3, 45},	/* HSPERIPH UCG3 USB1 suspend	25 MHz */
 };
 
+static struct ucg_channel ucg_lsp1_channels[] = {
+	{0, 0, 7},	/* LSPERIPH1 UCG0 SYS		87.75 MHz */
+	{0, 1, 6},	/* LSPERIPH1 UCG0 I2C0		102.375 MHz */
+	{0, 2, 6},	/* LSPERIPH1 UCG0 I2C1		102.375 MHz */
+	{0, 3, 6},	/* LSPERIPH1 UCG0 I2C2		102.375 MHz */
+	{0, 4, 7},	/* LSPERIPH1 UCG0 GPIO1_DB	87.75 MHz */
+	{0, 5, 4},	/* LSPERIPH1 UCG0 SSI1		153.5625 MHz */
+	{0, 6, -1},	/* LSPERIPH1 UCG0 UART0		27 MHz (bypass) */
+	{0, 7, 7},	/* LSPERIPH1 UCG0 TIMERS	87.75 MHz */
+	{0, 8, 7},	/* LSPERIPH1 UCG0 PWM0		87.75 MHz */
+	{0, 9, 7},	/* LSPERIPH1 UCG0 WDT1		87.75 MHz */
+	{1, 0, 50},	/* LSPERIPH1 UCG1 I2S		12.285 MHz */
+};
+
+static struct ucg_channel ucg_media_channels[] = {
+	{0, 0, 16},	/* MEDIA UCG0 SYS		124.875 MHz */
+	{0, 1, 10},	/* MEDIA UCG0 ISP		199.8 MHz */
+	{1, 0, 2},	/* MEDIA UCG1 DISP_ACLK		297 MHz */
+	{1, 1, 8},	/* MEDIA UCG1 DISP_MCLK		74.25 MHz */
+	{1, 2, 8},	/* MEDIA UCG1 DISP_PIXCLK	74.25 MHz */
+	{2, 0, 2},	/* MEDIA UCG2 GPU_SYS		247.5 MHz */
+	{2, 1, 2},	/* MEDIA UCG2 GPU_MEM		247.5 MHz */
+	{2, 2, 2},	/* MEDIA UCG2 GPU_CORE		247.5 MHz */
+	{3, 0, -1},	/* MEDIA UCG3 MIPI_RX_REF	27 MHz (bypass) */
+	{3, 1, -1},	/* MEDIA UCG3 MIPI_RX0_CFG	27 MHz (bypass) */
+	{3, 2, -1},	/* MEDIA UCG3 MIPI_RX1_CFG	27 MHz (bypass) */
+	{3, 3, -1},	/* MEDIA UCG3 MIPI_TX_REF	27 MHz (bypass) */
+	{3, 4, -1},	/* MEDIA UCG3 MIPI_TX_CFG	27 MHz (bypass) */
+	{3, 5, -1},	/* MEDIA UCG3 CMOS0		27 MHz (bypass) */
+	{3, 6, -1},	/* MEDIA UCG3 CMOS1		27 MHz (bypass) */
+	{3, 7, 30},	/* MEDIA UCG3 MIPI_TXCLKESC	20 MHz */
+	{3, 8, 2},	/* MEDIA UCG3 VPU_CLK		300 MHz */
+};
+
 enum ucg_qfsm_state {
 	Q_FSM_STOPPED = 0,
 	Q_FSM_CLK_EN = 1,
@@ -99,6 +152,26 @@ unsigned long hsp_ucg_ctr_addr_get(int ucg_id, int chan_id)
 unsigned long hsp_ucg_bp_addr_get(int ucg_id)
 {
 	return 0x10410040 + ucg_id * 0x10000;
+}
+
+unsigned long lsp1_ucg_ctr_addr_get(int ucg_id, int chan_id)
+{
+	return 0x17c0000 + ucg_id * 0x10000 + chan_id * 0x4;
+}
+
+unsigned long lsp1_ucg_bp_addr_get(int ucg_id)
+{
+	return 0x17c0040 + ucg_id * 0x10000;
+}
+
+unsigned long media_ucg_ctr_addr_get(int ucg_id, int chan_id)
+{
+	return 0x1320040 + ucg_id * 0x80 + chan_id * 0x4;
+}
+
+unsigned long media_ucg_bp_addr_get(int ucg_id)
+{
+	return 0x1320080 + ucg_id * 0x80;
 }
 
 static int pll_settings_get(int pll_id, struct pll_settings *settings)
@@ -152,7 +225,7 @@ static int ucg_cfg(struct ucg_channel *ucg_channels, int chans_num,
 		   unsigned long (*ucg_ctr_addr_get)(int, int),
 		   unsigned long (*ucg_bp_addr_get)(int),
 		   unsigned long refclk_addr, u32 refclk_mask,
-		   unsigned long pll_addr, enum pll_id pll_id)
+		   unsigned long *pll_addr, enum pll_id *pll_ids, int pll_num)
 {
 	unsigned long chan_addr;
 	int i, ret;
@@ -172,14 +245,20 @@ static int ucg_cfg(struct ucg_channel *ucg_channels, int chans_num,
 	}
 
 	/* Set reference clocks for all UCGs */
-	writel(refclk_mask, refclk_addr);
+	if (refclk_addr)
+		writel(refclk_mask, refclk_addr);
 
-	ret = pll_cfg(pll_id, pll_addr);
-	if (ret)
-		return ret;
+	for (i = 0; i < pll_num; i++) {
+		ret = pll_cfg(pll_ids[i], pll_addr[i]);
+		if (ret)
+			return ret;
+	}
 
 	/* Set dividers */
 	for (i = 0; i < chans_num; i++) {
+		if (ucg_channels[i].div == -1)
+			continue;
+
 		chan_addr = ucg_ctr_addr_get(ucg_channels[i].ucg_id,
 					     ucg_channels[i].chan_id);
 
@@ -215,6 +294,10 @@ static int ucg_cfg(struct ucg_channel *ucg_channels, int chans_num,
 
 	/* Disable bypass */
 	for (i = 0; i < chans_num; i++) {
+		/* Stay in baypass if div == -1 */
+		if (ucg_channels[i].div == -1)
+			continue;
+
 		val = readl(ucg_bp_addr_get(ucg_channels[i].ucg_id));
 
 		if (val & BIT(ucg_channels[i].chan_id))
@@ -228,11 +311,42 @@ static int ucg_cfg(struct ucg_channel *ucg_channels, int chans_num,
 
 int clk_cfg(void)
 {
+	enum pll_id pll_hsp = HSP_PLL;
+	enum pll_id pll_lsp1 = LSP1_PLL;
+	enum pll_id pll_media[] = { MEDIA_PLL0, MEDIA_PLL1,
+				    MEDIA_PLL2, MEDIA_PLL3 };
+	unsigned long hsp_pll_addr[] = { HSP_PLL_ADDR };
+	unsigned long lsp1_pll_addr[] = { LSP1_PLL_ADDR };
+	unsigned long media_pll_addr[] = { MEDIA_PLL0_ADDR, MEDIA_PLL1_ADDR,
+					   MEDIA_PLL2_ADDR, MEDIA_PLL3_ADDR };
+	u32 val;
 	int ret;
 
-	ret = ucg_cfg(&ucg_hsp_channels[0], ARRAY_SIZE(ucg_hsp_channels),
+	/* I2S RSTN muset be enabled before LSP1 UCGs setup */
+	writel(PP_ON, LSP1_I2S_UCG_RSTN_PPOLICY);
+	ret = readl_poll_timeout(LSP1_I2S_UCG_RSTN_PSTATUS, val, val == PP_ON,
+				 1000);
+	if (ret)
+		return ret;
+
+	ret = ucg_cfg(ucg_hsp_channels, ARRAY_SIZE(ucg_hsp_channels),
 		      hsp_ucg_ctr_addr_get, hsp_ucg_bp_addr_get,
-		      HSP_REFCLK_ADDR, 0x0, HSP_PLL_ADDR, HSP_PLL);
+		      HSP_REFCLK_ADDR, 0x0, hsp_pll_addr, &pll_hsp,
+		      ARRAY_SIZE(hsp_pll_addr));
+	if (ret)
+		return ret;
+
+	ret = ucg_cfg(ucg_lsp1_channels, ARRAY_SIZE(ucg_lsp1_channels),
+		      lsp1_ucg_ctr_addr_get, lsp1_ucg_bp_addr_get,
+		      0, 0x0, lsp1_pll_addr, &pll_lsp1,
+		      ARRAY_SIZE(lsp1_pll_addr));
+	if (ret)
+		return ret;
+
+	ret = ucg_cfg(ucg_media_channels, ARRAY_SIZE(ucg_media_channels),
+		      media_ucg_ctr_addr_get, media_ucg_bp_addr_get,
+		      0, 0x0, media_pll_addr, pll_media,
+		      ARRAY_SIZE(media_pll_addr));
 	if (ret)
 		return ret;
 
