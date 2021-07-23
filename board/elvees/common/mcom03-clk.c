@@ -23,6 +23,7 @@
 #define SDR_PLL0_ADDR 0x1910000
 #define SDR_PLL1_ADDR 0x1910008
 #define SDR_PLL2_ADDR 0x1910010
+#define SERV_PLL_ADDR 0x1f001000
 
 #define PLL_CFG_SEL GENMASK(7, 0)
 #define PLL_CFG_MAN BIT(9)
@@ -60,6 +61,7 @@ enum pll_id {
 	SDR_PLL0,
 	SDR_PLL1,
 	SDR_PLL2,
+	SERV_PLL,
 };
 
 struct pll_settings {
@@ -86,6 +88,7 @@ static struct pll_settings pll_settings[] = {
 	 * Setup PLL3 to frequency that can be divided by DISP_PIXCLK.
 	 */
 	{ MEDIA_PLL3, 27000000, 594000000, 0, 131, 5 },
+	{ SERV_PLL, 27000000, 594000000, 0, 131, 5 },
 };
 
 struct ucg_channel {
@@ -188,6 +191,22 @@ static struct ucg_channel ucg_sdr_channels[] = {
 	{0, 12, 9},	/* SDR UCG0 LVDS_CLK		210 MHz */
 };
 
+static struct ucg_channel ucg_serv_channels[] = {
+	{1, 0, 11},	/* SERVICE UCG1 APB		54 MHz */
+	{1, 1, 2},	/* SERVICE UCG1 CORE		297 MHz */
+	{1, 2, 2},	/* SERVICE UCG1 QSPI0		297 MHz */
+	{1, 3, 2},	/* SERVICE UCG1 BPAM		297 MHz */
+	{1, 4, 2},	/* SERVICE UCG1 RISC0		297 MHz */
+	{1, 5, 11},	/* SERVICE UCG1 MFBSP0		54 MHz */
+	{1, 6, 11},	/* SERVICE UCG1 MFBSP1		54 MHz */
+	{1, 7, 11},	/* SERVICE UCG1 MAILBOX0	54 MHz */
+	{1, 8, 11},	/* SERVICE UCG1 PVTCTR		54 MHz */
+	{1, 9, 11},	/* SERVICE UCG1 I2C4		54 MHz */
+	{1, 10, 11},	/* SERVICE UCG1 TRNG		54 MHz */
+	{1, 11, 11},	/* SERVICE UCG1 SPIOTP		54 MHz */
+	{1, 13, -1},	/* SERVICE UCG1 QSPI0_EXT	27 MHz (bypass) */
+};
+
 enum ucg_qfsm_state {
 	Q_FSM_STOPPED = 0,
 	Q_FSM_CLK_EN = 1,
@@ -246,6 +265,16 @@ unsigned long sdr_ucg_ctr_addr_get(int ucg_id, int chan_id)
 unsigned long sdr_ucg_bp_addr_get(int ucg_id)
 {
 	return 0x1900040;
+}
+
+unsigned long serv_ucg_ctr_addr_get(int ucg_id, int chan_id)
+{
+	return 0x1f020000 + chan_id * 0x4;
+}
+
+unsigned long serv_ucg_bp_addr_get(int ucg_id)
+{
+	return 0x1f020040;
 }
 
 static int pll_settings_get(int pll_id, struct pll_settings *settings)
@@ -458,5 +487,9 @@ int clk_cfg(void)
 	writel(SDR_URB_PCIE_CTL_ENABLE_CLK | SDR_URB_PCIE_CTL_PAD_EN,
 	       SDR_URB_PCI1_CTL);
 
-	return 0;
+	ret = ucg_cfg(ucg_serv_channels, ARRAY_SIZE(ucg_serv_channels),
+		      serv_ucg_ctr_addr_get, serv_ucg_bp_addr_get, 0, 0x0,
+		      (unsigned long []){ SERV_PLL_ADDR },
+		      (enum pll_id []){ SERV_PLL }, 1);
+	return ret;
 }
