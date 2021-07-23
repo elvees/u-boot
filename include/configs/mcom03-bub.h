@@ -26,11 +26,11 @@
 #define CONFIG_STANDALONE_LOAD_ADDR	0xC2000000
 
 /* Default environment */
-#define CONFIG_BOOTFILE			"Image"
 #define CONFIG_LOADADDR			CONFIG_SYS_LOAD_ADDR
 
 #define BOOT_TARGET_DEVICES(func) \
-	func(MMC, mmc, 0)
+	func(MMC, mmc, 0) \
+	func(PXE, pxe, na)
 
 #include <config_distro_bootcmd.h>
 
@@ -38,9 +38,10 @@
 	"disable_giga=0x1\0" \
 	"kernel_addr_r=0xc2000000\0" \
 	"scriptaddr=0xc8000000\0" \
-	"ramdisk_addr_r=0xc900000\0" \
-	"pxefile_addr_r=0xc800000\0" \
+	"ramdisk_addr_r=0xc9000000\0" \
+	"pxefile_addr_r=0xca000000\0" \
 	"fdt_addr_r=0xc8800000\0" \
+	"serverip=127.0.0.0\0" \
 	BOOTENV
 
 #endif
