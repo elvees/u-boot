@@ -175,3 +175,7 @@
 	clock-frequency = <400000>;
 	status = "okay";
 };
+
+&vpu {
+	status = "okay";
+};
