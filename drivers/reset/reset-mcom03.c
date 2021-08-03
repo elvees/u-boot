@@ -9,12 +9,14 @@
 #include <reset-uclass.h>
 #include <syscon.h>
 #include <regmap.h>
+#include <dt-bindings/soc/elvees,mcom03.h>
 
 #define WRITE_ENABLE_OFFSET	16
 
 struct mcom03_reset_priv {
 	struct regmap *urb;
 	unsigned long offset;
+	unsigned int subsystem;
 };
 
 static int mcom03_reset_deassert(struct reset_ctl *rst)
@@ -62,27 +64,30 @@ static const struct reset_ops mcom03_reset_reset_ops = {
 };
 
 static const struct udevice_id mcom03_reset_ids[] = {
-	{ .compatible = "elvees,mcom03-hsperiph-reset" },
+	{ .compatible = "elvees,mcom03-reset" },
 	{ /* sentinel */ }
 };
 
 static int mcom03_reset_probe(struct udevice *dev)
 {
 	struct mcom03_reset_priv *priv = dev_get_priv(dev);
-	struct ofnode_phandle_args args;
 	int ret;
 
-	ret = dev_read_phandle_with_args(dev, "urb", NULL, 0, 0, &args);
-	if (ret)
-		return ret;
+	priv->urb = syscon_get_regmap(dev->parent);
 
-	priv->urb = syscon_node_to_regmap(args.node);
 	if (IS_ERR(priv->urb))
 		return PTR_ERR(priv->urb);
 
 	priv->offset = devfdt_get_addr(dev);
 	if (!priv->offset)
 		return -ENOMEM;
+
+	ret = dev_read_u32(dev, "elvees,subsystem", &priv->subsystem);
+	if (ret)
+		return ret;
+
+	if (priv->subsystem != MCOM03_SUBSYSTEM_HSPERIPH)
+		return -EINVAL;
 
 	return 0;
 }

@@ -4,6 +4,7 @@
  */
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/soc/elvees,mcom03.h>
 
 / {
 	compatible = "elvees,mcom03";
@@ -256,16 +257,19 @@
 		#size-cells = <2>;
 		ranges;
 
-		hsurb: urb@10400000 {
-			compatible = "elvees,mcom03-urb", "syscon";
+		hsperiph_urb: urb@10400000 {
+			compatible = "elvees,mcom03-urb", "syscon", "simple-mfd";
+			#address-cells = <1>;
+			#size-cells = <1>;
 			reg = <0 0x10400000 0 0x200>;
-		};
+			ranges = <0 0 0 0x200>;
 
-		hsreset: reset-controller@8 {
-			compatible = "elvees,mcom03-hsperiph-reset";
-			reg = <0 0x8 0 0x4>;
-			urb = <&hsurb>;
-			#reset-cells = <1>;
+			hsperiph_reset: reset-controller@8 {
+				compatible = "elvees,mcom03-reset";
+				reg = <0x8 0x4>;
+				elvees,subsystem = <MCOM03_SUBSYSTEM_HSPERIPH>;
+				#reset-cells = <1>;
+			};
 		};
 
 		emac0: ethernet@10200000 {
@@ -273,7 +277,7 @@
 			reg = <0 0x10200000 0 0x1000>;
 			clocks = <&eth_bus_clk>;
 			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-			resets = <&hsreset 8>;
+			resets = <&hsperiph_reset HSPERIPH_RST_EMAC0>;
 			elvees,ctrl-id = <0>;
 			status = "disabled";
 		};
@@ -283,7 +287,7 @@
 			reg = <0 0x10210000 0 0x1000>;
 			clocks = <&eth_bus_clk>;
 			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-			resets = <&hsreset 9>;
+			resets = <&hsperiph_reset HSPERIPH_RST_EMAC1>;
 			elvees,ctrl-id = <1>;
 			status = "disabled";
 		};
@@ -291,12 +295,12 @@
 		sdhci0: sdhci0@10220000 {
 			compatible = "elvees,mcom03-sdhci-8.9a";
 			reg = <0 0x10220000 0 0x10000>;
-			arasan,soc-ctl-syscon = <&hsurb>;
+			arasan,soc-ctl-syscon = <&hsperiph_urb>;
 			interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
 			/* Linux driver requires the following clock names */
 			clock-names = "clk_xin", "clk_ahb";
 			clocks = <&sdmmc_clk>, <&sdmmc_clk>;
-			resets = <&hsreset 4>;
+			resets = <&hsperiph_reset HSPERIPH_RST_SDMMC0>;
 			elvees,ctrl-id = <0>;
 			status = "disabled";
 		};
@@ -304,11 +308,11 @@
 		sdhci1: sdhci1@10230000 {
 			compatible = "elvees,mcom03-sdhci-8.9a";
 			reg = <0 0x10230000 0 0x10000>;
-			arasan,soc-ctl-syscon = <&hsurb>;
+			arasan,soc-ctl-syscon = <&hsperiph_urb>;
 			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "clk_xin", "clk_ahb";
 			clocks = <&sdmmc_clk>, <&sdmmc_clk>;
-			resets = <&hsreset 5>;
+			resets = <&hsperiph_reset HSPERIPH_RST_SDMMC1>;
 			elvees,ctrl-id = <1>;
 			status = "disabled";
 		};
@@ -320,8 +324,8 @@
 			reg = <0 0x10260000 0 0x10000>;
 			clock-names = "clk_axi", "clk_ext";
 			clocks = <&qspi_clk>, <&qspi_clk>;
-			resets = <&hsreset 2>;
-			arasan,soc-ctl-syscon = <&hsurb>;
+			resets = <&hsperiph_reset HSPERIPH_RST_QSPI>;
+			arasan,soc-ctl-syscon = <&hsperiph_urb>;
 			num-cs = <4>;
 			status = "disabled";
 		};
@@ -333,7 +337,7 @@
 			compatible = "elvees,mcom03-dwc3";
 			clock-names = "bus_early", "ref", "suspend";
 			clocks = <&usb_bus_clk>, <&usb_suspend_clk>, <&usb_suspend_clk>;
-			resets = <&hsreset 6>;
+			resets = <&hsperiph_reset HSPERIPH_RST_USB0>;
 			status = "disabled";
 
 			dwc3@10000000 {
@@ -350,7 +354,7 @@
 			compatible = "elvees,mcom03-dwc3";
 			clock-names = "bus_early", "ref", "suspend";
 			clocks = <&usb_bus_clk>, <&usb_suspend_clk>, <&usb_suspend_clk>;
-			resets = <&hsreset 7>;
+			resets = <&hsperiph_reset HSPERIPH_RST_USB1>;
 			status = "disabled";
 
 			dwc3@10100000 {
