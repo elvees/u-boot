@@ -8,8 +8,8 @@
 / {
 	compatible = "elvees,mcom03";
 	interrupt-parent = <&gic>;
-	#address-cells = <1>;
-	#size-cells = <1>;
+	#address-cells = <2>;
+	#size-cells = <2>;
 
 	cpus {
 		#address-cells = <1>;
@@ -94,7 +94,7 @@
 
 	wdt0: watchdog@1f080000 {
 		compatible = "snps,dw-wdt";
-		reg = <0x1f080000 0x1000>;
+		reg = < 0 0x1f080000 0 0x1000>;
 		/* TODO: Add clocks property here */
 	};
 
@@ -107,35 +107,35 @@
 		compatible = "arm,gic-v3";
 		#interrupt-cells = <3>;
 		interrupt-controller;
-		reg = <0x1100000 0x10000>, /* GICD */
-		      <0x1180000 0x80000>; /* GICR */
+		reg = <0 0x1100000 0 0x10000>, /* GICD */
+		      <0 0x1180000 0 0x80000>; /* GICR */
 		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_LOW>;
 	};
 
 	media@1200000 {
 		compatible = "simple-bus";
-		#address-cells = <1>;
-		#size-cells = <1>;
+		#address-cells = <2>;
+		#size-cells = <2>;
 		ranges;
 
 		gpu: gpu@1200000 {
 			compatible = "img,gpu";
 			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
-			reg = <0x1200000 0x80000>;
+			reg = <0 0x1200000 0 0x80000>;
 			status = "disabled";
 		};
 
 		vpu: vpu@1280000 {
 			compatible = "arm,mali-v500";
 			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-			reg = <0x1280000 0x10000>;
+			reg = <0 0x1280000 0 0x10000>;
 			status = "disabled";
 		};
 
 		isp: isp@12a0000 {
 			compatible = "img,v2505-isp";
 			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-			reg = <0x12a0000 0x10000>;
+			reg = <0 0x12a0000 0 0x10000>;
 			/* TODO: Add clocks property here */
 			clock-names = "core";
 			status = "disabled";
@@ -144,13 +144,13 @@
 
 	lsperiph0@1600000 {
 		compatible = "simple-bus";
-		#address-cells = <1>;
-		#size-cells = <1>;
+		#address-cells = <2>;
+		#size-cells = <2>;
 		ranges;
 
 		uart1: serial0@1640000 {
 			compatible = "snps,dw-apb-uart";
-			reg = <0x1640000 0x1000>;
+			reg = <0 0x1640000 0 0x1000>;
 			interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
 			reg-shift = <2>;
 			reg-io-width = <4>;
@@ -159,7 +159,7 @@
 
 		uart2: serial0@1650000 {
 			compatible = "snps,dw-apb-uart";
-			reg = <0x1650000 0x1000>;
+			reg = <0 0x1650000 0 0x1000>;
 			interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
 			reg-shift = <2>;
 			reg-io-width = <4>;
@@ -168,7 +168,7 @@
 
 		uart3: serial0@1660000 {
 			compatible = "snps,dw-apb-uart";
-			reg = <0x1660000 0x1000>;
+			reg = <0 0x1660000 0 0x1000>;
 			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
 			reg-shift = <2>;
 			reg-io-width = <4>;
@@ -177,7 +177,7 @@
 
 		gpio0: gpio@1610000 {
 			compatible = "snps,dw-apb-gpio";
-			reg = <0x1610000 0x10000>;
+			reg = <0 0x1610000 0 0x10000>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 
@@ -232,25 +232,25 @@
 
 	hsperiph@0 {
 		compatible = "simple-bus";
-		#address-cells = <1>;
-		#size-cells = <1>;
+		#address-cells = <2>;
+		#size-cells = <2>;
 		ranges;
 
 		hsurb: urb@10400000 {
 			compatible = "elvees,mcom03-urb", "syscon";
-			reg = <0x10400000 0x200>;
+			reg = <0 0x10400000 0 0x200>;
 		};
 
 		hsreset: reset-controller@8 {
 			compatible = "elvees,mcom03-hsperiph-reset";
-			reg = <0x8 0x4>;
+			reg = <0 0x8 0 0x4>;
 			urb = <&hsurb>;
 			#reset-cells = <1>;
 		};
 
 		emac0: ethernet@10200000 {
 			compatible = "elvees,arasan-gemac";
-			reg = <0x10200000 0x1000>;
+			reg = <0 0x10200000 0 0x1000>;
 			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
 			resets = <&hsreset 8>;
 			elvees,ctrl-id = <0>;
@@ -259,7 +259,7 @@
 
 		emac1: ethernet@10210000 {
 			compatible = "elvees,arasan-gemac";
-			reg = <0x10210000 0x1000>;
+			reg = <0 0x10210000 0 0x1000>;
 			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
 			resets = <&hsreset 9>;
 			elvees,ctrl-id = <1>;
@@ -268,7 +268,7 @@
 
 		sdhci0: sdhci0@10220000 {
 			compatible = "elvees,mcom03-sdhci-8.9a";
-			reg = <0x10220000 0x10000>;
+			reg = <0 0x10220000 0 0x10000>;
 			arasan,soc-ctl-syscon = <&hsurb>;
 			interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
 			/* Linux driver requires the following clock names */
@@ -281,7 +281,7 @@
 
 		sdhci1: sdhci1@10230000 {
 			compatible = "elvees,mcom03-sdhci-8.9a";
-			reg = <0x10230000 0x10000>;
+			reg = <0 0x10230000 0 0x10000>;
 			arasan,soc-ctl-syscon = <&hsurb>;
 			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "clk_xin", "clk_ahb";
@@ -295,7 +295,7 @@
 			compatible = "silvaco,axi-qspi";
 			#address-cells = <1>;
 			#size-cells = <0>;
-			reg = <0x10260000 0x10000>;
+			reg = <0 0x10260000 0 0x10000>;
 			clock-names = "clk_axi", "clk_ext";
 			/* TODO: Add clocks property here */
 			resets = <&hsreset 2>;
@@ -305,8 +305,8 @@
 		};
 
 		usb0: usb@10000000 {
-			#address-cells = <1>;
-			#size-cells = <1>;
+			#address-cells = <2>;
+			#size-cells = <2>;
 			ranges;
 			compatible = "elvees,mcom03-dwc3";
 			resets = <&hsreset 6>;
@@ -314,14 +314,14 @@
 
 			dwc3@10000000 {
 				compatible = "snps,dwc3";
-				reg = <0x10000000 0x100000>;
+				reg = <0 0x10000000 0 0x100000>;
 				interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
 			};
 		};
 
 		usb1: usb@10100000 {
-			#address-cells = <1>;
-			#size-cells = <1>;
+			#address-cells = <2>;
+			#size-cells = <2>;
 			ranges;
 			compatible = "elvees,mcom03-dwc3";
 			resets = <&hsreset 7>;
@@ -329,7 +329,7 @@
 
 			dwc3@10100000 {
 				compatible = "snps,dwc3";
-				reg = <0x10100000 0x100000>;
+				reg = <0 0x10100000 0 0x100000>;
 				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
 			};
 		};
@@ -337,8 +337,8 @@
 
 	sdr@1900000 {
 		compatible = "simple-bus";
-		#address-cells = <1>;
-		#size-cells = <1>;
+		#address-cells = <2>;
+		#size-cells = <2>;
 		ranges;
 
 		/* For DeviceTree bindings see linux/modules/velcore3
@@ -351,14 +351,14 @@
 			#interrupt-cells = <1>;
 			interrupt-parent = <&gic>;
 			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-			reg = <0x1940000 0x40000>;
+			reg = <0 0x1940000 0 0x40000>;
 			status = "disabled";
 		};
 
 		elcore0: elcore@1980000 {
 			compatible = "elvees,elcore50";
-			reg = <0x1980000 0x40000>,
-			      <0x3000000 0x200000>;
+			reg = <0 0x1980000 0 0x40000>,
+			      <0 0x3000000 0 0x200000>;
 			interrupt-parent = <&qlic0>;
 			interrupts = <16>, <17>, <18>,
 				     <19>, <20>;
@@ -367,8 +367,8 @@
 
 		elcore1: elcore@1c80000 {
 			compatible = "elvees,elcore50";
-			reg = <0x1C80000 0x40000>,
-			      <0x3200000 0x200000>;
+			reg = <0 0x1C80000 0 0x40000>,
+			      <0 0x3200000 0 0x200000>;
 			interrupt-parent = <&qlic0>;
 			interrupts = <23>, <24>, <25>,
 				     <26>, <27>;
@@ -378,15 +378,15 @@
 
 	lsperiph1@1700000 {
 		compatible = "simple-bus";
-		#address-cells = <1>;
-		#size-cells = <1>;
+		#address-cells = <2>;
+		#size-cells = <2>;
 		ranges;
 
 		i2c1: i2c@1710000 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			compatible = "snps,designware-i2c";
-			reg = <0x1710000 0x10000>;
+			reg = <0 0x1710000 0 0x10000>;
 			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
 			status = "disabled";
 		};
@@ -395,7 +395,7 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			compatible = "snps,designware-i2c";
-			reg = <0x1720000 0x10000>;
+			reg = <0 0x1720000 0 0x10000>;
 			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
 			status = "disabled";
 		};
@@ -404,14 +404,14 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			compatible = "snps,designware-i2c";
-			reg = <0x1730000 0x10000>;
+			reg = <0 0x1730000 0 0x10000>;
 			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
 			status = "disabled";
 		};
 
 		uart0: serial0@1750000 {
 			compatible = "snps,dw-apb-uart";
-			reg = <0x1750000 0x1000>;
+			reg = <0 0x1750000 0 0x1000>;
 			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
 			reg-shift = <2>;
 			reg-io-width = <4>;
@@ -420,7 +420,7 @@
 
 		timer0: timer@1790000 {
 			compatible = "snps,dw-apb-timer";
-			reg = <0x1790000 0x14>;
+			reg = <0 0x1790000 0 0x14>;
 			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
 			status = "disabled";
@@ -428,7 +428,7 @@
 
 		timer1: timer@1790014 {
 			compatible = "snps,dw-apb-timer";
-			reg = <0x1790014 0x14>;
+			reg = <0 0x1790014 0 0x14>;
 			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
 			status = "disabled";
@@ -436,7 +436,7 @@
 
 		timer2: timer@1790028 {
 			compatible = "snps,dw-apb-timer";
-			reg = <0x1790028 0x14>;
+			reg = <0 0x1790028 0 0x14>;
 			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
 			status = "disabled";
@@ -444,7 +444,7 @@
 
 		timer3: timer@179003c {
 			compatible = "snps,dw-apb-timer";
-			reg = <0x179003C 0x14>;
+			reg = <0 0x179003C 0 0x14>;
 			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
 			status = "disabled";
@@ -452,7 +452,7 @@
 
 		timer4: timer@1790050 {
 			compatible = "snps,dw-apb-timer";
-			reg = <0x1790050 0x14>;
+			reg = <0 0x1790050 0 0x14>;
 			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
 			status = "disabled";
@@ -460,7 +460,7 @@
 
 		timer5: timer@1790064 {
 			compatible = "snps,dw-apb-timer";
-			reg = <0x1790064 0x14>;
+			reg = <0 0x1790064 0 0x14>;
 			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
 			status = "disabled";
@@ -468,7 +468,7 @@
 
 		timer6: timer@1790078 {
 			compatible = "snps,dw-apb-timer";
-			reg = <0x1790078 0x14>;
+			reg = <0 0x1790078 0 0x14>;
 			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
 			status = "disabled";
@@ -476,7 +476,7 @@
 
 		timer7: timer@179008c {
 			compatible = "snps,dw-apb-timer";
-			reg = <0x179008C 0x14>;
+			reg = <0 0x179008C 0 0x14>;
 			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
 			status = "disabled";
@@ -484,7 +484,7 @@
 
 		gpio1: gpio@1780000 {
 			compatible = "snps,dw-apb-gpio";
-			reg = <0x1780000 0x10000>;
+			reg = <0 0x1780000 0 0x10000>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 
