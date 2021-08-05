@@ -119,10 +119,26 @@
 		#size-cells = <2>;
 		ranges;
 
+		media_urb: urb@1320000 {
+			compatible = "elvees,mcom03-urb", "syscon", "simple-mfd";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			reg = <0 0x1320000 0 0x10000>;
+			ranges = <0 0 0 0x10000>;
+
+			media_reset: reset-controller@1000 {
+				compatible = "elvees,mcom03-reset";
+				reg = <0x1000 0x20>;
+				elvees,subsystem = <MCOM03_SUBSYSTEM_MEDIA>;
+				#reset-cells = <1>;
+			};
+		};
+
 		gpu: gpu@1200000 {
 			compatible = "img,gpu";
 			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0 0x1200000 0 0x80000>;
+			resets = <&media_reset MEDIA_RST_GPU>;
 			status = "disabled";
 		};
 
@@ -130,6 +146,7 @@
 			compatible = "arm,mali-v500";
 			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0 0x1280000 0 0x10000>;
+			resets = <&media_reset MEDIA_RST_VPU>;
 			status = "disabled";
 		};
 
@@ -139,6 +156,7 @@
 			reg = <0 0x12a0000 0 0x10000>;
 			/* TODO: Add clocks property here */
 			clock-names = "core";
+			resets = <&media_reset MEDIA_RST_ISP>;
 			status = "disabled";
 		};
 
@@ -148,6 +166,7 @@
 				     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
 			interrupt-names = "DE", "SE";
 			reg = <0 0x1300000 0 0x10000>;
+			resets = <&media_reset MEDIA_RST_DISPLAY>;
 			status = "disabled";
 			arm,malidp-output-port-lines = /bits/ 8 <8 8 8>;
 		};
