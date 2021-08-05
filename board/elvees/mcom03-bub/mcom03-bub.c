@@ -11,8 +11,8 @@ DECLARE_GLOBAL_DATA_PTR;
 
 int dram_init_banksize(void)
 {
-	gd->bd->bi_dram[0].start = PHYS_SDRAM_0;
-	gd->bd->bi_dram[0].size = PHYS_SDRAM_0_SIZE;
+	memcpy(gd->bd->bi_dram, (void *)CONFIG_MEM_REGIONS_ADDR,
+	       sizeof(struct bd_info));
 
 	return 0;
 }
