@@ -20,6 +20,9 @@
 #define MEDIA_PLL3_ADDR 0x1320030
 #define LSP1_I2S_UCG_RSTN_PPOLICY 0x17e0008
 #define LSP1_I2S_UCG_RSTN_PSTATUS 0x17e000c
+#define SDR_PLL0_ADDR 0x1910000
+#define SDR_PLL1_ADDR 0x1910008
+#define SDR_PLL2_ADDR 0x1910010
 
 #define PLL_CFG_SEL GENMASK(7, 0)
 #define PLL_CFG_MAN BIT(9)
@@ -36,6 +39,9 @@
 #define UCG_CTR_DIV_COEFF GENMASK(29, 10)
 #define UCG_CTR_DIV_LOCK BIT(30)
 
+#define SDR_URB_DSP_CTL 0x191004C
+#define SDR_URB_DSP_CTL_ENABLE_CLK (BIT(8) | BIT(9))
+
 #define PP_ON 0x10
 
 enum pll_id {
@@ -46,6 +52,9 @@ enum pll_id {
 	MEDIA_PLL1,
 	MEDIA_PLL2,
 	MEDIA_PLL3,
+	SDR_PLL0,
+	SDR_PLL1,
+	SDR_PLL2,
 };
 
 struct pll_settings {
@@ -65,6 +74,9 @@ static struct pll_settings pll_settings[] = {
 	{ MEDIA_PLL1, 27000000, 594000000, 0, 131, 5 },
 	{ MEDIA_PLL2, 27000000, 495000000, 0, 109, 5 },
 
+	{ SDR_PLL0, 27000000, 1890000000, 0, 69, 0 },
+	{ SDR_PLL1, 27000000, 657000000, 0, 72, 2 },
+	{ SDR_PLL2, 27000000, 459000000, 0, 16, 0 },
 	/* UCG3 channel 5 used as workaround for DISP_PIXCLK (UCG1 channel 2).
 	 * Setup PLL3 to frequency that can be divided by DISP_PIXCLK.
 	 */
@@ -150,6 +162,22 @@ static struct ucg_channel ucg_media_channels[] = {
 	{3, 8, 2},	/* MEDIA UCG3 VPU_CLK		297 MHz */
 };
 
+static struct ucg_channel ucg_sdr_channels[] = {
+	{0, 0, 9},	/* SDR UCG0 CLK_CFG		210 MHz */
+	{0, 1, 8},	/* SDR UCG0 EXT_CLK		236 MHz */
+	{0, 2, 4},	/* SDR UCG0 INT_CLK		472 MHz */
+	{0, 3, 9},	/* SDR UCG0 PCI_CLK		210 MHz */
+	{0, 4, 3},	/* SDR UCG0 VCU_CLK		630 MHz */
+	{0, 5, 3},	/* SDR UCG0 ACC0_CLK		630 MHz */
+	{0, 6, 3},	/* SDR UCG0 ACC1_CLK		630 MHz */
+	{0, 7, 3},	/* SDR UCG0 ACC2_CLK		630 MHz */
+	{0, 8, 37},	/* SDR UCG0 AUX_PCI_CLK		51 MHz */
+	{0, 9, 3},	/* SDR UCG0 GNSS_CLK		630 MHz */
+	{0, 10, 3},	/* SDR UCG0 DFE_ALT_CLK		630 MHz */
+	{0, 11, 9},	/* SDR UCG0 VCU_CLK		210 MHz */
+	{0, 12, 9},	/* SDR UCG0 LVDS_CLK		210 MHz */
+};
+
 enum ucg_qfsm_state {
 	Q_FSM_STOPPED = 0,
 	Q_FSM_CLK_EN = 1,
@@ -198,6 +226,16 @@ unsigned long media_ucg_ctr_addr_get(int ucg_id, int chan_id)
 unsigned long media_ucg_bp_addr_get(int ucg_id)
 {
 	return 0x1320080 + ucg_id * 0x80;
+}
+
+unsigned long sdr_ucg_ctr_addr_get(int ucg_id, int chan_id)
+{
+	return 0x1900000 + chan_id * 0x4;
+}
+
+unsigned long sdr_ucg_bp_addr_get(int ucg_id)
+{
+	return 0x1900040;
 }
 
 static int pll_settings_get(int pll_id, struct pll_settings *settings)
@@ -340,11 +378,13 @@ int clk_cfg(void)
 	enum pll_id pll_lsp1 = LSP1_PLL;
 	enum pll_id pll_media[] = { MEDIA_PLL0, MEDIA_PLL1,
 				    MEDIA_PLL2, MEDIA_PLL3 };
+	enum pll_id pll_sdr[] = { SDR_PLL0, SDR_PLL1, SDR_PLL2 };
 	unsigned long hsp_pll_addr[] = { HSP_PLL_ADDR };
 	unsigned long lsp0_pll_addr[] = { LSP0_PLL_ADDR };
 	unsigned long lsp1_pll_addr[] = { LSP1_PLL_ADDR };
 	unsigned long media_pll_addr[] = { MEDIA_PLL0_ADDR, MEDIA_PLL1_ADDR,
 					   MEDIA_PLL2_ADDR, MEDIA_PLL3_ADDR };
+	unsigned long sdr_pll_addr[] = { SDR_PLL0_ADDR, SDR_PLL1_ADDR, SDR_PLL2_ADDR };
 	u32 val;
 	int ret;
 
@@ -382,6 +422,15 @@ int clk_cfg(void)
 		      ARRAY_SIZE(media_pll_addr));
 	if (ret)
 		return ret;
+
+	ret = ucg_cfg(ucg_sdr_channels, ARRAY_SIZE(ucg_sdr_channels),
+		      sdr_ucg_ctr_addr_get, sdr_ucg_bp_addr_get,
+		      0, 0x0, sdr_pll_addr, pll_sdr,
+		      ARRAY_SIZE(sdr_pll_addr));
+	if (ret)
+		return ret;
+	// Enable DSP clocks
+	writel(SDR_URB_DSP_CTL_ENABLE_CLK, SDR_URB_DSP_CTL);
 
 	return 0;
 }

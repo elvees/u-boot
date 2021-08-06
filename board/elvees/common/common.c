@@ -117,7 +117,7 @@ void nand_pad_cfg(void)
 
 int board_init(void)
 {
-	enum subsystem_reset_lines reset_lines[] = { MEDIA_SUBS };
+	enum subsystem_reset_lines reset_lines[] = { MEDIA_SUBS, SDR_SUBS };
 
 	/* Order as in subsystem_reset_lines. -1 means that no gate
 	 * for subsystem */
