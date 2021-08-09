@@ -42,6 +42,11 @@
 #define SDR_URB_DSP_CTL 0x191004C
 #define SDR_URB_DSP_CTL_ENABLE_CLK (BIT(8) | BIT(9))
 
+#define SDR_URB_PCI0_CTL		0x1910050
+#define SDR_URB_PCI1_CTL		0x1910054
+#define SDR_URB_PCIE_CTL_ENABLE_CLK	BIT(0)
+#define SDR_URB_PCIE_CTL_PAD_EN		BIT(4)
+
 #define PP_ON 0x10
 
 enum pll_id {
@@ -431,6 +436,11 @@ int clk_cfg(void)
 		return ret;
 	// Enable DSP clocks
 	writel(SDR_URB_DSP_CTL_ENABLE_CLK, SDR_URB_DSP_CTL);
+	// Enable PCIe external clocks
+	writel(SDR_URB_PCIE_CTL_ENABLE_CLK | SDR_URB_PCIE_CTL_PAD_EN,
+	       SDR_URB_PCI0_CTL);
+	writel(SDR_URB_PCIE_CTL_ENABLE_CLK | SDR_URB_PCIE_CTL_PAD_EN,
+	       SDR_URB_PCI1_CTL);
 
 	return 0;
 }
