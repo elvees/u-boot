@@ -62,7 +62,11 @@ static struct pll_settings pll_settings[] = {
 	{ MEDIA_PLL0, 27000000, 1998000000, 0, 73, 0 },
 	{ MEDIA_PLL1, 27000000, 594000000, 0, 131, 5 },
 	{ MEDIA_PLL2, 27000000, 495000000, 0, 109, 5 },
-	{ MEDIA_PLL3, 27000000, 600000000, 2, 399, 5 },
+
+	/* UCG3 channel 5 used as workaround for DISP_PIXCLK (UCG1 channel 2).
+	 * Setup PLL3 to frequency that can be divided by DISP_PIXCLK.
+	 */
+	{ MEDIA_PLL3, 27000000, 594000000, 0, 131, 5 },
 };
 
 struct ucg_channel {
@@ -118,8 +122,8 @@ static struct ucg_channel ucg_media_channels[] = {
 	{0, 0, 16},	/* MEDIA UCG0 SYS		124.875 MHz */
 	{0, 1, 10},	/* MEDIA UCG0 ISP		199.8 MHz */
 	{1, 0, 2},	/* MEDIA UCG1 DISP_ACLK		297 MHz */
-	{1, 1, 8},	/* MEDIA UCG1 DISP_MCLK		74.25 MHz */
-	{1, 2, 8},	/* MEDIA UCG1 DISP_PIXCLK	74.25 MHz */
+	{1, 1, 4},	/* MEDIA UCG1 DISP_MCLK		148.5 MHz */
+	{1, 2, 4},	/* MEDIA UCG1 DISP_PIXCLK	148.5 MHz */
 	{2, 0, 2},	/* MEDIA UCG2 GPU_SYS		247.5 MHz */
 	{2, 1, 2},	/* MEDIA UCG2 GPU_MEM		247.5 MHz */
 	{2, 2, 2},	/* MEDIA UCG2 GPU_CORE		247.5 MHz */
@@ -128,10 +132,10 @@ static struct ucg_channel ucg_media_channels[] = {
 	{3, 2, -1},	/* MEDIA UCG3 MIPI_RX1_CFG	27 MHz (bypass) */
 	{3, 3, -1},	/* MEDIA UCG3 MIPI_TX_REF	27 MHz (bypass) */
 	{3, 4, -1},	/* MEDIA UCG3 MIPI_TX_CFG	27 MHz (bypass) */
-	{3, 5, -1},	/* MEDIA UCG3 CMOS0		27 MHz (bypass) */
+	{3, 5, 4},	/* MEDIA UCG3 CMOS0		148.5 as DISP_PIXCLK */
 	{3, 6, -1},	/* MEDIA UCG3 CMOS1		27 MHz (bypass) */
-	{3, 7, 30},	/* MEDIA UCG3 MIPI_TXCLKESC	20 MHz */
-	{3, 8, 2},	/* MEDIA UCG3 VPU_CLK		300 MHz */
+	{3, 7, 30},	/* MEDIA UCG3 MIPI_TXCLKESC	19.8 MHz */
+	{3, 8, 2},	/* MEDIA UCG3 VPU_CLK		297 MHz */
 };
 
 enum ucg_qfsm_state {
