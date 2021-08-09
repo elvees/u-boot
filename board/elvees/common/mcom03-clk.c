@@ -298,13 +298,11 @@ static int ucg_cfg(struct ucg_channel *ucg_channels, int chans_num,
 
 	/* Disable bypass */
 	for (i = 0; i < chans_num; i++) {
-		/* Stay in baypass if div == -1 */
-		if (ucg_channels[i].div == -1)
-			continue;
-
 		val = readl(ucg_bp_addr_get(ucg_channels[i].ucg_id));
 
-		if (val & BIT(ucg_channels[i].chan_id))
+		if (ucg_channels[i].div == -1)
+			val |= BIT(ucg_channels[i].chan_id);
+		else
 			val &= ~BIT(ucg_channels[i].chan_id);
 
 		writel(val, ucg_bp_addr_get(ucg_channels[i].ucg_id));
