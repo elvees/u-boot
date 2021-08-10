@@ -19,6 +19,8 @@
 #define LSP1_GPIO_SWPORTA_CTL		0x1780008
 #define GPIO_PAD_CTR_EN			BIT(12)
 
+#define LSP0_GPIO_SWPORTD_CTL		0x161002c
+
 #define SERVICE_PPOLICY(x)		(0x1F000000 + (unsigned long)(x) * 0x8)
 #define SERVICE_PSTATUS(x)		(0x1F000000 + (unsigned long)(x) * 0x8 \
 					+ 0x4)
@@ -119,6 +121,9 @@ static void setup_pads(void)
 
 	/* Turn GPIO1_A0 ... GPIO1_A5 to hardware mode (I2C1, I2C2, I2C3) */
 	writel(0x3f, LSP1_GPIO_SWPORTA_CTL);
+
+	/* Turn GPIO0_D3 ... GPIO0_D4 to hardware mode (I2C0) */
+	writel(0x18, LSP0_GPIO_SWPORTD_CTL);
 }
 
 int board_init(void)
