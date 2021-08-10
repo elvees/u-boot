@@ -158,6 +158,15 @@
 		#size-cells = <2>;
 		ranges;
 
+		i2c0: i2c@1630000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "snps,designware-i2c";
+			reg = <0 0x1630000 0 0x10000>;
+			interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
+			status = "disabled";
+		};
+
 		uart1: serial0@1640000 {
 			compatible = "snps,dw-apb-uart";
 			reg = <0 0x1640000 0 0x1000>;
