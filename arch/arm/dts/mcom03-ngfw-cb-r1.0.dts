@@ -46,6 +46,12 @@
 		clock-frequency = <125000000>;
 	};
 
+	i2c0_clk: i2c0_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <94500000>;
+	};
+
 	i2c_clk: i2c_clk {
 		#clock-cells = <0>;
 		compatible = "fixed-clock";
@@ -114,6 +120,14 @@
 	status = "okay";
 	clocks = <&usb_bus_clk>, <&usb_suspend_clk>, <&usb_suspend_clk>;
 	clock-names = "bus_early", "ref", "suspend";
+};
+
+&i2c0 {
+	clocks = <&i2c0_clk>;
+
+	/* USB HUB USB5807 supports only 100kHz */
+	clock-frequency = <100000>;
+	status = "okay";
 };
 
 &i2c1 {

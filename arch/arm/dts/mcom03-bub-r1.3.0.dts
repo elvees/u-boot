@@ -53,6 +53,12 @@
 		clock-frequency = <125000000>;
 	};
 
+	i2c0_clk: i2c0_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <94500000>;
+	};
+
 	i2c_clk: i2c_clk {
 		#clock-cells = <0>;
 		compatible = "fixed-clock";
@@ -156,6 +162,12 @@
 &qspi {
 	status = "okay";
 	clocks = <&qspi_clk>, <&qspi_clk>;
+};
+
+&i2c0 {
+	clocks = <&i2c0_clk>;
+	clock-frequency = <400000>;
+	status = "okay";
 };
 
 &i2c1 {
