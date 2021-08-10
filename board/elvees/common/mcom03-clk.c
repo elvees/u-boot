@@ -12,6 +12,7 @@
 
 #define HSP_PLL_ADDR 0x10400000
 #define HSP_REFCLK_ADDR 0x1040000c
+#define LSP0_PLL_ADDR 0x1680000
 #define LSP1_PLL_ADDR 0x17e0000
 #define MEDIA_PLL0_ADDR 0x1320000
 #define MEDIA_PLL1_ADDR 0x1320010
@@ -58,6 +59,7 @@ struct pll_settings {
 
 static struct pll_settings pll_settings[] = {
 	{ HSP_PLL, 27000000, 1125000000, 2, 249, 1 },
+	{ LSP0_PLL, 27000000, 189000000, 0, 111, 15 },
 	{ LSP1_PLL, 27000000, 614250000, 0, 90, 3 },
 	{ MEDIA_PLL0, 27000000, 1998000000, 0, 73, 0 },
 	{ MEDIA_PLL1, 27000000, 594000000, 0, 131, 5 },
@@ -102,6 +104,16 @@ static struct ucg_channel ucg_hsp_channels[] = {
 	{3, 1, 45},	/* HSPERIPH UCG3 USB0 suspend	25 MHz */
 	{3, 2, 45},	/* HSPERIPH UCG3 USB1 ref	25 MHz */
 	{3, 3, 45},	/* HSPERIPH UCG3 USB1 suspend	25 MHz */
+};
+
+static struct ucg_channel ucg_lsp0_channels[] = {
+	{0, 0, 2},	/* LSPERIPH0 UCG0 SYS		94.5 MHz */
+	{0, 1, 14},	/* LSPERIPH0 UCG0 UART3		13.5 MHz */
+	{0, 2, 14},	/* LSPERIPH0 UCG0 UART1		13.5 MHz */
+	{0, 3, 14},	/* LSPERIPH0 UCG0 UART2		13.5 MHz */
+	{0, 4, 2},	/* LSPERIPH0 UCG0 SPI0		94.5 MHz */
+	{0, 5, 2},	/* LSPERIPH0 UCG0 I2C0		94.5 MHz */
+	{0, 6, 189},	/* LSPERIPH0 UCG0 DBCLK		1 MHz */
 };
 
 static struct ucg_channel ucg_lsp1_channels[] = {
@@ -156,6 +168,16 @@ unsigned long hsp_ucg_ctr_addr_get(int ucg_id, int chan_id)
 unsigned long hsp_ucg_bp_addr_get(int ucg_id)
 {
 	return 0x10410040 + ucg_id * 0x10000;
+}
+
+unsigned long lsp0_ucg_ctr_addr_get(int ucg_id, int chan_id)
+{
+	return 0x1690000 + ucg_id * 0x10000 + chan_id * 0x4;
+}
+
+unsigned long lsp0_ucg_bp_addr_get(int ucg_id)
+{
+	return 0x1690040 + ucg_id * 0x10000;
 }
 
 unsigned long lsp1_ucg_ctr_addr_get(int ucg_id, int chan_id)
@@ -314,10 +336,12 @@ static int ucg_cfg(struct ucg_channel *ucg_channels, int chans_num,
 int clk_cfg(void)
 {
 	enum pll_id pll_hsp = HSP_PLL;
+	enum pll_id pll_lsp0 = LSP0_PLL;
 	enum pll_id pll_lsp1 = LSP1_PLL;
 	enum pll_id pll_media[] = { MEDIA_PLL0, MEDIA_PLL1,
 				    MEDIA_PLL2, MEDIA_PLL3 };
 	unsigned long hsp_pll_addr[] = { HSP_PLL_ADDR };
+	unsigned long lsp0_pll_addr[] = { LSP0_PLL_ADDR };
 	unsigned long lsp1_pll_addr[] = { LSP1_PLL_ADDR };
 	unsigned long media_pll_addr[] = { MEDIA_PLL0_ADDR, MEDIA_PLL1_ADDR,
 					   MEDIA_PLL2_ADDR, MEDIA_PLL3_ADDR };
@@ -335,6 +359,13 @@ int clk_cfg(void)
 		      hsp_ucg_ctr_addr_get, hsp_ucg_bp_addr_get,
 		      HSP_REFCLK_ADDR, 0x0, hsp_pll_addr, &pll_hsp,
 		      ARRAY_SIZE(hsp_pll_addr));
+	if (ret)
+		return ret;
+
+	ret = ucg_cfg(ucg_lsp0_channels, ARRAY_SIZE(ucg_lsp0_channels),
+		      lsp0_ucg_ctr_addr_get, lsp0_ucg_bp_addr_get,
+		      0, 0x0, lsp0_pll_addr, &pll_lsp0,
+		      ARRAY_SIZE(lsp0_pll_addr));
 	if (ret)
 		return ret;
 
