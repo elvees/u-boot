@@ -1,0 +1,111 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright 2021 RnD Center "ELVEES", JSC
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+
+#include "mcom03.dtsi"
+
+/ {	model = "MCom-03 NGFW-CB r1.0";
+	compatible = "elvees,mcom03-ngfw-cb-r1.0";
+
+	aliases {
+		serial0 = &uart0;
+	};
+
+	cpu_clk: cpu_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <1400000000>;
+	};
+
+	common_clk: common_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <27000000>;
+	};
+
+	sdmmc_clk: sdmmc_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <125000000>;
+	};
+
+	usb_suspend_clk: usb_suspend_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <25000000>;
+	};
+
+	usb_bus_clk: usb_bus_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <125000000>;
+	};
+
+	i2c_clk: i2c_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <102375000>;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+		bootargs = "earlycon console=ttyS0,115200";
+	};
+
+	reserved_memory: reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		cpu_reserved: cpu_reserved@C0000000 {
+			reg = <0 0xC0080000 0 0x1000>;
+			no-map;
+		};
+	};
+};
+
+&uart0 {
+	status = "okay";
+	clock-frequency = <27000000>;
+};
+
+&sdhci0 {
+	status = "okay";
+	clocks = <&sdmmc_clk>, <&sdmmc_clk>;
+	non-removable;
+	bus-width = <8>;
+};
+
+&sdhci1 {
+	status = "okay";
+	clocks = <&sdmmc_clk>, <&sdmmc_clk>;
+
+	/* Disable High Speed support
+	 * Disable 1.8V support
+	 * Disable SDR50, SDR104 and DDR50 support
+	 */
+	sdhci-caps-mask = <0x7 0x4200000>;
+	sdhci-caps = <0x0 0x0>;
+};
+
+&timer0 {
+	clocks = <&common_clk>;
+	status = "okay";
+};
+
+&usb0 {
+	status = "okay";
+	clocks = <&usb_bus_clk>, <&usb_suspend_clk>, <&usb_suspend_clk>;
+	clock-names = "bus_early", "ref", "suspend";
+};
+
+&usb1 {
+	status = "okay";
+	clocks = <&usb_bus_clk>, <&usb_suspend_clk>, <&usb_suspend_clk>;
+	clock-names = "bus_early", "ref", "suspend";
+};

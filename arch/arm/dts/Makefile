@@ -1007,6 +1007,7 @@ dtb-$(CONFIG_ARCH_MCOM03) += \
 	mcom03-haps-sdr.dtb \
 	mcom03-haps-media.dtb \
 	mcom03-haps-full.dtb \
+	mcom03-ngfw-cb-r1.0.dtb \
 	mcom03-rtl.dtb
 
 targets += $(dtb-y)
