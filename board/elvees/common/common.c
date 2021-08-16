@@ -17,6 +17,11 @@
 
 #define SERVICE_PPOLICY(x)		(0x1F000000UL + (x) * 0x8)
 #define SERVICE_PSTATUS(x)		(0x1F000000UL + (x) * 0x8 + 0x4)
+#define HSPERIPH_URB_NAND_PADCFG	0x10400184
+#define NAND_ENABLE			BIT(0)
+#define PAD_MUX_NAND			BIT(4)
+#define NAND_CLE			BIT(2)
+
 #define SERV_URB_TOP_GATECLK		0x1F001008
 
 #define MEDIA_SUBSYSTEM_CFG		0x1322000
@@ -102,6 +107,12 @@ void i2c_pad_cfg(int i2c_num)
 		val |= BIT(2 * i2c_num - 2) | BIT(2 * i2c_num - 1);
 		writel(val, LSP1_GPIO_SWPORTA_CTL);
 	}
+}
+
+void nand_pad_cfg(void)
+{
+	// temporary code until NAND support is added to pinctrl
+	writel(NAND_ENABLE | PAD_MUX_NAND | NAND_CLE, HSPERIPH_URB_NAND_PADCFG);
 }
 
 int board_init(void)

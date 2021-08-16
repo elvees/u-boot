@@ -23,6 +23,7 @@ void board_pads_cfg(void)
 {
 	int i;
 
+	nand_pad_cfg();
 	for (i = 0; i < 4; i++)
 		i2c_pad_cfg(i);
 }
