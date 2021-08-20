@@ -124,6 +124,64 @@
 	/* Not all devices are checked to 400kHz support */
 	clock-frequency = <100000>;
 	status = "okay";
+
+	gpio_exp: gpio-expander@22 {
+		compatible = "ti,tca6424";
+		reg = <0x22>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		interrupts-extended = <&gpio0a 3 IRQ_TYPE_EDGE_FALLING>;
+		interrupt-controller;
+		#interrupt-cells = <2>;
+		gpio-line-names =
+			"WAN_nRST", "LAN_nRST", "WAN_nPERST", "LAN_nPERST",
+			"USB_HUB_nRST", "PEX_THRM_ALERT", "PE_X4_nRST",
+			"PE_X4_nPRSNT", "WIFI_nPERST", "WIFI_nDISABLE_1",
+			"WIFI_nDISABLE_2", "mPCIE_PERST", "mPCIE_WDISABLE",
+			"5G_RESET", "5G_nPOWER_OFF", "5G_nPERSTR",
+			"5G_nW_DISABLE1", "5G_nW_DISABLE1", "EN_3V3_WIFI",
+			"EN_3V3_mPCIe", "EN_3V8_5G", "EN_3V3_SATA", "EN_5V_USB",
+			"USER_LED";
+		usb-hub-hog {
+			gpio-hog;
+			gpios = <22 GPIO_ACTIVE_HIGH>;
+			output-high;
+		};
+		wan-hog {
+			gpio-hog;
+			gpios = <0 GPIO_ACTIVE_HIGH>, <2 GPIO_ACTIVE_HIGH>;
+			output-high;
+		};
+		lan-hog {
+			gpio-hog;
+			gpios = <1 GPIO_ACTIVE_HIGH>, <3 GPIO_ACTIVE_HIGH>;
+			output-high;
+		};
+		pe-x4-hog {
+			gpio-hog;
+			gpios = <6 GPIO_ACTIVE_HIGH>;
+			output-high;
+		};
+		wifi-hog {
+			gpio-hog;
+			gpios = <8 GPIO_ACTIVE_HIGH>, <9 GPIO_ACTIVE_HIGH>,
+				<10 GPIO_ACTIVE_HIGH>, <18 GPIO_ACTIVE_HIGH>;
+			output-high;
+		};
+		mpcie-hog {
+			gpio-hog;
+			gpios = <11 GPIO_ACTIVE_HIGH>, <12 GPIO_ACTIVE_HIGH>,
+				<19 GPIO_ACTIVE_HIGH>;
+			output-high;
+		};
+		5g-hog {
+			gpio-hog;
+			gpios = <13 GPIO_ACTIVE_LOW>, <14 GPIO_ACTIVE_HIGH>,
+				<15 GPIO_ACTIVE_HIGH>, <16 GPIO_ACTIVE_HIGH>,
+				<17 GPIO_ACTIVE_HIGH>, <20 GPIO_ACTIVE_HIGH>;
+			output-high;
+		};
+	};
 };
 
 &i2c3 {
