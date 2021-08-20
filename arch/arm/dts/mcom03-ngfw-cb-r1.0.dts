@@ -122,12 +122,29 @@
 	clock-names = "bus_early", "ref", "suspend";
 };
 
+&gpio1d {
+	/* RESET_nOUT signal should be high for LAN, WAN, PEX, USB HUB) */
+	reset-nout-hog {
+		gpio-hog;
+		gpios = <7 GPIO_ACTIVE_HIGH>;
+		output-high;
+	};
+};
+
 &i2c0 {
 	clocks = <&i2c0_clk>;
 
 	/* USB HUB USB5807 supports only 100kHz */
 	clock-frequency = <100000>;
 	status = "okay";
+
+	usb-hub@2d {
+		/* USB HUB USB5807 is supported by driver usb4604 */
+		compatible = "smsc,usb4604";
+		reg = <0x2d>;
+		reset-gpios = <&gpio_exp 4 GPIO_ACTIVE_HIGH>;
+		initial-mode = <1>;
+	};
 };
 
 &i2c1 {
