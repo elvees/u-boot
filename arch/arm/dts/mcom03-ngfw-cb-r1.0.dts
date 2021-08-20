@@ -109,3 +109,27 @@
 	clocks = <&usb_bus_clk>, <&usb_suspend_clk>, <&usb_suspend_clk>;
 	clock-names = "bus_early", "ref", "suspend";
 };
+
+&i2c1 {
+	clocks = <&i2c_clk>;
+
+	/* Not all devices are checked to 400kHz support */
+	clock-frequency = <100000>;
+	status = "okay";
+};
+
+&i2c2 {
+	clocks = <&i2c_clk>;
+
+	/* Not all devices are checked to 400kHz support */
+	clock-frequency = <100000>;
+	status = "okay";
+};
+
+&i2c3 {
+	clocks = <&i2c_clk>;
+
+	/* Not all devices are checked to 400kHz support */
+	clock-frequency = <100000>;
+	status = "okay";
+};
