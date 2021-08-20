@@ -207,7 +207,8 @@ static int mcom03_sdhci_probe(struct udevice *dev)
 	host->mmc->priv = &priv->host;
 	upriv->mmc = host->mmc;
 
-	ret = sdhci_setup_cfg(&plat->cfg, host, 0, 400000);
+	/* plat->cfg.f_max is filled early in mcom03_sdhci_of_parse() */
+	ret = sdhci_setup_cfg(&plat->cfg, host, plat->cfg.f_max, 400000);
 	if (ret)
 		goto assert_reset;
 
