@@ -163,6 +163,7 @@
 			#size-cells = <0>;
 			compatible = "snps,designware-i2c";
 			reg = <0 0x1630000 0 0x10000>;
+			clocks = <&i2c0_clk>;
 			interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
 			status = "disabled";
 		};
@@ -270,6 +271,7 @@
 		emac0: ethernet@10200000 {
 			compatible = "elvees,arasan-gemac";
 			reg = <0 0x10200000 0 0x1000>;
+			clocks = <&eth_bus_clk>;
 			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
 			resets = <&hsreset 8>;
 			elvees,ctrl-id = <0>;
@@ -279,6 +281,7 @@
 		emac1: ethernet@10210000 {
 			compatible = "elvees,arasan-gemac";
 			reg = <0 0x10210000 0 0x1000>;
+			clocks = <&eth_bus_clk>;
 			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
 			resets = <&hsreset 9>;
 			elvees,ctrl-id = <1>;
@@ -292,7 +295,7 @@
 			interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
 			/* Linux driver requires the following clock names */
 			clock-names = "clk_xin", "clk_ahb";
-			/* TODO: Add clocks property here */
+			clocks = <&sdmmc_clk>, <&sdmmc_clk>;
 			resets = <&hsreset 4>;
 			elvees,ctrl-id = <0>;
 			status = "disabled";
@@ -304,7 +307,7 @@
 			arasan,soc-ctl-syscon = <&hsurb>;
 			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "clk_xin", "clk_ahb";
-			/* TODO: Add clocks property here */
+			clocks = <&sdmmc_clk>, <&sdmmc_clk>;
 			resets = <&hsreset 5>;
 			elvees,ctrl-id = <1>;
 			status = "disabled";
@@ -316,7 +319,7 @@
 			#size-cells = <0>;
 			reg = <0 0x10260000 0 0x10000>;
 			clock-names = "clk_axi", "clk_ext";
-			/* TODO: Add clocks property here */
+			clocks = <&qspi_clk>, <&qspi_clk>;
 			resets = <&hsreset 2>;
 			arasan,soc-ctl-syscon = <&hsurb>;
 			num-cs = <4>;
@@ -328,6 +331,8 @@
 			#size-cells = <2>;
 			ranges;
 			compatible = "elvees,mcom03-dwc3";
+			clock-names = "bus_early", "ref", "suspend";
+			clocks = <&usb_bus_clk>, <&usb_suspend_clk>, <&usb_suspend_clk>;
 			resets = <&hsreset 6>;
 			status = "disabled";
 
@@ -343,6 +348,8 @@
 			#size-cells = <2>;
 			ranges;
 			compatible = "elvees,mcom03-dwc3";
+			clock-names = "bus_early", "ref", "suspend";
+			clocks = <&usb_bus_clk>, <&usb_suspend_clk>, <&usb_suspend_clk>;
 			resets = <&hsreset 7>;
 			status = "disabled";
 
@@ -406,6 +413,7 @@
 			#size-cells = <0>;
 			compatible = "snps,designware-i2c";
 			reg = <0 0x1710000 0 0x10000>;
+			clocks = <&i2c_clk>;
 			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
 			status = "disabled";
 		};
@@ -415,6 +423,7 @@
 			#size-cells = <0>;
 			compatible = "snps,designware-i2c";
 			reg = <0 0x1720000 0 0x10000>;
+			clocks = <&i2c_clk>;
 			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
 			status = "disabled";
 		};
@@ -424,6 +433,7 @@
 			#size-cells = <0>;
 			compatible = "snps,designware-i2c";
 			reg = <0 0x1730000 0 0x10000>;
+			clocks = <&i2c_clk>;
 			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
 			status = "disabled";
 		};
@@ -442,6 +452,7 @@
 			reg = <0 0x1790000 0 0x14>;
 			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
+			clocks = <&xti_clk>;
 			status = "disabled";
 		};
 
@@ -450,6 +461,7 @@
 			reg = <0 0x1790014 0 0x14>;
 			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
+			clocks = <&xti_clk>;
 			status = "disabled";
 		};
 
@@ -458,6 +470,7 @@
 			reg = <0 0x1790028 0 0x14>;
 			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
+			clocks = <&xti_clk>;
 			status = "disabled";
 		};
 
@@ -466,6 +479,7 @@
 			reg = <0 0x179003C 0 0x14>;
 			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
+			clocks = <&xti_clk>;
 			status = "disabled";
 		};
 
@@ -474,6 +488,7 @@
 			reg = <0 0x1790050 0 0x14>;
 			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
+			clocks = <&xti_clk>;
 			status = "disabled";
 		};
 
@@ -482,6 +497,7 @@
 			reg = <0 0x1790064 0 0x14>;
 			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
+			clocks = <&xti_clk>;
 			status = "disabled";
 		};
 
@@ -490,6 +506,7 @@
 			reg = <0 0x1790078 0 0x14>;
 			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
+			clocks = <&xti_clk>;
 			status = "disabled";
 		};
 
@@ -498,6 +515,7 @@
 			reg = <0 0x179008C 0 0x14>;
 			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "timer";
+			clocks = <&xti_clk>;
 			status = "disabled";
 		};
 
@@ -554,5 +572,59 @@
 				bank-name = "gpiod";
 			};
 		};
+	};
+
+	cpu_clk: cpu_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <1400000000>;
+	};
+
+	xti_clk: xti_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <27000000>;
+	};
+
+	eth_bus_clk: eth_bus_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <125000000>;
+	};
+
+	sdmmc_clk: sdmmc_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <125000000>;
+	};
+
+	usb_suspend_clk: usb_suspend_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <25000000>;
+	};
+
+	usb_bus_clk: usb_bus_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <125000000>;
+	};
+
+	i2c0_clk: i2c0_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <94500000>;
+	};
+
+	i2c_clk: i2c_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <102375000>;
+	};
+
+	qspi_clk: qspi_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <25000000>;
 	};
 };

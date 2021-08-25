@@ -9,12 +9,10 @@
 
 / {
 	model = "MCom-03 HAPS, CPU configuration";
+};
 
-	common_clk: common_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <10000000>;
-	};
+&xti_clk {
+	clock-frequency = <10000000>;
 };
 
 &emac0 {
@@ -23,7 +21,7 @@
 	phy-mode = "gmii";
 	status = "okay";
 	phy-handle = <&ethernet_phy>;
-	clocks = <&common_clk>;
+	clocks = <&xti_clk>;
 
 	/* These two are required on HAPS due to its low frequency  */
 	arasan,max-mdc-freq = <150000>;

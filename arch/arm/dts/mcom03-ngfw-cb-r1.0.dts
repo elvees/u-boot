@@ -16,48 +16,6 @@
 		serial0 = &uart0;
 	};
 
-	cpu_clk: cpu_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <1400000000>;
-	};
-
-	common_clk: common_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <27000000>;
-	};
-
-	sdmmc_clk: sdmmc_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <125000000>;
-	};
-
-	usb_suspend_clk: usb_suspend_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <25000000>;
-	};
-
-	usb_bus_clk: usb_bus_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <125000000>;
-	};
-
-	i2c0_clk: i2c0_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <94500000>;
-	};
-
-	i2c_clk: i2c_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <102375000>;
-	};
-
 	chosen {
 		stdout-path = "serial0:115200n8";
 		bootargs = "earlycon console=ttyS0,115200";
@@ -82,7 +40,6 @@
 
 &sdhci0 {
 	status = "okay";
-	clocks = <&sdmmc_clk>, <&sdmmc_clk>;
 
 	/* Unstable at 25 MHz on NGFW CB */
 	max-frequency = <12000000>;
@@ -92,7 +49,6 @@
 
 &sdhci1 {
 	status = "okay";
-	clocks = <&sdmmc_clk>, <&sdmmc_clk>;
 
 	/* Unstable at 25 MHz on NGFW CB */
 	max-frequency = <12000000>;
@@ -106,20 +62,15 @@
 };
 
 &timer0 {
-	clocks = <&common_clk>;
 	status = "okay";
 };
 
 &usb0 {
 	status = "okay";
-	clocks = <&usb_bus_clk>, <&usb_suspend_clk>, <&usb_suspend_clk>;
-	clock-names = "bus_early", "ref", "suspend";
 };
 
 &usb1 {
 	status = "okay";
-	clocks = <&usb_bus_clk>, <&usb_suspend_clk>, <&usb_suspend_clk>;
-	clock-names = "bus_early", "ref", "suspend";
 };
 
 &gpio1d {
@@ -132,8 +83,6 @@
 };
 
 &i2c0 {
-	clocks = <&i2c0_clk>;
-
 	/* USB HUB USB5807 supports only 100kHz */
 	clock-frequency = <100000>;
 	status = "okay";
@@ -148,16 +97,12 @@
 };
 
 &i2c1 {
-	clocks = <&i2c_clk>;
-
 	/* Not all devices are checked to 400kHz support */
 	clock-frequency = <100000>;
 	status = "okay";
 };
 
 &i2c2 {
-	clocks = <&i2c_clk>;
-
 	/* Not all devices are checked to 400kHz support */
 	clock-frequency = <100000>;
 	status = "okay";
@@ -222,8 +167,6 @@
 };
 
 &i2c3 {
-	clocks = <&i2c_clk>;
-
 	/* Not all devices are checked to 400kHz support */
 	clock-frequency = <100000>;
 	status = "okay";

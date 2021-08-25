@@ -17,18 +17,14 @@
 	acptest {
 		compatible = "elvees,acptest";
 	};
+};
 
-	cpu_clk: cpu_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <10000000>;
-	};
+&cpu_clk {
+	clock-frequency = <10000000>;
+};
 
-	common_clk: common_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <5000000>;
-	};
+&xti_clk {
+	clock-frequency = <5000000>;
 };
 
 /* To workaround bug MCOM03SW-382 "carveout" memory allocator is used
@@ -43,7 +39,7 @@
 &isp {
 	status = "okay";
 	img,carveout-memory = <&isp_reserved>;
-	clocks = <&common_clk>;
+	clocks = <&xti_clk>;
 };
 
 &gpu {
@@ -60,7 +56,7 @@
 	phy-mode = "gmii";
 	status = "okay";
 	phy-handle = <&ethernet_phy>;
-	clocks = <&common_clk>;
+	clocks = <&xti_clk>;
 
 	/* These two are required on HAPS due to its low frequency */
 	arasan,max-mdc-freq = <150000>;
@@ -84,51 +80,43 @@
 };
 
 &timer0 {
-	clocks = <&common_clk>;
 	status = "okay";
 };
 
 &timer1 {
-	clocks = <&common_clk>;
 	status = "okay";
 };
 
 &timer2 {
-	clocks = <&common_clk>;
 	status = "okay";
 };
 
 &timer3 {
-	clocks = <&common_clk>;
 	status = "okay";
 };
 
 &timer4 {
-	clocks = <&common_clk>;
 	status = "okay";
 };
 
 &timer5 {
-	clocks = <&common_clk>;
 	status = "okay";
 };
 
 &timer6 {
-	clocks = <&common_clk>;
 	status = "okay";
 };
 
 &timer7 {
-	clocks = <&common_clk>;
 	status = "okay";
 };
 
 &wdt0 {
-	clocks = <&common_clk>;
+	clocks = <&xti_clk>;
 };
 
 &qspi {
-	clocks = <&common_clk>, <&common_clk>;
+	clocks = <&xti_clk>, <&xti_clk>;
 	status = "okay";
 
 	flash0: s25fl128s@0 {
@@ -142,7 +130,7 @@
 
 &sdhci0 {
 	/* SDHCI0 is connected to eMMC on HAPS */
-	clocks = <&common_clk>, <&common_clk>;
+	clocks = <&xti_clk>, <&xti_clk>;
 	bus-width = <8>;
 	no-1-8-v;
 	non-removable;
