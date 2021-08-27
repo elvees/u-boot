@@ -6,24 +6,17 @@
 #include <common.h>
 #include <asm/armv8/mmu.h>
 #include <asm/io.h>
-#include <linux/bitops.h>
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
 
+#include "mcom03-common.h"
 #include "mcom03-clk.h"
 
 #define DDR_SUBS_URB_BASE		0xC000000
 #define HSPERIPH_BAR			0xDC
 
-#define GPIO1_PORTA_PAD_CTR(x)		(0x17e0020 + (x) * 0x4)
-#define LSP1_GPIO_SWPORTA_CTL		0x1780008
-#define GPIO_PAD_CTR_EN			BIT(12)
-
-#define LSP0_GPIO_SWPORTD_CTL		0x161002c
-
-#define SERVICE_PPOLICY(x)		(0x1F000000 + (unsigned long)(x) * 0x8)
-#define SERVICE_PSTATUS(x)		(0x1F000000 + (unsigned long)(x) * 0x8 \
-					+ 0x4)
+#define SERVICE_PPOLICY(x)		(0x1F000000UL + (x) * 0x8)
+#define SERVICE_PSTATUS(x)		(0x1F000000UL + (x) * 0x8 + 0x4)
 #define SERV_URB_TOP_GATECLK		0x1F001008
 
 #define PP_ON				0x10
@@ -85,45 +78,27 @@ static int subsystem_reset_deassert(enum subsystem_reset_lines line)
 				  1000);
 }
 
-static void setup_pads(void)
+void i2c_pad_cfg(int i2c_num)
 {
 	u32 val;
 
-	/* Used for I2C1_SCL */
-	val = readl(GPIO1_PORTA_PAD_CTR(0));
-	val |= GPIO_PAD_CTR_EN;
-	writel(val, GPIO1_PORTA_PAD_CTR(0));
+	if (i2c_num == 0) {
+		/* There are no registers for GPIO0 to enable
+		 * the pad receiver */
+		writel(0x18, LSP0_GPIO_SWPORTD_CTL);
+	} else {
+		val = readl(GPIO1_PORTA_PAD_CTR(i2c_num + 1));
+		val |= GPIO_PAD_CTR_EN;
+		writel(val, GPIO1_PORTA_PAD_CTR(i2c_num + 1));
 
-	/* Used for I2C1_DAT */
-	val = readl(GPIO1_PORTA_PAD_CTR(1));
-	val |= GPIO_PAD_CTR_EN;
-	writel(val, GPIO1_PORTA_PAD_CTR(1));
+		val = readl(GPIO1_PORTA_PAD_CTR(i2c_num + 2));
+		val |= GPIO_PAD_CTR_EN;
+		writel(val, GPIO1_PORTA_PAD_CTR(i2c_num + 2));
 
-	/* Used for I2C2_SCL */
-	val = readl(GPIO1_PORTA_PAD_CTR(2));
-	val |= GPIO_PAD_CTR_EN;
-	writel(val, GPIO1_PORTA_PAD_CTR(2));
-
-	/* Used for I2C2_DAT */
-	val = readl(GPIO1_PORTA_PAD_CTR(3));
-	val |= GPIO_PAD_CTR_EN;
-	writel(val, GPIO1_PORTA_PAD_CTR(3));
-
-	/* Used for I2C3_SCL */
-	val = readl(GPIO1_PORTA_PAD_CTR(4));
-	val |= GPIO_PAD_CTR_EN;
-	writel(val, GPIO1_PORTA_PAD_CTR(4));
-
-	/* Used for I2C3_DAT */
-	val = readl(GPIO1_PORTA_PAD_CTR(5));
-	val |= GPIO_PAD_CTR_EN;
-	writel(val, GPIO1_PORTA_PAD_CTR(5));
-
-	/* Turn GPIO1_A0 ... GPIO1_A5 to hardware mode (I2C1, I2C2, I2C3) */
-	writel(0x3f, LSP1_GPIO_SWPORTA_CTL);
-
-	/* Turn GPIO0_D3 ... GPIO0_D4 to hardware mode (I2C0) */
-	writel(0x18, LSP0_GPIO_SWPORTD_CTL);
+		val = readl(LSP1_GPIO_SWPORTA_CTL);
+		val |= BIT(2 * i2c_num - 2) | BIT(2 * i2c_num - 1);
+		writel(val, LSP1_GPIO_SWPORTA_CTL);
+	}
 }
 
 int board_init(void)
@@ -155,7 +130,7 @@ int board_init(void)
 		}
 	}
 
-	setup_pads();
+	board_pads_cfg();
 
 	return clk_cfg();
 }

@@ -8,6 +8,8 @@
 #include <linux/kernel.h>
 #include <asm/sections.h>
 
+#include "../common/mcom03-common.h"
+
 DECLARE_GLOBAL_DATA_PTR;
 
 int dram_init_banksize(void)
@@ -34,4 +36,8 @@ void *board_fdt_blob_setup(void)
 		fdt_blob = (ulong *)&_end;
 
 	return fdt_blob;
+}
+
+void board_pads_cfg(void)
+{
 }
