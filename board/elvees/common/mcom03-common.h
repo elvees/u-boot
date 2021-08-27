@@ -9,6 +9,7 @@
 #include <linux/bitops.h>
 
 #define GPIO1_PORTA_PAD_CTR(x)		(0x17e0020UL + (x) * 0x4)
+#define GPIO1_PORTD_PAD_CTR(x)		(0x17e0080UL + (x) * 0x4)
 #define GPIO_PAD_CTR_EN			BIT(12)
 
 #define LSP1_GPIO_SWPORTA_CTL		0x1780008

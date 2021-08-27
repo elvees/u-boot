@@ -22,7 +22,19 @@ int dram_init_banksize(void)
 void board_pads_cfg(void)
 {
 	int i;
+	u32 val;
 
 	for (i = 0; i < 4; i++)
 		i2c_pad_cfg(i);
+
+	/* Enable receivers for GPIO1_A6 and GPIO1_D7,
+	 * which are used on ELV_MC03_SMARC as HDMI_INT and RESET_OUT.
+	 */
+	val = readl(GPIO1_PORTA_PAD_CTR(6));
+	val |= GPIO_PAD_CTR_EN;
+	writel(val, GPIO1_PORTA_PAD_CTR(6));
+
+	val = readl(GPIO1_PORTD_PAD_CTR(7));
+	val |= GPIO_PAD_CTR_EN;
+	writel(val, GPIO1_PORTD_PAD_CTR(7));
 }
