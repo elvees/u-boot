@@ -19,6 +19,9 @@
 #define SERVICE_PSTATUS(x)		(0x1F000000UL + (x) * 0x8 + 0x4)
 #define SERV_URB_TOP_GATECLK		0x1F001008
 
+#define MEDIA_SUBSYSTEM_CFG		0x1322000
+#define DISPLAY_PARALLEL_POR_EN		BIT(0)
+
 #define PP_ON				0x10
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -129,6 +132,8 @@ int board_init(void)
 			writel(val, SERV_URB_TOP_GATECLK);
 		}
 	}
+
+	writel(DISPLAY_PARALLEL_POR_EN, MEDIA_SUBSYSTEM_CFG);
 
 	board_pads_cfg();
 
