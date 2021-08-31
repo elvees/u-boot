@@ -167,8 +167,11 @@
 			interrupt-names = "DE", "SE";
 			reg = <0 0x1300000 0 0x10000>;
 			resets = <&media_reset MEDIA_RST_DISPLAY>;
-			status = "disabled";
+			clocks = <&dp_dummy_clk>, <&dp_dummy_clk>,
+				 <&dp_pix_clk>, <&dp_pix_clk>;
+			clock-names = "pclk", "aclk", "mclk", "pxlclk";
 			arm,malidp-output-port-lines = /bits/ 8 <8 8 8>;
+			status = "disabled";
 		};
 	};
 
@@ -649,5 +652,17 @@
 		#clock-cells = <0>;
 		compatible = "fixed-clock";
 		clock-frequency = <25000000>;
+	};
+
+	dp_pix_clk: dp_pix_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <148500000>;
+	};
+
+	dp_dummy_clk: dp_dummy_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <594000000>;
 	};
 };
