@@ -87,13 +87,13 @@ void i2c_pad_cfg(int i2c_num)
 		 * the pad receiver */
 		writel(0x18, LSP0_GPIO_SWPORTD_CTL);
 	} else {
-		val = readl(GPIO1_PORTA_PAD_CTR(i2c_num + 1));
+		val = readl(GPIO1_PORTA_PAD_CTR(2 * i2c_num - 2));
 		val |= GPIO_PAD_CTR_EN;
-		writel(val, GPIO1_PORTA_PAD_CTR(i2c_num + 1));
+		writel(val, GPIO1_PORTA_PAD_CTR(2 * i2c_num - 2));
 
-		val = readl(GPIO1_PORTA_PAD_CTR(i2c_num + 2));
+		val = readl(GPIO1_PORTA_PAD_CTR(2 * i2c_num - 1));
 		val |= GPIO_PAD_CTR_EN;
-		writel(val, GPIO1_PORTA_PAD_CTR(i2c_num + 2));
+		writel(val, GPIO1_PORTA_PAD_CTR(2 * i2c_num - 1));
 
 		val = readl(LSP1_GPIO_SWPORTA_CTL);
 		val |= BIT(2 * i2c_num - 2) | BIT(2 * i2c_num - 1);
