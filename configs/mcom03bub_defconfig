@@ -11,7 +11,6 @@ CONFIG_DEFAULT_DEVICE_TREE="mcom03-bub-r1.3.0"
 CONFIG_DISTRO_DEFAULTS=y
 CONFIG_USE_BOOTARGS=y
 CONFIG_BOOTARGS="earlycon console=ttyS0,115200 root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait"
-CONFIG_BOOTCOMMAND="setenv fdt_addr ${fdtcontroladdr}; run distro_bootcmd"
 # CONFIG_DISPLAY_CPUINFO is not set
 CONFIG_CMD_MEMINFO=y
 CONFIG_CMD_GPT=y
