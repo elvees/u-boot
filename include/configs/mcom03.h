@@ -42,6 +42,7 @@
 	"ramdisk_addr_r=0xc9000000\0" \
 	"pxefile_addr_r=0xca000000\0" \
 	"fdt_addr_r=0xc8800000\0" \
+	"fdtfile=" DEVICE_TREE ".dtb\0" \
 	"serverip=127.0.0.0\0" \
 	BOOTENV
 
