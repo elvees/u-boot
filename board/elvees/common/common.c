@@ -14,6 +14,7 @@
 
 #define DDR_SUBS_URB_BASE		0xC000000
 #define HSPERIPH_BAR			0xDC
+#define GPU_BAR				0xD8
 
 #define SERVICE_PPOLICY(x)		(0x1F000000UL + (x) * 0x8)
 #define SERVICE_PSTATUS(x)		(0x1F000000UL + (x) * 0x8 + 0x4)
@@ -127,10 +128,9 @@ int board_init(void)
 	int ret;
 	int i;
 
-	/* DDR high memory range is not available on HAPS. It means that
-	 * GEMAC DMA has access to DDR only if HSPERIPH_BAR is set to 0.
-	 */
+	/* Configure all devices to see DDR Low range (see #MCOM03BUP-234) */
 	writel(0, DDR_SUBS_URB_BASE + HSPERIPH_BAR);
+	writel(0, DDR_SUBS_URB_BASE + GPU_BAR);
 
 	for (i = 0; i < ARRAY_SIZE(reset_lines); i++) {
 		clkgate_bit = reset_lines[i];
