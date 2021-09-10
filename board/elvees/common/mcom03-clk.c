@@ -114,9 +114,14 @@ static struct ucg_channel ucg_hsp_channels[] = {
 	{1, 3, 45},	/* HSPERIPH UCG1 QSPI		25 MHz */
 	{1, 4, 9},	/* HSPERIPH UCG1 UltraSOC	125 MHz */
 	{2, 0, 45},	/* HSPERIPH UCG2 EMAC0 1588	25 MHz */
-	{2, 1, 45},	/* HSPERIPH UCG2 EMAC0 TXC	25 MHz */
 	{2, 2, 45},	/* HSPERIPH UCG2 EMAC1 1588	25 MHz */
+#ifdef CONFIG_TARGET_MCOM03_BUB
+	{2, 1, 45},	/* HSPERIPH UCG2 EMAC0 TXC	25 MHz */
 	{2, 3, 45},	/* HSPERIPH UCG2 EMAC1 TXC	25 MHz */
+#else
+	{2, 1, 9},	/* HSPERIPH UCG2 EMAC0 TXC	125 MHz */
+	{2, 3, 9},	/* HSPERIPH UCG2 EMAC1 TXC	125 MHz */
+#endif
 	{3, 0, 45},	/* HSPERIPH UCG3 USB0 ref	25 MHz */
 	{3, 1, 45},	/* HSPERIPH UCG3 USB0 suspend	25 MHz */
 	{3, 2, 45},	/* HSPERIPH UCG3 USB1 ref	25 MHz */
