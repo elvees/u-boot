@@ -295,6 +295,8 @@
 		};
 
 		emac0: ethernet@10200000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
 			compatible = "elvees,arasan-gemac";
 			reg = <0 0x10200000 0 0x1000>;
 			clocks = <&eth_bus_clk>;
@@ -305,6 +307,8 @@
 		};
 
 		emac1: ethernet@10210000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
 			compatible = "elvees,arasan-gemac";
 			reg = <0 0x10210000 0 0x1000>;
 			clocks = <&eth_bus_clk>;
