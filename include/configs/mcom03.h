@@ -8,6 +8,7 @@
 #ifndef __MCOM03_BUB_H
 #define __MCOM03_BUB_H
 
+#include <generated/dt.h>
 #include <linux/sizes.h>
 
 /* Specify available DDR memory.
