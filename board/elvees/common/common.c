@@ -87,6 +87,15 @@ static int subsystem_reset_deassert(enum subsystem_reset_lines line)
 				  1000);
 }
 
+void lsperiph1_v18_pad_cfg(void)
+{
+	u32 val;
+
+	val = readl(LSP1_URB_GPIO1_V18);
+	val |= LSP1_URB_GPIO1_V18_V18;
+	writel(val, LSP1_URB_GPIO1_V18);
+}
+
 void i2c_pad_cfg(int i2c_num)
 {
 	u32 val;

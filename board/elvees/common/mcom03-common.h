@@ -13,6 +13,9 @@
 #define GPIO1_PORTD_PAD_CTR(x)		(0x17e0080UL + (x) * 0x4)
 #define GPIO_PAD_CTR_EN			BIT(12)
 
+#define LSP1_URB_GPIO1_V18		0x17e00a0UL
+#define LSP1_URB_GPIO1_V18_V18		BIT(0)
+
 #define LSP0_GPIO_SWPORTD_CTL		0x161002c
 
 #define LSP1_GPIO_SWPORTA_DR		0x1780000
@@ -25,6 +28,7 @@
 #define LSP1_GPIO_SWPORTD_DDR		(0x1780000 + 0x28)
 #define LSP1_GPIO_SWPORTD_CTL		(0x1780000 + 0x2C)
 
+void lsperiph1_v18_pad_cfg(void);
 void i2c_pad_cfg(int i2c_num);
 void board_pads_cfg(void);
 

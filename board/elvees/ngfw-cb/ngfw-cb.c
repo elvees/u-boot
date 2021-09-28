@@ -69,6 +69,9 @@ void board_pads_cfg(void)
 	int i;
 	u32 val;
 
+	/* U-Boot don't have pinctrl driver, so switch pad voltage manually */
+	lsperiph1_v18_pad_cfg();
+
 	for (i = 0; i < 4; i++)
 		i2c_pad_cfg(i);
 
