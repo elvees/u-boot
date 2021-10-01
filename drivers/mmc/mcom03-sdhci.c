@@ -108,11 +108,6 @@ static int mcom03_sdhci_set_soc_regs(struct udevice *dev)
 			return ret;
 	}
 
-	ret = regmap_update_bits(regmap, SDMMC_CLK_PADCFG(priv->ctrl_id),
-				 SDMMC_CLK_PADCFG_PU, SDMMC_CLK_PADCFG_PU);
-	if (ret)
-		return ret;
-
 	ret = regmap_update_bits(regmap, SDMMC_CMD_PADCFG(priv->ctrl_id),
 				 SDMMC_CLK_PADCFG_PU, SDMMC_CLK_PADCFG_PU);
 	if (ret)
