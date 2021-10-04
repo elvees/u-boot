@@ -67,8 +67,15 @@ config MCOM03_EXTERNAL_DTB_ADDR
 	  This option contains memory address where U-Boot tries to
 	  find external DTB, which can be passed by previous bootloader.
 
-endif
-
 config MCOM03_XTAL_FREQ
 	int "XTAL frequency"
 	default 27000000
+
+config MEM_REGIONS_ADDR
+	hex "Address to read DDR info from"
+	default 0xE0000000
+	help
+	  Address to read DDR memory bank sizes and start addresses
+	  from (written by ddrinit).
+
+endif

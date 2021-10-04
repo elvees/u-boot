@@ -6,11 +6,4 @@ config SYS_BOARD
 config SYS_CONFIG_NAME
 	default "mcom03"
 
-config MEM_REGIONS_ADDR
-	hex "Address to read DDR info from"
-	default 0xE0000000
-	help
-	  Address to read DDR memory bank sizes and start addresses
-	  from (written by ddrinit).
-
 endif
