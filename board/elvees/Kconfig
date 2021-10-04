@@ -83,7 +83,7 @@ config MCOM03_XTAL_FREQ
 
 config MEM_REGIONS_ADDR
 	hex "Address to read DDR info from"
-	default 0xE0000000
+	default 0xA0000000
 	help
 	  Address to read DDR memory bank sizes and start addresses
 	  from (written by ddrinit).

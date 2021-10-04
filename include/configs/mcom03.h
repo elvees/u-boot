@@ -13,17 +13,17 @@
 /* Specify available DDR memory.
  * These macros are also used for specifying DDR size available for Linux.
  */
-#define CONFIG_SYS_SDRAM_BASE		0xC0000000
+#define CONFIG_SYS_SDRAM_BASE		0x80000000
 #define PHYS_SDRAM_0			CONFIG_SYS_SDRAM_BASE
 #define PHYS_SDRAM_0_SIZE		SZ_1G
 #define CONFIG_SYS_MALLOC_LEN		SZ_8M
 
-#define CONFIG_SYS_INIT_SP_ADDR		0xC0400000
+#define CONFIG_SYS_INIT_SP_ADDR		0x80400000
 
-#define CONFIG_SYS_LOAD_ADDR		0xC2000000 /* default load address */
+#define CONFIG_SYS_LOAD_ADDR		0x82000000 /* default load address */
 
 /* standalone support */
-#define CONFIG_STANDALONE_LOAD_ADDR	0xC2000000
+#define CONFIG_STANDALONE_LOAD_ADDR	0x82000000
 
 /* Default environment */
 #define CONFIG_LOADADDR			CONFIG_SYS_LOAD_ADDR
@@ -37,11 +37,11 @@
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"disable_giga=0x1\0" \
-	"kernel_addr_r=0xc2000000\0" \
-	"scriptaddr=0xc8000000\0" \
-	"ramdisk_addr_r=0xc9000000\0" \
-	"pxefile_addr_r=0xca000000\0" \
-	"fdt_addr_r=0xc8800000\0" \
+	"kernel_addr_r=0x82000000\0" \
+	"scriptaddr=0x88000000\0" \
+	"ramdisk_addr_r=0x89000000\0" \
+	"pxefile_addr_r=0x8a000000\0" \
+	"fdt_addr_r=0x88800000\0" \
 	"fdtfile=" CONFIG_DEFAULT_DEVICE_TREE ".dtb\0" \
 	"serverip=127.0.0.0\0" \
 	BOOTENV
