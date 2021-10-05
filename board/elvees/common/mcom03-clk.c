@@ -378,18 +378,6 @@ static int ucg_cfg(struct ucg_channel *ucg_channels, int chans_num,
 
 int clk_cfg(void)
 {
-	enum pll_id pll_hsp = HSP_PLL;
-	enum pll_id pll_lsp0 = LSP0_PLL;
-	enum pll_id pll_lsp1 = LSP1_PLL;
-	enum pll_id pll_media[] = { MEDIA_PLL0, MEDIA_PLL1,
-				    MEDIA_PLL2, MEDIA_PLL3 };
-	enum pll_id pll_sdr[] = { SDR_PLL0, SDR_PLL1, SDR_PLL2 };
-	unsigned long hsp_pll_addr[] = { HSP_PLL_ADDR };
-	unsigned long lsp0_pll_addr[] = { LSP0_PLL_ADDR };
-	unsigned long lsp1_pll_addr[] = { LSP1_PLL_ADDR };
-	unsigned long media_pll_addr[] = { MEDIA_PLL0_ADDR, MEDIA_PLL1_ADDR,
-					   MEDIA_PLL2_ADDR, MEDIA_PLL3_ADDR };
-	unsigned long sdr_pll_addr[] = { SDR_PLL0_ADDR, SDR_PLL1_ADDR, SDR_PLL2_ADDR };
 	u32 val;
 	int ret;
 
@@ -402,36 +390,59 @@ int clk_cfg(void)
 
 	ret = ucg_cfg(ucg_hsp_channels, ARRAY_SIZE(ucg_hsp_channels),
 		      hsp_ucg_ctr_addr_get, hsp_ucg_bp_addr_get,
-		      HSP_REFCLK_ADDR, 0x0, hsp_pll_addr, &pll_hsp,
-		      ARRAY_SIZE(hsp_pll_addr));
+		      HSP_REFCLK_ADDR, 0x0,
+		      (unsigned long []) { HSP_PLL_ADDR },
+		      (enum pll_id []) { HSP_PLL }, 1);
 	if (ret)
 		return ret;
 
 	ret = ucg_cfg(ucg_lsp0_channels, ARRAY_SIZE(ucg_lsp0_channels),
 		      lsp0_ucg_ctr_addr_get, lsp0_ucg_bp_addr_get,
-		      0, 0x0, lsp0_pll_addr, &pll_lsp0,
-		      ARRAY_SIZE(lsp0_pll_addr));
+		      0, 0x0,
+		      (unsigned long []) { LSP0_PLL_ADDR },
+		      (enum pll_id []) { LSP0_PLL }, 1);
 	if (ret)
 		return ret;
 
 	ret = ucg_cfg(ucg_lsp1_channels, ARRAY_SIZE(ucg_lsp1_channels),
 		      lsp1_ucg_ctr_addr_get, lsp1_ucg_bp_addr_get,
-		      0, 0x0, lsp1_pll_addr, &pll_lsp1,
-		      ARRAY_SIZE(lsp1_pll_addr));
+		      0, 0x0,
+		      (unsigned long []) { LSP1_PLL_ADDR },
+		      (enum pll_id []) { LSP1_PLL }, 1);
 	if (ret)
 		return ret;
 
 	ret = ucg_cfg(ucg_media_channels, ARRAY_SIZE(ucg_media_channels),
 		      media_ucg_ctr_addr_get, media_ucg_bp_addr_get,
-		      0, 0x0, media_pll_addr, pll_media,
-		      ARRAY_SIZE(media_pll_addr));
+		      0, 0x0,
+		      (unsigned long []) {
+			      MEDIA_PLL0_ADDR,
+			      MEDIA_PLL1_ADDR,
+			      MEDIA_PLL2_ADDR,
+			      MEDIA_PLL3_ADDR
+		      },
+		      (enum pll_id []) {
+			      MEDIA_PLL0,
+			      MEDIA_PLL1,
+			      MEDIA_PLL2,
+			      MEDIA_PLL3
+		      }, 4);
 	if (ret)
 		return ret;
 
 	ret = ucg_cfg(ucg_sdr_channels, ARRAY_SIZE(ucg_sdr_channels),
 		      sdr_ucg_ctr_addr_get, sdr_ucg_bp_addr_get,
-		      0, 0x0, sdr_pll_addr, pll_sdr,
-		      ARRAY_SIZE(sdr_pll_addr));
+		      0, 0x0,
+		      (unsigned long []) {
+			      SDR_PLL0_ADDR,
+			      SDR_PLL1_ADDR,
+			      SDR_PLL2_ADDR
+		      },
+		      (enum pll_id []) {
+			      SDR_PLL0,
+			      SDR_PLL1,
+			      SDR_PLL2
+		      }, 3);
 	if (ret)
 		return ret;
 	// Enable DSP clocks
