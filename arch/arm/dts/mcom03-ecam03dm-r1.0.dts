@@ -55,3 +55,11 @@
 		txc-skew-ps = <1860>;
 	};
 };
+
+&nand {
+	status = "okay";
+	chip@0 {
+		reg = <0>;
+		nand-ecc-mode="hw";
+	};
+};
