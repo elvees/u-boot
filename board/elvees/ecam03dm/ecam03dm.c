@@ -15,6 +15,8 @@ void board_pads_cfg(void)
 {
 	u32 val;
 
+	nand_pad_cfg();
+
 	/* Enable receivers for GPIO1_A6,
 	 * which are used as Ethernet PHY interrupt.
 	 * Temporary code until support is added to pinctrl

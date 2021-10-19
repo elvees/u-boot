@@ -20,8 +20,9 @@
 #define SERVICE_PSTATUS(x)		(0x1F000000UL + (x) * 0x8 + 0x4)
 #define HSPERIPH_URB_NAND_PADCFG	0x10400184
 #define NAND_ENABLE			BIT(0)
-#define PAD_MUX_NAND			BIT(4)
+#define NAND_V18			BIT(1)
 #define NAND_CLE			BIT(2)
+#define PAD_MUX_NAND			BIT(4)
 
 #define SERV_URB_TOP_GATECLK		0x1F001008
 
@@ -130,7 +131,12 @@ void i2c_pad_cfg(int i2c_num)
 void nand_pad_cfg(void)
 {
 	// temporary code until NAND support is added to pinctrl
-	writel(NAND_ENABLE | PAD_MUX_NAND | NAND_CLE, HSPERIPH_URB_NAND_PADCFG);
+	u32 val = PAD_MUX_NAND | NAND_CLE | NAND_ENABLE;
+
+	if (IS_ENABLED(CONFIG_TARGET_ECAM03DM))
+		val |= NAND_V18;
+
+	writel(val, HSPERIPH_URB_NAND_PADCFG);
 }
 
 int board_init(void)
