@@ -479,9 +479,9 @@ static int arasan_gemac_mdio_reset(struct mii_dev *bus)
 	struct arasan_gemac_priv *priv = bus->priv;
 
 	if (dm_gpio_is_valid(&priv->phy_reset)) {
-		dm_gpio_set_value(&priv->phy_reset, 0);
-		udelay(1000);
 		dm_gpio_set_value(&priv->phy_reset, 1);
+		udelay(1000);
+		dm_gpio_set_value(&priv->phy_reset, 0);
 
 		/* PHY on MCom-03 BuB requires delay after reset cycle. */
 		mdelay(100);
