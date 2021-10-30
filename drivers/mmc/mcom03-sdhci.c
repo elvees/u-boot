@@ -51,24 +51,6 @@ struct mcom03_sdhci_priv {
 	bool haps;
 };
 
-static int mcom03_sdhci_of_parse(struct udevice *dev)
-{
-	struct mcom03_sdhci_priv *priv = dev_get_priv(dev);
-	struct mcom03_sdhci_plat *plat = dev_get_platdata(dev);
-	int ret;
-
-	priv->host.ioaddr = (void *)devfdt_get_addr(dev);
-
-	ret = dev_read_u32(dev, "elvees,ctrl-id", &priv->ctrl_id);
-	if (ret < 0)
-		return ret;
-
-	priv->broken_hs = dev_read_bool(dev, "elvees,broken-hs");
-	priv->haps = dev_read_bool(dev, "elvees,haps");
-
-	return mmc_of_parse(dev, &plat->cfg);
-}
-
 static int mcom03_sdhci_set_soc_regs(struct udevice *dev)
 {
 	struct mcom03_sdhci_priv *priv = dev_get_priv(dev);
@@ -149,6 +131,27 @@ static int mcom03_sdhci_bind(struct udevice *dev)
 	return sdhci_bind(dev, &plat->mmc, &plat->cfg);
 }
 
+static int mcom03_sdhci_ofdata_to_platdata(struct udevice *dev)
+{
+	struct mcom03_sdhci_priv *priv = dev_get_priv(dev);
+	int ret;
+
+	priv->host.name = dev->name;
+
+	priv->host.ioaddr = (void *)dev_read_addr(dev);
+	if (IS_ERR(priv->host.ioaddr))
+		return PTR_ERR(priv->host.ioaddr);
+
+	ret = dev_read_u32(dev, "elvees,ctrl-id", &priv->ctrl_id);
+	if (ret < 0)
+		return ret;
+
+	priv->broken_hs = dev_read_bool(dev, "elvees,broken-hs");
+	priv->haps = dev_read_bool(dev, "elvees,haps");
+
+	return 0;
+}
+
 static int mcom03_sdhci_probe(struct udevice *dev)
 {
 	struct mcom03_sdhci_plat *plat = dev_get_platdata(dev);
@@ -179,7 +182,7 @@ static int mcom03_sdhci_probe(struct udevice *dev)
 	if (ret < 0)
 		goto disable_clk;
 
-	ret = mcom03_sdhci_of_parse(dev);
+	ret = mmc_of_parse(dev, &plat->cfg);
 	if (ret)
 		goto assert_reset;
 
@@ -202,7 +205,7 @@ static int mcom03_sdhci_probe(struct udevice *dev)
 	host->mmc->priv = &priv->host;
 	upriv->mmc = host->mmc;
 
-	/* plat->cfg.f_max is filled early in mcom03_sdhci_of_parse() */
+	/* plat->cfg.f_max is filled early in mmc_of_parse() */
 	ret = sdhci_setup_cfg(&plat->cfg, host, plat->cfg.f_max, 400000);
 	if (ret)
 		goto assert_reset;
@@ -228,6 +231,7 @@ U_BOOT_DRIVER(mcom03_sdhci_drv) = {
 	.name = "mcom03-sdhci",
 	.id = UCLASS_MMC,
 	.of_match = mcom03_sdhci_match_table,
+	.ofdata_to_platdata = mcom03_sdhci_ofdata_to_platdata,
 	.bind = mcom03_sdhci_bind,
 	.probe = mcom03_sdhci_probe,
 	.priv_auto_alloc_size = sizeof(struct mcom03_sdhci_priv),
