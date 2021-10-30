@@ -16,6 +16,16 @@
 		     "elvees,mcom03";
 };
 
+/* Connected to eMMC */
+&sdhci0 {
+	status = "okay";
+
+	/* Unstable at 25 MHz */
+	max-frequency = <12000000>;
+	non-removable;
+	bus-width = <8>;
+};
+
 &emac0 {
 	phy-mode = "rgmii";
 	phy-handle = <&ethernet_phy0>;
