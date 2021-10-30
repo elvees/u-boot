@@ -51,13 +51,6 @@ struct mcom03_sdhci_priv {
 	bool haps;
 };
 
-static int mcom03_sdhci_bind(struct udevice *dev)
-{
-	struct mcom03_sdhci_plat *plat = dev_get_platdata(dev);
-
-	return sdhci_bind(dev, &plat->mmc, &plat->cfg);
-}
-
 static int mcom03_sdhci_of_parse(struct udevice *dev)
 {
 	struct mcom03_sdhci_priv *priv = dev_get_priv(dev);
@@ -147,6 +140,13 @@ static void mcom03_wait_card_detect_debounce(struct sdhci_host *host)
 
 	if (ret)
 		printf("SD card detect debounce timeout\n");
+}
+
+static int mcom03_sdhci_bind(struct udevice *dev)
+{
+	struct mcom03_sdhci_plat *plat = dev_get_platdata(dev);
+
+	return sdhci_bind(dev, &plat->mmc, &plat->cfg);
 }
 
 static int mcom03_sdhci_probe(struct udevice *dev)
