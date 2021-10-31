@@ -9,7 +9,10 @@
 #include <dm.h>
 #include <fdtdec.h>
 #include <linux/bitfield.h>
+#include <linux/delay.h>
 #include <linux/iopoll.h>
+#include <mmc.h>
+#include <power/regulator.h>
 #include <sdhci.h>
 #include <syscon.h>
 #include <regmap.h>
@@ -124,6 +127,82 @@ static void mcom03_wait_card_detect_debounce(struct sdhci_host *host)
 		printf("SD card detect debounce timeout\n");
 }
 
+/* TODO: Use manual voltage switching using sdmmcX_padcfg. See rf#14673. */
+#if CONFIG_IS_ENABLED(MMC_IO_VOLTAGE)
+static void mcom03_sdhci_set_18v(struct sdhci_host *host, bool enable)
+{
+	u32 reg;
+
+	reg = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+
+	/* Check if required voltage is already set */
+	if (enable == !!(reg & SDHCI_CTRL_VDD_180))
+		return;
+
+	if (enable)
+		reg |= SDHCI_CTRL_VDD_180;
+	else
+		reg &= ~SDHCI_CTRL_VDD_180;
+
+	sdhci_writew(host, reg, SDHCI_HOST_CONTROL2);
+
+	/* According to SDHCI specification external regulator output shall be
+	 * stable within 5 ms. */
+	mdelay(5);
+
+	/* Don't check register value as required by SDHCI specification because
+	 * MCom-03 doesn't have error detection logic for signaling voltage
+	 * switch. */
+}
+
+/*
+ * Common MMC code doesn't take into account voltage regulators. Drivers should
+ * take care on its own.
+ */
+static int mcom03_sdhci_set_ios_post(struct sdhci_host *host)
+{
+	const struct mmc *mmc = host->mmc;
+	const int voltage = mmc_voltage_to_mv(mmc->signal_voltage) * 1000;
+	int ret;
+
+	if (mmc->signal_voltage == MMC_SIGNAL_VOLTAGE_120)
+		return -ENOTSUPP;
+
+#if CONFIG_IS_ENABLED(DM_REGULATOR)
+	if (mmc->vqmmc_supply) {
+		/* U-Boot doesn't support set_value() for fixed regulator */
+		int old = regulator_get_value(mmc->vqmmc_supply);
+
+		if (old != voltage) {
+			ret = regulator_set_value(mmc->vqmmc_supply, voltage);
+			if (ret)
+				return ret;
+		}
+
+		ret = regulator_set_enable_if_allowed(mmc->vqmmc_supply, true);
+		if (ret)
+			return ret;
+	}
+#endif
+
+	mcom03_sdhci_set_18v(host,
+			     mmc->signal_voltage == MMC_SIGNAL_VOLTAGE_180);
+
+	/* TODO: Decide what to do in case of MMC_SIGNAL_VOLTAGE_000. */
+
+	return 0;
+}
+#else
+static int mcom03_sdhci_set_ios_post(struct sdhci_host *host)
+{
+	return 0;
+}
+#endif
+
+const struct sdhci_ops mcom03_sdhci_ops = {
+	.set_ios_post = mcom03_sdhci_set_ios_post
+};
+
 static int mcom03_sdhci_bind(struct udevice *dev)
 {
 	struct mcom03_sdhci_plat *plat = dev_get_platdata(dev);
@@ -141,6 +220,8 @@ static int mcom03_sdhci_ofdata_to_platdata(struct udevice *dev)
 	priv->host.ioaddr = (void *)dev_read_addr(dev);
 	if (IS_ERR(priv->host.ioaddr))
 		return PTR_ERR(priv->host.ioaddr);
+
+	priv->host.ops = &mcom03_sdhci_ops;
 
 	ret = dev_read_u32(dev, "elvees,ctrl-id", &priv->ctrl_id);
 	if (ret < 0)
