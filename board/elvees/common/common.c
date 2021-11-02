@@ -6,6 +6,7 @@
 #include <common.h>
 #include <asm/armv8/mmu.h>
 #include <asm/io.h>
+#include <linux/bitfield.h>
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
 
@@ -94,6 +95,25 @@ static int subsystem_reset_deassert(enum subsystem_reset_lines line)
 	writel(PP_ON, SERVICE_PPOLICY(line));
 	return readl_poll_timeout(SERVICE_PSTATUS(line), val, val == PP_ON,
 				  1000);
+}
+
+static void pad_set_bits(unsigned long reg, u32 field, u32 value)
+{
+	u32 val = readl(reg);
+
+	val &= ~field;
+	val |= FIELD_PREP(field, value);
+	writel(val, reg);
+}
+
+void pad_set_ctl(unsigned long reg, u32 value)
+{
+	pad_set_bits(reg, LSP1_URB_GPIO1_PAD_CTR_CTL, value);
+}
+
+void pad_set_e(unsigned long reg, u32 value)
+{
+	pad_set_bits(reg, LSP1_URB_GPIO1_PAD_CTR_E, value);
 }
 
 void lsperiph1_v18_pad_cfg(void)

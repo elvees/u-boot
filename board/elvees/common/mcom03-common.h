@@ -13,6 +13,19 @@
 #define GPIO1_PORTD_PAD_CTR(x)		(0x17e0080UL + (x) * 0x4)
 #define GPIO_PAD_CTR_EN			BIT(12)
 
+#define LSP1_URB_GPIO1_PAD_CTR		0x17e0020UL
+#define LSP1_URB_GPIO1_PAD_CTR_SUS	BIT(0)
+#define LSP1_URB_GPIO1_PAD_CTR_PU	BIT(1)
+#define LSP1_URB_GPIO1_PAD_CTR_PD	BIT(2)
+#define LSP1_URB_GPIO1_PAD_CTR_SL	GENMASK(4, 3)
+#define LSP1_URB_GPIO1_PAD_CTR_CTL	GENMASK(10, 5)
+#define LSP1_URB_GPIO1_PAD_CTR_E	BIT(12)
+#define LSP1_URB_GPIO1_PAD_CTR_CLE	BIT(13)
+#define LSP1_URB_GPIO1_PAD_CTR_OD	BIT(14)
+
+#define LSP1_URB_GPIO1_PAD_CTR_ADDR(port, num) (LSP1_URB_GPIO1_PAD_CTR + \
+						((port) * 8 + (num)) * 4)
+
 #define LSP1_URB_GPIO1_V18		0x17e00a0UL
 #define LSP1_URB_GPIO1_V18_V18		BIT(0)
 
@@ -28,10 +41,17 @@
 #define LSP1_GPIO_SWPORTD_DDR		(0x1780000 + 0x28)
 #define LSP1_GPIO_SWPORTD_CTL		(0x1780000 + 0x2C)
 
+#define GPIO_PORTA			0
+#define GPIO_PORTB			1
+#define GPIO_PORTC			2
+#define GPIO_PORTD			3
+
 void lsperiph1_v18_pad_cfg(void);
 void i2c_pad_cfg(int i2c_num);
 void nand_pad_cfg(void);
 void board_pads_cfg(void);
 void nand_pad_cfg(void);
+void pad_set_ctl(unsigned long reg, u32 value);
+void pad_set_e(unsigned long reg, u32 value);
 
 #endif
