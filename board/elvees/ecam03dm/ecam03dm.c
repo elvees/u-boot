@@ -14,8 +14,15 @@ DECLARE_GLOBAL_DATA_PTR;
 void board_pads_cfg(void)
 {
 	u32 val;
+	int i;
 
 	nand_pad_cfg();
+
+	/* U-Boot doesn't have pinctrl driver, so switch pad voltage manually */
+	lsperiph1_v18_pad_cfg();
+
+	for (i = 1; i < 4; i++)
+		i2c_pad_cfg(i);
 
 	/* Enable receivers for GPIO1_A6,
 	 * which are used as Ethernet PHY interrupt.
