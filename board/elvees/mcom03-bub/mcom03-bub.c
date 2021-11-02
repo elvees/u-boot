@@ -16,6 +16,10 @@ void board_pads_cfg(void)
 	int i;
 
 	nand_pad_cfg();
+
+	// Enable pads for EMAC0/EMAC1 interrupt
+	pad_set_e(LSP1_URB_GPIO1_PAD_CTR_ADDR(GPIO_PORTA, 6), 1);
+	pad_set_e(LSP1_URB_GPIO1_PAD_CTR_ADDR(GPIO_PORTA, 7), 1);
 	for (i = 0; i < 4; i++)
 		i2c_pad_cfg(i);
 }
