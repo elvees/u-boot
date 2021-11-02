@@ -31,5 +31,6 @@
 void lsperiph1_v18_pad_cfg(void);
 void i2c_pad_cfg(int i2c_num);
 void board_pads_cfg(void);
+void nand_pad_cfg(void);
 
 #endif
