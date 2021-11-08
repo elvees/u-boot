@@ -20,6 +20,15 @@ void board_pads_cfg(void)
 	// Enable pads for EMAC0/EMAC1 interrupt
 	pad_set_e(LSP1_URB_GPIO1_PAD_CTR_ADDR(GPIO_PORTA, 6), 1);
 	pad_set_e(LSP1_URB_GPIO1_PAD_CTR_ADDR(GPIO_PORTA, 7), 1);
+
+	/* Set EMAC pads drive strength to 12 mA for data and 8 mA for clock.
+	 * Required for correct operation at 125 MHz 3.3V. See #MCOM03SW-823
+	 */
+	pad_set_ctl(HSP_URB_EMAC0_TX_PADCFG, 0x3f);
+	pad_set_ctl(HSP_URB_EMAC0_TXC_PADCFG, 0xf);
+	pad_set_ctl(HSP_URB_EMAC1_TX_PADCFG, 0x3f);
+	pad_set_ctl(HSP_URB_EMAC1_TXC_PADCFG, 0xf);
+
 	for (i = 0; i < 4; i++)
 		i2c_pad_cfg(i);
 }

@@ -46,6 +46,11 @@
 #define GPIO_PORTC			2
 #define GPIO_PORTD			3
 
+#define HSP_URB_EMAC0_TX_PADCFG		0x10400148
+#define HSP_URB_EMAC0_TXC_PADCFG	0x1040014c
+#define HSP_URB_EMAC1_TX_PADCFG		0x10400168
+#define HSP_URB_EMAC1_TXC_PADCFG	0x1040016c
+
 void lsperiph1_v18_pad_cfg(void);
 void i2c_pad_cfg(int i2c_num);
 void nand_pad_cfg(void);
