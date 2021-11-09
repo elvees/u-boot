@@ -56,14 +56,6 @@ int power_init_board(void)
 	return 0;
 }
 
-int dram_init_banksize(void)
-{
-	memcpy(gd->bd->bi_dram, (void *)CONFIG_MEM_REGIONS_ADDR,
-	       sizeof(struct bd_info));
-
-	return 0;
-}
-
 void board_pads_cfg(void)
 {
 	int i;
