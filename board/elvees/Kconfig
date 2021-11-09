@@ -47,6 +47,15 @@ config TARGET_RTL
 	help
 	  Support for RTL
 
+config TARGET_MCOM03_TRUSTPHONEPM
+	bool "Trustphone PM/CB"
+	select DM_ETH
+	select DM_MMC
+	select DM_GPIO
+	help
+	  Support for the following boards:
+	    Trustphone PM r1.5, Trustphone CB r1.1
+
 endchoice
 
 source "board/elvees/ecam03dm/Kconfig"
@@ -54,6 +63,7 @@ source "board/elvees/haps/Kconfig"
 source "board/elvees/mcom03-bub/Kconfig"
 source "board/elvees/ngfw-cb/Kconfig"
 source "board/elvees/rtl/Kconfig"
+source "board/elvees/trustphonepm/Kconfig"
 
 config SETUP_MEMORY_TAGS
 	bool "Enable memory tag"
