@@ -12,6 +12,11 @@
 	#address-cells = <2>;
 	#size-cells = <2>;
 
+	aliases {
+		spi0 = &qspi0;
+		spi1 = &qspi1;
+	};
+
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -125,6 +130,30 @@
 			compatible = "snps,dw-wdt";
 			reg = <0 0x1f080000 0 0x1000>;
 			/* TODO: Add clocks property here */
+		};
+
+		qspi0: spi@1ff00000 {
+			compatible = "silvaco,axi-qspi";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0 0x1ff00000 0 0x10000>;
+			clock-names = "clk_axi", "clk_ext";
+			clocks = <&qspi0_axi_clk>, <&qspi0_ext_clk>;
+			elvees,urb = <&service_urb>;
+			num-cs = <4>;
+			status = "disabled";
+		};
+
+		qspi0_axi_clk: qspi0_axi_clk {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <297000000>;
+		};
+
+		qspi0_ext_clk: qspi0_ext_clk {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <27000000>;
 		};
 	};
 
@@ -400,17 +429,29 @@
 			status = "disabled";
 		};
 
-		qspi: spi@10260000 {
+		qspi1: spi@10260000 {
 			compatible = "silvaco,axi-qspi";
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0 0x10260000 0 0x10000>;
 			clock-names = "clk_axi", "clk_ext";
-			clocks = <&qspi_clk>, <&qspi_clk>;
+			clocks = <&qspi1_axi_clk>, <&qspi1_ext_clk>;
 			resets = <&hsperiph_reset HSPERIPH_RST_QSPI>;
 			elvees,urb = <&hsperiph_urb>;
 			num-cs = <4>;
 			status = "disabled";
+		};
+
+		qspi1_axi_clk: qspi1_axi_clk {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <93750000>;
+		};
+
+		qspi1_ext_clk: qspi1_ext_clk {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <25000000>;
 		};
 
 		usb0: usb@10000000 {
@@ -707,12 +748,6 @@
 		#clock-cells = <0>;
 		compatible = "fixed-clock";
 		clock-frequency = <102375000>;
-	};
-
-	qspi_clk: qspi_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <25000000>;
 	};
 
 	dp_pix_clk: dp_pix_clk {

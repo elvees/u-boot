@@ -14,7 +14,6 @@
 
 	aliases {
 		serial0 = &uart0;
-		spi0 = &qspi;
 	};
 
 	adv7513_cec_clk: adv7513_cec_clk {
@@ -114,8 +113,34 @@
 	status = "okay";
 };
 
-&qspi {
+&qspi0 {
 	status = "okay";
+
+	flash0: s25fl128s@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor", "spi-flash";
+		reg = <0x0>;
+		/* This is the highest frequency at which all commands are
+		 * supported by the flash device.
+		 */
+		spi-max-frequency = <50000000>;
+	};
+};
+
+&qspi1 {
+	status = "okay";
+
+	flash1: s25fl128s@1 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor", "spi-flash";
+		reg = <0x0>;
+		/* This is the highest frequency at which all commands are
+		 * supported by the flash device.
+		 */
+		spi-max-frequency = <50000000>;
+	};
 };
 
 &i2c0 {

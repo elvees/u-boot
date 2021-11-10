@@ -10,10 +10,6 @@
 / {
 	model = "MCom-03 HAPS, full configuration";
 
-	aliases {
-		spi0 = &qspi;
-	};
-
 	acptest {
 		compatible = "elvees,acptest";
 	};
@@ -115,7 +111,7 @@
 	clocks = <&xti_clk>;
 };
 
-&qspi {
+&qspi1 {
 	clocks = <&xti_clk>, <&xti_clk>;
 	status = "okay";
 
