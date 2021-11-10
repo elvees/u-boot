@@ -52,27 +52,18 @@ struct mcom03_sdhci_priv {
 	u32 ctrl_id;
 	bool broken_hs;
 	bool haps;
+	struct regmap *soc_ctl_base;
 };
 
 static int mcom03_sdhci_set_soc_regs(struct udevice *dev)
 {
 	struct mcom03_sdhci_priv *priv = dev_get_priv(dev);
-	struct regmap *regmap;
-	struct ofnode_phandle_args args;
+	struct regmap *soc_ctl_base = priv->soc_ctl_base;
 	u32 freq;
 	int ret;
 
-	ret = dev_read_phandle_with_args(dev, "arasan,soc-ctl-syscon", NULL,
-					 0, 0, &args);
-	if (ret)
-		return ret;
-
-	regmap = syscon_node_to_regmap(args.node);
-	if (IS_ERR(regmap))
-		return PTR_ERR(regmap);
-
 	freq = priv->freq / 1000 / 1000;
-	ret = regmap_update_bits(regmap, SDMMC_CORECFG1(priv->ctrl_id),
+	ret = regmap_update_bits(soc_ctl_base, SDMMC_CORECFG1(priv->ctrl_id),
 				 SDMMC_CORECFG1_BASECLKFREQ,
 				 SDMMC_SET_FIELD(SDMMC_CORECFG1_BASECLKFREQ,
 						 freq));
@@ -80,28 +71,29 @@ static int mcom03_sdhci_set_soc_regs(struct udevice *dev)
 		return ret;
 
 	if (priv->broken_hs) {
-		ret = regmap_update_bits(regmap, SDMMC_CORECFG1(priv->ctrl_id),
+		ret = regmap_update_bits(soc_ctl_base,
+					 SDMMC_CORECFG1(priv->ctrl_id),
 					 SDMMC_CORECFG1_HSEN, 0);
 		if (ret)
 			return ret;
 	}
 
-	ret = regmap_update_bits(regmap, SDMMC_CMD_PADCFG(priv->ctrl_id),
+	ret = regmap_update_bits(soc_ctl_base, SDMMC_CMD_PADCFG(priv->ctrl_id),
 				 SDMMC_CLK_PADCFG_PU, SDMMC_CLK_PADCFG_PU);
 	if (ret)
 		return ret;
 
-	ret = regmap_update_bits(regmap, SDMMC_DAT_PADCFG(priv->ctrl_id),
+	ret = regmap_update_bits(soc_ctl_base, SDMMC_DAT_PADCFG(priv->ctrl_id),
 				 SDMMC_CLK_PADCFG_PU, SDMMC_CLK_PADCFG_PU);
 	if (ret)
 		return ret;
 
-	ret = regmap_update_bits(regmap, SDMMC_PADCFG(priv->ctrl_id),
+	ret = regmap_update_bits(soc_ctl_base, SDMMC_PADCFG(priv->ctrl_id),
 				 SDMMC_PADCFG_EN, SDMMC_PADCFG_EN);
 	if (ret)
 		return ret;
 
-	ret = regmap_update_bits(regmap, MISC_PADCFG,
+	ret = regmap_update_bits(soc_ctl_base, MISC_PADCFG,
 				 MISC_PADCFG_EN, MISC_PADCFG_EN);
 
 	return ret;
@@ -213,6 +205,7 @@ static int mcom03_sdhci_bind(struct udevice *dev)
 static int mcom03_sdhci_ofdata_to_platdata(struct udevice *dev)
 {
 	struct mcom03_sdhci_priv *priv = dev_get_priv(dev);
+	struct ofnode_phandle_args args;
 	int ret;
 
 	priv->host.name = dev->name;
@@ -222,6 +215,15 @@ static int mcom03_sdhci_ofdata_to_platdata(struct udevice *dev)
 		return PTR_ERR(priv->host.ioaddr);
 
 	priv->host.ops = &mcom03_sdhci_ops;
+
+	ret = dev_read_phandle_with_args(dev, "arasan,soc-ctl-syscon", NULL,
+					 0, 0, &args);
+	if (ret)
+		return ret;
+
+	priv->soc_ctl_base = syscon_node_to_regmap(args.node);
+	if (IS_ERR(priv->soc_ctl_base))
+		return PTR_ERR(priv->soc_ctl_base);
 
 	ret = dev_read_u32(dev, "elvees,ctrl-id", &priv->ctrl_id);
 	if (ret < 0)
