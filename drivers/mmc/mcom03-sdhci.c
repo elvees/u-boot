@@ -4,6 +4,9 @@
  *
  * Arasan SDHCI support for ELVEES MCom-03 SoC
  */
+
+#define pr_fmt(fmt) ("mcom03-sdhci: " fmt)
+
 #include <clk.h>
 #include <common.h>
 #include <dm.h>
@@ -11,6 +14,7 @@
 #include <linux/bitfield.h>
 #include <linux/delay.h>
 #include <linux/iopoll.h>
+#include <log.h>
 #include <mmc.h>
 #include <power/regulator.h>
 #include <sdhci.h>
@@ -30,6 +34,15 @@
 #define SDMMC_CORECFG1_BASECLKFREQ		GENMASK(15, 8)
 #define SDMMC_CORECFG1_HSEN			BIT(21)
 #define SDMMC_CORECFG1_SLOT_NONREMOVABLE	BIT(30)
+
+#define SDMMC_CORECFG7(ctrl_id)			(0x58 + (ctrl_id) * 0x3C)
+#define SDMMC_CORECFG7_ASYNCWKUPENA		BIT(19)
+#define SDMMC_CORECFG7_TUNINGCOUNT		GENMASK(18, 13)
+#define SDMMC_CORECFG7_OTAPDLYENA		BIT(12)
+#define SDMMC_CORECFG7_OTAPDLYSEL		GENMASK(11, 8)
+#define SDMMC_CORECFG7_ITAPCHGWIN		BIT(6)
+#define SDMMC_CORECFG7_ITAPDLYENA		BIT(5)
+#define SDMMC_CORECFG7_ITAPDLYSEL		GENMASK(4, 0)
 
 #define MISC_PADCFG				0x1a4
 #define MISC_PADCFG_EN				BIT(8)
@@ -53,6 +66,22 @@ struct mcom03_sdhci_priv {
 	bool broken_hs;
 	bool haps;
 	struct regmap *soc_ctl_base;
+	int clk_phase_in[MMC_TIMING_MMC_HS400 + 1];
+	int clk_phase_out[MMC_TIMING_MMC_HS400 + 1];
+};
+
+static const u8 mode2timing[] = {
+	[MMC_LEGACY] = MMC_TIMING_LEGACY,
+	[MMC_HS] = MMC_TIMING_MMC_HS,
+	[SD_HS] = MMC_TIMING_SD_HS,
+	[MMC_HS_52] = MMC_TIMING_UHS_SDR50,
+	[MMC_DDR_52] = MMC_TIMING_UHS_DDR50,
+	[UHS_SDR12] = MMC_TIMING_UHS_SDR12,
+	[UHS_SDR25] = MMC_TIMING_UHS_SDR25,
+	[UHS_SDR50] = MMC_TIMING_UHS_SDR50,
+	[UHS_DDR50] = MMC_TIMING_UHS_DDR50,
+	[UHS_SDR104] = MMC_TIMING_UHS_SDR104,
+	[MMC_HS_200] = MMC_TIMING_MMC_HS200,
 };
 
 static int mcom03_sdhci_set_soc_regs(struct udevice *dev)
@@ -191,8 +220,93 @@ static int mcom03_sdhci_set_ios_post(struct sdhci_host *host)
 }
 #endif
 
+/* TODO: Despite Ararsan documentation states that OTAPSELENA should not be
+ *       asserted when operating in DS mode it seems it doesn't harm. But still
+ *       consider disabling it in DS mode. Driver for MCom-02 SDMMC disables
+ *       them. */
+static void mcom03_sdhci_set_otapdly(struct regmap *regmap, int ctrl_id,
+				     int val)
+{
+	u32 reg;
+	int ret;
+
+	log_debug("Set otapdly to %d\n", val);
+
+	ret = regmap_read(regmap, SDMMC_CORECFG7(ctrl_id), &reg);
+	if (ret)
+		goto err;
+
+	reg |= SDMMC_CORECFG7_OTAPDLYENA;
+	reg &= ~SDMMC_CORECFG7_OTAPDLYSEL;
+	reg |= FIELD_PREP(SDMMC_CORECFG7_OTAPDLYSEL, val);
+
+	ret = regmap_write(regmap, SDMMC_CORECFG7(ctrl_id), reg);
+	if (ret)
+		goto err;
+
+	return;
+
+err:
+	log_err("Failed to set output tap delays\n");
+}
+
+static void mcom03_sdhci_set_itapdly(struct regmap *regmap, int ctrl_id,
+				     int val)
+{
+	u32 reg;
+	int ret;
+
+	log_debug("Set itapdly to %d\n", val);
+
+	ret = regmap_read(regmap, SDMMC_CORECFG7(ctrl_id), &reg);
+	if (ret)
+		goto err;
+
+	reg |= SDMMC_CORECFG7_ITAPCHGWIN;
+
+	ret = regmap_write(regmap, SDMMC_CORECFG7(ctrl_id), reg);
+	if (ret)
+		goto err;
+
+	reg |= SDMMC_CORECFG7_ITAPDLYENA;
+	reg &= ~SDMMC_CORECFG7_ITAPDLYSEL;
+	reg |= FIELD_PREP(SDMMC_CORECFG7_ITAPDLYSEL, val);
+
+	ret = regmap_write(regmap, SDMMC_CORECFG7(ctrl_id), reg);
+	if (ret)
+		goto err;
+
+	reg &= ~SDMMC_CORECFG7_ITAPCHGWIN;
+
+	ret = regmap_write(regmap, SDMMC_CORECFG7(ctrl_id), reg);
+	if (ret)
+		goto err;
+
+	return;
+
+err:
+	log_err("Failed to set input tap delays\n");
+}
+
+static void mcom03_sdhci_set_delay(struct sdhci_host *host)
+{
+	struct mcom03_sdhci_priv *priv = dev_get_priv(host->mmc->dev);
+	int timing = mode2timing[host->mmc->selected_mode];
+
+	log_debug("Set delays for %s (timing %d)\n",
+		  mmc_mode_name(host->mmc->selected_mode), timing);
+
+	mcom03_sdhci_set_otapdly(priv->soc_ctl_base,
+				 priv->ctrl_id,
+				 priv->clk_phase_out[timing]);
+	mcom03_sdhci_set_itapdly(priv->soc_ctl_base,
+				 priv->ctrl_id,
+				 priv->clk_phase_in[timing]);
+}
+
 const struct sdhci_ops mcom03_sdhci_ops = {
-	.set_ios_post = mcom03_sdhci_set_ios_post
+	.set_ios_post = mcom03_sdhci_set_ios_post,
+	.set_delay = mcom03_sdhci_set_delay
 };
 
 static int mcom03_sdhci_bind(struct udevice *dev)
@@ -200,6 +314,33 @@ static int mcom03_sdhci_bind(struct udevice *dev)
 	struct mcom03_sdhci_plat *plat = dev_get_platdata(dev);
 
 	return sdhci_bind(dev, &plat->mmc, &plat->cfg);
+}
+
+static void mcom03_read_clk_phase(struct udevice *dev, unsigned char timing,
+				  const char *prop)
+{
+	struct mcom03_sdhci_priv *priv = dev_get_priv(dev);
+	u32 clk_phase[2] = { 0 };
+
+	dev_read_u32_array(dev, prop, &clk_phase[0], 2);
+	priv->clk_phase_in[timing] = clk_phase[0];
+	priv->clk_phase_out[timing] = clk_phase[1];
+}
+
+static void mcom03_read_clk_phases(struct udevice *dev)
+{
+	mcom03_read_clk_phase(dev, MMC_TIMING_LEGACY, "clk-phase-legacy");
+	mcom03_read_clk_phase(dev, MMC_TIMING_MMC_HS, "clk-phase-mmc-hs");
+	mcom03_read_clk_phase(dev, MMC_TIMING_SD_HS, "clk-phase-sd-hs");
+	mcom03_read_clk_phase(dev, MMC_TIMING_UHS_SDR12, "clk-phase-uhs-sdr12");
+	mcom03_read_clk_phase(dev, MMC_TIMING_UHS_SDR25, "clk-phase-uhs-sdr25");
+	mcom03_read_clk_phase(dev, MMC_TIMING_UHS_SDR50, "clk-phase-uhs-sdr50");
+	mcom03_read_clk_phase(dev, MMC_TIMING_UHS_SDR104,
+			      "clk-phase-uhs-sdr104");
+	mcom03_read_clk_phase(dev, MMC_TIMING_UHS_DDR50, "clk-phase-uhs-ddr50");
+	mcom03_read_clk_phase(dev, MMC_TIMING_MMC_DDR52, "clk-phase-mmc-ddr52");
+	mcom03_read_clk_phase(dev, MMC_TIMING_MMC_HS200, "clk-phase-mmc-hs200");
+	mcom03_read_clk_phase(dev, MMC_TIMING_MMC_HS400, "clk-phase-mmc-hs400");
 }
 
 static int mcom03_sdhci_ofdata_to_platdata(struct udevice *dev)
@@ -228,6 +369,8 @@ static int mcom03_sdhci_ofdata_to_platdata(struct udevice *dev)
 	ret = dev_read_u32(dev, "elvees,ctrl-id", &priv->ctrl_id);
 	if (ret < 0)
 		return ret;
+
+	mcom03_read_clk_phases(dev);
 
 	priv->broken_hs = dev_read_bool(dev, "elvees,broken-hs");
 	priv->haps = dev_read_bool(dev, "elvees,haps");
