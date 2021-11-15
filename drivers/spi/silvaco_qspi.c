@@ -88,7 +88,7 @@ static int mcom03_qspi_set_soc_regs(struct udevice *dev)
 {
 	struct regmap *regmap;
 	struct ofnode_phandle_args args;
-	int ret;
+	int devnum, ret;
 
 	ret = dev_read_phandle_with_args(dev, "elvees,urb", NULL,
 					 0, 0, &args);
@@ -99,37 +99,41 @@ static int mcom03_qspi_set_soc_regs(struct udevice *dev)
 	if (IS_ERR(regmap))
 		return PTR_ERR(regmap);
 
-	ret = regmap_update_bits(regmap, QSPI1_PAD, QSPI1_PAD_1V8,
-				 QSPI1_PAD_1V8);
-	if (ret < 0)
-		return ret;
-	ret = regmap_update_bits(regmap, QSPI1_PAD, QSPI1_PAD_EN, QSPI1_PAD_EN);
-	if (ret < 0)
-		return ret;
+	dev_read_alias_seq(dev, &devnum);
 
-	ret = regmap_update_bits(regmap, QSPI1_SS, QSPI1_PAD_CTL_MASK,
-				 QSPI1_PAD_CTL(HS_URB_MAX_OUTPUT_8MA));
-	if (ret < 0)
-		return ret;
-	ret = regmap_update_bits(regmap, QSPI1_SS, QSPI1_PAD_PU, QSPI1_PAD_PU);
-	if (ret < 0)
-		return ret;
+	if (devnum == 1) {
+		ret = regmap_update_bits(regmap, QSPI1_PAD, QSPI1_PAD_1V8,
+					 QSPI1_PAD_1V8);
+		if (ret < 0)
+			return ret;
+		ret = regmap_update_bits(regmap, QSPI1_PAD, QSPI1_PAD_EN, QSPI1_PAD_EN);
+		if (ret < 0)
+			return ret;
 
-	ret = regmap_update_bits(regmap, QSPI1_SISO, QSPI1_PAD_CTL_MASK,
-				 QSPI1_PAD_CTL(HS_URB_MAX_OUTPUT_8MA));
-	if (ret < 0)
-		return ret;
-	ret = regmap_update_bits(regmap, QSPI1_SISO, QSPI1_PAD_PU,
-				 QSPI1_PAD_PU);
-	if (ret < 0)
-		return ret;
+		ret = regmap_update_bits(regmap, QSPI1_SS, QSPI1_PAD_CTL_MASK,
+					 QSPI1_PAD_CTL(HS_URB_MAX_OUTPUT_8MA));
+		if (ret < 0)
+			return ret;
+		ret = regmap_update_bits(regmap, QSPI1_SS, QSPI1_PAD_PU, QSPI1_PAD_PU);
+		if (ret < 0)
+			return ret;
 
-	ret = regmap_update_bits(regmap, QSPI1_SCLK, QSPI1_PAD_CTL_MASK,
-				 QSPI1_PAD_CTL(HS_URB_MAX_OUTPUT_8MA));
-	if (ret < 0)
-		return ret;
-	ret = regmap_update_bits(regmap, QSPI1_SCLK, QSPI1_PAD_PU,
-				 QSPI1_PAD_PU);
+		ret = regmap_update_bits(regmap, QSPI1_SISO, QSPI1_PAD_CTL_MASK,
+					 QSPI1_PAD_CTL(HS_URB_MAX_OUTPUT_8MA));
+		if (ret < 0)
+			return ret;
+		ret = regmap_update_bits(regmap, QSPI1_SISO, QSPI1_PAD_PU,
+					 QSPI1_PAD_PU);
+		if (ret < 0)
+			return ret;
+
+		ret = regmap_update_bits(regmap, QSPI1_SCLK, QSPI1_PAD_CTL_MASK,
+					 QSPI1_PAD_CTL(HS_URB_MAX_OUTPUT_8MA));
+		if (ret < 0)
+			return ret;
+		ret = regmap_update_bits(regmap, QSPI1_SCLK, QSPI1_PAD_PU,
+					 QSPI1_PAD_PU);
+	}
 
 	return ret;
 }
