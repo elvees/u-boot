@@ -408,7 +408,7 @@
 			clock-names = "clk_axi", "clk_ext";
 			clocks = <&qspi_clk>, <&qspi_clk>;
 			resets = <&hsperiph_reset HSPERIPH_RST_QSPI>;
-			arasan,soc-ctl-syscon = <&hsperiph_urb>;
+			elvees,urb = <&hsperiph_urb>;
 			num-cs = <4>;
 			status = "disabled";
 		};

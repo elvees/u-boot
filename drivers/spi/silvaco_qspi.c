@@ -94,7 +94,7 @@ static int mcom03_qspi_set_soc_regs(struct udevice *dev)
 	int ret;
 	u32 val;
 
-	ret = dev_read_phandle_with_args(dev, "arasan,soc-ctl-syscon", NULL,
+	ret = dev_read_phandle_with_args(dev, "elvees,urb", NULL,
 					 0, 0, &args);
 	if (ret)
 		return ret;
