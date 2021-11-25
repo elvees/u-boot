@@ -28,11 +28,30 @@
 /* Default environment */
 #define CONFIG_LOADADDR			CONFIG_SYS_LOAD_ADDR
 
-#define BOOT_TARGET_DEVICES(func) \
+#if CONFIG_IS_ENABLED(CMD_MMC)
+#define BOOT_TARGET_DEVICES_MMC(func) \
 	func(MMC, mmc, 0) \
-	func(MMC, mmc, 1) \
-	func(USB, usb, 0) \
-	func(PXE, pxe, na)
+	func(MMC, mmc, 1)
+#else
+#define BOOT_TARGET_DEVICES_MMC(func)
+#endif
+
+#if CONFIG_IS_ENABLED(CMD_USB)
+#define BOOT_TARGET_DEVICES_USB(func) func(USB, usb, 0)
+#else
+#define BOOT_TARGET_DEVICES_USB(func)
+#endif
+
+#if CONFIG_IS_ENABLED(CMD_PXE)
+#define BOOT_TARGET_DEVICES_PXE(func) func(PXE, pxe, na)
+#else
+#define BOOT_TARGET_DEVICES_PXE(func)
+#endif
+
+#define BOOT_TARGET_DEVICES(func) \
+	BOOT_TARGET_DEVICES_MMC(func) \
+	BOOT_TARGET_DEVICES_USB(func) \
+	BOOT_TARGET_DEVICES_PXE(func)
 
 #include <config_distro_bootcmd.h>
 
