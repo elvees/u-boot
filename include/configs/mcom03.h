@@ -36,14 +36,7 @@
 
 #include <config_distro_bootcmd.h>
 
-#ifdef CONFIG_TARGET_MCOM03_BUB
-#define GBIT_ENV "disable_giga=0x1\0"
-#else
-#define GBIT_ENV
-#endif
-
 #define CONFIG_EXTRA_ENV_SETTINGS \
-	GBIT_ENV \
 	"kernel_addr_r=0x82000000\0" \
 	"scriptaddr=0x88000000\0" \
 	"ramdisk_addr_r=0x89000000\0" \
