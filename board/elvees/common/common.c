@@ -159,6 +159,34 @@ void nand_pad_cfg(void)
 	writel(val, HSPERIPH_URB_NAND_PADCFG);
 }
 
+static int xip_disable(int qspi_num)
+{
+	u32 val;
+	u64 xip_en_req, xip_en_out;
+
+	switch (qspi_num) {
+	case 0:
+		xip_en_req = SERVICE_URB_XIP_EN_REQ;
+		xip_en_out = SERVICE_URB_XIP_EN_OUT;
+		break;
+	case 1:
+		xip_en_req = HSP_URB_XIP_EN_REQ;
+		xip_en_out = HSP_URB_XIP_EN_OUT;
+		break;
+	default:
+		printf("%s: Unknown bus: QSPI%d\n", __func__, qspi_num);
+		return -ENOENT;
+	}
+
+	/* Disable XIP mode */
+
+	val = readl(xip_en_req);
+	val &= ~QSPI_XIP_EN;
+	writel(val, xip_en_req);
+
+	return readl_poll_timeout(xip_en_out, val, !(val & QSPI_XIP_EN), 100);
+}
+
 int board_init(void)
 {
 #ifdef CONFIG_MCOM03_SUBSYSTEM_SDR
@@ -194,6 +222,12 @@ int board_init(void)
 	writel(DISPLAY_PARALLEL_POR_EN, MEDIA_SUBSYSTEM_CFG);
 
 	board_pads_cfg();
+
+	for (i = 0; i < 2; i++) {
+		ret = xip_disable(i);
+		if (ret)
+			return ret;
+	}
 
 	return clk_cfg();
 }

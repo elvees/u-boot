@@ -25,9 +25,6 @@
 #define SILVACO_STAT_TXFULL	BIT(4)
 #define SILVACO_STAT_RXEMPTY	BIT(5)
 
-#define QSPI1_XIP_EN_REQ	0x10
-#define QSPI1_XIP_EN		BIT(0)
-#define QSPI1_XIP_EN_OUT	0x14
 #define QSPI1_PAD		0x1c
 #define QSPI1_PAD_EN		1
 #define QSPI1_PAD_1V8		BIT(1)
@@ -92,7 +89,6 @@ static int mcom03_qspi_set_soc_regs(struct udevice *dev)
 	struct regmap *regmap;
 	struct ofnode_phandle_args args;
 	int ret;
-	u32 val;
 
 	ret = dev_read_phandle_with_args(dev, "elvees,urb", NULL,
 					 0, 0, &args);
@@ -134,16 +130,6 @@ static int mcom03_qspi_set_soc_regs(struct udevice *dev)
 		return ret;
 	ret = regmap_update_bits(regmap, QSPI1_SCLK, QSPI1_PAD_PU,
 				 QSPI1_PAD_PU);
-	if (ret < 0)
-		return ret;
-
-	/* Disable XIP mode */
-	ret = regmap_update_bits(regmap, QSPI1_XIP_EN_REQ, QSPI1_XIP_EN, 0);
-	if (ret < 0)
-		return ret;
-
-	ret = regmap_read_poll_timeout(regmap, QSPI1_XIP_EN_OUT, val,
-				       val == 0, 0, 100);
 
 	return ret;
 }

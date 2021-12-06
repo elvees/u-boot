@@ -46,10 +46,18 @@
 #define GPIO_PORTC			2
 #define GPIO_PORTD			3
 
+#define HSP_URB_XIP_EN_REQ		0x10400010
+#define HSP_URB_XIP_EN_OUT		0x10400014
+
 #define HSP_URB_EMAC0_TX_PADCFG		0x10400148
 #define HSP_URB_EMAC0_TXC_PADCFG	0x1040014c
 #define HSP_URB_EMAC1_TX_PADCFG		0x10400168
 #define HSP_URB_EMAC1_TXC_PADCFG	0x1040016c
+
+#define SERVICE_URB_XIP_EN_REQ		0x1f002004
+#define SERVICE_URB_XIP_EN_OUT		0x1f002008
+
+#define QSPI_XIP_EN			BIT(0)
 
 void lsperiph1_v18_pad_cfg(void);
 void i2c_pad_cfg(int i2c_num);
