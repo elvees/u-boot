@@ -81,9 +81,11 @@ static struct pll_settings pll_settings[] = {
 	{ MEDIA_PLL1, 27000000, 594000000, 0, 131, 5 },
 	{ MEDIA_PLL2, 27000000, 495000000, 0, 109, 5 },
 
+#ifdef CONFIG_MCOM03_SUBSYSTEM_SDR
 	{ SDR_PLL0, 27000000, 1890000000, 0, 69, 0 },
 	{ SDR_PLL1, 27000000, 657000000, 0, 72, 2 },
 	{ SDR_PLL2, 27000000, 459000000, 0, 16, 0 },
+#endif
 	/* UCG3 channel 5 used as workaround for DISP_PIXCLK (UCG1 channel 2).
 	 * Setup PLL3 to frequency that can be divided by DISP_PIXCLK.
 	 */
@@ -459,6 +461,7 @@ int clk_cfg(void)
 	if (ret)
 		return ret;
 
+#ifdef CONFIG_MCOM03_SUBSYSTEM_SDR
 	ret = ucg_cfg(ucg_sdr_channels, ARRAY_SIZE(ucg_sdr_channels),
 		      sdr_ucg_ctr_addr_get, sdr_ucg_bp_addr_get,
 		      0, 0x0,
@@ -481,6 +484,7 @@ int clk_cfg(void)
 	       SDR_URB_PCI0_CTL);
 	writel(SDR_URB_PCIE_CTL_ENABLE_CLK | SDR_URB_PCIE_CTL_PAD_EN,
 	       SDR_URB_PCI1_CTL);
+#endif
 
 	ret = ucg_cfg(ucg_serv_channels, ARRAY_SIZE(ucg_serv_channels),
 		      serv_ucg_ctr_addr_get, serv_ucg_bp_addr_get, 0, 0x0,
