@@ -7,6 +7,7 @@
 #include <dm.h>
 #include <errno.h>
 #include <spi.h>
+#include <spi-mem.h>
 #include <clk.h>
 #include <reset.h>
 #include <regmap.h>
@@ -22,6 +23,8 @@
 #define SILVACO_AUX_CNTXFEREXT	BIT(7)
 #define SILVACO_AUX_BITSIZE(x)	(((x) - 1) << 8)
 
+#define SILVACO_STAT_XFERIP	BIT(0)
+#define SILVACO_STAT_TXEMPTY	BIT(2)
 #define SILVACO_STAT_TXFULL	BIT(4)
 #define SILVACO_STAT_RXEMPTY	BIT(5)
 
@@ -36,6 +39,20 @@
 #define QSPI1_PAD_CTL(x)	((x) << 5)
 #define HS_URB_MAX_OUTPUT_8MA	0xF
 #define QSPI1_PAD_PU		BIT(1)
+
+#define SILVACO_DUMMY_BYTES	0xff
+
+#define GPO_OUTPUT_SISO_0_1	(0x3)
+#define GPO_OUTPUT_SISO_2_3	(0xC)
+#define GPO_TRISTATE_SISO_0_1	(0x3 << 4)
+#define GPO_TRISTATE_SISO_2_3	(0xC << 4)
+#define GPO_ENABLE_SISO_0_1	(0x3 << 8)
+#define GPO_ENABLE_SISO_2_3	(0xC << 8)
+#define GPO_DISABLE_FULL_DUPLEX	BIT(12)
+
+/* IO lines */
+#define SILVACO_NORMAL		1
+#define SILVACO_QUAD		4
 
 struct silvaco_qspi_regs {
 	u32 tx_data;      /* Serial Transmit Data Register */
@@ -71,6 +88,7 @@ struct silvaco_qspi_priv {
 	struct clk clk_ext;
 	struct reset_ctl rst_ctl;
 	unsigned int freq;
+	u8 io_lines;
 };
 
 static int silvaco_qspi_ofdata_to_platdata(struct udevice *dev)
@@ -201,12 +219,6 @@ static int silvaco_qspi_probe(struct udevice *dev)
 	if (ret)
 		goto assert_reset;
 
-	/* Allow SISO1 and SISO0 out of tristate for normal full-duplex */
-	writel(0xC << 4, &regs->gpo_set);
-	writel(0x3 << 4, &regs->gpo_clr);
-
-	/* full-duplex on */
-	writel(BIT(12), &regs->gpo_clr);
 	return 0;
 
 assert_reset:
@@ -250,6 +262,127 @@ static int silvaco_qspi_release_bus(struct udevice *dev)
 	return 0;
 }
 
+static int silvaco_qspi_wait_to_be_not(struct silvaco_qspi_regs *regs, u32 flag)
+{
+	return wait_for_bit_le32(&regs->stat, flag, false, 1000, false);
+}
+
+static int silvaco_qspi_wait_to_be(struct silvaco_qspi_regs *regs, u32 flag)
+{
+	return wait_for_bit_le32(&regs->stat, flag, true, 1000, false);
+}
+
+static int silvaco_qspi_tx_ready(struct silvaco_qspi_regs *regs)
+{
+	int ret = 0;
+
+	ret = silvaco_qspi_wait_to_be(regs, SILVACO_STAT_TXEMPTY);
+	if (ret) {
+		debug("%s: Timeout tx not empty\n", __func__);
+		return ret;
+	}
+
+	ret = silvaco_qspi_wait_to_be_not(regs, SILVACO_STAT_XFERIP);
+	if (ret) {
+		debug("%s: Timeout xfer ongoing\n", __func__);
+		return ret;
+	}
+
+	return ret;
+}
+
+static void mcom03_silvaco_setup_gpio(struct silvaco_qspi_priv *silvaco)
+{
+	struct silvaco_qspi_regs *regs = silvaco->regs;
+
+	/*
+	 gpo_{set, clr} registers has this bit mapping:
+	 gpo[0:3], gpo_oen[4:7], gpo_en[8:11]
+	 */
+	switch (silvaco->io_lines) {
+	case SILVACO_NORMAL:
+		/*
+		 gpo:
+		 Set SISO2 and SISO3 to HIGH.
+		 gpo_en:
+		 Give access for controling the output on SISO2 and SISO3.
+		 */
+		writel(GPO_OUTPUT_SISO_2_3 | GPO_ENABLE_SISO_2_3,
+		       &regs->gpo_set);
+		/*
+		 gpo_oen:
+		 Give access for enabling/disabling tristate on SISO2 and SISO3.
+		 gpo_en:
+		 Disable access for controling the output on SISO0 and SISO1.
+		 fdpx: Enable full-duplex mode
+		 */
+		writel(GPO_ENABLE_SISO_0_1 | GPO_TRISTATE_SISO_2_3 |
+		       GPO_DISABLE_FULL_DUPLEX, &regs->gpo_clr);
+		break;
+	case SILVACO_QUAD:
+		/*
+		 gpo_en: Disabling access to control the output on SISO[0-3]
+		 fdpx: Disable full-duplex mode
+		 */
+		writel(GPO_DISABLE_FULL_DUPLEX, &regs->gpo_set);
+		writel(GPO_ENABLE_SISO_0_1 | GPO_ENABLE_SISO_2_3,
+		       &regs->gpo_clr);
+		break;
+	}
+}
+
+static int silvaco_qspi_prep_io_lines(struct silvaco_qspi_priv *silvaco,
+				      u8 *rxp)
+{
+	struct silvaco_qspi_regs *regs = silvaco->regs;
+	u32 aux = readl(&regs->ctrl_aux);
+	int ret;
+
+	ret = silvaco_qspi_tx_ready(regs);
+	if (ret)
+		return ret;
+
+	switch (silvaco->io_lines) {
+	case SILVACO_NORMAL:
+		aux &= ~GENMASK(1, 0);
+		break;
+	case SILVACO_QUAD:
+		aux |= GENMASK(1, 0);
+		break;
+	}
+
+	writel(aux, &regs->ctrl_aux);
+
+	mcom03_silvaco_setup_gpio(silvaco);
+
+	if (rxp)
+		writel(readl(&regs->ctrl_aux) & ~SILVACO_AUX_INHDIN,
+		       &regs->ctrl_aux);
+
+	return 0;
+}
+
+static int silavco_qspi_end_xfer(struct silvaco_qspi_priv *silvaco,
+				 struct dm_spi_slave_platdata *slave_plat,
+				 u8 *rxp)
+{
+	struct silvaco_qspi_regs *regs = silvaco->regs;
+	int ret;
+
+	/*
+	 * Even if there is timeout, we should set INHIDIN and disable cs.
+	 */
+	ret = silvaco_qspi_tx_ready(regs);
+
+	if (rxp)
+		writel(readl(&regs->ctrl_aux) | SILVACO_AUX_INHDIN,
+		       &regs->ctrl_aux);
+
+	writel(0, &regs->ss);
+
+	return ret;
+}
+
 static int silvaco_qspi_xfer(struct udevice *dev, unsigned int bitlen,
 			     const void *dout, void *din, unsigned long flags)
 {
@@ -276,50 +409,52 @@ static int silvaco_qspi_xfer(struct udevice *dev, unsigned int bitlen,
 		goto done;
 	}
 
-	if (flags & SPI_XFER_BEGIN) {
-		writel(BIT(slave_plat->cs), &regs->ss);
-		writel(readl(&regs->ctrl_aux) & ~SILVACO_AUX_INHDIN,
-		       &regs->ctrl_aux);
+	ret = silvaco_qspi_prep_io_lines(priv, rxp);
+	if (ret) {
+		debug("%s: error upon preparing io lines\n", __func__);
+		flags |= SPI_XFER_END;
+		goto done;
 	}
+
+	if (flags & SPI_XFER_BEGIN)
+		writel(BIT(slave_plat->cs), &regs->ss);
 
 	while (bytes--) {
 		if (txp)
 			data = *txp++;
 		else
-			data = 0xff;
+			data = SILVACO_DUMMY_BYTES;
 
-		ret = wait_for_bit_le32(&regs->stat, SILVACO_STAT_TXFULL,
-					false, 1000, false);
+		ret = silvaco_qspi_wait_to_be_not(regs, SILVACO_STAT_TXFULL);
 		if (ret) {
 			debug("%s: Transmit timed out\n", __func__);
 			flags |= SPI_XFER_END;
 			goto done;
 		}
 
-		debug("%s: tx:%x\n", __func__, data);
+		if (txp)
+			debug("%s: tx:%x\n", __func__, data);
+
 		writel(data, &regs->tx_data);
 
-		ret = wait_for_bit_le32(&regs->stat, SILVACO_STAT_RXEMPTY,
-					false, 1000, false);
-		if (ret) {
-			debug("%s: Receive timed out\n", __func__);
-			flags |= SPI_XFER_END;
-			goto done;
-		}
+		if (rxp) {
+			ret = silvaco_qspi_wait_to_be_not(regs,
+							  SILVACO_STAT_RXEMPTY);
+			if (ret) {
+				debug("%s: Receive timed out\n", __func__);
+				flags |= SPI_XFER_END;
+				goto done;
+			}
 
-		data = readl(&regs->rx_data);
-		if (rxp)
+			data = readl(&regs->rx_data);
 			*rxp++ = data & 0xff;
 
-		debug("%s: rx:%x\n", __func__, data);
+			debug("%s: rx:%x\n", __func__, data);
+		}
 	}
-
 done:
-	if (flags & SPI_XFER_END) {
-		writel(0, &regs->ss);
-		writel(readl(&regs->ctrl_aux) | SILVACO_AUX_INHDIN,
-		       &regs->ctrl_aux);
-	}
+	if (flags & SPI_XFER_END)
+		ret = silavco_qspi_end_xfer(priv, slave_plat, rxp);
 
 	return ret;
 }
@@ -331,15 +466,106 @@ static int silvaco_qspi_set_speed(struct udevice *dev, uint speed)
 
 static int silvaco_qspi_set_mode(struct udevice *dev, uint mode)
 {
+	int ret = 0;
+
+	if (mode & (SPI_TX_DUAL | SPI_RX_DUAL)) {
+		printf("Silvaco driver does not support dual transmit\n");
+		ret = -EINVAL;
+	} else if (mode & (SPI_TX_OCTAL | SPI_RX_OCTAL)) {
+		printf("Silvaco controller does not support octal transmit\n");
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
+int silvaco_exec_op(struct spi_slave *slave, const struct spi_mem_op *op)
+{
+	struct udevice *dev = slave->dev;
+	struct silvaco_qspi_priv *priv = dev_get_priv(dev->parent);
+	u8 opcode = op->cmd.opcode;
+	unsigned long flags = SPI_XFER_BEGIN;
+	const void *txp = NULL;
+	void *rxp = NULL;
+	unsigned int pos = 0;
+	int op_len, i;
+	int ret;
+
+	if (!op->addr.nbytes && !op->dummy.nbytes && !op->data.nbytes)
+		flags |= SPI_XFER_END;
+
+	priv->io_lines = op->cmd.buswidth;
+
+	/* send the opcode */
+	ret = silvaco_qspi_xfer(dev, 8, (void *)&opcode, NULL, flags);
+	if (ret < 0) {
+		printf("Failed to xfer opcode %xh\n", opcode);
+		return ret;
+	}
+
+	op_len = op->addr.nbytes + op->dummy.nbytes;
+	u8 op_buf[op_len];
+
+	/* send the addr + dummy */
+	if (op->addr.nbytes) {
+		/* fill address */
+		for (i = 0; i < op->addr.nbytes; i++)
+			op_buf[pos + i] = op->addr.val >>
+				(8 * (op->addr.nbytes - i - 1));
+
+		pos += op->addr.nbytes;
+
+		/* fill dummy */
+		if (op->dummy.nbytes)
+			memset(op_buf + pos, SILVACO_DUMMY_BYTES,
+			       op->dummy.nbytes);
+
+		/*
+		 * Some commands doesn't require data(like sector erase), so we
+		 * need to end the xfer after sending the addr + dummy.
+		 */
+		if (!op->data.nbytes)
+			flags |= SPI_XFER_END;
+
+		priv->io_lines = op->addr.buswidth;
+
+		ret = silvaco_qspi_xfer(dev, op_len * 8, op_buf, NULL, flags);
+		if (ret < 0) {
+			debug("Failed to xfer addr + dummy\n");
+			return ret;
+		}
+	}
+
+	/* send/received the data */
+	if (op->data.nbytes) {
+		if (op->data.dir == SPI_MEM_DATA_IN)
+			rxp = op->data.buf.in;
+		else
+			txp = op->data.buf.out;
+
+		priv->io_lines = op->data.buswidth;
+
+		ret = silvaco_qspi_xfer(dev, op->data.nbytes * 8, txp, rxp,
+					SPI_XFER_END);
+		if (ret) {
+			debug("Failed to xfer data\n");
+			return ret;
+		}
+	}
+
 	return 0;
 }
+
+const struct spi_controller_mem_ops silvaco_mem_ops = {
+	.exec_op	= silvaco_exec_op,
+};
 
 static const struct dm_spi_ops silvaco_qspi_ops = {
 	.claim_bus	= silvaco_qspi_claim_bus,
 	.release_bus	= silvaco_qspi_release_bus,
-	.xfer		= silvaco_qspi_xfer,
 	.set_speed	= silvaco_qspi_set_speed,
 	.set_mode	= silvaco_qspi_set_mode,
+	.mem_ops	= &silvaco_mem_ops,
 	/*
 	 * cs_info is not needed, since we require all chip selects to be
 	 * in the device tree explicitly
