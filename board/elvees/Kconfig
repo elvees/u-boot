@@ -24,14 +24,14 @@ config TARGET_MCOM03_BUB
 	  Support for the following boards:
 	    MCom-03 Bring-Up Board r1.3.0
 
-config TARGET_MCOM03_NGFWCB
-	bool "MCom-03 NGFW-CB"
+config TARGET_ELVMC03SMARC
+	bool "ELV-MC03-SMARC"
 	select DM_ETH
 	select DM_MMC
 	select DM_GPIO
 	help
 	  Support for the following boards:
-	    MCom-03 NGFW-CB r1.0
+	    ELV-MC03-SMARC r1.0
 
 config TARGET_ECAM03DM
 	bool "ECAM03DM"
@@ -59,9 +59,9 @@ config TARGET_MCOM03_TRUSTPHONEPM
 endchoice
 
 source "board/elvees/ecam03dm/Kconfig"
+source "board/elvees/elvmc03smarc/Kconfig"
 source "board/elvees/haps/Kconfig"
 source "board/elvees/mcom03-bub/Kconfig"
-source "board/elvees/ngfw-cb/Kconfig"
 source "board/elvees/rtl/Kconfig"
 source "board/elvees/trustphonepm/Kconfig"
 

@@ -3,4 +3,4 @@
 # Copyright 2021 RnD Center "ELVEES", JSC
 #
 
-obj-y += ngfw-cb.o
+obj-y += elvmc03smarc.o
