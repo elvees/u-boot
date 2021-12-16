@@ -44,6 +44,9 @@ int power_init_board(void)
 	 */
 	mdelay(100);
 
+	if (of_machine_is_compatible("radxa,rockpi-n10"))
+		return 0;
+
 	/* Setup RESET_OUT# signal on ELV-MC03-SMARC */
 	val = readl(LSP1_GPIO_SWPORTD_DDR);
 	val |= BIT(7);
