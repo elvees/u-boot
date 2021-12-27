@@ -74,7 +74,7 @@ struct pll_settings {
 };
 
 static struct pll_settings pll_settings[] = {
-	{ HSP_PLL, 27000000, 1125000000, 2, 249, 1 },
+	{ HSP_PLL, 27000000, 1500000000, 8, 999, 1 },
 	{ LSP0_PLL, 27000000, 189000000, 0, 111, 15 },
 	{ LSP1_PLL, 27000000, 614250000, 0, 90, 3 },
 	{ MEDIA_PLL0, 27000000, 1998000000, 0, 73, 0 },
@@ -100,32 +100,32 @@ struct ucg_channel {
 };
 
 static struct ucg_channel ucg_hsp_channels[] = {
-	{0, 0, 4},	/* HSPERIPH UCG0 SYS		281.25 MHz */
-	{0, 1, 4},	/* HSPERIPH UCG0 DMA		281.25 MHz */
-	{0, 2, 12},	/* HSPERIPH UCG0 CTR		93.75 MHz */
-	{0, 3, 4},	/* HSPERIPH UCG0 SPRAM		281.25 MHz */
-	{0, 4, 9},	/* HSPERIPH UCG0 EMAC0		125 MHz */
-	{0, 5, 9},	/* HSPERIPH UCG0 EMAC1		125 MHz */
-	{0, 6, 9},	/* HSPERIPH UCG0 USB0		125 MHz */
-	{0, 7, 9},	/* HSPERIPH UCG0 USB1		125 MHz */
-	{0, 8, 9},	/* HSPERIPH UCG0 AXI NFC	125 MHz */
-	{0, 9, 4},	/* HSPERIPH UCG0 PDMA2		281.25 MHz */
-	{0, 10, 12},	/* HSPERIPH UCG0 AXI SDMMC0	93.75 MHz */
-	{0, 11, 12},	/* HSPERIPH UCG0 AXI SDMMC1	93.75 MHz */
-	{0, 12, 12},	/* HSPERIPH UCG0 AXI QSPI	93.75 MHz */
-	{1, 0, 9},	/* HSPERIPH UCG1 SDMMC0 XIN	125 MHz */
-	{1, 1, 9},	/* HSPERIPH UCG1 SDMMC1 XIN	125 MHz */
-	{1, 2, 12},	/* HSPERIPH UCG1 NFC		93.75 MHz */
-	{1, 3, 45},	/* HSPERIPH UCG1 QSPI		25 MHz */
-	{1, 4, 15},	/* HSPERIPH UCG1 UltraSOC	75 MHz */
-	{2, 0, 45},	/* HSPERIPH UCG2 EMAC0 1588	25 MHz */
-	{2, 2, 45},	/* HSPERIPH UCG2 EMAC1 1588	25 MHz */
-	{2, 1, 9},	/* HSPERIPH UCG2 EMAC0 TXC	125 MHz */
-	{2, 3, 9},	/* HSPERIPH UCG2 EMAC1 TXC	125 MHz */
-	{3, 0, 45},	/* HSPERIPH UCG3 USB0 ref	25 MHz */
-	{3, 1, 45},	/* HSPERIPH UCG3 USB0 suspend	25 MHz */
-	{3, 2, 45},	/* HSPERIPH UCG3 USB1 ref	25 MHz */
-	{3, 3, 45},	/* HSPERIPH UCG3 USB1 suspend	25 MHz */
+	{0, 0, 6},	/* HSPERIPH UCG0 SYS		250 MHz */
+	{0, 1, 6},	/* HSPERIPH UCG0 DMA		250 MHz */
+	{0, 2, 16},	/* HSPERIPH UCG0 CTR		93.75 MHz */
+	{0, 3, 6},	/* HSPERIPH UCG0 SPRAM		250 MHz */
+	{0, 4, 12},	/* HSPERIPH UCG0 EMAC0		125 MHz */
+	{0, 5, 12},	/* HSPERIPH UCG0 EMAC1		125 MHz */
+	{0, 6, 12},	/* HSPERIPH UCG0 USB0		125 MHz */
+	{0, 7, 12},	/* HSPERIPH UCG0 USB1		125 MHz */
+	{0, 8, 12},	/* HSPERIPH UCG0 AXI NFC	125 MHz */
+	{0, 9, 6},	/* HSPERIPH UCG0 PDMA2		250 MHz */
+	{0, 10, 16},	/* HSPERIPH UCG0 AXI SDMMC0	93.75 MHz */
+	{0, 11, 16},	/* HSPERIPH UCG0 AXI SDMMC1	93.75 MHz */
+	{0, 12, 16},	/* HSPERIPH UCG0 AXI QSPI	93.75 MHz */
+	{1, 0, 12},	/* HSPERIPH UCG1 SDMMC0 XIN	125 MHz */
+	{1, 1, 12},	/* HSPERIPH UCG1 SDMMC1 XIN	125 MHz */
+	{1, 2, 16},	/* HSPERIPH UCG1 NFC		93.75 MHz */
+	{1, 3, 60},	/* HSPERIPH UCG1 QSPI		25 MHz */
+	{1, 4, 20},	/* HSPERIPH UCG1 UltraSOC	75 MHz */
+	{2, 0, 60},	/* HSPERIPH UCG2 EMAC0 1588	25 MHz */
+	{2, 2, 60},	/* HSPERIPH UCG2 EMAC1 1588	25 MHz */
+	{2, 1, 12},	/* HSPERIPH UCG2 EMAC0 TXC	125 MHz */
+	{2, 3, 12},	/* HSPERIPH UCG2 EMAC1 TXC	125 MHz */
+	{3, 0, 60},	/* HSPERIPH UCG3 USB0 ref	25 MHz */
+	{3, 1, 60},	/* HSPERIPH UCG3 USB0 suspend	25 MHz */
+	{3, 2, 60},	/* HSPERIPH UCG3 USB1 ref	25 MHz */
+	{3, 3, 60},	/* HSPERIPH UCG3 USB1 suspend	25 MHz */
 };
 
 static struct ucg_channel ucg_lsp0_channels[] = {
