@@ -117,7 +117,7 @@ static struct ucg_channel ucg_hsp_channels[] = {
 	{1, 1, 9},	/* HSPERIPH UCG1 SDMMC1 XIN	125 MHz */
 	{1, 2, 12},	/* HSPERIPH UCG1 NFC		93.75 MHz */
 	{1, 3, 45},	/* HSPERIPH UCG1 QSPI		25 MHz */
-	{1, 4, 9},	/* HSPERIPH UCG1 UltraSOC	125 MHz */
+	{1, 4, 15},	/* HSPERIPH UCG1 UltraSOC	75 MHz */
 	{2, 0, 45},	/* HSPERIPH UCG2 EMAC0 1588	25 MHz */
 	{2, 2, 45},	/* HSPERIPH UCG2 EMAC1 1588	25 MHz */
 	{2, 1, 9},	/* HSPERIPH UCG2 EMAC0 TXC	125 MHz */
@@ -173,19 +173,19 @@ static struct ucg_channel ucg_media_channels[] = {
 };
 
 static struct ucg_channel ucg_sdr_channels[] = {
-	{0, 0, 9},	/* SDR UCG0 CLK_CFG		210 MHz */
-	{0, 1, 8},	/* SDR UCG0 EXT_CLK		236.25 MHz */
-	{0, 2, 4},	/* SDR UCG0 INT_CLK		472.5 MHz */
+	{0, 0, 18},	/* SDR UCG0 CLK_CFG		105 MHz */
+	{0, 1, 6},	/* SDR UCG0 EXT_CLK		315 MHz */
+	{0, 2, 9},	/* SDR UCG0 INT_CLK		210 MHz */
 	{0, 3, 9},	/* SDR UCG0 PCI_CLK		210 MHz */
-	{0, 4, 3},	/* SDR UCG0 VCU_ACLK		630 MHz */
+	{0, 4, 6},	/* SDR UCG0 VCU_ACLK		315 MHz */
 	{0, 5, 3},	/* SDR UCG0 ACC0_CLK		630 MHz */
 	{0, 6, 3},	/* SDR UCG0 ACC1_CLK		630 MHz */
 	{0, 7, 3},	/* SDR UCG0 ACC2_CLK		630 MHz */
 	{0, 8, 37},	/* SDR UCG0 AUX_PCI_CLK		51 MHz */
-	{0, 9, 3},	/* SDR UCG0 GNSS_CLK		630 MHz */
+	{0, 9, 6},	/* SDR UCG0 GNSS_CLK		315 MHz */
 	{0, 10, 3},	/* SDR UCG0 DFE_ALT_CLK		630 MHz */
-	{0, 11, 9},	/* SDR UCG0 VCU_TCK		210 MHz */
-	{0, 12, 9},	/* SDR UCG0 LVDS_CLK		210 MHz */
+	{0, 11, 18},	/* SDR UCG0 VCU_TCK		105 MHz */
+	{0, 12, 18},	/* SDR UCG0 LVDS_CLK		105 MHz */
 };
 
 static struct ucg_channel ucg_serv_channels[] = {
