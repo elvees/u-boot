@@ -280,7 +280,7 @@ flash_free:
 	return ptr;
 }
 
-int misc_init_r(void)
+int load_factory_settings(void)
 {
 	struct factory_env *factory_env;
 	u32 data_size;
@@ -288,11 +288,8 @@ int misc_init_r(void)
 
 	printf("Loading factory settings from SPI Flash... ");
 	factory_env = read_factory_settings(&data_size);
-	/* U-Boot will hang if misc_init_r() return non-zero value.
-	 * misc_inti_r() returns 0 even in case of errors, because
-	 * factory settings loading errors should not cause a hang. */
 	if (!factory_env)
-		return 0;
+		return -ENODATA;
 
 	data_size -= sizeof(real_crc);
 	real_crc = crc32(0, factory_env->data, data_size);
@@ -304,14 +301,17 @@ int misc_init_r(void)
 			printf("CRC error in factory settings\n");
 
 		/* Factory settings not found or corrupted. Nothing to import */
-		goto free_exit;
+		free(factory_env);
+		return -ENODATA;
 	}
 
 	if (!himport_r(&env_htab, (char *)factory_env->data, data_size, '\0',
 		       H_NOCLEAR, 0, 0, NULL)) {
 		printf("Unable to import factory settings\n");
-		goto free_exit;
+		free(factory_env);
+		return -ENODATA;
 	}
+
 	/* If ethaddr variable does not exists then create and set it using
 	 * address from factory_eth_mac */
 	if (!env_get("ethaddr")) {
@@ -321,8 +321,20 @@ int misc_init_r(void)
 			env_set("ethaddr", factory_eth_mac);
 	}
 
-free_exit:
-	free(factory_env);
+	return 0;
+}
+
+int misc_init_r(void)
+{
+	/* Check if environment been saved */
+	if (!env_get("factory_serial")) {
+		if (load_factory_settings())
+			env_set("factory_serial", "0");
+
+		printf("*** First boot, saving environment...\n");
+		env_save();
+	}
+
 	return 0;
 }
 #endif
