@@ -60,7 +60,6 @@
 #define QSPI_XIP_EN			BIT(0)
 
 void lsperiph1_v18_pad_cfg(void);
-void i2c_pad_cfg(int i2c_num);
 void nand_pad_cfg(void);
 void board_pads_cfg(void);
 void nand_pad_cfg(void);

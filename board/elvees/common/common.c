@@ -128,29 +128,6 @@ void lsperiph1_v18_pad_cfg(void)
 	writel(val, LSP1_URB_GPIO1_V18);
 }
 
-void i2c_pad_cfg(int i2c_num)
-{
-	u32 val;
-
-	if (i2c_num == 0) {
-		/* There are no registers for GPIO0 to enable
-		 * the pad receiver */
-		writel(0x18, LSP0_GPIO_SWPORTD_CTL);
-	} else {
-		val = readl(GPIO1_PORTA_PAD_CTR(2 * i2c_num - 2));
-		val |= GPIO_PAD_CTR_EN;
-		writel(val, GPIO1_PORTA_PAD_CTR(2 * i2c_num - 2));
-
-		val = readl(GPIO1_PORTA_PAD_CTR(2 * i2c_num - 1));
-		val |= GPIO_PAD_CTR_EN;
-		writel(val, GPIO1_PORTA_PAD_CTR(2 * i2c_num - 1));
-
-		val = readl(LSP1_GPIO_SWPORTA_CTL);
-		val |= BIT(2 * i2c_num - 2) | BIT(2 * i2c_num - 1);
-		writel(val, LSP1_GPIO_SWPORTA_CTL);
-	}
-}
-
 void nand_pad_cfg(void)
 {
 	// temporary code until NAND support is added to pinctrl
