@@ -172,14 +172,14 @@ static int silvaco_qspi_probe(struct udevice *dev)
 	}
 
 	ret = reset_get_by_index(dev, 0, &priv->rst_ctl);
-	if (ret < 0)
+	if (ret < 0 && ret != -ENOENT)
 		goto disable_clk_ext;
 
-	mdelay(10);
-
-	ret = reset_deassert(&priv->rst_ctl);
-	if (ret < 0)
-		goto disable_clk_ext;
+	if (priv->rst_ctl.dev) {
+		ret = reset_deassert(&priv->rst_ctl);
+		if (ret < 0)
+			goto disable_clk_ext;
+	}
 
 	ret = mcom03_qspi_set_soc_regs(dev);
 	if (ret)
@@ -210,8 +210,10 @@ static int silvaco_qspi_probe(struct udevice *dev)
 	return 0;
 
 assert_reset:
-	reset_assert(&priv->rst_ctl);
-	reset_free(&priv->rst_ctl);
+	if (priv->rst_ctl.dev) {
+		reset_assert(&priv->rst_ctl);
+		reset_free(&priv->rst_ctl);
+	}
 disable_clk_ext:
 	clk_disable(&priv->clk_ext);
 	clk_free(&priv->clk_ext);
