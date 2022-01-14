@@ -162,7 +162,7 @@ void nand_pad_cfg(void)
 static int xip_disable(int qspi_num)
 {
 	u32 val;
-	u64 xip_en_req, xip_en_out;
+	uintptr_t xip_en_req, xip_en_out;
 
 	switch (qspi_num) {
 	case 0:
