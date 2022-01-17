@@ -37,6 +37,14 @@
 			no-map;
 		};
 	};
+
+	sdhci1_supply: regulator@0 {
+		compatible = "regulator-fixed";
+		regulator-name = "sdhci1-supply";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		regulator-always-on;
+	};
 };
 
 &uart0 {
@@ -59,6 +67,7 @@
 	status = "okay";
 	non-removable;
 	bus-width = <8>;
+	vqmmc-supply = <&sdhci1_supply>;
 };
 
 &timer0 {
