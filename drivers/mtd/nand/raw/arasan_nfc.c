@@ -1302,6 +1302,7 @@ fail:
 
 static const struct udevice_id arasan_nand_dt_ids[] = {
 	{.compatible = "arasan,nfc-v3p10",},
+	{.compatible = "arasan,nfc-v3p16",},
 	{ /* sentinel */ }
 };
 
