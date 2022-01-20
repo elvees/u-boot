@@ -177,15 +177,15 @@ static struct ucg_channel ucg_sdr_channels[] = {
 	{0, 1, 6},	/* SDR UCG0 EXT_CLK		315 MHz */
 	{0, 2, 9},	/* SDR UCG0 INT_CLK		210 MHz */
 	{0, 3, 9},	/* SDR UCG0 PCI_CLK		210 MHz */
-	{0, 4, 6},	/* SDR UCG0 VCU_ACLK		315 MHz */
-	{0, 5, 3},	/* SDR UCG0 ACC0_CLK		630 MHz */
-	{0, 6, 3},	/* SDR UCG0 ACC1_CLK		630 MHz */
-	{0, 7, 3},	/* SDR UCG0 ACC2_CLK		630 MHz */
+	{0, 4, -6},	/* SDR UCG0 VCU_ACLK		off (315 MHz) */
+	{0, 5, -3},	/* SDR UCG0 ACC0_CLK		off (630 MHz) */
+	{0, 6, -3},	/* SDR UCG0 ACC1_CLK		off (630 MHz) */
+	{0, 7, -3},	/* SDR UCG0 ACC2_CLK		off (630 MHz) */
 	{0, 8, 37},	/* SDR UCG0 AUX_PCI_CLK		51 MHz */
-	{0, 9, 6},	/* SDR UCG0 GNSS_CLK		315 MHz */
-	{0, 10, 3},	/* SDR UCG0 DFE_ALT_CLK		630 MHz */
-	{0, 11, 18},	/* SDR UCG0 VCU_TCK		105 MHz */
-	{0, 12, 18},	/* SDR UCG0 LVDS_CLK		105 MHz */
+	{0, 9, -6},	/* SDR UCG0 GNSS_CLK		off (315 MHz) */
+	{0, 10, -3},	/* SDR UCG0 DFE_ALT_CLK		off (630 MHz) */
+	{0, 11, -18},	/* SDR UCG0 VCU_TCK		off (105 MHz) */
+	{0, 12, -18},	/* SDR UCG0 LVDS_CLK		off (105 MHz) */
 };
 
 static struct ucg_channel ucg_serv_channels[] = {
@@ -361,7 +361,7 @@ static int ucg_cfg(struct ucg_channel *ucg_channels, int chans_num,
 
 		val = readl(chan_addr);
 		val &= ~UCG_CTR_DIV_COEFF;
-		val |= FIELD_PREP(UCG_CTR_DIV_COEFF, ucg_channels[i].div);
+		val |= FIELD_PREP(UCG_CTR_DIV_COEFF, abs(ucg_channels[i].div));
 		writel(val, chan_addr);
 
 		ret = readl_poll_timeout(chan_addr, val,
@@ -378,14 +378,20 @@ static int ucg_cfg(struct ucg_channel *ucg_channels, int chans_num,
 		val = readl(chan_addr);
 		if (FIELD_GET(UCG_CTR_QFSM_STATE, val) != Q_FSM_RUN) {
 			val &= ~UCG_CTR_LPI_EN;
-			val |= UCG_CTR_CLK_EN;
-			writel(val, chan_addr);
+			if (ucg_channels[i].div >= 0)
+				val |= UCG_CTR_CLK_EN;
+			else
+				val &= ~UCG_CTR_CLK_EN;
 
-			ret = readl_poll_timeout(chan_addr, val,
-						 FIELD_GET(UCG_CTR_QFSM_STATE, val) == Q_FSM_RUN,
-						 1000);
-			if (ret)
-				return ret;
+			writel(val, chan_addr);
+			if (ucg_channels[i].div >= 0) {
+				ret = readl_poll_timeout(chan_addr, val,
+							 FIELD_GET(UCG_CTR_QFSM_STATE, val) ==
+								Q_FSM_RUN,
+							 1000);
+				if (ret)
+					return ret;
+			}
 		}
 	}
 
