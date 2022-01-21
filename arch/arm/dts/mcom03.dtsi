@@ -423,10 +423,9 @@
 			clock-names = "clk_flash", "clk_sys";
 			compatible = "arasan,nfc-v3p16";
 			reg = <0 0x10240000 0 0x10000>;
-			interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
 			#address-cells = <1>;
 			#size-cells = <0>;
-			resets = <&hsperiph_reset 3>;
+			resets = <&hsperiph_reset HSPERIPH_RST_NFC>;
 			status = "disabled";
 		};
 
