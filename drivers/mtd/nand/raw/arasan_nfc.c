@@ -18,6 +18,7 @@
 #include <asm/arch/sys_proto.h>
 #include <dm.h>
 #include <nand.h>
+#include <reset.h>
 
 struct nand_config {
 	u32 page;
@@ -1230,7 +1231,8 @@ static int arasan_probe(struct udevice *dev)
 	struct nand_drv *info = &arasan->nand_ctrl;
 	struct nand_config *nand = &info->config;
 	struct mtd_info *mtd;
-	int err = -1;
+	struct reset_ctl reset;
+	int err = -1, ret;
 
 	info->reg = (struct nand_regs *)dev_read_addr(dev);
 	mtd = nand_to_mtd(nand_chip);
@@ -1249,6 +1251,14 @@ static int arasan_probe(struct udevice *dev)
 	nand_chip->read_buf = arasan_nand_read_buf;
 	nand_chip->write_buf = arasan_nand_write_buf;
 	nand_chip->bbt_options = NAND_BBT_USE_FLASH;
+
+	/* Reset */
+	ret = reset_get_by_index(dev, 0, &reset);
+	if (!ret) {
+		reset_deassert(&reset);
+		/* Waiting 1 ms is enough for the reset to complete */
+		udelay(1000);
+	}
 
 	writel(0x0, &info->reg->cmd_reg);
 	writel(0x0, &info->reg->pgm_reg);
