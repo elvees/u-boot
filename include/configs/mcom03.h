@@ -28,6 +28,13 @@
 /* Default environment */
 #define CONFIG_LOADADDR			CONFIG_SYS_LOAD_ADDR
 
+/* NAND flash */
+#if CONFIG_IS_ENABLED(CMD_NAND)
+#define CONFIG_SYS_MAX_NAND_DEVICE      1
+#define CONFIG_SYS_NAND_MAX_CHIPS       1
+#define CONFIG_SYS_NAND_ONFI_DETECTION
+#endif
+
 #if CONFIG_IS_ENABLED(CMD_MMC)
 #define BOOT_TARGET_DEVICES_MMC(func) \
 	func(MMC, mmc, 1) \
