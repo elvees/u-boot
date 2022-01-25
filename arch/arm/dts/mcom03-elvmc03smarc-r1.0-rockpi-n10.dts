@@ -30,7 +30,7 @@
 /* Connected to Raspberry Pi header */
 &uart0 {
 	status = "okay";
-	clock-frequency = <27000000>;
+	clock-frequency = <27920454>;
 };
 
 /* Connected to MicroSD card */

@@ -145,7 +145,7 @@ static struct ucg_channel ucg_lsp1_channels[] = {
 	{0, 3, 6},	/* LSPERIPH1 UCG0 I2C3		102.375 MHz */
 	{0, 4, 7},	/* LSPERIPH1 UCG0 GPIO1_DB	87.75 MHz */
 	{0, 5, 4},	/* LSPERIPH1 UCG0 SSI1		153.5625 MHz */
-	{0, 6, -1},	/* LSPERIPH1 UCG0 UART0		27 MHz (bypass) */
+	{0, 6, 22},	/* LSPERIPH1 UCG0 UART0		27.920454 MHz */
 	{0, 7, 7},	/* LSPERIPH1 UCG0 TIMERS	87.75 MHz */
 	{0, 8, 7},	/* LSPERIPH1 UCG0 PWM0		87.75 MHz */
 	{0, 9, 7},	/* LSPERIPH1 UCG0 WDT1		87.75 MHz */
@@ -161,13 +161,13 @@ static struct ucg_channel ucg_media_channels[] = {
 	{2, 0, 2},	/* MEDIA UCG2 GPU_SYS		247.5 MHz */
 	{2, 1, 2},	/* MEDIA UCG2 GPU_MEM		247.5 MHz */
 	{2, 2, 2},	/* MEDIA UCG2 GPU_CORE		247.5 MHz */
-	{3, 0, -1},	/* MEDIA UCG3 MIPI_RX_REF	27 MHz (bypass) */
-	{3, 1, -1},	/* MEDIA UCG3 MIPI_RX0_CFG	27 MHz (bypass) */
-	{3, 2, -1},	/* MEDIA UCG3 MIPI_RX1_CFG	27 MHz (bypass) */
-	{3, 3, -1},	/* MEDIA UCG3 MIPI_TX_REF	27 MHz (bypass) */
-	{3, 4, -1},	/* MEDIA UCG3 MIPI_TX_CFG	27 MHz (bypass) */
+	{3, 0, 22},	/* MEDIA UCG3 MIPI_RX_REF	27 MHz */
+	{3, 1, 22},	/* MEDIA UCG3 MIPI_RX0_CFG	27 MHz */
+	{3, 2, 22},	/* MEDIA UCG3 MIPI_RX1_CFG	27 MHz */
+	{3, 3, 22},	/* MEDIA UCG3 MIPI_TX_REF	27 MHz */
+	{3, 4, 22},	/* MEDIA UCG3 MIPI_TX_CFG	27 MHz */
 	{3, 5, 4},	/* MEDIA UCG3 CMOS0		148.5 as DISP_PIXCLK */
-	{3, 6, -1},	/* MEDIA UCG3 CMOS1		27 MHz (bypass) */
+	{3, 6, 22},	/* MEDIA UCG3 CMOS1		27 MHz */
 	{3, 7, 30},	/* MEDIA UCG3 MIPI_TXCLKESC	19.8 MHz */
 	{3, 8, 2},	/* MEDIA UCG3 VPU_CLK		297 MHz */
 };
@@ -201,7 +201,7 @@ static struct ucg_channel ucg_serv_channels[] = {
 	{1, 9, 11},	/* SERVICE UCG1 I2C4		54 MHz */
 	{1, 10, 11},	/* SERVICE UCG1 TRNG		54 MHz */
 	{1, 11, 11},	/* SERVICE UCG1 SPIOTP		54 MHz */
-	{1, 13, -1},	/* SERVICE UCG1 QSPI0_EXT	27 MHz (bypass) */
+	{1, 13, 22},	/* SERVICE UCG1 QSPI0_EXT	27 MHz */
 };
 
 enum ucg_qfsm_state {
@@ -356,9 +356,6 @@ static int ucg_cfg(struct ucg_channel *ucg_channels, int chans_num,
 
 	/* Set dividers */
 	for (i = 0; i < chans_num; i++) {
-		if (ucg_channels[i].div == -1)
-			continue;
-
 		chan_addr = ucg_ctr_addr_get(ucg_channels[i].ucg_id,
 					     ucg_channels[i].chan_id);
 
@@ -395,12 +392,7 @@ static int ucg_cfg(struct ucg_channel *ucg_channels, int chans_num,
 	/* Disable bypass */
 	for (i = 0; i < chans_num; i++) {
 		val = readl(ucg_bp_addr_get(ucg_channels[i].ucg_id));
-
-		if (ucg_channels[i].div == -1)
-			val |= BIT(ucg_channels[i].chan_id);
-		else
-			val &= ~BIT(ucg_channels[i].chan_id);
-
+		val &= ~BIT(ucg_channels[i].chan_id);
 		writel(val, ucg_bp_addr_get(ucg_channels[i].ucg_id));
 	}
 
