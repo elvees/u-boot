@@ -61,14 +61,6 @@ int power_init_board(void)
 
 void board_pads_cfg(void)
 {
-	u32 val;
 	/* U-Boot don't have pinctrl driver, so switch pad voltage manually */
 	lsperiph1_v18_pad_cfg();
-
-	/* Enable receiver for GPIO1_A6, which is used as HDMI_INT
-	 * on ELV-MC03_SMARC.
-	 */
-	val = readl(GPIO1_PORTA_PAD_CTR(6));
-	val |= GPIO_PAD_CTR_EN;
-	writel(val, GPIO1_PORTA_PAD_CTR(6));
 }
