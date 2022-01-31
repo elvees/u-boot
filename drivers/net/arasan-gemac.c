@@ -593,7 +593,7 @@ static int arasan_gemac_probe(struct udevice *dev)
 		goto error_buffers_alloc;
 
 	/* TODO: Remove this extra PHY reset cycle */
-	if (IS_ENABLED(CONFIG_TARGET_MCOM03_NGFWCB))
+	if (IS_ENABLED(CONFIG_TARGET_ELVMC03SMARC))
 		arasan_gemac_mdio_reset(priv->bus);
 
 	return 0;
