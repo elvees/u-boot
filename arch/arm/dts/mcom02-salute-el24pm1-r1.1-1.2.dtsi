@@ -14,7 +14,7 @@
 		reg = <0x00000000 0x0200>;
 		clocks = <&nor_sclk>;
 		interrupt-parent = <&gpioa>;
-		interrupts = <4 GPIO_ACTIVE_HIGH>;
+		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
 		status = "disabled";
 	};
 };

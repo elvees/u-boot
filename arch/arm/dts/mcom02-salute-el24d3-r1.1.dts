@@ -218,7 +218,7 @@
 		spi-max-frequency = <10000000>;
 		clocks = <&can_clk>;
 		interrupt-parent = <&gpioa>;
-		interrupts = <20 GPIO_ACTIVE_HIGH>;
+		interrupts = <20 IRQ_TYPE_LEVEL_LOW>;
 		reset-gpios = <&gpioa 16 GPIO_ACTIVE_LOW>;
 		xceiver-supply = <&can_xceiver_reg>;
 	};

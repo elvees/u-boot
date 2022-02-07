@@ -82,7 +82,7 @@
 		reg = <1>;
 		clocks = <&can_clk>;
 		interrupt-parent = <&gpioa>;
-		interrupts = <26 GPIO_ACTIVE_HIGH>;
+		interrupts = <26 IRQ_TYPE_LEVEL_LOW>;
 		reset-gpios = <&gpiob 16 GPIO_ACTIVE_LOW>;
 		spi-max-frequency = <10000000>;
 		xceiver-supply = <&can_xceiver_reg>;

@@ -128,7 +128,7 @@
 		compatible = "nxp,pcf85063";
 		reg = <0x51>;
 		interrupt-parent = <&gpioa>;
-		interrupts = <12 GPIO_ACTIVE_HIGH>;
+		interrupts = <12 IRQ_TYPE_LEVEL_LOW>;
 	};
 };
 

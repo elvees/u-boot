@@ -172,7 +172,7 @@
 		compatible = "nxp,tda998x";
 		reg = <0x70>;
 		interrupt-parent = <&gpioa>;
-		interrupts = <11 GPIO_ACTIVE_HIGH>;
+		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
 		video-ports = <0x234501>;
 		#sound-dai-cells = <0>;
 		audio-ports = <TDA998x_I2S 0x3>;
@@ -202,7 +202,7 @@
 		compatible = "microchip,mcp7940x";
 		reg = <0x6f>;
 		interrupt-parent = <&gpioa>;
-		interrupts = <12 GPIO_ACTIVE_HIGH>;
+		interrupts = <12 IRQ_TYPE_LEVEL_LOW>;
 		wakeup-source;
 	};
 
@@ -236,7 +236,7 @@
 		compatible = "edt,edt-ft5206";
 		reg = <0x38>;
 		interrupt-parent = <&gpioa>;
-		interrupts = <16 GPIO_ACTIVE_HIGH>;
+		interrupts = <16 IRQ_TYPE_LEVEL_LOW>;
 		reset-gpios = <&gpioa 5 GPIO_ACTIVE_LOW>;
 		touchscreen-size-x = <600>;
 		touchscreen-size-y = <1024>;
@@ -283,7 +283,7 @@
 		spi-max-frequency = <10000000>;
 		clocks = <&can_clk>;
 		interrupt-parent = <&gpioa>;
-		interrupts = <31 GPIO_ACTIVE_HIGH>;
+		interrupts = <31 IRQ_TYPE_LEVEL_LOW>;
 		xceiver-supply = <&can_xceiver_reg>;
 	};
 };
