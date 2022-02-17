@@ -1,0 +1,81 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright 2021 RnD Center "ELVEES", JSC
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+
+#include "mcom03-elvmc03smarc-r1.0.dtsi"
+
+/ {
+	model = "ELV-MC03-SMARC r1.0, EGW-CB r1.0";
+	compatible = "elvees,elvmc03smarc-r1.0-egwcb-r1.0",
+		     "elvees,elvmc03smarc-egwcb",
+		     "elvees,egwcb-r1.0",
+		     "elvees,egwcb",
+		     "elvees,elvmc03smarc-r1.0",
+		     "elvees,elvmc03smarc",
+		     "elvees,mcom03";
+
+	aliases {
+		serial0 = &uart0;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	reserved_memory: reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		cpu_reserved: cpu_reserved@C0000000 {
+			reg = <0 0xC0080000 0 0x1000>;
+			no-map;
+		};
+	};
+};
+
+/* Connected to USB Type-C through CP2105 */
+&uart0 {
+	status = "okay";
+	clock-frequency = <27920454>;
+};
+
+/* Connected to MicroSD card */
+&sdhci1 {
+	status = "okay";
+
+	/* Unstable at 25 MHz on NGFW CB */
+	max-frequency = <12000000>;
+
+	/* Disable High Speed support
+	 * Disable 1.8V support
+	 * Disable SDR50, SDR104 and DDR50 support
+	 */
+	sdhci-caps-mask = <0x7 0x4200000>;
+	sdhci-caps = <0x0 0x0>;
+};
+
+&timer0 {
+	status = "okay";
+};
+
+/* Connected to M.2 key B slot (for LTE) */
+&usb0 {
+	status = "okay";
+};
+
+/* Connected to XP2 */
+&emac0 {
+	status = "okay";
+};
+
+/* Connected to XP3 */
+&emac1 {
+	status = "okay";
+};
