@@ -10,10 +10,6 @@
 / {
 	compatible = "elvees,mcom03-haps";
 
-	aliases {
-		serial1 = &uart1;
-	};
-
 	chosen {
 		stdout-path = "serial1:115200n8";
 		bootargs = "earlycon console=ttyS0,115200 modprobe.blacklist=acptest,vdmaacptest";

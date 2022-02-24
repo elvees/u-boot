@@ -17,10 +17,6 @@
 		     "elvees,trustphonepm",
 		     "elvees,mcom03";
 
-	aliases {
-		serial0 = &uart0;
-	};
-
 	chosen {
 		stdout-path = "serial0:115200n8";
 	};

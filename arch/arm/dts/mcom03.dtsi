@@ -13,6 +13,10 @@
 	#size-cells = <2>;
 
 	aliases {
+		serial0 = &uart0;
+		serial1 = &uart1;
+		serial2 = &uart2;
+		serial3 = &uart3;
 		spi0 = &qspi0;
 		spi1 = &qspi1;
 	};
