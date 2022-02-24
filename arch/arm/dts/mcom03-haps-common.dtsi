@@ -11,7 +11,7 @@
 	compatible = "elvees,mcom03-haps";
 
 	chosen {
-		stdout-path = "serial1:115200n8";
+		stdout-path = "serial0:115200n8";
 		bootargs = "earlycon console=ttyS0,115200 modprobe.blacklist=acptest,vdmaacptest";
 	};
 
@@ -27,7 +27,7 @@
 	};
 };
 
-&uart1 {
+&uart0 {
 	status = "okay";
 	clock-frequency = <14750000>;
 };
