@@ -80,6 +80,8 @@ int dram_init(void)
 	return 0;
 }
 
+/* dram_init_banksize() for HAPS placed in board/elvees/haps/haps.c */
+#ifndef CONFIG_TARGET_HAPS
 int dram_init_banksize(void)
 {
 	memcpy(gd->bd->bi_dram, (void *)CONFIG_MEM_REGIONS_ADDR,
@@ -87,6 +89,7 @@ int dram_init_banksize(void)
 
 	return 0;
 }
+#endif
 
 static int subsystem_reset_deassert(enum subsystem_reset_lines line)
 {
