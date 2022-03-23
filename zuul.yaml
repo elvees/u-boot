@@ -1,0 +1,9 @@
+---
+- project:
+    # Run all jobs regardless which files were modified.
+    experimental:
+      jobs:
+        - mcom03-buildroot-build
+        - mcom03-ngfwcb-buildroot-build
+        - mcom03-rockpi-buildroot-build
+        - mcom03-trustphone-buildroot-build
