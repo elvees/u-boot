@@ -84,8 +84,15 @@ int dram_init(void)
 #ifndef CONFIG_TARGET_HAPS
 int dram_init_banksize(void)
 {
-	memcpy(gd->bd->bi_dram, (void *)CONFIG_MEM_REGIONS_ADDR,
-	       sizeof(struct bd_info));
+	struct {
+		u64 start;
+		u64 size;
+	} *mem_regions = (void *)CONFIG_MEM_REGIONS_ADDR;
+
+	for (int i = 0; i < CONFIG_NR_DRAM_BANKS; i++) {
+		gd->bd->bi_dram[i].start = (phys_addr_t)mem_regions[i].start;
+		gd->bd->bi_dram[i].size = (phys_addr_t)mem_regions[i].size;
+	}
 
 	return 0;
 }
