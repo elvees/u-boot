@@ -321,6 +321,13 @@ int load_factory_settings(void)
 			env_set("ethaddr", factory_eth_mac);
 	}
 
+	if (!env_get("serial#")) {
+		char *factory_serial = env_get("factory_serial");
+
+		if (factory_serial)
+			env_set("serial#", factory_serial);
+	}
+
 	return 0;
 }
 

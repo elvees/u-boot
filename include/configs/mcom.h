@@ -164,21 +164,9 @@
 
 #define CONFIG_LOADADDR			0x40000000
 
-/* It's not possible to extend currently used DTB, as U-Boot drivers
- * are bound to DTB nodes offsets. Let's create new DTB in memory and
- * modify it. This DTB will be used only by Linux. */
 #define CONFIG_PREBOOT \
-	"if test ${ddrctl_cmd} = disable; then " \
-		"ddrctl ${ddrctl_cmd} ${ddrctl_cid};" \
-	"fi;" \
-	"fdt addr ${fdtcontroladdr};" \
-	"setexpr fdtaddr ${loadaddr} + 0x1000000;" \
-	"fdt move ${fdtcontroladdr} ${fdtaddr};" \
-	"setenv fdtcontroladdr ${fdtaddr};" \
-	"fdt resize 0x100;" \
-	"if test -n \"${factory_serial}\"; then "\
-		"fdt set / serial-number \"${factory_serial}\";" \
-		"echo \"Board serial: ${factory_serial}\";" \
+	"if test -n \"${serial#}\"; then " \
+		"echo \"Board serial: ${serial#}\";" \
 	"fi;"
 
 #undef CONFIG_BOOTCOMMAND
