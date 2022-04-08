@@ -189,18 +189,18 @@ static struct ucg_channel ucg_sdr_channels[] = {
 };
 
 static struct ucg_channel ucg_serv_channels[] = {
-	{1, 0, 11},	/* SERVICE UCG1 APB		54 MHz */
+	{1, 0, 12},	/* SERVICE UCG1 APB		49.5 MHz */
 	{1, 1, 2},	/* SERVICE UCG1 CORE		297 MHz */
 	{1, 2, 2},	/* SERVICE UCG1 QSPI0		297 MHz */
 	{1, 3, 2},	/* SERVICE UCG1 BPAM		297 MHz */
 	{1, 4, 2},	/* SERVICE UCG1 RISC0		297 MHz */
-	{1, 5, 11},	/* SERVICE UCG1 MFBSP0		54 MHz */
-	{1, 6, 11},	/* SERVICE UCG1 MFBSP1		54 MHz */
-	{1, 7, 11},	/* SERVICE UCG1 MAILBOX0	54 MHz */
-	{1, 8, 11},	/* SERVICE UCG1 PVTCTR		54 MHz */
-	{1, 9, 11},	/* SERVICE UCG1 I2C4		54 MHz */
-	{1, 10, 11},	/* SERVICE UCG1 TRNG		54 MHz */
-	{1, 11, 11},	/* SERVICE UCG1 SPIOTP		54 MHz */
+	{1, 5, 12},	/* SERVICE UCG1 MFBSP0		49.5 MHz */
+	{1, 6, 12},	/* SERVICE UCG1 MFBSP1		49.5 MHz */
+	{1, 7, 12},	/* SERVICE UCG1 MAILBOX0	49.5 MHz */
+	{1, 8, 12},	/* SERVICE UCG1 PVTCTR		49.5 MHz */
+	{1, 9, 12},	/* SERVICE UCG1 I2C4		49.5 MHz */
+	{1, 10, 12},	/* SERVICE UCG1 TRNG		49.5 MHz */
+	{1, 11, 12},	/* SERVICE UCG1 SPIOTP		49.5 MHz */
 	{1, 13, 22},	/* SERVICE UCG1 QSPI0_EXT	27 MHz */
 };
 
