@@ -189,19 +189,19 @@ static struct ucg_channel ucg_sdr_channels[] = {
 };
 
 static struct ucg_channel ucg_serv_channels[] = {
-	{1, 0, 12},	/* SERVICE UCG1 APB		49.5 MHz */
-	{1, 1, 2},	/* SERVICE UCG1 CORE		297 MHz */
-	{1, 2, 2},	/* SERVICE UCG1 QSPI0		297 MHz */
-	{1, 3, 2},	/* SERVICE UCG1 BPAM		297 MHz */
-	{1, 4, 2},	/* SERVICE UCG1 RISC0		297 MHz */
-	{1, 5, 12},	/* SERVICE UCG1 MFBSP0		49.5 MHz */
-	{1, 6, 12},	/* SERVICE UCG1 MFBSP1		49.5 MHz */
-	{1, 7, 12},	/* SERVICE UCG1 MAILBOX0	49.5 MHz */
-	{1, 8, 12},	/* SERVICE UCG1 PVTCTR		49.5 MHz */
-	{1, 9, 12},	/* SERVICE UCG1 I2C4		49.5 MHz */
-	{1, 10, 12},	/* SERVICE UCG1 TRNG		49.5 MHz */
-	{1, 11, 12},	/* SERVICE UCG1 SPIOTP		49.5 MHz */
-	{1, 13, 22},	/* SERVICE UCG1 QSPI0_EXT	27 MHz */
+	{0, 0, 12},	/* SERVICE UCG1 APB		49.5 MHz */
+	{0, 1, 2},	/* SERVICE UCG1 CORE		297 MHz */
+	{0, 2, 2},	/* SERVICE UCG1 QSPI0		297 MHz */
+	{0, 3, 2},	/* SERVICE UCG1 BPAM		297 MHz */
+	{0, 4, 2},	/* SERVICE UCG1 RISC0		297 MHz */
+	{0, 5, 12},	/* SERVICE UCG1 MFBSP0		49.5 MHz */
+	{0, 6, 12},	/* SERVICE UCG1 MFBSP1		49.5 MHz */
+	{0, 7, 12},	/* SERVICE UCG1 MAILBOX0	49.5 MHz */
+	{0, 8, 12},	/* SERVICE UCG1 PVTCTR		49.5 MHz */
+	{0, 9, 12},	/* SERVICE UCG1 I2C4		49.5 MHz */
+	{0, 10, 12},	/* SERVICE UCG1 TRNG		49.5 MHz */
+	{0, 11, 12},	/* SERVICE UCG1 SPIOTP		49.5 MHz */
+	{0, 13, 22},	/* SERVICE UCG1 QSPI0_EXT	27 MHz */
 };
 
 enum ucg_qfsm_state {
@@ -325,10 +325,11 @@ static int ucg_cfg(struct ucg_channel *ucg_channels, int chans_num,
 		   unsigned long (*ucg_ctr_addr_get)(int, int),
 		   unsigned long (*ucg_bp_addr_get)(int),
 		   unsigned long refclk_addr, u32 refclk_mask,
-		   unsigned long *pll_addr, enum pll_id *pll_ids, int pll_num)
+		   unsigned long *pll_addr, enum pll_id *pll_ids, int pll_num,
+		   u16 *sync_value)
 {
 	unsigned long chan_addr;
-	int i, ret;
+	int i, ret, max_ucg_id = 0;
 	u32 val;
 
 	/* Enable bypass on all enabled channels */
@@ -395,6 +396,16 @@ static int ucg_cfg(struct ucg_channel *ucg_channels, int chans_num,
 		}
 	}
 
+	if (sync_value) {
+		for (i = 0; i < chans_num; i++)
+			if (ucg_channels[i].ucg_id > max_ucg_id)
+				max_ucg_id = ucg_channels[i].ucg_id;
+
+		for (i = 0; i <= max_ucg_id; i++)
+			if (sync_value[i])
+				writel(sync_value[i], ucg_bp_addr_get(i) + 0x4);
+	}
+
 	/* Disable bypass */
 	for (i = 0; i < chans_num; i++) {
 		val = readl(ucg_bp_addr_get(ucg_channels[i].ucg_id));
@@ -421,7 +432,7 @@ int clk_cfg(void)
 		      hsp_ucg_ctr_addr_get, hsp_ucg_bp_addr_get,
 		      HSP_REFCLK_ADDR, 0x0,
 		      (unsigned long []) { HSP_PLL_ADDR },
-		      (enum pll_id []) { HSP_PLL }, 1);
+		      (enum pll_id []) { HSP_PLL }, 1, NULL);
 	if (ret)
 		return ret;
 
@@ -429,7 +440,7 @@ int clk_cfg(void)
 		      lsp0_ucg_ctr_addr_get, lsp0_ucg_bp_addr_get,
 		      0, 0x0,
 		      (unsigned long []) { LSP0_PLL_ADDR },
-		      (enum pll_id []) { LSP0_PLL }, 1);
+		      (enum pll_id []) { LSP0_PLL }, 1, NULL);
 	if (ret)
 		return ret;
 
@@ -437,7 +448,7 @@ int clk_cfg(void)
 		      lsp1_ucg_ctr_addr_get, lsp1_ucg_bp_addr_get,
 		      0, 0x0,
 		      (unsigned long []) { LSP1_PLL_ADDR },
-		      (enum pll_id []) { LSP1_PLL }, 1);
+		      (enum pll_id []) { LSP1_PLL }, 1, NULL);
 	if (ret)
 		return ret;
 
@@ -455,7 +466,7 @@ int clk_cfg(void)
 			      MEDIA_PLL1,
 			      MEDIA_PLL2,
 			      MEDIA_PLL3
-		      }, 4);
+		      }, 4, NULL);
 	if (ret)
 		return ret;
 
@@ -472,7 +483,7 @@ int clk_cfg(void)
 			      SDR_PLL0,
 			      SDR_PLL1,
 			      SDR_PLL2
-		      }, 3);
+		      }, 3, NULL);
 	if (ret)
 		return ret;
 	// Enable DSP clocks
@@ -487,6 +498,6 @@ int clk_cfg(void)
 	ret = ucg_cfg(ucg_serv_channels, ARRAY_SIZE(ucg_serv_channels),
 		      serv_ucg_ctr_addr_get, serv_ucg_bp_addr_get, 0, 0x0,
 		      (unsigned long []){ SERV_PLL_ADDR },
-		      (enum pll_id []){ SERV_PLL }, 1);
+		      (enum pll_id []){ SERV_PLL }, 1, (u16 []){ 0xfff });
 	return ret;
 }
