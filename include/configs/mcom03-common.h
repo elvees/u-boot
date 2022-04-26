@@ -23,7 +23,7 @@
 #define CONFIG_SYS_LOAD_ADDR		0x82000000 /* default load address */
 
 /* standalone support */
-#define CONFIG_STANDALONE_LOAD_ADDR	0x82000000
+#define CONFIG_STANDALONE_LOAD_ADDR	0x802000000
 
 /* Default environment */
 #define CONFIG_LOADADDR			CONFIG_SYS_LOAD_ADDR
@@ -57,11 +57,11 @@
 #endif
 
 #define MCOM03_COMMON_ENV_SETTINGS \
-	"kernel_addr_r=0x82000000\0" \
-	"scriptaddr=0x88000000\0" \
-	"ramdisk_addr_r=0x89000000\0" \
-	"pxefile_addr_r=0x8a000000\0" \
-	"fdt_addr_r=0x88800000\0" \
+	"kernel_addr_r=0x802000000\0" \
+	"scriptaddr=0x808000000\0" \
+	"ramdisk_addr_r=0x809000000\0" \
+	"pxefile_addr_r=0x80a000000\0" \
+	"fdt_addr_r=0x808800000\0" \
 	"fdtfile=" CONFIG_DEFAULT_DEVICE_TREE ".dtb\0" \
 	"serverip=127.0.0.0\0"
 

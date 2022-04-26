@@ -52,11 +52,17 @@ void reset_cpu(ulong addr)
 {
 }
 
-static struct mm_region haps_mem_map[] = {
+static struct mm_region mcom03_mem_map[] = {
 	{
 		.virt = CONFIG_SYS_SDRAM_BASE,
 		.phys = PHYS_SDRAM_0,
 		.size = PHYS_SDRAM_0_SIZE,
+		.attrs = PTE_BLOCK_MEMTYPE(MT_NORMAL) |
+			 PTE_BLOCK_INNER_SHARE
+	}, {
+		.virt = 0x800000000,
+		.phys = 0x800000000,
+		.size = 0x40000000,
 		.attrs = PTE_BLOCK_MEMTYPE(MT_NORMAL) |
 			 PTE_BLOCK_INNER_SHARE
 	}, {
@@ -72,7 +78,7 @@ static struct mm_region haps_mem_map[] = {
 	}
 };
 
-struct mm_region *mem_map = haps_mem_map;
+struct mm_region *mem_map = mcom03_mem_map;
 
 int dram_init(void)
 {
