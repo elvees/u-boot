@@ -1,0 +1,63 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright 2022 RnD Center "ELVEES", JSC
+ */
+
+/dts-v1/;
+
+#include "mcom03-elvmc03-r2.2.dtsi"
+
+/ {
+	model = "ELV-MC03 r2.2, ELV-MC03-CB r1.0";
+	compatible = "elvees,elvmc03-r2.2-elvmc03cb-r1.0",
+		     "elvees,elvmc03-elvmc03cb",
+		     "elvees,elvmc03cb-r1.0",
+		     "elvees,elvmc03cb",
+		     "elvees,elvmc03-r2.2",
+		     "elvees,elvmc03",
+		     "elvees,mcom03";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	sdhci0_supply: regulator@0 {
+		compatible = "regulator-fixed";
+		regulator-name = "sdhci0-supply";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		regulator-always-on;
+	};
+};
+
+&uart0 {
+	status = "okay";
+	clock-frequency = <27920454>;
+};
+
+&emac0 {
+	status = "okay";
+};
+
+/* Connected to USB hub */
+&usb1 {
+	status = "okay";
+};
+
+&sdhci0 {
+	status = "okay";
+
+	non-removable;
+	bus-width = <8>;
+	vqmmc-supply = <&sdhci0_supply>;
+};
+
+&sdhci1 {
+	status = "okay";
+
+	/* Disable 1.8V support
+	 * Disable SDR50, SDR104 and DDR50 support
+	 */
+	sdhci-caps-mask = <0x7 0x4000000>;
+	sdhci-caps = <0x0 0x0>;
+};

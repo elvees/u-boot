@@ -56,9 +56,19 @@ config TARGET_MCOM03_TRUSTPHONEPM
 	  Support for the following boards:
 	    Trustphone PM r1.5, Trustphone CB r1.1
 
+config TARGET_MCOM03_ELVMC03CB
+	bool "ELV-MC03-CB"
+	select DM_ETH
+	select DM_MMC
+	select DM_GPIO
+	help
+	  Support for the following boards:
+	    ELV-MC03-CB r1.1
+
 endchoice
 
 source "board/elvees/ecam03dm/Kconfig"
+source "board/elvees/elvmc03cb/Kconfig"
 source "board/elvees/elvmc03smarc/Kconfig"
 source "board/elvees/haps/Kconfig"
 source "board/elvees/mcom03-bub/Kconfig"
