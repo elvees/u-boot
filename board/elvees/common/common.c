@@ -11,7 +11,7 @@
 #include <linux/kernel.h>
 
 #include "mcom03-common.h"
-#include "mcom03-clk.h"
+#include <asm/arch/mcom03-clk.h>
 
 #define DDR_SUBS_URB_BASE		0xC000000
 #define HSPERIPH_BAR			0xDC

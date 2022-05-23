@@ -8,7 +8,7 @@
 #include <linux/bitops.h>
 #include <linux/iopoll.h>
 
-#include "mcom03-clk.h"
+#include <asm/arch/mcom03-clk.h>
 
 #define HSP_PLL_ADDR 0x10400000
 #define HSP_REFCLK_ADDR 0x1040000c
