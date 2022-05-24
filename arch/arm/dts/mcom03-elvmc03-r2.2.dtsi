@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright 2022 RnD Center "ELVEES", JSC
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+
+#include "mcom03.dtsi"
+
+/ {
+	model = "ELV-MC03 r2.2";
+	compatible = "elvees,elvmc03-r2.2",
+		     "elvees,elvmc03",
+		     "elvees,mcom03";
+};
+
+&emac0 {
+	phy-mode = "rgmii";
+	phy-handle = <&ethernet_phy0>;
+	phy-reset-gpios = <&gpio1c 5 GPIO_ACTIVE_LOW>;
+	elvees,pads-1v8-en;
+
+	ethernet_phy0: ethernet-phy@0 {
+		reg = <0x0>;
+		/* This is max GTX_CLK skew (0b11111 * 60ps/step)
+		 * for KSZ9031 Ethernet PHY
+		 */
+		txc-skew-ps = <1860>;
+	};
+};
+
+&qspi0 {
+	status = "okay";
+
+	flash0: s25fl256s@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor", "spi-flash";
+		reg = <0x0>;
+		/* This is the highest frequency at which all commands are
+		 * supported by the flash device.
+		 */
+		spi-max-frequency = <50000000>;
+	};
+};
