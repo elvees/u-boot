@@ -169,7 +169,6 @@ static struct ucg_channel ucg_media_channels[] = {
 	{3, 5, 4},	/* MEDIA UCG3 CMOS0		148.5 as DISP_PIXCLK */
 	{3, 6, 22},	/* MEDIA UCG3 CMOS1		27 MHz */
 	{3, 7, 30},	/* MEDIA UCG3 MIPI_TXCLKESC	19.8 MHz */
-	{3, 8, 2},	/* MEDIA UCG3 VPU_CLK		297 MHz */
 };
 
 static struct ucg_channel ucg_sdr_channels[] = {
