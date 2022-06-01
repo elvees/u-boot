@@ -57,15 +57,6 @@
 	sdhci-caps = <0x0 0x0>;
 };
 
-&timer0 {
-	status = "okay";
-};
-
-/* Connected to M.2 key B slot (for LTE) */
-&usb0 {
-	status = "okay";
-};
-
 /* Connected to XP2 */
 &emac0 {
 	status = "okay";
