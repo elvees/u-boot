@@ -24,6 +24,17 @@
 	};
 };
 
+&gpio0d {
+	gpio-line-names = "SER2_TX", "USB_HUB_RST", "LED_ORANGE", "I2C0_SCL",
+		"I2C0_SDA", "I2C0_SMBALERT", "RGMII_0_RST#", "LED_BLUE";
+
+	reset-usb2517-hub-hog {
+		gpio-hog;
+		gpios = <1 GPIO_ACTIVE_HIGH>;
+		output-low;
+	};
+};
+
 /* Connected to eMMC */
 &sdhci0 {
 	status = "okay";
