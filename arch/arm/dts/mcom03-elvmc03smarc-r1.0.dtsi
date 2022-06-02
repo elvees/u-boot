@@ -78,3 +78,8 @@
 		spi-max-frequency = <50000000>;
 	};
 };
+
+/* Serial port definitions for SMARC */
+ser1: &uart0 { };
+ser2: &uart2 { };
+ser3: &uart1 { };

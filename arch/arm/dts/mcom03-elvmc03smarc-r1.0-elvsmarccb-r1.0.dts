@@ -35,7 +35,8 @@
 	};
 };
 
-&uart0 {
+/* Connected to USB Type-C Debug UART */
+&ser1 {
 	status = "okay";
 	clock-frequency = <27920454>;
 };
