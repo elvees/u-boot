@@ -24,11 +24,15 @@
 
 #define SDMMC_PADCFG(ctrl_id)			(0x2C + (ctrl_id) * 0x3C)
 #define SDMMC_PADCFG_EN				BIT(0)
+#define SDMMC_PADCFG_USE_SW_CTL			BIT(17)
+#define SDMMC_PADCFG_CTL			GENMASK(10, 5)
 
 #define SDMMC_CLK_PADCFG(ctrl_id)		(0x30 + (ctrl_id) * 0x3C)
 #define SDMMC_CMD_PADCFG(ctrl_id)		(0x34 + (ctrl_id) * 0x3C)
 #define SDMMC_DAT_PADCFG(ctrl_id)		(0x38 + (ctrl_id) * 0x3C)
 #define SDMMC_CLK_PADCFG_PU			BIT(1)
+
+#define SDMMC_CURRENT_TO_PAD_CTL(x)		GENMASK(4 + ((x) >> 1), 5)
 
 #define SDMMC_CORECFG1(ctrl_id)			(0x40 + (ctrl_id) * 0x3C)
 #define SDMMC_CORECFG1_BASECLKFREQ		GENMASK(15, 8)
@@ -68,6 +72,7 @@ struct mcom03_sdhci_priv {
 	struct regmap *soc_ctl_base;
 	int clk_phase_in[MMC_TIMING_MMC_HS400 + 1];
 	int clk_phase_out[MMC_TIMING_MMC_HS400 + 1];
+	u32 drive_strength[3];
 };
 
 static const u8 mode2timing[] = {
@@ -89,7 +94,12 @@ static int mcom03_sdhci_set_soc_regs(struct udevice *dev)
 	struct mcom03_sdhci_priv *priv = dev_get_priv(dev);
 	struct regmap *soc_ctl_base = priv->soc_ctl_base;
 	u32 freq;
-	int ret;
+	int ret, i;
+	u32 pad_offset[] = {
+		SDMMC_CLK_PADCFG(priv->ctrl_id),
+		SDMMC_CMD_PADCFG(priv->ctrl_id),
+		SDMMC_DAT_PADCFG(priv->ctrl_id),
+	};
 
 	freq = priv->freq / 1000 / 1000;
 	ret = regmap_update_bits(soc_ctl_base, SDMMC_CORECFG1(priv->ctrl_id),
@@ -103,6 +113,25 @@ static int mcom03_sdhci_set_soc_regs(struct udevice *dev)
 		ret = regmap_update_bits(soc_ctl_base,
 					 SDMMC_CORECFG1(priv->ctrl_id),
 					 SDMMC_CORECFG1_HSEN, 0);
+		if (ret)
+			return ret;
+	}
+
+	for (i = 0; i < 3; i++) {
+		if (!priv->drive_strength[i])
+			continue;
+
+		if (priv->drive_strength[i] > 12 || priv->drive_strength[i] & 0x1) {
+			log_err("Invalid SDMMC pad drive strength value\n");
+			return -EINVAL;
+		}
+
+		ret = regmap_update_bits(soc_ctl_base,
+					 pad_offset[i],
+					 SDMMC_PADCFG_USE_SW_CTL |
+					 SDMMC_PADCFG_CTL,
+					 SDMMC_PADCFG_USE_SW_CTL |
+					 SDMMC_CURRENT_TO_PAD_CTL(priv->drive_strength[i]));
 		if (ret)
 			return ret;
 	}
@@ -374,6 +403,13 @@ static int mcom03_sdhci_ofdata_to_platdata(struct udevice *dev)
 
 	priv->broken_hs = dev_read_bool(dev, "elvees,broken-hs");
 	priv->haps = dev_read_bool(dev, "elvees,haps");
+
+	if (dev_read_u32(dev, "elvees,drive-strength-clk", &priv->drive_strength[0]))
+		priv->drive_strength[0] = 0;
+	if (dev_read_u32(dev, "elvees,drive-strength-cmd", &priv->drive_strength[1]))
+		priv->drive_strength[1] = 0;
+	if (dev_read_u32(dev, "elvees,drive-strength-dat", &priv->drive_strength[2]))
+		priv->drive_strength[2] = 0;
 
 	return 0;
 }
