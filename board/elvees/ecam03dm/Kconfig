@@ -4,6 +4,6 @@ config SYS_BOARD
 	default "ecam03dm"
 
 config SYS_CONFIG_NAME
-	default "mcom03"
+	default "mcom03-ecam03"
 
 endif
