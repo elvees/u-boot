@@ -13,17 +13,18 @@
 /* Specify available DDR memory.
  * These macros are also used for specifying DDR size available for Linux.
  */
-#define CONFIG_SYS_SDRAM_BASE		0x80000000
+#define CONFIG_SYS_SDRAM_BASE		0x882400000
 #define PHYS_SDRAM_0			CONFIG_SYS_SDRAM_BASE
 #define PHYS_SDRAM_0_SIZE		SZ_256M
 #define CONFIG_SYS_MALLOC_LEN		SZ_8M
 
-#define CONFIG_SYS_INIT_SP_ADDR		0x80400000
+#define CONFIG_SYS_INIT_SP_ADDR		(CONFIG_SYS_SDRAM_BASE + 0x400000)
 
-#define CONFIG_SYS_LOAD_ADDR		0x82000000 /* default load address */
+/* default load address */
+#define CONFIG_SYS_LOAD_ADDR		(CONFIG_SYS_SDRAM_BASE + 0x2000000)
 
 /* standalone support */
-#define CONFIG_STANDALONE_LOAD_ADDR	0x802000000
+#define CONFIG_STANDALONE_LOAD_ADDR	(CONFIG_SYS_SDRAM_BASE + 0x2000000)
 
 /* Default environment */
 #define CONFIG_LOADADDR			CONFIG_SYS_LOAD_ADDR
@@ -57,11 +58,11 @@
 #endif
 
 #define MCOM03_COMMON_ENV_SETTINGS \
-	"kernel_addr_r=0x802000000\0" \
-	"scriptaddr=0x808000000\0" \
-	"ramdisk_addr_r=0x809000000\0" \
-	"pxefile_addr_r=0x80a000000\0" \
-	"fdt_addr_r=0x808800000\0" \
+	"kernel_addr_r=0x884400000\0" \
+	"scriptaddr=0x88a400000\0" \
+	"ramdisk_addr_r=0x88b400000\0" \
+	"pxefile_addr_r=0x88c400000\0" \
+	"fdt_addr_r=0x88ac00000\0" \
 	"fdtfile=" CONFIG_DEFAULT_DEVICE_TREE ".dtb\0" \
 	"serverip=127.0.0.0\0"
 

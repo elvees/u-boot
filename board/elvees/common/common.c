@@ -56,15 +56,9 @@ void reset_cpu(ulong addr)
 
 static struct mm_region mcom03_mem_map[] = {
 	{
-		.virt = CONFIG_SYS_SDRAM_BASE,
+		.virt = PHYS_SDRAM_0,
 		.phys = PHYS_SDRAM_0,
 		.size = PHYS_SDRAM_0_SIZE,
-		.attrs = PTE_BLOCK_MEMTYPE(MT_NORMAL) |
-			 PTE_BLOCK_INNER_SHARE
-	}, {
-		.virt = 0x800000000,
-		.phys = 0x800000000,
-		.size = 0x40000000,
 		.attrs = PTE_BLOCK_MEMTYPE(MT_NORMAL) |
 			 PTE_BLOCK_INNER_SHARE
 	}, {
