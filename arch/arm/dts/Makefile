@@ -1003,6 +1003,7 @@ dtb-$(CONFIG_TARGET_PRESIDIO_ASIC) += ca-presidio-engboard.dtb
 
 dtb-$(CONFIG_ARCH_MCOM03) += \
 	mcom03-ecam03dm-r1.0.dtb \
+	mcom03-ecam03ptz-r1.0.dtb \
 	mcom03-egwpm-r1.0-egwcb-r1.0.dtb \
 	mcom03-elvmc03-r2.2-elvmc03cb-r1.0.dtb \
 	mcom03-elvmc03smarc-r1.0-ngfwcb-r1.0.dtb \
