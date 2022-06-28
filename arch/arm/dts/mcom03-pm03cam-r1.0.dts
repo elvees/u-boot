@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright 2022 RnD Center "ELVEES", JSC
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+
+#include "mcom03.dtsi"
+
+/ {
+	model = "PM03CAM r1.0";
+	compatible = "elvees,pm03cam-r1.0",
+		     "elvees,pm03cam",
+		     "elvees,mcom03";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+};
+
+&uart0 {
+	status = "okay";
+	clock-frequency = <27920454>;
+};
+
+&sdhci0 {
+	status = "okay";
+
+	/* Disable High Speed support
+	 * Disable 1.8V support
+	 * Disable SDR50, SDR104 and DDR50 support
+	 */
+	sdhci-caps-mask = <0x7 0x4200000>;
+	sdhci-caps = <0x0 0x0>;
+};
+
+&emac0 {
+	status = "okay";
+	phy-mode = "rgmii";
+	phy-handle = <&ethernet_phy0>;
+	phy-reset-gpios = <&gpio0c 6 GPIO_ACTIVE_LOW>;
+	elvees,pads-1v8-en;
+
+	ethernet_phy0: ethernet-phy@1 {
+		reg = <0x1>;
+	};
+};
+
+&qspi0 {
+	status = "okay";
+
+	flash0: s25fl128s@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor", "spi-flash";
+		reg = <0x0>;
+		/* This is the highest frequency at which all commands are
+		 * supported by the flash device.
+		 */
+		spi-max-frequency = <50000000>;
+
+		spi-tx-bus-width = <4>;
+		spi-rx-bus-width = <4>;
+	};
+};
