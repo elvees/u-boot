@@ -51,6 +51,15 @@ config TARGET_ECAM03PTZ
 	  Support for the following boards:
 	    ECAM03PTZ r1.0
 
+config TARGET_PM03CAM
+	bool "PM03CAM"
+	select DM_ETH
+	select DM_MMC
+	select DM_GPIO
+	help
+	  Support for the following boards:
+	    PM03CAM r1.0
+
 config TARGET_RTL
 	bool "RTL"
 	help
@@ -82,6 +91,7 @@ source "board/elvees/elvmc03cb/Kconfig"
 source "board/elvees/elvmc03smarc/Kconfig"
 source "board/elvees/haps/Kconfig"
 source "board/elvees/mcom03-bub/Kconfig"
+source "board/elvees/pm03cam/Kconfig"
 source "board/elvees/rtl/Kconfig"
 source "board/elvees/trustphonepm/Kconfig"
 
