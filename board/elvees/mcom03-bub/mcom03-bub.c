@@ -13,6 +13,8 @@ DECLARE_GLOBAL_DATA_PTR;
 
 void board_pads_cfg(void)
 {
+	int i;
+
 	nand_pad_cfg();
 
 	// Enable pads for EMAC0/EMAC1 interrupt
@@ -26,4 +28,7 @@ void board_pads_cfg(void)
 	pad_set_ctl(HSP_URB_EMAC0_TXC_PADCFG, 0xf);
 	pad_set_ctl(HSP_URB_EMAC1_TX_PADCFG, 0x3f);
 	pad_set_ctl(HSP_URB_EMAC1_TXC_PADCFG, 0xf);
+
+	for (i = 0; i < 4; i++)
+		i2c_pad_cfg(i);
 }
