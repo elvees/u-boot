@@ -142,6 +142,8 @@ struct arasan_gemac_priv {
 	struct gpio_desc phy_txclk;
 	u8 *tx_buffer;
 	u8 *rx_buffer;
+	u8 *tx_buffer_ptr;
+	u8 *rx_buffer_ptr;
 	struct arasan_gemac_dma_desc *tx_desc_ptr;
 	struct arasan_gemac_dma_desc *rx_desc_ptr;
 	struct arasan_gemac_dma_desc *tx_desc_ring;
@@ -215,6 +217,7 @@ static void arasan_gemac_tx_desc_ring_init(struct udevice *dev)
 	desc_ring[TX_DESC_NUMBER - 1].ctrl |= DMA_DESC_CTRL_END_OF_THE_RING;
 
 	priv->tx_desc_ptr = desc_ring;
+	priv->tx_buffer_ptr = priv->tx_buffer;
 
 	arasan_gemac_flush_dcache((uintptr_t)desc_ring,
 				  TX_DESC_NUMBER * sizeof(*desc_ring));
@@ -242,6 +245,7 @@ static void arasan_gemac_rx_desc_ring_init(struct udevice *dev)
 	desc_ring[RX_DESC_NUMBER - 1].ctrl |= DMA_DESC_CTRL_END_OF_THE_RING;
 
 	priv->rx_desc_ptr = desc_ring;
+	priv->rx_buffer_ptr = priv->rx_buffer;
 
 	arasan_gemac_flush_dcache((uintptr_t)desc_ring,
 				  RX_DESC_NUMBER * sizeof(*desc_ring));
@@ -343,9 +347,9 @@ static int arasan_gemac_send(struct udevice *dev, void *packet, int length)
 	if (desc->status & DMA_DESC_STATUS_OWN)
 		return -EAGAIN;
 
-	memcpy((void *)(ulong)desc->addr1, packet, length);
+	memcpy((void *)priv->tx_buffer_ptr, packet, length);
 
-	arasan_gemac_flush_dcache(desc->addr1, length);
+	arasan_gemac_flush_dcache((uintptr_t)priv->tx_buffer_ptr, length);
 
 	desc->ctrl &= DMA_DESC_CTRL_END_OF_THE_RING;
 	desc->ctrl |= DMA_DESC_CTRL_LAST_SEGMENT |
@@ -360,6 +364,12 @@ static int arasan_gemac_send(struct udevice *dev, void *packet, int length)
 
 	if (++priv->tx_desc_ptr == priv->tx_desc_ring + TX_DESC_NUMBER)
 		priv->tx_desc_ptr = priv->tx_desc_ring;
+
+	priv->tx_buffer_ptr += PKTSIZE_ALIGN;
+
+	if ((uintptr_t)priv->tx_buffer_ptr ==
+	    (uintptr_t)priv->tx_buffer + TX_DESC_NUMBER * PKTSIZE_ALIGN)
+		priv->tx_buffer_ptr = priv->tx_buffer;
 
 	return 0;
 }
@@ -377,9 +387,9 @@ static int arasan_gemac_recv(struct udevice *dev, int flags, uchar **packetp)
 
 	length = desc->status & 0x3fff;
 
-	arasan_gemac_invalidate_dcache(desc->addr1, length);
+	arasan_gemac_invalidate_dcache((uintptr_t)priv->rx_buffer_ptr, length);
 
-	*packetp = (uchar *)(ulong)desc->addr1;
+	*packetp = (uchar *)priv->rx_buffer_ptr;
 
 	return length;
 }
@@ -398,6 +408,12 @@ static int arasan_gemac_free_pkt(struct udevice *dev, uchar *packet,
 
 	if (++priv->rx_desc_ptr == priv->rx_desc_ring + RX_DESC_NUMBER)
 		priv->rx_desc_ptr = priv->rx_desc_ring;
+
+	priv->rx_buffer_ptr += PKTSIZE_ALIGN;
+
+	if ((uintptr_t)priv->rx_buffer_ptr ==
+	    (uintptr_t)priv->rx_buffer + RX_DESC_NUMBER * PKTSIZE_ALIGN)
+		priv->rx_buffer_ptr = priv->rx_buffer;
 
 	return 0;
 }
