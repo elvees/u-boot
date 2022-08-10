@@ -52,6 +52,12 @@
 	 */
 	sdhci-caps-mask = <0x7 0x4200000>;
 	sdhci-caps = <0x0 0x0>;
+
+	/* The default clock pad drive strength of 6 mA is insufficient
+	 * for some NGFW-CBs resulting in unstable SDMMC performance,
+	 * especially at higher CPU temperatures.
+	 */
+	elvees,drive-strength-clk = <8>;
 };
 
 &timer0 {
