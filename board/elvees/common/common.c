@@ -4,6 +4,8 @@
  */
 
 #include <common.h>
+#include <env.h>
+#include <init.h>
 #include <asm/armv8/mmu.h>
 #include <asm/io.h>
 #include <linux/bitfield.h>
@@ -245,3 +247,17 @@ int board_init(void)
 
 	return clk_cfg();
 }
+
+#ifdef CONFIG_MISC_INIT_R
+int misc_init_r(void)
+{
+	if (!IS_ENABLED(CONFIG_ENV_IS_NOWHERE))
+		if (!env_get("first_boot_checker")) {
+			printf("*** First boot\n");
+			env_set_hex("first_boot_checker", 0x0);
+			env_save();
+		}
+
+	return 0;
+}
+#endif
