@@ -141,11 +141,11 @@ static int designware_wdt_probe(struct udevice *dev)
 	struct reset_ctl_bulk resets;
 
 	ret = reset_get_bulk(dev, &resets);
-	if (ret)
+	if (ret && ret != -ENOENT)
 		return ret;
 
 	ret = reset_deassert_bulk(&resets);
-	if (ret)
+	if (ret && ret != -ENOENT)
 		return ret;
 #endif
 
