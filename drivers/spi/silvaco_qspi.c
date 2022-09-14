@@ -12,8 +12,8 @@
 #include <reset.h>
 #include <regmap.h>
 #include <syscon.h>
-#include <asm/io.h>
 #include <wait_bit.h>
+#include <asm/io.h>
 
 #define SILVACO_CTRL_XFER	BIT(0)
 #define SILVACO_CTRL_MSB1ST	BIT(2)
@@ -120,10 +120,21 @@ static int mcom03_qspi_set_soc_regs(struct udevice *dev)
 	dev_read_alias_seq(dev, &devnum);
 
 	if (devnum == 1) {
+		bool is_18v = dev_read_bool(dev, "elvees,pads-1v8-en");
+
 		ret = regmap_update_bits(regmap, QSPI1_PAD, QSPI1_PAD_1V8,
-					 QSPI1_PAD_1V8);
-		if (ret < 0)
+					 is_18v ? QSPI1_PAD_1V8 : 0);
+		if (ret)
 			return ret;
+		/*
+		 * QSPI1 is less auto-probed device, printing this will be
+		 * helpful if voltage for some reason differ from current pad
+		 * configuration and the initialization of a flash didn't done
+		 * correctly.
+		 */
+		debug("\nHint: QSPI1 pads are configured as %s\n", is_18v ?
+		      "1.8V" : "3.3V");
+
 		ret = regmap_update_bits(regmap, QSPI1_PAD, QSPI1_PAD_EN, QSPI1_PAD_EN);
 		if (ret < 0)
 			return ret;
