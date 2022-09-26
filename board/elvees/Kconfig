@@ -123,4 +123,11 @@ config MCOM03_SUBSYSTEM_SDR
 	default y
 	help
 	  SDR subsystem includes RISC1, DSP, PCIe, etc.
+
+config DDRMC_MAX_NUMBER
+	int
+	default 2
+	help
+	  Number of DDR controllers
+
 endif

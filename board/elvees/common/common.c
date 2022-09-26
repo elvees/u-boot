@@ -36,6 +36,22 @@
 
 #define PP_ON				0x10
 
+struct ddrinfo {
+	u64 dram_size[CONFIG_DDRMC_MAX_NUMBER];
+	u64 total_dram_size;
+	struct {
+		bool enable;
+		int channels;
+		int size;
+	} interleaving;
+	int speed[CONFIG_DDRMC_MAX_NUMBER];
+	/* RAM configuration */
+	struct {
+		u64 start;
+		u64 size;
+	} mem_regions[CONFIG_NR_DRAM_BANKS];
+};
+
 DECLARE_GLOBAL_DATA_PTR;
 
 enum subsystem_reset_lines {
@@ -88,15 +104,10 @@ int dram_init(void)
 #ifndef CONFIG_TARGET_HAPS
 int dram_init_banksize(void)
 {
-	struct {
-		u64 start;
-		u64 size;
-	} *mem_regions = (void *)CONFIG_MEM_REGIONS_ADDR;
+	struct ddrinfo *info = (struct ddrinfo *)CONFIG_MEM_REGIONS_ADDR;
 
-	for (int i = 0; i < CONFIG_NR_DRAM_BANKS; i++) {
-		gd->bd->bi_dram[i].start = (phys_addr_t)mem_regions[i].start;
-		gd->bd->bi_dram[i].size = (phys_addr_t)mem_regions[i].size;
-	}
+	memcpy(gd->bd->bi_dram, info->mem_regions,
+	       FIELD_SIZEOF(struct bd_info, bi_dram));
 
 	return 0;
 }
