@@ -171,6 +171,7 @@ static struct ucg_channel ucg_media_channels[] = {
 	{3, 7, 30},	/* MEDIA UCG3 MIPI_TXCLKESC	19.8 MHz */
 };
 
+#ifdef CONFIG_MCOM03_SUBSYSTEM_SDR
 static struct ucg_channel ucg_sdr_channels[] = {
 	{0, 0, 18},	/* SDR UCG0 CLK_CFG		105 MHz */
 	{0, 1, 6},	/* SDR UCG0 EXT_CLK		315 MHz */
@@ -186,6 +187,7 @@ static struct ucg_channel ucg_sdr_channels[] = {
 	{0, 11, -18},	/* SDR UCG0 VCU_TCK		off (105 MHz) */
 	{0, 12, -18},	/* SDR UCG0 LVDS_CLK		off (105 MHz) */
 };
+#endif
 
 static struct ucg_channel ucg_serv_channels[] = {
 	{0, 0, 12},	/* SERVICE UCG1 APB		49.5 MHz */
