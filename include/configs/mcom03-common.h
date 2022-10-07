@@ -13,7 +13,7 @@
 /* Specify available DDR memory.
  * These macros are also used for specifying DDR size available for Linux.
  */
-#define CONFIG_SYS_SDRAM_BASE		0x882400000
+#define CONFIG_SYS_SDRAM_BASE		0x890400000
 #define PHYS_SDRAM_0			CONFIG_SYS_SDRAM_BASE
 #define PHYS_SDRAM_0_SIZE		SZ_256M
 #define CONFIG_SYS_MALLOC_LEN		SZ_8M
@@ -58,11 +58,11 @@
 #endif
 
 #define MCOM03_COMMON_ENV_SETTINGS \
-	"kernel_addr_r=0x884400000\0" \
-	"scriptaddr=0x88a400000\0" \
-	"ramdisk_addr_r=0x88b400000\0" \
-	"pxefile_addr_r=0x88c400000\0" \
-	"fdt_addr_r=0x88ac00000\0" \
+	"kernel_addr_r=0x892400000\0" \
+	"scriptaddr=0x898400000\0" \
+	"ramdisk_addr_r=0x899400000\0" \
+	"pxefile_addr_r=0x89a400000\0" \
+	"fdt_addr_r=0x898c00000\0" \
 	"fdtfile=" CONFIG_DEFAULT_DEVICE_TREE ".dtb\0" \
 	"serverip=127.0.0.0\0"
 
