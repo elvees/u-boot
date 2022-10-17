@@ -150,4 +150,9 @@ config DDRMC_MAX_NUMBER
 	help
 	  Number of DDR controllers
 
+config ECAM03_DEFAULT_DTB_FILE_NAME
+	string
+	help
+	  Default value for dtb_file_name variable.
+
 endif

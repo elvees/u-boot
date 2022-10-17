@@ -25,7 +25,7 @@
 			"saveenv;" \
 		"fi;" \
 	"fi;" \
-	"test -n \"$dtb_file_name\" || dtb_file_name=mcom03-ecam03dm-r1.0.dtb;" \
+	"test -n \"$dtb_file_name\" || dtb_file_name=" CONFIG_ECAM03_DEFAULT_DTB_FILE_NAME ".dtb;" \
 	"devtype=mmc;" \
 	"test -n \"$devnum\" || devnum=0;" \
 	"if test \"${bootvol}\" = \"a\"; then " \
