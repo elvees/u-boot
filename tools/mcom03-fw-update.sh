@@ -7,30 +7,26 @@ set -o pipefail
 
 function help {
     echo "Description:
-    Flash the MCom-02 U-Boot image to the SPI from OS running on the board.
+    Flash the MCom-03 SBL image to the SPI from OS running on the board.
     /etc/fw_env.config is used to detect U-Boot environment variables location.
     mtd-utils are required.
 Usage:
     $(basename "$0") [OPTION] IMAGE
 Arguments:
-    IMAGE      U-Boot image file
+    IMAGE      SBL image file
 Options:
-    -r         restore U-Boot environment
     -h         print this message"
 }
 
 function read_uboot_version {
-    head $DEV -c 65536 | strings | grep 'U-Boot SPL'
+    head $DEV -c 1048576 | strings | grep -e 'U-Boot [0-9]'
 }
 
-while getopts "hr" arg; do
+while getopts "h" arg; do
     case "$arg" in
     h)
         help
         exit 0
-    ;;
-    r)
-        RESTORE_ENV=true
     ;;
     *)
         echo "Incorrect option"
@@ -42,7 +38,7 @@ done
 shift $((OPTIND-1))
 IMAGE=$1
 if [[ -z "$IMAGE" ]]; then
-    echo "U-Boot image is not specified"
+    echo "SBL image is not specified"
     help
     exit 1
 fi
@@ -62,25 +58,11 @@ fi
 ENV_CONFIG=/etc/fw_env.config
 CONF_STR="$(grep -vE '(^[[:space:]]*#|^[[:space:]]*$)' $ENV_CONFIG | head -n1)"
 readonly DEV=$(echo "$CONF_STR" | awk '{print $1}')
-readonly ENV_OFFSET=$(echo "$CONF_STR" | awk '{print $2}')
-readonly ENV_SIZE=$(echo "$CONF_STR" | awk '{print $3}')
 
 # TODO: Add lock check
 readonly TEMPFILES=$(mktemp -d)
 trap 'rm -rf $TEMPFILES' 0
 trap 'echo "$LOG" >&2' ERR
-
-if [[ "$RESTORE_ENV" != "true" ]]; then
-    # Prepare new image with environment block taken from device
-    echo "Saving old environment variables..."
-    TMP_IMAGE=$TEMPFILES/tmp.image
-    cp "$IMAGE" "$TMP_IMAGE"
-    ENV_BLOCK=$TEMPFILES/env
-    LOG=$(mtd_debug read "$DEV" "$ENV_OFFSET" "$ENV_SIZE" "$ENV_BLOCK" 2>&1)
-    dd if="$ENV_BLOCK" of="$TMP_IMAGE" bs=$(( 16#${ENV_SIZE:2} )) \
-        seek=$(( ENV_OFFSET/ENV_SIZE )) conv=notrunc &> /dev/null
-    IMAGE=$TMP_IMAGE
-fi
 
 readonly IMAGE_SIZE=$(wc -c "$IMAGE" | awk '{print $1}')
 # Round up to mtd.erase_size
