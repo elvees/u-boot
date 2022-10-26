@@ -90,7 +90,6 @@ static struct pll_settings pll_settings[] = {
 	 * Setup PLL3 to frequency that can be divided by DISP_PIXCLK.
 	 */
 	{ MEDIA_PLL3, 27000000, 594000000, 0, 131, 5 },
-	{ SERV_PLL, 27000000, 594000000, 0, 131, 5 },
 };
 
 struct ucg_channel {
@@ -189,22 +188,6 @@ static struct ucg_channel ucg_sdr_channels[] = {
 };
 #endif
 
-static struct ucg_channel ucg_serv_channels[] = {
-	{0, 0, 12},	/* SERVICE UCG1 APB		49.5 MHz */
-	{0, 1, 2},	/* SERVICE UCG1 CORE		297 MHz */
-	{0, 2, 2},	/* SERVICE UCG1 QSPI0		297 MHz */
-	{0, 3, 2},	/* SERVICE UCG1 BPAM		297 MHz */
-	{0, 4, 2},	/* SERVICE UCG1 RISC0		297 MHz */
-	{0, 5, 12},	/* SERVICE UCG1 MFBSP0		49.5 MHz */
-	{0, 6, 12},	/* SERVICE UCG1 MFBSP1		49.5 MHz */
-	{0, 7, 12},	/* SERVICE UCG1 MAILBOX0	49.5 MHz */
-	{0, 8, 12},	/* SERVICE UCG1 PVTCTR		49.5 MHz */
-	{0, 9, 12},	/* SERVICE UCG1 I2C4		49.5 MHz */
-	{0, 10, 12},	/* SERVICE UCG1 TRNG		49.5 MHz */
-	{0, 11, 12},	/* SERVICE UCG1 SPIOTP		49.5 MHz */
-	{0, 13, 22},	/* SERVICE UCG1 QSPI0_EXT	27 MHz */
-};
-
 enum ucg_qfsm_state {
 	Q_FSM_STOPPED = 0,
 	Q_FSM_CLK_EN = 1,
@@ -263,16 +246,6 @@ unsigned long sdr_ucg_ctr_addr_get(int ucg_id, int chan_id)
 unsigned long sdr_ucg_bp_addr_get(int ucg_id)
 {
 	return 0x1900040;
-}
-
-unsigned long serv_ucg_ctr_addr_get(int ucg_id, int chan_id)
-{
-	return 0x1f020000 + chan_id * 0x4;
-}
-
-unsigned long serv_ucg_bp_addr_get(int ucg_id)
-{
-	return 0x1f020040;
 }
 
 static int pll_settings_get(int pll_id, struct pll_settings *settings)
@@ -496,9 +469,5 @@ int clk_cfg(void)
 	       SDR_URB_PCI1_CTL);
 #endif
 
-	ret = ucg_cfg(ucg_serv_channels, ARRAY_SIZE(ucg_serv_channels),
-		      serv_ucg_ctr_addr_get, serv_ucg_bp_addr_get, 0, 0x0,
-		      (unsigned long []){ SERV_PLL_ADDR },
-		      (enum pll_id []){ SERV_PLL }, 1, (u16 []){ 0xfff });
-	return ret;
+	return 0;
 }
