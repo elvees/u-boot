@@ -136,11 +136,6 @@ void pad_set_ctl(unsigned long reg, u32 value)
 	pad_set_bits(reg, LSP1_URB_GPIO1_PAD_CTR_CTL, value);
 }
 
-void pad_set_e(unsigned long reg, u32 value)
-{
-	pad_set_bits(reg, LSP1_URB_GPIO1_PAD_CTR_E, value);
-}
-
 void lsperiph1_v18_pad_cfg(void)
 {
 	u32 val;

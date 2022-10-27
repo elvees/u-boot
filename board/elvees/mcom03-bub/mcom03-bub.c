@@ -17,9 +17,6 @@ void board_pads_cfg(void)
 
 	nand_pad_cfg();
 
-	// Enable pads for EMAC0/EMAC1 interrupt
-	pad_set_e(LSP1_URB_GPIO1_PAD_CTR_ADDR(GPIO_PORTA, 6), 1);
-	pad_set_e(LSP1_URB_GPIO1_PAD_CTR_ADDR(GPIO_PORTA, 7), 1);
 
 	/* Set EMAC pads drive strength to 12 mA for data and 8 mA for clock.
 	 * Required for correct operation at 125 MHz 3.3V. See #MCOM03SW-823
