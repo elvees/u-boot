@@ -237,4 +237,11 @@ config SPL_WDT
 	  Enable driver model for watchdog timer in SPL.
 	  This is similar to CONFIG_WDT in U-Boot.
 
+config WDT_MCOM03
+	bool "ELVEES MCom-03 SoC watchdog support"
+	depends on WDT && ARCH_MCOM03
+	help
+	  Select this to enable ELVEES MCom-03 SoC watchdog timer.
+
+
 endmenu

@@ -34,3 +34,4 @@ obj-$(CONFIG_WDT_SP805) += sp805_wdt.o
 obj-$(CONFIG_WDT_STM32MP) += stm32mp_wdt.o
 obj-$(CONFIG_WDT_TANGIER) += tangier_wdt.o
 obj-$(CONFIG_WDT_XILINX) += xilinx_wwdt.o
+obj-$(CONFIG_WDT_MCOM03) += mcom03_wdt.o
