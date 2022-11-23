@@ -171,7 +171,8 @@ void nand_pad_cfg(void)
 	// temporary code until NAND support is added to pinctrl
 	u32 val = PAD_MUX_NAND | NAND_CLE | NAND_ENABLE;
 
-	if (IS_ENABLED(CONFIG_TARGET_ECAM03DM))
+	if (IS_ENABLED(CONFIG_TARGET_ECAM03DM) ||
+	    IS_ENABLED(CONFIG_TARGET_ECAM03BL))
 		val |= NAND_V18;
 
 	writel(val, HSPERIPH_URB_NAND_PADCFG);
