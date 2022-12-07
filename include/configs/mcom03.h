@@ -10,10 +10,17 @@
 
 #include "mcom03-common.h"
 
+#ifdef TARGET_MCOM03_TRUSTPHONEPM
+#define BOOT_TARGET_DEVICES(func) \
+	BOOT_TARGET_DEVICES_USB(func) \
+	BOOT_TARGET_DEVICES_MMC(func) \
+	BOOT_TARGET_DEVICES_PXE(func)
+#else
 #define BOOT_TARGET_DEVICES(func) \
 	BOOT_TARGET_DEVICES_MMC(func) \
 	BOOT_TARGET_DEVICES_USB(func) \
 	BOOT_TARGET_DEVICES_PXE(func)
+#endif
 
 #include <config_distro_bootcmd.h>
 
