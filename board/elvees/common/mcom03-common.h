@@ -46,6 +46,9 @@
 #define GPIO_PORTC			2
 #define GPIO_PORTD			3
 
+#define MFBSP1_DIR			0x1f0b1308
+#define MFBSP1_DR			0x1f0b130c
+
 #define HSP_URB_XIP_EN_REQ		0x10400010
 #define HSP_URB_XIP_EN_OUT		0x10400014
 

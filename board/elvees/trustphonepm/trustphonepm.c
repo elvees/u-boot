@@ -26,6 +26,16 @@ int power_init_board(void)
 	 * Pulse duration must be at least 500ms.
 	 * TODO: Move it to userspace.
 	 */
+	/* Reset deassert */
+	val = readl(MFBSP1_DIR);
+	val |= BIT(7);
+	writel(val, MFBSP1_DIR);
+
+	val = readl(MFBSP1_DR);
+	val |= BIT(7);
+	writel(val, MFBSP1_DR);
+
+	/* PWR OFF */
 	val = readl(LSP1_GPIO_SWPORTD_DDR);
 	val |= BIT(4);
 	writel(val, LSP1_GPIO_SWPORTD_DDR);
@@ -36,6 +46,7 @@ int power_init_board(void)
 
 	mdelay(500);
 
+	/* PWR ON */
 	val = readl(LSP1_GPIO_SWPORTD_DR);
 	val |= BIT(4);
 	writel(val, LSP1_GPIO_SWPORTD_DR);
