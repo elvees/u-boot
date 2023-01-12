@@ -92,12 +92,22 @@ config TARGET_MCOM03_ELVMC03CB
 	  Support for the following boards:
 	    ELV-MC03-CB r1.1
 
+config TARGET_MCOM03_ELVMC03Q7
+	bool "ELV-MC03-Q7"
+	select DM_ETH
+	select DM_MMC
+	select DM_GPIO
+	help
+	  Support for the following boards:
+	    ELV-MC03-Q7 r1.0, ELV-Q7-CB r1.0
+
 endchoice
 
 source "board/elvees/ecam03bl/Kconfig"
 source "board/elvees/ecam03dm/Kconfig"
 source "board/elvees/ecam03ptz/Kconfig"
 source "board/elvees/elvmc03cb/Kconfig"
+source "board/elvees/elvmc03q7/Kconfig"
 source "board/elvees/elvmc03smarc/Kconfig"
 source "board/elvees/haps/Kconfig"
 source "board/elvees/mcom03-bub/Kconfig"

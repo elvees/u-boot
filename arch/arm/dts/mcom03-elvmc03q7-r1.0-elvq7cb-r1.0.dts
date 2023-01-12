@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright 2023 RnD Center "ELVEES", JSC
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+
+#include "mcom03-elvmc03q7-r1.0.dtsi"
+
+/ {
+	model = "ELV-MC03-Q7 r1.0, ELV-Q7-CB r1.0";
+	compatible = "elvees,elvmc03q7-r1.0-elvq7cb-r1.0",
+		     "elvees,elvmc03q7-elvq7cb",
+		     "elvees,elvq7cb-r1.0",
+		     "elvees,elvq7cb",
+		     "elvees,elvmc03q7-r1.0",
+		     "elvees,elvmc03q7",
+		     "elvees,mcom03";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+};
+
+&uart0 {
+	status = "okay";
+	clock-frequency = <27920454>;
+};
+
+&sdhci1 {
+	status = "okay";
+
+	/* Disable 1.8V support
+	 * Disable SDR50, SDR104 and DDR50 support
+	 */
+	sdhci-caps-mask = <0x7 0x4000000>;
+	sdhci-caps = <0x0 0x0>;
+};
+
+&usb0 {
+	status = "okay";
+};
+
+&usb1 {
+	status = "okay";
+};

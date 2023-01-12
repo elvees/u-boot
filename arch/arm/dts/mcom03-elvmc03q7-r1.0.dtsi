@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright 2023 RnD Center "ELVEES", JSC
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+
+#include "mcom03.dtsi"
+
+/ {
+	model = "ELV-MC03-Q7 r1.0";
+	compatible = "elvees,elvmc03q7-r1.0",
+		     "elvees,elvmc03q7",
+		     "elvees,mcom03";
+
+	sdhci0_supply: regulator@0 {
+		compatible = "regulator-fixed";
+		regulator-name = "sdhci0-supply";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		regulator-always-on;
+	};
+};
+
+&gpio0c {
+	gpio-line-names = "CAM0_ENA#", "CAM1_ENA#", "CAM0_RST#", "CAM1_RST#",
+		"CAM0_GPIO", "CAM1_GPIO", "LVDS_EN", "RGMII_0_RST";
+};
+
+/* Connected to eMMC */
+&sdhci0 {
+	status = "okay";
+
+	non-removable;
+	bus-width = <8>;
+
+	vqmmc-supply = <&sdhci0_supply>;
+};
+
+&qspi0 {
+	status = "okay";
+
+	flash0: s25fl128s@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor", "spi-flash";
+		reg = <0x0>;
+		/* This is the highest frequency at which all commands are
+		 * supported by the flash device.
+		 */
+		spi-max-frequency = <50000000>;
+
+		spi-tx-bus-width = <4>;
+		spi-rx-bus-width = <4>;
+	};
+};
