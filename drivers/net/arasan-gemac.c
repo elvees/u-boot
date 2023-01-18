@@ -605,8 +605,7 @@ static int arasan_gemac_probe(struct udevice *dev)
 	if (ret != 0)
 		goto error_buffers_alloc;
 
-	/* TODO: Remove this extra PHY reset cycle */
-	if (IS_ENABLED(CONFIG_TARGET_ELVMC03SMARC))
+	if (dev_read_bool(dev, "elvees,extra-phy-reset-cycle"))
 		arasan_gemac_mdio_reset(priv->bus);
 
 	return 0;

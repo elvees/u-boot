@@ -41,6 +41,12 @@
 	phy-reset-gpios = <&gpio0d 6 GPIO_ACTIVE_LOW>;
 	elvees,pads-1v8-en;
 
+	/* TODO: Remove this extra PHY reset cycle.
+	 * DP83867 has to be reset twice on this module.
+	 * The reason is currently unknown.
+	 */
+	elvees,extra-phy-reset-cycle;
+
 	ethernet_phy0: ethernet-phy@4 {
 		reg = <0x4>;
 		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
@@ -55,6 +61,12 @@
 	clocks = <&eth_bus_clk>;
 	phy-reset-gpios = <&gpio0c 7 GPIO_ACTIVE_LOW>;
 	elvees,pads-1v8-en;
+
+	/* TODO: Remove this extra PHY reset cycle.
+	 * DP83867 has to be reset twice on this module.
+	 * The reason is currently unknown.
+	 */
+	elvees,extra-phy-reset-cycle;
 
 	ethernet_phy1: ethernet-phy@5 {
 		reg = <0x5>;
