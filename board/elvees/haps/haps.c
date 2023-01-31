@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2019 - 2021 RnD Center "ELVEES", JSC
+ * Copyright 2019-2021 RnD Center "ELVEES", JSC
  */
 
 #include <common.h>
