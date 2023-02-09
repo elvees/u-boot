@@ -73,6 +73,7 @@ struct mcom03_sdhci_priv {
 	int clk_phase_in[MMC_TIMING_MMC_HS400 + 1];
 	int clk_phase_out[MMC_TIMING_MMC_HS400 + 1];
 	u32 drive_strength[3];
+	bool non_removable;
 };
 
 static const u8 mode2timing[] = {
@@ -113,6 +114,15 @@ static int mcom03_sdhci_set_soc_regs(struct udevice *dev)
 		ret = regmap_update_bits(soc_ctl_base,
 					 SDMMC_CORECFG1(priv->ctrl_id),
 					 SDMMC_CORECFG1_HSEN, 0);
+		if (ret)
+			return ret;
+	}
+
+	if (priv->non_removable) {
+		ret = regmap_update_bits(soc_ctl_base,
+					 SDMMC_CORECFG1(priv->ctrl_id),
+					 SDMMC_CORECFG1_SLOT_NONREMOVABLE,
+					 SDMMC_SET_FIELD(SDMMC_CORECFG1_SLOT_NONREMOVABLE, 1));
 		if (ret)
 			return ret;
 	}
@@ -410,6 +420,8 @@ static int mcom03_sdhci_ofdata_to_platdata(struct udevice *dev)
 		priv->drive_strength[1] = 0;
 	if (dev_read_u32(dev, "elvees,drive-strength-dat", &priv->drive_strength[2]))
 		priv->drive_strength[2] = 0;
+
+	priv->non_removable = dev_read_bool(dev, "non-removable");
 
 	return 0;
 }
