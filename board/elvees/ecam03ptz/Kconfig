@@ -6,7 +6,4 @@ config SYS_BOARD
 config SYS_CONFIG_NAME
 	default "mcom03-ecam03"
 
-config ECAM03_DEFAULT_DTB_FILE_NAME
-	default "mcom03-ecam03ptz-r1.0"
-
 endif

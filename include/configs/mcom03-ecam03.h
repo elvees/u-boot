@@ -13,7 +13,6 @@
 #define EXTRABOOTENV "bootvol=a\0" \
 	"safe_bootvol=a\0"
 
-// TODO: Remove dtb_file_name assignment when MCOM03SW-1629 is done
 #define BOOTENV_DEV_ECAM(devtypeu, devtypel, instance) "bootcmd_ecam=" \
 	"if test \"${bootvol}\" != \"${safe_bootvol}\"; then " \
 		"if env exists tried_to_boot; then " \
@@ -25,7 +24,6 @@
 			"saveenv;" \
 		"fi;" \
 	"fi;" \
-	"test -n \"$dtb_file_name\" || dtb_file_name=" CONFIG_ECAM03_DEFAULT_DTB_FILE_NAME ".dtb;" \
 	"devtype=mmc;" \
 	"test -n \"$devnum\" || devnum=0;" \
 	"if test \"${bootvol}\" = \"a\"; then " \
