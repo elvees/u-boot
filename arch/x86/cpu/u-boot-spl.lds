@@ -12,7 +12,7 @@ ENTRY(_start)
 SECTIONS
 {
 #ifndef CONFIG_CMDLINE
-	/DISCARD/ : { *(.u_boot_list_2_cmd_*) }
+	/DISCARD/ : { *(__u_boot_list_2_cmd_*) }
 #endif
 
 	. = IMAGE_TEXT_BASE;	/* Location of bootcode in flash */
@@ -25,12 +25,20 @@ SECTIONS
 	. = ALIGN(4);
 
 	. = ALIGN(4);
-	.u_boot_list : {
-		KEEP(*(SORT(.u_boot_list*)));
+	__u_boot_list : {
+		KEEP(*(SORT(__u_boot_list*)));
 	}
 
 	. = ALIGN(4);
 	.rodata : { *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.rodata*))) }
+
+	. = ALIGN(4);
+
+	.priv_data : {
+		__priv_data_start = .;
+		*(SORT_BY_ALIGNMENT(SORT_BY_NAME(.priv_data*)))
+		__priv_data_end = .;
+	}
 
 	. = ALIGN(4);
 	.data : { *(.data*) }
@@ -43,11 +51,23 @@ SECTIONS
 		__binman_sym_start = .;
 		KEEP(*(SORT(.binman_sym*)));
 		__binman_sym_end = .;
+
+		/*
+		 * Force 32-byte alignment so that it lines up with the start of
+		 * bss, which may have up to 32-byte alignment. This ensures
+		 * that the end of the .bin file matches up with
+		 * _image_binary_end or __bss_end - see board_fdt_blob_setup().
+		 * The alignment of BSS depends on what is in it, so can range
+		 * from 4 to 32 bytes.
+		 */
+		. = ALIGN(32);
 	}
 
         _image_binary_end = .;
 
+#if CONFIG_IS_ENABLED(SEPARATE_BSS)
 	. = 0x120000;
+#endif
 	.bss (OVERLAY) : {
 		__bss_start = .;
 		*(.bss*)
@@ -62,6 +82,7 @@ SECTIONS
 	/DISCARD/ : { *(.plt*) }
 	/DISCARD/ : { *(.interp*) }
 	/DISCARD/ : { *(.gnu*) }
+	/DISCARD/ : { *(.note.gnu.property) }
 
 #if defined(CONFIG_SPL_X86_16BIT_INIT) || defined(CONFIG_TPL_X86_16BIT_INIT)
 	/*

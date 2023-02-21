@@ -228,9 +228,9 @@ static void handle_read(struct sandbox_flash_priv *priv, ulong lba,
 			ulong transfer_len)
 {
 	debug("%s: lba=%lx, transfer_len=%lx\n", __func__, lba, transfer_len);
+	priv->read_len = transfer_len;
 	if (priv->fd != -1) {
 		os_lseek(priv->fd, lba * SANDBOX_FLASH_BLOCK_LEN, OS_SEEK_SET);
-		priv->read_len = transfer_len;
 		setup_response(priv, priv->buff,
 			       transfer_len * SANDBOX_FLASH_BLOCK_LEN);
 	} else {
@@ -297,7 +297,7 @@ static int handle_ufi_command(struct sandbox_flash_plat *plat,
 static int sandbox_flash_bulk(struct udevice *dev, struct usb_device *udev,
 			      unsigned long pipe, void *buff, int len)
 {
-	struct sandbox_flash_plat *plat = dev_get_platdata(dev);
+	struct sandbox_flash_plat *plat = dev_get_plat(dev);
 	struct sandbox_flash_priv *priv = dev_get_priv(dev);
 	int ep = usb_pipeendpoint(pipe);
 	struct umass_bbb_cbw *cbw = buff;
@@ -336,6 +336,9 @@ static int sandbox_flash_bulk(struct udevice *dev, struct usb_device *udev,
 			if (priv->read_len) {
 				ulong bytes_read;
 
+				if (priv->fd == -1)
+					return -EIO;
+
 				bytes_read = os_read(priv->fd, buff, len);
 				if (bytes_read != len)
 					return -EIO;
@@ -345,6 +348,8 @@ static int sandbox_flash_bulk(struct udevice *dev, struct usb_device *udev,
 			} else {
 				if (priv->alloc_len && len > priv->alloc_len)
 					len = priv->alloc_len;
+				if (len > sizeof(priv->buff))
+					len = sizeof(priv->buff);
 				memcpy(buff, priv->buff, len);
 				priv->phase = PHASE_STATUS;
 			}
@@ -366,9 +371,9 @@ err:
 	return 0;
 }
 
-static int sandbox_flash_ofdata_to_platdata(struct udevice *dev)
+static int sandbox_flash_of_to_plat(struct udevice *dev)
 {
-	struct sandbox_flash_plat *plat = dev_get_platdata(dev);
+	struct sandbox_flash_plat *plat = dev_get_plat(dev);
 
 	plat->pathname = dev_read_string(dev, "sandbox,filepath");
 
@@ -377,7 +382,7 @@ static int sandbox_flash_ofdata_to_platdata(struct udevice *dev)
 
 static int sandbox_flash_bind(struct udevice *dev)
 {
-	struct sandbox_flash_plat *plat = dev_get_platdata(dev);
+	struct sandbox_flash_plat *plat = dev_get_plat(dev);
 	struct usb_string *fs;
 
 	fs = plat->flash_strings;
@@ -393,7 +398,7 @@ static int sandbox_flash_bind(struct udevice *dev)
 
 static int sandbox_flash_probe(struct udevice *dev)
 {
-	struct sandbox_flash_plat *plat = dev_get_platdata(dev);
+	struct sandbox_flash_plat *plat = dev_get_plat(dev);
 	struct sandbox_flash_priv *priv = dev_get_priv(dev);
 
 	priv->fd = os_open(plat->pathname, OS_O_RDONLY);
@@ -419,8 +424,8 @@ U_BOOT_DRIVER(usb_sandbox_flash) = {
 	.of_match = sandbox_usb_flash_ids,
 	.bind	= sandbox_flash_bind,
 	.probe	= sandbox_flash_probe,
-	.ofdata_to_platdata = sandbox_flash_ofdata_to_platdata,
+	.of_to_plat = sandbox_flash_of_to_plat,
 	.ops	= &sandbox_usb_flash_ops,
-	.priv_auto_alloc_size = sizeof(struct sandbox_flash_priv),
-	.platdata_auto_alloc_size = sizeof(struct sandbox_flash_plat),
+	.priv_auto	= sizeof(struct sandbox_flash_priv),
+	.plat_auto	= sizeof(struct sandbox_flash_plat),
 };

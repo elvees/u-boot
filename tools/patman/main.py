@@ -9,9 +9,9 @@
 from argparse import ArgumentParser
 import os
 import re
+import shutil
 import sys
 import traceback
-import unittest
 
 if __name__ == "__main__":
     # Allow 'from patman import xxx to work'
@@ -27,6 +27,7 @@ from patman import settings
 from patman import terminal
 from patman import test_util
 from patman import test_checkpatch
+from patman import tools
 
 epilog = '''Create patches from commits in a branch, check them and email them
 as specified by tags you place in the commits. Use -n to do a dry run first.'''
@@ -40,7 +41,7 @@ parser.add_argument('-e', '--end', type=int, default=0,
     help='Commits to skip at end of patch list')
 parser.add_argument('-D', '--debug', action='store_true',
     help='Enabling debugging (provides a full traceback on error)')
-parser.add_argument('-p', '--project', default=project.DetectProject(),
+parser.add_argument('-p', '--project', default=project.detect_project(),
                     help="Project name; affects default option values and "
                     "aliases [default: %(default)s]")
 parser.add_argument('-P', '--patchwork-url',
@@ -68,7 +69,8 @@ send.add_argument('-n', '--dry-run', action='store_true', dest='dry_run',
 send.add_argument('-r', '--in-reply-to', type=str, action='store',
                   help="Message ID that this series is in reply to")
 send.add_argument('-t', '--ignore-bad-tags', action='store_true',
-                  default=False, help='Ignore bad tags / aliases')
+                  default=False,
+                  help='Ignore bad tags / aliases (default=warn)')
 send.add_argument('-T', '--thread', action='store_true', dest='thread',
                   default=False, help='Create patches as a single thread')
 send.add_argument('--cc-cmd', dest='cc_cmd', type=str, action='store',
@@ -79,8 +81,16 @@ send.add_argument('--no-binary', action='store_true', dest='ignore_binary',
 send.add_argument('--no-check', action='store_false', dest='check_patch',
                   default=True,
                   help="Don't check for patch compliance")
+send.add_argument('--tree', dest='check_patch_use_tree', default=False,
+                  action='store_true',
+                  help=("Set `tree` to True. If `tree` is False then we'll "
+                  "pass '--no-tree' to checkpatch (default: tree=%(default)s)"))
+send.add_argument('--no-tree', dest='check_patch_use_tree',
+                  action='store_false', help="Set `tree` to False")
 send.add_argument('--no-tags', action='store_false', dest='process_tags',
                   default=True, help="Don't process subject tags as aliases")
+send.add_argument('--no-signoff', action='store_false', dest='add_signoff',
+                  default=True, help="Don't add Signed-off-by to patches")
 send.add_argument('--smtp-server', type=str,
                   help="Specify the SMTP server to 'git send-email'")
 
@@ -129,25 +139,12 @@ if args.cmd == 'test':
     import doctest
     from patman import func_test
 
-    sys.argv = [sys.argv[0]]
-    result = unittest.TestResult()
-    suite = unittest.TestSuite()
-    loader = unittest.TestLoader()
-    for module in (test_checkpatch.TestPatch, func_test.TestFunctional):
-        if args.testname:
-            try:
-                suite.addTests(loader.loadTestsFromName(args.testname, module))
-            except AttributeError:
-                continue
-        else:
-            suite.addTests(loader.loadTestsFromTestCase(module))
-    suite.run(result)
+    result = test_util.run_test_suites(
+        'patman', False, False, False, None, None, None,
+        [test_checkpatch.TestPatch, func_test.TestFunctional,
+         'gitutil', 'settings', 'terminal'])
 
-    for module in ['gitutil', 'settings', 'terminal']:
-        suite = doctest.DocTestSuite(module)
-        suite.run(result)
-
-    sys.exit(test_util.ReportResult('patman', args.testname, result))
+    sys.exit(0 if result.wasSuccessful() else 1)
 
 # Process commits, produce patches files, check them, email them
 elif args.cmd == 'send':
@@ -166,14 +163,15 @@ elif args.cmd == 'send':
         fd.close()
 
     elif args.full_help:
-        pager = os.getenv('PAGER')
-        if not pager:
-            pager = 'more'
-        fname = os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])),
-                             'README')
-        command.Run(pager, fname)
+        tools.print_full_help(
+            os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])),
+                         'README.rst')
+        )
 
     else:
+        # If we are not processing tags, no need to warning about bad ones
+        if not args.process_tags:
+            args.ignore_bad_tags = True
         control.send(args)
 
 # Check status of patches in patchwork
@@ -184,7 +182,7 @@ elif args.cmd == 'status':
                                  args.dest_branch, args.force,
                                  args.show_comments, args.patchwork_url)
     except Exception as e:
-        terminal.Print('patman: %s: %s' % (type(e).__name__, e),
+        terminal.tprint('patman: %s: %s' % (type(e).__name__, e),
                        colour=terminal.Color.RED)
         if args.debug:
             print()

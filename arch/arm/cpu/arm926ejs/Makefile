@@ -12,11 +12,10 @@ extra-y	:=
 endif
 endif
 
-obj-$(CONFIG_ARMADA100) += armada100/
-obj-$(CONFIG_MX25) += mx25/
 obj-$(CONFIG_MX27) += mx27/
 obj-$(if $(filter mxs,$(SOC)),y) += mxs/
 obj-$(if $(filter spear,$(SOC)),y) += spear/
+obj-$(CONFIG_ARCH_SUNXI) += sunxi/
 
 # some files can only build in ARM or THUMB2, not THUMB1
 
@@ -25,6 +24,8 @@ ifndef CONFIG_HAS_THUMB2
 
 CFLAGS_cpu.o := -marm
 CFLAGS_cache.o := -marm
+CFLAGS_REMOVE_cpu.o := $(LTO_CFLAGS)
+CFLAGS_REMOVE_cache.o := $(LTO_CFLAGS)
 
 endif
 endif

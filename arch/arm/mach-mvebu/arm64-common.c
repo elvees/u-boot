@@ -8,6 +8,7 @@
 #include <fdtdec.h>
 #include <init.h>
 #include <asm/cache.h>
+#include <asm/global_data.h>
 #include <asm/ptrace.h>
 #include <linux/libfdt.h>
 #include <linux/sizes.h>
@@ -27,14 +28,13 @@ DECLARE_GLOBAL_DATA_PTR;
  * Currently only 2GiB are mapped for system memory. This is what
  * we pass to the U-Boot subsystem here.
  */
-#define USABLE_RAM_SIZE		0x80000000
+#define USABLE_RAM_SIZE		0x80000000ULL
 
 ulong board_get_usable_ram_top(ulong total_size)
 {
-	if (gd->ram_size > USABLE_RAM_SIZE)
-		return USABLE_RAM_SIZE;
+	unsigned long top = CONFIG_SYS_SDRAM_BASE + min(gd->ram_size, USABLE_RAM_SIZE);
 
-	return gd->ram_size;
+	return (gd->ram_top > top) ? top : gd->ram_top;
 }
 
 /*
@@ -103,10 +103,9 @@ int arch_early_init_r(void)
 	/* Cause the SATA device to do its early init */
 	uclass_first_device(UCLASS_AHCI, &dev);
 
-#ifdef CONFIG_DM_PCI
 	/* Trigger PCIe devices detection */
-	pci_init();
-#endif
+	if (IS_ENABLED(CONFIG_PCI))
+		pci_init();
 
 	return 0;
 }

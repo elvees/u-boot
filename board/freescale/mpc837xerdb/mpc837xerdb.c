@@ -11,6 +11,7 @@
 #include <i2c.h>
 #include <init.h>
 #include <asm/bitops.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/fsl_mpc83xx_serdes.h>
 #include <fdt_support.h>
@@ -96,7 +97,7 @@ int dram_init(void)
 int fixed_sdram(void)
 {
 	immap_t *im = (immap_t *) CONFIG_SYS_IMMR;
-	u32 msize = CONFIG_SYS_DDR_SIZE * 1024 * 1024;
+	u32 msize = CONFIG_SYS_SDRAM_SIZE;
 	u32 msize_log2 = __ilog2(msize);
 
 	im->sysconf.ddrlaw[0].bar = CONFIG_SYS_SDRAM_BASE & 0xfffff000;
@@ -126,7 +127,7 @@ int fixed_sdram(void)
 
 	im->ddr.sdram_cfg |= SDRAM_CFG_MEM_EN;
 	udelay(2000);
-	return CONFIG_SYS_DDR_SIZE;
+	return CONFIG_SYS_SDRAM_SIZE >> 20;
 }
 #endif	/*!CONFIG_SYS_SPD_EEPROM */
 
@@ -138,8 +139,8 @@ int checkboard(void)
 
 int board_early_init_f(void)
 {
-#ifdef CONFIG_FSL_SERDES
 	immap_t *immr = (immap_t *)CONFIG_SYS_IMMR;
+#ifdef CONFIG_FSL_SERDES
 	u32 spridr = in_be32(&immr->sysconf.spridr);
 
 	/* we check only part num, and don't look for CPU revisions */
@@ -166,10 +167,16 @@ int board_early_init_f(void)
 		break;
 	}
 #endif /* CONFIG_FSL_SERDES */
+
+#ifdef CONFIG_FSL_ESDHC
+	clrsetbits_be32(&immr->sysconf.sicrl, SICRL_USB_B, SICRL_USB_B_SD);
+	clrsetbits_be32(&immr->sysconf.sicrh, SICRH_SPI, SICRH_SPI_SD);
+#endif
 	return 0;
 }
 
 #ifdef CONFIG_FSL_ESDHC
+#if !(CONFIG_IS_ENABLED(DM_MMC) || CONFIG_IS_ENABLED(DM_USB))
 int board_mmc_init(struct bd_info *bd)
 {
 	struct immap __iomem *im = (struct immap __iomem *)CONFIG_SYS_IMMR;
@@ -187,6 +194,7 @@ int board_mmc_init(struct bd_info *bd)
 
 	return fsl_esdhc_mmc_init(bd);
 }
+#endif
 #endif
 
 /*
@@ -207,6 +215,15 @@ int misc_init_r(void)
 #endif
 
 	return rc;
+}
+
+int board_late_init(void)
+{
+	volatile immap_t *immap = (immap_t *) CONFIG_SYS_IMMR;
+#ifdef CONFIG_USB_HOST
+	clrsetbits_be32(&immap->sysconf.sicrl, SICRL_USB_A, 0x40000000);
+#endif
+	return 0;
 }
 
 #if defined(CONFIG_OF_BOARD_SETUP)

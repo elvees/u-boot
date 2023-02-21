@@ -6,9 +6,14 @@
 
 #include <common.h>
 #include <i2c.h>
+#include <dm.h>
+#include <errno.h>
+#include <fdtdec.h>
+#include <power/pmic.h>
 #include <power/tps65217.h>
 
-struct udevice *tps65217_dev __attribute__((section(".data"))) = NULL;
+#if !CONFIG_IS_ENABLED(DM_PMIC)
+struct udevice *tps65217_dev __section(".data") = NULL;
 
 /**
  * tps65217_reg_read() - Generic function that can read a TPS65217 register
@@ -18,7 +23,7 @@ struct udevice *tps65217_dev __attribute__((section(".data"))) = NULL;
  */
 int tps65217_reg_read(uchar src_reg, uchar *src_val)
 {
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 	return i2c_read(TPS65217_CHIP_PM, src_reg, 1, src_val, 1);
 #else
 	return dm_i2c_read(tps65217_dev, src_reg,  src_val, 1);
@@ -52,7 +57,7 @@ int tps65217_reg_write(uchar prot_level, uchar dest_reg, uchar dest_val,
 	 * mask
 	 */
 	if (mask != TPS65217_MASK_ALL_BITS) {
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 		ret = i2c_read(TPS65217_CHIP_PM, dest_reg, 1, &read_val, 1);
 #else
 		ret = dm_i2c_read(tps65217_dev, dest_reg, &read_val, 1);
@@ -67,7 +72,7 @@ int tps65217_reg_write(uchar prot_level, uchar dest_reg, uchar dest_val,
 
 	if (prot_level > 0) {
 		xor_reg = dest_reg ^ TPS65217_PASSWORD_UNLOCK;
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 		ret = i2c_write(TPS65217_CHIP_PM, TPS65217_PASSWORD, 1,
 				&xor_reg, 1);
 #else
@@ -77,7 +82,7 @@ int tps65217_reg_write(uchar prot_level, uchar dest_reg, uchar dest_val,
 		if (ret)
 			return ret;
 	}
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 	ret = i2c_write(TPS65217_CHIP_PM, dest_reg, 1, &dest_val, 1);
 #else
 	ret = dm_i2c_write(tps65217_dev, dest_reg, &dest_val, 1);
@@ -86,7 +91,7 @@ int tps65217_reg_write(uchar prot_level, uchar dest_reg, uchar dest_val,
 		return ret;
 
 	if (prot_level == TPS65217_PROT_LEVEL_2) {
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 		ret = i2c_write(TPS65217_CHIP_PM, TPS65217_PASSWORD, 1,
 				&xor_reg, 1);
 #else
@@ -96,7 +101,7 @@ int tps65217_reg_write(uchar prot_level, uchar dest_reg, uchar dest_val,
 		if (ret)
 			return ret;
 
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 		ret = i2c_write(TPS65217_CHIP_PM, dest_reg, 1, &dest_val, 1);
 #else
 		ret = dm_i2c_write(tps65217_dev, dest_reg, &dest_val, 1);
@@ -137,7 +142,7 @@ int tps65217_voltage_update(uchar dc_cntrl_reg, uchar volt_sel)
 
 int power_tps65217_init(unsigned char bus)
 {
-#ifdef CONFIG_DM_I2C
+#if CONFIG_IS_ENABLED(DM_I2C)
 	struct udevice *dev = NULL;
 	int rc;
 
@@ -148,3 +153,80 @@ int power_tps65217_init(unsigned char bus)
 #endif
 	return 0;
 }
+#else /* CONFIG_IS_ENABLED(DM_PMIC) */
+static const struct pmic_child_info pmic_children_info[] = {
+	{ .prefix = "ldo", .driver = "tps65217_ldo" },
+	{ },
+};
+
+static int tps65217_reg_count(struct udevice *dev)
+{
+	return TPS65217_PMIC_NUM_OF_REGS;
+}
+
+static int tps65217_write(struct udevice *dev, uint reg, const uint8_t *buff,
+			  int len)
+{
+	if (dm_i2c_write(dev, reg, buff, len)) {
+		pr_err("write error to device: %p register: %#x!\n", dev, reg);
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static int tps65217_read(struct udevice *dev, uint reg, uint8_t *buff, int len)
+{
+	int ret;
+
+	ret = dm_i2c_read(dev, reg, buff, len);
+	if (ret) {
+		pr_err("read error %d from device: %p register: %#x!\n", ret,
+		       dev, reg);
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static int tps65217_bind(struct udevice *dev)
+{
+	ofnode regulators_node;
+	int children;
+
+	regulators_node = dev_read_subnode(dev, "regulators");
+	if (!ofnode_valid(regulators_node)) {
+		debug("%s: %s regulators subnode not found!\n", __func__,
+		      dev->name);
+		return -ENXIO;
+	}
+
+	debug("%s: '%s' - found regulators subnode\n", __func__, dev->name);
+
+	children = pmic_bind_children(dev, regulators_node, pmic_children_info);
+	if (!children)
+		debug("%s: %s - no child found\n", __func__, dev->name);
+
+	/* Always return success for this device */
+	return 0;
+}
+
+static struct dm_pmic_ops tps65217_ops = {
+	.reg_count = tps65217_reg_count,
+	.read = tps65217_read,
+	.write = tps65217_write,
+};
+
+static const struct udevice_id tps65217_ids[] = {
+	{ .compatible = "ti,tps65217" },
+	{ }
+};
+
+U_BOOT_DRIVER(pmic_tps65217) = {
+	.name = "tps65217 pmic",
+	.id = UCLASS_PMIC,
+	.of_match = tps65217_ids,
+	.bind = tps65217_bind,
+	.ops = &tps65217_ops,
+};
+#endif

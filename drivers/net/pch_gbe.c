@@ -68,7 +68,7 @@ static int pch_gbe_mac_write(struct pch_gbe_regs *mac_regs, u8 *addr)
 static int pch_gbe_reset(struct udevice *dev)
 {
 	struct pch_gbe_priv *priv = dev_get_priv(dev);
-	struct eth_pdata *plat = dev_get_platdata(dev);
+	struct eth_pdata *plat = dev_get_plat(dev);
 	struct pch_gbe_regs *mac_regs = priv->mac_regs;
 	ulong start;
 
@@ -412,17 +412,17 @@ static int pch_gbe_mdio_init(const char *name, struct pch_gbe_regs *mac_regs)
 static int pch_gbe_phy_init(struct udevice *dev)
 {
 	struct pch_gbe_priv *priv = dev_get_priv(dev);
-	struct eth_pdata *plat = dev_get_platdata(dev);
+	struct eth_pdata *plat = dev_get_plat(dev);
 	struct phy_device *phydev;
 	int mask = 0xffffffff;
 
-	phydev = phy_find_by_mask(priv->bus, mask, plat->phy_interface);
+	phydev = phy_find_by_mask(priv->bus, mask);
 	if (!phydev) {
 		printf("pch_gbe: cannot find the phy\n");
 		return -1;
 	}
 
-	phy_connect_dev(phydev, dev);
+	phy_connect_dev(phydev, dev, plat->phy_interface);
 
 	phydev->supported &= PHY_GBIT_FEATURES;
 	phydev->advertising = phydev->supported;
@@ -436,7 +436,7 @@ static int pch_gbe_phy_init(struct udevice *dev)
 static int pch_gbe_probe(struct udevice *dev)
 {
 	struct pch_gbe_priv *priv;
-	struct eth_pdata *plat = dev_get_platdata(dev);
+	struct eth_pdata *plat = dev_get_plat(dev);
 	void *iobase;
 	int err;
 
@@ -449,7 +449,7 @@ static int pch_gbe_probe(struct udevice *dev)
 
 	priv->dev = dev;
 
-	iobase = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_1, PCI_REGION_MEM);
+	iobase = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_1, 0, 0, PCI_REGION_TYPE, PCI_REGION_MEM);
 
 	plat->iobase = (ulong)iobase;
 	priv->mac_regs = (struct pch_gbe_regs *)iobase;
@@ -499,8 +499,8 @@ U_BOOT_DRIVER(eth_pch_gbe) = {
 	.probe = pch_gbe_probe,
 	.remove = pch_gbe_remove,
 	.ops = &pch_gbe_ops,
-	.priv_auto_alloc_size = sizeof(struct pch_gbe_priv),
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
+	.priv_auto	= sizeof(struct pch_gbe_priv),
+	.plat_auto	= sizeof(struct eth_pdata),
 	.flags = DM_FLAG_ALLOC_PRIV_DMA,
 };
 

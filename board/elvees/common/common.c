@@ -7,6 +7,7 @@
 #include <env.h>
 #include <init.h>
 #include <asm/armv8/mmu.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <linux/bitfield.h>
 #include <linux/iopoll.h>
@@ -68,7 +69,7 @@ enum subsystem_reset_lines {
 	RISC0_SUBS,
 };
 
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 }
 

@@ -93,20 +93,10 @@ struct sunxi_gpio_reg {
 #define GPIO_PULL_OFFSET(pin)	((((pin) & 0x1f) & 0xf) << 1)
 
 /* GPIO bank sizes */
-#define SUNXI_GPIO_A_NR		32
-#define SUNXI_GPIO_B_NR		32
-#define SUNXI_GPIO_C_NR		32
-#define SUNXI_GPIO_D_NR		32
-#define SUNXI_GPIO_E_NR		32
-#define SUNXI_GPIO_F_NR		32
-#define SUNXI_GPIO_G_NR		32
-#define SUNXI_GPIO_H_NR		32
-#define SUNXI_GPIO_I_NR		32
-#define SUNXI_GPIO_L_NR		32
-#define SUNXI_GPIO_M_NR		32
+#define SUNXI_GPIOS_PER_BANK	32
 
 #define SUNXI_GPIO_NEXT(__gpio) \
-	((__gpio##_START) + (__gpio##_NR) + 0)
+	((__gpio##_START) + SUNXI_GPIOS_PER_BANK)
 
 enum sunxi_gpio_number {
 	SUNXI_GPIO_A_START = 0,
@@ -145,19 +135,13 @@ enum sunxi_gpio_number {
 #define SUNXI_GPIO_OUTPUT	1
 #define SUNXI_GPIO_DISABLE	7
 
-#define SUNXI_GPA_EMAC		2
-#define SUN6I_GPA_GMAC		2
-#define SUN7I_GPA_GMAC		5
-#define SUN6I_GPA_SDC2		5
-#define SUN6I_GPA_SDC3		4
 #define SUN8I_H3_GPA_UART0	2
+#define SUN8I_H3_GPA_UART2	2
 
 #define SUN4I_GPB_PWM		2
 #define SUN4I_GPB_TWI0		2
 #define SUN4I_GPB_TWI1		2
 #define SUN5I_GPB_TWI1		2
-#define SUN4I_GPB_TWI2		2
-#define SUN5I_GPB_TWI2		2
 #define SUN8I_V3S_GPB_TWI0	2
 #define SUN4I_GPB_UART0		2
 #define SUN5I_GPB_UART0		2
@@ -172,15 +156,12 @@ enum sunxi_gpio_number {
 #define SUNXI_GPC_SDC2		3
 #define SUN6I_GPC_SDC3		4
 #define SUN50I_GPC_SPI0		4
+#define SUNIV_GPC_SPI0		2
 
-#define SUN8I_GPD_SDC1		3
 #define SUNXI_GPD_LCD0		2
 #define SUNXI_GPD_LVDS0		3
-#define SUNXI_GPD_PWM		2
 
-#define SUN5I_GPE_SDC2		3
-#define SUN8I_GPE_TWI2		3
-#define SUN50I_GPE_TWI2		3
+#define SUNIV_GPE_UART0		5
 
 #define SUNXI_GPF_SDC0		2
 #define SUNXI_GPF_UART0		4
@@ -190,7 +171,7 @@ enum sunxi_gpio_number {
 #define SUN5I_GPG_SDC1		2
 #define SUN6I_GPG_SDC1		2
 #define SUN8I_GPG_SDC1		2
-#define SUN6I_GPG_TWI3		2
+#define SUN8I_GPG_UART1		2
 #define SUN5I_GPG_UART1		4
 
 #define SUN6I_GPH_PWM		2
@@ -202,14 +183,12 @@ enum sunxi_gpio_number {
 #define SUN6I_GPH_TWI1		2
 #define SUN8I_GPH_TWI1		2
 #define SUN50I_GPH_TWI1		2
-#define SUN6I_GPH_TWI2		2
 #define SUN6I_GPH_UART0		2
 #define SUN9I_GPH_UART0		2
 #define SUN50I_H6_GPH_UART0	2
+#define SUN50I_H616_GPH_UART0	2
 
 #define SUNXI_GPI_SDC3		2
-#define SUN7I_GPI_TWI3		3
-#define SUN7I_GPI_TWI4		3
 
 #define SUN6I_GPL0_R_P2WI_SCK	3
 #define SUN6I_GPL1_R_P2WI_SDA	3
@@ -219,6 +198,7 @@ enum sunxi_gpio_number {
 #define SUN8I_A23_GPL_R_TWI	3
 #define SUN8I_GPL_R_UART	2
 #define SUN50I_GPL_R_TWI	2
+#define SUN50I_H616_GPL_R_TWI	3
 
 #define SUN9I_GPN_R_RSB		3
 
@@ -233,15 +213,20 @@ enum sunxi_gpio_number {
 #define SUNXI_GPIO_AXP0_VBUS_ENABLE	5
 #define SUNXI_GPIO_AXP0_GPIO_COUNT	6
 
+struct sunxi_gpio_plat {
+	struct sunxi_gpio	*regs;
+	char			bank_name[3];
+};
+
 void sunxi_gpio_set_cfgbank(struct sunxi_gpio *pio, int bank_offset, u32 val);
 void sunxi_gpio_set_cfgpin(u32 pin, u32 val);
 int sunxi_gpio_get_cfgbank(struct sunxi_gpio *pio, int bank_offset);
 int sunxi_gpio_get_cfgpin(u32 pin);
-int sunxi_gpio_set_drv(u32 pin, u32 val);
-int sunxi_gpio_set_pull(u32 pin, u32 val);
-int sunxi_name_to_gpio_bank(const char *name);
+void sunxi_gpio_set_drv(u32 pin, u32 val);
+void sunxi_gpio_set_drv_bank(struct sunxi_gpio *pio, u32 bank_offset, u32 val);
+void sunxi_gpio_set_pull(u32 pin, u32 val);
+void sunxi_gpio_set_pull_bank(struct sunxi_gpio *pio, int bank_offset, u32 val);
 int sunxi_name_to_gpio(const char *name);
-#define name_to_gpio(name) sunxi_name_to_gpio(name)
 
 #if !defined CONFIG_SPL_BUILD && defined CONFIG_AXP_GPIO
 int axp_gpio_init(void);

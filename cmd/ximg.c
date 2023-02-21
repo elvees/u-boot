@@ -59,16 +59,16 @@ do_imgextract(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	verify = env_get_yesno("verify");
 
 	if (argc > 1) {
-		addr = simple_strtoul(argv[1], NULL, 16);
+		addr = hextoul(argv[1], NULL);
 	}
 	if (argc > 2) {
-		part = simple_strtoul(argv[2], NULL, 16);
+		part = hextoul(argv[2], NULL);
 #if defined(CONFIG_FIT)
 		uname = argv[2];
 #endif
 	}
 	if (argc > 3) {
-		dest = simple_strtoul(argv[3], NULL, 16);
+		dest = hextoul(argv[3], NULL);
 	}
 
 	switch (genimg_get_format((void *)addr)) {
@@ -136,7 +136,7 @@ do_imgextract(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 			"at %08lx ...\n", uname, addr);
 
 		fit_hdr = (const void *)addr;
-		if (!fit_check_format(fit_hdr)) {
+		if (fit_check_format(fit_hdr, IMAGE_SIZE_INVAL)) {
 			puts("Bad FIT image format\n");
 			return 1;
 		}
@@ -171,11 +171,8 @@ do_imgextract(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 			return 1;
 		}
 
-		if (fit_image_get_comp(fit_hdr, noffset, &comp)) {
-			puts("Could not find script subimage "
-				"compression type\n");
-			return 1;
-		}
+		if (fit_image_get_comp(fit_hdr, noffset, &comp))
+			comp = IH_COMP_NONE;
 
 		data = (ulong)fit_data;
 		len = (ulong)fit_len;

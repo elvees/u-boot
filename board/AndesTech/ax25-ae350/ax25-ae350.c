@@ -12,6 +12,7 @@
 #if defined(CONFIG_FTMAC100) && !defined(CONFIG_DM_ETH)
 #include <netdev.h>
 #endif
+#include <asm/global_data.h>
 #include <linux/io.h>
 #include <faraday/ftsmc020.h>
 #include <fdtdec.h>
@@ -20,7 +21,6 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-extern phys_addr_t prior_stage_fdt_address;
 /*
  * Miscellaneous platform dependent initializations
  */
@@ -54,9 +54,22 @@ ulong board_flash_get_legacy(ulong base, int banknum, flash_info_t *info)
 	return 0;
 }
 
-void *board_fdt_blob_setup(void)
+#define ANDES_HW_DTB_ADDRESS	0xF2000000
+void *board_fdt_blob_setup(int *err)
 {
-	return (void *)CONFIG_SYS_FDT_BASE;
+	*err = 0;
+
+	if (IS_ENABLED(CONFIG_OF_SEPARATE) || IS_ENABLED(CONFIG_OF_BOARD)) {
+		if (gd->arch.firmware_fdt_addr)
+			return (void *)(ulong)gd->arch.firmware_fdt_addr;
+	}
+
+	if (fdt_magic(CONFIG_SYS_FDT_BASE) == FDT_MAGIC)
+		return (void *)CONFIG_SYS_FDT_BASE;
+	return (void *)ANDES_HW_DTB_ADDRESS;
+
+	*err = -EINVAL;
+	return NULL;
 }
 
 int smc_init(void)
@@ -77,7 +90,7 @@ int smc_init(void)
 	if (addr == FDT_ADDR_T_NONE)
 		return -EINVAL;
 
-	regs = (struct ftsmc020_bank *)addr;
+	regs = (struct ftsmc020_bank *)(uintptr_t)addr;
 	regs->cr &= ~FTSMC020_BANK_WPROT;
 
 	return 0;
@@ -108,7 +121,7 @@ void board_boot_order(u32 *spl_boot_list)
 #ifdef CONFIG_SPL_RAM_SUPPORT
 		BOOT_DEVICE_RAM,
 #endif
-#ifdef CONFIG_SPL_MMC_SUPPORT
+#ifdef CONFIG_SPL_MMC
 		BOOT_DEVICE_MMC1,
 #endif
 	};

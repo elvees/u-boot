@@ -4,10 +4,10 @@
  */
 
 #include "ddr3_init.h"
+#include "mv_ddr_common.h"
 #include "mv_ddr_training_db.h"
 #include "mv_ddr_regs.h"
 #include "mv_ddr_sys_env_lib.h"
-#include <linux/delay.h>
 
 #define DDR_INTERFACES_NUM		1
 #define DDR_INTERFACE_OCTETS_NUM	5
@@ -166,8 +166,6 @@ static u16 a38x_vco_freq_per_sar_ref_clk_40_mhz[] = {
 	1800			/* 30 - 0x1E */
 };
 
-
-static u32 async_mode_at_tf;
 
 static u32 dq_bit_map_2_phy_pin[] = {
 	1, 0, 2, 6, 9, 8, 3, 7,	/* 0 */
@@ -559,11 +557,7 @@ static int ddr3_tip_a38x_get_medium_freq(int dev_num, enum mv_ddr_freq *freq)
 
 static int ddr3_tip_a38x_get_device_info(u8 dev_num, struct ddr3_device_info *info_ptr)
 {
-#if defined(CONFIG_ARMADA_39X)
-	info_ptr->device_id = 0x6900;
-#else
 	info_ptr->device_id = 0x6800;
-#endif
 	info_ptr->ck_delay = ck_delay;
 
 	return MV_OK;
@@ -666,11 +660,7 @@ static int mv_ddr_sw_db_init(u32 dev_num, u32 board_id)
 	ddr3_tip_dev_attr_set(dev_num, MV_ATTR_TIP_REV, MV_TIP_REV_4);
 	ddr3_tip_dev_attr_set(dev_num, MV_ATTR_PHY_EDGE, MV_DDR_PHY_EDGE_POSITIVE);
 	ddr3_tip_dev_attr_set(dev_num, MV_ATTR_OCTET_PER_INTERFACE, DDR_INTERFACE_OCTETS_NUM);
-#ifdef CONFIG_ARMADA_39X
-	ddr3_tip_dev_attr_set(dev_num, MV_ATTR_INTERLEAVE_WA, 1);
-#else
 	ddr3_tip_dev_attr_set(dev_num, MV_ATTR_INTERLEAVE_WA, 0);
-#endif
 
 	ca_delay = 0;
 	delay_enable = 1;
@@ -742,7 +732,8 @@ static int ddr3_tip_a38x_set_divider(u8 dev_num, u32 if_id,
 	u32 divider = 0;
 	u32 sar_val, ref_clk_satr;
 	u32 async_val;
-	u32 freq = mv_ddr_freq_get(frequency);
+	u32 cpu_freq;
+	u32 ddr_freq = mv_ddr_freq_get(frequency);
 
 	if (if_id != 0) {
 		DEBUG_TRAINING_ACCESS(DEBUG_LEVEL_ERROR,
@@ -759,11 +750,14 @@ static int ddr3_tip_a38x_set_divider(u8 dev_num, u32 if_id,
 	ref_clk_satr = reg_read(DEVICE_SAMPLE_AT_RESET2_REG);
 	if (((ref_clk_satr >> DEVICE_SAMPLE_AT_RESET2_REG_REFCLK_OFFSET) & 0x1) ==
 	    DEVICE_SAMPLE_AT_RESET2_REG_REFCLK_25MHZ)
-		divider = a38x_vco_freq_per_sar_ref_clk_25_mhz[sar_val] / freq;
+		cpu_freq = a38x_vco_freq_per_sar_ref_clk_25_mhz[sar_val];
 	else
-		divider = a38x_vco_freq_per_sar_ref_clk_40_mhz[sar_val] / freq;
+		cpu_freq = a38x_vco_freq_per_sar_ref_clk_40_mhz[sar_val];
 
-	if ((async_mode_at_tf == 1) && (freq > 400)) {
+	divider = cpu_freq / ddr_freq;
+
+	if (((cpu_freq % ddr_freq != 0) || (divider != 2 && divider != 3)) &&
+	    (ddr_freq > 400)) {
 		/* Set async mode */
 		dunit_write(0x20220, 0x1000, 0x1000);
 		dunit_write(0xe42f4, 0x200, 0x200);
@@ -877,8 +871,6 @@ int ddr3_tip_ext_write(u32 dev_num, u32 if_id, u32 reg_addr,
 
 int mv_ddr_early_init(void)
 {
-	struct mv_ddr_topology_map *tm = mv_ddr_topology_map_get();
-
 	/* FIXME: change this configuration per ddr type
 	 * configure a380 and a390 to work with receiver odt timing
 	 * the odt_config is defined:
@@ -889,9 +881,6 @@ int mv_ddr_early_init(void)
 	 */
 
 	mv_ddr_sw_db_init(0, 0);
-
-	if (tm->interface_params[0].memory_freq != MV_DDR_FREQ_SAR)
-		async_mode_at_tf = 1;
 
 	return MV_OK;
 }
@@ -1016,7 +1005,7 @@ int ddr3_calc_mem_cs_size(u32 cs, uint64_t *cs_size)
 		return MV_BAD_VALUE;
 	}
 
-	*cs_size = cs_mem_size << 20; /* write cs size in bytes */
+	*cs_size = cs_mem_size;
 
 	return MV_OK;
 }
@@ -1025,8 +1014,10 @@ static int ddr3_fast_path_dynamic_cs_size_config(u32 cs_ena)
 {
 	u32 reg, cs;
 	uint64_t mem_total_size = 0;
+	uint64_t cs_mem_size_mb = 0;
 	uint64_t cs_mem_size = 0;
 	uint64_t mem_total_size_c, cs_mem_size_c;
+
 
 #ifdef DEVICE_MAX_DRAM_ADDRESS_SIZE
 	u32 physical_mem_size;
@@ -1038,8 +1029,9 @@ static int ddr3_fast_path_dynamic_cs_size_config(u32 cs_ena)
 	for (cs = 0; cs < MAX_CS_NUM; cs++) {
 		if (cs_ena & (1 << cs)) {
 			/* get CS size */
-			if (ddr3_calc_mem_cs_size(cs, &cs_mem_size) != MV_OK)
+			if (ddr3_calc_mem_cs_size(cs, &cs_mem_size_mb) != MV_OK)
 				return MV_FAIL;
+			cs_mem_size = cs_mem_size_mb * _1M;
 
 #ifdef DEVICE_MAX_DRAM_ADDRESS_SIZE
 			/*
@@ -1088,6 +1080,7 @@ static int ddr3_fast_path_dynamic_cs_size_config(u32 cs_ena)
 			 */
 			mem_total_size_c = (mem_total_size >> 16) & 0xffffffffffff;
 			cs_mem_size_c = (cs_mem_size >> 16) & 0xffffffffffff;
+
 			/* if the sum less than 2 G - calculate the value */
 			if (mem_total_size_c + cs_mem_size_c < 0x10000)
 				mem_total_size += cs_mem_size;

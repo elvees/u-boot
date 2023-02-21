@@ -14,19 +14,9 @@
 
 #include "siemens-am33x-common.h"
 /* NAND specific changes for etamin due to different page size */
-#undef CONFIG_SYS_NAND_PAGE_SIZE
-#undef CONFIG_SYS_NAND_OOBSIZE
-#undef CONFIG_SYS_NAND_BLOCK_SIZE
 #undef CONFIG_SYS_NAND_ECCPOS
-#undef CONFIG_SYS_NAND_U_BOOT_OFFS
-#undef CONFIG_SYS_ENV_SECT_SIZE
-#undef CONFIG_NAND_OMAP_ECCSCHEME
-#define CONFIG_NAND_OMAP_ECCSCHEME	OMAP_ECC_BCH16_CODE_HW
 
 #define CONFIG_SYS_ENV_SECT_SIZE       (512 << 10)     /* 512 KiB */
-#define CONFIG_SYS_NAND_PAGE_SIZE       4096
-#define CONFIG_SYS_NAND_OOBSIZE         224
-#define CONFIG_SYS_NAND_BLOCK_SIZE      (128 * CONFIG_SYS_NAND_PAGE_SIZE)
 #define CONFIG_SYS_NAND_ECCPOS	{ 2, 3, 4, 5, 6, 7, 8, 9, \
 				10, 11, 12, 13, 14, 15, 16, 17, 18, 19, \
 				20, 21, 22, 23, 24, 25, 26, 27, 28, 29, \
@@ -55,17 +45,12 @@
 #define CONFIG_SYS_NAND_ECCSIZE 512
 #define CONFIG_SYS_NAND_ECCBYTES 26
 
-#define CONFIG_SYS_NAND_U_BOOT_OFFS     0x200000
-
-#define CONFIG_SYS_NAND_MAX_CHIPS       1
-
 #undef CONFIG_SYS_MAX_NAND_DEVICE
 #define CONFIG_SYS_MAX_NAND_DEVICE      3
 #define CONFIG_SYS_NAND_BASE2           (0x18000000)    /* physical address */
 #define CONFIG_SYS_NAND_BASE_LIST       {CONFIG_SYS_NAND_BASE, \
 					CONFIG_SYS_NAND_BASE2}
 
-#define CONFIG_SYS_NAND_ONFI_DETECTION
 #define DDR_PLL_FREQ	303
 
 /* FWD Button = 27
@@ -86,30 +71,10 @@
 /* Physical Memory Map */
 #define CONFIG_MAX_RAM_BANK_SIZE       (1024 << 20)    /* 1GB */
 
-/* I2C Configuration */
-#define CONFIG_SYS_I2C_SPEED		100000
-
-#define CONFIG_SYS_I2C_EEPROM_ADDR              0x50
 #define EEPROM_ADDR_DDR3 0x90
 #define EEPROM_ADDR_CHIP 0x120
 
-#define CONFIG_FACTORYSET
-
-/* use both define to compile a SPL compliance test  */
-/*
-#define CONFIG_SPL_CMT
-#define CONFIG_SPL_CMT_DEBUG
-*/
-
 /* nedded by compliance test in read mode */
-#if defined(CONFIG_SPL_CMT)
-#define CONFIG_SYS_DCACHE_OFF
-#endif
-
-/* Define own nand partitions */
-#define CONFIG_ENV_RANGE		(4 * CONFIG_SYS_ENV_SECT_SIZE)
-
-
 
 #undef COMMON_ENV_DFU_ARGS
 #define COMMON_ENV_DFU_ARGS	"dfu_args=run bootargs_defaults;" \
@@ -135,7 +100,7 @@
 	"nand_active_ubi_vol=rootfs_a\0" \
 	"rootfs_name=rootfs\0" \
 	"kernel_name=uImage\0"\
-	"nand_root_fs_type=ubifs rootwait=1\0" \
+	"nand_root_fs_type=ubifs rootwait\0" \
 	"nand_args=run bootargs_defaults;" \
 		"mtdparts default;" \
 		"setenv ${partitionset_active} true;" \
@@ -173,7 +138,6 @@
 #define ETAMIN_NAND_GPMC_CONFIG4	0x16051807
 #define ETAMIN_NAND_GPMC_CONFIG5	0x00151e1e
 #define ETAMIN_NAND_GPMC_CONFIG6	0x16000f80
-#define CONFIG_MTD_CONCAT
 
 /* Default env settings */
 #define CONFIG_EXTRA_ENV_SETTINGS \
@@ -185,26 +149,5 @@
 	CONFIG_ENV_SETTINGS_BUTTONS_AND_LEDS \
 	CONFIG_ENV_SETTINGS_V2 \
 	CONFIG_ENV_SETTINGS_NAND_V2
-
-#ifndef CONFIG_RESTORE_FLASH
-
-#define CONFIG_BOOTCOMMAND \
-"if dfubutton; then " \
-	"run dfu_start; " \
-	"reset; " \
-"fi;" \
-"run nand_boot;" \
-"run nand_boot_backup;" \
-"reset;"
-
-
-#else
-#define CONFIG_BOOTCOMMAND			\
-	"setenv autoload no; "			\
-	"dhcp; "				\
-	"if tftp 80000000 debrick.scr; then "	\
-		"source 80000000; "		\
-	"fi"
-#endif
 #endif	/* CONFIG_SPL_BUILD */
 #endif	/* ! __CONFIG_ETAMIN_H */

@@ -20,45 +20,11 @@
  * (easy to change)
  */
 
-#define CONFIG_MCFUART
 #define CONFIG_SYS_UART_PORT		(0)
 
-#undef CONFIG_WATCHDOG
 #define CONFIG_WATCHDOG_TIMEOUT	3360	/* timeout in ms, max is 3.36 sec */
 
-#define CONFIG_SYS_UNIFY_CACHE
-
-#ifdef CONFIG_MCFFEC
-#	define CONFIG_MII_INIT		1
-#	define CONFIG_SYS_DISCOVER_PHY
-#	define CONFIG_SYS_RX_ETH_BUFFER	8
-#	define CONFIG_SYS_FAULT_ECHO_LINK_DOWN
-/* If CONFIG_SYS_DISCOVER_PHY is not defined - hardcoded */
-#	ifndef CONFIG_SYS_DISCOVER_PHY
-#		define FECDUPLEX	FULL
-#		define FECSPEED		_100BASET
-#	else
-#		ifndef CONFIG_SYS_FAULT_ECHO_LINK_DOWN
-#			define CONFIG_SYS_FAULT_ECHO_LINK_DOWN
-#		endif
-#	endif			/* CONFIG_SYS_DISCOVER_PHY */
-#endif
-
-#define CONFIG_MCFRTC
-#undef RTC_DEBUG
-
-/* Timer */
-#define CONFIG_MCFTMR
-
 /* I2C */
-#define CONFIG_SYS_I2C
-#define CONFIG_SYS_I2C_FSL
-#define CONFIG_SYS_FSL_I2C_SPEED	80000
-#define CONFIG_SYS_FSL_I2C_SLAVE	0x7F
-#define CONFIG_SYS_FSL_I2C_OFFSET	0x58000
-#define CONFIG_SYS_IMMR		CONFIG_SYS_MBAR
-
-#define CONFIG_UDP_CHECKSUM
 
 #ifdef CONFIG_MCFFEC
 #	define CONFIG_IPADDR	192.162.1.2
@@ -82,8 +48,6 @@
 
 #define CONFIG_PRAM		512	/* 512 KB */
 
-#define CONFIG_SYS_LOAD_ADDR		0x40010000
-
 #define CONFIG_SYS_CLK			80000000
 #define CONFIG_SYS_CPU_CLK		CONFIG_SYS_CLK * 3
 
@@ -102,8 +66,6 @@
 #define CONFIG_SYS_INIT_RAM_ADDR	0x80000000
 #define CONFIG_SYS_INIT_RAM_SIZE	0x8000	/* Size of used area in internal SRAM */
 #define CONFIG_SYS_INIT_RAM_CTRL	0x221
-#define CONFIG_SYS_GBL_DATA_OFFSET	((CONFIG_SYS_INIT_RAM_SIZE - GENERATED_GBL_DATA_SIZE) - 0x10)
-#define CONFIG_SYS_INIT_SP_OFFSET	CONFIG_SYS_GBL_DATA_OFFSET
 
 /*-----------------------------------------------------------------------
  * Start addresses for the final memory configuration
@@ -118,11 +80,7 @@
 #define CONFIG_SYS_SDRAM_EMOD		0x40010000
 #define CONFIG_SYS_SDRAM_MODE		0x018D0000
 
-#define CONFIG_SYS_MONITOR_BASE	(CONFIG_SYS_FLASH_BASE + 0x400)
 #define CONFIG_SYS_MONITOR_LEN		(256 << 10)	/* Reserve 256 kB for Monitor */
-
-#define CONFIG_SYS_BOOTPARAMS_LEN	64*1024
-#define CONFIG_SYS_MALLOC_LEN		(128 << 10)	/* Reserve 128 kB for malloc() */
 
 /*
  * For booting Linux, the board info and command line data
@@ -130,29 +88,19 @@
  * the maximum mapped by the Linux kernel during initialization ??
  */
 #define CONFIG_SYS_BOOTMAPSZ		(CONFIG_SYS_SDRAM_BASE + (CONFIG_SYS_SDRAM_SIZE << 20))
-#define CONFIG_SYS_BOOTM_LEN		(CONFIG_SYS_SDRAM_SIZE << 20)
 
 /*-----------------------------------------------------------------------
  * FLASH organization
  */
 #ifdef CONFIG_SYS_FLASH_CFI
 #	define CONFIG_SYS_FLASH_SIZE		0x800000	/* Max size that the board might have */
-#	define CONFIG_SYS_FLASH_CFI_WIDTH	FLASH_CFI_16BIT
-#	define CONFIG_SYS_MAX_FLASH_BANKS	1	/* max number of memory banks */
-#	define CONFIG_SYS_MAX_FLASH_SECT	137	/* max number of sectors on one chip */
 #endif
 
-#ifdef CONFIG_NANDFLASH_SIZE
 #	define CONFIG_SYS_MAX_NAND_DEVICE	1
 #	define CONFIG_SYS_NAND_BASE		CONFIG_SYS_CS2_BASE
 #	define CONFIG_SYS_NAND_SIZE		1
 #	define CONFIG_SYS_NAND_BASE_LIST	{ CONFIG_SYS_NAND_BASE }
 #	define NAND_ALLOW_ERASE_ALL	1
-#	define CONFIG_JFFS2_NAND	1
-#	define CONFIG_JFFS2_DEV		"nand0"
-#	define CONFIG_JFFS2_PART_SIZE	(CONFIG_SYS_CS2_MASK & ~1)
-#	define CONFIG_JFFS2_PART_OFFSET	0x00000000
-#endif
 
 #define CONFIG_SYS_FLASH_BASE		CONFIG_SYS_CS0_BASE
 
@@ -167,7 +115,6 @@
 /*-----------------------------------------------------------------------
  * Cache Configuration
  */
-#define CONFIG_SYS_CACHELINE_SIZE	16
 
 #define ICACHE_STATUS			(CONFIG_SYS_INIT_RAM_ADDR + \
 					 CONFIG_SYS_INIT_RAM_SIZE - 8)
@@ -199,10 +146,8 @@
 #define CONFIG_SYS_CS1_MASK		0x001f0001
 #define CONFIG_SYS_CS1_CTRL		0x002A3780
 
-#ifdef CONFIG_NANDFLASH_SIZE
 #define CONFIG_SYS_CS2_BASE		0x20000000
-#define CONFIG_SYS_CS2_MASK		((CONFIG_NANDFLASH_SIZE << 20) | 1)
+#define CONFIG_SYS_CS2_MASK		(16 << 20)
 #define CONFIG_SYS_CS2_CTRL		0x00001f60
-#endif
 
 #endif				/* _M5373EVB_H */

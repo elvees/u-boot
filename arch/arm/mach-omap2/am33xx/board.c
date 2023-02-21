@@ -11,6 +11,7 @@
 #include <dm.h>
 #include <debug_uart.h>
 #include <errno.h>
+#include <event.h>
 #include <init.h>
 #include <net.h>
 #include <ns16550.h>
@@ -23,9 +24,14 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/gpio.h>
 #include <asm/arch/i2c.h>
+#if IS_ENABLED(CONFIG_TARGET_AM335X_GUARDIAN)
+#include <asm/arch/mem-guardian.h>
+#else
 #include <asm/arch/mem.h>
+#endif
 #include <asm/arch/mmc_host_def.h>
 #include <asm/arch/sys_proto.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/emif.h>
 #include <asm/gpio.h>
@@ -60,7 +66,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 int dram_init(void)
 {
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT)
 	sdram_init();
 #endif
 
@@ -80,7 +86,7 @@ int dram_init_banksize(void)
 }
 
 #if !CONFIG_IS_ENABLED(OF_CONTROL)
-static const struct ns16550_platdata am33xx_serial[] = {
+static const struct ns16550_plat am33xx_serial[] = {
 	{ .base = CONFIG_SYS_NS16550_COM1, .reg_shift = 2,
 	  .clock = CONFIG_SYS_NS16550_CLK, .fcr = UART_FCR_DEFVAL, },
 # ifdef CONFIG_SYS_NS16550_COM2
@@ -99,7 +105,7 @@ static const struct ns16550_platdata am33xx_serial[] = {
 # endif
 };
 
-U_BOOT_DEVICES(am33xx_uarts) = {
+U_BOOT_DRVINFOS(am33xx_uarts) = {
 	{ "ns16550_serial", &am33xx_serial[0] },
 #  ifdef CONFIG_SYS_NS16550_COM2
 	{ "ns16550_serial", &am33xx_serial[1] },
@@ -112,14 +118,14 @@ U_BOOT_DEVICES(am33xx_uarts) = {
 #  endif
 };
 
-#ifdef CONFIG_DM_I2C
-static const struct omap_i2c_platdata am33xx_i2c[] = {
+#if CONFIG_IS_ENABLED(DM_I2C)
+static const struct omap_i2c_plat am33xx_i2c[] = {
 	{ I2C_BASE1, 100000, OMAP_I2C_REV_V2},
 	{ I2C_BASE2, 100000, OMAP_I2C_REV_V2},
 	{ I2C_BASE3, 100000, OMAP_I2C_REV_V2},
 };
 
-U_BOOT_DEVICES(am33xx_i2c) = {
+U_BOOT_DRVINFOS(am33xx_i2c) = {
 	{ "i2c_omap", &am33xx_i2c[0] },
 	{ "i2c_omap", &am33xx_i2c[1] },
 	{ "i2c_omap", &am33xx_i2c[2] },
@@ -127,7 +133,7 @@ U_BOOT_DEVICES(am33xx_i2c) = {
 #endif
 
 #if CONFIG_IS_ENABLED(DM_GPIO)
-static const struct omap_gpio_platdata am33xx_gpio[] = {
+static const struct omap_gpio_plat am33xx_gpio[] = {
 	{ 0, AM33XX_GPIO0_BASE },
 	{ 1, AM33XX_GPIO1_BASE },
 	{ 2, AM33XX_GPIO2_BASE },
@@ -138,7 +144,7 @@ static const struct omap_gpio_platdata am33xx_gpio[] = {
 #endif
 };
 
-U_BOOT_DEVICES(am33xx_gpios) = {
+U_BOOT_DRVINFOS(am33xx_gpios) = {
 	{ "gpio_omap", &am33xx_gpio[0] },
 	{ "gpio_omap", &am33xx_gpio[1] },
 	{ "gpio_omap", &am33xx_gpio[2] },
@@ -155,9 +161,9 @@ static const struct omap3_spi_plat omap3_spi_pdata = {
 	.pin_dir = MCSPI_PINDIR_D0_IN_D1_OUT,
 };
 
-U_BOOT_DEVICE(am33xx_spi) = {
+U_BOOT_DRVINFO(am33xx_spi) = {
 	.name = "omap3_spi",
-	.platdata = &omap3_spi_pdata,
+	.plat = &omap3_spi_pdata,
 };
 #endif
 #endif
@@ -201,10 +207,8 @@ int cpu_mmc_init(struct bd_info *bis)
 #define RTC_BOARD_TYPE_SHIFT	16
 
 /* AM33XX has two MUSB controllers which can be host or gadget */
-#if (defined(CONFIG_USB_MUSB_GADGET) || defined(CONFIG_USB_MUSB_HOST)) && \
-	(defined(CONFIG_AM335X_USB0) || defined(CONFIG_AM335X_USB1)) && \
-	(!CONFIG_IS_ENABLED(DM_USB) || !CONFIG_IS_ENABLED(OF_CONTROL)) && \
-	(!defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_MUSB_NEW_SUPPORT))
+#if (defined(CONFIG_AM335X_USB0) || defined(CONFIG_AM335X_USB1)) && \
+	defined(CONFIG_SPL_BUILD)
 
 static struct musb_hdrc_config musb_config = {
 	.multipoint     = 1,
@@ -213,8 +217,8 @@ static struct musb_hdrc_config musb_config = {
 	.ram_bits       = 12,
 };
 
-#if CONFIG_IS_ENABLED(DM_USB) && !CONFIG_IS_ENABLED(OF_CONTROL)
-static struct ti_musb_platdata usb0 = {
+#ifdef CONFIG_AM335X_USB0
+static struct ti_musb_plat usb0 = {
 	.base = (void *)USB0_OTG_BASE,
 	.ctrl_mod_base = &((struct ctrl_dev *)CTRL_DEVICE_BASE)->usb_ctrl0,
 	.plat = {
@@ -223,8 +227,10 @@ static struct ti_musb_platdata usb0 = {
 		.platform_ops	= &musb_dsps_ops,
 		},
 };
+#endif
 
-static struct ti_musb_platdata usb1 = {
+#ifdef CONFIG_AM335X_USB1
+static struct ti_musb_plat usb1 = {
 	.base = (void *)USB1_OTG_BASE,
 	.ctrl_mod_base = &((struct ctrl_dev *)CTRL_DEVICE_BASE)->usb_ctrl1,
 	.plat = {
@@ -233,16 +239,17 @@ static struct ti_musb_platdata usb1 = {
 		.platform_ops	= &musb_dsps_ops,
 		},
 };
+#endif
 
-U_BOOT_DEVICES(am33xx_usbs) = {
-#if CONFIG_AM335X_USB0_MODE == MUSB_PERIPHERAL
+U_BOOT_DRVINFOS(am33xx_usbs) = {
+#ifdef CONFIG_AM335X_USB0_PERIPHERAL
 	{ "ti-musb-peripheral", &usb0 },
-#elif CONFIG_AM335X_USB0_MODE == MUSB_HOST
+#elif defined(CONFIG_AM335X_USB0_HOST)
 	{ "ti-musb-host", &usb0 },
 #endif
-#if CONFIG_AM335X_USB1_MODE == MUSB_PERIPHERAL
+#ifdef CONFIG_AM335X_USB1_PERIPHERAL
 	{ "ti-musb-peripheral", &usb1 },
-#elif CONFIG_AM335X_USB1_MODE == MUSB_HOST
+#elif defined(CONFIG_AM335X_USB1_HOST)
 	{ "ti-musb-host", &usb1 },
 #endif
 };
@@ -251,77 +258,6 @@ int arch_misc_init(void)
 {
 	return 0;
 }
-#else
-static struct ctrl_dev *cdev = (struct ctrl_dev *)CTRL_DEVICE_BASE;
-
-/* USB 2.0 PHY Control */
-#define CM_PHY_PWRDN			(1 << 0)
-#define CM_PHY_OTG_PWRDN		(1 << 1)
-#define OTGVDET_EN			(1 << 19)
-#define OTGSESSENDEN			(1 << 20)
-
-static void am33xx_usb_set_phy_power(u8 on, u32 *reg_addr)
-{
-	if (on) {
-		clrsetbits_le32(reg_addr, CM_PHY_PWRDN | CM_PHY_OTG_PWRDN,
-				OTGVDET_EN | OTGSESSENDEN);
-	} else {
-		clrsetbits_le32(reg_addr, 0, CM_PHY_PWRDN | CM_PHY_OTG_PWRDN);
-	}
-}
-
-#ifdef CONFIG_AM335X_USB0
-static void am33xx_otg0_set_phy_power(struct udevice *dev, u8 on)
-{
-	am33xx_usb_set_phy_power(on, &cdev->usb_ctrl0);
-}
-
-struct omap_musb_board_data otg0_board_data = {
-	.set_phy_power = am33xx_otg0_set_phy_power,
-};
-
-static struct musb_hdrc_platform_data otg0_plat = {
-	.mode           = CONFIG_AM335X_USB0_MODE,
-	.config         = &musb_config,
-	.power          = 50,
-	.platform_ops	= &musb_dsps_ops,
-	.board_data	= &otg0_board_data,
-};
-#endif
-
-#ifdef CONFIG_AM335X_USB1
-static void am33xx_otg1_set_phy_power(struct udevice *dev, u8 on)
-{
-	am33xx_usb_set_phy_power(on, &cdev->usb_ctrl1);
-}
-
-struct omap_musb_board_data otg1_board_data = {
-	.set_phy_power = am33xx_otg1_set_phy_power,
-};
-
-static struct musb_hdrc_platform_data otg1_plat = {
-	.mode           = CONFIG_AM335X_USB1_MODE,
-	.config         = &musb_config,
-	.power          = 50,
-	.platform_ops	= &musb_dsps_ops,
-	.board_data	= &otg1_board_data,
-};
-#endif
-
-int arch_misc_init(void)
-{
-#ifdef CONFIG_AM335X_USB0
-	musb_register(&otg0_plat, &otg0_board_data,
-		(void *)USB0_OTG_BASE);
-#endif
-#ifdef CONFIG_AM335X_USB1
-	musb_register(&otg1_plat, &otg1_board_data,
-		(void *)USB1_OTG_BASE);
-#endif
-	return 0;
-}
-#endif
-
 #else	/* CONFIG_USB_MUSB_* && CONFIG_AM335X_USB* && !CONFIG_DM_USB */
 
 int arch_misc_init(void)
@@ -346,7 +282,7 @@ int arch_misc_init(void)
 
 #endif /* CONFIG_USB_MUSB_* && CONFIG_AM335X_USB* && !CONFIG_DM_USB */
 
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT)
 
 #if defined(CONFIG_SPL_AM33XX_ENABLE_RTC32K_OSC) || \
 	(defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_RTC_DDR_SUPPORT))
@@ -591,11 +527,12 @@ void board_init_f(ulong dummy)
 
 #endif
 
-int arch_cpu_init_dm(void)
+static int am33xx_dm_post_init(void *ctx, struct event *event)
 {
 	hw_data_init();
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT)
 	early_system_init();
 #endif
 	return 0;
 }
+EVENT_SPY(EVT_DM_POST_INIT, am33xx_dm_post_init);

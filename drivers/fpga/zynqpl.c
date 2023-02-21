@@ -315,7 +315,7 @@ static u32 *zynq_align_dma_buffer(u32 *buf, u32 len, u32 swap)
 		if (new_buf > buf) {
 			debug("%s: Aligned buffer is after buffer start\n",
 			      __func__);
-			new_buf -= ARCH_DMA_MINALIGN;
+			new_buf = (u32 *)((u32)new_buf - ARCH_DMA_MINALIGN);
 		}
 		printf("%s: Align buffer at %x to %x(swap %d)\n", __func__,
 		       (u32)buf, (u32)new_buf, swap);
@@ -371,7 +371,7 @@ static int zynq_validate_bitstream(xilinx_desc *desc, const void *buf,
 }
 
 static int zynq_load(xilinx_desc *desc, const void *buf, size_t bsize,
-		     bitstream_type bstype)
+		     bitstream_type bstype, int flags)
 {
 	unsigned long ts; /* Timestamp */
 	u32 isr_status, swap;

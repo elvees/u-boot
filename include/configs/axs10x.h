@@ -18,18 +18,10 @@
 /*
  * Memory configuration
  */
-#define CONFIG_SYS_MONITOR_BASE		CONFIG_SYS_TEXT_BASE
 
 #define CONFIG_SYS_DDR_SDRAM_BASE	0x80000000
 #define CONFIG_SYS_SDRAM_BASE		CONFIG_SYS_DDR_SDRAM_BASE
 #define CONFIG_SYS_SDRAM_SIZE		SZ_512M
-
-#define CONFIG_SYS_INIT_SP_ADDR		\
-	(CONFIG_SYS_SDRAM_BASE + 0x1000 - GENERATED_GBL_DATA_SIZE)
-
-#define CONFIG_SYS_MALLOC_LEN		SZ_2M
-#define CONFIG_SYS_BOOTM_LEN		SZ_128M
-#define CONFIG_SYS_LOAD_ADDR		0x82000000
 
 /*
  * UART configuration
@@ -45,8 +37,6 @@
 /*
  * USB 1.1 configuration
  */
-#define CONFIG_USB_OHCI_NEW
-#define CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS 1
 
 /*
  * Environment settings
@@ -58,12 +48,6 @@
 		"\"Fail to upgrade.\n" \
 		"Do you have u-boot-update.img and u-boot.head on first (FAT) SD card partition?\"" \
 		"; fi\0"
-
-/*
- * Environment configuration
- */
-#define CONFIG_BOOTFILE			"uImage"
-#define CONFIG_LOADADDR			CONFIG_SYS_LOAD_ADDR
 
 /*
  * Console configuration

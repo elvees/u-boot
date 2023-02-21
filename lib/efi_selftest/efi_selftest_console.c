@@ -46,11 +46,10 @@ static void mac(void *pointer, u16 **buf)
 /*
  * printx() - print hexadecimal number to an u16 string
  *
- * @pointer:	pointer
+ * @p:		value to print
  * @prec:	minimum number of digits to print
  * @buf:	pointer to buffer address,
  *		on return position of terminating zero word
- * @size:	size of value to be printed in bytes
  */
 static void printx(u64 p, int prec, u16 **buf)
 {
@@ -69,6 +68,28 @@ static void printx(u64 p, int prec, u16 **buf)
 	}
 	*pos = 0;
 	*buf = pos;
+}
+
+/**
+ * print_guid() - print GUID to an u16 string
+ *
+ * @p:		GUID to print
+ * @buf:	pointer to buffer address,
+ *		on return position of terminating zero word
+ */
+static void print_uuid(u8 *p, u16 **buf)
+{
+	int i;
+	const u8 seq[] = {
+		3, 2, 1, 0, '-', 5, 4, '-', 7, 6, '-',
+		8, 9, 10, 11, 12, 13, 14, 15 };
+
+	for (i = 0; i < sizeof(seq); ++i) {
+		if (seq[i] == '-')
+			*(*buf)++ = u'-';
+		else
+			printx(p[seq[i]], 2, buf);
+	}
 }
 
 /*
@@ -213,6 +234,9 @@ void efi_st_printc(int color, const char *fmt, ...)
 					con_out->output_string(con_out, u);
 					pos = buf;
 					break;
+				case 'U':
+					print_uuid(va_arg(args, void*), &pos);
+					break;
 				default:
 					--c;
 					printx((uintptr_t)va_arg(args, void *),
@@ -250,7 +274,7 @@ void efi_st_printc(int color, const char *fmt, ...)
 /*
  * Reads an Unicode character from the input device.
  *
- * @return: Unicode character
+ * Return: Unicode character
  */
 u16 efi_st_get_key(void)
 {

@@ -22,6 +22,7 @@ xilinx_desc fpga = {
 	.family = xilinx_zynq,
 	.iface = devcfg,
 	.operations = &zynq_op,
+	.flags = FPGA_LEGACY,
 };
 #endif
 
@@ -78,7 +79,7 @@ unsigned int zynq_get_silicon_version(void)
 						>> ZYNQ_SILICON_VER_SHIFT;
 }
 
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 	zynq_slcr_cpu_reset();
 	while (1)

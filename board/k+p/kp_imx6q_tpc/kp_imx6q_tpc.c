@@ -12,6 +12,7 @@
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/mx6-pins.h>
 #include <asm/arch/sys_proto.h>
+#include <asm/global_data.h>
 #include <asm/mach-imx/boot_mode.h>
 #include <env.h>
 #include <errno.h>
@@ -135,9 +136,6 @@ int board_late_init(void)
 #ifdef CONFIG_CMD_BMODE
 	add_board_boot_modes(board_boot_modes);
 #endif
-
-	if (IS_ENABLED(CONFIG_LED))
-		led_default_state();
 
 	env_set("boardname", "kp-tpc");
 	env_set("boardsoc", "imx6q");

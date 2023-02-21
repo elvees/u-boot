@@ -44,18 +44,6 @@ static int ti_sci_power_domain_probe(struct udevice *dev)
 	return 0;
 }
 
-static int ti_sci_power_domain_request(struct power_domain *pd)
-{
-	debug("%s(pd=%p)\n", __func__, pd);
-	return 0;
-}
-
-static int ti_sci_power_domain_free(struct power_domain *pd)
-{
-	debug("%s(pd=%p)\n", __func__, pd);
-	return 0;
-}
-
 static int ti_sci_power_domain_on(struct power_domain *pd)
 {
 	struct ti_sci_power_domain_data *data = dev_get_priv(pd->dev);
@@ -123,8 +111,6 @@ static const struct udevice_id ti_sci_power_domain_of_match[] = {
 };
 
 static struct power_domain_ops ti_sci_power_domain_ops = {
-	.request = ti_sci_power_domain_request,
-	.rfree = ti_sci_power_domain_free,
 	.on = ti_sci_power_domain_on,
 	.off = ti_sci_power_domain_off,
 	.of_xlate = ti_sci_power_domain_of_xlate,
@@ -135,6 +121,6 @@ U_BOOT_DRIVER(ti_sci_pm_domains) = {
 	.id = UCLASS_POWER_DOMAIN,
 	.of_match = ti_sci_power_domain_of_match,
 	.probe = ti_sci_power_domain_probe,
-	.priv_auto_alloc_size = sizeof(struct ti_sci_power_domain_data),
+	.priv_auto	= sizeof(struct ti_sci_power_domain_data),
 	.ops = &ti_sci_power_domain_ops,
 };

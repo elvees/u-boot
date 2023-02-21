@@ -11,6 +11,7 @@
 #include <charset.h>
 #include <log.h>
 #include <malloc.h>
+#include <efi_default_filename.h>
 #include <efi_loader.h>
 #include <efi_variable.h>
 #include <asm/unaligned.h>
@@ -31,170 +32,140 @@ static const struct efi_runtime_services *rs;
  */
 
 /**
- * efi_set_load_options() - set the load options of a loaded image
+ * expand_media_path() - expand a device path for default file name
+ * @device_path:	device path to check against
  *
- * @handle:		the image handle
- * @load_options_size:	size of load options
- * @load_options:	pointer to load options
- * Return:		status code
+ * If @device_path is a media or disk partition which houses a file
+ * system, this function returns a full device path which contains
+ * an architecture-specific default file name for removable media.
+ *
+ * Return:	a newly allocated device path
  */
-efi_status_t efi_set_load_options(efi_handle_t handle,
-				  efi_uintn_t load_options_size,
-				  void *load_options)
+static
+struct efi_device_path *expand_media_path(struct efi_device_path *device_path)
 {
-	struct efi_loaded_image *loaded_image_info;
-	efi_status_t ret;
+	struct efi_device_path *dp, *rem, *full_path;
+	efi_handle_t handle;
 
-	ret = EFI_CALL(systab.boottime->open_protocol(
-					handle,
-					&efi_guid_loaded_image,
-					(void **)&loaded_image_info,
-					efi_root, NULL,
-					EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL));
-	if (ret != EFI_SUCCESS)
-		return EFI_INVALID_PARAMETER;
+	if (!device_path)
+		return NULL;
 
-	loaded_image_info->load_options = load_options;
-	loaded_image_info->load_options_size = load_options_size;
+	/*
+	 * If device_path is a (removable) media or partition which provides
+	 * simple file system protocol, append a default file name to support
+	 * booting from removable media.
+	 */
+	dp = device_path;
+	handle = efi_dp_find_obj(dp, &efi_simple_file_system_protocol_guid,
+				 &rem);
+	if (handle) {
+		if (rem->type == DEVICE_PATH_TYPE_END) {
+			dp = efi_dp_from_file(NULL, 0,
+					      "/EFI/BOOT/" BOOTEFI_NAME);
+			full_path = efi_dp_append(device_path, dp);
+			efi_free_pool(dp);
+		} else {
+			full_path = efi_dp_dup(device_path);
+		}
+	} else {
+		full_path = efi_dp_dup(device_path);
+	}
 
-	return EFI_CALL(systab.boottime->close_protocol(handle,
-							&efi_guid_loaded_image,
-							efi_root, NULL));
+	return full_path;
 }
 
+/**
+ * try_load_from_file_path() - try to load a file
+ *
+ * Given a file media path iterate through a list of handles and try to
+ * to load the file from each of them until the first success.
+ *
+ * @fs_handles: array of handles with the simple file protocol
+ * @num:	number of handles in fs_handles
+ * @fp:		file path to open
+ * @handle:	on return pointer to handle for loaded image
+ * @removable:	if true only consider removable media, else only non-removable
+ */
+static efi_status_t try_load_from_file_path(efi_handle_t *fs_handles,
+					    efi_uintn_t num,
+					    struct efi_device_path *fp,
+					    efi_handle_t *handle,
+					    bool removable)
+{
+	struct efi_handler *handler;
+	struct efi_device_path *dp;
+	int i;
+	efi_status_t ret;
+
+	for (i = 0; i < num; i++) {
+		if (removable != efi_disk_is_removable(fs_handles[i]))
+			continue;
+
+		ret = efi_search_protocol(fs_handles[i], &efi_guid_device_path,
+					  &handler);
+		if (ret != EFI_SUCCESS)
+			continue;
+
+		dp = handler->protocol_interface;
+		if (!dp)
+			continue;
+
+		dp = efi_dp_append(dp, fp);
+		if (!dp)
+			continue;
+
+		ret = EFI_CALL(efi_load_image(true, efi_root, dp, NULL, 0,
+					      handle));
+		efi_free_pool(dp);
+		if (ret == EFI_SUCCESS)
+			return ret;
+	}
+
+	return EFI_NOT_FOUND;
+}
 
 /**
- * efi_deserialize_load_option() - parse serialized data
+ * try_load_from_short_path
+ * @fp:		file path
+ * @handle:	pointer to handle for newly installed image
  *
- * Parse serialized data describing a load option and transform it to the
- * efi_load_option structure.
+ * Enumerate all the devices which support file system operations,
+ * prepend its media device path to the file path, @fp, and
+ * try to load the file.
+ * This function should be called when handling a short-form path
+ * which is starting with a file device path.
  *
- * @lo:		pointer to target
- * @data:	serialized data
- * @size:	size of the load option, on return size of the optional data
  * Return:	status code
  */
-efi_status_t efi_deserialize_load_option(struct efi_load_option *lo, u8 *data,
-					 efi_uintn_t *size)
+static efi_status_t try_load_from_short_path(struct efi_device_path *fp,
+					     efi_handle_t *handle)
 {
-	efi_uintn_t len;
-
-	len = sizeof(u32);
-	if (*size < len + 2 * sizeof(u16))
-		return EFI_INVALID_PARAMETER;
-	lo->attributes = get_unaligned_le32(data);
-	data += len;
-	*size -= len;
-
-	len = sizeof(u16);
-	lo->file_path_length = get_unaligned_le16(data);
-	data += len;
-	*size -= len;
-
-	lo->label = (u16 *)data;
-	len = u16_strnlen(lo->label, *size / sizeof(u16) - 1);
-	if (lo->label[len])
-		return EFI_INVALID_PARAMETER;
-	len = (len + 1) * sizeof(u16);
-	if (*size < len)
-		return EFI_INVALID_PARAMETER;
-	data += len;
-	*size -= len;
-
-	len = lo->file_path_length;
-	if (*size < len)
-		return EFI_INVALID_PARAMETER;
-	lo->file_path = (struct efi_device_path *)data;
-	if (efi_dp_check_length(lo->file_path, len) < 0)
-		return EFI_INVALID_PARAMETER;
-	data += len;
-	*size -= len;
-
-	lo->optional_data = data;
-
-	return EFI_SUCCESS;
-}
-
-/**
- * efi_serialize_load_option() - serialize load option
- *
- * Serialize efi_load_option structure into byte stream for BootXXXX.
- *
- * @data:	buffer for serialized data
- * @lo:		load option
- * Return:	size of allocated buffer
- */
-unsigned long efi_serialize_load_option(struct efi_load_option *lo, u8 **data)
-{
-	unsigned long label_len;
-	unsigned long size;
-	u8 *p;
-
-	label_len = (u16_strlen(lo->label) + 1) * sizeof(u16);
-
-	/* total size */
-	size = sizeof(lo->attributes);
-	size += sizeof(lo->file_path_length);
-	size += label_len;
-	size += lo->file_path_length;
-	if (lo->optional_data)
-		size += (utf8_utf16_strlen((const char *)lo->optional_data)
-					   + 1) * sizeof(u16);
-	p = malloc(size);
-	if (!p)
-		return 0;
-
-	/* copy data */
-	*data = p;
-	memcpy(p, &lo->attributes, sizeof(lo->attributes));
-	p += sizeof(lo->attributes);
-
-	memcpy(p, &lo->file_path_length, sizeof(lo->file_path_length));
-	p += sizeof(lo->file_path_length);
-
-	memcpy(p, lo->label, label_len);
-	p += label_len;
-
-	memcpy(p, lo->file_path, lo->file_path_length);
-	p += lo->file_path_length;
-
-	if (lo->optional_data) {
-		utf8_utf16_strcpy((u16 **)&p, (const char *)lo->optional_data);
-		p += sizeof(u16); /* size of trailing \0 */
-	}
-	return size;
-}
-
-/**
- * get_var() - get UEFI variable
- *
- * It is the caller's duty to free the returned buffer.
- *
- * @name:	name of variable
- * @vendor:	vendor GUID of variable
- * @size:	size of allocated buffer
- * Return:	buffer with variable data or NULL
- */
-static void *get_var(u16 *name, const efi_guid_t *vendor,
-		     efi_uintn_t *size)
-{
+	efi_handle_t *fs_handles;
+	efi_uintn_t num;
 	efi_status_t ret;
-	void *buf = NULL;
 
-	*size = 0;
-	ret = efi_get_variable_int(name, vendor, NULL, size, buf, NULL);
-	if (ret == EFI_BUFFER_TOO_SMALL) {
-		buf = malloc(*size);
-		ret = efi_get_variable_int(name, vendor, NULL, size, buf, NULL);
-	}
+	ret = EFI_CALL(efi_locate_handle_buffer(
+					BY_PROTOCOL,
+					&efi_simple_file_system_protocol_guid,
+					NULL,
+					&num, &fs_handles));
+	if (ret != EFI_SUCCESS)
+		return ret;
+	if (!num)
+		return EFI_NOT_FOUND;
 
-	if (ret != EFI_SUCCESS) {
-		free(buf);
-		*size = 0;
-		return NULL;
-	}
+	/* removable media first */
+	ret = try_load_from_file_path(fs_handles, num, fp, handle, true);
+	if (ret == EFI_SUCCESS)
+		goto out;
 
-	return buf;
+	/* fixed media */
+	ret = try_load_from_file_path(fs_handles, num, fp, handle, false);
+	if (ret == EFI_SUCCESS)
+		goto out;
+
+out:
+	return ret;
 }
 
 /**
@@ -213,18 +184,14 @@ static efi_status_t try_load_entry(u16 n, efi_handle_t *handle,
 				   void **load_options)
 {
 	struct efi_load_option lo;
-	u16 varname[] = L"Boot0000";
-	u16 hexmap[] = L"0123456789ABCDEF";
+	u16 varname[9];
 	void *load_option;
 	efi_uintn_t size;
 	efi_status_t ret;
 
-	varname[4] = hexmap[(n & 0xf000) >> 12];
-	varname[5] = hexmap[(n & 0x0f00) >> 8];
-	varname[6] = hexmap[(n & 0x00f0) >> 4];
-	varname[7] = hexmap[(n & 0x000f) >> 0];
+	efi_create_indexed_name(varname, sizeof(varname), "Boot", n);
 
-	load_option = get_var(varname, &efi_global_variable_guid, &size);
+	load_option = efi_get_var(varname, &efi_global_variable_guid, &size);
 	if (!load_option)
 		return EFI_LOAD_ERROR;
 
@@ -235,13 +202,21 @@ static efi_status_t try_load_entry(u16 n, efi_handle_t *handle,
 	}
 
 	if (lo.attributes & LOAD_OPTION_ACTIVE) {
+		struct efi_device_path *file_path;
 		u32 attributes;
 
-		log_debug("%s: trying to load \"%ls\" from %pD\n",
-			  __func__, lo.label, lo.file_path);
+		log_debug("trying to load \"%ls\" from %pD\n", lo.label,
+			  lo.file_path);
 
-		ret = EFI_CALL(efi_load_image(true, efi_root, lo.file_path,
-					      NULL, 0, handle));
+		if (EFI_DP_TYPE(lo.file_path, MEDIA_DEVICE, FILE_PATH)) {
+			/* file_path doesn't contain a device path */
+			ret = try_load_from_short_path(lo.file_path, handle);
+		} else {
+			file_path = expand_media_path(lo.file_path);
+			ret = EFI_CALL(efi_load_image(true, efi_root, file_path,
+						      NULL, 0, handle));
+			efi_free_pool(file_path);
+		}
 		if (ret != EFI_SUCCESS) {
 			log_warning("Loading %ls '%ls' failed\n",
 				    varname, lo.label);
@@ -250,14 +225,16 @@ static efi_status_t try_load_entry(u16 n, efi_handle_t *handle,
 
 		attributes = EFI_VARIABLE_BOOTSERVICE_ACCESS |
 			     EFI_VARIABLE_RUNTIME_ACCESS;
-		ret = efi_set_variable_int(L"BootCurrent",
+		ret = efi_set_variable_int(u"BootCurrent",
 					   &efi_global_variable_guid,
 					   attributes, sizeof(n), &n, false);
-		if (ret != EFI_SUCCESS) {
-			if (EFI_CALL(efi_unload_image(*handle))
-			    != EFI_SUCCESS)
-				log_err("Unloading image failed\n");
-			goto error;
+		if (ret != EFI_SUCCESS)
+			goto unload;
+		/* try to register load file2 for initrd's */
+		if (IS_ENABLED(CONFIG_EFI_LOAD_FILE2_INITRD)) {
+			ret = efi_initrd_register();
+			if (ret != EFI_SUCCESS)
+				goto unload;
 		}
 
 		log_info("Booting: %ls\n", lo.label);
@@ -279,6 +256,13 @@ static efi_status_t try_load_entry(u16 n, efi_handle_t *handle,
 	}
 
 error:
+	free(load_option);
+
+	return ret;
+
+unload:
+	if (EFI_CALL(efi_unload_image(*handle)) != EFI_SUCCESS)
+		log_err("Unloading image failed\n");
 	free(load_option);
 
 	return ret;
@@ -307,7 +291,7 @@ efi_status_t efi_bootmgr_load(efi_handle_t *handle, void **load_options)
 
 	/* BootNext */
 	size = sizeof(bootnext);
-	ret = efi_get_variable_int(L"BootNext",
+	ret = efi_get_variable_int(u"BootNext",
 				   &efi_global_variable_guid,
 				   NULL, &size, &bootnext, NULL);
 	if (ret == EFI_SUCCESS || ret == EFI_BUFFER_TOO_SMALL) {
@@ -316,7 +300,7 @@ efi_status_t efi_bootmgr_load(efi_handle_t *handle, void **load_options)
 			log_err("BootNext must be 16-bit integer\n");
 
 		/* delete BootNext */
-		ret = efi_set_variable_int(L"BootNext",
+		ret = efi_set_variable_int(u"BootNext",
 					   &efi_global_variable_guid,
 					   0, 0, NULL, false);
 
@@ -336,7 +320,7 @@ efi_status_t efi_bootmgr_load(efi_handle_t *handle, void **load_options)
 	}
 
 	/* BootOrder */
-	bootorder = get_var(L"BootOrder", &efi_global_variable_guid, &size);
+	bootorder = efi_get_var(u"BootOrder", &efi_global_variable_guid, &size);
 	if (!bootorder) {
 		log_info("BootOrder not defined\n");
 		ret = EFI_NOT_FOUND;
@@ -345,8 +329,7 @@ efi_status_t efi_bootmgr_load(efi_handle_t *handle, void **load_options)
 
 	num = size / sizeof(uint16_t);
 	for (i = 0; i < num; i++) {
-		log_debug("%s trying to load Boot%04X\n", __func__,
-			  bootorder[i]);
+		log_debug("trying to load Boot%04X\n", bootorder[i]);
 		ret = try_load_entry(bootorder[i], handle, load_options);
 		if (ret == EFI_SUCCESS)
 			break;

@@ -158,8 +158,8 @@ static int dm_test_devres_phase(struct unit_test_state *uts)
 	ut_asserteq(1, stats.allocs);
 	ut_asserteq(TEST_DEVRES_SIZE, stats.total_size);
 
-	/* Getting platdata should add one allocation */
-	ut_assertok(device_ofdata_to_platdata(dev));
+	/* Getting plat should add one allocation */
+	ut_assertok(device_of_to_plat(dev));
 	devres_get_stats(dev, &stats);
 	ut_asserteq(2, stats.allocs);
 	ut_asserteq(TEST_DEVRES_SIZE + TEST_DEVRES_SIZE3, stats.total_size);
@@ -178,11 +178,8 @@ static int dm_test_devres_phase(struct unit_test_state *uts)
 	ut_asserteq(1, stats.allocs);
 	ut_asserteq(TEST_DEVRES_SIZE, stats.total_size);
 
-	/* Unbinding removes the other. Note this access a freed pointer */
+	/* Unbinding removes the other. */
 	device_unbind(dev);
-	devres_get_stats(dev, &stats);
-	ut_asserteq(0, stats.allocs);
-	ut_asserteq(0, stats.total_size);
 
 	return 0;
 }

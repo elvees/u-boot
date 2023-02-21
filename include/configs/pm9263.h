@@ -5,7 +5,7 @@
  * Lead Tech Design <www.leadtechdesign.com>
  * Ilko Iliev <www.ronetix.at>
  *
- * Configuation settings for the RONETIX PM9263 board.
+ * Configuration settings for the RONETIX PM9263 board.
  */
 
 #ifndef __CONFIG_H
@@ -24,10 +24,6 @@
 #define MAIN_PLL_DIV		2	/* 2 or 4 */
 #define CONFIG_SYS_AT91_MAIN_CLOCK	18432000
 #define CONFIG_SYS_AT91_SLOW_CLOCK	32768		/* slow clock xtal */
-
-#define CONFIG_SYS_AT91_CPU_NAME	"AT91SAM9263"
-
-#define CONFIG_MACH_TYPE	MACH_TYPE_PM9263
 
 /* clocks */
 #define CONFIG_SYS_MOR_VAL						\
@@ -140,31 +136,11 @@
 		 AT91_WDT_MR_WDDIS |				\
 		 AT91_WDT_MR_WDD(0xfff))
 
-#define CONFIG_CMDLINE_TAG	1	/* enable passing of ATAGs */
-#define CONFIG_SETUP_MEMORY_TAGS 1
-#define CONFIG_INITRD_TAG	1
-
-#undef CONFIG_SKIP_LOWLEVEL_INIT
-#define CONFIG_USER_LOWLEVEL_INIT	1
-
 /*
  * Hardware drivers
  */
 /* LCD */
 #define LCD_BPP				LCD_COLOR8
-#define CONFIG_LCD_LOGO			1
-#undef LCD_TEST_PATTERN
-#define CONFIG_LCD_INFO			1
-#define CONFIG_LCD_INFO_BELOW_LOGO	1
-#define CONFIG_ATMEL_LCD		1
-#define CONFIG_ATMEL_LCD_BGR555		1
-
-#define CONFIG_LCD_IN_PSRAM		1
-
-/*
- * BOOTP options
- */
-#define CONFIG_BOOTP_BOOTFILESIZE	1
 
 /* SDRAM */
 #define PHYS_SDRAM		0x20000000
@@ -173,8 +149,6 @@
 /* NOR flash, if populated */
 #define PHYS_FLASH_1			0x10000000
 #define CONFIG_SYS_FLASH_BASE		PHYS_FLASH_1
-#define CONFIG_SYS_MAX_FLASH_SECT	256
-#define CONFIG_SYS_MAX_FLASH_BANKS	1
 
 /* NAND flash */
 #ifdef CONFIG_CMD_NAND
@@ -190,11 +164,6 @@
 
 #endif
 
-#define CONFIG_JFFS2_NAND		1
-#define CONFIG_JFFS2_DEV		"nand0" /* NAND device jffs2 lives on */
-#define CONFIG_JFFS2_PART_OFFSET	0	/* start of jffs2 partition */
-#define CONFIG_JFFS2_PART_SIZE		(256 * 1024 * 1024) /* partition size*/
-
 /* PSRAM */
 #define	PHYS_PSRAM			0x70000000
 #define	PHYS_PSRAM_SIZE			0x00400000	/* 4MB */
@@ -204,59 +173,14 @@
 					 AT91_MATRIX_SCFG_DEFMSTR_TYPE_FIXED	| \
 					 AT91_MATRIX_SCFG_SLOT_CYCLE(255))
 
-/* Ethernet */
-#define CONFIG_MACB			1
-#define CONFIG_RMII			1
-#define CONFIG_NET_RETRY_COUNT		20
-#define CONFIG_RESET_PHY_R		1
-
 /* USB */
-#define CONFIG_USB_ATMEL
-#define CONFIG_USB_ATMEL_CLK_SEL_PLLB
-#define CONFIG_USB_OHCI_NEW			1
-#define CONFIG_SYS_USB_OHCI_CPU_INIT		1
 #define CONFIG_SYS_USB_OHCI_REGS_BASE		0x00a00000	/* AT91SAM9263_UHP_BASE */
-#define CONFIG_SYS_USB_OHCI_SLOT_NAME		"at91sam9263"
-#define CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS	2
-
-#define CONFIG_SYS_LOAD_ADDR			0x22000000	/* load address */
-
-#define CONFIG_SYS_USE_FLASH	1
-#undef CONFIG_SYS_USE_DATAFLASH
-#undef CONFIG_SYS_USE_NANDFLASH
-
-#ifdef CONFIG_SYS_USE_DATAFLASH
-
-/* bootstrap + u-boot + env + linux in dataflash on CS0 */
-#define CONFIG_BOOTCOMMAND	"sf probe 0; " \
-				"sf read 0x22000000 0x84000 0x294000; " \
-				"bootm 0x22000000"
-
-#elif defined(CONFIG_SYS_USE_NANDFLASH) /* CFG_USE_NANDFLASH */
-
-/* bootstrap + u-boot + env + linux in nandflash */
-#define CONFIG_BOOTCOMMAND	"nand read 0x22000000 0xA0000 0x200000; bootm"
-
-#elif defined(CONFIG_SYS_USE_FLASH) /* CFG_USE_FLASH */
-/* JFFS Partition offset set */
-#define CONFIG_SYS_JFFS2_FIRST_BANK	0
-#define CONFIG_SYS_JFFS2_NUM_BANKS	1
-
-/* 512k reserved for u-boot */
-#define CONFIG_SYS_JFFS2_FIRST_SECTOR	11
-
-#define CONFIG_BOOTCOMMAND		"run flashboot"
-#define CONFIG_ROOTPATH			"/ronetix/rootfs"
-
-#define CONFIG_CON_ROT			"fbcon=rotate:3 "
 
 #define CONFIG_EXTRA_ENV_SETTINGS				\
-	"mtdids=" CONFIG_MTDIDS_DEFAULT "\0"				\
-	"mtdparts=" CONFIG_MTDPARTS_DEFAULT "\0"			\
 	"partition=nand0,0\0"					\
 	"ramargs=setenv bootargs $(bootargs) $(mtdparts)\0"	\
 	"nfsargs=setenv bootargs root=/dev/nfs rw "		\
-		CONFIG_CON_ROT					\
+		"fbcon=rotate:3 "				\
 		"nfsroot=$(serverip):$(rootpath) $(mtdparts)\0"	\
 	"addip=setenv bootargs $(bootargs) "			\
 		"ip=$(ipaddr):$(serverip):$(gatewayip):$(netmask)"\
@@ -268,17 +192,6 @@
 	"flashboot=run ramargs;run addip;bootm 0x10050000\0"	\
 	""
 
-#else
-#error "Undefined memory device"
-#endif
-
-/*
- * Size of malloc() pool
- */
-#define CONFIG_SYS_MALLOC_LEN	ROUND(3 * CONFIG_ENV_SIZE + 128 * 1024, 0x1000)
-
 #define CONFIG_SYS_SDRAM_BASE	PHYS_SDRAM
-#define CONFIG_SYS_INIT_SP_ADDR	(CONFIG_SYS_SDRAM_BASE + 16 * 1024 - \
-				GENERATED_GBL_DATA_SIZE)
 
 #endif

@@ -32,21 +32,10 @@
 #define CONFIG_SYS_AT91_MAIN_CLOCK	16000000/* 16.0 MHz crystal */
 
 /* Misc CPU related */
-#define CONFIG_SKIP_LOWLEVEL_INIT
-#define CONFIG_SETUP_MEMORY_TAGS
-#define CONFIG_INITRD_TAG
-#define CONFIG_SERIAL_TAG
-#define CONFIG_REVISION_TAG
-#define CONFIG_CMDLINE_TAG			/* enable passing of ATAGs */
 
 /*
  * Hardware drivers
  */
-
-/*
- * BOOTP options
- */
-#define CONFIG_BOOTP_BOOTFILESIZE
 
 /*
  * SDRAM: 1 bank, min 32, max 128 MB
@@ -58,15 +47,8 @@
 #define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM
 #define CONFIG_SYS_SDRAM_SIZE		PHYS_SDRAM_SIZE
 
-#define CONFIG_SYS_LOAD_ADDR		(CONFIG_SYS_SDRAM_BASE + 0x00100000)
-
-/*
- * Initial stack pointer: 4k - GENERATED_GBL_DATA_SIZE in internal SRAM,
- * leaving the correct space for initial global data structure above
- * that address while providing maximum stack area below.
- */
-#define CONFIG_SYS_INIT_SP_ADDR \
-	(ATMEL_BASE_SRAM0 + 16 * 1024 - GENERATED_GBL_DATA_SIZE)
+#define CONFIG_SYS_INIT_RAM_ADDR	ATMEL_BASE_SRAM0
+#define CONFIG_SYS_INIT_RAM_SIZE	(16 * 1024)
 
 /* NAND flash */
 #ifdef CONFIG_CMD_NAND
@@ -79,31 +61,7 @@
 # define CONFIG_SYS_NAND_READY_PIN		GPIO_PIN_PA(22)
 #endif
 
-/* Ethernet */
-#define CONFIG_MACB
-#define CONFIG_RMII
-#define CONFIG_NET_RETRY_COUNT			20
-#undef CONFIG_RESET_PHY_R
-
 /* hw-controller addresses */
 #define CONFIG_ET1100_BASE		0x70000000
-
-#ifdef CONFIG_SYS_USE_DATAFLASH
-
-/* bootstrap + u-boot + env in dataflash on CS0 */
-
-#elif CONFIG_SYS_USE_NANDFLASH
-
-/* bootstrap + u-boot + env + linux in nandflash */
-
-#endif
-
-#define CONFIG_SYS_CBSIZE		512
-
-/*
- * Size of malloc() pool
- */
-#define CONFIG_SYS_MALLOC_LEN		ROUND(3 * CONFIG_ENV_SIZE + \
-					128*1024, 0x1000)
 
 #endif

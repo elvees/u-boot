@@ -53,8 +53,8 @@ static int dm_test_eth_alias(struct unit_test_state *uts)
 	ut_assertok(net_loop(PING));
 	ut_asserteq_str("eth@10004000", env_get("ethact"));
 
-	/* Expected to fail since eth2 is not defined in the device tree */
-	env_set("ethact", "eth2");
+	/* Expected to fail since eth1 is not defined in the device tree */
+	env_set("ethact", "eth1");
 	ut_assertok(net_loop(PING));
 	ut_asserteq_str("eth@10002000", env_get("ethact"));
 
@@ -147,6 +147,35 @@ static int dm_test_eth_act(struct unit_test_state *uts)
 }
 DM_TEST(dm_test_eth_act, UT_TESTF_SCAN_FDT);
 
+/* Ensure that all addresses are loaded properly */
+static int dm_test_ethaddr(struct unit_test_state *uts)
+{
+	static const char *const addr[] = {
+		"02:00:11:22:33:44",
+		"02:00:11:22:33:48", /* dsa slave */
+		"02:00:11:22:33:45",
+		"02:00:11:22:33:48", /* dsa master */
+		"02:00:11:22:33:46",
+		"02:00:11:22:33:47",
+		"02:00:11:22:33:48", /* dsa slave */
+		"02:00:11:22:33:49",
+	};
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(addr); i++) {
+		char addrname[10];
+
+		if (i)
+			snprintf(addrname, sizeof(addrname), "eth%daddr", i + 1);
+		else
+			strcpy(addrname, "ethaddr");
+		ut_asserteq_str(addr[i], env_get(addrname));
+	}
+
+	return 0;
+}
+DM_TEST(dm_test_ethaddr, UT_TESTF_SCAN_FDT);
+
 /* The asserts include a return on fail; cleanup in the caller */
 static int _dm_test_eth_rotate1(struct unit_test_state *uts)
 {
@@ -227,7 +256,7 @@ static int _dm_test_net_retry(struct unit_test_state *uts)
 	 * the active device should be eth0
 	 */
 	sandbox_eth_disable_response(1, true);
-	env_set("ethact", "eth@10004000");
+	env_set("ethact", "lan1");
 	env_set("netretry", "yes");
 	sandbox_eth_skip_timeout();
 	ut_assertok(net_loop(PING));
@@ -237,11 +266,11 @@ static int _dm_test_net_retry(struct unit_test_state *uts)
 	 * eth1 is disabled and netretry is no, so the ping should fail and the
 	 * active device should be eth1
 	 */
-	env_set("ethact", "eth@10004000");
+	env_set("ethact", "lan1");
 	env_set("netretry", "no");
 	sandbox_eth_skip_timeout();
 	ut_asserteq(-ENONET, net_loop(PING));
-	ut_asserteq_str("eth@10004000", env_get("ethact"));
+	ut_asserteq_str("lan1", env_get("ethact"));
 
 	return 0;
 }

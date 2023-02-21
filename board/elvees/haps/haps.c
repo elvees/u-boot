@@ -4,6 +4,7 @@
  */
 
 #include <common.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <linux/kernel.h>
 #include <asm/sections.h>
@@ -26,7 +27,7 @@ int dram_init_banksize(void)
 /* If external DTB is passed to U-Boot, use it. Otherwise use
  * DTB appended to U-Boot image (default U-Boot behavior).
  */
-void *board_fdt_blob_setup(void)
+void *board_fdt_blob_setup(int *err)
 {
 	void *fdt_blob = NULL;
 
@@ -35,6 +36,7 @@ void *board_fdt_blob_setup(void)
 	else
 		fdt_blob = (ulong *)&_end;
 
+	*err = 0;
 	return fdt_blob;
 }
 

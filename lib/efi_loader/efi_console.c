@@ -5,6 +5,8 @@
  *  Copyright (c) 2016 Alexander Graf
  */
 
+#define LOG_CATEGORY LOGC_EFI
+
 #include <common.h>
 #include <charset.h>
 #include <malloc.h>
@@ -12,6 +14,7 @@
 #include <dm/device.h>
 #include <efi_loader.h>
 #include <env.h>
+#include <log.h>
 #include <stdio_dev.h>
 #include <video_console.h>
 #include <linux/delay.h>
@@ -24,6 +27,8 @@ struct cout_mode {
 	unsigned long rows;
 	int present;
 };
+
+__maybe_unused static struct efi_object uart_obj;
 
 static struct cout_mode efi_cout_modes[] = {
 	/* EFI Mode 0 is 80x25 and always present */
@@ -56,7 +61,12 @@ const efi_guid_t efi_guid_text_output_protocol =
 #define cESC '\x1b'
 #define ESC "\x1b"
 
-/* Default to mode 0 */
+/*
+ * efi_con_mode - mode information of the Simple Text Output Protocol
+ *
+ * Use safe settings before efi_setup_console_size() is called.
+ * By default enable only the 80x25 mode which must always exist.
+ */
 static struct simple_text_output_mode efi_con_mode = {
 	.max_mode = 1,
 	.mode = 0,
@@ -141,12 +151,12 @@ static int term_read_reply(int *n, int num, char end_char)
  */
 static efi_status_t EFIAPI efi_cout_output_string(
 			struct efi_simple_text_output_protocol *this,
-			const efi_string_t string)
+			const u16 *string)
 {
 	struct simple_text_output_mode *con = &efi_con_mode;
 	struct cout_mode *mode = &efi_cout_modes[con->mode];
 	char *buf, *pos;
-	u16 *p;
+	const u16 *p;
 	efi_status_t ret = EFI_SUCCESS;
 
 	EFI_ENTRY("%p, %p", this, string);
@@ -230,7 +240,7 @@ out:
  */
 static efi_status_t EFIAPI efi_cout_test_string(
 			struct efi_simple_text_output_protocol *this,
-			const efi_string_t string)
+			const u16 *string)
 {
 	EFI_ENTRY("%p, %p", this, string);
 	return EFI_EXIT(EFI_SUCCESS);
@@ -254,7 +264,7 @@ static bool cout_mode_matches(struct cout_mode *mode, int rows, int cols)
 }
 
 /**
- * query_console_serial() - query console size
+ * query_console_serial() - query serial console size
  *
  * When using a serial console or the net console we can only devise the
  * terminal size by querying the terminal using ECMA-48 control sequences.
@@ -300,29 +310,56 @@ out:
 }
 
 /**
- * query_console_size() - update the mode table.
+ * query_vidconsole() - query video console size
+ *
+ *
+ * @rows:	pointer to return number of rows
+ * @cols:	pointer to return number of columns
+ * Returns:	0 on success
+ */
+static int __maybe_unused query_vidconsole(int *rows, int *cols)
+{
+	const char *stdout_name = env_get("stdout");
+	struct stdio_dev *stdout_dev;
+	struct udevice *dev;
+	struct vidconsole_priv *priv;
+
+	if (!stdout_name || strncmp(stdout_name, "vidconsole", 10))
+		return -ENODEV;
+	stdout_dev = stdio_get_by_name("vidconsole");
+	if (!stdout_dev)
+		return -ENODEV;
+	dev = stdout_dev->priv;
+	if (!dev)
+		return -ENODEV;
+	priv = dev_get_uclass_priv(dev);
+	if (!priv)
+		return -ENODEV;
+	*rows = priv->rows;
+	*cols = priv->cols;
+	return 0;
+}
+
+/**
+ * efi_setup_console_size() - update the mode table.
  *
  * By default the only mode available is 80x25. If the console has at least 50
  * lines, enable mode 80x50. If we can query the console size and it is neither
  * 80x25 nor 80x50, set it as an additional mode.
  */
-static void query_console_size(void)
+void efi_setup_console_size(void)
 {
-	const char *stdout_name = env_get("stdout");
 	int rows = 25, cols = 80;
+	int ret = -ENODEV;
 
-	if (stdout_name && !strcmp(stdout_name, "vidconsole") &&
-	    IS_ENABLED(CONFIG_DM_VIDEO)) {
-		struct stdio_dev *stdout_dev =
-			stdio_get_by_name("vidconsole");
-		struct udevice *dev = stdout_dev->priv;
-		struct vidconsole_priv *priv =
-			dev_get_uclass_priv(dev);
-		rows = priv->rows;
-		cols = priv->cols;
-	} else if (query_console_serial(&rows, &cols)) {
+	if (IS_ENABLED(CONFIG_DM_VIDEO))
+		ret = query_vidconsole(&rows, &cols);
+	if (ret)
+		ret = query_console_serial(&rows, &cols);
+	if (ret)
 		return;
-	}
+
+	log_debug("Console size %dx%d\n", rows, cols);
 
 	/* Test if we can have Mode 1 */
 	if (cols >= 80 && rows >= 50) {
@@ -343,7 +380,6 @@ static void query_console_size(void)
 		efi_con_mode.mode = EFI_COUT_MODE_2;
 	}
 }
-
 
 /**
  * efi_cout_query_mode() - get terminal size for a text mode
@@ -495,11 +531,11 @@ static efi_status_t EFIAPI efi_cout_reset(
 {
 	EFI_ENTRY("%p, %d", this, extended_verification);
 
-	/* Clear screen */
-	EFI_CALL(efi_cout_clear_screen(this));
 	/* Set default colors */
 	efi_con_mode.attribute = 0x07;
 	printf(ESC "[0;37;40m");
+	/* Clear screen */
+	EFI_CALL(efi_cout_clear_screen(this));
 
 	return EFI_EXIT(EFI_SUCCESS);
 }
@@ -951,12 +987,14 @@ static efi_status_t EFIAPI efi_cin_read_key_stroke_ex(
 	efi_cin_check();
 
 	if (!key_available) {
+		memset(key_data, 0, sizeof(struct efi_key_data));
 		ret = EFI_NOT_READY;
 		goto out;
 	}
 	/*
 	 * CTRL+A - CTRL+Z have to be signaled as a - z.
 	 * SHIFT+CTRL+A - SHIFT+CTRL+Z have to be signaled as A - Z.
+	 * CTRL+\ - CTRL+_ have to be signaled as \ - _.
 	 */
 	switch (next_key.key.unicode_char) {
 	case 0x01 ... 0x07:
@@ -969,6 +1007,9 @@ static efi_status_t EFIAPI efi_cin_read_key_stroke_ex(
 			next_key.key.unicode_char += 0x40;
 		else
 			next_key.key.unicode_char += 0x60;
+		break;
+	case 0x1c ... 0x1f:
+			next_key.key.unicode_char += 0x40;
 	}
 	*key_data = next_key;
 	key_available = false;
@@ -1233,37 +1274,30 @@ static void EFIAPI efi_key_notify(struct efi_event *event, void *context)
 efi_status_t efi_console_register(void)
 {
 	efi_status_t r;
-	efi_handle_t console_output_handle;
-	efi_handle_t console_input_handle;
+	struct efi_device_path *dp;
 
-	/* Set up mode information */
-	query_console_size();
+	/* Install protocols on root node */
+	r = EFI_CALL(efi_install_multiple_protocol_interfaces
+		     (&efi_root,
+		      &efi_guid_text_output_protocol, &efi_con_out,
+		      &efi_guid_text_input_protocol, &efi_con_in,
+		      &efi_guid_text_input_ex_protocol, &efi_con_in_ex,
+		      NULL));
 
-	/* Create handles */
-	r = efi_create_handle(&console_output_handle);
-	if (r != EFI_SUCCESS)
-		goto out_of_memory;
+	/* Create console node and install device path protocols */
+	if (CONFIG_IS_ENABLED(DM_SERIAL)) {
+		dp = efi_dp_from_uart();
+		if (!dp)
+			goto out_of_memory;
 
-	r = efi_add_protocol(console_output_handle,
-			     &efi_guid_text_output_protocol, &efi_con_out);
-	if (r != EFI_SUCCESS)
-		goto out_of_memory;
-	systab.con_out_handle = console_output_handle;
-	systab.stderr_handle = console_output_handle;
+		/* Hook UART up to the device list */
+		efi_add_handle(&uart_obj);
 
-	r = efi_create_handle(&console_input_handle);
-	if (r != EFI_SUCCESS)
-		goto out_of_memory;
-
-	r = efi_add_protocol(console_input_handle,
-			     &efi_guid_text_input_protocol, &efi_con_in);
-	if (r != EFI_SUCCESS)
-		goto out_of_memory;
-	systab.con_in_handle = console_input_handle;
-	r = efi_add_protocol(console_input_handle,
-			     &efi_guid_text_input_ex_protocol, &efi_con_in_ex);
-	if (r != EFI_SUCCESS)
-		goto out_of_memory;
+		/* Install device path */
+		r = efi_add_protocol(&uart_obj, &efi_guid_device_path, dp);
+		if (r != EFI_SUCCESS)
+			goto out_of_memory;
+	}
 
 	/* Create console events */
 	r = efi_create_event(EVT_NOTIFY_WAIT, TPL_CALLBACK, efi_key_notify,

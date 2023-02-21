@@ -128,7 +128,7 @@ struct higmac_priv {
 
 static int higmac_write_hwaddr(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct higmac_priv *priv = dev_get_priv(dev);
 	unsigned char *mac = pdata->enetaddr;
 	u32 val;
@@ -528,7 +528,7 @@ static int higmac_probe(struct udevice *dev)
 	bus->priv = priv;
 	priv->bus = bus;
 
-	ret = mdio_register_seq(bus, dev->seq);
+	ret = mdio_register_seq(bus, dev_seq(dev));
 	if (ret)
 		return ret;
 
@@ -558,22 +558,17 @@ static int higmac_remove(struct udevice *dev)
 	return 0;
 }
 
-static int higmac_ofdata_to_platdata(struct udevice *dev)
+static int higmac_of_to_plat(struct udevice *dev)
 {
 	struct higmac_priv *priv = dev_get_priv(dev);
-	int phyintf = PHY_INTERFACE_MODE_NONE;
-	const char *phy_mode;
 	ofnode phy_node;
 
 	priv->base = dev_remap_addr_index(dev, 0);
 	priv->macif_ctrl = dev_remap_addr_index(dev, 1);
 
-	phy_mode = dev_read_string(dev, "phy-mode");
-	if (phy_mode)
-		phyintf = phy_get_interface_by_name(phy_mode);
-	if (phyintf == PHY_INTERFACE_MODE_NONE)
+	priv->phyintf = dev_read_phy_mode(dev);
+	if (priv->phyintf == PHY_INTERFACE_MODE_NA)
 		return -ENODEV;
-	priv->phyintf = phyintf;
 
 	phy_node = dev_read_subnode(dev, "phy");
 	if (!ofnode_valid(phy_node)) {
@@ -594,10 +589,10 @@ U_BOOT_DRIVER(eth_higmac) = {
 	.name	= "eth_higmac",
 	.id	= UCLASS_ETH,
 	.of_match = higmac_ids,
-	.ofdata_to_platdata = higmac_ofdata_to_platdata,
+	.of_to_plat = higmac_of_to_plat,
 	.probe	= higmac_probe,
 	.remove	= higmac_remove,
 	.ops	= &higmac_ops,
-	.priv_auto_alloc_size = sizeof(struct higmac_priv),
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
+	.priv_auto	= sizeof(struct higmac_priv),
+	.plat_auto	= sizeof(struct eth_pdata),
 };

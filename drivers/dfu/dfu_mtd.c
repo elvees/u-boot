@@ -12,16 +12,31 @@
 #include <mtd.h>
 #include <jffs2/load_kernel.h>
 #include <linux/err.h>
+#include <linux/ctype.h>
 
 static bool mtd_is_aligned_with_block_size(struct mtd_info *mtd, u64 size)
 {
 	return !do_div(size, mtd->erasesize);
 }
 
+/* Logic taken from cmd/mtd.c:mtd_oob_write_is_empty() */
+static bool mtd_page_is_empty(struct mtd_oob_ops *op)
+{
+	int i;
+
+	for (i = 0; i < op->len; i++)
+		if (op->datbuf[i] != 0xff)
+			return false;
+
+	/* oob is not used, with MTD_OPS_AUTO_OOB & ooblen=0 */
+
+	return true;
+}
+
 static int mtd_block_op(enum dfu_op op, struct dfu_entity *dfu,
 			u64 offset, void *buf, long *len)
 {
-	u64 off, lim, remaining;
+	u64 off, lim, remaining, lock_ofs, lock_len;
 	struct mtd_info *mtd = dfu->data.mtd.info;
 	struct mtd_oob_ops io_op = {};
 	int ret = 0;
@@ -34,7 +49,7 @@ static int mtd_block_op(enum dfu_op op, struct dfu_entity *dfu,
 		return 0;
 	}
 
-	off = dfu->data.mtd.start + offset + dfu->bad_skip;
+	off = lock_ofs = dfu->data.mtd.start + offset + dfu->bad_skip;
 	lim = dfu->data.mtd.start + dfu->data.mtd.size;
 
 	if (off >= lim) {
@@ -56,11 +71,18 @@ static int mtd_block_op(enum dfu_op op, struct dfu_entity *dfu,
 	if (op == DFU_OP_WRITE) {
 		struct erase_info erase_op = {};
 
-		remaining = round_up(*len, mtd->erasesize);
+		remaining = lock_len = round_up(*len, mtd->erasesize);
 		erase_op.mtd = mtd;
 		erase_op.addr = off;
 		erase_op.len = mtd->erasesize;
 		erase_op.scrub = 0;
+
+		debug("Unlocking the mtd device\n");
+		ret = mtd_unlock(mtd, lock_ofs, lock_len);
+		if (ret && ret != -EOPNOTSUPP) {
+			printf("MTD device unlock failed\n");
+			return 0;
+		}
 
 		while (remaining) {
 			if (erase_op.addr + remaining > lim) {
@@ -122,8 +144,14 @@ static int mtd_block_op(enum dfu_op op, struct dfu_entity *dfu,
 
 		if (op == DFU_OP_READ)
 			ret = mtd_read_oob(mtd, off, &io_op);
-		else
+		else if (has_pages && dfu->data.mtd.ubi && mtd_page_is_empty(&io_op)) {
+			/* in case of ubi partition, do not write an empty page, only skip it */
+			ret = 0;
+			io_op.retlen = mtd->writesize;
+			io_op.oobretlen = mtd->oobsize;
+		} else {
 			ret = mtd_write_oob(mtd, off, &io_op);
+		}
 
 		if (ret) {
 			printf("Failure while %s at offset 0x%llx\n",
@@ -139,6 +167,15 @@ static int mtd_block_op(enum dfu_op op, struct dfu_entity *dfu,
 			io_op.len = mtd->writesize;
 	}
 
+	if (op == DFU_OP_WRITE) {
+		/* Write done, lock again */
+		debug("Locking the mtd device\n");
+		ret = mtd_lock(mtd, lock_ofs, lock_len);
+		if (ret == -EOPNOTSUPP)
+			ret = 0;
+		else if (ret)
+			printf("MTD device lock failed\n");
+	}
 	return ret;
 }
 
@@ -190,7 +227,7 @@ static int dfu_flush_medium_mtd(struct dfu_entity *dfu)
 	int ret;
 
 	/* in case of ubi partition, erase rest of the partition */
-	if (dfu->data.nand.ubi) {
+	if (dfu->data.mtd.ubi) {
 		struct erase_info erase_op = {};
 
 		erase_op.mtd = dfu->data.mtd.info;
@@ -228,17 +265,16 @@ static unsigned int dfu_polltimeout_mtd(struct dfu_entity *dfu)
 	 * ubi partition, as sectors which are not used need
 	 * to be erased
 	 */
-	if (dfu->data.nand.ubi)
+	if (dfu->data.mtd.ubi)
 		return DFU_MANIFEST_POLL_TIMEOUT;
 
 	return DFU_DEFAULT_POLL_TIMEOUT;
 }
 
-int dfu_fill_entity_mtd(struct dfu_entity *dfu, char *devstr, char *s)
+int dfu_fill_entity_mtd(struct dfu_entity *dfu, char *devstr, char **argv, int argc)
 {
-	char *st;
+	char *s;
 	struct mtd_info *mtd;
-	bool has_pages;
 	int ret, part;
 
 	mtd = get_mtd_device_nm(devstr);
@@ -248,25 +284,34 @@ int dfu_fill_entity_mtd(struct dfu_entity *dfu, char *devstr, char *s)
 
 	dfu->dev_type = DFU_DEV_MTD;
 	dfu->data.mtd.info = mtd;
+	dfu->max_buf_size = mtd->erasesize;
+	if (argc < 1)
+		return -EINVAL;
 
-	has_pages = mtd->type == MTD_NANDFLASH || mtd->type == MTD_MLCNANDFLASH;
-	dfu->max_buf_size = has_pages ? mtd->erasesize : 0;
-
-	st = strsep(&s, " ");
-	if (!strcmp(st, "raw")) {
+	if (!strcmp(argv[0], "raw")) {
+		if (argc != 3)
+			return -EINVAL;
 		dfu->layout = DFU_RAW_ADDR;
-		dfu->data.mtd.start = simple_strtoul(s, &s, 16);
-		s++;
-		dfu->data.mtd.size = simple_strtoul(s, &s, 16);
-	} else if ((!strcmp(st, "part")) || (!strcmp(st, "partubi"))) {
+		dfu->data.mtd.start = hextoul(argv[1], &s);
+		if (*s)
+			return -EINVAL;
+		dfu->data.mtd.size = hextoul(argv[2], &s);
+		if (*s)
+			return -EINVAL;
+	} else if ((!strcmp(argv[0], "part")) || (!strcmp(argv[0], "partubi"))) {
 		char mtd_id[32];
 		struct mtd_device *mtd_dev;
 		u8 part_num;
 		struct part_info *pi;
 
+		if (argc != 2)
+			return -EINVAL;
+
 		dfu->layout = DFU_RAW_ADDR;
 
-		part = simple_strtoul(s, &s, 10);
+		part = dectoul(argv[1], &s);
+		if (*s)
+			return -EINVAL;
 
 		sprintf(mtd_id, "%s,%d", devstr, part - 1);
 		printf("using id '%s'\n", mtd_id);
@@ -281,10 +326,10 @@ int dfu_fill_entity_mtd(struct dfu_entity *dfu, char *devstr, char *s)
 
 		dfu->data.mtd.start = pi->offset;
 		dfu->data.mtd.size = pi->size;
-		if (!strcmp(st, "partubi"))
+		if (!strcmp(argv[0], "partubi"))
 			dfu->data.mtd.ubi = 1;
 	} else {
-		printf("%s: Memory layout (%s) not supported!\n", __func__, st);
+		printf("%s: Memory layout (%s) not supported!\n", __func__, argv[0]);
 		return -1;
 	}
 

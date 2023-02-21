@@ -14,6 +14,7 @@
 #include <command.h>
 #include <time.h>
 #include <watchdog.h>
+#include <asm/global_data.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -320,6 +321,7 @@ static int cread_line(const char *const prompt, char *buf, unsigned int *len,
 					act = ESC_CONVERTED;
 					break;	/* pass off to ^N handler */
 				case '1':
+				case '2':
 				case '3':
 				case '4':
 				case '7':
@@ -331,7 +333,8 @@ static int cread_line(const char *const prompt, char *buf, unsigned int *len,
 					break;
 				}
 			} else if (esc_len == 3) {
-				if (ichar == '~') {
+				switch (ichar) {
+				case '~':
 					switch (esc_save[2]) {
 					case '3':	/* Delete key */
 						ichar = CTL_CH('d');
@@ -348,9 +351,25 @@ static int cread_line(const char *const prompt, char *buf, unsigned int *len,
 						act = ESC_CONVERTED;
 						break;	/* pass to ^E handler */
 					}
+					break;
+				case '0':
+					if (esc_save[2] == '2')
+						act = ESC_SAVE;
+					break;
+				}
+			} else if (esc_len == 4) {
+				switch (ichar) {
+				case '0':
+				case '1':
+					act = ESC_SAVE;
+					break;		/* bracketed paste */
+				}
+			} else if (esc_len == 5) {
+				if (ichar == '~') {	/* bracketed paste */
+					ichar = 0;
+					act = ESC_CONVERTED;
 				}
 			}
-
 			switch (act) {
 			case ESC_SAVE:
 				esc_save[esc_len++] = ichar;
@@ -493,8 +512,10 @@ static int cread_line(const char *const prompt, char *buf, unsigned int *len,
 		}
 #endif
 		default:
-			cread_add_char(ichar, insert, &num, &eol_num, buf,
-				       *len);
+			if (ichar >= ' ' && ichar <= '~') {
+				cread_add_char(ichar, insert, &num, &eol_num,
+					       buf, *len);
+			}
 			break;
 		}
 	}

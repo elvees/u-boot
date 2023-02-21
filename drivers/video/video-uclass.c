@@ -3,6 +3,8 @@
  * Copyright (c) 2015 Google, Inc
  */
 
+#define LOG_CATEGORY UCLASS_VIDEO
+
 #include <common.h>
 #include <console.h>
 #include <cpu_func.h>
@@ -14,7 +16,9 @@
 #include <video.h>
 #include <video_console.h>
 #include <asm/cache.h>
+#include <asm/global_data.h>
 #include <dm/lists.h>
+#include <dm/device_compat.h>
 #include <dm/device-internal.h>
 #include <dm/uclass-internal.h>
 #ifdef CONFIG_SANDBOX
@@ -25,11 +29,12 @@
  * Theory of operation:
  *
  * Before relocation each device is bound. The driver for each device must
- * set the @align and @size values in struct video_uc_platdata. This
+ * set the @align and @size values in struct video_uc_plat. This
  * information represents the requires size and alignment of the frame buffer
  * for the device. The values can be an over-estimate but cannot be too
  * small. The actual values will be suppled (in the same manner) by the bind()
- * method after relocation.
+ * method after relocation. Additionally driver can allocate frame buffer
+ * itself by setting plat->base.
  *
  * This information is then picked up by video_reserve() which works out how
  * much memory is needed for all devices. This is allocated between
@@ -68,10 +73,14 @@ void video_set_flush_dcache(struct udevice *dev, bool flush)
 
 static ulong alloc_fb(struct udevice *dev, ulong *addrp)
 {
-	struct video_uc_platdata *plat = dev_get_uclass_platdata(dev);
+	struct video_uc_plat *plat = dev_get_uclass_plat(dev);
 	ulong base, align, size;
 
 	if (!plat->size)
+		return 0;
+
+	/* Allow drivers to allocate the frame buffer themselves */
+	if (plat->base)
 		return 0;
 
 	align = plat->align ? plat->align : 1 << 20;
@@ -142,7 +151,7 @@ int video_clear(struct udevice *dev)
 	if (ret)
 		return ret;
 
-	return 0;
+	return video_sync(dev, false);
 }
 
 void video_set_default_colors(struct udevice *dev, bool invert)
@@ -172,8 +181,17 @@ void video_set_default_colors(struct udevice *dev, bool invert)
 }
 
 /* Flush video activity to the caches */
-void video_sync(struct udevice *vid, bool force)
+int video_sync(struct udevice *vid, bool force)
 {
+	struct video_ops *ops = video_get_ops(vid);
+	int ret;
+
+	if (ops && ops->video_sync) {
+		ret = ops->video_sync(vid);
+		if (ret)
+			return ret;
+	}
+
 	/*
 	 * flush_dcache_range() is declared in common.h but it seems that some
 	 * architectures do not actually implement it. Is there a way to find
@@ -191,14 +209,31 @@ void video_sync(struct udevice *vid, bool force)
 	struct video_priv *priv = dev_get_uclass_priv(vid);
 	static ulong last_sync;
 
-	if (force || get_timer(last_sync) > 10) {
+	if (force || get_timer(last_sync) > 100) {
 		sandbox_sdl_sync(priv->fb);
 		last_sync = get_timer(0);
 	}
 #endif
+	return 0;
 }
 
 void video_sync_all(void)
+{
+	struct udevice *dev;
+	int ret;
+
+	for (uclass_find_first_device(UCLASS_VIDEO, &dev);
+	     dev;
+	     uclass_find_next_device(&dev)) {
+		if (device_active(dev)) {
+			ret = video_sync(dev, true);
+			if (ret)
+				dev_dbg(dev, "Video sync failed\n");
+		}
+	}
+}
+
+bool video_is_active(void)
 {
 	struct udevice *dev;
 
@@ -206,8 +241,10 @@ void video_sync_all(void)
 	     dev;
 	     uclass_find_next_device(&dev)) {
 		if (device_active(dev))
-			video_sync(dev, true);
+			return true;
 	}
+
+	return false;
 }
 
 int video_get_xsize(struct udevice *dev)
@@ -247,10 +284,10 @@ int video_sync_copy(struct udevice *dev, void *from, void *to)
 		 */
 		if (offset < -priv->fb_size || offset > 2 * priv->fb_size) {
 #ifdef DEBUG
-			char str[80];
+			char str[120];
 
 			snprintf(str, sizeof(str),
-				 "[sync_copy fb=%p, from=%p, to=%p, offset=%lx]",
+				 "[** FAULT sync_copy fb=%p, from=%p, to=%p, offset=%lx]",
 				 priv->fb, from, to, offset);
 			console_puts_select_stderr(true, str);
 #endif
@@ -275,25 +312,32 @@ int video_sync_copy(struct udevice *dev, void *from, void *to)
 
 	return 0;
 }
-#endif
 
-/* Set up the colour map */
-static int video_pre_probe(struct udevice *dev)
+int video_sync_copy_all(struct udevice *dev)
 {
 	struct video_priv *priv = dev_get_uclass_priv(dev);
 
-	priv->cmap = calloc(256, sizeof(ushort));
-	if (!priv->cmap)
-		return -ENOMEM;
+	video_sync_copy(dev, priv->fb, priv->fb + priv->fb_size);
 
 	return 0;
 }
 
-static int video_pre_remove(struct udevice *dev)
-{
-	struct video_priv *priv = dev_get_uclass_priv(dev);
+#endif
 
-	free(priv->cmap);
+#define SPLASH_DECL(_name) \
+	extern u8 __splash_ ## _name ## _begin[]; \
+	extern u8 __splash_ ## _name ## _end[]
+
+#define SPLASH_START(_name)	__splash_ ## _name ## _begin
+
+SPLASH_DECL(u_boot_logo);
+
+static int show_splash(struct udevice *dev)
+{
+	u8 *data = SPLASH_START(u_boot_logo);
+	int ret;
+
+	ret = video_bmp_display(dev, map_to_sysmem(data), -4, 4, true);
 
 	return 0;
 }
@@ -301,7 +345,7 @@ static int video_pre_remove(struct udevice *dev)
 /* Set up the display ready for use */
 static int video_post_probe(struct udevice *dev)
 {
-	struct video_uc_platdata *plat = dev_get_uclass_platdata(dev);
+	struct video_uc_plat *plat = dev_get_uclass_plat(dev);
 	struct video_priv *priv = dev_get_uclass_priv(dev);
 	char name[30], drv[15], *str;
 	const char *drv_name = drv;
@@ -363,6 +407,15 @@ static int video_post_probe(struct udevice *dev)
 		return ret;
 	}
 
+	if (IS_ENABLED(CONFIG_VIDEO_LOGO) &&
+	    !IS_ENABLED(CONFIG_SPLASH_SCREEN) && !plat->hide_logo) {
+		ret = show_splash(dev);
+		if (ret) {
+			log_debug("Cannot show splash screen\n");
+			return ret;
+		}
+	}
+
 	return 0;
 };
 
@@ -378,7 +431,7 @@ static int video_post_bind(struct udevice *dev)
 		return 0;
 
 	/* Set up the video pointer, if this is the first device */
-	uc_priv = dev->uclass->priv;
+	uc_priv = uclass_get_priv(dev->uclass);
 	if (!uc_priv->video_ptr)
 		uc_priv->video_ptr = gd->video_top;
 
@@ -405,10 +458,8 @@ UCLASS_DRIVER(video) = {
 	.name		= "video",
 	.flags		= DM_UC_FLAG_SEQ_ALIAS,
 	.post_bind	= video_post_bind,
-	.pre_probe	= video_pre_probe,
 	.post_probe	= video_post_probe,
-	.pre_remove	= video_pre_remove,
-	.priv_auto_alloc_size	= sizeof(struct video_uc_priv),
-	.per_device_auto_alloc_size	= sizeof(struct video_priv),
-	.per_device_platdata_auto_alloc_size = sizeof(struct video_uc_platdata),
+	.priv_auto	= sizeof(struct video_uc_priv),
+	.per_device_auto	= sizeof(struct video_priv),
+	.per_device_plat_auto	= sizeof(struct video_uc_plat),
 };

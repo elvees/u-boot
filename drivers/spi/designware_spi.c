@@ -113,7 +113,7 @@
 
 #define RX_TIMEOUT			1000		/* timeout in ms */
 
-struct dw_spi_platdata {
+struct dw_spi_plat {
 	s32 frequency;		/* Default clock frequency, -1 for none */
 	void __iomem *regs;
 };
@@ -194,6 +194,20 @@ static int dw_spi_apb_init(struct udevice *bus, struct dw_spi_priv *priv)
 	return 0;
 }
 
+static int dw_spi_apb_k210_init(struct udevice *bus, struct dw_spi_priv *priv)
+{
+	/*
+	 * The Canaan Kendryte K210 SoC DW apb_ssi v4 spi controller is
+	 * documented to have a 32 word deep TX and RX FIFO, which
+	 * spi_hw_init() detects. However, when the RX FIFO is filled up to
+	 * 32 entries (RXFLR = 32), an RX FIFO overrun error occurs. Avoid
+	 * this problem by force setting fifo_len to 31.
+	 */
+	priv->fifo_len = 31;
+
+	return dw_spi_apb_init(bus, priv);
+}
+
 static int dw_spi_dwc_init(struct udevice *bus, struct dw_spi_priv *priv)
 {
 	priv->max_xfer = 32;
@@ -228,9 +242,9 @@ static int request_gpio_cs(struct udevice *bus)
 	return 0;
 }
 
-static int dw_spi_ofdata_to_platdata(struct udevice *bus)
+static int dw_spi_of_to_plat(struct udevice *bus)
 {
-	struct dw_spi_platdata *plat = bus->platdata;
+	struct dw_spi_plat *plat = dev_get_plat(bus);
 
 	plat->regs = dev_read_addr_ptr(bus);
 	if (!plat->regs)
@@ -252,7 +266,7 @@ static int dw_spi_ofdata_to_platdata(struct udevice *bus)
 static void spi_hw_init(struct udevice *bus, struct dw_spi_priv *priv)
 {
 	dw_write(priv, DW_SPI_SSIENR, 0);
-	dw_write(priv, DW_SPI_IMR, 0xff);
+	dw_write(priv, DW_SPI_IMR, 0);
 	dw_write(priv, DW_SPI_SSIENR, 1);
 
 	/*
@@ -342,7 +356,7 @@ typedef int (*dw_spi_init_t)(struct udevice *bus, struct dw_spi_priv *priv);
 static int dw_spi_probe(struct udevice *bus)
 {
 	dw_spi_init_t init = (dw_spi_init_t)dev_get_driver_data(bus);
-	struct dw_spi_platdata *plat = dev_get_platdata(bus);
+	struct dw_spi_plat *plat = dev_get_plat(bus);
 	struct dw_spi_priv *priv = dev_get_priv(bus);
 	int ret;
 	u32 version;
@@ -572,7 +586,7 @@ static int dw_spi_exec_op(struct spi_slave *slave, const struct spi_mem_op *op)
 	int pos, i, ret = 0;
 	struct udevice *bus = slave->dev->parent;
 	struct dw_spi_priv *priv = dev_get_priv(bus);
-	u8 op_len = sizeof(op->cmd.opcode) + op->addr.nbytes + op->dummy.nbytes;
+	u8 op_len = op->cmd.nbytes + op->addr.nbytes + op->dummy.nbytes;
 	u8 op_buf[op_len];
 	u32 cr0;
 
@@ -665,7 +679,7 @@ static const struct spi_controller_mem_ops dw_spi_mem_ops = {
 
 static int dw_spi_set_speed(struct udevice *bus, uint speed)
 {
-	struct dw_spi_platdata *plat = dev_get_platdata(bus);
+	struct dw_spi_plat *plat = dev_get_plat(bus);
 	struct dw_spi_priv *priv = dev_get_priv(bus);
 	u16 clk_div;
 
@@ -718,7 +732,7 @@ static int dw_spi_remove(struct udevice *bus)
 	if (ret)
 		return ret;
 
-	ret = clk_free(&priv->clk);
+	clk_free(&priv->clk);
 	if (ret)
 		return ret;
 #endif
@@ -758,8 +772,8 @@ static const struct udevice_id dw_spi_ids[] = {
 	 */
 	{ .compatible = "altr,socfpga-spi", .data = (ulong)dw_spi_apb_init },
 	{ .compatible = "altr,socfpga-arria10-spi", .data = (ulong)dw_spi_apb_init },
-	{ .compatible = "canaan,kendryte-k210-spi", .data = (ulong)dw_spi_apb_init },
-	{ .compatible = "canaan,kendryte-k210-ssi", .data = (ulong)dw_spi_dwc_init },
+	{ .compatible = "canaan,k210-spi", .data = (ulong)dw_spi_apb_k210_init},
+	{ .compatible = "canaan,k210-ssi", .data = (ulong)dw_spi_dwc_init },
 	{ .compatible = "intel,stratix10-spi", .data = (ulong)dw_spi_apb_init },
 	{ .compatible = "intel,agilex-spi", .data = (ulong)dw_spi_apb_init },
 	{ .compatible = "mscc,ocelot-spi", .data = (ulong)dw_spi_apb_init },
@@ -774,9 +788,9 @@ U_BOOT_DRIVER(dw_spi) = {
 	.id = UCLASS_SPI,
 	.of_match = dw_spi_ids,
 	.ops = &dw_spi_ops,
-	.ofdata_to_platdata = dw_spi_ofdata_to_platdata,
-	.platdata_auto_alloc_size = sizeof(struct dw_spi_platdata),
-	.priv_auto_alloc_size = sizeof(struct dw_spi_priv),
+	.of_to_plat = dw_spi_of_to_plat,
+	.plat_auto	= sizeof(struct dw_spi_plat),
+	.priv_auto	= sizeof(struct dw_spi_priv),
 	.probe = dw_spi_probe,
 	.remove = dw_spi_remove,
 };

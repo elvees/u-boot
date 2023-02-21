@@ -1,8 +1,10 @@
 #include "skeleton.dtsi"
+#include <dt-bindings/interrupt-controller/irq.h>
 
 / {
 	model = "Atmel SAMA5D2 family SoC";
 	compatible = "atmel,sama5d2";
+	interrupt-parent = <&aic>;
 
 	aliases {
 		spi0 = &spi0;
@@ -32,7 +34,7 @@
 		#size-cells = <1>;
 		u-boot,dm-pre-reloc;
 
-		usb1: ohci@00400000 {
+		usb1: ohci@400000 {
 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
 			reg = <0x00400000 0x100000>;
 			clocks = <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
@@ -40,7 +42,7 @@
 			status = "disabled";
 		};
 
-		usb2: ehci@00500000 {
+		usb2: ehci@500000 {
 			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
 			reg = <0x00500000 0x100000>;
 			clocks = <&utmi>, <&uhphs_clk>;
@@ -361,6 +363,7 @@
 						#clock-cells = <0>;
 						reg = <35>;
 						atmel,clk-output-range = <0 83000000>;
+						u-boot,dm-pre-reloc;
 					};
 
 					tcb1_clk: tcb1_clk@36 {
@@ -638,6 +641,23 @@
 				status = "disabled";
 			};
 
+			tcb0: timer@f800c000 {
+				compatible = "atmel,sama5d2-tcb", "simple-mfd", "syscon";
+				reg = <0xf800c000 0x100>;
+				interrupts = <35 IRQ_TYPE_LEVEL_HIGH 0>;
+				clocks = <&tcb0_clk>, <&tcb0_gclk>, <&clk32k>;
+				clock-names = "t0_clk", "gclk", "slow_clk";
+				#address-cells = <1>;
+				#size-cells = <0>;
+				u-boot,dm-pre-reloc;
+
+				timer0: timer@0 {
+					compatible = "atmel,tcb-timer";
+					reg = <0>, <1>;
+					u-boot,dm-pre-reloc;
+				};
+			};
+
 			uart0: serial@f801c000 {
 				compatible = "atmel,at91sam9260-usart";
 				reg = <0xf801c000 0x100>;
@@ -668,6 +688,14 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				clocks = <&twi0_clk>;
+				status = "disabled";
+			};
+
+			pwm0: pwm@f802c000 {
+				compatible = "atmel,sama5d2-pwm";
+				reg = <0xf802c000 0x4000>;
+				clocks = <&pwm_clk>;
+				#pwm-cells = <3>;
 				status = "disabled";
 			};
 
@@ -752,6 +780,14 @@
 				clocks = <&uart4_clk>;
 				clock-names = "usart";
 				status = "disabled";
+			};
+
+			aic: interrupt-controller@fc020000 {
+				#interrupt-cells = <3>;
+				compatible = "atmel,sama5d2-aic";
+				interrupt-controller;
+				reg = <0xfc020000 0x200>;
+				atmel,external-irqs = <49>;
 			};
 
 			i2c1: i2c@fc028000 {

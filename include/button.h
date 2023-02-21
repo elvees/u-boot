@@ -6,6 +6,8 @@
 #ifndef __BUTTON_H
 #define __BUTTON_H
 
+struct udevice;
+
 /**
  * struct button_uc_plat - Platform data the uclass stores about each device
  *
@@ -44,7 +46,7 @@ struct button_ops {
  *
  * @label:	button label to look up
  * @devp:	Returns the associated device, if found
- * @return 0 if found, -ENODEV if not found, other -ve on error
+ * Return: 0 if found, -ENODEV if not found, other -ve on error
  */
 int button_get_by_label(const char *label, struct udevice **devp);
 
@@ -52,7 +54,7 @@ int button_get_by_label(const char *label, struct udevice **devp);
  * button_get_state() - get the state of a button
  *
  * @dev:	button device to change
- * @return button state button_state_t, or -ve on error
+ * Return: button state button_state_t, or -ve on error
  */
 enum button_state_t button_get_state(struct udevice *dev);
 

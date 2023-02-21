@@ -2,15 +2,12 @@
 /*
  * Copyright (C) 2013 - 2017 Markus Niebel <Markus.Niebel@tq-group.com>
  *
- * Configuration settings for the TQ Systems TQMa6<Q,D,DL,S> module on
+ * Configuration settings for the TQ-Systems TQMa6<Q,D,DL,S> module on
  * MBa6 starter kit
  */
 
 #ifndef __CONFIG_TQMA6_MBA6_H
 #define __CONFIG_TQMA6_MBA6_H
-
-#define CONFIG_FEC_XCV_TYPE		RGMII
-#define CONFIG_ETHPRIME			"FEC"
 
 #define CONFIG_FEC_MXC_PHYADDR		0x03
 

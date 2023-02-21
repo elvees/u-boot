@@ -8,8 +8,10 @@
 MINIMAL=
 
 ifdef CONFIG_SPL_BUILD
+ifndef CONFIG_TPL_BUILD
 ifdef CONFIG_SPL_INIT_MINIMAL
 MINIMAL=y
+endif
 endif
 endif
 
@@ -26,7 +28,7 @@ obj-y += cpu.o
 obj-y += cpu_init.o
 obj-y += speed.o
 obj-y += interrupts.o
-obj-y += ecc.o
+obj-$(CONFIG_DDR_ECC_CMD) += ecc.o
 ifndef CONFIG_PINCTRL
 obj-$(CONFIG_QE) += qe_io.o
 endif

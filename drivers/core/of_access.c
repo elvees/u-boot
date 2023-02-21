@@ -22,6 +22,7 @@
 #include <common.h>
 #include <log.h>
 #include <malloc.h>
+#include <asm/global_data.h>
 #include <linux/bug.h>
 #include <linux/libfdt.h>
 #include <dm/of_access.h>
@@ -342,24 +343,30 @@ static struct device_node *__of_find_node_by_path(struct device_node *parent,
 #define for_each_property_of_node(dn, pp) \
 	for (pp = dn->properties; pp != NULL; pp = pp->next)
 
-struct device_node *of_find_node_opts_by_path(const char *path,
+struct device_node *of_find_node_opts_by_path(struct device_node *root,
+					      const char *path,
 					      const char **opts)
 {
 	struct device_node *np = NULL;
 	struct property *pp;
 	const char *separator = strchr(path, ':');
 
+	if (!root)
+		root = gd->of_root;
 	if (opts)
 		*opts = separator ? separator + 1 : NULL;
 
 	if (strcmp(path, "/") == 0)
-		return of_node_get(gd->of_root);
+		return of_node_get(root);
 
 	/* The path could begin with an alias */
 	if (*path != '/') {
 		int len;
 		const char *p = separator;
 
+		/* Only allow alias processing on the control FDT */
+		if (root != gd->of_root)
+			return NULL;
 		if (!p)
 			p = strchrnul(path, '/');
 		len = p - path;
@@ -382,7 +389,7 @@ struct device_node *of_find_node_opts_by_path(const char *path,
 
 	/* Step down the tree matching path components */
 	if (!np)
-		np = of_node_get(gd->of_root);
+		np = of_node_get(root);
 	while (np && *path == '/') {
 		struct device_node *tmp = np;
 
@@ -462,7 +469,7 @@ struct device_node *of_find_node_by_phandle(phandle handle)
  * @propname:	name of the property to be searched.
  * @len:	requested length of property value
  *
- * @return the property value on success, -EINVAL if the property does not
+ * Return: the property value on success, -EINVAL if the property does not
  * exist, -ENODATA if property does not have a value, and -EOVERFLOW if the
  * property data isn't large enough.
  */
@@ -580,7 +587,8 @@ int of_property_match_string(const struct device_node *np, const char *propname,
  * @propname:	name of the property to be searched.
  * @out_strs:	output array of string pointers.
  * @sz:		number of array elements to read.
- * @skip:	Number of strings to skip over at beginning of list.
+ * @skip:	Number of strings to skip over at beginning of list (cannot be
+ *	negative)
  *
  * Don't call this function directly. It is a utility helper for the
  * of_property_read_string*() family of functions.
@@ -789,7 +797,7 @@ int of_alias_scan(void)
 
 		name = of_get_property(of_chosen, "stdout-path", NULL);
 		if (name)
-			of_stdout = of_find_node_opts_by_path(name,
+			of_stdout = of_find_node_opts_by_path(NULL, name,
 							&of_stdout_options);
 	}
 
@@ -878,4 +886,47 @@ int of_alias_get_highest_id(const char *stem)
 struct device_node *of_get_stdout(void)
 {
 	return of_stdout;
+}
+
+int of_write_prop(struct device_node *np, const char *propname, int len,
+		  const void *value)
+{
+	struct property *pp;
+	struct property *pp_last = NULL;
+	struct property *new;
+
+	if (!np)
+		return -EINVAL;
+
+	for (pp = np->properties; pp; pp = pp->next) {
+		if (strcmp(pp->name, propname) == 0) {
+			/* Property exists -> change value */
+			pp->value = (void *)value;
+			pp->length = len;
+			return 0;
+		}
+		pp_last = pp;
+	}
+
+	if (!pp_last)
+		return -ENOENT;
+
+	/* Property does not exist -> append new property */
+	new = malloc(sizeof(struct property));
+	if (!new)
+		return -ENOMEM;
+
+	new->name = strdup(propname);
+	if (!new->name) {
+		free(new);
+		return -ENOMEM;
+	}
+
+	new->value = (void *)value;
+	new->length = len;
+	new->next = NULL;
+
+	pp_last->next = new;
+
+	return 0;
 }

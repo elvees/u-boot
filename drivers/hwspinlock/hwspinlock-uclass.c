@@ -3,6 +3,8 @@
  * Copyright (C) 2018, STMicroelectronics - All Rights Reserved
  */
 
+#define LOG_CATEGORY UCLASS_HWSPINLOCK
+
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
@@ -11,6 +13,7 @@
 #include <dm/device-internal.h>
 #include <dm/device_compat.h>
 #include <linux/compat.h>
+#include <asm/global_data.h>
 
 static inline const struct hwspinlock_ops *
 hwspinlock_dev_ops(struct udevice *dev)
@@ -22,7 +25,7 @@ static int hwspinlock_of_xlate_default(struct hwspinlock *hws,
 				       struct ofnode_phandle_args *args)
 {
 	if (args->args_count > 1) {
-		debug("Invaild args_count: %d\n", args->args_count);
+		debug("Invalid args_count: %d\n", args->args_count);
 		return -EINVAL;
 	}
 

@@ -19,12 +19,12 @@
 #include <dm.h>
 #include <dm/uclass-internal.h>
 #include <dm/pinctrl.h>
+#include <dm/root.h>
+#include <fdtdec.h>
 #include <mmc.h>
 #include <remoteproc.h>
 
-#ifdef CONFIG_SPL_BUILD
 #ifdef CONFIG_K3_LOAD_SYSFW
-#ifdef CONFIG_TI_SECURE_DEVICE
 struct fwl_data cbass_hc_cfg0_fwls[] = {
 	{ "PCIE0_CFG", 2560, 8 },
 	{ "PCIE1_CFG", 2561, 8 },
@@ -61,7 +61,6 @@ struct fwl_data cbass_hc_cfg0_fwls[] = {
 }, wkup_cbass0_fwls[] = {
 	{ "WKUP_CTRL_MMR0", 131, 16 },
 };
-#endif
 #endif
 
 static void ctrl_mmr_unlock(void)
@@ -125,8 +124,8 @@ void k3_mmc_restart_clock(void)
  * but the .bss is cleared between writing and reading this variable, so move
  * it to the .data section.
  */
-u32 bootindex __attribute__((section(".data")));
-static struct rom_extended_boot_data bootdata __section(.data);
+u32 bootindex __section(".data");
+static struct rom_extended_boot_data bootdata __section(".data");
 
 static void store_boot_info_from_rom(void)
 {
@@ -134,6 +133,59 @@ static void store_boot_info_from_rom(void)
 	memcpy(&bootdata, (uintptr_t *)ROM_ENTENDED_BOOT_DATA_INFO,
 	       sizeof(struct rom_extended_boot_data));
 }
+
+#ifdef CONFIG_SPL_OF_LIST
+void do_dt_magic(void)
+{
+	int ret, rescan, mmc_dev = -1;
+	static struct mmc *mmc;
+
+	if (IS_ENABLED(CONFIG_TI_I2C_BOARD_DETECT))
+		do_board_detect();
+
+	/*
+	 * Board detection has been done.
+	 * Let us see if another dtb wouldn't be a better match
+	 * for our board
+	 */
+	if (IS_ENABLED(CONFIG_CPU_V7R)) {
+		ret = fdtdec_resetup(&rescan);
+		if (!ret && rescan) {
+			dm_uninit();
+			dm_init_and_scan(true);
+		}
+	}
+
+	/*
+	 * Because of multi DTB configuration, the MMC device has
+	 * to be re-initialized after reconfiguring FDT inorder to
+	 * boot from MMC. Do this when boot mode is MMC and ROM has
+	 * not loaded SYSFW.
+	 */
+	switch (spl_boot_device()) {
+	case BOOT_DEVICE_MMC1:
+		mmc_dev = 0;
+		break;
+	case BOOT_DEVICE_MMC2:
+	case BOOT_DEVICE_MMC2_2:
+		mmc_dev = 1;
+		break;
+	}
+
+	if (mmc_dev > 0 && !is_rom_loaded_sysfw(&bootdata)) {
+		ret = mmc_init_device(mmc_dev);
+		if (!ret) {
+			mmc = find_mmc_device(mmc_dev);
+			if (mmc) {
+				ret = mmc_init(mmc);
+				if (ret) {
+					printf("mmc init failed with error: %d\n", ret);
+				}
+			}
+		}
+	}
+}
+#endif
 
 void board_init_f(ulong dummy)
 {
@@ -167,7 +219,7 @@ void board_init_f(ulong dummy)
 	 * firmware (SYSFW) image for various purposes and SYSFW depends on us
 	 * to initialize its pin settings.
 	 */
-	ret = uclass_find_device_by_seq(UCLASS_SERIAL, 0, true, &dev);
+	ret = uclass_find_device_by_seq(UCLASS_SERIAL, 0, &dev);
 	if (!ret)
 		pinctrl_select_state(dev, "default");
 
@@ -180,11 +232,26 @@ void board_init_f(ulong dummy)
 	k3_sysfw_loader(is_rom_loaded_sysfw(&bootdata),
 			k3_mmc_stop_clock, k3_mmc_restart_clock);
 
+#ifdef CONFIG_SPL_OF_LIST
+	do_dt_magic();
+#endif
+
+	/*
+	 * Force probe of clk_k3 driver here to ensure basic default clock
+	 * configuration is always done.
+	 */
+	if (IS_ENABLED(CONFIG_SPL_CLK_K3)) {
+		ret = uclass_get_device_by_driver(UCLASS_CLK,
+						  DM_DRIVER_GET(ti_clk),
+						  &dev);
+		if (ret)
+			panic("Failed to initialize clk-k3!\n");
+	}
+
 	/* Prepare console output */
 	preloader_console_init();
 
 	/* Disable ROM configured firewalls right after loading sysfw */
-#ifdef CONFIG_TI_SECURE_DEVICE
 	remove_fwl_configs(cbass_hc_cfg0_fwls, ARRAY_SIZE(cbass_hc_cfg0_fwls));
 	remove_fwl_configs(cbass_hc0_fwls, ARRAY_SIZE(cbass_hc0_fwls));
 	remove_fwl_configs(cbass_rc_cfg0_fwls, ARRAY_SIZE(cbass_rc_cfg0_fwls));
@@ -192,7 +259,6 @@ void board_init_f(ulong dummy)
 	remove_fwl_configs(infra_cbass0_fwls, ARRAY_SIZE(infra_cbass0_fwls));
 	remove_fwl_configs(mcu_cbass0_fwls, ARRAY_SIZE(mcu_cbass0_fwls));
 	remove_fwl_configs(wkup_cbass0_fwls, ARRAY_SIZE(wkup_cbass0_fwls));
-#endif
 #else
 	/* Prepare console output */
 	preloader_console_init();
@@ -206,7 +272,7 @@ void board_init_f(ulong dummy)
 		do_board_detect();
 
 #if defined(CONFIG_CPU_V7R) && defined(CONFIG_K3_AVS0)
-	ret = uclass_get_device_by_driver(UCLASS_MISC, DM_GET_DRIVER(k3_avs),
+	ret = uclass_get_device_by_driver(UCLASS_MISC, DM_DRIVER_GET(k3_avs),
 					  &dev);
 	if (ret)
 		printf("AVS init failed: %d\n", ret);
@@ -220,7 +286,7 @@ void board_init_f(ulong dummy)
 	spl_enable_dcache();
 }
 
-u32 spl_mmc_boot_mode(const u32 boot_device)
+u32 spl_mmc_boot_mode(struct mmc *mmc, const u32 boot_device)
 {
 	switch (boot_device) {
 	case BOOT_DEVICE_MMC1:
@@ -284,6 +350,17 @@ static u32 __get_primary_bootmedia(u32 main_devstat, u32 wkup_devstat)
 	return bootmode;
 }
 
+u32 spl_spi_boot_bus(void)
+{
+	u32 wkup_devstat = readl(CTRLMMR_WKUP_DEVSTAT);
+	u32 main_devstat = readl(CTRLMMR_MAIN_DEVSTAT);
+	u32 bootmode = ((wkup_devstat & WKUP_DEVSTAT_PRIMARY_BOOTMODE_MASK) >>
+			WKUP_DEVSTAT_PRIMARY_BOOTMODE_SHIFT) |
+			((main_devstat & MAIN_DEVSTAT_BOOT_MODE_B_MASK) << BOOT_MODE_B_SHIFT);
+
+	return (bootmode == BOOT_DEVICE_QSPI) ? 1 : 0;
+}
+
 u32 spl_boot_device(void)
 {
 	u32 wkup_devstat = readl(CTRLMMR_WKUP_DEVSTAT);
@@ -302,7 +379,6 @@ u32 spl_boot_device(void)
 	else
 		return __get_backup_bootmedia(main_devstat);
 }
-#endif
 
 #ifdef CONFIG_SYS_K3_SPL_ATF
 
@@ -356,41 +432,5 @@ void release_resources_for_core_shutdown(void)
 			panic("Failed sending core %u shutdown message (%d)\n",
 			      id, ret);
 	}
-}
-#endif
-
-#ifdef CONFIG_SYS_K3_SPL_ATF
-void start_non_linux_remote_cores(void)
-{
-	int size = 0, ret;
-	u32 loadaddr = 0;
-
-	if (!soc_is_j721e())
-		return;
-
-	size = load_firmware("name_mainr5f0_0fw", "addr_mainr5f0_0load",
-			     &loadaddr);
-	if (size <= 0)
-		goto err_load;
-
-	/* assuming remoteproc 2 is aliased for the needed remotecore */
-	ret = rproc_load(2, loadaddr, size);
-	if (ret) {
-		printf("Firmware failed to start on rproc (%d)\n", ret);
-		goto err_load;
-	}
-
-	ret = rproc_start(2);
-	if (ret) {
-		printf("Firmware init failed on rproc (%d)\n", ret);
-		goto err_load;
-	}
-
-	printf("Remoteproc 2 started successfully\n");
-
-	return;
-
-err_load:
-	rproc_reset(2);
 }
 #endif

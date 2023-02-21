@@ -718,9 +718,23 @@ static ulong versal_clk_set_rate(struct clk *clk, ulong rate)
 	return clk_rate;
 }
 
+static int versal_clk_enable(struct clk *clk)
+{
+	struct versal_clk_priv *priv = dev_get_priv(clk->dev);
+	u32 clk_id;
+
+	clk_id = priv->clk[clk->id].clk_id;
+
+	if (versal_clock_gate(clk_id))
+		return xilinx_pm_request(PM_CLOCK_ENABLE, clk_id, 0, 0, 0, NULL);
+
+	return 0;
+}
+
 static struct clk_ops versal_clk_ops = {
 	.set_rate = versal_clk_set_rate,
 	.get_rate = versal_clk_get_rate,
+	.enable = versal_clk_enable,
 };
 
 static const struct udevice_id versal_clk_ids[] = {
@@ -734,5 +748,5 @@ U_BOOT_DRIVER(versal_clk) = {
 	.of_match = versal_clk_ids,
 	.probe = versal_clk_probe,
 	.ops = &versal_clk_ops,
-	.priv_auto_alloc_size = sizeof(struct versal_clk_priv),
+	.priv_auto	= sizeof(struct versal_clk_priv),
 };

@@ -2,7 +2,7 @@
 /*
  * BTRFS filesystem implementation for U-Boot
  *
- * 2017 Marek Behun, CZ.NIC, marek.behun@nic.cz
+ * 2017 Marek Behún, CZ.NIC, kabel@kernel.org
  */
 
 #include <linux/kernel.h>
@@ -390,10 +390,16 @@ int btrfs_read_extent_inline(struct btrfs_path *path,
 			   csize);
 	ret = btrfs_decompress(btrfs_file_extent_compression(leaf, fi),
 			       cbuf, csize, dbuf, dsize);
-	if (ret < 0 || ret != dsize) {
+	if (ret == (u32)-1) {
 		ret = -EIO;
 		goto out;
 	}
+	/*
+	 * The compressed part ends before sector boundary, the remaining needs
+	 * to be zeroed out.
+	 */
+	if (ret < dsize)
+		memset(dbuf + ret, 0, dsize - ret);
 	memcpy(dest, dbuf, dsize);
 	ret = dsize;
 out:
@@ -494,10 +500,16 @@ int btrfs_read_extent_reg(struct btrfs_path *path,
 
 	ret = btrfs_decompress(btrfs_file_extent_compression(leaf, fi), cbuf,
 			       csize, dbuf, dsize);
-	if (ret != dsize) {
+	if (ret == (u32)-1) {
 		ret = -EIO;
 		goto out;
 	}
+	/*
+	 * The compressed part ends before sector boundary, the remaining needs
+	 * to be zeroed out.
+	 */
+	if (ret < dsize)
+		memset(dbuf + ret, 0, dsize - ret);
 	/* Then copy the needed part */
 	memcpy(dest, dbuf + btrfs_file_extent_offset(leaf, fi), len);
 	ret = len;
@@ -534,15 +546,12 @@ static int lookup_data_extent(struct btrfs_root *root, struct btrfs_path *path,
 	/* Error or we're already at the file extent */
 	if (ret <= 0)
 		return ret;
-	if (ret > 0) {
-		/* Check previous file extent */
-		ret = btrfs_previous_item(root, path, ino,
-					  BTRFS_EXTENT_DATA_KEY);
-		if (ret < 0)
-			return ret;
-		if (ret > 0)
-			goto check_next;
-	}
+	/* Check previous file extent */
+	ret = btrfs_previous_item(root, path, ino, BTRFS_EXTENT_DATA_KEY);
+	if (ret < 0)
+		return ret;
+	if (ret > 0)
+		goto check_next;
 	/* Now the key.offset must be smaller than @file_offset */
 	btrfs_item_key_to_cpu(path->nodes[0], &key, path->slots[0]);
 	if (key.objectid != ino ||
@@ -704,6 +713,14 @@ int btrfs_file_read(struct btrfs_root *root, u64 ino, u64 file_offset, u64 len,
 			if (!next_offset) {
 				ret = 0;
 				goto out;
+			}
+			/*
+			 * Find a extent gap, mostly caused by NO_HOLE feature.
+			 * Just to next offset directly.
+			 */
+			if (next_offset > cur) {
+				cur = next_offset;
+				continue;
 			}
 		}
 		fi = btrfs_item_ptr(path.nodes[0], path.slots[0],

@@ -4,6 +4,7 @@
  */
 #include <common.h>
 #include <init.h>
+#include <asm/global_data.h>
 #include <linux/delay.h>
 
 #include <asm/arch/clock.h>
@@ -42,6 +43,14 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define NAND_PAD_READY0_CTRL (PAD_CTL_DSE_48ohm | PAD_CTL_PUS_22K_UP)
 
+#define FLASH_DETECTION_CTRL (PAD_CTL_HYS | PAD_CTL_PUE)
+#define FLASH_DET_GPIO	IMX_GPIO_NR(4, 1)
+static const iomux_v3_cfg_t flash_detection_pads[] = {
+	MX6_PAD_NAND_WE_B__GPIO4_IO01 | MUX_PAD_CTRL(FLASH_DETECTION_CTRL),
+};
+
+static bool is_emmc;
+
 int dram_init(void)
 {
 	gd->ram_size = get_ram_size((void *)PHYS_SDRAM, PHYS_SDRAM_SIZE);
@@ -52,13 +61,14 @@ int dram_init(void)
 #ifdef CONFIG_NAND_MXS
 static void setup_gpmi_nand(void)
 {
-	setup_gpmi_io_clk((3 << MXC_CCM_CSCDR1_BCH_PODF_OFFSET) |
-			  (3 << MXC_CCM_CSCDR1_GPMI_PODF_OFFSET));
+	setup_gpmi_io_clk((MXC_CCM_CS2CDR_ENFC_CLK_PODF(0) |
+			   MXC_CCM_CS2CDR_ENFC_CLK_PRED(3) |
+			   MXC_CCM_CS2CDR_ENFC_CLK_SEL(3)));
 }
 #endif /* CONFIG_NAND_MXS */
 
 #ifdef CONFIG_DM_VIDEO
-static iomux_v3_cfg_t const backlight_pads[] = {
+static const iomux_v3_cfg_t backlight_pads[] = {
 	/* Backlight On */
 	MX6_PAD_JTAG_TMS__GPIO1_IO11		| MUX_PAD_CTRL(NO_PAD_CTRL),
 	/* Backlight PWM<A> (multiplexed pin) */
@@ -90,26 +100,19 @@ static int setup_fec(void)
 	struct iomuxc *iomuxc_regs = (struct iomuxc *)IOMUXC_BASE_ADDR;
 	int ret;
 
-	/* provide the PHY clock from the i.MX 6 */
+	/*
+	 * Use 50MHz anatop loopback REF_CLK2 for ENET2,
+	 * clear gpr1[14], set gpr1[18].
+	 */
+	clrsetbits_le32(&iomuxc_regs->gpr[1], IOMUX_GPR1_FEC2_MASK,
+			IOMUX_GPR1_FEC2_CLOCK_MUX1_SEL_MASK);
+
 	ret = enable_fec_anatop_clock(1, ENET_50MHZ);
 	if (ret)
 		return ret;
 
-	/* Use 50M anatop REF_CLK and output it on ENET2_TX_CLK */
-	clrsetbits_le32(&iomuxc_regs->gpr[1],
-			IOMUX_GPR1_FEC2_CLOCK_MUX2_SEL_MASK,
-			IOMUX_GPR1_FEC2_CLOCK_MUX1_SEL_MASK);
+	enable_enet_clk(1);
 
-	/* give new Ethernet PHY power save mode circuitry time to settle */
-	mdelay(300);
-
-	return 0;
-}
-
-int board_phy_config(struct phy_device *phydev)
-{
-	if (phydev->drv->config)
-		phydev->drv->config(phydev);
 	return 0;
 }
 #endif /* CONFIG_FEC_MXC */
@@ -118,6 +121,16 @@ int board_init(void)
 {
 	/* address of boot parameters */
 	gd->bd->bi_boot_params = PHYS_SDRAM + 0x100;
+
+	/*
+	 * Enable GPIO on NAND_WE_B/eMMC_RST with 100k pull-down. eMMC_RST
+	 * is pulled high with 4.7k for eMMC devices. This allows to reliably
+	 * detect eMMC/NAND flash
+	 */
+	imx_iomux_v3_setup_multiple_pads(flash_detection_pads, ARRAY_SIZE(flash_detection_pads));
+	gpio_request(FLASH_DET_GPIO, "flash-detection-gpio");
+	is_emmc = gpio_get_value(FLASH_DET_GPIO);
+	gpio_free(FLASH_DET_GPIO);
 
 #ifdef CONFIG_FEC_MXC
 	setup_fec();
@@ -147,8 +160,19 @@ int board_late_init(void)
 	 * Wi-Fi/Bluetooth make sure we use the -wifi device tree.
 	 */
 	if (tdx_hw_tag.prodid == COLIBRI_IMX6ULL_WIFI_BT_IT ||
-	    tdx_hw_tag.prodid == COLIBRI_IMX6ULL_WIFI_BT)
+	    tdx_hw_tag.prodid == COLIBRI_IMX6ULL_WIFI_BT) {
 		env_set("variant", "-wifi");
+	} else {
+		if (is_emmc)
+			env_set("variant", "-emmc");
+		else
+			env_set("variant", "");
+	}
+#else
+	if (is_emmc)
+		env_set("variant", "-emmc");
+	else
+		env_set("variant", "");
 #endif
 
 	/*
@@ -203,12 +227,12 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 }
 #endif
 
-static struct mxc_serial_platdata mxc_serial_plat = {
+static struct mxc_serial_plat mxc_serial_plat = {
 	.reg = (struct mxc_uart *)UART1_BASE,
 	.use_dte = 1,
 };
 
-U_BOOT_DEVICE(mxc_serial) = {
+U_BOOT_DRVINFO(mxc_serial) = {
 	.name = "serial_mxc",
-	.platdata = &mxc_serial_plat,
+	.plat = &mxc_serial_plat,
 };

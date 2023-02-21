@@ -5,6 +5,7 @@
 
 #include <common.h>
 #include <command.h>
+#include <efi_api.h>
 #include <env.h>
 #include <rand.h>
 #include <time.h>
@@ -15,6 +16,8 @@
 #include <asm/io.h>
 #include <part_efi.h>
 #include <malloc.h>
+#include <dm/uclass.h>
+#include <rng.h>
 
 /*
  * UUID - Universally Unique IDentifier - 128 bits unique number.
@@ -84,11 +87,11 @@ int uuid_str_valid(const char *uuid)
 	return 1;
 }
 
-#ifdef CONFIG_PARTITION_TYPE_GUID
 static const struct {
 	const char *string;
 	efi_guid_t guid;
 } list_guid[] = {
+#ifdef CONFIG_PARTITION_TYPE_GUID
 	{"system",	PARTITION_SYSTEM_GUID},
 	{"mbr",		LEGACY_MBR_PARTITION_GUID},
 	{"msft",	PARTITION_MSFT_RESERVED_GUID},
@@ -96,7 +99,162 @@ static const struct {
 	{"linux",	PARTITION_LINUX_FILE_SYSTEM_DATA_GUID},
 	{"raid",	PARTITION_LINUX_RAID_GUID},
 	{"swap",	PARTITION_LINUX_SWAP_GUID},
-	{"lvm",		PARTITION_LINUX_LVM_GUID}
+	{"lvm",		PARTITION_LINUX_LVM_GUID},
+	{"u-boot-env",	PARTITION_U_BOOT_ENVIRONMENT},
+#endif
+#ifdef CONFIG_CMD_EFIDEBUG
+	{
+		"Device Path",
+		EFI_DEVICE_PATH_PROTOCOL_GUID,
+	},
+	{
+		"Device Path To Text",
+		EFI_DEVICE_PATH_TO_TEXT_PROTOCOL_GUID,
+	},
+	{
+		"Device Path Utilities",
+		EFI_DEVICE_PATH_UTILITIES_PROTOCOL_GUID,
+	},
+	{
+		"Unicode Collation 2",
+		EFI_UNICODE_COLLATION_PROTOCOL2_GUID,
+	},
+	{
+		"Driver Binding",
+		EFI_DRIVER_BINDING_PROTOCOL_GUID,
+	},
+	{
+		"Simple Text Input",
+		EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID,
+	},
+	{
+		"Simple Text Input Ex",
+		EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL_GUID,
+	},
+	{
+		"Simple Text Output",
+		EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID,
+	},
+	{
+		"Block IO",
+		EFI_BLOCK_IO_PROTOCOL_GUID,
+	},
+	{
+		"Simple File System",
+		EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID,
+	},
+	{
+		"Loaded Image",
+		EFI_LOADED_IMAGE_PROTOCOL_GUID,
+	},
+	{
+		"Graphics Output",
+		EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID,
+	},
+	{
+		"HII String",
+		EFI_HII_STRING_PROTOCOL_GUID,
+	},
+	{
+		"HII Database",
+		EFI_HII_DATABASE_PROTOCOL_GUID,
+	},
+	{
+		"HII Config Routing",
+		EFI_HII_CONFIG_ROUTING_PROTOCOL_GUID,
+	},
+	{
+		"Load File2",
+		EFI_LOAD_FILE2_PROTOCOL_GUID,
+	},
+	{
+		"Random Number Generator",
+		EFI_RNG_PROTOCOL_GUID,
+	},
+	{
+		"Simple Network",
+		EFI_SIMPLE_NETWORK_PROTOCOL_GUID,
+	},
+	{
+		"PXE Base Code",
+		EFI_PXE_BASE_CODE_PROTOCOL_GUID,
+	},
+	{
+		"Device-Tree Fixup",
+		EFI_DT_FIXUP_PROTOCOL_GUID,
+	},
+	{
+		"TCG2",
+		EFI_TCG2_PROTOCOL_GUID,
+		},
+	{
+		"System Partition",
+		PARTITION_SYSTEM_GUID
+	},
+	{
+		"Firmware Management",
+		EFI_FIRMWARE_MANAGEMENT_PROTOCOL_GUID
+	},
+	/* Configuration table GUIDs */
+	{
+		"ACPI table",
+		EFI_ACPI_TABLE_GUID,
+	},
+	{
+		"EFI System Resource Table",
+		EFI_SYSTEM_RESOURCE_TABLE_GUID,
+	},
+	{
+		"device tree",
+		EFI_FDT_GUID,
+	},
+	{
+		"SMBIOS table",
+		SMBIOS_TABLE_GUID,
+	},
+	{
+		"Runtime properties",
+		EFI_RT_PROPERTIES_TABLE_GUID,
+	},
+	{
+		"TCG2 Final Events Table",
+		EFI_TCG2_FINAL_EVENTS_TABLE_GUID,
+	},
+	{
+		"EFI Conformance Profiles Table",
+		EFI_CONFORMANCE_PROFILES_TABLE_GUID,
+	},
+#ifdef CONFIG_EFI_RISCV_BOOT_PROTOCOL
+	{
+		"RISC-V Boot",
+		RISCV_EFI_BOOT_PROTOCOL_GUID,
+	},
+#endif
+#endif /* CONFIG_CMD_EFIDEBUG */
+#ifdef CONFIG_CMD_NVEDIT_EFI
+	/* signature database */
+	{
+		"EFI_GLOBAL_VARIABLE_GUID",
+		EFI_GLOBAL_VARIABLE_GUID,
+	},
+	{
+		"EFI_IMAGE_SECURITY_DATABASE_GUID",
+		EFI_IMAGE_SECURITY_DATABASE_GUID,
+	},
+	/* certificate types */
+	{
+		"EFI_CERT_SHA256_GUID",
+		EFI_CERT_SHA256_GUID,
+	},
+	{
+		"EFI_CERT_X509_GUID",
+		EFI_CERT_X509_GUID,
+	},
+	{
+		"EFI_CERT_TYPE_PKCS7_GUID",
+		EFI_CERT_TYPE_PKCS7_GUID,
+	},
+#endif
 };
 
 /*
@@ -122,22 +280,20 @@ int uuid_guid_get_bin(const char *guid_str, unsigned char *guid_bin)
  * uuid_guid_get_str() - this function get string for GUID.
  *
  * @param guid_bin - pointer to string with partition type guid [16B]
- * @param guid_str - pointer to allocated partition type string [7B]
+ *
+ * Returns NULL if the type GUID is not known.
  */
-int uuid_guid_get_str(const unsigned char *guid_bin, char *guid_str)
+const char *uuid_guid_get_str(const unsigned char *guid_bin)
 {
 	int i;
 
-	*guid_str = 0;
 	for (i = 0; i < ARRAY_SIZE(list_guid); i++) {
 		if (!memcmp(list_guid[i].guid.b, guid_bin, 16)) {
-			strcpy(guid_str, list_guid[i].string);
-			return 0;
+			return list_guid[i].string;
 		}
 	}
-	return -ENODEV;
+	return NULL;
 }
-#endif
 
 /*
  * uuid_str_to_bin() - convert string UUID or GUID to big endian binary data.
@@ -162,26 +318,26 @@ int uuid_str_to_bin(const char *uuid_str, unsigned char *uuid_bin,
 	}
 
 	if (str_format == UUID_STR_FORMAT_STD) {
-		tmp32 = cpu_to_be32(simple_strtoul(uuid_str, NULL, 16));
+		tmp32 = cpu_to_be32(hextoul(uuid_str, NULL));
 		memcpy(uuid_bin, &tmp32, 4);
 
-		tmp16 = cpu_to_be16(simple_strtoul(uuid_str + 9, NULL, 16));
+		tmp16 = cpu_to_be16(hextoul(uuid_str + 9, NULL));
 		memcpy(uuid_bin + 4, &tmp16, 2);
 
-		tmp16 = cpu_to_be16(simple_strtoul(uuid_str + 14, NULL, 16));
+		tmp16 = cpu_to_be16(hextoul(uuid_str + 14, NULL));
 		memcpy(uuid_bin + 6, &tmp16, 2);
 	} else {
-		tmp32 = cpu_to_le32(simple_strtoul(uuid_str, NULL, 16));
+		tmp32 = cpu_to_le32(hextoul(uuid_str, NULL));
 		memcpy(uuid_bin, &tmp32, 4);
 
-		tmp16 = cpu_to_le16(simple_strtoul(uuid_str + 9, NULL, 16));
+		tmp16 = cpu_to_le16(hextoul(uuid_str + 9, NULL));
 		memcpy(uuid_bin + 4, &tmp16, 2);
 
-		tmp16 = cpu_to_le16(simple_strtoul(uuid_str + 14, NULL, 16));
+		tmp16 = cpu_to_le16(hextoul(uuid_str + 14, NULL));
 		memcpy(uuid_bin + 6, &tmp16, 2);
 	}
 
-	tmp16 = cpu_to_be16(simple_strtoul(uuid_str + 19, NULL, 16));
+	tmp16 = cpu_to_be16(hextoul(uuid_str + 19, NULL));
 	memcpy(uuid_bin + 8, &tmp16, 2);
 
 	tmp64 = cpu_to_be64(simple_strtoull(uuid_str + 24, NULL, 16));
@@ -249,9 +405,22 @@ void gen_rand_uuid(unsigned char *uuid_bin)
 {
 	u32 ptr[4];
 	struct uuid *uuid = (struct uuid *)ptr;
-	int i;
+	int i, ret;
+	struct udevice *devp;
+	u32 randv = 0;
 
-	srand(get_ticks() + rand());
+	if (IS_ENABLED(CONFIG_DM_RNG)) {
+		ret = uclass_get_device(UCLASS_RNG, 0, &devp);
+		if (!ret) {
+			ret = dm_rng_read(devp, &randv, sizeof(randv));
+			if (ret < 0)
+				randv = 0;
+		}
+	}
+	if (randv)
+		srand(randv);
+	else
+		srand(get_ticks() + rand());
 
 	/* Set all fields randomly */
 	for (i = 0; i < 4; i++)

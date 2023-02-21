@@ -74,6 +74,7 @@ def CreateBuildmanConfigFile(config_fname):
     print('''[toolchain]
 # name = path
 # e.g. x86 = /opt/gcc-4.6.3-nolibc/x86_64-linux
+other = /
 
 [toolchain-prefix]
 # name = path to prefix
@@ -84,7 +85,6 @@ def CreateBuildmanConfigFile(config_fname):
 # Indicates which toolchain should be used to build for that arch
 x86 = i386
 blackfin = bfin
-nds32 = nds32le
 openrisc = or1k
 
 [make-flags]

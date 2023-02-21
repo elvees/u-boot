@@ -6,6 +6,7 @@
 #include <common.h>
 #include <fsl_ddr_sdram.h>
 #include <fsl_ddr_dimm_params.h>
+#include <asm/global_data.h>
 #include "ddr.h"
 #include <log.h>
 #include <vsprintf.h>
@@ -113,7 +114,7 @@ dimm_params_t ddr_raw_timing = {
 	.mirrored_dimm = 0,
 	.n_row_addr = 15,
 	.n_col_addr = 10,
-	.bank_addr_bits = 0,
+	.bank_addr_bits = 2,
 	.bank_group_bits = 2,
 	.edc_config = 0,
 	.burst_lengths_bitmask = 0x0c,

@@ -1,6 +1,6 @@
 if ARCH_TEGRA
 
-config SPL_GPIO_SUPPORT
+config SPL_GPIO
 	default y
 
 config SPL_LIBCOMMON_SUPPORT
@@ -9,7 +9,7 @@ config SPL_LIBCOMMON_SUPPORT
 config SPL_LIBGENERIC_SUPPORT
 	default y
 
-config SPL_SERIAL_SUPPORT
+config SPL_SERIAL
 	default y
 
 config TEGRA_CLKRST
@@ -72,6 +72,7 @@ config TEGRA_ARMV7_COMMON
 	select CPU_V7A
 	select SPL
 	select SPL_BOARD_INIT if SPL
+	select SPL_SKIP_LOWLEVEL_INIT_ONLY if SPL
 	select SUPPORT_SPL
 	select TEGRA_CLKRST
 	select TEGRA_COMMON
@@ -124,6 +125,7 @@ config TEGRA124
 
 config TEGRA210
 	bool "Tegra210 family"
+	select GICV2
 	select TEGRA_ARMV8_COMMON
 	select TEGRA_CLKRST
 	select TEGRA_GPIO
@@ -137,6 +139,7 @@ config TEGRA210
 config TEGRA186
 	bool "Tegra186 family"
 	select DM_MAILBOX
+	select GICV2
 	select TEGRA186_BPMP
 	select TEGRA186_CLOCK
 	select TEGRA186_GPIO
@@ -161,6 +164,10 @@ config TEGRA_DISCONNECT_UDC_ON_BOOT
 	  USB controller when U-Boot boots to avoid leaving a stale USB device
 	  present.
 
+config CI_UDC_HAS_HOSTPC
+	def_bool y
+	depends on CI_UDC && !TEGRA20
+
 config SYS_MALLOC_F_LEN
 	default 0x1800
 
@@ -170,6 +177,10 @@ source "arch/arm/mach-tegra/tegra114/Kconfig"
 source "arch/arm/mach-tegra/tegra124/Kconfig"
 source "arch/arm/mach-tegra/tegra210/Kconfig"
 source "arch/arm/mach-tegra/tegra186/Kconfig"
+
+config TEGRA_GPU
+	bool "Enable setting up the GPU"
+	depends on TEGRA124 || TEGRA210
 
 config CMD_ENTERRCM
 	bool "Enable 'enterrcm' command"

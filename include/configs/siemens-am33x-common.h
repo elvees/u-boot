@@ -15,55 +15,27 @@
 
 #include <asm/arch/omap.h>
 
-#define CONFIG_DMA_COHERENT
-#define CONFIG_DMA_COHERENT_SIZE	(1 << 20)
-
-#define CONFIG_SYS_MALLOC_LEN		(16 * 1024 * 1024)
-#ifdef CONFIG_SIEMENS_MACH_TYPE
-#define CONFIG_MACH_TYPE		CONFIG_SIEMENS_MACH_TYPE
-#endif
-
-#define CONFIG_CMDLINE_TAG		/* enable passing of ATAGs */
-#define CONFIG_SETUP_MEMORY_TAGS
-#define CONFIG_INITRD_TAG
-
 /* commands to include */
 
-#ifndef CONFIG_SPL_BUILD
 #define CONFIG_ROOTPATH		"/opt/eldk"
-#endif
-
-#define CONFIG_SYS_AUTOLOAD	"yes"
 
 /* Clock Defines */
 #define V_OSCK				24000000  /* Clock output from T2 */
 #define V_SCLK				(V_OSCK)
 
-/* We set the max number of command args high to avoid HUSH bugs. */
-#define CONFIG_SYS_MAXARGS		32
-
 /* Console I/O Buffer Size */
-#define CONFIG_SYS_CBSIZE		1024
-
-/* Boot Argument Buffer Size */
-#define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
 
 /*
  * memtest works on 8 MB in DRAM after skipping 32MB from
  * start addr of ram disk
  */
 
-#define CONFIG_SYS_LOAD_ADDR		0x81000000 /* Default load address */
-
  /* Physical Memory Map */
 #define PHYS_DRAM_1			0x80000000	/* DRAM Bank #1 */
 
 #define CONFIG_SYS_SDRAM_BASE		PHYS_DRAM_1
-#define CONFIG_SYS_INIT_SP_ADDR         (NON_SECURE_SRAM_END - \
-						GENERATED_GBL_DATA_SIZE)
  /* Platform/Board specific defs */
 #define CONFIG_SYS_TIMERBASE		0x48040000	/* Use Timer2 */
-#define CONFIG_SYS_PTV			2	/* Divisor: 2^(PTV+1) => 8 */
 
 /* NS16550 Configuration */
 #define CONFIG_SYS_NS16550_SERIAL
@@ -73,26 +45,9 @@
 
 
 /* I2C Configuration */
-#define CONFIG_I2C
-#define CONFIG_SYS_I2C
 
 /* Defines for SPL */
-#define CONFIG_SPL_MAX_SIZE		(SRAM_SCRATCH_SPACE_ADDR - \
-					 CONFIG_SPL_TEXT_BASE)
 
-#define CONFIG_SPL_BSS_START_ADDR	0x80000000
-#define CONFIG_SPL_BSS_MAX_SIZE		0x80000		/* 512 KB */
-
-#define CONFIG_SPL_FS_LOAD_PAYLOAD_NAME	"u-boot.img"
-
-#define CONFIG_SYS_NAND_ONFI_DETECTION
-#define CONFIG_SYS_NAND_5_ADDR_CYCLE
-#define CONFIG_SYS_NAND_PAGE_COUNT	(CONFIG_SYS_NAND_BLOCK_SIZE / \
-					 CONFIG_SYS_NAND_PAGE_SIZE)
-#define CONFIG_SYS_NAND_PAGE_SIZE	2048
-#define CONFIG_SYS_NAND_OOBSIZE		64
-#define CONFIG_SYS_NAND_BLOCK_SIZE	(128*1024)
-#define CONFIG_SYS_NAND_BAD_BLOCK_POS	NAND_LARGE_BADBLOCK_POS
 #define CONFIG_SYS_NAND_ECCPOS		{ 2, 3, 4, 5, 6, 7, 8, 9, \
 					 10, 11, 12, 13, 14, 15, 16, 17, \
 					 18, 19, 20, 21, 22, 23, 24, 25, \
@@ -103,7 +58,6 @@
 
 #define CONFIG_SYS_NAND_ECCSIZE		512
 #define CONFIG_SYS_NAND_ECCBYTES	14
-#define CONFIG_NAND_OMAP_ECCSCHEME	OMAP_ECC_BCH8_CODE_HW
 
 #define CONFIG_SYS_NAND_ECCSTEPS	4
 #define	CONFIG_SYS_NAND_ECCTOTAL	(CONFIG_SYS_NAND_ECCBYTES * \
@@ -111,42 +65,23 @@
 
 #define	CONFIG_SYS_NAND_U_BOOT_START	CONFIG_SYS_TEXT_BASE
 
-#define CONFIG_SYS_NAND_U_BOOT_OFFS	0x80000
-
 /*
  * 1MB into the SDRAM to allow for SPL's bss at the beginning of SDRAM
  * 64 bytes before this address should be set aside for u-boot.img's
  * header. That is 0x800FFFC0--0x80100000 should not be used for any
  * other needs.
  */
-#define CONFIG_SYS_SPL_MALLOC_START	0x80208000
-#define CONFIG_SYS_SPL_MALLOC_SIZE	0x100000
 
 /*
  * Since SPL did pll and ddr initialization for us,
  * we don't need to do it twice.
  */
-#ifndef CONFIG_SPL_BUILD
-#define CONFIG_SKIP_LOWLEVEL_INIT
-#endif
-
-#ifndef CONFIG_SPL_BUILD
-/*
- * USB configuration
- */
-#define CONFIG_AM335X_USB0
-#define CONFIG_AM335X_USB0_MODE	MUSB_PERIPHERAL
-#define CONFIG_AM335X_USB1
-#define CONFIG_AM335X_USB1_MODE MUSB_HOST
 
 /* USB DRACO ID as default */
 #define CONFIG_USBD_HS
 
 /* USB Device Firmware Update support */
-#define CONFIG_SYS_DFU_DATA_BUF_SIZE	(1 << 20)
 #define DFU_MANIFEST_POLL_TIMEOUT	25000
-
-#endif /* CONFIG_SPL_BUILD */
 
 /*
  * Default to using SPI for environment, etc.  We have multiple copies
@@ -160,8 +95,6 @@
  * 0xE0000 - 0x442000 : Linux Kernel
  * 0x442000 - 0x800000 : Userland
  */
-
-#define CONFIG_NET_RETRY_COUNT         10
 
 /* NAND support */
 #ifdef CONFIG_MTD_RAW_NAND
@@ -277,7 +210,7 @@
 	"nand_active_ubi_vol=rootfs_a\0" \
 	"nand_active_ubi_vol_A=rootfs_a\0" \
 	"nand_active_ubi_vol_B=rootfs_b\0" \
-	"nand_root_fs_type=ubifs rootwait=1\0" \
+	"nand_root_fs_type=ubifs rootwait\0" \
 	"nand_src_addr=0x280000\0" \
 	"nand_src_addr_A=0x280000\0" \
 	"nand_src_addr_B=0x780000\0" \
@@ -354,7 +287,7 @@
 	"nand_active_ubi_vol=rootfs_a\0" \
 	"rootfs_name=rootfs\0" \
 	"kernel_name=uImage\0"\
-	"nand_root_fs_type=ubifs rootwait=1\0" \
+	"nand_root_fs_type=ubifs rootwait\0" \
 	"nand_args=run bootargs_defaults;" \
 		"mtdparts default;" \
 		"setenv ${partitionset_active} true;" \
@@ -437,13 +370,6 @@
 							/* CS0 */
 #define CONFIG_SYS_MAX_NAND_DEVICE	1		/* Max number of NAND
 							   devices */
-#if !defined(CONFIG_SPI_BOOT)
-#define CONFIG_SYS_ENV_SECT_SIZE	(128 << 10)	/* 128 KiB */
 #endif
-#endif
-
-/* Reboot after 60 sec if bootcmd fails */
-#define CONFIG_RESET_TO_RETRY
-#define CONFIG_BOOT_RETRY_TIME 60
 
 #endif	/* ! __CONFIG_SIEMENS_AM33X_COMMON_H */

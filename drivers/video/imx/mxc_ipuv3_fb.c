@@ -22,7 +22,6 @@
 #include <asm/io.h>
 #include <asm/mach-imx/video.h>
 #include <malloc.h>
-#include <video_fb.h>
 #include "../videomodes.h"
 #include "ipu.h"
 #include "mxcfb.h"
@@ -383,7 +382,7 @@ static int mxcfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 static int mxcfb_map_video_memory(struct fb_info *fbi)
 {
 	struct mxcfb_info *mxc_fbi = (struct mxcfb_info *)fbi->par;
-	struct video_uc_platdata *plat = dev_get_uclass_platdata(mxc_fbi->udev);
+	struct video_uc_plat *plat = dev_get_uclass_plat(mxc_fbi->udev);
 
 	if (fbi->fix.smem_len < fbi->var.yres_virtual * fbi->fix.line_length) {
 		fbi->fix.smem_len = fbi->var.yres_virtual *
@@ -428,7 +427,7 @@ static int mxcfb_unmap_video_memory(struct fb_info *fbi)
  * structures.  This includes information such as bits per pixel,
  * color maps, screen width/height and RGBA offsets.
  *
- * @return      Framebuffer structure initialized with our information
+ * Return:      Framebuffer structure initialized with our information
  */
 static struct fb_info *mxcfb_init_fbinfo(void)
 {
@@ -479,7 +478,7 @@ extern struct clk *g_ipu_clk;
  * this routine: Framebuffer initialization, Memory allocation and
  * mapping, Framebuffer registration, IPU initialization.
  *
- * @return      Appropriate error code to the kernel common code
+ * Return:      Appropriate error code to the kernel common code
  */
 static int mxcfb_probe(struct udevice *dev, u32 interface_pix_fmt,
 		       uint8_t disp, struct fb_videomode const *mode)
@@ -586,7 +585,7 @@ enum {
 
 static int ipuv3_video_probe(struct udevice *dev)
 {
-	struct video_uc_platdata *plat = dev_get_uclass_platdata(dev);
+	struct video_uc_plat *plat = dev_get_uclass_plat(dev);
 	struct video_priv *uc_priv = dev_get_uclass_priv(dev);
 #if defined(CONFIG_DISPLAY)
 	struct udevice *disp_dev;
@@ -647,7 +646,7 @@ struct ipuv3_video_priv {
 
 static int ipuv3_video_bind(struct udevice *dev)
 {
-	struct video_uc_platdata *plat = dev_get_uclass_platdata(dev);
+	struct video_uc_plat *plat = dev_get_uclass_plat(dev);
 
 	plat->size = LCD_MAX_WIDTH * LCD_MAX_HEIGHT *
 		     (1 << VIDEO_BPP32) / 8;
@@ -671,6 +670,6 @@ U_BOOT_DRIVER(fsl_imx6q_ipu) = {
 	.of_match = ipuv3_video_ids,
 	.bind	= ipuv3_video_bind,
 	.probe	= ipuv3_video_probe,
-	.priv_auto_alloc_size = sizeof(struct ipuv3_video_priv),
+	.priv_auto	= sizeof(struct ipuv3_video_priv),
 	.flags	= DM_FLAG_PRE_RELOC,
 };

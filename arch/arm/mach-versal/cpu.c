@@ -8,10 +8,12 @@
 #include <init.h>
 #include <asm/armv8/mmu.h>
 #include <asm/cache.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/hardware.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/cache.h>
+#include <dm/platdata.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -119,3 +121,7 @@ int arm_reserve_mmu(void)
 	return 0;
 }
 #endif
+
+U_BOOT_DRVINFO(soc_xilinx_versal) = {
+	.name = "soc_xilinx_versal",
+};

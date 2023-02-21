@@ -90,6 +90,25 @@ int sbi_get_impl_id(void)
 }
 
 /**
+ * sbi_get_impl_version() - get SBI implementation version
+ *
+ * @version:	pointer to receive version
+ * Return:	0 on success, -ENOTSUPP otherwise
+ */
+int sbi_get_impl_version(long *version)
+{
+	struct sbiret ret;
+
+	ret = sbi_ecall(SBI_EXT_BASE, SBI_EXT_BASE_GET_IMP_VERSION,
+			0, 0, 0, 0, 0, 0);
+	if (ret.error)
+		return -ENOTSUPP;
+	if (version)
+		*version = ret.value;
+	return 0;
+}
+
+/**
  * sbi_probe_extension() - Check if an SBI extension ID is supported or not.
  * @extid: The extension ID to be probed.
  *
@@ -106,6 +125,83 @@ int sbi_probe_extension(int extid)
 			return ret.value;
 
 	return -ENOTSUPP;
+}
+
+/**
+ * sbi_get_mvendorid() - get machine vendor ID
+ *
+ * @mimpid:	on return machine vendor ID
+ * Return:	0 on success
+ */
+int sbi_get_mvendorid(long *mvendorid)
+{
+	struct sbiret ret;
+
+	ret = sbi_ecall(SBI_EXT_BASE, SBI_EXT_BASE_GET_MVENDORID,
+			0, 0, 0, 0, 0, 0);
+	if (ret.error)
+		return -ENOTSUPP;
+
+	if (mvendorid)
+		*mvendorid = ret.value;
+
+	return 0;
+}
+
+/**
+ * sbi_get_marchid() - get machine architecture ID
+ *
+ * @mimpid:	on return machine architecture ID
+ * Return:	0 on success
+ */
+int sbi_get_marchid(long *marchid)
+{
+	struct sbiret ret;
+
+	ret = sbi_ecall(SBI_EXT_BASE, SBI_EXT_BASE_GET_MARCHID,
+			0, 0, 0, 0, 0, 0);
+
+	if (ret.error)
+		return -ENOTSUPP;
+
+	if (marchid)
+		*marchid = ret.value;
+
+	return 0;
+}
+
+/**
+ * sbi_get_mimpid() - get machine implementation ID
+ *
+ * @mimpid:	on return machine implementation ID
+ * Return:	0 on success
+ */
+int sbi_get_mimpid(long *mimpid)
+{
+	struct sbiret ret;
+
+	ret = sbi_ecall(SBI_EXT_BASE, SBI_EXT_BASE_GET_MIMPID,
+			0, 0, 0, 0, 0, 0);
+
+	if (ret.error)
+		return -ENOTSUPP;
+
+	if (mimpid)
+		*mimpid = ret.value;
+
+	return 0;
+}
+
+/**
+ * sbi_srst_reset() - invoke system reset extension
+ *
+ * @type:	type of reset
+ * @reason:	reason for reset
+ */
+void sbi_srst_reset(unsigned long type, unsigned long reason)
+{
+	sbi_ecall(SBI_EXT_SRST, SBI_EXT_SRST_RESET, type, reason,
+		  0, 0, 0, 0);
 }
 
 #ifdef CONFIG_SBI_V01

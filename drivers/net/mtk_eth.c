@@ -145,7 +145,8 @@ enum mtk_switch {
 enum mtk_soc {
 	SOC_MT7623,
 	SOC_MT7629,
-	SOC_MT7622
+	SOC_MT7622,
+	SOC_MT7621
 };
 
 struct mtk_eth_priv {
@@ -159,8 +160,9 @@ struct mtk_eth_priv {
 
 	void __iomem *fe_base;
 	void __iomem *gmac_base;
-	void __iomem *ethsys_base;
 	void __iomem *sgmii_base;
+
+	struct regmap *ethsys_regmap;
 
 	struct mii_dev *mdio_bus;
 	int (*mii_read)(struct mtk_eth_priv *priv, u8 phy, u8 reg);
@@ -233,7 +235,12 @@ static void mtk_gmac_rmw(struct mtk_eth_priv *priv, u32 reg, u32 clr, u32 set)
 static void mtk_ethsys_rmw(struct mtk_eth_priv *priv, u32 reg, u32 clr,
 			   u32 set)
 {
-	clrsetbits_le32(priv->ethsys_base + reg, clr, set);
+	uint val;
+
+	regmap_read(priv->ethsys_regmap, reg, &val);
+	val &= ~clr;
+	val |= set;
+	regmap_write(priv->ethsys_regmap, reg, val);
 }
 
 /* Direct MDIO clause 22/45 access via SoC */
@@ -669,12 +676,18 @@ static int mt7530_pad_clk_setup(struct mtk_eth_priv *priv, int mode)
 static int mt7530_setup(struct mtk_eth_priv *priv)
 {
 	u16 phy_addr, phy_val;
-	u32 val;
+	u32 val, txdrv;
 	int i;
 
-	/* Select 250MHz clk for RGMII mode */
-	mtk_ethsys_rmw(priv, ETHSYS_CLKCFG0_REG,
-		       ETHSYS_TRGMII_CLK_SEL362_5, 0);
+	if (priv->soc != SOC_MT7621) {
+		/* Select 250MHz clk for RGMII mode */
+		mtk_ethsys_rmw(priv, ETHSYS_CLKCFG0_REG,
+			       ETHSYS_TRGMII_CLK_SEL362_5, 0);
+
+		txdrv = 8;
+	} else {
+		txdrv = 4;
+	}
 
 	/* Modify HWTRAP first to allow direct access to internal PHYs */
 	mt753x_reg_read(priv, HWTRAP_REG, &val);
@@ -732,7 +745,8 @@ static int mt7530_setup(struct mtk_eth_priv *priv)
 	/* Lower Tx Driving for TRGMII path */
 	for (i = 0 ; i < NUM_TRGMII_CTRL ; i++)
 		mt753x_reg_write(priv, MT7530_TRGMII_TD_ODT(i),
-				 (8 << TD_DM_DRVP_S) | (8 << TD_DM_DRVN_S));
+				 (txdrv << TD_DM_DRVP_S) |
+				 (txdrv << TD_DM_DRVN_S));
 
 	for (i = 0 ; i < NUM_TRGMII_CTRL; i++)
 		mt753x_reg_rmw(priv, MT7530_TRGMII_RD(i), RD_TAP_M, 16);
@@ -1278,7 +1292,7 @@ static void mtk_eth_stop(struct udevice *dev)
 
 static int mtk_eth_write_hwaddr(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct mtk_eth_priv *priv = dev_get_priv(dev);
 	unsigned char *mac = pdata->enetaddr;
 	u32 macaddr_lsb, macaddr_msb;
@@ -1358,7 +1372,7 @@ static int mtk_eth_free_pkt(struct udevice *dev, uchar *packet, int length)
 
 static int mtk_eth_probe(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct mtk_eth_priv *priv = dev_get_priv(dev);
 	ulong iobase = pdata->iobase;
 	int ret;
@@ -1407,9 +1421,9 @@ static int mtk_eth_remove(struct udevice *dev)
 	return 0;
 }
 
-static int mtk_eth_ofdata_to_platdata(struct udevice *dev)
+static int mtk_eth_of_to_plat(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct mtk_eth_priv *priv = dev_get_priv(dev);
 	struct ofnode_phandle_args args;
 	struct regmap *regmap;
@@ -1419,7 +1433,7 @@ static int mtk_eth_ofdata_to_platdata(struct udevice *dev)
 
 	priv->soc = dev_get_driver_data(dev);
 
-	pdata->iobase = dev_read_addr(dev);
+	pdata->iobase = (phys_addr_t)dev_remap_addr(dev);
 
 	/* get corresponding ethsys phandle */
 	ret = dev_read_phandle_with_args(dev, "mediatek,ethsys", NULL, 0, 0,
@@ -1427,15 +1441,9 @@ static int mtk_eth_ofdata_to_platdata(struct udevice *dev)
 	if (ret)
 		return ret;
 
-	regmap = syscon_node_to_regmap(args.node);
-	if (IS_ERR(regmap))
-		return PTR_ERR(regmap);
-
-	priv->ethsys_base = regmap_get_range(regmap, 0);
-	if (!priv->ethsys_base) {
-		dev_err(dev, "Unable to find ethsys\n");
-		return -ENODEV;
-	}
+	priv->ethsys_regmap = syscon_node_to_regmap(args.node);
+	if (IS_ERR(priv->ethsys_regmap))
+		return PTR_ERR(priv->ethsys_regmap);
 
 	/* Reset controllers */
 	ret = reset_get_by_name(dev, "fe", &priv->rst_fe);
@@ -1447,11 +1455,9 @@ static int mtk_eth_ofdata_to_platdata(struct udevice *dev)
 	priv->gmac_id = dev_read_u32_default(dev, "mediatek,gmac-id", 0);
 
 	/* Interface mode is required */
-	str = dev_read_string(dev, "phy-mode");
-	if (str) {
-		pdata->phy_interface = phy_get_interface_by_name(str);
-		priv->phy_interface = pdata->phy_interface;
-	} else {
+	pdata->phy_interface = dev_read_phy_mode(dev);
+	priv->phy_interface = pdata->phy_interface;
+	if (pdata->phy_interface == PHY_INTERFACE_MODE_NA) {
 		printf("error: phy-mode is not set\n");
 		return -EINVAL;
 	}
@@ -1542,6 +1548,7 @@ static const struct udevice_id mtk_eth_ids[] = {
 	{ .compatible = "mediatek,mt7629-eth", .data = SOC_MT7629 },
 	{ .compatible = "mediatek,mt7623-eth", .data = SOC_MT7623 },
 	{ .compatible = "mediatek,mt7622-eth", .data = SOC_MT7622 },
+	{ .compatible = "mediatek,mt7621-eth", .data = SOC_MT7621 },
 	{}
 };
 
@@ -1558,11 +1565,11 @@ U_BOOT_DRIVER(mtk_eth) = {
 	.name = "mtk-eth",
 	.id = UCLASS_ETH,
 	.of_match = mtk_eth_ids,
-	.ofdata_to_platdata = mtk_eth_ofdata_to_platdata,
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
+	.of_to_plat = mtk_eth_of_to_plat,
+	.plat_auto	= sizeof(struct eth_pdata),
 	.probe = mtk_eth_probe,
 	.remove = mtk_eth_remove,
 	.ops = &mtk_eth_ops,
-	.priv_auto_alloc_size = sizeof(struct mtk_eth_priv),
+	.priv_auto	= sizeof(struct mtk_eth_priv),
 	.flags = DM_FLAG_ALLOC_PRIV_DMA,
 };

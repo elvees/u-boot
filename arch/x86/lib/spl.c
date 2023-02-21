@@ -17,6 +17,8 @@
 #include <syscon.h>
 #include <asm/cpu.h>
 #include <asm/cpu_common.h>
+#include <asm/fsp2/fsp_api.h>
+#include <asm/global_data.h>
 #include <asm/mrccache.h>
 #include <asm/mtrr.h>
 #include <asm/pci.h>
@@ -26,7 +28,7 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-__weak int arch_cpu_init_dm(void)
+__weak int fsp_setup_pinctrl(void *ctx, struct event *event)
 {
 	return 0;
 }
@@ -88,14 +90,14 @@ static int x86_spl_init(void)
 		return ret;
 	}
 #ifndef CONFIG_TPL
-	ret = arch_cpu_init_dm();
+	ret = fsp_setup_pinctrl(NULL, NULL);
 	if (ret) {
 		debug("%s: arch_cpu_init_dm() failed\n", __func__);
 		return ret;
 	}
 #endif
 	preloader_console_init();
-#ifndef CONFIG_TPL
+#if !defined(CONFIG_TPL) && !CONFIG_IS_ENABLED(CPU)
 	ret = print_cpuinfo();
 	if (ret) {
 		debug("%s: print_cpuinfo() failed\n", __func__);
@@ -115,8 +117,8 @@ static int x86_spl_init(void)
 	}
 
 #ifndef CONFIG_SYS_COREBOOT
-# ifndef CONFIG_TPL
 	memset(&__bss_start, 0, (ulong)&__bss_end - (ulong)&__bss_start);
+# ifndef CONFIG_TPL
 
 	/* TODO(sjg@chromium.org): Consider calling cpu_init_r() here */
 	ret = interrupt_init();

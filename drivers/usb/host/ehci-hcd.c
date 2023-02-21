@@ -25,10 +25,6 @@
 
 #include "ehci.h"
 
-#ifndef CONFIG_USB_MAX_CONTROLLER_COUNT
-#define CONFIG_USB_MAX_CONTROLLER_COUNT 1
-#endif
-
 /*
  * EHCI spec page 20 says that the HC may take up to 16 uFrames (= 4ms) to halt.
  * Let's time out after 8 to have a little safety margin on top of that.
@@ -108,7 +104,7 @@ static struct descriptor {
 	},
 };
 
-#if defined(CONFIG_EHCI_IS_TDI)
+#if defined(CONFIG_USB_EHCI_IS_TDI)
 #define ehci_is_TDI()	(1)
 #else
 #define ehci_is_TDI()	(0)
@@ -342,6 +338,28 @@ static int ehci_disable_async(struct ehci_ctrl *ctrl)
 			100 * 1000);
 	if (ret < 0)
 		printf("EHCI fail timeout STS_ASS reset\n");
+
+	return ret;
+}
+
+static int ehci_iaa_cycle(struct ehci_ctrl *ctrl)
+{
+	u32 cmd, status;
+	int ret;
+
+	/* Enable Interrupt on Async Advance Doorbell. */
+	cmd = ehci_readl(&ctrl->hcor->or_usbcmd);
+	cmd |= CMD_IAAD;
+	ehci_writel(&ctrl->hcor->or_usbcmd, cmd);
+
+	ret = handshake(&ctrl->hcor->or_usbsts, STS_IAA, STS_IAA,
+			10 * 1000); /* 10ms timeout */
+	if (ret < 0)
+		printf("EHCI fail timeout STS_IAA set\n");
+
+	status = ehci_readl(&ctrl->hcor->or_usbsts);
+	if (status & STS_IAA)
+		ehci_writel(&ctrl->hcor->or_usbsts, STS_IAA);
 
 	return ret;
 }
@@ -630,6 +648,11 @@ ehci_submit_async(struct usb_device *dev, unsigned long pipe, void *buffer,
 	ctrl->qh_list.qh_link = cpu_to_hc32(virt_to_phys(&ctrl->qh_list) | QH_LINK_TYPE_QH);
 	flush_dcache_range((unsigned long)&ctrl->qh_list,
 		ALIGN_END_ADDR(struct QH, &ctrl->qh_list, 1));
+
+	/* Set IAAD, poll IAA */
+	ret = ehci_iaa_cycle(ctrl);
+	if (ret)
+		goto fail;
 
 	/*
 	 * Invalidate the memory area occupied by buffer

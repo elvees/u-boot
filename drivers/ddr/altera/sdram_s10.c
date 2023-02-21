@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2016-2018 Intel Corporation <www.intel.com>
+ * Copyright (C) 2016-2022 Intel Corporation <www.intel.com>
  *
  */
 
@@ -15,6 +15,7 @@
 #include <log.h>
 #include <ram.h>
 #include <reset.h>
+#include <asm/global_data.h>
 #include "sdram_s10.h"
 #include <wait_bit.h>
 #include <asm/arch/firewall.h>
@@ -70,7 +71,7 @@ int match_ddr_conf(u32 ddr_conf)
  */
 int sdram_mmr_init_full(struct udevice *dev)
 {
-	struct altera_sdram_platdata *plat = dev->platdata;
+	struct altera_sdram_plat *plat = dev_get_plat(dev);
 	struct altera_sdram_priv *priv = dev_get_priv(dev);
 	u32 update_value, io48_value, ddrioctl;
 	u32 i;
@@ -276,7 +277,7 @@ int sdram_mmr_init_full(struct udevice *dev)
 			DDR_SCH_DEVTODEV);
 
 	/* assigning the SDRAM size */
-	unsigned long long size = sdram_calculate_size(plat);
+	phys_size_t size = sdram_calculate_size(plat);
 	/* If the size is invalid, use default Config size */
 	if (size <= 0)
 		hw_size = PHYS_SDRAM_1_SIZE;
@@ -334,4 +335,3 @@ int sdram_mmr_init_full(struct udevice *dev)
 	debug("DDR: HMC init success\n");
 	return 0;
 }
-

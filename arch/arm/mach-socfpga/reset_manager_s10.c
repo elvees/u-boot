@@ -5,11 +5,15 @@
  */
 
 #include <common.h>
+#include <hang.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/reset_manager.h>
+#include <asm/arch/smc_api.h>
 #include <asm/arch/system_manager.h>
 #include <dt-bindings/reset/altr,rst-mgr-s10.h>
 #include <linux/iopoll.h>
+#include <linux/intel-smc.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -55,6 +59,15 @@ void socfpga_per_reset_all(void)
 
 void socfpga_bridges_reset(int enable)
 {
+#if !defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_ATF)
+	u64 arg = enable;
+
+	int ret = invoke_smc(INTEL_SIP_SMC_HPS_SET_BRIDGES, &arg, 1, NULL, 0);
+	if (ret) {
+		printf("SMC call failed with error %d in %s.\n", ret, __func__);
+		return;
+	}
+#else
 	u32 reg;
 
 	if (enable) {
@@ -67,9 +80,9 @@ void socfpga_bridges_reset(int enable)
 			     ~0);
 
 		/* Poll until all idleack to 0 */
-		read_poll_timeout(readl, socfpga_get_sysmgr_addr() +
-				  SYSMGR_SOC64_NOC_IDLEACK, reg, !reg, 1000,
-				  300000);
+		read_poll_timeout(readl, reg, !reg, 1000, 300000,
+				  socfpga_get_sysmgr_addr() +
+				  SYSMGR_SOC64_NOC_IDLEACK);
 	} else {
 		/* set idle request to all bridges */
 		writel(~0,
@@ -80,18 +93,20 @@ void socfpga_bridges_reset(int enable)
 		writel(1, socfpga_get_sysmgr_addr() + SYSMGR_SOC64_NOC_TIMEOUT);
 
 		/* Poll until all idleack to 1 */
-		read_poll_timeout(readl, socfpga_get_sysmgr_addr() +
-				  SYSMGR_SOC64_NOC_IDLEACK, reg,
+		read_poll_timeout(readl, reg,
 				  reg == (SYSMGR_NOC_H2F_MSK |
 					  SYSMGR_NOC_LWH2F_MSK),
-				  1000, 300000);
+				  1000, 300000,
+				  socfpga_get_sysmgr_addr() +
+				  SYSMGR_SOC64_NOC_IDLEACK);
 
 		/* Poll until all idlestatus to 1 */
-		read_poll_timeout(readl, socfpga_get_sysmgr_addr() +
-				  SYSMGR_SOC64_NOC_IDLESTATUS, reg,
+		read_poll_timeout(readl, reg,
 				  reg == (SYSMGR_NOC_H2F_MSK |
 					  SYSMGR_NOC_LWH2F_MSK),
-				  1000, 300000);
+				  1000, 300000,
+				  socfpga_get_sysmgr_addr() +
+				  SYSMGR_SOC64_NOC_IDLESTATUS);
 
 		/* Reset all bridges (except NOR DDR scheduler & F2S) */
 		setbits_le32(socfpga_get_rstmgr_addr() + RSTMGR_SOC64_BRGMODRST,
@@ -101,6 +116,7 @@ void socfpga_bridges_reset(int enable)
 		/* Disable NOC timeout */
 		writel(0, socfpga_get_sysmgr_addr() + SYSMGR_SOC64_NOC_TIMEOUT);
 	}
+#endif
 }
 
 /*

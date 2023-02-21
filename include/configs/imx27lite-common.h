@@ -15,10 +15,6 @@
 #define CONFIG_MX27
 #define CONFIG_MX27_CLK32	32768		/* OSC32K frequency */
 
-#define CONFIG_CMDLINE_TAG		1	/* enable passing of ATAGs */
-#define CONFIG_SETUP_MEMORY_TAGS	1
-#define CONFIG_INITRD_TAG		1
-
 /*
  * Lowlevel configuration
  */
@@ -67,8 +63,6 @@
 /*
  * Memory Info
  */
-/* malloc() len */
-#define CONFIG_SYS_MALLOC_LEN		(0x10000 + 512 * 1024)
 /* memtest start address */
 #define PHYS_SDRAM_1		0xA0000000	/* DDR Start */
 #define PHYS_SDRAM_1_SIZE	0x08000000	/* DDR size 128MB */
@@ -76,28 +70,23 @@
 /*
  * Serial Driver info
  */
-#define CONFIG_MXC_UART_BASE	UART1_BASE
+#define CONFIG_MXC_UART_BASE	UART_BASE_ADDR(1)
 
 /*
  * Flash & Environment
  */
 /* Use buffered writes (~10x faster) */
 /* Use hardware sector protection */
-#define CONFIG_SYS_MAX_FLASH_BANKS	1	/* max number of flash banks */
 /* CS2 Base address */
 #define PHYS_FLASH_1			0xc0000000
 /* Flash Base for U-Boot */
 #define CONFIG_SYS_FLASH_BASE		PHYS_FLASH_1
-#define CONFIG_SYS_MAX_FLASH_SECT	(PHYS_FLASH_SIZE / \
-		CONFIG_SYS_FLASH_SECT_SZ)
-#define CONFIG_SYS_MONITOR_BASE		CONFIG_SYS_FLASH_BASE
 #define CONFIG_SYS_MONITOR_LEN		0x40000		/* Reserve 256KiB */
 /* Address and size of Redundant Environment Sector	*/
 
 /*
  * Ethernet
  */
-#define CONFIG_FEC_MXC
 #define CONFIG_FEC_MXC_PHYADDR		0x1f
 
 /*
@@ -110,19 +99,11 @@
 #define CONFIG_MXC_NAND_REGS_BASE	0xd8000000
 #define CONFIG_SYS_MAX_NAND_DEVICE	1
 #define CONFIG_SYS_NAND_BASE		0xd8000000
-#define CONFIG_JFFS2_NAND
 #define CONFIG_MXC_NAND_HWECC
 
 /*
  * U-Boot general configuration
  */
-#define CONFIG_SYS_CBSIZE	1024	/* Console I/O Buffer Size  */
-/* Boot Argument Buffer Size */
-#define CONFIG_SYS_BARGSIZE	CONFIG_SYS_CBSIZE
-
-#define CONFIG_LOADADDR		0xa0800000	/* loadaddr env var */
-#define CONFIG_SYS_LOAD_ADDR		CONFIG_LOADADDR
-
 #define	CONFIG_EXTRA_ENV_SETTINGS					\
 	"netdev=eth0\0"							\
 	"nfsargs=setenv bootargs root=/dev/nfs rw "			\
@@ -149,11 +130,7 @@
 		" +${filesize};cp.b ${fileaddr} "			\
 		__stringify(CONFIG_SYS_MONITOR_BASE) " ${filesize}\0"	\
 	"upd=run load update\0"						\
-	"mtdids=" CONFIG_MTDIDS_DEFAULT "\0"					\
-	"mtdparts=" CONFIG_MTDPARTS_DEFAULT "\0"				\
 
 /* additions for new relocation code, must be added to all boards */
 #define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM_1
-#define CONFIG_SYS_INIT_SP_ADDR		(CONFIG_SYS_SDRAM_BASE + 0x1000 - /* Fix this */ \
-					GENERATED_GBL_DATA_SIZE)
 #endif /* __IMX27LITE_COMMON_CONFIG_H */

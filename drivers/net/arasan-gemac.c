@@ -431,7 +431,7 @@ static void arasan_gemac_stop(struct udevice *dev)
 
 static int arasan_gemac_write_hwaddr(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct arasan_gemac_priv *priv = dev_get_priv(dev);
 	unsigned char *enetaddr = pdata->enetaddr;
 
@@ -542,18 +542,12 @@ static int arasan_gemac_phy_init(struct udevice *dev)
 static int arasan_gemac_probe(struct udevice *dev)
 {
 	struct arasan_gemac_priv *priv = dev_get_priv(dev);
-	const char *phy_mode;
 	int phy_handle, ret;
 
 	priv->base = (void *)devfdt_get_addr(dev);
 
-	phy_mode = fdt_getprop(gd->fdt_blob, dev_of_offset(dev),
-			       "phy-mode", 0);
-	if (!phy_mode)
-		return -EINVAL;
-
-	priv->phy_interface = phy_get_interface_by_name(phy_mode);
-	if (priv->phy_interface < 0)
+	priv->phy_interface = dev_read_phy_mode(dev);
+	if (priv->phy_interface == PHY_INTERFACE_MODE_NA)
 		return -EINVAL;
 
 	phy_handle = fdtdec_lookup_phandle(gd->fdt_blob, dev_of_offset(dev),
@@ -653,7 +647,7 @@ U_BOOT_DRIVER(arasan_gemac_drv) = {
 	.of_match = arasan_gemac_match_table,
 	.probe = arasan_gemac_probe,
 	.remove = arasan_gemac_remove,
-	.priv_auto_alloc_size = sizeof(struct arasan_gemac_priv),
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
+	.priv_auto = sizeof(struct arasan_gemac_priv),
+	.plat_auto = sizeof(struct eth_pdata),
 	.ops = &arasan_gemac_ops,
 };

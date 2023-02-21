@@ -14,6 +14,7 @@
 #include <qfw.h>
 #include <asm/atomic.h>
 #include <asm/cpu.h>
+#include <asm/global_data.h>
 #include <asm/interrupt.h>
 #include <asm/io.h>
 #include <asm/lapic.h>
@@ -87,7 +88,7 @@ DECLARE_GLOBAL_DATA_PTR;
  *			intel,apic-id = <2>;
  *		};
  *
- * Here the 'reg' property is the CPU number and then is placed in dev->req_seq
+ * Here the 'reg' property is the CPU number and then is placed in dev_seq(cpu)
  * so that we can index into ap_callbacks[] using that. The APIC ID is different
  * and may not be sequential (it typically is if hyperthreading is supported).
  *
@@ -135,7 +136,7 @@ struct mp_flight_plan {
  *
  * @func: Function to run
  * @arg: Argument to pass to the function
- * @logical_cpu_number: Either a CPU number (i.e. dev->req_seq) or a special
+ * @logical_cpu_number: Either a CPU number (i.e. dev_seq(cpu) or a special
  *	value like MP_SELECT_BSP. It tells the AP whether it should process this
  *	callback
  */
@@ -152,7 +153,7 @@ static struct mp_flight_plan mp_info;
  * ap_callbacks - Callback mailbox array
  *
  * Array of callback, one entry for each available CPU, indexed by the CPU
- * number, which is dev->req_seq. The entry for the main CPU is never used.
+ * number, which is dev_seq(cpu). The entry for the main CPU is never used.
  * When this is NULL, there is no pending work for the CPU to run. When
  * non-NULL it points to the mp_callback structure. This is shared between all
  * CPUs, so should only be written by the main CPU.
@@ -221,7 +222,7 @@ static int find_cpu_by_apic_id(int apic_id, struct udevice **devp)
 	for (uclass_find_first_device(UCLASS_CPU, &dev);
 	     dev;
 	     uclass_find_next_device(&dev)) {
-		struct cpu_platdata *plat = dev_get_parent_platdata(dev);
+		struct cpu_plat *plat = dev_get_parent_plat(dev);
 
 		if (plat->cpu_id == apic_id) {
 			*devp = dev;
@@ -422,7 +423,7 @@ static int apic_wait_timeout(int total_delay, const char *msg)
  *
  * @num_aps: Number of APs we expect to find
  * @ap_count: Initially zero. Incremented by this function for each AP found
- * @return 0 if all APs were set up correctly or there are none to set up,
+ * Return: 0 if all APs were set up correctly or there are none to set up,
  *	-ENOSPC if the SIPI vector is too high in memory,
  *	-ETIMEDOUT if the ICR is busy or the second SIPI fails to complete
  *	-EIO if not all APs check in correctly
@@ -535,7 +536,7 @@ static int bsp_do_flight_plan(struct udevice *cpu, struct mp_flight_plan *plan,
  *
  * @devp: If non-NULL, returns CPU device corresponding to the BSP
  * @cpu_countp: If non-NULL, returns the total number of CPUs
- * @return CPU number of the BSP, or -ve on error. If multiprocessing is not
+ * Return: CPU number of the BSP, or -ve on error. If multiprocessing is not
  *	enabled, returns 0
  */
 static int get_bsp(struct udevice **devp, int *cpu_countp)
@@ -562,7 +563,7 @@ static int get_bsp(struct udevice **devp, int *cpu_countp)
 	if (cpu_countp)
 		*cpu_countp = ret;
 
-	return dev->req_seq >= 0 ? dev->req_seq : 0;
+	return dev_seq(dev) >= 0 ? dev_seq(dev) : 0;
 }
 
 /**
@@ -572,7 +573,7 @@ static int get_bsp(struct udevice **devp, int *cpu_countp)
  * pointer to new instructions
  *
  * @slot: Pointer to the AP's callback slot
- * @return value of that pointer
+ * Return: value of that pointer
  */
 static struct mp_callback *read_callback(struct mp_callback **slot)
 {
@@ -609,12 +610,12 @@ static void store_callback(struct mp_callback **slot, struct mp_callback *val)
  * @num_cpus: The number of CPUs in the system (= number of APs + 1)
  * @expire_ms: Timeout to wait for all APs to finish, in milliseconds, or 0 for
  *	no timeout
- * @return 0 if OK, -ETIMEDOUT if one or more APs failed to respond in time
+ * Return: 0 if OK, -ETIMEDOUT if one or more APs failed to respond in time
  */
 static int run_ap_work(struct mp_callback *callback, struct udevice *bsp,
 		       int num_cpus, uint expire_ms)
 {
-	int cur_cpu = bsp->req_seq;
+	int cur_cpu = dev_seq(bsp);
 	int num_aps = num_cpus - 1; /* number of non-BSPs to get this message */
 	int cpus_accepted;
 	ulong start;
@@ -669,7 +670,7 @@ static int run_ap_work(struct mp_callback *callback, struct udevice *bsp,
  *
  * @cpu: CPU that is waiting
  * @unused: Optional argument provided by struct mp_flight_record, not used here
- * @return Does not return
+ * Return: Does not return
  */
 static int ap_wait_for_instruction(struct udevice *cpu, void *unused)
 {
@@ -679,7 +680,7 @@ static int ap_wait_for_instruction(struct udevice *cpu, void *unused)
 	if (!IS_ENABLED(CONFIG_SMP_AP_WORK))
 		return 0;
 
-	per_cpu_slot = &ap_callbacks[cpu->req_seq];
+	per_cpu_slot = &ap_callbacks[dev_seq(cpu)];
 
 	while (1) {
 		struct mp_callback *cb = read_callback(per_cpu_slot);
@@ -694,7 +695,7 @@ static int ap_wait_for_instruction(struct udevice *cpu, void *unused)
 		mfence();
 		if (lcb.logical_cpu_number == MP_SELECT_ALL ||
 		    lcb.logical_cpu_number == MP_SELECT_APS ||
-		    cpu->req_seq == lcb.logical_cpu_number)
+		    dev_seq(cpu) == lcb.logical_cpu_number)
 			lcb.func(lcb.arg);
 
 		/* Indicate we are finished */
@@ -706,7 +707,7 @@ static int ap_wait_for_instruction(struct udevice *cpu, void *unused)
 
 static int mp_init_cpu(struct udevice *cpu, void *unused)
 {
-	struct cpu_platdata *plat = dev_get_parent_platdata(cpu);
+	struct cpu_plat *plat = dev_get_parent_plat(cpu);
 
 	plat->ucode_version = microcode_read_rev();
 	plat->device_id = gd->arch.x86_device;
@@ -839,7 +840,6 @@ int mp_init(void)
 	int num_aps, num_cpus;
 	atomic_t *ap_count;
 	struct udevice *cpu;
-	struct uclass *uc;
 	int ret;
 
 	if (IS_ENABLED(CONFIG_QFW)) {
@@ -847,14 +847,6 @@ int mp_init(void)
 		if (ret)
 			return ret;
 	}
-
-	/*
-	 * Multiple APs are brought up simultaneously and they may get the same
-	 * seq num in the uclass_resolve_seq() during device_probe(). To avoid
-	 * this, set req_seq to the reg number in the device tree in advance.
-	 */
-	uclass_id_foreach_dev(UCLASS_CPU, cpu, uc)
-		cpu->req_seq = dev_read_u32_default(cpu, "reg", -1);
 
 	ret = get_bsp(&cpu, &num_cpus);
 	if (ret < 0) {

@@ -20,7 +20,7 @@ void cli_simple_loop(void);
  *
  * @cmd:	String containing the command to execute
  * @flag	Flag value - see CMD_FLAG_...
- * @return 1  - command executed, repeatable
+ * Return: 1  - command executed, repeatable
  *	0  - command executed but not repeatable, interrupted commands are
  *	     always considered not repeatable
  *	-1 - not executed (unrecognized, bootd recursion or too many args)
@@ -34,8 +34,10 @@ int cli_simple_run_command(const char *cmd, int flag);
  *
  * @param input		Input string possible containing $() / ${} vars
  * @param output	Output string with $() / ${} vars expanded
+ * @param max_size	Maximum size of @output (including terminator)
+ * Return: 0 if OK, -ENOSPC if we ran out of space in @output
  */
-void cli_simple_process_macros(const char *input, char *output);
+int cli_simple_process_macros(const char *input, char *output, int max_size);
 
 /**
  * cli_simple_run_command_list() - Execute a list of command
@@ -48,7 +50,7 @@ void cli_simple_process_macros(const char *input, char *output);
  *
  * @param cmd	String containing list of commands
  * @param flag	Execution flags (CMD_FLAG_...)
- * @return 0 on success, or != 0 on error.
+ * Return: 0 on success, or != 0 on error.
  */
 int cli_simple_run_command_list(char *cmd, int flag);
 
@@ -58,7 +60,7 @@ int cli_simple_run_command_list(char *cmd, int flag);
  * This is a convenience function which calls cli_readline_into_buffer().
  *
  * @prompt: Prompt to display
- * @return command line length excluding terminator, or -ve on error
+ * Return: command line length excluding terminator, or -ve on error
  */
 int cli_readline(const char *const prompt);
 
@@ -80,7 +82,7 @@ int cli_readline(const char *const prompt);
  * @prompt:	Prompt to display
  * @buffer:	Place to put the line that is entered
  * @timeout:	Timeout in milliseconds, 0 if none
- * @return command line length excluding terminator, or -ve on error: of the
+ * Return: command line length excluding terminator, or -ve on error: of the
  * timeout is exceeded (either CONFIG_BOOT_RETRY_TIME or the timeout
  * parameter), then -2 is returned. If a break is detected (Ctrl-C) then
  * -1 is returned.
@@ -103,7 +105,7 @@ int cli_readline_into_buffer(const char *const prompt, char *buffer,
  *
  * @line:	Command line to parse
  * @args:	Array to hold arguments
- * @return number of arguments
+ * Return: number of arguments
  */
 int cli_simple_parse_line(char *line, char *argv[]);
 
@@ -119,7 +121,7 @@ int cli_simple_parse_line(char *line, char *argv[]);
  * @cmdp:	On entry, the command that will be executed if the FDT does
  *		not have a command. Returns the command to execute after
  *		checking the FDT.
- * @return true to execute securely, else false
+ * Return: true to execute securely, else false
  */
 bool cli_process_fdt(const char **cmdp);
 

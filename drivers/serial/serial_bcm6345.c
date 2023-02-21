@@ -262,14 +262,14 @@ U_BOOT_DRIVER(bcm6345_serial) = {
 	.id = UCLASS_SERIAL,
 	.of_match = bcm6345_serial_ids,
 	.probe = bcm6345_serial_probe,
-	.priv_auto_alloc_size = sizeof(struct bcm6345_serial_priv),
+	.priv_auto	= sizeof(struct bcm6345_serial_priv),
 	.ops = &bcm6345_serial_ops,
 };
 
 #ifdef CONFIG_DEBUG_UART_BCM6345
 static inline void _debug_uart_init(void)
 {
-	void __iomem *base = (void __iomem *)CONFIG_DEBUG_UART_BASE;
+	void __iomem *base = (void __iomem *)CONFIG_VAL(DEBUG_UART_BASE);
 
 	bcm6345_serial_init(base, CONFIG_DEBUG_UART_CLOCK, CONFIG_BAUDRATE);
 }
@@ -285,7 +285,7 @@ static inline void wait_xfered(void __iomem *base)
 
 static inline void _debug_uart_putc(int ch)
 {
-	void __iomem *base = (void __iomem *)CONFIG_DEBUG_UART_BASE;
+	void __iomem *base = (void __iomem *)CONFIG_VAL(DEBUG_UART_BASE);
 
 	wait_xfered(base);
 	writel(ch, base + UART_FIFO_REG);

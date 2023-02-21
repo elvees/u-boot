@@ -25,7 +25,7 @@ class Entry_text(Entry):
         <text>: The text to place in the entry (overrides the above mechanism).
             This is useful when the text is constant.
 
-    Example node:
+    Example node::
 
         text {
             size = <50>;
@@ -38,7 +38,7 @@ class Entry_text(Entry):
 
     and binman will insert that string into the entry.
 
-    It is also possible to put the string directly in the node:
+    It is also possible to put the string directly in the node::
 
         text {
             size = <8>;
@@ -46,7 +46,7 @@ class Entry_text(Entry):
             message = "a message directly in the node"
         };
 
-    or just:
+    or just::
 
         text {
             size = <8>;
@@ -60,14 +60,14 @@ class Entry_text(Entry):
         super().__init__(section, etype, node)
         value = fdt_util.GetString(self._node, 'text')
         if value:
-            value = tools.ToBytes(value)
+            value = tools.to_bytes(value)
         else:
             label, = self.GetEntryArgsOrProps([EntryArg('text-label', str)])
             self.text_label = label
             if self.text_label:
                 value, = self.GetEntryArgsOrProps([EntryArg(self.text_label,
                                                             str)])
-                value = tools.ToBytes(value) if value is not None else value
+                value = tools.to_bytes(value) if value is not None else value
         self.value = value
 
     def ObtainContents(self):

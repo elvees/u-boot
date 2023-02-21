@@ -10,95 +10,49 @@
 #ifndef __XILINX_ZYNQMP_H
 #define __XILINX_ZYNQMP_H
 
-#define CONFIG_REMAKE_ELF
-
-/* #define CONFIG_ARMV8_SWITCH_TO_EL1 */
-
 /* Generic Interrupt Controller Definitions */
-#define CONFIG_GICV2
 #define GICD_BASE	0xF9010000
 #define GICC_BASE	0xF9020000
 
-#define CONFIG_SYS_INIT_SP_ADDR		CONFIG_SYS_TEXT_BASE
-
-/* Generic Timer Definitions - setup in EL3. Setup by ATF for other cases */
-#if !defined(COUNTER_FREQUENCY)
-# define COUNTER_FREQUENCY		100000000
-#endif
-
-/* Size of malloc() pool */
-#define CONFIG_SYS_MALLOC_LEN		(CONFIG_ENV_SIZE + 0x2000000)
-
 /* Serial setup */
-#define CONFIG_CPU_ARMV8
-
 #define CONFIG_SYS_BAUDRATE_TABLE \
 	{ 4800, 9600, 19200, 38400, 57600, 115200 }
 
-/* BOOTP options */
-#define CONFIG_BOOTP_BOOTFILESIZE
-#define CONFIG_BOOTP_MAY_FAIL
+/* GUIDs for capsule updatable firmware images */
+#define XILINX_BOOT_IMAGE_GUID \
+	EFI_GUID(0xde6066e8, 0x0256, 0x4fad, 0x82, 0x38, \
+		 0xe4, 0x06, 0xe2, 0x74, 0xc4, 0xcf)
+
+#define XILINX_UBOOT_IMAGE_GUID \
+	EFI_GUID(0xcf9ecfd4, 0x938b, 0x41c5, 0x85, 0x51, \
+		 0x1f, 0x88, 0x3a, 0xb7, 0xdc, 0x18)
 
 #ifdef CONFIG_NAND_ARASAN
 # define CONFIG_SYS_MAX_NAND_DEVICE	1
-# define CONFIG_SYS_NAND_ONFI_DETECTION
-#endif
-
-#if defined(CONFIG_SPL_BUILD)
-#define CONFIG_ZYNQMP_PSU_INIT_ENABLED
 #endif
 
 /* Miscellaneous configurable options */
-#define CONFIG_SYS_LOAD_ADDR		0x8000000
 
 #if defined(CONFIG_ZYNQMP_USB)
-#define CONFIG_SYS_DFU_DATA_BUF_SIZE	0x1800000
 #define DFU_DEFAULT_POLL_TIMEOUT	300
 #define CONFIG_THOR_RESET_OFF
-#define DFU_ALT_INFO_RAM \
-	"dfu_ram_info=" \
-	"setenv dfu_alt_info " \
-	"Image ram 80000 $kernel_size_r\\\\;" \
-	"system.dtb ram $fdt_addr_r $fdt_size_r\0" \
-	"dfu_ram=run dfu_ram_info && dfu 0 ram 0\0" \
-	"thor_ram=run dfu_ram_info && thordown 0 ram 0\0" \
-	"dfu_ram_tftp=run dfu_ram_info && setenv updatefile boot && " \
-	"setenv loadaddr 10000000 && dfu tftp ram 0\0"
 
-#define DFU_ALT_INFO  \
-		DFU_ALT_INFO_RAM
-
-#ifndef CONFIG_SPL_BUILD
 # define PARTS_DEFAULT \
 	"partitions=uuid_disk=${uuid_gpt_disk};" \
 	"name=""boot"",size=16M,uuid=${uuid_gpt_boot};" \
 	"name=""Linux"",size=-M,uuid=${uuid_gpt_Linux}\0"
-#endif
-#endif
-
-#if !defined(DFU_ALT_INFO)
-# define DFU_ALT_INFO
 #endif
 
 #if !defined(PARTS_DEFAULT)
 # define PARTS_DEFAULT
 #endif
 
-/* Monitor Command Prompt */
 /* Console I/O Buffer Size */
-#define CONFIG_SYS_CBSIZE		2048
-#define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
-#define CONFIG_SYS_MAXARGS		64
 
 /* Ethernet driver */
 #if defined(CONFIG_ZYNQ_GEM)
-# define CONFIG_SYS_FAULT_ECHO_LINK_DOWN
 # define PHY_ANEG_TIMEOUT       20000
 #endif
-
-#define CONFIG_SYS_BOOTM_LEN	(60 * 1024 * 1024)
-
-#define CONFIG_CLOCKS
 
 #define ENV_MEM_LAYOUT_SETTINGS \
 	"fdt_addr_r=0x40000000\0" \
@@ -106,6 +60,8 @@
 	"pxefile_addr_r=0x10000000\0" \
 	"kernel_addr_r=0x18000000\0" \
 	"kernel_size_r=0x10000000\0" \
+	"kernel_comp_addr_r=0x30000000\0" \
+	"kernel_comp_size=0x3C00000\0" \
 	"scriptaddr=0x20000000\0" \
 	"ramdisk_addr_r=0x02100000\0" \
 	"script_size_f=0x80000\0" \
@@ -179,11 +135,41 @@
 #define BOOTENV_DEV_NAME_JTAG(devtypeu, devtypel, instance) \
 	"jtag "
 
+#define BOOT_TARGET_DEVICES_USB_DFU(func) \
+	func(USB_DFU, usb_dfu, 0) func(USB_DFU, usb_dfu, 1)
+
+#define BOOTENV_DEV_USB_DFU(devtypeu, devtypel, instance) \
+	"bootcmd_" #devtypel #instance "=setenv dfu_alt_info boot.scr ram " \
+	"$scriptaddr $script_size_f && " \
+	"dfu " #instance " ram " #instance " 60 && " \
+	"echo DFU" #instance ": Trying to boot script at ${scriptaddr} && " \
+	"source ${scriptaddr}; " \
+	"echo DFU" #instance ": SCRIPT FAILED: continuing...;\0"
+
+#define BOOTENV_DEV_NAME_USB_DFU(devtypeu, devtypel, instance) \
+	""
+
+#define BOOT_TARGET_DEVICES_USB_THOR(func) \
+	func(USB_THOR, usb_thor, 0) func(USB_THOR, usb_thor, 1)
+
+#define BOOTENV_DEV_USB_THOR(devtypeu, devtypel, instance) \
+	"bootcmd_" #devtypel #instance "=setenv dfu_alt_info boot.scr ram " \
+	"$scriptaddr $script_size_f && " \
+	"thordown " #instance " ram " #instance " && " \
+	"echo THOR" #instance ": Trying to boot script at ${scriptaddr} && " \
+	"source ${scriptaddr}; " \
+	"echo THOR" #instance ": SCRIPT FAILED: continuing...;\0"
+
+#define BOOTENV_DEV_NAME_USB_THOR(devtypeu, devtypel, instance) \
+	""
+
 #define BOOT_TARGET_DEVICES(func) \
 	BOOT_TARGET_DEVICES_JTAG(func) \
 	BOOT_TARGET_DEVICES_MMC(func) \
 	BOOT_TARGET_DEVICES_QSPI(func) \
 	BOOT_TARGET_DEVICES_NAND(func) \
+	BOOT_TARGET_DEVICES_USB_DFU(func) \
+	BOOT_TARGET_DEVICES_USB_THOR(func) \
 	BOOT_TARGET_DEVICES_USB(func) \
 	BOOT_TARGET_DEVICES_SCSI(func) \
 	BOOT_TARGET_DEVICES_PXE(func) \
@@ -195,8 +181,7 @@
 #ifndef CONFIG_EXTRA_ENV_SETTINGS
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	ENV_MEM_LAYOUT_SETTINGS \
-	BOOTENV \
-	DFU_ALT_INFO
+	BOOTENV
 #endif
 
 /* SPL can't handle all huge variables - define just DFU */
@@ -210,13 +195,6 @@
 	"dfu_bufsiz=0x1000\0"
 #endif
 
-#define CONFIG_SPL_STACK		0xfffffffc
-#define CONFIG_SPL_MAX_SIZE		0x40000
-
-/* Just random location in OCM */
-#define CONFIG_SPL_BSS_START_ADDR	0x0
-#define CONFIG_SPL_BSS_MAX_SIZE		0x80000
-
 #if defined(CONFIG_SPL_SPI_FLASH_SUPPORT)
 # define CONFIG_SYS_SPI_KERNEL_OFFS	0x80000
 # define CONFIG_SYS_SPI_ARGS_OFFS	0xa0000
@@ -224,32 +202,8 @@
 #endif
 
 /* u-boot is like dtb */
-#define CONFIG_SPL_FS_LOAD_ARGS_NAME	"u-boot.bin"
-#define CONFIG_SYS_SPL_ARGS_ADDR	0x8000000
 
 /* ATF is my kernel image */
-#define CONFIG_SPL_FS_LOAD_KERNEL_NAME	"atf-uboot.ub"
-
-/* MMC support */
-#ifdef CONFIG_MMC_SDHCI_ZYNQ
-# define CONFIG_SYS_MMCSD_RAW_MODE_ARGS_SECTOR	0 /* unused */
-# define CONFIG_SYS_MMCSD_RAW_MODE_ARGS_SECTORS	0 /* unused */
-# define CONFIG_SYS_MMCSD_RAW_MODE_KERNEL_SECTOR	0 /* unused */
-# if defined(CONFIG_SPL_LOAD_FIT)
-#  define CONFIG_SPL_FS_LOAD_PAYLOAD_NAME	"u-boot.itb"
-# else
-#  define CONFIG_SPL_FS_LOAD_PAYLOAD_NAME	"u-boot.img"
-# endif
-#endif
-
-#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_DFU)
-# define CONFIG_SPL_ENV_SUPPORT
-# define CONFIG_SPL_HASH_SUPPORT
-# define CONFIG_ENV_MAX_ENTRIES	10
-#endif
-
-#define CONFIG_SYS_SPL_MALLOC_START	0x20000000
-#define CONFIG_SYS_SPL_MALLOC_SIZE	0x100000
 
 #ifdef CONFIG_SPL_SYS_MALLOC_SIMPLE
 # error "Disable CONFIG_SPL_SYS_MALLOC_SIMPLE. Full malloc needs to be used"

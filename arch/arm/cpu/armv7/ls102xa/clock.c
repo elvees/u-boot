@@ -5,16 +5,13 @@
 
 #include <common.h>
 #include <clock_legacy.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/immap_ls102xa.h>
 #include <asm/arch/clock.h>
 #include <fsl_ifc.h>
 
 DECLARE_GLOBAL_DATA_PTR;
-
-#ifndef CONFIG_SYS_FSL_NUM_CC_PLLS
-#define CONFIG_SYS_FSL_NUM_CC_PLLS      2
-#endif
 
 void get_sys_info(struct sys_info *sys_info)
 {
@@ -38,11 +35,11 @@ void get_sys_info(struct sys_info *sys_info)
 	uint i;
 	uint freq_c_pll[CONFIG_SYS_FSL_NUM_CC_PLLS];
 	uint ratio[CONFIG_SYS_FSL_NUM_CC_PLLS];
-	unsigned long sysclk = CONFIG_SYS_CLK_FREQ;
+	unsigned long sysclk = get_board_sys_clk();
 
 	sys_info->freq_systembus = sysclk;
-#ifdef CONFIG_DDR_CLK_FREQ
-	sys_info->freq_ddrbus = CONFIG_DDR_CLK_FREQ;
+#if defined(CONFIG_DYNAMIC_DDR_CLK_FREQ) || defined(CONFIG_STATIC_DDR_CLK_FREQ)
+	sys_info->freq_ddrbus = get_board_ddr_clk();
 #else
 	sys_info->freq_ddrbus = sysclk;
 #endif

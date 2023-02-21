@@ -7,6 +7,13 @@
 #ifndef	__ASM_GBL_DATA_H
 #define __ASM_GBL_DATA_H
 
+#ifndef __ASSEMBLY__
+
+#include <config.h>
+
+#include <asm/types.h>
+#include <linux/types.h>
+
 /* Architecture-specific global data */
 struct arch_global_data {
 #if defined(CONFIG_FSL_ESDHC) || defined(CONFIG_FSL_ESDHC_IMX)
@@ -82,11 +89,19 @@ struct arch_global_data {
 #ifdef CONFIG_ARCH_IMX8
 	struct udevice *scu_dev;
 #endif
+
+#ifdef CONFIG_IMX_SENTINEL
+	struct udevice *s400_dev;
+	u32 soc_rev;
+	u32 lifecycle;
+	u32 uid[4];
+#endif
+
 };
 
 #include <asm-generic/global_data.h>
 
-#ifdef __clang__
+#if defined(__clang__) || defined(CONFIG_LTO)
 
 #define DECLARE_GLOBAL_DATA_PTR
 #define gd	get_gd()
@@ -117,9 +132,13 @@ static inline void set_gd(volatile gd_t *gd_ptr)
 {
 #ifdef CONFIG_ARM64
 	__asm__ volatile("ldr x18, %0\n" : : "m"(gd_ptr));
-#else
+#elif __ARM_ARCH >= 7
 	__asm__ volatile("ldr r9, %0\n" : : "m"(gd_ptr));
+#else
+	__asm__ volatile("mov r9, %0\n" : : "r"(gd_ptr));
 #endif
 }
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* __ASM_GBL_DATA_H */

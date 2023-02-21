@@ -35,7 +35,7 @@ static int spl_nor_load_image(struct spl_image_info *spl_image,
 	 */
 	spl_image->flags |= SPL_COPY_PAYLOAD_ONLY;
 
-#ifdef CONFIG_SPL_OS_BOOT
+#if CONFIG_IS_ENABLED(OS_BOOT)
 	if (!spl_start_uboot()) {
 		/*
 		 * Load Linux from its location in NOR flash to its defined
@@ -66,7 +66,7 @@ static int spl_nor_load_image(struct spl_image_info *spl_image,
 			/* happy - was a Linux */
 			int ret;
 
-			ret = spl_parse_image_header(spl_image, header);
+			ret = spl_parse_image_header(spl_image, bootdev, header);
 			if (ret)
 				return ret;
 
@@ -74,8 +74,8 @@ static int spl_nor_load_image(struct spl_image_info *spl_image,
 			       (void *)(CONFIG_SYS_OS_BASE +
 					sizeof(struct image_header)),
 			       spl_image->size);
-#ifdef CONFIG_SYS_FDT_BASE
-			spl_image->arg = (void *)CONFIG_SYS_FDT_BASE;
+#ifdef CONFIG_SYS_SPL_ARGS_ADDR
+			spl_image->arg = (void *)CONFIG_SYS_SPL_ARGS_ADDR;
 #endif
 
 			return 0;
@@ -110,10 +110,10 @@ static int spl_nor_load_image(struct spl_image_info *spl_image,
 	}
 
 	/* Legacy image handling */
-	if (IS_ENABLED(CONFIG_SPL_LEGACY_IMAGE_SUPPORT)) {
+	if (IS_ENABLED(CONFIG_SPL_LEGACY_IMAGE_FORMAT)) {
 		load.bl_len = 1;
 		load.read = spl_nor_load_read;
-		return spl_load_legacy_img(spl_image, &load,
+		return spl_load_legacy_img(spl_image, bootdev, &load,
 					   spl_nor_get_uboot_base());
 	}
 

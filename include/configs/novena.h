@@ -9,7 +9,6 @@
 #define __CONFIG_H
 
 /* System configurations */
-#define CONFIG_KEYBOARD
 
 #include "mx6_common.h"
 
@@ -26,7 +25,6 @@
  */
 
 /* Booting Linux */
-#define CONFIG_BOOTFILE			"fitImage"
 #define CONFIG_HOSTNAME			"novena"
 
 /* Physical Memory Map */
@@ -36,36 +34,13 @@
 #define CONFIG_SYS_INIT_RAM_ADDR	IRAM_BASE_ADDR
 #define CONFIG_SYS_INIT_RAM_SIZE	IRAM_SIZE
 
-#define CONFIG_SYS_INIT_SP_OFFSET \
-	(CONFIG_SYS_INIT_RAM_SIZE - GENERATED_GBL_DATA_SIZE)
-#define CONFIG_SYS_INIT_SP_ADDR \
-	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
-
-#define CONFIG_SYS_MALLOC_LEN		(64 * 1024 * 1024)
-
 /* SPL */
 #include "imx6_spl.h"			/* common IMX6 SPL configuration */
 
-/* Ethernet Configuration */
-#ifdef CONFIG_SPL_BUILD
-#undef CONFIG_DM_ETH
-#endif
-
 /* I2C */
-#define CONFIG_SYS_I2C
-#define CONFIG_SYS_I2C_MXC
-#define CONFIG_SYS_I2C_MXC_I2C1		/* enable I2C bus 1 */
-#define CONFIG_SYS_I2C_MXC_I2C2		/* enable I2C bus 2 */
-#define CONFIG_SYS_I2C_MXC_I2C3		/* enable I2C bus 3 */
 #define CONFIG_I2C_MULTI_BUS
-#define CONFIG_SYS_I2C_SPEED		100000
-#define CONFIG_SYS_SPD_BUS_NUM		0
 
 /* I2C EEPROM */
-#ifdef CONFIG_CMD_EEPROM
-#define CONFIG_SYS_I2C_EEPROM_ADDR_LEN	2
-#define CONFIG_SYS_I2C_EEPROM_BUS	2
-#endif
 
 /* MMC Configs */
 #define CONFIG_SYS_FSL_ESDHC_ADDR	0
@@ -73,27 +48,19 @@
 
 /* PCI express */
 #ifdef CONFIG_CMD_PCI
-#define CONFIG_PCI_SCAN_SHOW
-#define CONFIG_PCIE_IMX
 #define CONFIG_PCIE_IMX_PERST_GPIO	IMX_GPIO_NR(3, 29)
 #define CONFIG_PCIE_IMX_POWER_GPIO	IMX_GPIO_NR(7, 12)
 #endif
 
 /* PMIC */
-#define CONFIG_POWER
-#define CONFIG_POWER_I2C
 #define CONFIG_POWER_PFUZE100
 #define CONFIG_POWER_PFUZE100_I2C_ADDR	0x08
-
-/* SATA Configs */
-#define CONFIG_LBA48
 
 /* UART */
 #define CONFIG_MXC_UART_BASE		UART2_BASE
 
 /* USB Configs */
 #ifdef CONFIG_CMD_USB
-#define CONFIG_USB_MAX_CONTROLLER_COUNT 2
 #define CONFIG_MXC_USB_PORTSC		(PORT_PTS_UTMI | PORT_PTS_PTW)
 #define CONFIG_MXC_USB_FLAGS		0
 /* Gadget part */
@@ -101,12 +68,10 @@
 #endif
 
 /* Video output */
-#define CONFIG_VIDEO_LOGO
 #define CONFIG_IMX_HDMI
 #define CONFIG_IMX_VIDEO_SKIP
 
 /* Extra U-Boot environment. */
-#ifndef CONFIG_SPL_BUILD
 #define CONFIG_EXTRA_ENV_SETTINGS					\
 	"fdt_high=0xffffffff\0"						\
 	"initrd_high=0xffffffff\0"					\
@@ -115,10 +80,10 @@
 	"bootdev=/dev/mmcblk0p1\0"					\
 	"rootdev=/dev/mmcblk0p2\0"					\
 	"netdev=eth0\0"							\
-	"kernel_addr_r="__stringify(CONFIG_LOADADDR)"\0"		\
-	"pxefile_addr_r="__stringify(CONFIG_LOADADDR)"\0"		\
-	"scriptaddr="__stringify(CONFIG_LOADADDR)"\0"			\
-	"ramdisk_addr_r=0x28000000\0"		   			\
+	"kernel_addr_r="__stringify(CONFIG_SYS_LOAD_ADDR)"\0"		\
+	"pxefile_addr_r="__stringify(CONFIG_SYS_LOAD_ADDR)"\0"		\
+	"scriptaddr="__stringify(CONFIG_SYS_LOAD_ADDR)"\0"			\
+	"ramdisk_addr_r=0x28000000\0"					\
 	"fdt_addr_r=0x18000000\0"					\
 	"fdtfile=imx6q-novena.dtb\0"					\
 	"stdout=serial,vidconsole\0"					\
@@ -176,9 +141,5 @@
 	func(DHCP, dhcp, na)
 
 #include <config_distro_bootcmd.h>
-
-#else
-#define CONFIG_EXTRA_ENV_SETTINGS
-#endif /* CONFIG_SPL_BUILD */
 
 #endif				/* __CONFIG_H */

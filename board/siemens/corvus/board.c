@@ -14,6 +14,7 @@
 #include <dm.h>
 #include <init.h>
 #include <log.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/at91sam9g45_matrix.h>
 #include <asm/arch/at91sam9_smc.h>
@@ -51,8 +52,28 @@ static void corvus_request_gpio(void)
 	gpio_request(AT91_PIN_PD3, "USB1");
 	gpio_request(AT91_PIN_PB18, "SPICS1");
 	gpio_request(AT91_PIN_PB3, "SPICS0");
-	gpio_request(CONFIG_RED_LED, "red led");
-	gpio_request(CONFIG_GREEN_LED, "green led");
+	gpio_request(AT91_PIN_PD31, "red led"); /* this is the user1 led */
+	gpio_request(AT91_PIN_PD0, "green led"); /* this is the user2 led */
+}
+
+void red_led_on(void)
+{
+	gpio_set_value(AT91_PIN_PD31, 1);
+}
+
+void red_led_off(void)
+{
+	gpio_set_value(AT91_PIN_PD31, 0);
+}
+
+void green_led_on(void)
+{
+	gpio_set_value(AT91_PIN_PD0, 0);
+}
+
+void green_led_off(void)
+{
+	gpio_set_value(AT91_PIN_PD0, 1);
 }
 
 static void corvus_nand_hw_init(void)
@@ -314,11 +335,11 @@ void spi_cs_deactivate(struct spi_slave *slave)
 	}
 }
 
-static struct atmel_serial_platdata at91sam9260_serial_plat = {
+static struct atmel_serial_plat at91sam9260_serial_plat = {
 	.base_addr = ATMEL_BASE_DBGU,
 };
 
-U_BOOT_DEVICE(at91sam9260_serial) = {
+U_BOOT_DRVINFO(at91sam9260_serial) = {
 	.name	= "serial_atmel",
-	.platdata = &at91sam9260_serial_plat,
+	.plat = &at91sam9260_serial_plat,
 };

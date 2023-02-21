@@ -6,6 +6,8 @@
 #ifndef _MISC_H_
 #define _MISC_H_
 
+struct udevice;
+
 /**
  * misc_read() - Read the device to buffer, optional.
  * @dev: the device
@@ -26,7 +28,7 @@ int misc_read(struct udevice *dev, int offset, void *buf, int size);
  *
  * Return: number of bytes written if OK (may be < @size), -ve on error
  */
-int misc_write(struct udevice *dev, int offset, void *buf, int size);
+int misc_write(struct udevice *dev, int offset, const void *buf, int size);
 
 /**
  * misc_ioctl() - Assert command to the device, optional.

@@ -12,23 +12,18 @@
 #include <asm/mipsregs.h>
 #include <asm/addrspace.h>
 #include <asm/asm.h>
+#include <system-constants.h>
 #include "mt7628.h"
 
-/* Set temporary stack address range */
-#ifndef CONFIG_SYS_INIT_SP_ADDR
-#define CONFIG_SYS_INIT_SP_ADDR	(CONFIG_SYS_SDRAM_BASE + \
-				CONFIG_SYS_INIT_SP_OFFSET)
-#endif
-
 #define CACHE_STACK_SIZE	0x4000
-#define CACHE_STACK_BASE	(CONFIG_SYS_INIT_SP_ADDR - CACHE_STACK_SIZE)
+#define CACHE_STACK_BASE	(SYS_INIT_SP_ADDR - CACHE_STACK_SIZE)
 
 #define DELAY_USEC(us)		((58 * (us)) / 3)
 
 	.set noreorder
 
 LEAF(mips_sram_init)
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT)
 	/* Setup CPU PLL */
 	li	t0, DELAY_USEC(1000000)
 	li	t1, KSEG1ADDR(SYSCTL_BASE + SYSCTL_ROM_STATUS_REG)
@@ -116,7 +111,7 @@ _cpu_pll_done:
 	sub	a1, CONFIG_SYS_DCACHE_LINE_SIZE
 	bnez	a1, 3b
 	 nop
-#endif /* CONFIG_SKIP_LOWLEVEL_INIT */
+#endif /* CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT) */
 
 	jr	ra
 	 nop
@@ -134,7 +129,7 @@ NESTED(lowlevel_init, 0, ra)
 
 #if CONFIG_IS_ENABLED(INIT_STACK_WITHOUT_MALLOC_F)
 	/* Set malloc base */
-	li	t0, (CONFIG_SYS_INIT_SP_ADDR + 15) & (~15)
+	li	t0, (SYS_INIT_SP_ADDR + 15) & (~15)
 	PTR_S	t0, GD_MALLOC_BASE(k0)	# gd->malloc_base offset
 #endif
 

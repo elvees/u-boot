@@ -16,6 +16,7 @@
 #include <malloc.h>
 #include <nand.h>
 #include <asm/byteorder.h>
+#include <asm/global_data.h>
 #include <linux/ctype.h>
 #include <linux/err.h>
 #include <u-boot/zlib.h>
@@ -30,7 +31,6 @@ static int image_info(unsigned long addr);
 #if defined(CONFIG_CMD_IMLS)
 #include <flash.h>
 #include <mtd/cfi_flash.h>
-extern flash_info_t flash_info[]; /* info for FLASH chips */
 #endif
 
 #if defined(CONFIG_CMD_IMLS) || defined(CONFIG_CMD_IMLS_NAND)
@@ -43,6 +43,9 @@ static int do_imls(struct cmd_tbl *cmdtp, int flag, int argc,
 static struct cmd_tbl cmd_bootm_sub[] = {
 	U_BOOT_CMD_MKENT(start, 0, 1, (void *)BOOTM_STATE_START, "", ""),
 	U_BOOT_CMD_MKENT(loados, 0, 1, (void *)BOOTM_STATE_LOADOS, "", ""),
+#ifdef CONFIG_CMD_BOOTM_PRE_LOAD
+	U_BOOT_CMD_MKENT(preload, 0, 1, (void *)BOOTM_STATE_PRE_LOAD, "", ""),
+#endif
 #ifdef CONFIG_SYS_BOOT_RAMDISK_HIGH
 	U_BOOT_CMD_MKENT(ramdisk, 0, 1, (void *)BOOTM_STATE_RAMDISK, "", ""),
 #endif
@@ -55,6 +58,20 @@ static struct cmd_tbl cmd_bootm_sub[] = {
 	U_BOOT_CMD_MKENT(fake, 0, 1, (void *)BOOTM_STATE_OS_FAKE_GO, "", ""),
 	U_BOOT_CMD_MKENT(go, 0, 1, (void *)BOOTM_STATE_OS_GO, "", ""),
 };
+
+#if defined(CONFIG_CMD_BOOTM_PRE_LOAD)
+static ulong bootm_get_addr(int argc, char *const argv[])
+{
+	ulong addr;
+
+	if (argc > 0)
+		addr = hextoul(argv[0], NULL);
+	else
+		addr = image_load_addr;
+
+	return addr;
+}
+#endif
 
 static int do_bootm_subcommand(struct cmd_tbl *cmdtp, int flag, int argc,
 			       char *const argv[])
@@ -69,7 +86,12 @@ static int do_bootm_subcommand(struct cmd_tbl *cmdtp, int flag, int argc,
 	if (c) {
 		state = (long)c->cmd;
 		if (state == BOOTM_STATE_START)
-			state |= BOOTM_STATE_FINDOS | BOOTM_STATE_FINDOTHER;
+			state |= BOOTM_STATE_PRE_LOAD | BOOTM_STATE_FINDOS |
+				 BOOTM_STATE_FINDOTHER;
+#if defined(CONFIG_CMD_BOOTM_PRE_LOAD)
+		if (state == BOOTM_STATE_PRE_LOAD)
+			state |= BOOTM_STATE_START;
+#endif
 	} else {
 		/* Unrecognized command */
 		return CMD_RET_USAGE;
@@ -82,6 +104,12 @@ static int do_bootm_subcommand(struct cmd_tbl *cmdtp, int flag, int argc,
 	}
 
 	ret = do_bootm_states(cmdtp, flag, argc, argv, state, &images, 0);
+
+#if defined(CONFIG_CMD_BOOTM_PRE_LOAD)
+	if (!ret && (state & BOOTM_STATE_PRE_LOAD))
+		env_set_hex("loadaddr_verified",
+			    bootm_get_addr(argc, argv) + image_load_offset);
+#endif
 
 	return ret;
 }
@@ -111,7 +139,7 @@ int do_bootm(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	if (argc > 0) {
 		char *endp;
 
-		simple_strtoul(argv[0], &endp, 16);
+		hextoul(argv[0], &endp);
 		/* endp pointing to NULL means that argv[0] was just a
 		 * valid number, pass it along to the normal bootm processing
 		 *
@@ -125,7 +153,7 @@ int do_bootm(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	}
 
 	return do_bootm_states(cmdtp, flag, argc, argv, BOOTM_STATE_START |
-		BOOTM_STATE_FINDOS | BOOTM_STATE_FINDOTHER |
+		BOOTM_STATE_FINDOS | BOOTM_STATE_PRE_LOAD | BOOTM_STATE_FINDOTHER |
 		BOOTM_STATE_LOADOS |
 #ifdef CONFIG_SYS_BOOT_RAMDISK_HIGH
 		BOOTM_STATE_RAMDISK |
@@ -139,9 +167,7 @@ int do_bootm(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 
 int bootm_maybe_autostart(struct cmd_tbl *cmdtp, const char *cmd)
 {
-	const char *ep = env_get("autostart");
-
-	if (ep && !strcmp(ep, "yes")) {
+	if (env_get_autostart()) {
 		char *local_args[2];
 		local_args[0] = (char *)cmd;
 		local_args[1] = NULL;
@@ -177,6 +203,9 @@ static char bootm_help_text[] =
 	"must be\n"
 	"issued in the order below (it's ok to not issue all sub-commands):\n"
 	"\tstart [addr [arg ...]]\n"
+#if defined(CONFIG_CMD_BOOTM_PRE_LOAD)
+	"\tpreload [addr [arg ..]] - run only the preload stage\n"
+#endif
 	"\tloados  - load OS image\n"
 #if defined(CONFIG_SYS_BOOT_RAMDISK_HIGH)
 	"\tramdisk - relocate initrd, set env initrd_start/initrd_end\n"
@@ -239,7 +268,7 @@ static int do_iminfo(struct cmd_tbl *cmdtp, int flag, int argc,
 	}
 
 	for (arg = 1; arg < argc; ++arg) {
-		addr = simple_strtoul(argv[arg], NULL, 16);
+		addr = hextoul(argv[arg], NULL);
 		if (image_info(addr) != 0)
 			rcode = 1;
 	}
@@ -291,7 +320,7 @@ static int image_info(ulong addr)
 	case IMAGE_FORMAT_FIT:
 		puts("   FIT image found\n");
 
-		if (!fit_check_format(hdr)) {
+		if (fit_check_format(hdr, IMAGE_SIZE_INVAL)) {
 			puts("Bad FIT image format!\n");
 			unmap_sysmem(hdr);
 			return 1;
@@ -339,7 +368,7 @@ static int do_imls_nor(void)
 	void *hdr;
 
 	for (i = 0, info = &flash_info[0];
-		i < CONFIG_SYS_MAX_FLASH_BANKS; ++i, ++info) {
+		i < CFI_FLASH_BANKS; ++i, ++info) {
 
 		if (info->flash_id == FLASH_UNKNOWN)
 			goto next_bank;
@@ -368,7 +397,7 @@ static int do_imls_nor(void)
 #endif
 #if defined(CONFIG_FIT)
 			case IMAGE_FORMAT_FIT:
-				if (!fit_check_format(hdr))
+				if (fit_check_format(hdr, IMAGE_SIZE_INVAL))
 					goto next_sector;
 
 				printf("FIT Image at %08lX:\n", (ulong)hdr);
@@ -448,7 +477,7 @@ static int nand_imls_fitimage(struct mtd_info *mtd, int nand_dev, loff_t off,
 		return ret;
 	}
 
-	if (!fit_check_format(imgdata)) {
+	if (fit_check_format(imgdata, IMAGE_SIZE_INVAL)) {
 		free(imgdata);
 		return 0;
 	}

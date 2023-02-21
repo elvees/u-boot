@@ -31,6 +31,8 @@ struct bd_info;
 #define is_mx7() (is_soc_type(MXC_SOC_MX7))
 #define is_imx8m() (is_soc_type(MXC_SOC_IMX8M))
 #define is_imx8() (is_soc_type(MXC_SOC_IMX8))
+#define is_imx9() (is_soc_type(MXC_SOC_IMX9))
+#define is_imxrt() (is_soc_type(MXC_SOC_IMXRT))
 
 #define is_mx6dqp() (is_cpu_type(MXC_CPU_MX6QP) || is_cpu_type(MXC_CPU_MX6DP))
 #define is_mx6dq() (is_cpu_type(MXC_CPU_MX6Q) || is_cpu_type(MXC_CPU_MX6D))
@@ -50,6 +52,7 @@ struct bd_info;
 #define is_imx8md() (is_cpu_type(MXC_CPU_IMX8MD))
 #define is_imx8mql() (is_cpu_type(MXC_CPU_IMX8MQL))
 #define is_imx8qm() (is_cpu_type(MXC_CPU_IMX8QM))
+#define is_imx8ulp() (is_cpu_type(MXC_CPU_IMX8ULP))
 #define is_imx8mm() (is_cpu_type(MXC_CPU_IMX8MM) || is_cpu_type(MXC_CPU_IMX8MML) ||\
 	is_cpu_type(MXC_CPU_IMX8MMD) || is_cpu_type(MXC_CPU_IMX8MMDL) || \
 	is_cpu_type(MXC_CPU_IMX8MMS) || is_cpu_type(MXC_CPU_IMX8MMSL))
@@ -60,28 +63,38 @@ struct bd_info;
 #define is_imx8mmsl() (is_cpu_type(MXC_CPU_IMX8MMSL))
 #define is_imx8mn() (is_cpu_type(MXC_CPU_IMX8MN) || is_cpu_type(MXC_CPU_IMX8MND) || \
 	is_cpu_type(MXC_CPU_IMX8MNS) || is_cpu_type(MXC_CPU_IMX8MNL) || \
-	is_cpu_type(MXC_CPU_IMX8MNDL) || is_cpu_type(MXC_CPU_IMX8MNSL))
+	is_cpu_type(MXC_CPU_IMX8MNDL) || is_cpu_type(MXC_CPU_IMX8MNSL) || \
+	is_cpu_type(MXC_CPU_IMX8MNUD) || is_cpu_type(MXC_CPU_IMX8MNUS) || is_cpu_type(MXC_CPU_IMX8MNUQ))
 #define is_imx8mnd() (is_cpu_type(MXC_CPU_IMX8MND))
 #define is_imx8mns() (is_cpu_type(MXC_CPU_IMX8MNS))
 #define is_imx8mnl() (is_cpu_type(MXC_CPU_IMX8MNL))
 #define is_imx8mndl() (is_cpu_type(MXC_CPU_IMX8MNDL))
 #define is_imx8mnsl() (is_cpu_type(MXC_CPU_IMX8MNSL))
+#define is_imx8mnuq() (is_cpu_type(MXC_CPU_IMX8MNUQ))
+#define is_imx8mnud() (is_cpu_type(MXC_CPU_IMX8MNUD))
+#define is_imx8mnus() (is_cpu_type(MXC_CPU_IMX8MNUS))
 #define is_imx8mp() (is_cpu_type(MXC_CPU_IMX8MP)  || is_cpu_type(MXC_CPU_IMX8MPD) || \
-	is_cpu_type(MXC_CPU_IMX8MPL) || is_cpu_type(MXC_CPU_IMX8MP6))
+	is_cpu_type(MXC_CPU_IMX8MPL) || is_cpu_type(MXC_CPU_IMX8MP6) || is_cpu_type(MXC_CPU_IMX8MPUL))
 #define is_imx8mpd() (is_cpu_type(MXC_CPU_IMX8MPD))
 #define is_imx8mpl() (is_cpu_type(MXC_CPU_IMX8MPL))
 #define is_imx8mp6() (is_cpu_type(MXC_CPU_IMX8MP6))
+#define is_imx8mpul() (is_cpu_type(MXC_CPU_IMX8MPUL))
 
 #define is_imx8qxp() (is_cpu_type(MXC_CPU_IMX8QXP))
+
+#define is_imx93() (is_cpu_type(MXC_CPU_IMX93))
+
+#define is_imxrt1020() (is_cpu_type(MXC_CPU_IMXRT1020))
+#define is_imxrt1050() (is_cpu_type(MXC_CPU_IMXRT1050))
 
 #ifdef CONFIG_MX6
 #define IMX6_SRC_GPR10_BMODE			BIT(28)
 #define IMX6_SRC_GPR10_PERSIST_SECONDARY_BOOT	BIT(30)
 
 #define IMX6_BMODE_MASK			GENMASK(7, 0)
-#define	IMX6_BMODE_SHIFT		4
-#define IMX6_BMODE_EMI_MASK		BIT(3)
-#define IMX6_BMODE_EMI_SHIFT		3
+#define IMX6_BMODE_SHIFT		4
+#define IMX6_BMODE_EIM_MASK		BIT(3)
+#define IMX6_BMODE_EIM_SHIFT		3
 #define IMX6_BMODE_SERIAL_ROM_MASK	GENMASK(26, 24)
 #define IMX6_BMODE_SERIAL_ROM_SHIFT	24
 
@@ -96,13 +109,13 @@ enum imx6_bmode_serial_rom {
 	IMX6_BMODE_I2C3,
 };
 
-enum imx6_bmode_emi {
+enum imx6_bmode_eim {
 	IMX6_BMODE_NOR,
 	IMX6_BMODE_ONENAND,
 };
 
 enum imx6_bmode {
-	IMX6_BMODE_EMI,
+	IMX6_BMODE_EIM,
 #if defined(CONFIG_MX6UL) || defined(CONFIG_MX6ULL)
 	IMX6_BMODE_QSPI,
 	IMX6_BMODE_RESERVED,
@@ -136,7 +149,6 @@ struct rproc_att {
 	u32 size; /* size of reg range */
 };
 
-#ifdef CONFIG_IMX8M
 struct rom_api {
 	u16 ver;
 	u16 tag;
@@ -150,6 +162,7 @@ enum boot_dev_type_e {
 	BT_DEV_TYPE_MMC = 2,
 	BT_DEV_TYPE_NAND = 3,
 	BT_DEV_TYPE_FLEXSPINOR = 4,
+	BT_DEV_TYPE_SPI_NOR = 6,
 
 	BT_DEV_TYPE_USB = 0xE,
 	BT_DEV_TYPE_MEM_DEV = 0xF,
@@ -167,7 +180,23 @@ enum boot_dev_type_e {
 #define ROM_API_OKAY		0xF0
 
 extern struct rom_api *g_rom_api;
-#endif
+extern unsigned long rom_pointer[];
+
+ulong spl_romapi_raw_seekable_read(u32 offset, u32 size, void *buf);
+ulong spl_romapi_get_uboot_base(u32 image_offset, u32 rom_bt_dev);
+
+u32 rom_api_download_image(u8 *dest, u32 offset, u32 size);
+u32 rom_api_query_boot_infor(u32 info_type, u32 *info);
+
+/* For i.MX ULP */
+#define BT0CFG_LPBOOT_MASK	0x1
+#define BT0CFG_DUALBOOT_MASK	0x2
+
+enum bt_mode {
+	LOW_POWER_BOOT,		/* LP_BT = 1 */
+	DUAL_BOOT,		/* LP_BT = 0, DUAL_BT = 1 */
+	SINGLE_BOOT		/* LP_BT = 0, DUAL_BT = 0 */
+};
 
 u32 get_nr_cpus(void);
 u32 get_cpu_rev(void);
@@ -209,6 +238,8 @@ int mxs_reset_block(struct mxs_register_32 *reg);
 int mxs_wait_mask_set(struct mxs_register_32 *reg, u32 mask, u32 timeout);
 int mxs_wait_mask_clr(struct mxs_register_32 *reg, u32 mask, u32 timeout);
 
+void board_late_mmc_env_init(void);
+
 unsigned long call_imx_sip(unsigned long id, unsigned long reg0,
 			   unsigned long reg1, unsigned long reg2,
 			   unsigned long reg3);
@@ -217,4 +248,11 @@ unsigned long call_imx_sip_ret2(unsigned long id, unsigned long reg0,
 				unsigned long reg3);
 
 void imx_get_mac_from_fuse(int dev_id, unsigned char *mac);
+
+#if defined(CONFIG_MX6) || defined(CONFIG_MX7) || defined(CONFIG_MX7ULP)
+void enable_ca7_smp(void);
+#endif
+
+enum boot_device get_boot_device(void);
+
 #endif

@@ -7,6 +7,7 @@
 #include <common.h>
 #include <clock_legacy.h>
 #include <cpu_func.h>
+#include <asm/global_data.h>
 #include <linux/compiler.h>
 #include <asm/io.h>
 #include <asm/processor.h>
@@ -17,10 +18,6 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#ifndef CONFIG_SYS_FSL_NUM_CC_PLLS
-#define CONFIG_SYS_FSL_NUM_CC_PLLS      2
-#endif
-
 void get_sys_info(struct sys_info *sys_info)
 {
 	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
@@ -28,8 +25,8 @@ void get_sys_info(struct sys_info *sys_info)
  * mux 2 clock for LS1043A/LS1046A.
  */
 #if defined(CONFIG_SYS_DPAA_FMAN) || \
-	    defined(CONFIG_TARGET_LS1046ARDB) || \
-	    defined(CONFIG_TARGET_LS1043ARDB)
+	    defined(CONFIG_ARCH_LS1046A) || \
+	    defined(CONFIG_ARCH_LS1043A)
 	u32 rcw_tmp;
 #endif
 	struct ccsr_clk *clk = (void *)(CONFIG_SYS_FSL_CLK_ADDR);
@@ -51,17 +48,17 @@ void get_sys_info(struct sys_info *sys_info)
 	uint i, cluster;
 	uint freq_c_pll[CONFIG_SYS_FSL_NUM_CC_PLLS];
 	uint ratio[CONFIG_SYS_FSL_NUM_CC_PLLS];
-	unsigned long sysclk = CONFIG_SYS_CLK_FREQ;
+	unsigned long sysclk = get_board_sys_clk();
 	unsigned long cluster_clk;
 
 	sys_info->freq_systembus = sysclk;
 #ifndef CONFIG_CLUSTER_CLK_FREQ
-#define CONFIG_CLUSTER_CLK_FREQ	CONFIG_SYS_CLK_FREQ
+#define CONFIG_CLUSTER_CLK_FREQ	get_board_sys_clk()
 #endif
 	cluster_clk = CONFIG_CLUSTER_CLK_FREQ;
 
-#ifdef CONFIG_DDR_CLK_FREQ
-	sys_info->freq_ddrbus = CONFIG_DDR_CLK_FREQ;
+#if defined(CONFIG_DYNAMIC_DDR_CLK_FREQ) || defined(CONFIG_STATIC_DDR_CLK_FREQ)
+	sys_info->freq_ddrbus = get_board_ddr_clk();
 #else
 	sys_info->freq_ddrbus = sysclk;
 #endif
@@ -128,13 +125,13 @@ void get_sys_info(struct sys_info *sys_info)
 
 #define HWA_CGA_M2_CLK_SEL	0x00000007
 #define HWA_CGA_M2_CLK_SHIFT	0
-#if defined(CONFIG_TARGET_LS1046ARDB) || defined(CONFIG_TARGET_LS1043ARDB)
+#if defined(CONFIG_ARCH_LS1046A) || defined(CONFIG_ARCH_LS1043A)
 	rcw_tmp = in_be32(&gur->rcwsr[15]);
 	switch ((rcw_tmp & HWA_CGA_M2_CLK_SEL) >> HWA_CGA_M2_CLK_SHIFT) {
 	case 1:
 		sys_info->freq_cga_m2 = freq_c_pll[1];
 		break;
-#if defined(CONFIG_TARGET_LS1046ARDB)
+#if defined(CONFIG_ARCH_LS1046A)
 	case 2:
 		sys_info->freq_cga_m2 = freq_c_pll[1] / 2;
 		break;
@@ -142,7 +139,7 @@ void get_sys_info(struct sys_info *sys_info)
 	case 3:
 		sys_info->freq_cga_m2 = freq_c_pll[1] / 3;
 		break;
-#if defined(CONFIG_TARGET_LS1046ARDB)
+#if defined(CONFIG_ARCH_LS1046A)
 	case 6:
 		sys_info->freq_cga_m2 = freq_c_pll[0] / 2;
 		break;

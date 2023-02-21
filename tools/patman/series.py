@@ -16,7 +16,7 @@ from patman import tools
 
 # Series-xxx tags that we understand
 valid_series = ['to', 'cc', 'version', 'changes', 'prefix', 'notes', 'name',
-                'cover_cc', 'process_log', 'links', 'patchwork_url']
+                'cover_cc', 'process_log', 'links', 'patchwork_url', 'postfix']
 
 class Series(dict):
     """Holds information about a patch series, including all tags.
@@ -94,7 +94,7 @@ class Series(dict):
         Args:
             commit: Commit object to add
         """
-        commit.CheckTags()
+        commit.check_tags()
         self.commits.append(commit)
 
     def ShowActions(self, args, cmd, process_tags):
@@ -105,8 +105,8 @@ class Series(dict):
             cmd: The git command we would have run
             process_tags: Process tags as if they were aliases
         """
-        to_set = set(gitutil.BuildEmailList(self.to));
-        cc_set = set(gitutil.BuildEmailList(self.cc));
+        to_set = set(gitutil.build_email_list(self.to));
+        cc_set = set(gitutil.build_email_list(self.cc));
 
         col = terminal.Color()
         print('Dry run, so not doing much. But I would do this:')
@@ -118,12 +118,11 @@ class Series(dict):
         # TODO: Colour the patches according to whether they passed checks
         for upto in range(len(args)):
             commit = self.commits[upto]
-            print(col.Color(col.GREEN, '   %s' % args[upto]))
+            print(col.build(col.GREEN, '   %s' % args[upto]))
             cc_list = list(self._generated_cc[commit.patch])
             for email in sorted(set(cc_list) - to_set - cc_set):
                 if email == None:
-                    email = col.Color(col.YELLOW, "<alias '%s' not found>"
-                            % tag)
+                    email = col.build(col.YELLOW, '<alias not found>')
                 if email:
                     print('      Cc: ', email)
         print
@@ -133,9 +132,10 @@ class Series(dict):
             print('Cc:\t ', item)
         print('Version: ', self.get('version'))
         print('Prefix:\t ', self.get('prefix'))
+        print('Postfix:\t ', self.get('postfix'))
         if self.cover:
             print('Cover: %d lines' % len(self.cover))
-            cover_cc = gitutil.BuildEmailList(self.get('cover_cc', ''))
+            cover_cc = gitutil.build_email_list(self.get('cover_cc', ''))
             all_ccs = itertools.chain(cover_cc, *self._generated_cc.values())
             for email in sorted(set(all_ccs) - to_set - cc_set):
                     print('      Cc: ', email)
@@ -226,15 +226,15 @@ class Series(dict):
                 else:
                     if version > 1:
                         str = 'Change log missing for v%d' % version
-                        print(col.Color(col.RED, str))
+                        print(col.build(col.RED, str))
             for version in changes_copy:
                 str = 'Change log for unknown version v%d' % version
-                print(col.Color(col.RED, str))
+                print(col.build(col.RED, str))
         elif self.changes:
             str = 'Change log exists, but no version is set'
-            print(col.Color(col.RED, str))
+            print(col.build(col.RED, str))
 
-    def MakeCcFile(self, process_tags, cover_fname, raise_on_error,
+    def MakeCcFile(self, process_tags, cover_fname, warn_on_error,
                    add_maintainers, limit):
         """Make a cc file for us to use for per-commit Cc automation
 
@@ -243,8 +243,8 @@ class Series(dict):
         Args:
             process_tags: Process tags as if they were aliases
             cover_fname: If non-None the name of the cover letter.
-            raise_on_error: True to raise an error when an alias fails to match,
-                False to just print a message.
+            warn_on_error: True to print a warning when an alias fails to match,
+                False to ignore it.
             add_maintainers: Either:
                 True/False to call the get_maintainers to CC maintainers
                 List of maintainers to include (for testing)
@@ -260,19 +260,18 @@ class Series(dict):
         for commit in self.commits:
             cc = []
             if process_tags:
-                cc += gitutil.BuildEmailList(commit.tags,
-                                               raise_on_error=raise_on_error)
-            cc += gitutil.BuildEmailList(commit.cc_list,
-                                           raise_on_error=raise_on_error)
+                cc += gitutil.build_email_list(commit.tags,
+                                               warn_on_error=warn_on_error)
+            cc += gitutil.build_email_list(commit.cc_list,
+                                           warn_on_error=warn_on_error)
             if type(add_maintainers) == type(cc):
                 cc += add_maintainers
             elif add_maintainers:
-                dir_list = [os.path.join(gitutil.GetTopLevel(), 'scripts')]
-                cc += get_maintainer.GetMaintainer(dir_list, commit.patch)
+                dir_list = [os.path.join(gitutil.get_top_level(), 'scripts')]
+                cc += get_maintainer.get_maintainer(dir_list, commit.patch)
             for x in set(cc) & set(settings.bounces):
-                print(col.Color(col.YELLOW, 'Skipping "%s"' % x))
-            cc = set(cc) - set(settings.bounces)
-            cc = [tools.FromUnicode(m) for m in cc]
+                print(col.build(col.YELLOW, 'Skipping "%s"' % x))
+            cc = list(set(cc) - set(settings.bounces))
             if limit is not None:
                 cc = cc[:limit]
             all_ccs += cc
@@ -280,12 +279,11 @@ class Series(dict):
             self._generated_cc[commit.patch] = cc
 
         if cover_fname:
-            cover_cc = gitutil.BuildEmailList(self.get('cover_cc', ''))
-            cover_cc = [tools.FromUnicode(m) for m in cover_cc]
+            cover_cc = gitutil.build_email_list(self.get('cover_cc', ''))
             cover_cc = list(set(cover_cc + all_ccs))
             if limit is not None:
                 cover_cc = cover_cc[:limit]
-            cc_list = '\0'.join([tools.ToUnicode(x) for x in sorted(cover_cc)])
+            cc_list = '\0'.join([x for x in sorted(cover_cc)])
             print(cover_fname, cc_list, file=fd)
 
         fd.close()
@@ -310,7 +308,7 @@ class Series(dict):
         Return:
             Patch string, like 'RFC PATCH v5' or just 'PATCH'
         """
-        git_prefix = gitutil.GetDefaultSubjectPrefix()
+        git_prefix = gitutil.get_default_subject_prefix()
         if git_prefix:
             git_prefix = '%s][' % git_prefix
         else:
@@ -324,4 +322,8 @@ class Series(dict):
         prefix = ''
         if self.get('prefix'):
             prefix = '%s ' % self['prefix']
-        return '%s%sPATCH%s' % (git_prefix, prefix, version)
+
+        postfix = ''
+        if self.get('postfix'):
+           postfix = ' %s' % self['postfix']
+        return '%s%sPATCH%s%s' % (git_prefix, prefix, postfix, version)

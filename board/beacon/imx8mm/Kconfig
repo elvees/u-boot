@@ -9,6 +9,7 @@ config SYS_VENDOR
 config SYS_CONFIG_NAME
 	default "imx8mm_beacon"
 
-source "board/freescale/common/Kconfig"
+config IMX_CONFIG
+	default "board/beacon/imx8mm/imximage-8mm-lpddr4.cfg"
 
 endif

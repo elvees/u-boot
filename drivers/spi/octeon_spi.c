@@ -81,7 +81,7 @@ struct octeon_spi {
 
 static u64 octeon_spi_set_mpicfg(struct udevice *dev)
 {
-	struct dm_spi_slave_platdata *slave = dev_get_parent_platdata(dev);
+	struct dm_spi_slave_plat *slave = dev_get_parent_plat(dev);
 	struct udevice *bus = dev_get_parent(dev);
 	struct octeon_spi *priv = dev_get_priv(bus);
 	u64 mpi_cfg;
@@ -137,7 +137,7 @@ static void octeon_spi_wait_ready(struct udevice *dev)
  *
  * @param	dev	SPI bus
  *
- * @return	0 for success, -EINVAL if chip select is invalid
+ * Return:	0 for success, -EINVAL if chip select is invalid
  */
 static int octeon_spi_claim_bus(struct udevice *dev)
 {
@@ -168,7 +168,7 @@ static int octeon_spi_claim_bus(struct udevice *dev)
  *
  * @param	dev	SPI bus
  *
- * @return	0 for success, -EINVAL if chip select is invalid
+ * Return:	0 for success, -EINVAL if chip select is invalid
  */
 static int octeon_spi_release_bus(struct udevice *dev)
 {
@@ -568,7 +568,7 @@ static int octeon_spi_probe(struct udevice *dev)
 		pci_dev_t bdf = dm_pci_get_bdf(dev);
 
 		debug("SPI PCI device: %x\n", bdf);
-		priv->base = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_0,
+		priv->base = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_0, 0, 0, PCI_REGION_TYPE,
 					    PCI_REGION_MEM);
 		/* Add base offset */
 		priv->base += 0x1000;
@@ -593,7 +593,7 @@ static int octeon_spi_probe(struct udevice *dev)
 	if (ret)
 		return ret;
 
-	debug("SPI bus %s %d at %p\n", dev->name, dev->seq, priv->base);
+	debug("SPI bus %s %d at %p\n", dev->name, dev_seq(dev), priv->base);
 
 	return 0;
 }
@@ -611,6 +611,6 @@ U_BOOT_DRIVER(octeon_spi) = {
 	.id			= UCLASS_SPI,
 	.of_match		= octeon_spi_ids,
 	.probe			= octeon_spi_probe,
-	.priv_auto_alloc_size	= sizeof(struct octeon_spi),
+	.priv_auto	= sizeof(struct octeon_spi),
 	.ops			= &octeon_spi_ops,
 };

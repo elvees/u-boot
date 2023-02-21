@@ -18,11 +18,9 @@
  * SoC Configuration
  */
 #define CONFIG_SYS_EXCEPTION_VECTORS_HIGH
-#define CONFIG_SYS_CLK_FREQ		clk_get(DAVINCI_ARM_CLKID)
 #define CONFIG_SYS_OSCIN_FREQ		24000000
 #define CONFIG_SYS_TIMERBASE		DAVINCI_TIMER0_BASE
 #define CONFIG_SYS_HZ_CLOCK		clk_get(DAVINCI_AUXCLK_CLKID)
-#define CONFIG_SKIP_LOWLEVEL_INIT_ONLY
 
 #ifdef CONFIG_MTD_NOR_FLASH
 #define CONFIG_SYS_DV_NOR_BOOT_CFG	(0x11)
@@ -31,12 +29,9 @@
 /*
  * Memory Info
  */
-#define CONFIG_SYS_MALLOC_LEN	(0x10000 + 1*1024*1024) /* malloc() len */
 #define PHYS_SDRAM_1		DAVINCI_DDR_EMIF_DATA_BASE /* DDR Start */
 #define PHYS_SDRAM_1_SIZE	(64 << 20) /* SDRAM size 64MB */
 #define CONFIG_MAX_RAM_BANK_SIZE (512 << 20) /* max size from SPRS586*/
-#define CONFIG_SPL_BSS_START_ADDR DAVINCI_DDR_EMIF_DATA_BASE
-#define CONFIG_SPL_BSS_MAX_SIZE 0x1080000
 /* memtest start addr */
 
 /* memtest will be run on 16MB */
@@ -106,9 +101,7 @@
 /*
  * I2C Configuration
  */
-#ifndef CONFIG_SPL_BUILD
 #define CONFIG_SYS_I2C_EXPANDER_ADDR   0x20
-#endif
 
 /*
  * Flash & Environment
@@ -123,9 +116,6 @@
 #undef CONFIG_SYS_NAND_HW_ECC
 #define CONFIG_SYS_MAX_NAND_DEVICE	1 /* Max number of NAND devices */
 #define CONFIG_SYS_NAND_HW_ECC_OOBFIRST
-#define CONFIG_SYS_NAND_5_ADDR_CYCLE
-#define CONFIG_SYS_NAND_PAGE_SIZE	(2 << 10)
-#define CONFIG_SYS_NAND_BLOCK_SIZE	(128 << 10)
 #define CONFIG_SYS_NAND_U_BOOT_SIZE	0x40000
 #define CONFIG_SYS_NAND_U_BOOT_DST	0xc1080000
 #define CONFIG_SYS_NAND_U_BOOT_START	CONFIG_SYS_NAND_U_BOOT_DST
@@ -139,54 +129,24 @@
 				39, 40, 41, 42, 43, 44, 45, 46, 47, 48, \
 				49, 50, 51, 52, 53, 54, 55, 56, 57, 58, \
 				59, 60, 61, 62, 63 }
-#define CONFIG_SYS_NAND_PAGE_COUNT	64
-#define CONFIG_SYS_NAND_BAD_BLOCK_POS	0
 #define CONFIG_SYS_NAND_ECCSIZE		512
 #define CONFIG_SYS_NAND_ECCBYTES	10
-#define CONFIG_SYS_NAND_OOBSIZE		64
-#define CONFIG_SPL_NAND_LOAD
-
-#ifndef CONFIG_SPL_BUILD
-#define CONFIG_SYS_NAND_SELF_INIT
-#endif
-#endif
-
-/*
- * Network & Ethernet Configuration
- */
-#ifdef CONFIG_DRIVER_TI_EMAC
-#define CONFIG_NET_RETRY_COUNT	10
 #endif
 
 #ifdef CONFIG_MTD_NOR_FLASH
-#define CONFIG_SYS_MAX_FLASH_BANKS	1 /* max number of flash banks */
-#define CONFIG_SYS_FLASH_SECT_SZ	(128 << 10) /* 128KB */
 #define CONFIG_SYS_FLASH_BASE		DAVINCI_ASYNC_EMIF_DATA_CE2_BASE
 #define PHYS_FLASH_SIZE			(8 << 20) /* Flash size 8MB */
-#define CONFIG_SYS_MAX_FLASH_SECT ((PHYS_FLASH_SIZE/CONFIG_SYS_FLASH_SECT_SZ)\
-	       + 3)
 #endif
 
 /*
  * U-Boot general configuration
  */
-#define CONFIG_BOOTFILE		"uImage" /* Boot file name */
-#define CONFIG_SYS_CBSIZE	1024 /* Console I/O Buffer Size	*/
-#define CONFIG_SYS_BARGSIZE	CONFIG_SYS_CBSIZE /* Boot Args Buffer Size */
-#define CONFIG_SYS_LOAD_ADDR	(PHYS_SDRAM_1 + 0x700000)
 
 /*
  * Linux Information
  */
 #define LINUX_BOOT_PARAM_ADDR	(PHYS_SDRAM_1 + 0x100)
 #define CONFIG_HWCONFIG		/* enable hwconfig */
-#define CONFIG_CMDLINE_TAG
-#define CONFIG_REVISION_TAG
-#define CONFIG_SETUP_MEMORY_TAGS
-
-#define CONFIG_BOOTCOMMAND \
-		"run envboot; " \
-		"run mmcboot; "
 
 #define DEFAULT_LINUX_BOOT_ENV \
 	"loadaddr=0xc0700000\0" \
@@ -207,35 +167,15 @@
 	"console=ttyS2,115200n8\0" \
 	"hwconfig=dsp:wake=yes"
 
-#ifdef CONFIG_CMD_BDI
-#define CONFIG_CLOCKS
-#endif
-
-/* USB Configs */
-#define CONFIG_USB_OHCI_NEW
-#define CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS	15
-
 #ifdef CONFIG_SPL_BUILD
 /* defines for SPL */
-#define CONFIG_SYS_SPL_MALLOC_START	(CONFIG_SYS_TEXT_BASE - \
-						CONFIG_SYS_MALLOC_LEN)
-#define CONFIG_SYS_SPL_MALLOC_SIZE	CONFIG_SYS_MALLOC_LEN
-#define CONFIG_SPL_STACK	0x8001ff00
-#define CONFIG_SPL_MAX_FOOTPRINT	32768
-#define CONFIG_SPL_PAD_TO	32768
+
 #endif
 
 /* Load U-Boot Image From MMC */
 
 /* additions for new relocation code, must added to all boards */
 #define CONFIG_SYS_SDRAM_BASE		0xc0000000
-
-#ifdef CONFIG_MTD_NOR_FLASH
-#define CONFIG_SYS_INIT_SP_ADDR		0x8001ff00
-#else
-#define CONFIG_SYS_INIT_SP_ADDR		(CONFIG_SYS_SDRAM_BASE + 0x1000 - /* Fix this */ \
-					GENERATED_GBL_DATA_SIZE)
-#endif /* CONFIG_MTD_NOR_FLASH */
 
 #include <asm/arch/hardware.h>
 

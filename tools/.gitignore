@@ -20,6 +20,7 @@
 /kwboot
 /lib/
 /mips-relocs
+/mkeficapsule
 /mkenvimage
 /mkexynosspl
 /mkimage
@@ -35,3 +36,4 @@
 /update_octeon_header
 /version.h
 /xway-swap-bytes
+/boot

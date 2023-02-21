@@ -10,6 +10,7 @@
 
 #include <common.h>
 #include <command.h>
+#include <mapmem.h>
 #include <part.h>
 
 int do_read(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
@@ -30,13 +31,13 @@ int do_read(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		return 1;
 	}
 
-	dev = (int)simple_strtoul(argv[2], &ep, 16);
+	dev = (int)hextoul(argv[2], &ep);
 	if (*ep) {
 		if (*ep != ':') {
 			printf("Invalid block device %s\n", argv[2]);
 			return 1;
 		}
-		part = (int)simple_strtoul(++ep, NULL, 16);
+		part = (int)hextoul(++ep, NULL);
 	}
 
 	dev_desc = blk_get_dev(argv[1], dev);
@@ -45,9 +46,9 @@ int do_read(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		return 1;
 	}
 
-	addr = (void *)simple_strtoul(argv[3], NULL, 16);
-	blk = simple_strtoul(argv[4], NULL, 16);
-	cnt = simple_strtoul(argv[5], NULL, 16);
+	addr = map_sysmem(hextoul(argv[3], NULL), 0);
+	blk = hextoul(argv[4], NULL);
+	cnt = hextoul(argv[5], NULL);
 
 	if (part != 0) {
 		if (part_get_info(dev_desc, part, &part_info)) {

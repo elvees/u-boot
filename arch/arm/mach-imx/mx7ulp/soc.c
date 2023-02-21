@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2016 Freescale Semiconductor, Inc.
+ * Copyright 2021 NXP
  */
 
 #include <common.h>
@@ -13,7 +14,10 @@
 #include <asm/arch/sys_proto.h>
 #include <asm/mach-imx/boot_mode.h>
 #include <asm/mach-imx/hab.h>
+#include <asm/mach-imx/sys_proto.h>
+#include <asm/setup.h>
 #include <linux/bitops.h>
+#include <dm.h>
 
 #define PMC0_BASE_ADDR		0x410a1000
 #define PMC0_CTRL		0x28
@@ -76,8 +80,25 @@ enum bt_mode get_boot_mode(void)
 
 int arch_cpu_init(void)
 {
+	enable_ca7_smp();
 	return 0;
 }
+
+#if defined(CONFIG_ARCH_MISC_INIT)
+int arch_misc_init(void)
+{
+	if (IS_ENABLED(CONFIG_FSL_CAAM)) {
+		struct udevice *dev;
+		int ret;
+
+		ret = uclass_get_device_by_driver(UCLASS_MISC, DM_DRIVER_GET(caam_jr), &dev);
+		if (ret)
+			printf("Failed to initialize caam_jr: %d\n", ret);
+	}
+
+	return 0;
+}
+#endif
 
 #ifdef CONFIG_BOARD_POSTCLK_INIT
 int board_postclk_init(void)
@@ -93,14 +114,31 @@ int board_postclk_init(void)
 
 static void disable_wdog(u32 wdog_base)
 {
-	writel(UNLOCK_WORD0, (wdog_base + 0x04));
-	writel(UNLOCK_WORD1, (wdog_base + 0x04));
-	writel(0x0, (wdog_base + 0x0C)); /* Set WIN to 0 */
-	writel(0x400, (wdog_base + 0x08)); /* Set timeout to default 0x400 */
-	writel(0x120, (wdog_base + 0x00)); /* Disable it and set update */
+	u32 val_cs = readl(wdog_base + 0x00);
 
-	writel(REFRESH_WORD0, (wdog_base + 0x04)); /* Refresh the CNT */
-	writel(REFRESH_WORD1, (wdog_base + 0x04));
+	if (!(val_cs & 0x80))
+		return;
+
+	dmb();
+	__raw_writel(REFRESH_WORD0, (wdog_base + 0x04)); /* Refresh the CNT */
+	__raw_writel(REFRESH_WORD1, (wdog_base + 0x04));
+	dmb();
+
+	if (!(val_cs & 800)) {
+		dmb();
+		__raw_writel(UNLOCK_WORD0, (wdog_base + 0x04));
+		__raw_writel(UNLOCK_WORD1, (wdog_base + 0x04));
+		dmb();
+
+		while (!(readl(wdog_base + 0x00) & 0x800));
+	}
+	dmb();
+	__raw_writel(0x0, wdog_base + 0x0C); /* Set WIN to 0 */
+	__raw_writel(0x400, wdog_base + 0x08); /* Set timeout to default 0x400 */
+	__raw_writel(0x120, wdog_base + 0x00); /* Disable it and set update */
+	dmb();
+
+	while (!(readl(wdog_base + 0x00) & 0x400));
 }
 
 void init_wdog(void)
@@ -197,7 +235,7 @@ void s_init(void)
 #endif
 
 #ifndef CONFIG_ULP_WATCHDOG
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 	setbits_le32(SIM0_RBASE, SIM_SOPT1_A7_SW_RESET);
 	while (1)
@@ -363,3 +401,25 @@ enum boot_device get_boot_device(void)
 
 	return boot_dev;
 }
+
+#ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
+/*
+ * OCOTP_CFG (SJC CHALLENGE, Unique ID)
+ * i.MX 7ULP Applications Processor Reference Manual, Rev. 0, 09/2020
+ *
+ * OCOTP_CFG0 offset 0x4B0: 15:0 -> 15:0  bits of Unique ID
+ * OCOTP_CFG1 offset 0x4C0: 15:0 -> 31:16 bits of Unique ID
+ * OCOTP_CFG2 offset 0x4D0: 15:0 -> 47:32 bits of Unique ID
+ * OCOTP_CFG3 offset 0x4E0: 15:0 -> 63:48 bits of Unique ID
+ */
+void get_board_serial(struct tag_serialnr *serialnr)
+{
+	struct ocotp_regs *ocotp = (struct ocotp_regs *)OCOTP_BASE_ADDR;
+	struct fuse_bank *bank = &ocotp->bank[1];
+	struct fuse_bank1_regs *fuse =
+		(struct fuse_bank1_regs *)bank->fuse_regs;
+
+	serialnr->low = (fuse->cfg0 & 0xFFFF) + ((fuse->cfg1 & 0xFFFF) << 16);
+	serialnr->high = (fuse->cfg2 & 0xFFFF) + ((fuse->cfg3 & 0xFFFF) << 16);
+}
+#endif /* CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG */

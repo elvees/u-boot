@@ -2,7 +2,9 @@
 # Copyright (c) 2015 Stephen Warren
 # Copyright (c) 2015-2016, NVIDIA CORPORATION. All rights reserved.
 
-# Logic to interact with the sandbox port of U-Boot, running as a sub-process.
+"""
+Logic to interact with the sandbox port of U-Boot, running as a sub-process.
+"""
 
 import time
 from u_boot_spawn import Spawn
@@ -25,6 +27,7 @@ class ConsoleSandbox(ConsoleBase):
 
         super(ConsoleSandbox, self).__init__(log, config, max_fifo_fill=1024)
         self.sandbox_flags = []
+        self.use_dtb = True
 
     def get_spawn(self):
         """Connect to a fresh U-Boot instance.
@@ -41,25 +44,31 @@ class ConsoleSandbox(ConsoleBase):
 
         bcfg = self.config.buildconfig
         config_spl = bcfg.get('config_spl', 'n') == 'y'
-        fname = '/spl/u-boot-spl' if config_spl else '/u-boot'
+        config_vpl = bcfg.get('config_vpl', 'n') == 'y'
+        if config_vpl:
+            # Run TPL first, which runs VPL
+            fname = '/tpl/u-boot-tpl'
+        else:
+            fname = '/spl/u-boot-spl' if config_spl else '/u-boot'
         print(fname)
         cmd = []
         if self.config.gdbserver:
             cmd += ['gdbserver', self.config.gdbserver]
-        cmd += [
-            self.config.build_dir + fname,
-            '-v',
-            '-d',
-            self.config.dtb
-        ]
+        cmd += [self.config.build_dir + fname, '-v']
+        if self.use_dtb:
+            cmd += ['-d', self.config.dtb]
         cmd += self.sandbox_flags
         return Spawn(cmd, cwd=self.config.source_dir)
 
-    def restart_uboot_with_flags(self, flags):
+    def restart_uboot_with_flags(self, flags, expect_reset=False, use_dtb=True):
         """Run U-Boot with the given command-line flags
 
         Args:
             flags: List of flags to pass, each a string
+            expect_reset: Boolean indication whether this boot is expected
+                to be reset while the 1st boot process after main boot before
+                prompt. False by default.
+            use_dtb: True to use a device tree file, False to run without one
 
         Returns:
             A u_boot_spawn.Spawn object that is attached to U-Boot.
@@ -67,9 +76,11 @@ class ConsoleSandbox(ConsoleBase):
 
         try:
             self.sandbox_flags = flags
-            return self.restart_uboot()
+            self.use_dtb = use_dtb
+            return self.restart_uboot(expect_reset)
         finally:
             self.sandbox_flags = []
+            self.use_dtb = True
 
     def kill(self, sig):
         """Send a specific Unix signal to the sandbox process.

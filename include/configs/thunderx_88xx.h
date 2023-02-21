@@ -6,27 +6,14 @@
 #ifndef __THUNDERX_88XX_H__
 #define __THUNDERX_88XX_H__
 
-#define CONFIG_REMAKE_ELF
-
-#define CONFIG_THUNDERX
-
-#define CONFIG_SYS_64BIT
-
 #define MEM_BASE			0x00500000
 
 #define CONFIG_SYS_LOWMEM_BASE		MEM_BASE
 
 /* Link Definitions */
-#define CONFIG_SYS_INIT_SP_ADDR		(CONFIG_SYS_SDRAM_BASE + 0x7fff0)
 
 /* SMP Spin Table Definitions */
 #define CPU_RELEASE_ADDR		(CONFIG_SYS_SDRAM_BASE + 0x7fff0)
-
-/* Generic Timer Definitions */
-#define COUNTER_FREQUENCY		(0x1800000)	/* 24MHz */
-
-/* Size of malloc() pool */
-#define CONFIG_SYS_MALLOC_LEN		(CONFIG_ENV_SIZE + 1024 * 1024)
 
 /* PL011 Serial Configuration */
 
@@ -38,11 +25,7 @@
 #define CONFIG_SYS_SERIAL0		0x87e024000000
 #define CONFIG_SYS_SERIAL1		0x87e025000000
 
-/* BOOTP options */
-#define CONFIG_BOOTP_BOOTFILESIZE
-
 /* Miscellaneous configurable options */
-#define CONFIG_SYS_LOAD_ADDR		(MEM_BASE)
 
 /* Physical Memory Map */
 #define PHYS_SDRAM_1			(MEM_BASE)	  /* SDRAM Bank #1 */
@@ -59,10 +42,6 @@
 
 /* Do not preserve environment */
 
-/* Monitor Command Prompt */
-#define CONFIG_SYS_CBSIZE		512	/* Console I/O Buffer Size */
-#define CONFIG_SYS_MAXARGS		64		/* max command args */
-#define CONFIG_NO_RELOCATION		1
 #define PLL_REF_CLK			50000000	/* 50 MHz */
 #define NS_PER_REF_CLK_TICK		(1000000000/PLL_REF_CLK)
 

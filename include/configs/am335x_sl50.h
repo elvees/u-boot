@@ -10,19 +10,9 @@
 
 #include <configs/ti_am335x_common.h>
 
-#ifndef CONFIG_SPL_BUILD
-# define CONFIG_TIMESTAMP
-#endif
-
-#define CONFIG_SYS_BOOTM_LEN		(16 << 20)
-
-/*#define CONFIG_MACH_TYPE		3589	 Until the next sync */
-
 /* Clock Defines */
 #define V_OSCK				24000000  /* Clock output from T2 */
 #define V_SCLK				(V_OSCK)
-
-#ifndef CONFIG_SPL_BUILD
 
 #define MEM_LAYOUT_ENV_SETTINGS \
 	"scriptaddr=0x80000000\0" \
@@ -45,8 +35,6 @@
 	MEM_LAYOUT_ENV_SETTINGS \
 	BOOTENV
 
-#endif
-
 /* NS16550 Configuration */
 #define CONFIG_SYS_NS16550_COM1		0x44e09000	/* Base EVM has UART0 */
 #define CONFIG_SYS_NS16550_COM2		0x48022000	/* UART1 */
@@ -55,25 +43,10 @@
 #define CONFIG_SYS_NS16550_COM5		0x481a8000	/* UART4 */
 #define CONFIG_SYS_NS16550_COM6		0x481aa000	/* UART5 */
 
-#define CONFIG_ENV_EEPROM_IS_ON_I2C
-#define CONFIG_SYS_I2C_EEPROM_ADDR	0x50	/* Main EEPROM */
-#define CONFIG_SYS_I2C_EEPROM_ADDR_LEN	2
-
 /* PMIC support */
-#define CONFIG_POWER_TPS65217
 #define CONFIG_POWER_TPS65910
 
 /* SPL */
-
-/* Bootcount using the RTC block */
-#define CONFIG_SYS_BOOTCOUNT_BE
-
-#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_USB_ETHER)
-/* Remove other SPL modes. */
-/* disable host part of MUSB in SPL */
-#undef CONFIG_MUSB_HOST
-/* disable EFI partitions and partition UUID support */
-#endif
 
 /* Network. */
 

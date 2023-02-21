@@ -58,12 +58,20 @@ struct rpu_regs {
 
 #define VERSAL_CRP_BASEADDR	0xF1260000
 
+#define VERSAL_SLCR_BASEADDR	0xF1060000
+#define VERSAL_AXI_MUX_SEL	(VERSAL_SLCR_BASEADDR + 0x504)
+#define VERSAL_OSPI_LINEAR_MODE	BIT(1)
+
 struct crp_regs {
 	u32 reserved0[128];
 	u32 boot_mode_usr;
 };
 
 #define crp_base ((struct crp_regs *)VERSAL_CRP_BASEADDR)
+
+#define VERSAL_PS_PMC_VERSION	0xF11A0004
+#define VERSAL_PS_VER_MASK	GENMASK(7, 0)
+#define VERSAL_PS_VER_SHIFT	12
 
 /* Bootmode setting values */
 #define BOOT_MODES_MASK	0x0000000F
@@ -78,3 +86,14 @@ struct crp_regs {
 #define JTAG_MODE	0x00000000
 #define BOOT_MODE_USE_ALT	0x100
 #define BOOT_MODE_ALT_SHIFT	12
+
+#define FLASH_RESET_GPIO	0xc
+#define WPROT_CRP	0xF126001C
+#define RST_GPIO	0xF1260318
+#define WPROT_LPD_MIO	0xFF080728
+#define WPROT_PMC_MIO	0xF1060828
+#define BOOT_MODE_DIR	0xF1020204
+#define BOOT_MODE_OUT	0xF1020208
+#define MIO_PIN_12	0xF1060030
+#define BANK0_OUTPUT	0xF1020040
+#define BANK0_TRI	0xF1060200

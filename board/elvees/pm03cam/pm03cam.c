@@ -4,6 +4,7 @@
  */
 
 #include <common.h>
+#include <asm/global_data.h>
 
 #include "../common/mcom03-common.h"
 

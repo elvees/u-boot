@@ -13,6 +13,7 @@
 #include <ram.h>
 #include <spl.h>
 #include <asm/arch-rockchip/bootrom.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <linux/bitops.h>
 
@@ -55,7 +56,8 @@ u32 spl_boot_device(void)
 		defined(CONFIG_TARGET_CHROMEBIT_MICKEY) || \
 		defined(CONFIG_TARGET_CHROMEBOOK_MINNIE) || \
 		defined(CONFIG_TARGET_CHROMEBOOK_SPEEDY) || \
-		defined(CONFIG_TARGET_CHROMEBOOK_BOB)
+		defined(CONFIG_TARGET_CHROMEBOOK_BOB) || \
+		defined(CONFIG_TARGET_CHROMEBOOK_KEVIN)
 	return BOOT_DEVICE_SPI;
 #endif
 	if (CONFIG_IS_ENABLED(ROCKCHIP_BACK_TO_BROM))
@@ -64,12 +66,11 @@ u32 spl_boot_device(void)
 	return boot_device;
 }
 
-u32 spl_mmc_boot_mode(const u32 boot_device)
+u32 spl_mmc_boot_mode(struct mmc *mmc, const u32 boot_device)
 {
 	return MMCSD_MODE_RAW;
 }
 
-#if !defined(CONFIG_ROCKCHIP_RK3188)
 #define TIMER_LOAD_COUNT_L	0x00
 #define TIMER_LOAD_COUNT_H	0x04
 #define TIMER_CONTROL_REG	0x10
@@ -79,6 +80,7 @@ u32 spl_mmc_boot_mode(const u32 boot_device)
 
 __weak void rockchip_stimer_init(void)
 {
+#if defined(CONFIG_ROCKCHIP_STIMER_BASE)
 	/* If Timer already enabled, don't re-init it */
 	u32 reg = readl(CONFIG_ROCKCHIP_STIMER_BASE + TIMER_CONTROL_REG);
 
@@ -86,15 +88,15 @@ __weak void rockchip_stimer_init(void)
 		return;
 #ifndef CONFIG_ARM64
 	asm volatile("mcr p15, 0, %0, c14, c0, 0"
-		     : : "r"(COUNTER_FREQUENCY));
+		     : : "r"(CONFIG_COUNTER_FREQUENCY));
 #endif
 	writel(0, CONFIG_ROCKCHIP_STIMER_BASE + TIMER_CONTROL_REG);
 	writel(0xffffffff, CONFIG_ROCKCHIP_STIMER_BASE);
 	writel(0xffffffff, CONFIG_ROCKCHIP_STIMER_BASE + 4);
 	writel(TIMER_EN | TIMER_FMODE, CONFIG_ROCKCHIP_STIMER_BASE +
 	       TIMER_CONTROL_REG);
-}
 #endif
+}
 
 __weak int board_early_init_f(void)
 {
@@ -131,9 +133,9 @@ void board_init_f(ulong dummy)
 		hang();
 	}
 	arch_cpu_init();
-#if !defined(CONFIG_ROCKCHIP_RK3188)
+
 	rockchip_stimer_init();
-#endif
+
 #ifdef CONFIG_SYS_ARCH_TIMER
 	/* Init ARM arch timer in arch/arm/cpu/armv7/arch_timer.c */
 	timer_init();
@@ -150,13 +152,3 @@ void board_init_f(ulong dummy)
 #endif
 	preloader_console_init();
 }
-
-#ifdef CONFIG_SPL_LOAD_FIT
-int __weak board_fit_config_name_match(const char *name)
-{
-	/* Just empty function now - can't decide what to choose */
-	debug("%s: %s\n", __func__, name);
-
-	return 0;
-}
-#endif

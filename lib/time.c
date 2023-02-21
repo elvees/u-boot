@@ -5,14 +5,17 @@
  */
 
 #include <common.h>
+#include <clock_legacy.h>
 #include <bootstage.h>
 #include <dm.h>
 #include <errno.h>
 #include <init.h>
+#include <spl.h>
 #include <time.h>
 #include <timer.h>
 #include <watchdog.h>
 #include <div64.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <linux/delay.h>
 
@@ -44,12 +47,15 @@ ulong timer_get_boot_us(void)
 {
 	ulong count = timer_read_counter();
 
-#if CONFIG_SYS_TIMER_RATE == 1000000
-	return count;
-#elif CONFIG_SYS_TIMER_RATE > 1000000
-	return lldiv(count, CONFIG_SYS_TIMER_RATE / 1000000);
-#elif defined(CONFIG_SYS_TIMER_RATE)
-	return (unsigned long long)count * 1000000 / CONFIG_SYS_TIMER_RATE;
+#ifdef CONFIG_SYS_TIMER_RATE
+	const ulong timer_rate = CONFIG_SYS_TIMER_RATE;
+
+	if (timer_rate == 1000000)
+		return count;
+	else if (timer_rate > 1000000)
+		return lldiv(count, timer_rate / 1000000);
+	else
+		return (unsigned long long)count * 1000000 / timer_rate;
 #else
 	/* Assume the counter is in microseconds */
 	return count;
@@ -96,8 +102,13 @@ uint64_t notrace get_ticks(void)
 	}
 
 	ret = timer_get_count(gd->timer, &count);
-	if (ret)
-		panic("Could not read count from timer (err %d)\n", ret);
+	if (ret) {
+		if (spl_phase() > PHASE_TPL)
+			panic("Could not read count from timer (err %d)\n",
+			      ret);
+		else
+			panic("no timer (err %d)\n", ret);
+	}
 
 	return count;
 }

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * Copyright 2018 NXP
+ * Copyright 2018, 2021 NXP
  */
 
 #ifndef __LS1012AFRWY_H__
@@ -8,45 +8,27 @@
 
 #include "ls1012a_common.h"
 
-#undef CONFIG_SYS_BOARD
-#define CONFIG_SYS_BOARD "ls1012afrwy"
-
 /* Board Rev*/
 #define BOARD_REV_A_B			0x0
 #define BOARD_REV_C			0x00080000
 #define BOARD_REV_MASK			0x001A0000
 /* DDR */
-#define CONFIG_DIMM_SLOTS_PER_CTLR	1
-#define CONFIG_CHIP_SELECTS_PER_CTRL	1
 #define SYS_SDRAM_SIZE_512		0x20000000
 #define SYS_SDRAM_SIZE_1024		0x40000000
-#define CONFIG_CHIP_SELECTS_PER_CTRL	1
 
 /* ENV */
 #define CONFIG_SYS_FSL_QSPI_BASE	0x40000000
 
-#ifndef CONFIG_SPL_BUILD
 #undef BOOT_TARGET_DEVICES
 #define BOOT_TARGET_DEVICES(func) \
 	func(MMC, mmc, 0) \
 	func(USB, usb, 0) \
 	func(DHCP, dhcp, na)
-#endif
-
-/*  MMC  */
-#ifdef CONFIG_MMC
-#define CONFIG_SYS_FSL_MMC_HAS_CAPBLT_VS33
-#endif
-
-#define CONFIG_PCIE1		/* PCIE controller 1 */
-
-#define CONFIG_PCI_SCAN_SHOW
 
 #undef CONFIG_EXTRA_ENV_SETTINGS
 #define CONFIG_EXTRA_ENV_SETTINGS		\
 	"verify=no\0"				\
 	"initrd_high=0xffffffffffffffff\0"	\
-	"fdt_addr=0x00f00000\0"			\
 	"kernel_addr=0x01000000\0"		\
 	"kernel_size_sd=0x16000\0"		\
 	"kernelhdr_size_sd=0x10\0"		\
@@ -80,13 +62,6 @@
 		      "run scan_dev_for_boot; "	\
 		  "fi; "			\
 	      "done\0"				\
-	"scan_dev_for_boot="				  \
-		"echo Scanning ${devtype} "		  \
-				"${devnum}:${distro_bootpart}...; "  \
-		"for prefix in ${boot_prefixes}; do "	  \
-			"run scan_dev_for_scripts; "	  \
-		"done;"					  \
-		"\0"					  \
 	"boot_a_script="				  \
 		"load ${devtype} ${devnum}:${distro_bootpart} "  \
 			"${scriptaddr} ${prefix}${script}; "    \
@@ -96,7 +71,7 @@
 			"env exists secureboot "	\
 			"&& esbc_validate ${scripthdraddr};"    \
 		"source ${scriptaddr}\0"	  \
-	"sd_bootcmd=pfe stop; echo Trying load from sd card..;"		\
+	"sd_bootcmd=echo Trying load from sd card..;"		\
 		"mmcinfo; mmc read $load_addr "			\
 		"$kernel_addr_sd $kernel_size_sd ;"		\
 		"env exists secureboot && mmc read $kernelheader_addr_r "\
@@ -104,14 +79,10 @@
 		" && esbc_validate ${kernelheader_addr_r};"	\
 		"bootm $load_addr#$BOARD\0"
 
-#undef CONFIG_BOOTCOMMAND
 #ifdef CONFIG_TFABOOT
 #undef QSPI_NOR_BOOTCOMMAND
-#define QSPI_NOR_BOOTCOMMAND "pfe stop; run distro_bootcmd; run sd_bootcmd; "\
+#define QSPI_NOR_BOOTCOMMAND "run distro_bootcmd; run sd_bootcmd; "\
 			     "env exists secureboot && esbc_halt;"
-#else
-#define CONFIG_BOOTCOMMAND "pfe stop; run distro_bootcmd; run sd_bootcmd; "\
-			   "env exists secureboot && esbc_halt;"
 #endif
 
 #include <asm/fsl_secure_boot.h>

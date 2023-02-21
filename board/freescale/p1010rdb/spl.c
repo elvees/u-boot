@@ -15,6 +15,7 @@
 #include <i2c.h>
 #include <fsl_esdhc.h>
 #include <spi_flash.h>
+#include <asm/global_data.h>
 #include "../common/spl.h"
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -42,9 +43,9 @@ void board_init_f(ulong bootflag)
 	/* initialize selected port with appropriate baud rate */
 	plat_ratio = in_be32(&gur->porpllsr) & MPC85xx_PORPLLSR_PLAT_RATIO;
 	plat_ratio >>= 1;
-	gd->bus_clk = CONFIG_SYS_CLK_FREQ * plat_ratio;
+	gd->bus_clk = get_board_sys_clk() * plat_ratio;
 
-	NS16550_init((NS16550_t)CONFIG_SYS_NS16550_COM1,
+	ns16550_init((struct ns16550 *)CONFIG_SYS_NS16550_COM1,
 		     gd->bus_clk / 16 / CONFIG_BAUDRATE);
 
 #ifdef CONFIG_SPL_MMC_BOOT
@@ -56,24 +57,24 @@ void board_init_f(ulong bootflag)
 	/* NOTE - code has to be copied out of NAND buffer before
 	 * other blocks can be read.
 	*/
-	relocate_code(CONFIG_SPL_RELOC_STACK, 0, CONFIG_SPL_RELOC_TEXT_BASE);
+	relocate_code(CONFIG_VAL(RELOC_STACK), 0, CONFIG_SPL_RELOC_TEXT_BASE);
 }
 
 void board_init_r(gd_t *gd, ulong dest_addr)
 {
 	/* Pointer is writable since we allocated a register for it */
-	gd = (gd_t *)CONFIG_SPL_GD_ADDR;
+	gd = (gd_t *)CONFIG_VAL(GD_ADDR);
 	struct bd_info *bd;
 
 	memset(gd, 0, sizeof(gd_t));
-	bd = (struct bd_info *)(CONFIG_SPL_GD_ADDR + sizeof(gd_t));
+	bd = (struct bd_info *)(CONFIG_VAL(GD_ADDR) + sizeof(gd_t));
 	memset(bd, 0, sizeof(struct bd_info));
 	gd->bd = bd;
 
 	arch_cpu_init();
 	get_clocks();
-	mem_malloc_init(CONFIG_SPL_RELOC_MALLOC_ADDR,
-			CONFIG_SPL_RELOC_MALLOC_SIZE);
+	mem_malloc_init(CONFIG_VAL(RELOC_MALLOC_ADDR),
+			CONFIG_VAL(RELOC_MALLOC_SIZE));
 	gd->flags |= GD_FLG_FULL_MALLOC_INIT;
 
 #ifndef CONFIG_SPL_NAND_BOOT

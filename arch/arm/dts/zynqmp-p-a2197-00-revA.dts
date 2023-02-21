@@ -11,6 +11,7 @@
 #include "zynqmp.dtsi"
 #include "zynqmp-clk-ccf.dtsi"
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/phy/phy.h>
 
 / {
 	model = "Versal System Controller on a2197 Processor Char board RevA"; /* Tenzing */
@@ -19,11 +20,11 @@
 
 	aliases {
 		ethernet0 = &gem0;
-		gpio0 = &gpio;
 		i2c0 = &i2c0;
 		i2c1 = &i2c1;
 		mmc0 = &sdhci0;
 		mmc1 = &sdhci1;
+		nvmem0 = &eeprom;
 		rtc0 = &rtc;
 		serial0 = &uart0;
 		serial1 = &uart1;
@@ -35,13 +36,23 @@
 	chosen {
 		bootargs = "earlycon";
 		stdout-path = "serial0:115200n8";
-		xlnx,eeprom = <&eeprom>;
-		/* xlnx,fmc-eeprom = FIXME */
 	};
 
 	memory@0 {
 		device_type = "memory";
 		reg = <0x0 0x0 0x0 0x80000000>;
+	};
+
+	si5332_1: si5332_1 { /* clk0_sgmii - u142 */
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <125000000>;
+	};
+
+	si5332_2: si5332_2 { /* clk1_usb - u142 */
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <27000000>;
 	};
 };
 
@@ -55,12 +66,10 @@
 
 &uart0 { /* uart0 MIO38-39 */
 	status = "okay";
-	u-boot,dm-pre-reloc;
 };
 
 &uart1 { /* uart1 MIO40-41 */
 	status = "okay";
-	u-boot,dm-pre-reloc;
 };
 
 &sdhci1 { /* sd1 MIO45-51 cd in place */
@@ -68,6 +77,13 @@
 	no-1-8-v;
 	disable-wp;
 	xlnx,mio-bank = <1>;
+};
+
+&psgtr {
+	status = "okay";
+	/* sgmii, usb3 */
+	clocks = <&si5332_1>, <&si5332_2>;
+	clock-names = "ref0", "ref1";
 };
 
 &gem0 {
@@ -390,6 +406,7 @@
 				factory-fout = <33333333>;
 				clock-frequency = <33333333>;
 				clock-output-names = "ref_clk";
+				silabs,skip-recall;
 			};
 			/* Connection via Samtec J212D */
 			/* Use for storing information about X-PRC card */
@@ -494,10 +511,10 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <6>;
-			si570_hsdp: clock-generator@5d { /* u5 */
+			si570_hsdp: clock-generator@60 { /* u5 */
 				#clock-cells = <0>;
 				compatible = "silabs,si570";
-				reg = <0x5d>;	/* 570JAC000900DG */
+				reg = <0x60>;	/* 570JAC000900DG */
 				temperature-stability = <50>;
 				factory-fout = <156250000>;
 				clock-frequency = <156250000>;
@@ -511,10 +528,10 @@
 			/* u36 0xd8 or 0xde - pcie clk buf - 9ZML1241EKILF PCIe GEN 4 CLOCK BUFFER FIXME - no driver */
 			/* u37 0xd0 DNP - pcie clocking 1 - 9FGV1006BQ505LTGI - PCIe GEN 4 CLOCK GENERATOR FIXME - no linux driver */
 			/* u38 0xca - pcie clocking 2 - 9ZML1241EKILF PCIe GEN 4 CLOCK BUFFER FIXME - no driver */
-			clock_8t49n287: clock-generator@d8 { /* u39 8T49N240 - pcie clocking 3 */
+			clock_8t49n287: clock-generator@60 { /* u39 8T49N240 - pcie clocking 3 */
 				#clock-cells = <1>; /* author David Cater <david.cater@idt.com>*/
 				compatible = "idt,8t49n240", "idt,8t49n241"; /* FIXME no driver for 240 */
-				reg = <0xd8>;
+				reg = <0x60>;
 				/* Documentation/devicetree/bindings/clock/idt,idt8t49n24x.txt */
 				/* FIXME there input via J241 Samtec CLK1 and CLK0 from U38 - selection PIN */
 
@@ -528,6 +545,8 @@
 	status = "okay";
 	xlnx,usb-polarity = <0>;
 	xlnx,usb-reset-mode = <0>;
+	phy-names = "usb3-phy";
+	phys = <&psgtr 1 PHY_TYPE_USB3 0 1>;
 };
 
 &dwc3_0 {

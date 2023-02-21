@@ -16,6 +16,7 @@
 #include <malloc.h>
 #include <net.h>
 #include <asm/cache.h>
+#include <asm/global_data.h>
 #include <linux/bitops.h>
 #include <linux/compiler.h>
 #include <linux/delay.h>
@@ -588,7 +589,7 @@ static void ag7xxx_eth_stop(struct udevice *dev)
  */
 static int ag7xxx_eth_write_hwaddr(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct ar7xxx_eth_priv *priv = dev_get_priv(dev);
 	unsigned char *mac = pdata->enetaddr;
 	u32 macid_lo, macid_hi;
@@ -1197,7 +1198,7 @@ static int ag7xxx_get_phy_iface_offset(struct udevice *dev)
 
 static int ag7xxx_eth_probe(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct ar7xxx_eth_priv *priv = dev_get_priv(dev);
 	void __iomem *iobase, *phyiobase;
 	int ret, phyreg;
@@ -1250,10 +1251,9 @@ static const struct eth_ops ag7xxx_eth_ops = {
 	.write_hwaddr		= ag7xxx_eth_write_hwaddr,
 };
 
-static int ag7xxx_eth_ofdata_to_platdata(struct udevice *dev)
+static int ag7xxx_eth_of_to_plat(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
-	const char *phy_mode;
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	int ret;
 
 	pdata->iobase = dev_read_addr(dev);
@@ -1264,13 +1264,9 @@ static int ag7xxx_eth_ofdata_to_platdata(struct udevice *dev)
 	if (ret <= 0)
 		return ret;
 
-	phy_mode = fdt_getprop(gd->fdt_blob, ret, "phy-mode", NULL);
-	if (phy_mode)
-		pdata->phy_interface = phy_get_interface_by_name(phy_mode);
-	if (pdata->phy_interface == -1) {
-		debug("%s: Invalid PHY interface '%s'\n", __func__, phy_mode);
+	pdata->phy_interface = dev_read_phy_mode(dev);
+	if (pdata->phy_interface == PHY_INTERFACE_MODE_NA)
 		return -EINVAL;
-	}
 
 	return 0;
 }
@@ -1287,11 +1283,11 @@ U_BOOT_DRIVER(eth_ag7xxx) = {
 	.name		= "eth_ag7xxx",
 	.id		= UCLASS_ETH,
 	.of_match	= ag7xxx_eth_ids,
-	.ofdata_to_platdata = ag7xxx_eth_ofdata_to_platdata,
+	.of_to_plat = ag7xxx_eth_of_to_plat,
 	.probe		= ag7xxx_eth_probe,
 	.remove		= ag7xxx_eth_remove,
 	.ops		= &ag7xxx_eth_ops,
-	.priv_auto_alloc_size = sizeof(struct ar7xxx_eth_priv),
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
+	.priv_auto	= sizeof(struct ar7xxx_eth_priv),
+	.plat_auto	= sizeof(struct eth_pdata),
 	.flags		= DM_FLAG_ALLOC_PRIV_DMA,
 };

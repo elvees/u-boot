@@ -11,17 +11,15 @@
 
 #include <common.h>
 #include <cpu_func.h>
+#include <clock_legacy.h>
 #include <ppc_asm.tmpl>
+#include <asm/global_data.h>
 #include <linux/compiler.h>
 #include <asm/processor.h>
 #include <asm/io.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
-
-#ifndef CONFIG_SYS_FSL_NUM_CC_PLLS
-#define CONFIG_SYS_FSL_NUM_CC_PLLS	6
-#endif
 /* --------------------------------------------------------------- */
 
 void get_sys_info(sys_info_t *sys_info)
@@ -73,7 +71,7 @@ void get_sys_info(sys_info_t *sys_info)
 	uint rcw_tmp;
 #endif
 	uint ratio[CONFIG_SYS_FSL_NUM_CC_PLLS];
-	unsigned long sysclk = CONFIG_SYS_CLK_FREQ;
+	unsigned long sysclk = get_board_sys_clk();
 	uint mem_pll_rat;
 
 	sys_info->freq_systembus = sysclk;
@@ -100,11 +98,11 @@ void get_sys_info(sys_info_t *sys_info)
 	 * are driven by differential sysclock.
 	 */
 	if (ddr_refclk_sel == FSL_CORENET2_RCWSR5_DDR_REFCLK_SINGLE_CLK)
-		sys_info->freq_ddrbus = CONFIG_SYS_CLK_FREQ;
+		sys_info->freq_ddrbus = get_board_sys_clk();
 	else
 #endif
-#ifdef CONFIG_DDR_CLK_FREQ
-		sys_info->freq_ddrbus = CONFIG_DDR_CLK_FREQ;
+#if defined(CONFIG_DYNAMIC_DDR_CLK_FREQ) || defined(CONFIG_STATIC_DDR_CLK_FREQ)
+		sys_info->freq_ddrbus = get_board_ddr_clk();
 #else
 		sys_info->freq_ddrbus = sysclk;
 #endif
@@ -125,8 +123,7 @@ void get_sys_info(sys_info_t *sys_info)
 	 * it uses 6.
 	 * T2080 rev 1.1 and later also use half mem_pll comparing with rev 1.0
 	 */
-#if defined(CONFIG_ARCH_T4240) || defined(CONFIG_ARCH_T4160) || \
-	defined(CONFIG_ARCH_T2080) || defined(CONFIG_ARCH_T2081)
+#if defined(CONFIG_ARCH_T4240) || defined(CONFIG_ARCH_T2080)
 	svr = get_svr();
 	switch (SVR_SOC_VER(svr)) {
 	case SVR_T4240:
@@ -197,10 +194,10 @@ void get_sys_info(sys_info_t *sys_info)
 #endif
 
 #if defined(CONFIG_ARCH_B4860) || defined(CONFIG_ARCH_B4420) || \
-	defined(CONFIG_ARCH_T2080) || defined(CONFIG_ARCH_T2081)
+	defined(CONFIG_ARCH_T2080)
 #define FM1_CLK_SEL	0xe0000000
 #define FM1_CLK_SHIFT	29
-#elif defined(CONFIG_ARCH_T1024) || defined(CONFIG_ARCH_T1023)
+#elif defined(CONFIG_ARCH_T1024)
 #define FM1_CLK_SEL	0x00000007
 #define FM1_CLK_SHIFT	0
 #else
@@ -210,7 +207,7 @@ void get_sys_info(sys_info_t *sys_info)
 #define FM1_CLK_SHIFT	26
 #endif
 #if !defined(CONFIG_FM_PLAT_CLK_DIV) || !defined(CONFIG_PME_PLAT_CLK_DIV)
-#if defined(CONFIG_ARCH_T1024) || defined(CONFIG_ARCH_T1023)
+#if defined(CONFIG_ARCH_T1024)
 	rcw_tmp = in_be32(&gur->rcwsr[15]) - 4;
 #else
 	rcw_tmp = in_be32(&gur->rcwsr[7]);
@@ -525,7 +522,7 @@ void get_sys_info(sys_info_t *sys_info)
 
 	plat_ratio = (gur->porpllsr) & 0x0000003e;
 	plat_ratio >>= 1;
-	sys_info->freq_systembus = plat_ratio * CONFIG_SYS_CLK_FREQ;
+	sys_info->freq_systembus = plat_ratio * get_board_sys_clk();
 
 	/* Divide before multiply to avoid integer
 	 * overflow for processor speeds above 2GHz */
@@ -538,12 +535,12 @@ void get_sys_info(sys_info_t *sys_info)
 	/* Note: freq_ddrbus is the MCLK frequency, not the data rate. */
 	sys_info->freq_ddrbus = sys_info->freq_systembus;
 
-#ifdef CONFIG_DDR_CLK_FREQ
+#if defined(CONFIG_DYNAMIC_DDR_CLK_FREQ) || defined(CONFIG_STATIC_DDR_CLK_FREQ)
 	{
 		u32 ddr_ratio = ((gur->porpllsr) & MPC85xx_PORPLLSR_DDR_RATIO)
 			>> MPC85xx_PORPLLSR_DDR_RATIO_SHIFT;
 		if (ddr_ratio != 0x7)
-			sys_info->freq_ddrbus = ddr_ratio * CONFIG_DDR_CLK_FREQ;
+			sys_info->freq_ddrbus = ddr_ratio * get_board_ddr_clk();
 	}
 #endif
 
@@ -553,7 +550,7 @@ void get_sys_info(sys_info_t *sys_info)
 #else
 	qe_ratio = ((gur->porpllsr) & MPC85xx_PORPLLSR_QE_RATIO)
 			>> MPC85xx_PORPLLSR_QE_RATIO_SHIFT;
-	sys_info->freq_qe = qe_ratio * CONFIG_SYS_CLK_FREQ;
+	sys_info->freq_qe = qe_ratio * get_board_sys_clk();
 #endif
 #endif
 
@@ -580,15 +577,6 @@ int get_clocks(void)
 #ifdef CONFIG_ARCH_MPC8544
 	volatile ccsr_gur_t *gur = (void *) CONFIG_SYS_MPC85xx_GUTS_ADDR;
 #endif
-#if defined(CONFIG_CPM2)
-	volatile ccsr_cpm_t *cpm = (ccsr_cpm_t *)CONFIG_SYS_MPC85xx_CPM_ADDR;
-	uint sccr, dfbrg;
-
-	/* set VCO = 4 * BRG */
-	cpm->im_cpm_intctl.sccr &= 0xfffffffc;
-	sccr = cpm->im_cpm_intctl.sccr;
-	dfbrg = (sccr & SCCR_DFBRG_MSK) >> SCCR_DFBRG_SHIFT;
-#endif
 	get_sys_info (&sys_info);
 	gd->cpu_clk = sys_info.freq_processor[0];
 	gd->bus_clk = sys_info.freq_systembus;
@@ -606,9 +594,7 @@ int get_clocks(void)
 	 * for that SOC. This information is taken from application note
 	 * AN2919.
 	 */
-#if defined(CONFIG_ARCH_MPC8540) || defined(CONFIG_ARCH_MPC8541) || \
-	defined(CONFIG_ARCH_MPC8560) || defined(CONFIG_ARCH_MPC8555) || \
-	defined(CONFIG_ARCH_P1022)
+#if defined(CONFIG_ARCH_MPC8540) || defined(CONFIG_ARCH_MPC8560)
 	gd->arch.i2c1_clk = sys_info.freq_systembus;
 #elif defined(CONFIG_ARCH_MPC8544)
 	/*
@@ -629,19 +615,12 @@ int get_clocks(void)
 	gd->arch.i2c2_clk = gd->arch.i2c1_clk;
 
 #if defined(CONFIG_FSL_ESDHC)
-#if defined(CONFIG_ARCH_MPC8569) || defined(CONFIG_ARCH_P1010)
+#if defined(CONFIG_ARCH_P1010)
 	gd->arch.sdhc_clk = gd->bus_clk;
 #else
 	gd->arch.sdhc_clk = gd->bus_clk / 2;
 #endif
 #endif /* defined(CONFIG_FSL_ESDHC) */
-
-#if defined(CONFIG_CPM2)
-	gd->arch.vco_out = 2*sys_info.freq_systembus;
-	gd->arch.cpm_clk = gd->arch.vco_out / 2;
-	gd->arch.scc_clk = gd->arch.vco_out / 4;
-	gd->arch.brg_clk = gd->arch.vco_out / (1 << (2 * (dfbrg + 1)));
-#endif
 
 	if(gd->cpu_clk != 0) return (0);
 	else return (1);

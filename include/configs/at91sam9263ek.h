@@ -22,51 +22,26 @@
 #define CONFIG_SYS_AT91_MAIN_CLOCK	16367660 /* 16.367 MHz crystal */
 #define CONFIG_SYS_AT91_SLOW_CLOCK	32768
 
-#define CONFIG_CMDLINE_TAG	1	/* enable passing of ATAGs	*/
-#define CONFIG_SETUP_MEMORY_TAGS 1
-#define CONFIG_INITRD_TAG	1
-
-#ifndef CONFIG_SYS_USE_BOOT_NORFLASH
-#define CONFIG_SKIP_LOWLEVEL_INIT
-#else
-#define CONFIG_SYS_USE_NORFLASH
-#endif
-
 /*
  * Hardware drivers
  */
-#define CONFIG_ATMEL_LEGACY
 
 /* LCD */
 #define LCD_BPP				LCD_COLOR8
-#define CONFIG_LCD_LOGO			1
-#undef LCD_TEST_PATTERN
-#define CONFIG_LCD_INFO			1
-#define CONFIG_LCD_INFO_BELOW_LOGO	1
-#define CONFIG_ATMEL_LCD		1
-#define CONFIG_ATMEL_LCD_BGR555		1
-
-/*
- * BOOTP options
- */
-#define CONFIG_BOOTP_BOOTFILESIZE	1
 
 /* SDRAM */
 #define CONFIG_SYS_SDRAM_BASE		ATMEL_BASE_CS1
 #define CONFIG_SYS_SDRAM_SIZE		0x04000000
 
-#define CONFIG_SYS_INIT_SP_ADDR \
-	(ATMEL_BASE_SRAM1 + 16 * 1024 - GENERATED_GBL_DATA_SIZE)
+#define CONFIG_SYS_INIT_RAM_SIZE	(16 * 1024)
+#define CONFIG_SYS_INIT_RAM_ADDR	ATMEL_BASE_SRAM1
 
 /* NOR flash, if populated */
 #ifdef CONFIG_SYS_USE_NORFLASH
 #define PHYS_FLASH_1				0x10000000
 #define CONFIG_SYS_FLASH_BASE			PHYS_FLASH_1
-#define CONFIG_SYS_MAX_FLASH_SECT		256
-#define CONFIG_SYS_MAX_FLASH_BANKS		1
 
 #define CONFIG_SYS_MONITOR_SEC	1:0-3
-#define CONFIG_SYS_MONITOR_BASE	CONFIG_SYS_FLASH_BASE
 #define CONFIG_SYS_MONITOR_LEN	(256 << 10)
 
 /* Address and size of Primary Environment Sector */
@@ -91,7 +66,7 @@
 	(AT91_PMC_PLLAR_29 |					\
 	AT91_PMC_PLLXR_OUT(MASTER_PLL_OUT) |			\
 	AT91_PMC_PLLXR_PLLCOUNT(63) |				\
-	AT91_PMC_PLLXR_MUL(MASTER_PLL_MUL - 1) | 		\
+	AT91_PMC_PLLXR_MUL(MASTER_PLL_MUL - 1) |		\
 	AT91_PMC_PLLXR_DIV(MASTER_PLL_DIV))
 
 /* PCK/2 = MCK Master Clock from PLLA */
@@ -101,7 +76,7 @@
 
 /* PCK/2 = MCK Master Clock from PLLA */
 #define	CONFIG_SYS_MCKR2_VAL		\
-	(AT91_PMC_MCKR_CSS_PLLA | AT91_PMC_MCKR_PRES_1 | 	\
+	(AT91_PMC_MCKR_CSS_PLLA | AT91_PMC_MCKR_PRES_1 |	\
 	AT91_PMC_MCKR_MDIV_2)
 
 /* define PDC[31:16] as DATA[31:16] */
@@ -196,37 +171,7 @@
 #define CONFIG_SYS_NAND_READY_PIN		AT91_PIN_PA22
 #endif
 
-/* Ethernet */
-#define CONFIG_RESET_PHY_R		1
-#define CONFIG_AT91_WANTS_COMMON_PHY
-
 /* USB */
-#define CONFIG_USB_ATMEL
-#define CONFIG_USB_ATMEL_CLK_SEL_PLLB
-#define CONFIG_USB_OHCI_NEW		1
-#define CONFIG_SYS_USB_OHCI_CPU_INIT		1
 #define CONFIG_SYS_USB_OHCI_REGS_BASE		0x00a00000	/* AT91SAM9263_UHP_BASE */
-#define CONFIG_SYS_USB_OHCI_SLOT_NAME		"at91sam9263"
-#define CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS	2
-
-#define CONFIG_SYS_LOAD_ADDR			0x22000000	/* load address */
-
-#ifdef CONFIG_SYS_USE_DATAFLASH
-
-/* bootstrap + u-boot + env + linux in dataflash on CS0 */
-#define CONFIG_BOOTCOMMAND	"sf probe 0; " \
-				"sf read 0x22000000 0x84000 0x294000; " \
-				"bootm 0x22000000"
-
-#elif CONFIG_SYS_USE_NANDFLASH
-
-/* bootstrap + u-boot + env + linux in nandflash */
-#define CONFIG_BOOTCOMMAND	"nand read 0x22000000 0x200000 0x300000; bootm"
-#endif
-
-/*
- * Size of malloc() pool
- */
-#define CONFIG_SYS_MALLOC_LEN	ROUND(3 * CONFIG_ENV_SIZE + 128*1024, 0x1000)
 
 #endif

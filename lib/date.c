@@ -10,8 +10,6 @@
 #include <rtc.h>
 #include <linux/time.h>
 
-#if defined(CONFIG_LIB_DATE) || defined(CONFIG_TIMESTAMP)
-
 #define FEBRUARY		2
 #define	STARTOFTIME		1970
 #define SECDAY			86400L
@@ -73,19 +71,16 @@ int rtc_calc_weekday(struct rtc_time *tm)
  * -year / 100 + year / 400 terms, and add 10.]
  *
  * This algorithm was first published by Gauss (I think).
- *
- * WARNING: this function will overflow on 2106-02-07 06:28:16 on
- * machines where long is 32-bit! (However, as time_t is signed, we
- * will already get problems at other places on 2038-01-19 03:14:08)
  */
-unsigned long rtc_mktime(const struct rtc_time *tm)
+time64_t rtc_mktime(const struct rtc_time *tm)
 {
 	int mon = tm->tm_mon;
 	int year = tm->tm_year;
-	int days, hours;
+	unsigned long days;
+	time64_t hours;
 
 	mon -= 2;
-	if (0 >= (int)mon) {	/* 1..12 -> 11, 12, 1..10 */
+	if (0 >= mon) {		/* 1..12 -> 11, 12, 1..10 */
 		mon += 12;	/* Puts Feb last since it has leap day */
 		year -= 1;
 	}
@@ -97,9 +92,6 @@ unsigned long rtc_mktime(const struct rtc_time *tm)
 	return (hours * 60 + tm->tm_min) * 60 + tm->tm_sec;
 }
 
-#endif /* CONFIG_LIB_DATE || CONFIG_TIMESTAMP */
-
-#ifdef CONFIG_LIB_DATE
 /* for compatibility with linux code */
 time64_t mktime64(const unsigned int year, const unsigned int mon,
 		  const unsigned int day, const unsigned int hour,
@@ -114,6 +106,5 @@ time64_t mktime64(const unsigned int year, const unsigned int mon,
 	time.tm_min = min;
 	time.tm_sec = sec;
 
-	return (time64_t)rtc_mktime((const struct rtc_time *)&time);
+	return rtc_mktime((const struct rtc_time *)&time);
 }
-#endif

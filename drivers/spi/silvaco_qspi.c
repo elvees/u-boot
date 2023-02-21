@@ -93,7 +93,7 @@ struct silvaco_qspi_priv {
 
 static int silvaco_qspi_ofdata_to_platdata(struct udevice *dev)
 {
-	struct silvaco_qspi_platdata *plat = dev_get_platdata(dev);
+	struct silvaco_qspi_platdata *plat = dev_get_plat(dev);
 
 	plat->regs = map_physmem(dev_read_addr(dev),
 				 sizeof(struct silvaco_qspi_regs),
@@ -170,7 +170,7 @@ static int mcom03_qspi_set_soc_regs(struct udevice *dev)
 static int silvaco_qspi_probe(struct udevice *dev)
 {
 	struct silvaco_qspi_priv *priv = dev_get_priv(dev);
-	struct silvaco_qspi_platdata *plat = dev_get_platdata(dev);
+	struct silvaco_qspi_platdata *plat = dev_get_plat(dev);
 	struct silvaco_qspi_regs *regs = plat->regs;
 	int ret;
 
@@ -373,9 +373,7 @@ static int silvaco_qspi_prep_io_lines(struct silvaco_qspi_priv *silvaco,
 	return 0;
 }
 
-static int silavco_qspi_end_xfer(struct silvaco_qspi_priv *silvaco,
-				 struct dm_spi_slave_platdata *slave_plat,
-				 u8 *rxp)
+static int silavco_qspi_end_xfer(struct silvaco_qspi_priv *silvaco, u8 *rxp)
 {
 	struct silvaco_qspi_regs *regs = silvaco->regs;
 	int ret;
@@ -398,7 +396,7 @@ static int silvaco_qspi_xfer(struct udevice *dev, unsigned int bitlen,
 			     const void *dout, void *din, unsigned long flags)
 {
 	struct silvaco_qspi_priv *priv = dev_get_priv(dev->parent);
-	struct dm_spi_slave_platdata *slave_plat = dev_get_parent_platdata(dev);
+	struct dm_spi_slave_plat *slave_plat = dev_get_parent_plat(dev);
 	struct silvaco_qspi_regs *regs = priv->regs;
 	unsigned int bytes = bitlen / 8;
 	const unsigned char *txp = dout;
@@ -407,7 +405,7 @@ static int silvaco_qspi_xfer(struct udevice *dev, unsigned int bitlen,
 	u32 data;
 
 	debug("%s: bus:%i cs:%i bitlen:%i bytes:%i flags:%lx\n", __func__,
-	      dev->parent->seq, slave_plat->cs, bitlen, bytes, flags);
+	      dev->parent->seq_, slave_plat->cs, bitlen, bytes, flags);
 
 	/*
 	 * The controller can do non-multiple-of-8 bit
@@ -465,7 +463,7 @@ static int silvaco_qspi_xfer(struct udevice *dev, unsigned int bitlen,
 	}
 done:
 	if (flags & SPI_XFER_END)
-		ret = silavco_qspi_end_xfer(priv, slave_plat, rxp);
+		ret = silavco_qspi_end_xfer(priv, rxp);
 
 	return ret;
 }
@@ -593,9 +591,9 @@ U_BOOT_DRIVER(silvaco_qspi) = {
 	.id	= UCLASS_SPI,
 	.of_match = silvaco_qspi_ids,
 	.ops	= &silvaco_qspi_ops,
-	.ofdata_to_platdata = silvaco_qspi_ofdata_to_platdata,
-	.platdata_auto_alloc_size = sizeof(struct silvaco_qspi_platdata),
-	.priv_auto_alloc_size = sizeof(struct silvaco_qspi_priv),
+	.of_to_plat = silvaco_qspi_ofdata_to_platdata,
+	.plat_auto = sizeof(struct silvaco_qspi_platdata),
+	.priv_auto = sizeof(struct silvaco_qspi_priv),
 	.probe	= silvaco_qspi_probe,
 	.remove	= silvaco_qspi_remove,
 };

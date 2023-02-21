@@ -5,9 +5,6 @@
 #ifndef __CONFIGS_MX23_OLINUXINO_H__
 #define __CONFIGS_MX23_OLINUXINO_H__
 
-/* System configurations */
-#define CONFIG_MACH_TYPE	4105
-
 /* U-Boot Commands */
 
 /* Memory configuration */
@@ -18,17 +15,8 @@
 /* Status LED */
 
 /* USB */
-#ifdef CONFIG_CMD_USB
-#define CONFIG_EHCI_MXS_PORT0
-#define CONFIG_USB_MAX_CONTROLLER_COUNT 1
-#endif
 
 /* Ethernet */
-
-/* Booting Linux */
-#define CONFIG_BOOTFILE		"uImage"
-#define CONFIG_LOADADDR		0x42000000
-#define CONFIG_SYS_LOAD_ADDR	CONFIG_LOADADDR
 
 /* Extra Environment */
 #define CONFIG_EXTRA_ENV_SETTINGS \
@@ -99,18 +87,6 @@
 		"else " \
 			"bootm; " \
 		"fi;\0"
-
-#define CONFIG_BOOTCOMMAND \
-	"mmc dev ${mmcdev}; if mmc rescan; then " \
-		"if run loadbootscript; then " \
-			"run bootscript; " \
-		"else " \
-			"if run loaduimage; then " \
-				"run mmcboot; " \
-			"else run netboot; " \
-			"fi; " \
-		"fi; " \
-	"else run netboot; fi"
 
 /* The rest of the configuration is shared */
 #include <configs/mxs.h>

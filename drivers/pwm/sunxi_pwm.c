@@ -10,9 +10,9 @@
 #include <pwm.h>
 #include <regmap.h>
 #include <syscon.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/pwm.h>
-#include <asm/arch/gpio.h>
 #include <power/regulator.h>
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -43,14 +43,6 @@ static const u32 prescaler_table[] = {
 	0,	/* 1110 */
 	1,	/* 1111 */
 };
-
-static int sunxi_pwm_config_pinmux(void)
-{
-#ifdef CONFIG_MACH_SUN50I
-	sunxi_gpio_set_cfgpin(SUNXI_GPD(22), SUNXI_GPD_PWM);
-#endif
-	return 0;
-}
 
 static int sunxi_pwm_set_invert(struct udevice *dev, uint channel,
 				bool polarity)
@@ -136,8 +128,6 @@ static int sunxi_pwm_set_enable(struct udevice *dev, uint channel, bool enable)
 		return 0;
 	}
 
-	sunxi_pwm_config_pinmux();
-
 	if (priv->invert)
 		v &= ~SUNXI_PWM_CTRL_CH0_ACT_STA;
 	else
@@ -148,7 +138,7 @@ static int sunxi_pwm_set_enable(struct udevice *dev, uint channel, bool enable)
 	return 0;
 }
 
-static int sunxi_pwm_ofdata_to_platdata(struct udevice *dev)
+static int sunxi_pwm_of_to_plat(struct udevice *dev)
 {
 	struct sunxi_pwm_priv *priv = dev_get_priv(dev);
 
@@ -179,7 +169,7 @@ U_BOOT_DRIVER(sunxi_pwm) = {
 	.id	= UCLASS_PWM,
 	.of_match = sunxi_pwm_ids,
 	.ops	= &sunxi_pwm_ops,
-	.ofdata_to_platdata	= sunxi_pwm_ofdata_to_platdata,
+	.of_to_plat	= sunxi_pwm_of_to_plat,
 	.probe		= sunxi_pwm_probe,
-	.priv_auto_alloc_size	= sizeof(struct sunxi_pwm_priv),
+	.priv_auto	= sizeof(struct sunxi_pwm_priv),
 };

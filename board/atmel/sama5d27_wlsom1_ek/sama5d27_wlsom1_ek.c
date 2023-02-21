@@ -8,6 +8,7 @@
 #include <common.h>
 #include <debug_uart.h>
 #include <init.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/at91_common.h>
 #include <asm/arch/atmel_pio4.h>
@@ -20,6 +21,13 @@
 extern void at91_pda_detect(void);
 
 DECLARE_GLOBAL_DATA_PTR;
+
+static void rgb_leds_init(void)
+{
+	atmel_pio4_set_pio_output(AT91_PIO_PORTA, 6, 0);	/* LED RED */
+	atmel_pio4_set_pio_output(AT91_PIO_PORTA, 7, 0);	/* LED GREEN */
+	atmel_pio4_set_pio_output(AT91_PIO_PORTA, 8, 1);	/* LED BLUE */
+}
 
 #ifdef CONFIG_BOARD_LATE_INIT
 int board_late_init(void)
@@ -50,10 +58,6 @@ void board_debug_uart_init(void)
 #ifdef CONFIG_BOARD_EARLY_INIT_F
 int board_early_init_f(void)
 {
-#ifdef CONFIG_DEBUG_UART
-	debug_uart_init();
-#endif
-
 	return 0;
 }
 #endif
@@ -62,6 +66,8 @@ int board_init(void)
 {
 	/* address of boot parameters */
 	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+
+	rgb_leds_init();
 
 	return 0;
 }

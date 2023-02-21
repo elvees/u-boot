@@ -9,6 +9,15 @@ config POWER_DOMAIN
 	  domains). This may be used to save power. This API provides the
 	  means to control such power management hardware.
 
+config APPLE_PMGR_POWER_DOMAIN
+	bool "Enable the Apple PMGR power domain driver"
+	depends on POWER_DOMAIN
+	default y if ARCH_APPLE
+	help
+	  Enable support for manipulating power domains on Apple SoCs.
+	  This driver is needed to power on parts of the SoC that have
+	  not been powered on by previous boot stages.
+
 config BCM6328_POWER_DOMAIN
 	bool "Enable the BCM6328 power domain driver"
 	depends on POWER_DOMAIN && ARCH_BMIPS
@@ -26,9 +35,17 @@ config IMX8_POWER_DOMAIN
 config IMX8M_POWER_DOMAIN
 	bool "Enable i.MX8M power domain driver"
 	depends on POWER_DOMAIN && ARCH_IMX8M
+	select CLK
 	help
 	  Enable support for manipulating NXP i.MX8M on-SoC power domains via
 	  requests to the ATF.
+
+config IMX8MP_HSIOMIX_BLKCTRL
+	bool "Enable i.MX8MP HSIOMIX domain driver"
+	depends on POWER_DOMAIN && IMX8MP
+	select CLK
+	help
+	  Enable support for manipulating NXP i.MX8MP on-SoC HSIOMIX block controller.
 
 config MTK_POWER_DOMAIN
 	bool "Enable the MediaTek power domain driver"
@@ -72,4 +89,20 @@ config TI_SCI_POWER_DOMAIN
 	help
 	  Generic power domain implementation for TI devices implementing the
 	  TI SCI protocol.
+
+config TI_POWER_DOMAIN
+	bool "Enable the TI K3 Power domain driver"
+	depends on POWER_DOMAIN && ARCH_K3
+	help
+	  Generic power domain implementation for TI K3 devices.
+
+config ZYNQMP_POWER_DOMAIN
+	bool "Enable the Xilinx ZynqMP Power domain driver"
+	depends on POWER_DOMAIN && ZYNQMP_FIRMWARE
+	help
+	  Generic power domain implementation for Xilinx ZynqMP devices.
+	  The driver should be enabled when system starts in very minimal
+	  configuration and it is extended at run time. Then enabling
+	  the driver will ensure that PMUFW enable access to requested IP.
+
 endmenu

@@ -12,6 +12,7 @@
 #include <image.h>
 #include <init.h>
 #include <netdev.h>
+#include <asm/global_data.h>
 #include <linux/compiler.h>
 #include <asm/mmu.h>
 #include <asm/processor.h>
@@ -161,16 +162,6 @@ int board_early_init_r(void)
 	return 0;
 }
 
-unsigned long get_board_sys_clk(void)
-{
-	return CONFIG_SYS_CLK_FREQ;
-}
-
-unsigned long get_board_ddr_clk(void)
-{
-	return CONFIG_DDR_CLK_FREQ;
-}
-
 #ifdef CONFIG_TARGET_T1024RDB
 void board_reset(void)
 {
@@ -258,7 +249,7 @@ static u32 t1023rdb_ctrl(u32 ctrl_type)
 	u8 tmp;
 	int bus_num = I2C_PCA6408_BUS_NUM;
 
-#ifdef CONFIG_DM_I2C
+#if CONFIG_IS_ENABLED(DM_I2C)
 	struct udevice *dev;
 	int ret;
 

@@ -8,6 +8,7 @@
 #include <init.h>
 #include <miiphy.h>
 #include <netdev.h>
+#include <asm/global_data.h>
 
 #include <asm/arch/clock.h>
 #include <asm/arch/sys_proto.h>
@@ -59,9 +60,10 @@ int board_mmc_get_env_dev(int devno)
 
 int board_late_init(void)
 {
-#ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
-	env_set("board_name", "EVK");
-	env_set("board_rev", "iMX8MM");
-#endif
+	if (IS_ENABLED(CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG)) {
+		env_set("board_name", "EVK");
+		env_set("board_rev", "iMX8MM");
+	}
+
 	return 0;
 }

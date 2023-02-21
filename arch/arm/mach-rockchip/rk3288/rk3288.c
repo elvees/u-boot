@@ -10,6 +10,7 @@
 #include <init.h>
 #include <malloc.h>
 #include <asm/armv7.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch-rockchip/bootrom.h>
 #include <asm/arch-rockchip/clock.h>
@@ -27,8 +28,8 @@ DECLARE_GLOBAL_DATA_PTR;
 #define GRF_BASE	0xff770000
 
 const char * const boot_devices[BROM_LAST_BOOTSOURCE + 1] = {
-	[BROM_BOOTSOURCE_EMMC] = "/dwmmc@ff0f0000",
-	[BROM_BOOTSOURCE_SD] = "/dwmmc@ff0c0000",
+	[BROM_BOOTSOURCE_EMMC] = "/mmc@ff0f0000",
+	[BROM_BOOTSOURCE_SD] = "/mmc@ff0c0000",
 };
 
 #ifdef CONFIG_SPL_BUILD

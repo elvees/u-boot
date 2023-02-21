@@ -17,6 +17,12 @@ of the sandbox U-Boot. The purpose of running U-Boot under Linux is to test
 all the generic code, not specific to any one architecture. The idea is to
 create unit tests which we can run to test this upper level code.
 
+Sandbox allows development of many types of new features in a traditional way,
+rather than needing to test each iteration on real hardware. Many U-Boot
+features were developed on sandbox, including the core driver model, most
+uclasses, verified boot, bloblist, logging and dozens of others. Sandbox has
+enabled many large-scale code refactors as well.
+
 CONFIG_SANDBOX is defined when building a native board.
 
 The board name is 'sandbox' but the vendor name is unset, so there is a
@@ -37,11 +43,7 @@ Note that standalone/API support is not available at present.
 Prerequisites
 -------------
 
-Here are some packages that are worth installing if you are doing sandbox or
-tools development in U-Boot:
-
-   python3-pytest lzma lzma-alone lz4 python3 python3-virtualenv
-   libssl1.0-dev
+Install the dependencies noted in :doc:`../build/gcc`.
 
 
 Basic Operation
@@ -76,7 +78,7 @@ console::
 You can issue commands as your would normally. If the command you want is
 not supported you can add it to include/configs/sandbox.h.
 
-To exit, type 'reset' or press Ctrl-C.
+To exit, type 'poweroff' or press Ctrl-C.
 
 
 Console / LCD support
@@ -99,42 +101,49 @@ Command-line Options
 Various options are available, mostly for test purposes. Use -h to see
 available options. Some of these are described below:
 
-* -t, --terminal <arg>
-  - The terminal is normally in what is called 'raw-with-sigs' mode. This means
+-t, --terminal <arg>
+  The terminal is normally in what is called 'raw-with-sigs' mode. This means
   that you can use arrow keys for command editing and history, but if you
   press Ctrl-C, U-Boot will exit instead of handling this as a keypress.
   Other options are 'raw' (so Ctrl-C is handled within U-Boot) and 'cooked'
   (where the terminal is in cooked mode and cursor keys will not work, Ctrl-C
   will exit).
 
-* -l
-  - Show the LCD emulation window.
+-l
+  Show the LCD emulation window.
 
-* -d <device_tree>
-  - A device tree binary file can be provided with -d. If you edit the source
+-d <device_tree>
+  A device tree binary file can be provided with -d. If you edit the source
   (it is stored at arch/sandbox/dts/sandbox.dts) you must rebuild U-Boot to
   recreate the binary file.
 
-* -D
-  - To use the default device tree, use -D.
+-D
+  To use the default device tree, use -D.
 
-* -T
-  - To use the test device tree, use -T.
+-T
+  To use the test device tree, use -T.
 
-* -c [<cmd>;]<cmd>
-  - To execute commands directly, use the -c option. You can specify a single
+-c [<cmd>;]<cmd>
+  To execute commands directly, use the -c option. You can specify a single
   command, or multiple commands separated by a semicolon, as is normal in
   U-Boot. Be careful with quoting as the shell will normally process and
   swallow quotes. When -c is used, U-Boot exits after the command is complete,
   but you can force it to go to interactive mode instead with -i.
 
-* -i
-  - Go to interactive mode after executing the commands specified by -c.
+-i
+  Go to interactive mode after executing the commands specified by -c.
+
+Environment Variables
+---------------------
+
+UBOOT_SB_TIME_OFFSET
+    This environment variable stores the offset of the emulated real time clock
+    to the host's real time clock in seconds. The offset defaults to zero.
 
 Memory Emulation
 ----------------
 
-Memory emulation is supported, with the size set by CONFIG_SYS_SDRAM_SIZE.
+Memory emulation is supported, with the size set by CONFIG_SANDBOX_RAM_SIZE_MB.
 The -m option can be used to read memory from a file on start-up and write
 it when shutting down. This allows preserving of memory contents across
 test runs. You can tell U-Boot to remove the memory file after it is read
@@ -376,6 +385,8 @@ the contents of the root directory on the second partion of the image
    =>host bind 0 ./disk.raw
    =>ls host 0:2
 
+The device can be marked removeable with 'host bind -r'.
+
 A disk image can be created using the following commands::
 
    $> truncate -s 1200M ./disk.raw
@@ -407,6 +418,19 @@ a node name, compatible string and functions to read and write the state.
 Since writing the state can expand the device tree, you may need to use
 state_setprop() which does this automatically and avoids running out of
 space. See existing code for examples.
+
+
+VPL (Verifying Program Loader)
+------------------------------
+
+Sandbox provides an example build of vpl called `sandbox_vpl`. This can be run
+using::
+
+   /path/to/sandbox_vpl/tpl/u-boot-tpl -D
+
+It starts up TPL (first-stage init), then VPL, then runs SPL and finally U-Boot
+proper, following the normal flow for a verified boot. At present, no
+verification is actually implemented.
 
 
 Debugging the init sequence
@@ -453,6 +477,9 @@ board_init_f() and board_init_r().
 
 This approach can be used on normal boards as well as sandbox.
 
+For debugging with GDB or LLDB, it is preferable to reduce the compiler
+optimization level (CONFIG_CC_OPTIMIZE_FOR_DEBUG=y) and to disable Link Time
+Optimization (CONFIG_LTO=n).
 
 SDL_CONFIG
 ----------
@@ -466,55 +493,115 @@ Using valgrind / memcheck
 
 It is possible to run U-Boot under valgrind to check memory allocations::
 
-   valgrind u-boot
+    valgrind ./u-boot
 
-If you are running sandbox SPL or TPL, then valgrind will not by default
-notice when U-Boot jumps from TPL to SPL, or from SPL to U-Boot proper. To
-fix this, use::
+However, this does not give very useful results. The sandbox allocates a memory
+pool via mmap(). U-Boot's internal malloc() and free() work on this memory pool.
+Custom allocators and deallocators are invisible to valgrind by default. To
+expose U-Boot's malloc() and free() to valgrind, enable ``CONFIG_VALGRIND``.
+Enabling this option will inject placeholder assembler code which valgrind
+interprets. This is used to annotate sections of memory as safe or unsafe, and
+to inform valgrind about malloc()s and free()s. There are currently no standard
+placeholder assembly sequences for RISC-V, so this option cannot be enabled on
+that architecture.
 
-   valgrind --trace-children=yes u-boot
+Malloc's bookkeeping information is marked as unsafe by default. However, this
+will generate many false positives when malloc itself accesses this information.
+These warnings can be suppressed with::
 
+    valgrind --suppressions=scripts/u-boot.supp ./u-boot
+
+Additionally, you may experience false positives if U-Boot is using a smaller
+pointer size than your host architecture. This is because the pointers used by
+U-Boot will only contain 32 bits of addressing information. When interpreted as
+64-bit pointers, valgrind will think that they are not initialized properly. To
+fix this, enable ``CONFIG_SANDBOX64`` (such as via ``sandbox64_defconfig``)
+when running on a 64-bit host.
+
+Additional options
+^^^^^^^^^^^^^^^^^^
+
+The following valgrind options are useful in addition to the above examples:
+
+``--trace-childen=yes``
+    tells valgrind to keep tracking subprocesses, such
+    as when U-Boot jumps from TPL to SPL, or from SPL to U-Boot proper.
+
+``--track-origins=yes``
+    will (for a small overhead) tell valgrind to keep
+    track of who allocated some troublesome memory.
+
+``--error-limit``
+    will enable printing more than 1000 errors in a single session.
+
+``--vgdb=yes --vgdb-error=0``
+    will let you use GDB to attach like::
+
+        gdb -ex "target remote | vgdb" u-boot
+
+    This is very helpful for inspecting the program state when there is
+    an error.
+
+The following U-Boot option are also helpful:
+
+``-Tc 'ut all'``
+    lets U-Boot run unit tests automatically. Note
+    that not all unit tests will succeed in the default configuration.
+
+``-t cooked``
+    will keep the console in a sane state if you
+    terminate it early (instead of having to run tset).
+
+Future work
+^^^^^^^^^^^
+
+The biggest limitation to the current approach is that supressions don't
+"un-taint" uninitialized memory accesses. Currently, dlmalloc's bookkeeping
+information is marked as a "red zone." This means that all reads to that zone
+are marked as illegal by valgrind. This is fine for regular code, but dlmalloc
+really does need to access this area, so we suppress its violations. However, if
+dlmalloc then passes a result calculated from a "tainted" access, that result is
+still tainted. So the first accessor will raise a warning. This means that every
+construct like
+
+.. code-block::
+
+    foo = malloc(sizeof(*foo));
+    if (!foo)
+        return -ENOMEM;
+
+will raise a warning when we check the result of malloc. Whoops.
+
+There are at least four possible ways to address this:
+
+* Don't mark dlmalloc bookkeeping information as a red zone. This is the
+  simplest solution, but reduces the power of valgrind immensely, since we can
+  no longer determine that (e.g.) access past the end of an array is undefined.
+* Implement red zones properly. This would involve growing every allocation by a
+  fixed amount (16 bytes or so) and then using that extra space for a real red
+  zone that neither regular code nor dlmalloc needs to access. Unfortunately,
+  this would probably some fairly intensive surgery to dlmalloc to add/remove
+  the offset appropriately.
+* Mark bookkeeping information as valid before we use it in dlmalloc, and then
+  mark it invalid before returning. This would be the most correct, but it would
+  be very tricky to implement since there are so many code paths to mark. I
+  think it would be the most effort out of the three options here.
+* Use the host malloc and free instead of U-Boot's custom allocator. This will
+  eliminate the need to annotate dlmalloc. However, using a different allocator
+  for sandbox will mean that bugs in dlmalloc will only be tested when running
+  on read (or emulated) hardware.
+
+Until one of the above options are implemented, it will remain difficult
+to sift through the massive amount of spurious warnings.
 
 Testing
 -------
 
 U-Boot sandbox can be used to run various tests, mostly in the test/
-directory. These include:
+directory.
 
-command_ut:
-  Unit tests for command parsing and handling
-compression:
-  Unit tests for U-Boot's compression algorithms, useful for
-  security checking. It supports gzip, bzip2, lzma and lzo.
-driver model:
-  Run this pytest::
-
-   ./test/py/test.py --bd sandbox --build -k ut_dm -v
-
-image:
-  Unit tests for images:
-  test/image/test-imagetools.sh - multi-file images
-  test/image/test-fit.py        - FIT images
-tracing:
-  test/trace/test-trace.sh tests the tracing system (see README.trace)
-verified boot:
-  See test/vboot/vboot_test.sh for this
-
-If you change or enhance any of the above subsystems, you shold write or
-expand a test and include it with your patch series submission. Test
-coverage in U-Boot is limited, as we need to work to improve it.
-
-Note that many of these tests are implemented as commands which you can
-run natively on your board if desired (and enabled).
-
-To run all tests use "make check".
-
-To run a single test in an existing sandbox build, you can use -T to use the
-test device tree, and -c to select the test:
-
-  /tmp/b/sandbox/u-boot -T -c "ut dm pci_busdev"
-
-This runs dm_test_pci_busdev() which is in test/dm/pci.c
+See :doc:`../develop/tests_sandbox` for more information and
+:doc:`../develop/testing` for information about testing generally.
 
 
 Memory Map
@@ -527,8 +614,10 @@ that are mapped into that memory:
 Addr      Config                     Usage
 =======   ========================   ===============================
       0   CONFIG_SYS_FDT_LOAD_ADDR   Device tree
-   e000   CONFIG_BLOBLIST_ADDR       Blob list
+   c000   CONFIG_BLOBLIST_ADDR       Blob list
   10000   CONFIG_MALLOC_F_ADDR       Early memory allocation
   f0000   CONFIG_PRE_CON_BUF_ADDR    Pre-console buffer
- 100000   CONFIG_TRACE_EARLY_ADDR    Early trace buffer (if enabled)
+ 100000   CONFIG_TRACE_EARLY_ADDR    Early trace buffer (if enabled). Also used
+                                     as the SPL load buffer in spl_test_load().
+ 200000   CONFIG_SYS_TEXT_BASE       Load buffer for U-Boot (sandbox_spl only)
 =======   ========================   ===============================

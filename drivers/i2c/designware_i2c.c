@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2009
- * Vipin Kumar, ST Micoelectronics, vipin.kumar@st.com.
+ * Vipin Kumar, STMicroelectronics, vipin.kumar@st.com.
  */
 
 #include <common.h>
@@ -24,16 +24,6 @@
  */
 #define DW_I2C_COMP_TYPE	0x44570140
 
-#ifdef CONFIG_SYS_I2C_DW_ENABLE_STATUS_UNSUPPORTED
-static int  dw_i2c_enable(struct i2c_regs *i2c_base, bool enable)
-{
-	u32 ena = enable ? IC_ENABLE_0B : 0;
-
-	writel(ena, &i2c_base->ic_enable);
-
-	return 0;
-}
-#else
 static int dw_i2c_enable(struct i2c_regs *i2c_base, bool enable)
 {
 	u32 ena = enable ? IC_ENABLE_0B : 0;
@@ -55,7 +45,6 @@ static int dw_i2c_enable(struct i2c_regs *i2c_base, bool enable)
 
 	return -ETIMEDOUT;
 }
-#endif
 
 /* High and low times in different speed modes (in ns) */
 enum {
@@ -68,7 +57,7 @@ enum {
  *
  * @ic_clk: Input clock in Hz
  * @period_ns: Period to represent, in ns
- * @return calculated count
+ * Return: calculated count
  */
 static uint calc_counts(uint ic_clk, uint period_ns)
 {
@@ -134,7 +123,7 @@ static const struct i2c_mode_info info_for_mode[] = {
  * @ic_clk: IC clock speed in Hz
  * @spk_cnt: Spike-suppression count
  * @config: Returns value to use
- * @return 0 if OK, -EINVAL if the calculation failed due to invalid data
+ * Return: 0 if OK, -EINVAL if the calculation failed due to invalid data
  */
 static int dw_i2c_calc_timing(struct dw_i2c *priv, enum i2c_speed_mode mode,
 			      int ic_clk, int spk_cnt,
@@ -213,7 +202,7 @@ static int dw_i2c_calc_timing(struct dw_i2c *priv, enum i2c_speed_mode mode,
  * @speed: Required i2c speed in Hz
  * @bus_clk: Input clock to the I2C controller in Hz (e.g. IC_CLK)
  * @config: Returns the config to use for this speed
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 static int calc_bus_speed(struct dw_i2c *priv, struct i2c_regs *regs, int speed,
 			  ulong bus_clk, struct dw_i2c_speed_config *config)
@@ -282,7 +271,7 @@ static int calc_bus_speed(struct dw_i2c *priv, struct i2c_regs *regs, int speed,
  * @i2c_base: Registers for the I2C controller
  * @speed: Required i2c speed in Hz
  * @bus_clk: Input clock to the I2C controller in Hz (e.g. IC_CLK)
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 static int _dw_i2c_set_bus_speed(struct dw_i2c *priv, struct i2c_regs *i2c_base,
 				 unsigned int speed, unsigned int bus_clk)
@@ -598,7 +587,7 @@ static int __dw_i2c_init(struct i2c_regs *i2c_base, int speed, int slaveaddr)
 	writel(IC_RX_TL, &i2c_base->ic_rx_tl);
 	writel(IC_TX_TL, &i2c_base->ic_tx_tl);
 	writel(IC_STOP_DET, &i2c_base->ic_intr_mask);
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 	_dw_i2c_set_bus_speed(NULL, i2c_base, speed, IC_CLK);
 	writel(slaveaddr, &i2c_base->ic_sar);
 #endif
@@ -611,7 +600,7 @@ static int __dw_i2c_init(struct i2c_regs *i2c_base, int speed, int slaveaddr)
 	return 0;
 }
 
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 /*
  * The legacy I2C functions. These need to get removed once
  * all users of this driver are converted to DM.
@@ -685,24 +674,6 @@ U_BOOT_I2C_ADAP_COMPLETE(dw_0, dw_i2c_init, dw_i2c_probe, dw_i2c_read,
 			 dw_i2c_write, dw_i2c_set_bus_speed,
 			 CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE, 0)
 
-#if CONFIG_SYS_I2C_BUS_MAX >= 2
-U_BOOT_I2C_ADAP_COMPLETE(dw_1, dw_i2c_init, dw_i2c_probe, dw_i2c_read,
-			 dw_i2c_write, dw_i2c_set_bus_speed,
-			 CONFIG_SYS_I2C_SPEED1, CONFIG_SYS_I2C_SLAVE1, 1)
-#endif
-
-#if CONFIG_SYS_I2C_BUS_MAX >= 3
-U_BOOT_I2C_ADAP_COMPLETE(dw_2, dw_i2c_init, dw_i2c_probe, dw_i2c_read,
-			 dw_i2c_write, dw_i2c_set_bus_speed,
-			 CONFIG_SYS_I2C_SPEED2, CONFIG_SYS_I2C_SLAVE2, 2)
-#endif
-
-#if CONFIG_SYS_I2C_BUS_MAX >= 4
-U_BOOT_I2C_ADAP_COMPLETE(dw_3, dw_i2c_init, dw_i2c_probe, dw_i2c_read,
-			 dw_i2c_write, dw_i2c_set_bus_speed,
-			 CONFIG_SYS_I2C_SPEED3, CONFIG_SYS_I2C_SLAVE3, 3)
-#endif
-
 #else /* CONFIG_DM_I2C */
 /* The DM I2C functions */
 
@@ -762,7 +733,7 @@ static int designware_i2c_probe_chip(struct udevice *bus, uint chip_addr,
 	return ret;
 }
 
-int designware_i2c_ofdata_to_platdata(struct udevice *bus)
+int designware_i2c_of_to_plat(struct udevice *bus)
 {
 	struct dw_i2c *priv = dev_get_priv(bus);
 	int ret;
@@ -842,9 +813,9 @@ U_BOOT_DRIVER(i2c_designware) = {
 	.name	= "i2c_designware",
 	.id	= UCLASS_I2C,
 	.of_match = designware_i2c_ids,
-	.ofdata_to_platdata = designware_i2c_ofdata_to_platdata,
+	.of_to_plat = designware_i2c_of_to_plat,
 	.probe	= designware_i2c_probe,
-	.priv_auto_alloc_size = sizeof(struct dw_i2c),
+	.priv_auto	= sizeof(struct dw_i2c),
 	.remove = designware_i2c_remove,
 	.flags	= DM_FLAG_OS_PREPARE,
 	.ops	= &designware_i2c_ops,

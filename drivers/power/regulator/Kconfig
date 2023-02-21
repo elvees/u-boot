@@ -18,7 +18,7 @@ config DM_REGULATOR
 
 config SPL_DM_REGULATOR
 	bool "Enable regulators for SPL"
-	depends on DM_REGULATOR
+	depends on DM_REGULATOR && SPL_POWER
 	---help---
 	Regulators are seldom needed in SPL. Even if they are accessed, some
 	code space can be saved by accessing the PMIC registers directly.
@@ -55,10 +55,25 @@ config DM_REGULATOR_BD71837
 
 config SPL_DM_REGULATOR_BD71837
 	bool "Enable Driver Model for ROHM BD71837/BD71847 regulators in SPL"
-	depends on DM_REGULATOR_BD71837
+	depends on DM_REGULATOR_BD71837 && SPL
 	help
 	This config enables implementation of driver-model regulator uclass
 	features for regulators on ROHM BD71837 and BD71847 in SPL.
+
+config DM_REGULATOR_PCA9450
+	bool "Enable Driver Model for NXP PCA9450 regulators"
+	depends on DM_REGULATOR && DM_PMIC_PCA9450
+	help
+	This config enables implementation of driver-model regulator uclass
+	features for regulators on NXP PCA9450 PMICs. PCA9450 contains 6 bucks
+	and 5 LDOS. The driver implements get/set api for value and enable.
+
+config SPL_DM_REGULATOR_PCA9450
+	bool "Enable Driver Model for NXP PCA9450 regulators in SPL"
+	depends on DM_REGULATOR_PCA9450 && SPL
+	help
+	This config enables implementation of driver-model regulator uclass
+	features for regulators on ROHM PCA9450 in SPL.
 
 config DM_REGULATOR_DA9063
 	bool "Enable Driver Model for REGULATOR DA9063"
@@ -100,7 +115,7 @@ config REGULATOR_PWM
 
 config SPL_REGULATOR_PWM
 	bool "Enable Driver for PWM regulators in SPL"
-	depends on REGULATOR_PWM
+	depends on REGULATOR_PWM && SPL
 	help
 	  This config enables implementation of driver-model regulator uclass
 	  features for PWM regulators in SPL.
@@ -148,7 +163,7 @@ config DM_REGULATOR_FIXED
 
 config SPL_DM_REGULATOR_FIXED
 	bool "Enable Driver Model for REGULATOR Fixed value in SPL"
-	depends on DM_REGULATOR_FIXED
+	depends on DM_REGULATOR_FIXED && SPL
 	select SPL_DM_REGULATOR_COMMON
 	---help---
 	This config enables implementation of driver-model regulator uclass
@@ -165,7 +180,7 @@ config DM_REGULATOR_GPIO
 
 config SPL_DM_REGULATOR_GPIO
 	bool "Enable Driver Model for GPIO REGULATOR in SPL"
-	depends on DM_REGULATOR_GPIO && SPL_GPIO_SUPPORT
+	depends on DM_REGULATOR_GPIO && SPL_GPIO
 	select SPL_DM_REGULATOR_COMMON
 	---help---
 	This config enables implementation of driver-model regulator uclass
@@ -312,6 +327,16 @@ config DM_REGULATOR_STPMIC1
 	by the PMIC device. This driver is controlled by a device tree node
 	which includes voltage limits.
 
+config DM_REGULATOR_ANATOP
+	bool "Enable driver for ANATOP regulators"
+	depends on DM_REGULATOR
+	select REGMAP
+	select SYSCON
+	help
+	Enable support for the Freescale i.MX on-chip ANATOP LDO
+	regulators. It is recommended that this option be enabled on
+	i.MX6 platform.
+
 config SPL_DM_REGULATOR_STPMIC1
 	bool "Enable driver for STPMIC1 regulators in SPL"
 	depends on SPL_DM_REGULATOR && PMIC_STPMIC1
@@ -320,7 +345,7 @@ config SPL_DM_REGULATOR_STPMIC1
 
 config SPL_DM_REGULATOR_PALMAS
 	bool "Enable driver for PALMAS PMIC regulators"
-       depends on SPL_PMIC_PALMAS
+	depends on SPL_PMIC_PALMAS
 	help
 	This enables implementation of driver-model regulator uclass
 	features for REGULATOR PALMAS and the family of PALMAS PMICs.
@@ -328,7 +353,7 @@ config SPL_DM_REGULATOR_PALMAS
 
 config SPL_DM_REGULATOR_LP87565
 	bool "Enable driver for LP87565 PMIC regulators"
-       depends on SPL_PMIC_LP87565
+	depends on SPL_PMIC_LP87565
 	help
 	This enables implementation of driver-model regulator uclass
 	features for REGULATOR LP87565 and the family of LP87565 PMICs.
@@ -353,3 +378,20 @@ config DM_REGULATOR_TPS65941
 	TPS65941 series of PMICs have 5 single phase BUCKs that can also
 	be configured in multi phase modes & 4 LDOs. The driver implements
 	get/set api for value and enable.
+
+config DM_REGULATOR_SCMI
+	bool "Enable driver for SCMI voltage domain regulators"
+	depends on DM_REGULATOR
+	select SCMI_AGENT
+        help
+          Enable this option if you want to support regulators exposed through
+	  the SCMI voltage domain protocol by a SCMI server.
+
+config DM_REGULATOR_TPS65219
+	bool "Enable driver for TPS65219 PMIC regulators"
+        depends on PMIC_TPS65219
+	help
+	This enables implementation of driver-model regulator uclass
+	features for REGULATOR TPS65219 and the family of TPS65219 PMICs.
+	TPS65219 series of PMICs have 3 single phase BUCKs & 4 LDOs.
+	The driver implements get/set api for value and enable.

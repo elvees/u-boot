@@ -327,7 +327,7 @@ err:
 	log_err("Failed to set input tap delays\n");
 }
 
-static void mcom03_sdhci_set_delay(struct sdhci_host *host)
+static int mcom03_sdhci_set_delay(struct sdhci_host *host)
 {
 	struct mcom03_sdhci_priv *priv = dev_get_priv(host->mmc->dev);
 	int timing = mode2timing[host->mmc->selected_mode];
@@ -341,6 +341,8 @@ static void mcom03_sdhci_set_delay(struct sdhci_host *host)
 	mcom03_sdhci_set_itapdly(priv->soc_ctl_base,
 				 priv->ctrl_id,
 				 priv->clk_phase_in[timing]);
+
+	return 0;
 }
 
 const struct sdhci_ops mcom03_sdhci_ops = {
@@ -350,7 +352,7 @@ const struct sdhci_ops mcom03_sdhci_ops = {
 
 static int mcom03_sdhci_bind(struct udevice *dev)
 {
-	struct mcom03_sdhci_plat *plat = dev_get_platdata(dev);
+	struct mcom03_sdhci_plat *plat = dev_get_plat(dev);
 
 	return sdhci_bind(dev, &plat->mmc, &plat->cfg);
 }
@@ -428,7 +430,7 @@ static int mcom03_sdhci_ofdata_to_platdata(struct udevice *dev)
 
 static int mcom03_sdhci_probe(struct udevice *dev)
 {
-	struct mcom03_sdhci_plat *plat = dev_get_platdata(dev);
+	struct mcom03_sdhci_plat *plat = dev_get_plat(dev);
 	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(dev);
 	struct mcom03_sdhci_priv *priv = dev_get_priv(dev);
 	struct sdhci_host *host = &priv->host;
@@ -505,10 +507,10 @@ U_BOOT_DRIVER(mcom03_sdhci_drv) = {
 	.name = "mcom03-sdhci",
 	.id = UCLASS_MMC,
 	.of_match = mcom03_sdhci_match_table,
-	.ofdata_to_platdata = mcom03_sdhci_ofdata_to_platdata,
+	.of_to_plat = mcom03_sdhci_ofdata_to_platdata,
 	.bind = mcom03_sdhci_bind,
 	.probe = mcom03_sdhci_probe,
-	.priv_auto_alloc_size = sizeof(struct mcom03_sdhci_priv),
-	.platdata_auto_alloc_size = sizeof(struct mcom03_sdhci_plat),
+	.priv_auto = sizeof(struct mcom03_sdhci_priv),
+	.plat_auto = sizeof(struct mcom03_sdhci_plat),
 	.ops = &sdhci_ops,
 };

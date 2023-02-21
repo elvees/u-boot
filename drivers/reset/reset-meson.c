@@ -30,11 +30,6 @@ static int meson_reset_request(struct reset_ctl *reset_ctl)
 	return 0;
 }
 
-static int meson_reset_free(struct reset_ctl *reset_ctl)
-{
-	return 0;
-}
-
 static int meson_reset_level(struct reset_ctl *reset_ctl, bool assert)
 {
 	struct meson_reset_priv *priv = dev_get_priv(reset_ctl->dev);
@@ -65,21 +60,20 @@ static int meson_reset_deassert(struct reset_ctl *reset_ctl)
 
 struct reset_ops meson_reset_ops = {
 	.request = meson_reset_request,
-	.rfree = meson_reset_free,
 	.rst_assert = meson_reset_assert,
 	.rst_deassert = meson_reset_deassert,
 };
 
-static const struct udevice_id meson_reset_ids[] = {                          
-	{ .compatible = "amlogic,meson-gxbb-reset" },                                  
+static const struct udevice_id meson_reset_ids[] = {
+	{ .compatible = "amlogic,meson-gxbb-reset" },
 	{ .compatible = "amlogic,meson-axg-reset" },
-	{ }                                                                     
-};  
+	{ }
+};
 
 static int meson_reset_probe(struct udevice *dev)
 {
 	struct meson_reset_priv *priv = dev_get_priv(dev);
-	
+
 	return regmap_init_mem(dev_ofnode(dev), &priv->regmap);
 }
 
@@ -89,5 +83,5 @@ U_BOOT_DRIVER(meson_reset) = {
 	.of_match = meson_reset_ids,
 	.probe = meson_reset_probe,
 	.ops = &meson_reset_ops,
-	.priv_auto_alloc_size = sizeof(struct meson_reset_priv),
+	.priv_auto	= sizeof(struct meson_reset_priv),
 };

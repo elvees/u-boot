@@ -3,6 +3,8 @@
  * Copyright (c) 2016, NVIDIA CORPORATION.
  */
 
+#define LOG_CATEGORY UCLASS_RESET
+
 #include <common.h>
 #include <dm.h>
 #include <fdtdec.h>
@@ -24,7 +26,7 @@ static int reset_of_xlate_default(struct reset_ctl *reset_ctl,
 	debug("%s(reset_ctl=%p)\n", __func__, reset_ctl);
 
 	if (args->args_count != 1) {
-		debug("Invaild args_count: %d\n", args->args_count);
+		debug("Invalid args_count: %d\n", args->args_count);
 		return -EINVAL;
 	}
 
@@ -66,7 +68,7 @@ static int reset_get_by_index_tail(int ret, ofnode node,
 		return ret;
 	}
 
-	ret = ops->request(reset_ctl);
+	ret = ops->request ? ops->request(reset_ctl) : 0;
 	if (ret) {
 		debug("ops->request() failed: %d\n", ret);
 		return ret;
@@ -95,7 +97,7 @@ int reset_get_by_index_nodev(ofnode node, int index,
 	int ret;
 
 	ret = ofnode_parse_phandle_with_args(node, "resets", "#reset-cells", 0,
-					     index > 0, &args);
+					     index, &args);
 
 	return reset_get_by_index_tail(ret, node, &args, "resets",
 				       index > 0, reset_ctl);
@@ -166,7 +168,7 @@ int reset_request(struct reset_ctl *reset_ctl)
 
 	debug("%s(reset_ctl=%p)\n", __func__, reset_ctl);
 
-	return ops->request(reset_ctl);
+	return ops->request ? ops->request(reset_ctl) : 0;
 }
 
 int reset_free(struct reset_ctl *reset_ctl)
@@ -175,7 +177,7 @@ int reset_free(struct reset_ctl *reset_ctl)
 
 	debug("%s(reset_ctl=%p)\n", __func__, reset_ctl);
 
-	return ops->rfree(reset_ctl);
+	return ops->rfree ? ops->rfree(reset_ctl) : 0;
 }
 
 int reset_assert(struct reset_ctl *reset_ctl)
@@ -184,7 +186,7 @@ int reset_assert(struct reset_ctl *reset_ctl)
 
 	debug("%s(reset_ctl=%p)\n", __func__, reset_ctl);
 
-	return ops->rst_assert(reset_ctl);
+	return ops->rst_assert ? ops->rst_assert(reset_ctl) : 0;
 }
 
 int reset_assert_bulk(struct reset_ctl_bulk *bulk)
@@ -206,7 +208,7 @@ int reset_deassert(struct reset_ctl *reset_ctl)
 
 	debug("%s(reset_ctl=%p)\n", __func__, reset_ctl);
 
-	return ops->rst_deassert(reset_ctl);
+	return ops->rst_deassert ? ops->rst_deassert(reset_ctl) : 0;
 }
 
 int reset_deassert_bulk(struct reset_ctl_bulk *bulk)
@@ -228,7 +230,7 @@ int reset_status(struct reset_ctl *reset_ctl)
 
 	debug("%s(reset_ctl=%p)\n", __func__, reset_ctl);
 
-	return ops->rst_status(reset_ctl);
+	return ops->rst_status ? ops->rst_status(reset_ctl) : 0;
 }
 
 int reset_release_all(struct reset_ctl *reset_ctl, int count)
@@ -323,6 +325,8 @@ struct reset_ctl_bulk *devm_reset_bulk_get_by_node(struct udevice *dev,
 	bulk = devres_alloc(devm_reset_bulk_release,
 			    sizeof(struct reset_ctl_bulk),
 			    __GFP_ZERO);
+
+	/* this looks like a leak, but devres takes care of it */
 	if (unlikely(!bulk))
 		return ERR_PTR(-ENOMEM);
 

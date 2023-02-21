@@ -11,6 +11,7 @@
 #include <i2c.h>
 #include <log.h>
 #include <malloc.h>
+#include <asm/global_data.h>
 
 #include <asm-generic/gpio.h>
 
@@ -22,7 +23,8 @@ enum pca_type {
 	PCA9546,
 	PCA9547,
 	PCA9548,
-	PCA9646
+	PCA9646,
+	PCA9847,
 };
 
 struct chip_desc {
@@ -67,6 +69,11 @@ static const struct chip_desc chips[] = {
 		.muxtype = pca954x_isswi,
 		.width = 4,
 	},
+	[PCA9847] = {
+		.enable = 0x8,
+		.muxtype = pca954x_ismux,
+		.width = 8,
+	},
 };
 
 static int pca954x_deselect(struct udevice *mux, struct udevice *bus,
@@ -105,10 +112,11 @@ static const struct udevice_id pca954x_ids[] = {
 	{ .compatible = "nxp,pca9547", .data = PCA9547 },
 	{ .compatible = "nxp,pca9548", .data = PCA9548 },
 	{ .compatible = "nxp,pca9646", .data = PCA9646 },
+	{ .compatible = "nxp,pca9847", .data = PCA9847 },
 	{ }
 };
 
-static int pca954x_ofdata_to_platdata(struct udevice *dev)
+static int pca954x_of_to_plat(struct udevice *dev)
 {
 	struct pca954x_priv *priv = dev_get_priv(dev);
 	const struct chip_desc *chip = &chips[dev_get_driver_data(dev)];
@@ -171,6 +179,6 @@ U_BOOT_DRIVER(pca954x) = {
 	.probe = pca954x_probe,
 	.remove = pca954x_remove,
 	.ops = &pca954x_ops,
-	.ofdata_to_platdata = pca954x_ofdata_to_platdata,
-	.priv_auto_alloc_size = sizeof(struct pca954x_priv),
+	.of_to_plat = pca954x_of_to_plat,
+	.priv_auto	= sizeof(struct pca954x_priv),
 };

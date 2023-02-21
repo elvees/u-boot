@@ -35,7 +35,7 @@ struct bd71837_vrange {
 };
 
 /**
- * struct bd71837_platdata - describe regulator control registers
+ * struct bd71837_plat - describe regulator control registers
  *
  * @name:	name of the regulator. Used for matching the dt-entry
  * @enable_reg:	register address used to enable/disable regulator
@@ -49,7 +49,7 @@ struct bd71837_vrange {
  * @sel_mask:	bit to toggle in order to transfer the register control to SW
  * @dvs:	whether the voltage can be changed when regulator is enabled
  */
-struct bd71837_platdata {
+struct bd71837_plat {
 	const char		*name;
 	u8			enable_reg;
 	u8			enablemask;
@@ -160,7 +160,7 @@ static struct bd71837_vrange ldo7_vranges[] = {
  * is powering NXP i.MX8. In this use-case we (for now) only allow control
  * for BUCK3 and BUCK4 which are not boot critical.
  */
-static struct bd71837_platdata bd71837_reg_data[] = {
+static struct bd71837_plat bd71837_reg_data[] = {
 /* Bucks 1-4 which support dynamic voltage scaling */
 	BD_DATA("BUCK1", BD718XX_BUCK1_CTRL, HW_STATE_CONTROL,
 		BD718XX_BUCK1_VOLT_RUN, DVS_BUCK_RUN_MASK, dvs_buck_vranges, 0,
@@ -205,7 +205,7 @@ static struct bd71837_platdata bd71837_reg_data[] = {
 		BD71837_LDO7_MASK, ldo7_vranges, 0, false, BD718XX_LDO_SEL),
 };
 
-static struct bd71837_platdata bd71847_reg_data[] = {
+static struct bd71837_plat bd71847_reg_data[] = {
 /* Bucks 1 and 2 which support dynamic voltage scaling */
 	BD_DATA("BUCK1", BD718XX_BUCK1_CTRL, HW_STATE_CONTROL,
 		BD718XX_BUCK1_VOLT_RUN, DVS_BUCK_RUN_MASK, dvs_buck_vranges, 0,
@@ -274,7 +274,7 @@ static int vrange_find_selector(struct bd71837_vrange *r, int val,
 static int bd71837_get_enable(struct udevice *dev)
 {
 	int val;
-	struct bd71837_platdata *plat = dev_get_platdata(dev);
+	struct bd71837_plat *plat = dev_get_plat(dev);
 
 	/*
 	 * boot critical regulators on bd71837 must not be controlled by sw
@@ -298,7 +298,7 @@ static int bd71837_get_enable(struct udevice *dev)
 static int bd71837_set_enable(struct udevice *dev, bool enable)
 {
 	int val = 0;
-	struct bd71837_platdata *plat = dev_get_platdata(dev);
+	struct bd71837_plat *plat = dev_get_plat(dev);
 
 	/*
 	 * boot critical regulators on bd71837 must not be controlled by sw
@@ -306,7 +306,7 @@ static int bd71837_set_enable(struct udevice *dev, bool enable)
 	 * reseted to snvs state. Hence we can't set the state here.
 	 */
 	if (plat->enablemask == HW_STATE_CONTROL)
-		return -EINVAL;
+		return enable ? 0 : -EINVAL;
 
 	if (enable)
 		val = plat->enablemask;
@@ -315,13 +315,45 @@ static int bd71837_set_enable(struct udevice *dev, bool enable)
 			       val);
 }
 
+static int bd71837_get_value(struct udevice *dev)
+{
+	unsigned int reg, range;
+	unsigned int tmp;
+	struct bd71837_plat *plat = dev_get_plat(dev);
+	int i;
+
+	reg = pmic_reg_read(dev->parent, plat->volt_reg);
+	if (((int)reg) < 0)
+		return reg;
+
+	range = reg & plat->rangemask;
+
+	reg &= plat->volt_mask;
+	reg >>= ffs(plat->volt_mask) - 1;
+
+	for (i = 0; i < plat->numranges; i++) {
+		struct bd71837_vrange *r = &plat->ranges[i];
+
+		if (plat->rangemask && ((plat->rangemask & range) !=
+		    r->rangeval))
+			continue;
+
+		if (!vrange_find_value(r, reg, &tmp))
+			return tmp;
+	}
+
+	pr_err("Unknown voltage value read from pmic\n");
+
+	return -EINVAL;
+}
+
 static int bd71837_set_value(struct udevice *dev, int uvolt)
 {
 	unsigned int sel;
 	unsigned int range;
 	int i;
 	int found = 0;
-	struct bd71837_platdata *plat = dev_get_platdata(dev);
+	struct bd71837_plat *plat = dev_get_plat(dev);
 
 	/*
 	 * An under/overshooting may occur if voltage is changed for other
@@ -330,6 +362,9 @@ static int bd71837_set_value(struct udevice *dev, int uvolt)
 	 */
 	if (!plat->dvs)
 		if (bd71837_get_enable(dev)) {
+			/* If the value is already set, skip the warning. */
+			if (bd71837_get_value(dev) == uvolt)
+				return 0;
 			pr_err("Only DVS bucks can be changed when enabled\n");
 			return -EINVAL;
 		}
@@ -365,45 +400,13 @@ static int bd71837_set_value(struct udevice *dev, int uvolt)
 			       plat->rangemask, sel);
 }
 
-static int bd71837_get_value(struct udevice *dev)
-{
-	unsigned int reg, range;
-	unsigned int tmp;
-	struct bd71837_platdata *plat = dev_get_platdata(dev);
-	int i;
-
-	reg = pmic_reg_read(dev->parent, plat->volt_reg);
-	if (((int)reg) < 0)
-		return reg;
-
-	range = reg & plat->rangemask;
-
-	reg &= plat->volt_mask;
-	reg >>= ffs(plat->volt_mask) - 1;
-
-	for (i = 0; i < plat->numranges; i++) {
-		struct bd71837_vrange *r = &plat->ranges[i];
-
-		if (plat->rangemask && ((plat->rangemask & range) !=
-		    r->rangeval))
-			continue;
-
-		if (!vrange_find_value(r, reg, &tmp))
-			return tmp;
-	}
-
-	pr_err("Unknown voltage value read from pmic\n");
-
-	return -EINVAL;
-}
-
 static int bd71837_regulator_probe(struct udevice *dev)
 {
-	struct bd71837_platdata *plat = dev_get_platdata(dev);
+	struct bd71837_plat *plat = dev_get_plat(dev);
 	int i, ret;
-	struct dm_regulator_uclass_platdata *uc_pdata;
+	struct dm_regulator_uclass_plat *uc_pdata;
 	int type;
-	struct bd71837_platdata *init_data;
+	struct bd71837_plat *init_data;
 	int data_amnt;
 
 	type = dev_get_driver_data(dev_get_parent(dev));
@@ -433,7 +436,7 @@ static int bd71837_regulator_probe(struct udevice *dev)
 				 * the initial state matches dt flags and then
 				 * write the SEL bit
 				 */
-				uc_pdata = dev_get_uclass_platdata(dev);
+				uc_pdata = dev_get_uclass_plat(dev);
 				ret = bd71837_set_enable(dev,
 							 !!(uc_pdata->boot_on ||
 							 uc_pdata->always_on));
@@ -466,5 +469,5 @@ U_BOOT_DRIVER(bd71837_regulator) = {
 	.id = UCLASS_REGULATOR,
 	.ops = &bd71837_regulator_ops,
 	.probe = bd71837_regulator_probe,
-	.platdata_auto_alloc_size = sizeof(struct bd71837_platdata),
+	.plat_auto	= sizeof(struct bd71837_plat),
 };

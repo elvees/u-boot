@@ -7,6 +7,7 @@
 #ifndef __SYS_PROTO_IMX6_
 #define __SYS_PROTO_IMX6_
 
+#include <asm/gpio.h>
 #include <asm/mach-imx/sys_proto.h>
 #include <asm/arch/iomux.h>
 
@@ -16,9 +17,6 @@
 
 #define is_usbotg_phy_active(void) (!(readl(USB_PHY0_BASE_ADDR + USBPHY_PWD) & \
 				   USBPHY_PWD_RXPWDRX))
-
-int imx6_pcie_toggle_power(void);
-int imx6_pcie_toggle_reset(void);
 
 enum ldo_reg {
 	LDO_ARM,

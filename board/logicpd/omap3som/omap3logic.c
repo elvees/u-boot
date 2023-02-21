@@ -15,11 +15,11 @@
 #include <init.h>
 #include <net.h>
 #include <ns16550.h>
-#include <flash.h>
 #include <nand.h>
 #include <i2c.h>
 #include <serial.h>
 #include <twl4030.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/mmc_host_def.h>
 #include <asm/arch/mux.h>

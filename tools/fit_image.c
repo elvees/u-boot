@@ -59,6 +59,9 @@ static int fit_add_file_data(struct image_tool_params *params, size_t size_inc,
 		ret = fit_set_timestamp(ptr, 0, time);
 	}
 
+	if (!ret)
+		ret = fit_pre_load_data(params->keydir, dest_blob, ptr);
+
 	if (!ret) {
 		ret = fit_cipher_data(params->keydir, dest_blob, ptr,
 				      params->comment,
@@ -68,11 +71,14 @@ static int fit_add_file_data(struct image_tool_params *params, size_t size_inc,
 	}
 
 	if (!ret) {
-		ret = fit_add_verification_data(params->keydir, dest_blob, ptr,
+		ret = fit_add_verification_data(params->keydir,
+						params->keyfile, dest_blob, ptr,
 						params->comment,
 						params->require_keys,
 						params->engine_id,
-						params->cmdname);
+						params->cmdname,
+						params->algo_name,
+						&params->summary);
 	}
 
 	if (dest_blob) {
@@ -193,15 +199,36 @@ static void get_basename(char *str, int size, const char *fname)
 }
 
 /**
- * add_crc_node() - Add a hash node to request a CRC checksum for an image
+ * add_hash_node() - Add a hash or signature node
  *
+ * @params: Image parameters
  * @fdt: Device tree to add to (in sequential-write mode)
+ *
+ * If there is a key name hint, try to sign the images. Otherwise, just add a
+ * CRC.
+ *
+ * Return: 0 on success, or -1 on failure
  */
-static void add_crc_node(void *fdt)
+static int add_hash_node(struct image_tool_params *params, void *fdt)
 {
-	fdt_begin_node(fdt, "hash-1");
-	fdt_property_string(fdt, FIT_ALGO_PROP, "crc32");
+	if (params->keyname) {
+		if (!params->algo_name) {
+			fprintf(stderr,
+				"%s: Algorithm name must be specified\n",
+				params->cmdname);
+			return -1;
+		}
+
+		fdt_begin_node(fdt, "signature-1");
+		fdt_property_string(fdt, FIT_ALGO_PROP, params->algo_name);
+		fdt_property_string(fdt, FIT_KEY_HINT, params->keyname);
+	} else {
+		fdt_begin_node(fdt, "hash-1");
+		fdt_property_string(fdt, FIT_ALGO_PROP, "crc32");
+	}
+
 	fdt_end_node(fdt);
+	return 0;
 }
 
 /**
@@ -242,7 +269,9 @@ static int fit_write_images(struct image_tool_params *params, char *fdt)
 	ret = fdt_property_file(params, fdt, FIT_DATA_PROP, params->datafile);
 	if (ret)
 		return ret;
-	add_crc_node(fdt);
+	ret = add_hash_node(params, fdt);
+	if (ret)
+		return ret;
 	fdt_end_node(fdt);
 
 	/* Now the device tree files if available */
@@ -265,7 +294,9 @@ static int fit_write_images(struct image_tool_params *params, char *fdt)
 				    genimg_get_arch_short_name(params->arch));
 		fdt_property_string(fdt, FIT_COMP_PROP,
 				    genimg_get_comp_short_name(IH_COMP_NONE));
-		add_crc_node(fdt);
+		ret = add_hash_node(params, fdt);
+		if (ret)
+			return ret;
 		fdt_end_node(fdt);
 	}
 
@@ -283,7 +314,9 @@ static int fit_write_images(struct image_tool_params *params, char *fdt)
 					params->fit_ramdisk);
 		if (ret)
 			return ret;
-		add_crc_node(fdt);
+		ret = add_hash_node(params, fdt);
+		if (ret)
+			return ret;
 		fdt_end_node(fdt);
 	}
 
@@ -523,8 +556,9 @@ static int fit_extract_data(struct image_tool_params *params, const char *fname)
 	/* Check if an offset for the external data was set. */
 	if (params->external_offset > 0) {
 		if (params->external_offset < new_size) {
-			debug("External offset %x overlaps FIT length %x",
-			      params->external_offset, new_size);
+			fprintf(stderr,
+				"External offset %x overlaps FIT length %x\n",
+				params->external_offset, new_size);
 			ret = -EINVAL;
 			goto err;
 		}
@@ -653,62 +687,6 @@ err:
 	return ret;
 }
 
-static int copyfile(const char *src, const char *dst)
-{
-	int fd_src = -1, fd_dst = -1;
-	void *buf = NULL;
-	ssize_t size;
-	size_t count;
-	int ret = -1;
-
-	fd_src = open(src, O_RDONLY);
-	if (fd_src < 0) {
-		printf("Can't open file %s (%s)\n", src, strerror(errno));
-		goto out;
-	}
-
-	fd_dst = open(dst, O_WRONLY | O_CREAT, 0666);
-	if (fd_dst < 0) {
-		printf("Can't open file %s (%s)\n", dst, strerror(errno));
-		goto out;
-	}
-
-	buf = calloc(1, 512);
-	if (!buf) {
-		printf("Can't allocate buffer to copy file\n");
-		goto out;
-	}
-
-	while (1) {
-		size = read(fd_src, buf, 512);
-		if (size < 0) {
-			printf("Can't read file %s\n", src);
-			goto out;
-		}
-		if (!size)
-			break;
-
-		count = size;
-		size = write(fd_dst, buf, count);
-		if (size < 0) {
-			printf("Can't write file %s\n", dst);
-			goto out;
-		}
-	}
-
-	ret = 0;
-
- out:
-	if (fd_src >= 0)
-		close(fd_src);
-	if (fd_dst >= 0)
-		close(fd_dst);
-	if (buf)
-		free(buf);
-
-	return ret;
-}
-
 /**
  * fit_handle_file - main FIT file processing function
  *
@@ -736,7 +714,7 @@ static int fit_handle_file(struct image_tool_params *params)
 	if (strlen (params->imagefile) +
 		strlen (MKIMAGE_TMPFILE_SUFFIX) + 1 > sizeof (tmpfile)) {
 		fprintf (stderr, "%s: Image file name (%s) too long, "
-				"can't create tmpfile",
+				"can't create tmpfile.\n",
 				params->imagefile, params->cmdname);
 		return (EXIT_FAILURE);
 	}
@@ -882,11 +860,6 @@ static int fit_extract_contents(void *ptr, struct image_tool_params *params)
 
 	/* Indent string is defined in header image.h */
 	p = IMAGE_INDENT_STRING;
-
-	if (!fit_check_format(fit)) {
-		printf("Bad FIT image format\n");
-		return -1;
-	}
 
 	/* Find images parent node offset */
 	images_noffset = fdt_path_offset(fit, FIT_IMAGES_PATH);

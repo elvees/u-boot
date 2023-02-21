@@ -12,6 +12,7 @@
 #include <malloc.h>
 #include <net.h>
 #include <asm/eth.h>
+#include <asm/global_data.h>
 #include <asm/test.h>
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -393,10 +394,12 @@ static void sb_eth_stop(struct udevice *dev)
 
 static int sb_eth_write_hwaddr(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
+	struct eth_sandbox_priv *priv = dev_get_priv(dev);
 
 	debug("eth_sandbox %s: Write HW ADDR - %pM\n", dev->name,
 	      pdata->enetaddr);
+	memcpy(priv->fake_host_hwaddr, pdata->enetaddr, ARP_HLEN);
 	return 0;
 }
 
@@ -414,20 +417,12 @@ static int sb_eth_remove(struct udevice *dev)
 	return 0;
 }
 
-static int sb_eth_ofdata_to_platdata(struct udevice *dev)
+static int sb_eth_of_to_plat(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct eth_sandbox_priv *priv = dev_get_priv(dev);
-	const u8 *mac;
 
 	pdata->iobase = dev_read_addr(dev);
-
-	mac = dev_read_u8_array_ptr(dev, "fake-host-hwaddr", ARP_HLEN);
-	if (!mac) {
-		printf("'fake-host-hwaddr' is missing from the DT\n");
-		return -EINVAL;
-	}
-	memcpy(priv->fake_host_hwaddr, mac, ARP_HLEN);
 	priv->disabled = false;
 	priv->tx_handler = sb_default_handler;
 
@@ -443,9 +438,9 @@ U_BOOT_DRIVER(eth_sandbox) = {
 	.name	= "eth_sandbox",
 	.id	= UCLASS_ETH,
 	.of_match = sb_eth_ids,
-	.ofdata_to_platdata = sb_eth_ofdata_to_platdata,
+	.of_to_plat = sb_eth_of_to_plat,
 	.remove	= sb_eth_remove,
 	.ops	= &sb_eth_ops,
-	.priv_auto_alloc_size = sizeof(struct eth_sandbox_priv),
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
+	.priv_auto	= sizeof(struct eth_sandbox_priv),
+	.plat_auto	= sizeof(struct eth_pdata),
 };

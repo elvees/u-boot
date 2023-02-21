@@ -62,9 +62,7 @@ static int bcm6348_usbh_probe(struct udevice *dev)
 	if (ret < 0)
 		return ret;
 
-	ret = clk_free(&clk);
-	if (ret < 0)
-		return ret;
+	clk_free(&clk);
 
 	/* perform reset */
 	ret = reset_get_by_index(dev, 0, &rst_ctl);
@@ -87,6 +85,6 @@ U_BOOT_DRIVER(bcm6348_usbh) = {
 	.id = UCLASS_PHY,
 	.of_match = bcm6348_usbh_ids,
 	.ops = &bcm6348_usbh_ops,
-	.priv_auto_alloc_size = sizeof(struct bcm6348_usbh_priv),
+	.priv_auto	= sizeof(struct bcm6348_usbh_priv),
 	.probe = bcm6348_usbh_probe,
 };

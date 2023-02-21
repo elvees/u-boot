@@ -13,9 +13,9 @@
 #include <cpu_func.h>
 #include <log.h>
 #include <asm/cache.h>
+#include <asm/global_data.h>
+#include <asm/gpio.h>
 #include <asm/io.h>
-#include <asm/arch/clock.h>
-#include <asm/arch/gpio.h>
 #include <common.h>
 #include <clk.h>
 #include <dm.h>
@@ -28,11 +28,7 @@
 #include <miiphy.h>
 #include <net.h>
 #include <reset.h>
-#include <dt-bindings/pinctrl/sun4i-a10.h>
 #include <wait_bit.h>
-#if CONFIG_IS_ENABLED(DM_GPIO)
-#include <asm-generic/gpio.h>
-#endif
 
 #define MDIO_CMD_MII_BUSY		BIT(0)
 #define MDIO_CMD_MII_WRITE		BIT(1)
@@ -82,11 +78,6 @@
 #define CONFIG_MDIO_TIMEOUT	(3 * CONFIG_SYS_HZ)
 
 #define AHB_GATE_OFFSET_EPHY	0
-
-/* IO mux settings */
-#define SUN8I_IOMUX_H3		2
-#define SUN8I_IOMUX_R40	5
-#define SUN8I_IOMUX		4
 
 /* H3/A64 EMAC Register's offset */
 #define EMAC_CTL0		0x00
@@ -208,7 +199,9 @@ static int sun8i_mdio_read(struct mii_dev *bus, int addr, int devad, int reg)
 	 * The EMAC clock is either 200 or 300 MHz, so we need a divider
 	 * of 128 to get the MDIO frequency below the required 2.5 MHz.
 	 */
-	mii_cmd |= MDIO_CMD_MII_CLK_CSR_DIV_128 << MDIO_CMD_MII_CLK_CSR_SHIFT;
+	if (!priv->use_internal_phy)
+		mii_cmd |= MDIO_CMD_MII_CLK_CSR_DIV_128 <<
+			   MDIO_CMD_MII_CLK_CSR_SHIFT;
 
 	mii_cmd |= MDIO_CMD_MII_BUSY;
 
@@ -239,7 +232,9 @@ static int sun8i_mdio_write(struct mii_dev *bus, int addr, int devad, int reg,
 	 * The EMAC clock is either 200 or 300 MHz, so we need a divider
 	 * of 128 to get the MDIO frequency below the required 2.5 MHz.
 	 */
-	mii_cmd |= MDIO_CMD_MII_CLK_CSR_DIV_128 << MDIO_CMD_MII_CLK_CSR_SHIFT;
+	if (!priv->use_internal_phy)
+		mii_cmd |= MDIO_CMD_MII_CLK_CSR_DIV_128 <<
+			   MDIO_CMD_MII_CLK_CSR_SHIFT;
 
 	mii_cmd |= MDIO_CMD_MII_WRITE;
 	mii_cmd |= MDIO_CMD_MII_BUSY;
@@ -255,7 +250,7 @@ static int sun8i_mdio_write(struct mii_dev *bus, int addr, int devad, int reg,
 static int sun8i_eth_write_hwaddr(struct udevice *dev)
 {
 	struct emac_eth_dev *priv = dev_get_priv(dev);
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	uchar *mac_id = pdata->enetaddr;
 	u32 macid_lo, macid_hi;
 
@@ -297,30 +292,29 @@ static void sun8i_adjust_link(struct emac_eth_dev *priv,
 	writel(v, priv->mac_reg + EMAC_CTL0);
 }
 
-static int sun8i_emac_set_syscon_ephy(struct emac_eth_dev *priv, u32 *reg)
+static u32 sun8i_emac_set_syscon_ephy(struct emac_eth_dev *priv, u32 reg)
 {
 	if (priv->use_internal_phy) {
 		/* H3 based SoC's that has an Internal 100MBit PHY
 		 * needs to be configured and powered up before use
 		*/
-		*reg &= ~H3_EPHY_DEFAULT_MASK;
-		*reg |=  H3_EPHY_DEFAULT_VALUE;
-		*reg |= priv->phyaddr << H3_EPHY_ADDR_SHIFT;
-		*reg &= ~H3_EPHY_SHUTDOWN;
-		*reg |= H3_EPHY_SELECT;
-	} else
-		/* This is to select External Gigabit PHY on
-		 * the boards with H3 SoC.
-		*/
-		*reg &= ~H3_EPHY_SELECT;
+		reg &= ~H3_EPHY_DEFAULT_MASK;
+		reg |=  H3_EPHY_DEFAULT_VALUE;
+		reg |= priv->phyaddr << H3_EPHY_ADDR_SHIFT;
+		reg &= ~H3_EPHY_SHUTDOWN;
+		return reg | H3_EPHY_SELECT;
+	}
 
-	return 0;
+	/* This is to select External Gigabit PHY on those boards with
+	 * an internal PHY. Does not hurt on other SoCs. Linux does
+	 * it as well.
+	 */
+	return reg & ~H3_EPHY_SELECT;
 }
 
 static int sun8i_emac_set_syscon(struct sun8i_eth_pdata *pdata,
 				 struct emac_eth_dev *priv)
 {
-	int ret;
 	u32 reg;
 
 	if (priv->variant == R40_GMAC) {
@@ -336,11 +330,7 @@ static int sun8i_emac_set_syscon(struct sun8i_eth_pdata *pdata,
 
 	reg = readl(priv->sysctl_reg + 0x30);
 
-	if (priv->variant == H3_EMAC || priv->variant == H6_EMAC) {
-		ret = sun8i_emac_set_syscon_ephy(priv, &reg);
-		if (ret)
-			return ret;
-	}
+	reg = sun8i_emac_set_syscon_ephy(priv, reg);
 
 	reg &= ~(SC_ETCS_MASK | SC_EPIT);
 	if (priv->variant == H3_EMAC ||
@@ -353,6 +343,9 @@ static int sun8i_emac_set_syscon(struct sun8i_eth_pdata *pdata,
 		/* default */
 		break;
 	case PHY_INTERFACE_MODE_RGMII:
+	case PHY_INTERFACE_MODE_RGMII_ID:
+	case PHY_INTERFACE_MODE_RGMII_RXID:
+	case PHY_INTERFACE_MODE_RGMII_TXID:
 		reg |= SC_EPIT | SC_ETCS_INT_GMII;
 		break;
 	case PHY_INTERFACE_MODE_RMII:
@@ -389,8 +382,6 @@ static int sun8i_phy_init(struct emac_eth_dev *priv, void *dev)
 	if (!phydev)
 		return -ENODEV;
 
-	phy_connect_dev(phydev, dev);
-
 	priv->phydev = phydev;
 	phy_config(priv->phydev);
 
@@ -398,7 +389,7 @@ static int sun8i_phy_init(struct emac_eth_dev *priv, void *dev)
 }
 
 #define cache_clean_descriptor(desc)					\
-	flush_dcache_range((uintptr_t)(desc), 				\
+	flush_dcache_range((uintptr_t)(desc),				\
 			   (uintptr_t)(desc) + sizeof(struct emac_dma_desc))
 
 #define cache_inv_descriptor(desc)					\
@@ -513,71 +504,6 @@ static int sun8i_emac_eth_start(struct udevice *dev)
 	/* Enable RX/TX */
 	setbits_le32(priv->mac_reg + EMAC_RX_CTL0, EMAC_RX_CTL0_RX_EN);
 	setbits_le32(priv->mac_reg + EMAC_TX_CTL0, EMAC_TX_CTL0_TX_EN);
-
-	return 0;
-}
-
-static int parse_phy_pins(struct udevice *dev)
-{
-	struct emac_eth_dev *priv = dev_get_priv(dev);
-	int offset;
-	const char *pin_name;
-	int drive, pull = SUN4I_PINCTRL_NO_PULL, i;
-
-	offset = fdtdec_lookup_phandle(gd->fdt_blob, dev_of_offset(dev),
-				       "pinctrl-0");
-	if (offset < 0) {
-		printf("WARNING: emac: cannot find pinctrl-0 node\n");
-		return offset;
-	}
-
-	drive = fdt_getprop_u32_default_node(gd->fdt_blob, offset, 0,
-					     "drive-strength", ~0);
-	if (drive != ~0) {
-		if (drive <= 10)
-			drive = SUN4I_PINCTRL_10_MA;
-		else if (drive <= 20)
-			drive = SUN4I_PINCTRL_20_MA;
-		else if (drive <= 30)
-			drive = SUN4I_PINCTRL_30_MA;
-		else
-			drive = SUN4I_PINCTRL_40_MA;
-	}
-
-	if (fdt_get_property(gd->fdt_blob, offset, "bias-pull-up", NULL))
-		pull = SUN4I_PINCTRL_PULL_UP;
-	else if (fdt_get_property(gd->fdt_blob, offset, "bias-pull-down", NULL))
-		pull = SUN4I_PINCTRL_PULL_DOWN;
-
-	for (i = 0; ; i++) {
-		int pin;
-
-		pin_name = fdt_stringlist_get(gd->fdt_blob, offset,
-					      "pins", i, NULL);
-		if (!pin_name)
-			break;
-
-		pin = sunxi_name_to_gpio(pin_name);
-		if (pin < 0)
-			continue;
-
-		if (priv->variant == H3_EMAC)
-			sunxi_gpio_set_cfgpin(pin, SUN8I_IOMUX_H3);
-		else if (priv->variant == R40_GMAC || priv->variant == H6_EMAC)
-			sunxi_gpio_set_cfgpin(pin, SUN8I_IOMUX_R40);
-		else
-			sunxi_gpio_set_cfgpin(pin, SUN8I_IOMUX);
-
-		if (drive != ~0)
-			sunxi_gpio_set_drv(pin, drive);
-		if (pull != ~0)
-			sunxi_gpio_set_pull(pin, pull);
-	}
-
-	if (!i) {
-		printf("WARNING: emac: cannot find pins property\n");
-		return -2;
-	}
 
 	return 0;
 }
@@ -712,7 +638,7 @@ static int sun8i_mdio_reset(struct mii_dev *bus)
 {
 	struct udevice *dev = bus->priv;
 	struct emac_eth_dev *priv = dev_get_priv(dev);
-	struct sun8i_eth_pdata *pdata = dev_get_platdata(dev);
+	struct sun8i_eth_pdata *pdata = dev_get_plat(dev);
 	int ret;
 
 	if (!dm_gpio_is_valid(&priv->reset_gpio))
@@ -799,7 +725,7 @@ static void sun8i_emac_eth_stop(struct udevice *dev)
 
 static int sun8i_emac_eth_probe(struct udevice *dev)
 {
-	struct sun8i_eth_pdata *sun8i_pdata = dev_get_platdata(dev);
+	struct sun8i_eth_pdata *sun8i_pdata = dev_get_plat(dev);
 	struct eth_pdata *pdata = &sun8i_pdata->eth_pdata;
 	struct emac_eth_dev *priv = dev_get_priv(dev);
 	int ret;
@@ -861,12 +787,11 @@ static int sun8i_handle_internal_phy(struct udevice *dev, struct emac_eth_dev *p
 	return 0;
 }
 
-static int sun8i_emac_eth_ofdata_to_platdata(struct udevice *dev)
+static int sun8i_emac_eth_of_to_plat(struct udevice *dev)
 {
-	struct sun8i_eth_pdata *sun8i_pdata = dev_get_platdata(dev);
+	struct sun8i_eth_pdata *sun8i_pdata = dev_get_plat(dev);
 	struct eth_pdata *pdata = &sun8i_pdata->eth_pdata;
 	struct emac_eth_dev *priv = dev_get_priv(dev);
-	const char *phy_mode;
 	const fdt32_t *reg;
 	int node = dev_of_offset(dev);
 	int offset = 0;
@@ -930,16 +855,10 @@ static int sun8i_emac_eth_ofdata_to_platdata(struct udevice *dev)
 	}
 	priv->phyaddr = fdtdec_get_int(gd->fdt_blob, offset, "reg", -1);
 
-	phy_mode = fdt_getprop(gd->fdt_blob, node, "phy-mode", NULL);
-
-	if (phy_mode)
-		pdata->phy_interface = phy_get_interface_by_name(phy_mode);
-	printf("phy interface%d\n", pdata->phy_interface);
-
-	if (pdata->phy_interface == -1) {
-		debug("%s: Invalid PHY interface '%s'\n", __func__, phy_mode);
+	pdata->phy_interface = dev_read_phy_mode(dev);
+	debug("phy interface %d\n", pdata->phy_interface);
+	if (pdata->phy_interface == PHY_INTERFACE_MODE_NA)
 		return -EINVAL;
-	}
 
 	if (priv->variant == H3_EMAC) {
 		ret = sun8i_handle_internal_phy(dev, priv);
@@ -948,9 +867,6 @@ static int sun8i_emac_eth_ofdata_to_platdata(struct udevice *dev)
 	}
 
 	priv->interface = pdata->phy_interface;
-
-	if (!priv->use_internal_phy)
-		parse_phy_pins(dev);
 
 	sun8i_pdata->tx_delay_ps = fdtdec_get_int(gd->fdt_blob, node,
 						  "allwinner,tx-delay-ps", 0);
@@ -1001,10 +917,10 @@ U_BOOT_DRIVER(eth_sun8i_emac) = {
 	.name   = "eth_sun8i_emac",
 	.id     = UCLASS_ETH,
 	.of_match = sun8i_emac_eth_ids,
-	.ofdata_to_platdata = sun8i_emac_eth_ofdata_to_platdata,
+	.of_to_plat = sun8i_emac_eth_of_to_plat,
 	.probe  = sun8i_emac_eth_probe,
 	.ops    = &sun8i_emac_eth_ops,
-	.priv_auto_alloc_size = sizeof(struct emac_eth_dev),
-	.platdata_auto_alloc_size = sizeof(struct sun8i_eth_pdata),
+	.priv_auto	= sizeof(struct emac_eth_dev),
+	.plat_auto	= sizeof(struct sun8i_eth_pdata),
 	.flags = DM_FLAG_ALLOC_PRIV_DMA,
 };

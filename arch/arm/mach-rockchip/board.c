@@ -12,6 +12,7 @@
 #include <ram.h>
 #include <syscon.h>
 #include <asm/cache.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch-rockchip/boot_mode.h>
 #include <asm/arch-rockchip/clock.h>
@@ -89,7 +90,7 @@ int board_usb_init(int index, enum usb_init_type init)
 	}
 	otg_data.regs_otg = ofnode_get_addr(node);
 
-#ifdef CONFIG_ROCKCHIP_RK3288
+#ifdef CONFIG_ROCKCHIP_USB2_PHY
 	int ret;
 	u32 phandle, offset;
 	ofnode phy_node;
@@ -138,7 +139,7 @@ static struct dwc3_device dwc3_device_data = {
 	.hsphy_mode = USBPHY_INTERFACE_MODE_UTMIW,
 };
 
-int usb_gadget_handle_interrupts(void)
+int usb_gadget_handle_interrupts(int index)
 {
 	dwc3_uboot_handle_interrupt(0);
 	return 0;

@@ -11,58 +11,14 @@
 /* Microblaze is microblaze_0 */
 #define XILINX_FSL_NUMBER	3
 
-/* MicroBlaze CPU */
-#define	MICROBLAZE_V5		1
-
-#define CONFIG_SYS_BOOTM_LEN	(64 * 1024 * 1024)
-
 /* uart */
 /* The following table includes the supported baudrates */
 # define CONFIG_SYS_BAUDRATE_TABLE \
 	{300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400}
 
-/* setting reset address */
-/*#define	CONFIG_SYS_RESET_ADDRESS	CONFIG_SYS_TEXT_BASE*/
-
-#define CONFIG_SYS_MALLOC_LEN	0xC0000
-
-/* Stack location before relocation */
-#define CONFIG_SYS_INIT_SP_OFFSET	(CONFIG_SYS_TEXT_BASE - \
-					 CONFIG_SYS_MALLOC_F_LEN)
-
-#ifdef CONFIG_CFI_FLASH
-/* ?empty sector */
-# define CONFIG_SYS_FLASH_EMPTY_INFO	1
-/* max number of memory banks */
-# define CONFIG_SYS_MAX_FLASH_BANKS	1
-/* max number of sectors on one chip */
-# define CONFIG_SYS_MAX_FLASH_SECT	2048
-#endif
-
-#define CONFIG_ICACHE
-#define CONFIG_DCACHE
-
-#ifndef XILINX_DCACHE_BYTE_SIZE
-#define XILINX_DCACHE_BYTE_SIZE	32768
-#endif
-
-/*
- * BOOTP options
- */
-#define CONFIG_BOOTP_BOOTFILESIZE
-
-/* size of console buffer */
-#define	CONFIG_SYS_CBSIZE	512
-/* max number of command args */
-#define	CONFIG_SYS_MAXARGS	15
-/* default load address */
-#define	CONFIG_SYS_LOAD_ADDR	0
-
 #define	CONFIG_HOSTNAME		"microblaze-generic"
 
 /* architecture dependent code */
-#define	CONFIG_SYS_USR_EXCEP	/* user exception */
-
 #if defined(CONFIG_CMD_PXE) && defined(CONFIG_CMD_DHCP)
 #define BOOT_TARGET_DEVICES_PXE(func)	func(PXE, pxe, na)
 #else
@@ -80,6 +36,20 @@
 #else
 # define BOOT_TARGET_DEVICES_QSPI(func)
 #endif
+
+#if defined(CONFIG_MTD_NOR_FLASH)
+# define BOOT_TARGET_DEVICES_NOR(func)  func(NOR, nor, na)
+#else
+# define BOOT_TARGET_DEVICES_NOR(func)
+#endif
+
+#define BOOTENV_DEV_NOR(devtypeu, devtypel, instance) \
+	"bootcmd_nor=cp.b ${script_offset_nor} ${scriptaddr} ${script_size_f} && " \
+		"echo NOR: Trying to boot script at ${scriptaddr} && " \
+		"source ${scriptaddr}; echo NOR: SCRIPT FAILED: continuing...;\0"
+
+#define BOOTENV_DEV_NAME_NOR(devtypeu, devtypel, instance) \
+	"nor "
 
 #define BOOTENV_DEV_QSPI(devtypeu, devtypel, instance) \
 	"bootcmd_qspi=sf probe 0 0 0 && " \
@@ -101,7 +71,8 @@
 
 #define BOOT_TARGET_DEVICES(func) \
 	BOOT_TARGET_DEVICES_JTAG(func) \
-	BOOT_TARGET_DEVICES_QSPI(func)  \
+	BOOT_TARGET_DEVICES_QSPI(func) \
+	BOOT_TARGET_DEVICES_NOR(func) \
 	BOOT_TARGET_DEVICES_DHCP(func) \
 	BOOT_TARGET_DEVICES_PXE(func)
 
@@ -122,36 +93,14 @@
 	BOOTENV
 #endif
 
-#if defined(CONFIG_XILINX_AXIEMAC)
-# define CONFIG_SYS_FAULT_ECHO_LINK_DOWN	1
-#endif
-
 /* SPL part */
 
 #define CONFIG_SYS_UBOOT_BASE		CONFIG_SYS_TEXT_BASE
-
-/* for booting directly linux */
-#define CONFIG_SYS_FDT_BASE		(CONFIG_SYS_TEXT_BASE + \
-					0x40000)
-
-#define CONFIG_SYS_SPL_ARGS_ADDR	(CONFIG_SYS_TEXT_BASE + \
-					 0x1000000)
 
 /* SP location before relocation, must use scratch RAM */
 /* BRAM start */
 #define CONFIG_SYS_INIT_RAM_ADDR	0x0
 /* BRAM size - will be generated */
 #define CONFIG_SYS_INIT_RAM_SIZE	0x100000
-
-# define CONFIG_SPL_STACK_ADDR		(CONFIG_SYS_INIT_RAM_ADDR + \
-					 CONFIG_SYS_INIT_RAM_SIZE)
-
-/* Just for sure that there is a space for stack */
-#define CONFIG_SPL_STACK_SIZE		0x100
-
-#define CONFIG_SPL_MAX_FOOTPRINT	(CONFIG_SYS_INIT_RAM_SIZE - \
-					 CONFIG_SYS_INIT_RAM_ADDR - \
-					 CONFIG_SYS_MALLOC_F_LEN - \
-					 CONFIG_SPL_STACK_SIZE)
 
 #endif	/* __CONFIG_H */

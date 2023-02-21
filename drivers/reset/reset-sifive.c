@@ -9,6 +9,7 @@
 #include <reset-uclass.h>
 #include <asm/io.h>
 #include <dm/device_compat.h>
+#include <dm/device-internal.h>
 #include <dm/lists.h>
 #include <linux/bitops.h>
 
@@ -62,16 +63,6 @@ static int sifive_reset_request(struct reset_ctl *rst)
 	return 0;
 }
 
-static int sifive_reset_free(struct reset_ctl *rst)
-{
-	struct sifive_reset_priv *priv = dev_get_priv(rst->dev);
-
-	debug("%s(rst=%p) (dev=%p, id=%lu) (nr_reset=%d)\n", __func__,
-	      rst, rst->dev, rst->id, priv->nr_reset);
-
-	return 0;
-}
-
 static int sifive_reset_probe(struct udevice *dev)
 {
 	struct sifive_reset_priv *priv = dev_get_priv(dev);
@@ -97,14 +88,13 @@ int sifive_reset_bind(struct udevice *dev, ulong count)
 	}
 	priv = malloc(sizeof(struct sifive_reset_priv));
 	priv->nr_reset = count;
-	rst_dev->priv = priv;
+	dev_set_priv(rst_dev, priv);
 
 	return 0;
 }
 
 const struct reset_ops sifive_reset_ops = {
 	.request = sifive_reset_request,
-	.rfree = sifive_reset_free,
 	.rst_assert = sifive_reset_assert,
 	.rst_deassert = sifive_reset_deassert,
 };
@@ -114,5 +104,5 @@ U_BOOT_DRIVER(sifive_reset) = {
 	.id		= UCLASS_RESET,
 	.ops		= &sifive_reset_ops,
 	.probe		= sifive_reset_probe,
-	.priv_auto_alloc_size = sizeof(struct sifive_reset_priv),
+	.priv_auto	= sizeof(struct sifive_reset_priv),
 };

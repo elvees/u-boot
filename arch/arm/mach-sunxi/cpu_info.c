@@ -57,6 +57,8 @@ int print_cpuinfo(void)
 {
 #ifdef CONFIG_MACH_SUN4I
 	puts("CPU:   Allwinner A10 (SUN4I)\n");
+#elif defined CONFIG_MACH_SUNIV
+	puts("CPU:   Allwinner F Series (SUNIV)\n");
 #elif defined CONFIG_MACH_SUN5I
 	u32 val = readl(SUNXI_SID_BASE + 0x08);
 	switch ((val >> 12) & 0xf) {
@@ -99,6 +101,8 @@ int print_cpuinfo(void)
 	puts("CPU:   Allwinner H5 (SUN50I)\n");
 #elif defined CONFIG_MACH_SUN50I_H6
 	puts("CPU:   Allwinner H6 (SUN50I)\n");
+#elif defined CONFIG_MACH_SUN50I_H616
+	puts("CPU:   Allwinner H616 (SUN50I)\n");
 #else
 #warning Please update cpu_info.c with correct CPU information
 	puts("CPU:   SUNXI Family\n");

@@ -8,6 +8,7 @@
 
 #include <common.h>
 #include <init.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/iomux-vf610.h>
@@ -358,9 +359,6 @@ int board_late_init(void)
 {
 	struct src *psrc = (struct src *)SRC_BASE_ADDR;
 	u32 reg;
-
-	if (IS_ENABLED(CONFIG_LED))
-		led_default_state();
 
 	/*
 	 * BK4r1 handle emergency/service SD card boot

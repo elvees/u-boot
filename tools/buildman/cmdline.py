@@ -13,6 +13,8 @@ def ParseArgs():
             args: command lin arguments
     """
     parser = OptionParser()
+    parser.add_option('-a', '--adjust-cfg', type=str, action='append',
+          help='Adjust the Kconfig settings in .config before building')
     parser.add_option('-A', '--print-prefix', action='store_true',
           help='Print the tool-chain prefix for a board (CROSS_COMPILE=)')
     parser.add_option('-b', '--branch', type='string',
@@ -32,6 +34,8 @@ def ParseArgs():
           help='Show detailed size delta for each board in the -S summary')
     parser.add_option('-D', '--config-only', action='store_true', default=False,
           help="Don't build, just configure each commit")
+    parser.add_option('--debug', action='store_true',
+        help='Enabling debugging (provides a full traceback on error)')
     parser.add_option('-e', '--show_errors', action='store_true',
           default=False, help='Show errors and warnings')
     parser.add_option('-E', '--warnings-as-errors', action='store_true',
@@ -55,9 +59,8 @@ def ParseArgs():
     parser.add_option('-i', '--in-tree', dest='in_tree',
           action='store_true', default=False,
           help='Build in the source tree instead of a separate directory')
-    # -I will be removed after April 2021
-    parser.add_option('-I', '--incremental', action='store_true',
-          default=False, help='Deprecated, does nothing. See -m')
+    parser.add_option('-I', '--ide', action='store_true', default=False,
+          help='Create build output that can be parsed by an IDE')
     parser.add_option('-j', '--jobs', dest='jobs', type='int',
           default=None, help='Number of jobs to run at once (passed to make)')
     parser.add_option('-k', '--keep-outputs', action='store_true',
@@ -86,6 +89,8 @@ def ParseArgs():
           default=False, help="Use full toolchain path in CROSS_COMPILE")
     parser.add_option('-P', '--per-board-out-dir', action='store_true',
           default=False, help="Use an O= (output) directory per board rather than per thread")
+    parser.add_option('-R', '--regen-board-list', action='store_true',
+          help='Force regeneration of the list of boards, like the old boards.cfg file')
     parser.add_option('-s', '--summary', action='store_true',
           default=False, help='Show a build summary')
     parser.add_option('-S', '--show-sizes', action='store_true',
@@ -97,7 +102,8 @@ def ParseArgs():
     parser.add_option('-t', '--test', action='store_true', dest='test',
                       default=False, help='run tests')
     parser.add_option('-T', '--threads', type='int',
-          default=None, help='Number of builder threads to use')
+          default=None,
+          help='Number of builder threads to use (0=single-thread)')
     parser.add_option('-u', '--show_unknown', action='store_true',
           default=False, help='Show boards with unknown build result')
     parser.add_option('-U', '--show-environment', action='store_true',

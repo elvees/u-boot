@@ -113,7 +113,6 @@
 
 #include <common.h>
 #include <config.h>
-#include <flash.h>
 #include <malloc.h>
 #include <div64.h>
 #include <linux/compiler.h>
@@ -180,6 +179,7 @@ static int read_nand_cached(u32 off, u32 size, u_char *buf)
 	struct mtd_info *mtd;
 	u32 bytes_read = 0;
 	size_t retlen;
+	size_t toread;
 	int cpy_bytes;
 
 	mtd = get_nand_dev_by_index(id->num);
@@ -187,8 +187,12 @@ static int read_nand_cached(u32 off, u32 size, u_char *buf)
 		return -1;
 
 	while (bytes_read < size) {
+		retlen = NAND_CACHE_SIZE;
+		if( nand_cache_off + retlen > mtd->size )
+			retlen = mtd->size - nand_cache_off;
+
 		if ((off + bytes_read < nand_cache_off) ||
-		    (off + bytes_read >= nand_cache_off+NAND_CACHE_SIZE)) {
+		    (off + bytes_read >= nand_cache_off + retlen)) {
 			nand_cache_off = (off + bytes_read) & NAND_PAGE_MASK;
 			if (!nand_cache) {
 				/* This memory never gets freed but 'cause
@@ -201,16 +205,20 @@ static int read_nand_cached(u32 off, u32 size, u_char *buf)
 				}
 			}
 
-			retlen = NAND_CACHE_SIZE;
+			toread = NAND_CACHE_SIZE;
+			if( nand_cache_off + toread > mtd->size )
+				toread = mtd->size - nand_cache_off;
+
+			retlen = toread;
 			if (nand_read(mtd, nand_cache_off,
 				      &retlen, nand_cache) < 0 ||
-					retlen != NAND_CACHE_SIZE) {
+					retlen != toread) {
 				printf("read_nand_cached: error reading nand off %#x size %d bytes\n",
-						nand_cache_off, NAND_CACHE_SIZE);
+						nand_cache_off, toread);
 				return -1;
 			}
 		}
-		cpy_bytes = nand_cache_off + NAND_CACHE_SIZE - (off + bytes_read);
+		cpy_bytes = nand_cache_off + retlen - (off + bytes_read);
 		if (cpy_bytes > size - bytes_read)
 			cpy_bytes = size - bytes_read;
 		memcpy(buf + bytes_read,
@@ -283,11 +291,16 @@ static int read_onenand_cached(u32 off, u32 size, u_char *buf)
 {
 	u32 bytes_read = 0;
 	size_t retlen;
+	size_t toread;
 	int cpy_bytes;
 
 	while (bytes_read < size) {
+		retlen = ONENAND_CACHE_SIZE;
+		if( onenand_cache_off + retlen > onenand_mtd.size )
+			retlen = onenand_mtd.size - onenand_cache_off;
+
 		if ((off + bytes_read < onenand_cache_off) ||
-		    (off + bytes_read >= onenand_cache_off + ONENAND_CACHE_SIZE)) {
+		    (off + bytes_read >= onenand_cache_off + retlen)) {
 			onenand_cache_off = (off + bytes_read) & ONENAND_PAGE_MASK;
 			if (!onenand_cache) {
 				/* This memory never gets freed but 'cause
@@ -300,16 +313,19 @@ static int read_onenand_cached(u32 off, u32 size, u_char *buf)
 				}
 			}
 
-			retlen = ONENAND_CACHE_SIZE;
+			toread = ONENAND_CACHE_SIZE;
+			if( onenand_cache_off + toread > onenand_mtd.size )
+				toread = onenand_mtd.size - onenand_cache_off;
+			retlen = toread;
 			if (onenand_read(&onenand_mtd, onenand_cache_off, retlen,
 						&retlen, onenand_cache) < 0 ||
-					retlen != ONENAND_CACHE_SIZE) {
+					retlen != toread) {
 				printf("read_onenand_cached: error reading nand off %#x size %d bytes\n",
-					onenand_cache_off, ONENAND_CACHE_SIZE);
+					onenand_cache_off, toread);
 				return -1;
 			}
 		}
-		cpy_bytes = onenand_cache_off + ONENAND_CACHE_SIZE - (off + bytes_read);
+		cpy_bytes = onenand_cache_off + retlen - (off + bytes_read);
 		if (cpy_bytes > size - bytes_read)
 			cpy_bytes = size - bytes_read;
 		memcpy(buf + bytes_read,
@@ -364,6 +380,8 @@ static void put_fl_mem_onenand(void *buf)
 
 
 #if defined(CONFIG_CMD_FLASH)
+#include <flash.h>
+
 /*
  * Support for jffs2 on top of NOR-flash
  *
@@ -375,7 +393,6 @@ static inline void *get_fl_mem_nor(u32 off, u32 size, void *ext_buf)
 	u32 addr = off;
 	struct mtdids *id = current_part->dev->id;
 
-	extern flash_info_t flash_info[];
 	flash_info_t *flash = &flash_info[id->num];
 
 	addr += flash->start[0];
@@ -1276,6 +1293,7 @@ static int jffs2_sum_process_sum_data(struct part_info *part, uint32_t offset,
 							&spi->version);
 						b->ino = sum_get_unaligned32(
 							&spi->inode);
+						b->datacrc = CRC_UNKNOWN;
 					}
 
 					sp += JFFS2_SUMMARY_INODE_SIZE;
@@ -1297,6 +1315,7 @@ static int jffs2_sum_process_sum_data(struct part_info *part, uint32_t offset,
 							&spd->version);
 						b->pino = sum_get_unaligned32(
 							&spd->pino);
+						b->datacrc = CRC_UNKNOWN;
 					}
 
 					sp += JFFS2_SUMMARY_DIRENT_SIZE(

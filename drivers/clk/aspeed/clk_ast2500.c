@@ -7,10 +7,12 @@
 #include <clk-uclass.h>
 #include <dm.h>
 #include <log.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/scu_ast2500.h>
 #include <dm/lists.h>
 #include <dt-bindings/clock/aspeed-clock.h>
+#include <dt-bindings/reset/ast2500-reset.h>
 #include <linux/delay.h>
 #include <linux/err.h>
 
@@ -90,7 +92,7 @@ static ulong ast2500_get_clkin(struct ast2500_scu *scu)
  * @scu SCU registers
  * @uart_index UART index, 1-5
  *
- * @return current setting for uart clock rate
+ * Return: current setting for uart clock rate
  */
 static ulong ast2500_get_uart_clk_rate(struct ast2500_scu *scu, int uart_index)
 {
@@ -172,6 +174,7 @@ static ulong ast2500_clk_get_rate(struct clk *clk)
 		rate = ast2500_get_uart_clk_rate(priv->scu, 5);
 		break;
 	default:
+		debug("%s: unknown clk %ld\n", __func__, clk->id);
 		return -ENOENT;
 	}
 
@@ -215,7 +218,7 @@ static bool ast2500_get_clock_config_default(ulong input_rate,
  * The result (the best config we could find), would also be returned
  * in this structure.
  *
- * @return The clock rate, when the resulting div_config is used.
+ * Return: The clock rate, when the resulting div_config is used.
  */
 static ulong ast2500_calc_clock_config(ulong input_rate, ulong requested_rate,
 				       struct ast2500_div_config *cfg)
@@ -424,6 +427,25 @@ static ulong ast2500_configure_d2pll(struct ast2500_scu *scu, ulong rate)
 	return new_rate;
 }
 
+#define SCU_CLKSTOP_SDIO 27
+static ulong ast2500_enable_sdclk(struct ast2500_scu *scu)
+{
+	u32 reset_bit;
+	u32 clkstop_bit;
+
+	reset_bit = BIT(ASPEED_RESET_SDIO);
+	clkstop_bit = BIT(SCU_CLKSTOP_SDIO);
+
+	setbits_le32(&scu->sysreset_ctrl1, reset_bit);
+	udelay(100);
+	//enable clk
+	clrbits_le32(&scu->clk_stop_ctrl1, clkstop_bit);
+	mdelay(10);
+	clrbits_le32(&scu->sysreset_ctrl1, reset_bit);
+
+	return 0;
+}
+
 static ulong ast2500_clk_set_rate(struct clk *clk, ulong rate)
 {
 	struct ast2500_clk_priv *priv = dev_get_priv(clk->dev);
@@ -437,6 +459,7 @@ static ulong ast2500_clk_set_rate(struct clk *clk, ulong rate)
 		new_rate = ast2500_configure_d2pll(priv->scu, rate);
 		break;
 	default:
+		debug("%s: unknown clk %ld\n", __func__, clk->id);
 		return -ENOENT;
 	}
 
@@ -478,7 +501,11 @@ static int ast2500_clk_enable(struct clk *clk)
 	case ASPEED_CLK_D2PLL:
 		ast2500_configure_d2pll(priv->scu, D2PLL_DEFAULT_RATE);
 		break;
+	case ASPEED_CLK_GATE_SDCLK:
+		ast2500_enable_sdclk(priv->scu);
+		break;
 	default:
+		debug("%s: unknown clk %ld\n", __func__, clk->id);
 		return -ENOENT;
 	}
 
@@ -491,7 +518,7 @@ struct clk_ops ast2500_clk_ops = {
 	.enable = ast2500_clk_enable,
 };
 
-static int ast2500_clk_ofdata_to_platdata(struct udevice *dev)
+static int ast2500_clk_of_to_plat(struct udevice *dev)
 {
 	struct ast2500_clk_priv *priv = dev_get_priv(dev);
 
@@ -523,8 +550,8 @@ U_BOOT_DRIVER(aspeed_ast2500_scu) = {
 	.name		= "aspeed_ast2500_scu",
 	.id		= UCLASS_CLK,
 	.of_match	= ast2500_clk_ids,
-	.priv_auto_alloc_size = sizeof(struct ast2500_clk_priv),
+	.priv_auto	= sizeof(struct ast2500_clk_priv),
 	.ops		= &ast2500_clk_ops,
 	.bind		= ast2500_clk_bind,
-	.ofdata_to_platdata		= ast2500_clk_ofdata_to_platdata,
+	.of_to_plat		= ast2500_clk_of_to_plat,
 };

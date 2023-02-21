@@ -10,33 +10,12 @@
 #ifndef __CONFIGS_MX28EVK_H__
 #define __CONFIGS_MX28EVK_H__
 
-/* System configurations */
-#define CONFIG_MACH_TYPE	MACH_TYPE_MX28EVK
-
 /* Memory configuration */
 #define PHYS_SDRAM_1			0x40000000	/* Base address */
 #define PHYS_SDRAM_1_SIZE		0x40000000	/* Max 1 GB RAM */
 #define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM_1
 
-/* Environment */
-
-/* Environment is in MMC */
-
-/* Environment is in NAND */
-#if defined(CONFIG_CMD_NAND) && defined(CONFIG_ENV_IS_IN_NAND)
-#define CONFIG_ENV_RANGE		(512 * 1024)
-#endif
-
-/* Environment is in SPI flash */
-
 /* UBI and NAND partitioning */
-
-/* FEC Ethernet on SoC */
-#ifdef	CONFIG_CMD_NET
-#define CONFIG_FEC_MXC
-#define CONFIG_FEC_MXC_MDIO_BASE MXS_ENET0_BASE
-#define CONFIG_MX28_FEC_MAC_IN_OCOTP
-#endif
 
 /* RTC */
 #ifdef	CONFIG_CMD_DATE
@@ -44,21 +23,11 @@
 #endif
 
 /* USB */
-#ifdef	CONFIG_CMD_USB
-#define CONFIG_EHCI_MXS_PORT1
-#define CONFIG_USB_MAX_CONTROLLER_COUNT	1
-#endif
 
 /* Framebuffer support */
-#ifdef CONFIG_VIDEO
-#define CONFIG_VIDEO_LOGO
+#ifdef CONFIG_DM_VIDEO
 #define CONFIG_SYS_VIDEO_LOGO_MAX_SIZE	(512 << 10)
 #endif
-
-/* Boot Linux */
-#define CONFIG_BOOTFILE		"uImage"
-#define CONFIG_LOADADDR		0x42000000
-#define CONFIG_SYS_LOAD_ADDR	CONFIG_LOADADDR
 
 /* Extra Environment */
 #define CONFIG_EXTRA_ENV_SETTINGS \
@@ -207,18 +176,6 @@
 		"else " \
 			"bootz; " \
 		"fi;\0"
-
-#define CONFIG_BOOTCOMMAND \
-	"mmc dev ${mmcdev}; if mmc rescan; then " \
-		"if run loadbootscript; then " \
-			"run bootscript; " \
-		"else " \
-			"if run loadimage; then " \
-				"run mmcboot; " \
-			"else run netboot; " \
-			"fi; " \
-		"fi; " \
-	"else run netboot; fi"
 
 /* The rest of the configuration is shared */
 #include <configs/mxs.h>

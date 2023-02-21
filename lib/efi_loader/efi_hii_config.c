@@ -1,9 +1,13 @@
 // SPDX-License-Identifier:     GPL-2.0+
 /*
- *  EFI Human Interface Infrastructure ... Configuration
+ * EFI Human Interface Infrastructure ... Configuration
  *
- *  Copyright (c) 2017 Leif Lindholm
- *  Copyright (c) 2018 AKASHI Takahiro, Linaro Limited
+ * Copyright (c) 2017 Leif Lindholm
+ * Copyright (c) 2018 AKASHI Takahiro, Linaro Limited
+ *
+ * As this is still a non-working stub and the protocol is neither required
+ * by the EFI shell nor by the UEFI SCT this module has been removed from
+ * the Makefile.
  */
 
 #include <common.h>
@@ -84,7 +88,7 @@ get_alt_config(const struct efi_hii_config_routing_protocol *this,
 	       const efi_string_t alt_cfg_id,
 	       efi_string_t *alt_cfg_resp)
 {
-	EFI_ENTRY("%p, \"%ls\", %pUl, \"%ls\", %p, \"%ls\", %p",
+	EFI_ENTRY("%p, \"%ls\", %pUs, \"%ls\", %p, \"%ls\", %p",
 		  this, config_resp, guid, name, device_path,
 		  alt_cfg_id, alt_cfg_resp);
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2009
- * Vipin Kumar, ST Micoelectronics, vipin.kumar@st.com.
+ * Vipin Kumar, STMicroelectronics, vipin.kumar@st.com.
  * Copyright 2019 Google Inc
  */
 
@@ -34,7 +34,7 @@ static struct dw_scl_sda_cfg byt_config = {
 /* Have a weak function for now - possibly should be a new uclass */
 __weak void lpss_reset_release(void *regs);
 
-static int designware_i2c_pci_ofdata_to_platdata(struct udevice *dev)
+static int designware_i2c_pci_of_to_plat(struct udevice *dev)
 {
 	struct dw_i2c *priv = dev_get_priv(dev);
 
@@ -59,7 +59,8 @@ static int designware_i2c_pci_ofdata_to_platdata(struct udevice *dev)
 		priv->regs = (struct i2c_regs *)dm_pci_read_bar32(dev, 0);
 	} else {
 		priv->regs = (struct i2c_regs *)
-			dm_pci_map_bar(dev, PCI_BASE_ADDRESS_0, PCI_REGION_MEM);
+			dm_pci_map_bar(dev, PCI_BASE_ADDRESS_0, 0, 0,
+				       PCI_REGION_TYPE, PCI_REGION_MEM);
 	}
 	if (!priv->regs)
 		return -EINVAL;
@@ -71,7 +72,7 @@ static int designware_i2c_pci_ofdata_to_platdata(struct udevice *dev)
 	if (dev_get_driver_data(dev) == INTEL_APL)
 		priv->has_spk_cnt = true;
 
-	return designware_i2c_ofdata_to_platdata(dev);
+	return designware_i2c_of_to_plat(dev);
 }
 
 static int designware_i2c_pci_probe(struct udevice *dev)
@@ -92,24 +93,10 @@ static int designware_i2c_pci_bind(struct udevice *dev)
 {
 	char name[20];
 
-	if (dev_of_valid(dev))
+	if (dev_has_ofnode(dev))
 		return 0;
 
-	/*
-	 * Create a unique device name for PCI type devices
-	 * ToDo:
-	 * Setting req_seq in the driver is probably not recommended.
-	 * But without a DT alias the number is not configured. And
-	 * using this driver is impossible for PCIe I2C devices.
-	 * This can be removed, once a better (correct) way for this
-	 * is found and implemented.
-	 *
-	 * TODO(sjg@chromium.org): Perhaps if uclasses had platdata this would
-	 * be possible. We cannot use static data in drivers since they may be
-	 * used in SPL or before relocation.
-	 */
-	dev->req_seq = uclass_find_next_free_req_seq(UCLASS_I2C);
-	sprintf(name, "i2c_designware#%u", dev->req_seq);
+	sprintf(name, "i2c_designware#%u", dev_seq(dev));
 	device_set_name(dev, name);
 
 	return 0;
@@ -166,7 +153,7 @@ static int dw_i2c_acpi_fill_ssdt(const struct udevice *dev,
 	int ret;
 
 	/* If no device-tree node, ignore this since we assume it isn't used */
-	if (!dev_of_valid(dev))
+	if (!dev_has_ofnode(dev))
 		return 0;
 
 	ret = acpi_device_path(dev, path, sizeof(path));
@@ -206,14 +193,16 @@ static const struct udevice_id designware_i2c_pci_ids[] = {
 	{ }
 };
 
+DM_DRIVER_ALIAS(i2c_designware_pci, intel_apl_i2c)
+
 U_BOOT_DRIVER(i2c_designware_pci) = {
 	.name	= "i2c_designware_pci",
 	.id	= UCLASS_I2C,
 	.of_match = designware_i2c_pci_ids,
 	.bind	= designware_i2c_pci_bind,
-	.ofdata_to_platdata	= designware_i2c_pci_ofdata_to_platdata,
+	.of_to_plat	= designware_i2c_pci_of_to_plat,
 	.probe	= designware_i2c_pci_probe,
-	.priv_auto_alloc_size = sizeof(struct dw_i2c),
+	.priv_auto	= sizeof(struct dw_i2c),
 	.remove = designware_i2c_remove,
 	.flags = DM_FLAG_OS_PREPARE,
 	.ops	= &designware_i2c_ops,

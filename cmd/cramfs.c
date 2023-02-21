@@ -3,7 +3,7 @@
  *
  * based on: cmd_jffs2.c
  *
- * 	Add support for a CRAMFS located in RAM
+ *	Add support for a CRAMFS located in RAM
  */
 
 
@@ -33,11 +33,11 @@
 # define DEBUGF(fmt, args...)
 #endif
 
-#include <flash.h>
 
 #ifndef CONFIG_MTD_NOR_FLASH
 # define OFFSET_ADJUSTMENT	0
 #else
+#include <flash.h>
 # define OFFSET_ADJUSTMENT	(flash_info[id.num].start[0])
 #endif
 
@@ -92,7 +92,7 @@ extern int cramfs_info (struct part_info *info);
  * @param flag command flag
  * @param argc number of arguments supplied to the command
  * @param argv arguments list
- * @return 0 on success, 1 otherwise
+ * Return: 0 on success, 1 otherwise
  */
 int do_cramfs_load(struct cmd_tbl *cmdtp, int flag, int argc,
 		   char *const argv[])
@@ -107,7 +107,7 @@ int do_cramfs_load(struct cmd_tbl *cmdtp, int flag, int argc,
 	struct mtdids id;
 
 	ulong addr;
-	addr = simple_strtoul(env_get("cramfsaddr"), NULL, 16);
+	addr = hextoul(env_get("cramfsaddr"), NULL);
 
 	/* hack! */
 	/* cramfs_* only supports NOR flash chips */
@@ -161,7 +161,7 @@ int do_cramfs_load(struct cmd_tbl *cmdtp, int flag, int argc,
  * @param flag command flag
  * @param argc number of arguments supplied to the command
  * @param argv arguments list
- * @return 0 on success, 1 otherwise
+ * Return: 0 on success, 1 otherwise
  */
 int do_cramfs_ls(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
@@ -172,7 +172,7 @@ int do_cramfs_ls(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	struct mtdids id;
 
 	ulong addr;
-	addr = simple_strtoul(env_get("cramfsaddr"), NULL, 16);
+	addr = hextoul(env_get("cramfsaddr"), NULL);
 
 	/* hack! */
 	/* cramfs_* only supports NOR flash chips */

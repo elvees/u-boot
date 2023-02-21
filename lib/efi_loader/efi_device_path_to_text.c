@@ -8,6 +8,7 @@
 #include <common.h>
 #include <blk.h>
 #include <efi_loader.h>
+#include <malloc.h>
 
 #define MAC_OUTPUT_LEN 22
 #define UNKNOWN_OUTPUT_LEN 23
@@ -34,7 +35,7 @@ static u16 *efi_str_to_u16(char *str)
 	efi_status_t ret;
 
 	len = sizeof(u16) * (utf8_utf16_strlen(str) + 1);
-	ret = efi_allocate_pool(EFI_ALLOCATE_ANY_PAGES, len, (void **)&out);
+	ret = efi_allocate_pool(EFI_BOOT_SERVICES_DATA, len, (void **)&out);
 	if (ret != EFI_SUCCESS)
 		return NULL;
 	dst = out;
@@ -67,7 +68,8 @@ static char *dp_hardware(char *s, struct efi_device_path *dp)
 
 		s += sprintf(s, "VenHw(%pUl", &vdp->guid);
 		n = (int)vdp->dp.length - sizeof(struct efi_device_path_vendor);
-		if (n > 0) {
+		/* Node must fit into MAX_NODE_LEN) */
+		if (n > 0 && n < MAX_NODE_LEN / 2 - 22) {
 			s += sprintf(s, ",");
 			for (i = 0; i < n; ++i)
 				s += sprintf(s, "%02x", vdp->vendor_data[i]);
@@ -117,6 +119,31 @@ static char *dp_msging(char *s, struct efi_device_path *dp)
 			     ide->logical_unit_number);
 		break;
 	}
+	case DEVICE_PATH_SUB_TYPE_MSG_UART: {
+		struct efi_device_path_uart *uart =
+			(struct efi_device_path_uart *)dp;
+		const char parity_str[6] = {'D', 'N', 'E', 'O', 'M', 'S'};
+		const char *stop_bits_str[4] = { "D", "1", "1.5", "2" };
+
+		s += sprintf(s, "Uart(%lld,%d,", uart->baud_rate,
+			     uart->data_bits);
+
+		/*
+		 * Parity and stop bits can either both use keywords or both use
+		 * numbers but numbers and keywords should not be mixed. Let's
+		 * go for keywords as this is what EDK II does. For illegal
+		 * values fall back to numbers.
+		 */
+		if (uart->parity < 6)
+			s += sprintf(s, "%c,", parity_str[uart->parity]);
+		else
+			s += sprintf(s, "%d,", uart->parity);
+		if (uart->stop_bits < 4)
+			s += sprintf(s, "%s)", stop_bits_str[uart->stop_bits]);
+		else
+			s += sprintf(s, "%d)", uart->stop_bits);
+		break;
+	}
 	case DEVICE_PATH_SUB_TYPE_MSG_USB: {
 		struct efi_device_path_usb *udp =
 			(struct efi_device_path_usb *)dp;
@@ -163,15 +190,29 @@ static char *dp_msging(char *s, struct efi_device_path *dp)
 		struct efi_device_path_nvme *ndp =
 			(struct efi_device_path_nvme *)dp;
 		u32 ns_id;
-		int i;
 
 		memcpy(&ns_id, &ndp->ns_id, sizeof(ns_id));
 		s += sprintf(s, "NVMe(0x%x,", ns_id);
-		for (i = 0; i < sizeof(ndp->eui64); ++i)
+
+		/* Display byte 7 first, byte 0 last */
+		for (int i = 0; i < 8; ++i)
 			s += sprintf(s, "%s%02x", i ? "-" : "",
-				     ndp->eui64[i]);
+				     ndp->eui64[i ^ 7]);
 		s += sprintf(s, ")");
 
+		break;
+	}
+	case DEVICE_PATH_SUB_TYPE_MSG_URI: {
+		struct efi_device_path_uri *udp =
+			(struct efi_device_path_uri *)dp;
+		int n;
+
+		n = (int)udp->dp.length - sizeof(struct efi_device_path_uri);
+
+		s += sprintf(s, "Uri(");
+		if (n > 0 && n < MAX_NODE_LEN - 6)
+			s += snprintf(s, n, "%s", (char *)udp->uri);
+		s += sprintf(s, ")");
 		break;
 	}
 	case DEVICE_PATH_SUB_TYPE_MSG_SD:
@@ -196,7 +237,7 @@ static char *dp_msging(char *s, struct efi_device_path *dp)
  *
  * @s		output buffer
  * @dp		device path node
- * @return	next unused buffer address
+ * Return:	next unused buffer address
  */
 static char *dp_media(char *s, struct efi_device_path *dp)
 {
@@ -244,13 +285,37 @@ static char *dp_media(char *s, struct efi_device_path *dp)
 			     cddp->partition_start, cddp->partition_size);
 		break;
 	}
+	case DEVICE_PATH_SUB_TYPE_VENDOR_PATH: {
+		int i, n;
+		struct efi_device_path_vendor *vdp =
+			(struct efi_device_path_vendor *)dp;
+
+		s += sprintf(s, "VenMedia(%pUl", &vdp->guid);
+		n = (int)vdp->dp.length - sizeof(struct efi_device_path_vendor);
+		/* Node must fit into MAX_NODE_LEN) */
+		if (n > 0 && n < MAX_NODE_LEN / 2 - 24) {
+			s += sprintf(s, ",");
+			for (i = 0; i < n; ++i)
+				s += sprintf(s, "%02x", vdp->vendor_data[i]);
+		}
+		s += sprintf(s, ")");
+		break;
+	}
 	case DEVICE_PATH_SUB_TYPE_FILE_PATH: {
 		struct efi_device_path_file_path *fp =
 			(struct efi_device_path_file_path *)dp;
-		int slen = (dp->length - sizeof(*dp)) / 2;
-		if (slen > MAX_NODE_LEN - 2)
-			slen = MAX_NODE_LEN - 2;
-		s += sprintf(s, "%-.*ls", slen, fp->str);
+		u16 *buffer;
+		int slen = dp->length - sizeof(*dp);
+
+		/* two bytes for \0, extra byte if dp->length is odd */
+		buffer = calloc(1, slen + 3);
+		if (!buffer) {
+			log_err("Out of memory\n");
+			return s;
+		}
+		memcpy(buffer, fp->str, dp->length - sizeof(*dp));
+		s += snprintf(s, MAX_NODE_LEN - 1, "%ls", buffer);
+		free(buffer);
 		break;
 	}
 	default:
@@ -265,7 +330,7 @@ static char *dp_media(char *s, struct efi_device_path *dp)
  *
  * @buffer		output buffer
  * @dp			device path or node
- * @return		end of string
+ * Return:		end of string
  */
 static char *efi_convert_single_device_node_to_text(
 		char *buffer,
@@ -305,7 +370,7 @@ static char *efi_convert_single_device_node_to_text(
  * device_node		device node to be converted
  * display_only		true if the shorter text representation shall be used
  * allow_shortcuts	true if shortcut forms may be used
- * @return		text representation of the device path
+ * Return:		text representation of the device path
  *			NULL if out of memory of device_path is NULL
  */
 static uint16_t EFIAPI *efi_convert_device_node_to_text(
@@ -338,7 +403,7 @@ out:
  * device_path		device path to be converted
  * display_only		true if the shorter text representation shall be used
  * allow_shortcuts	true if shortcut forms may be used
- * @return		text representation of the device path
+ * Return:		text representation of the device path
  *			NULL if out of memory of device_path is NULL
  */
 static uint16_t EFIAPI *efi_convert_device_path_to_text(
@@ -354,13 +419,21 @@ static uint16_t EFIAPI *efi_convert_device_path_to_text(
 
 	if (!device_path)
 		goto out;
-	while (device_path &&
-	       str + MAX_NODE_LEN < buffer + MAX_PATH_LEN) {
-		*str++ = '/';
-		str = efi_convert_single_device_node_to_text(str, device_path);
-		device_path = efi_dp_next(device_path);
+	while (device_path && str + MAX_NODE_LEN < buffer + MAX_PATH_LEN) {
+		if (device_path->type == DEVICE_PATH_TYPE_END) {
+			if (device_path->sub_type !=
+			    DEVICE_PATH_SUB_TYPE_INSTANCE_END)
+				break;
+			*str++ = ',';
+		} else {
+			*str++ = '/';
+			str = efi_convert_single_device_node_to_text(
+							str, device_path);
+		}
+		*(u8 **)&device_path += device_path->length;
 	}
 
+	*str = 0;
 	text = efi_str_to_u16(buffer);
 
 out:

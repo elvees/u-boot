@@ -13,6 +13,7 @@
 #include <asm/io.h>
 #include <linux/bitops.h>
 #include <linux/err.h>
+#include <power/regulator.h>
 
 #define SARADC_CTRL_CHN_MASK		GENMASK(2, 0)
 #define SARADC_CTRL_POWER_CTRL		BIT(3)
@@ -44,7 +45,7 @@ int rockchip_saradc_channel_data(struct udevice *dev, int channel,
 				 unsigned int *data)
 {
 	struct rockchip_saradc_priv *priv = dev_get_priv(dev);
-	struct adc_uclass_platdata *uc_pdata = dev_get_uclass_platdata(dev);
+	struct adc_uclass_plat *uc_pdata = dev_get_uclass_plat(dev);
 
 	if (channel != priv->active_channel) {
 		pr_err("Requested channel is not active!");
@@ -100,8 +101,11 @@ int rockchip_saradc_stop(struct udevice *dev)
 
 int rockchip_saradc_probe(struct udevice *dev)
 {
+	struct adc_uclass_plat *uc_pdata = dev_get_uclass_plat(dev);
 	struct rockchip_saradc_priv *priv = dev_get_priv(dev);
+	struct udevice *vref;
 	struct clk clk;
+	int vref_uv;
 	int ret;
 
 	ret = clk_get_by_index(dev, 0, &clk);
@@ -114,12 +118,29 @@ int rockchip_saradc_probe(struct udevice *dev)
 
 	priv->active_channel = -1;
 
+	ret = device_get_supply_regulator(dev, "vref-supply", &vref);
+	if (ret) {
+		printf("can't get vref-supply: %d\n", ret);
+		return ret;
+	}
+
+	vref_uv = regulator_get_value(vref);
+	if (vref_uv < 0) {
+		printf("can't get vref-supply value: %d\n", vref_uv);
+		return vref_uv;
+	}
+
+	/* VDD supplied by common vref pin */
+	uc_pdata->vdd_supply = vref;
+	uc_pdata->vdd_microvolts = vref_uv;
+	uc_pdata->vss_microvolts = 0;
+
 	return 0;
 }
 
-int rockchip_saradc_ofdata_to_platdata(struct udevice *dev)
+int rockchip_saradc_of_to_plat(struct udevice *dev)
 {
-	struct adc_uclass_platdata *uc_pdata = dev_get_uclass_platdata(dev);
+	struct adc_uclass_plat *uc_pdata = dev_get_uclass_plat(dev);
 	struct rockchip_saradc_priv *priv = dev_get_priv(dev);
 	struct rockchip_saradc_data *data;
 
@@ -131,7 +152,7 @@ int rockchip_saradc_ofdata_to_platdata(struct udevice *dev)
 	}
 
 	priv->data = data;
-	uc_pdata->data_mask = (1 << priv->data->num_bits) - 1;;
+	uc_pdata->data_mask = (1 << priv->data->num_bits) - 1;
 	uc_pdata->data_format = ADC_DATA_FORMAT_BIN;
 	uc_pdata->data_timeout_us = SARADC_TIMEOUT / 5;
 	uc_pdata->channel_mask = (1 << priv->data->num_channels) - 1;
@@ -179,6 +200,6 @@ U_BOOT_DRIVER(rockchip_saradc) = {
 	.of_match	= rockchip_saradc_ids,
 	.ops		= &rockchip_saradc_ops,
 	.probe		= rockchip_saradc_probe,
-	.ofdata_to_platdata = rockchip_saradc_ofdata_to_platdata,
-	.priv_auto_alloc_size = sizeof(struct rockchip_saradc_priv),
+	.of_to_plat = rockchip_saradc_of_to_plat,
+	.priv_auto	= sizeof(struct rockchip_saradc_priv),
 };

@@ -9,6 +9,7 @@
 #include <log.h>
 #include <net.h>
 #include <serial.h>
+#include <asm/global_data.h>
 #include <asm/mach-types.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/arch/mmc_host_def.h>
@@ -38,7 +39,7 @@ struct omap4_scrm_regs *const scrm = (struct omap4_scrm_regs *)0x4a30a000;
 /**
  * @brief board_init
  *
- * @return 0
+ * Return: 0
  */
 int board_init(void)
 {
@@ -214,7 +215,7 @@ void emif_get_dmm_regs(const struct dmm_lisa_map_regs
  * such as power configurations, ethernet initialization as phase2 of
  * boot sequence
  *
- * @return 0
+ * Return: 0
  */
 int misc_init_r(void)
 {
@@ -311,6 +312,7 @@ void board_mmc_power_init(void)
 #endif
 #endif
 
+#ifdef CONFIG_REVISION_TAG
 /*
  * get_board_rev() - get board revision
  */
@@ -318,3 +320,4 @@ u32 get_board_rev(void)
 {
 	return 0x20;
 }
+#endif

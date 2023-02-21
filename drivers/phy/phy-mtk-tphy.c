@@ -723,13 +723,13 @@ static int mtk_tphy_probe(struct udevice *dev)
 		tphy->phys[index] = instance;
 		index++;
 
-		err = clk_get_optional_nodev(subnode, "ref",
-					     &instance->ref_clk);
+		err = clk_get_by_name_nodev_optional(subnode, "ref",
+						     &instance->ref_clk);
 		if (err)
 			return err;
 
-		err = clk_get_optional_nodev(subnode, "da_ref",
-					     &instance->da_ref_clk);
+		err = clk_get_by_name_nodev_optional(subnode, "da_ref",
+						     &instance->da_ref_clk);
 		if (err)
 			return err;
 	}
@@ -749,5 +749,5 @@ U_BOOT_DRIVER(mtk_tphy) = {
 	.of_match	= mtk_tphy_id_table,
 	.ops		= &mtk_tphy_ops,
 	.probe		= mtk_tphy_probe,
-	.priv_auto_alloc_size = sizeof(struct mtk_tphy),
+	.priv_auto	= sizeof(struct mtk_tphy),
 };

@@ -11,6 +11,7 @@
 #include <dm.h>
 #include <env.h>
 #include <errno.h>
+#include <hang.h>
 #include <image.h>
 #include <init.h>
 #include <malloc.h>
@@ -27,6 +28,7 @@
 #include <asm/arch/mmc_host_def.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/arch/mem.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/emif.h>
 #include <asm/gpio.h>
@@ -37,12 +39,14 @@
 #include <miiphy.h>
 #include <cpsw.h>
 #include <linux/bitops.h>
+#include <linux/compiler.h>
 #include <linux/delay.h>
 #include <power/tps65217.h>
 #include <power/tps65910.h>
 #include <env_internal.h>
 #include <watchdog.h>
 #include "../common/board_detect.h"
+#include "../common/cape_detect.h"
 #include "board.h"
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -76,9 +80,7 @@ static struct ctrl_dev *cdev = (struct ctrl_dev *)CTRL_DEVICE_BASE;
 void do_board_detect(void)
 {
 	enable_i2c0_pin_mux();
-#ifndef CONFIG_DM_I2C
-	i2c_init(CONFIG_SYS_OMAP24_I2C_SPEED, CONFIG_SYS_OMAP24_I2C_SLAVE);
-#endif
+	enable_i2c2_pin_mux();
 	if (ti_i2c_eeprom_am_get(CONFIG_EEPROM_BUS_ADDRESS,
 				 CONFIG_EEPROM_CHIP_ADDRESS))
 		printf("ti_i2c_eeprom_init failed\n");
@@ -95,7 +97,7 @@ struct serial_device *default_serial_console(void)
 }
 #endif
 
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT)
 static const struct ddr_data ddr2_data = {
 	.datardsratio0 = MT47H128M16RT25E_RD_DQS,
 	.datafwsratio0 = MT47H128M16RT25E_PHY_FIFO_WE,
@@ -249,7 +251,7 @@ static struct emif_regs ddr3_icev2_emif_reg_data = {
 #ifdef CONFIG_SPL_OS_BOOT
 int spl_start_uboot(void)
 {
-#ifdef CONFIG_SPL_SERIAL_SUPPORT
+#ifdef CONFIG_SPL_SERIAL
 	/* break into full u-boot on 'c' */
 	if (serial_tstc() && serial_getc() == 'c')
 		return 1;
@@ -335,13 +337,8 @@ static void scale_vcores_bone(int freq)
 	if (board_is_bone() && !strncmp(board_ti_get_rev(), "00A1", 4))
 		return;
 
-#ifndef CONFIG_DM_I2C
-	if (i2c_probe(TPS65217_CHIP_PM))
-		return;
-#else
 	if (power_tps65217_init(0))
 		return;
-#endif
 
 
 	/*
@@ -434,13 +431,8 @@ void scale_vcores_generic(int freq)
 	 * 1.10V.  For MPU voltage we need to switch based on
 	 * the frequency we are running at.
 	 */
-#ifndef CONFIG_DM_I2C
-	if (i2c_probe(TPS65910_CTRL_I2C_ADDR))
-		return;
-#else
 	if (power_tps65910_init(0))
 		return;
-#endif
 	/*
 	 * Depending on MPU clock and PG we will need a different
 	 * VDD to drive at that speed.
@@ -468,10 +460,6 @@ void gpi2c_init(void)
 
 	if (first_time) {
 		enable_i2c0_pin_mux();
-#ifndef CONFIG_DM_I2C
-		i2c_init(CONFIG_SYS_OMAP24_I2C_SPEED,
-			 CONFIG_SYS_OMAP24_I2C_SLAVE);
-#endif
 		first_time = false;
 	}
 }
@@ -584,7 +572,7 @@ void sdram_init(void)
 #endif
 
 #if defined(CONFIG_CLOCK_SYNTHESIZER) && (!defined(CONFIG_SPL_BUILD) || \
-	(defined(CONFIG_SPL_ETH_SUPPORT) && defined(CONFIG_SPL_BUILD)))
+	(defined(CONFIG_SPL_ETH) && defined(CONFIG_SPL_BUILD)))
 static void request_and_set_gpio(int gpio, char *name, int val)
 {
 	int ret;
@@ -705,6 +693,8 @@ done:
 }
 #endif
 
+static bool __maybe_unused prueth_is_mii = true;
+
 /*
  * Basic board specific setup.  Pinmux has been handled already.
  */
@@ -720,10 +710,12 @@ int board_init(void)
 #endif
 
 #if defined(CONFIG_CLOCK_SYNTHESIZER) && (!defined(CONFIG_SPL_BUILD) || \
-	(defined(CONFIG_SPL_ETH_SUPPORT) && defined(CONFIG_SPL_BUILD)))
+	(defined(CONFIG_SPL_ETH) && defined(CONFIG_SPL_BUILD)))
 	if (board_is_icev2()) {
 		int rv;
 		u32 reg;
+		bool eth0_is_mii = true;
+		bool eth1_is_mii = true;
 
 		REQUEST_AND_SET_GPIO(GPIO_PR1_MII_CTRL);
 		/* Make J19 status available on GPIO1_26 */
@@ -754,6 +746,7 @@ int board_init(void)
 			writel(reg, GPIO0_IRQSTATUS1); /* clear irq */
 			/* RMII mode */
 			printf("ETH0, CPSW\n");
+			eth0_is_mii = false;
 		} else {
 			/* MII mode */
 			printf("ETH0, PRU\n");
@@ -766,11 +759,20 @@ int board_init(void)
 			/* RMII mode */
 			printf("ETH1, CPSW\n");
 			gpio_set_value(GPIO_MUX_MII_CTRL, 1);
+			eth1_is_mii = false;
 		} else {
 			/* MII mode */
 			printf("ETH1, PRU\n");
 			cdce913_data.pdiv2 = 4;	/* 25MHz PHY clk */
 		}
+
+		if (eth0_is_mii != eth1_is_mii) {
+			printf("Unsupported Ethernet port configuration\n");
+			printf("Both ports must be set as RMII or MII\n");
+			hang();
+		}
+
+		prueth_is_mii = eth0_is_mii;
 
 		/* disable rising edge IRQs */
 		reg = readl(GPIO0_RISINGDETECT) & ~BIT(11);
@@ -823,8 +825,20 @@ int board_late_init(void)
 
 	if (board_is_bbg1())
 		name = "BBG1";
-	if (board_is_bben())
-		name = "BBEN";
+	if (board_is_bben()) {
+		char subtype_id = board_ti_get_config()[1];
+
+		switch (subtype_id) {
+		case 'L':
+			name = "BBELITE";
+			break;
+		case 'I':
+			name = "BBE_EX_WIFI";
+			break;
+		default:
+			name = "BBEN";
+		}
+	}
 	set_board_info_env(name);
 
 	/*
@@ -866,6 +880,8 @@ int board_late_init(void)
 		if (is_valid_ethaddr(mac_addr))
 			eth_env_set_enetaddr("eth1addr", mac_addr);
 	}
+
+	env_set("ice_mii", prueth_is_mii ? "mii" : "rmii");
 #endif
 
 	if (!env_get("serial#")) {
@@ -879,14 +895,14 @@ int board_late_init(void)
 	}
 
 	/* Just probe the potentially supported cdce913 device */
-	uclass_get_device(UCLASS_CLK, 0, &dev);
+	uclass_get_device_by_name(UCLASS_CLK, "cdce913@65", &dev);
 
 	return 0;
 }
 #endif
 
-/* CPSW platdata */
-#if !CONFIG_IS_ENABLED(OF_CONTROL)
+/* CPSW plat */
+#if CONFIG_IS_ENABLED(NET) && !CONFIG_IS_ENABLED(OF_CONTROL)
 struct cpsw_slave_data slave_data[] = {
 	{
 		.slave_reg_ofs  = CPSW_SLAVE0_OFFSET,
@@ -927,9 +943,9 @@ struct eth_pdata cpsw_pdata = {
 	.priv_pdata = &am335_eth_data,
 };
 
-U_BOOT_DEVICE(am335x_eth) = {
+U_BOOT_DRVINFO(am335x_eth) = {
 	.name = "eth_cpsw",
-	.platdata = &cpsw_pdata,
+	.plat = &cpsw_pdata,
 };
 #endif
 
@@ -950,20 +966,33 @@ int board_fit_config_name_match(const char *name)
 		return 0;
 	else if (board_is_icev2() && !strcmp(name, "am335x-icev2"))
 		return 0;
-	else
-		return -1;
+	else if (board_is_bben()) {
+		char subtype_id = board_ti_get_config()[1];
+
+		if (subtype_id == 'L') {
+			if (!strcmp(name, "am335x-sancloud-bbe-lite"))
+				return 0;
+		} else if (subtype_id == 'I') {
+			if (!strcmp(name, "am335x-sancloud-bbe-extended-wifi"))
+				return 0;
+		} else if (!strcmp(name, "am335x-sancloud-bbe")) {
+			return 0;
+		}
+	}
+	return -1;
 }
 #endif
 
 #ifdef CONFIG_TI_SECURE_DEVICE
-void board_fit_image_post_process(void **p_image, size_t *p_size)
+void board_fit_image_post_process(const void *fit, int node, void **p_image,
+				  size_t *p_size)
 {
 	secure_boot_verify_image(p_image, p_size);
 }
 #endif
 
 #if !CONFIG_IS_ENABLED(OF_CONTROL)
-static const struct omap_hsmmc_plat am335x_mmc0_platdata = {
+static const struct omap_hsmmc_plat am335x_mmc0_plat = {
 	.base_addr = (struct hsmmc *)OMAP_HSMMC1_BASE,
 	.cfg.host_caps = MMC_MODE_HS_52MHz | MMC_MODE_HS | MMC_MODE_4BIT,
 	.cfg.f_min = 400000,
@@ -972,12 +1001,12 @@ static const struct omap_hsmmc_plat am335x_mmc0_platdata = {
 	.cfg.b_max = CONFIG_SYS_MMC_MAX_BLK_COUNT,
 };
 
-U_BOOT_DEVICE(am335x_mmc0) = {
+U_BOOT_DRVINFO(am335x_mmc0) = {
 	.name = "omap_hsmmc",
-	.platdata = &am335x_mmc0_platdata,
+	.plat = &am335x_mmc0_plat,
 };
 
-static const struct omap_hsmmc_plat am335x_mmc1_platdata = {
+static const struct omap_hsmmc_plat am335x_mmc1_plat = {
 	.base_addr = (struct hsmmc *)OMAP_HSMMC2_BASE,
 	.cfg.host_caps = MMC_MODE_HS_52MHz | MMC_MODE_HS | MMC_MODE_8BIT,
 	.cfg.f_min = 400000,
@@ -986,8 +1015,8 @@ static const struct omap_hsmmc_plat am335x_mmc1_platdata = {
 	.cfg.b_max = CONFIG_SYS_MMC_MAX_BLK_COUNT,
 };
 
-U_BOOT_DEVICE(am335x_mmc1) = {
+U_BOOT_DRVINFO(am335x_mmc1) = {
 	.name = "omap_hsmmc",
-	.platdata = &am335x_mmc1_platdata,
+	.plat = &am335x_mmc1_plat,
 };
 #endif

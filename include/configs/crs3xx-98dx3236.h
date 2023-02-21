@@ -10,13 +10,6 @@
  * High Level Configuration Options (easy to change)
  */
 
-#define CONFIG_SYS_BOOTM_LEN	(64 * 1024 * 1024) /* 64 MB */
-#define CONFIG_SYS_KWD_CONFIG	$(CONFIG_BOARDDIR)/kwbimage.cfg
-#define CONFIG_SYS_TCLK		200000000	/* 200MHz */
-
-/* USB/EHCI configuration */
-#define CONFIG_EHCI_IS_TDI
-
 /* Environment in SPI NOR flash */
 
 /* Keep device tree and initrd in lower memory so the kernel can access them */
@@ -29,7 +22,5 @@
  * to enable certain macros
  */
 #include "mv-common.h"
-#undef CONFIG_SYS_MAXARGS
-#define CONFIG_SYS_MAXARGS 96
 
 #endif /* _CONFIG_CRS3XX_98DX3236_H */

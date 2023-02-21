@@ -116,7 +116,8 @@ static int do_tpm2_pcr_extend(struct cmd_tbl *cmdtp, int flag, int argc,
 	if (index >= priv->pcr_count)
 		return -EINVAL;
 
-	rc = tpm2_pcr_extend(dev, index, digest);
+	rc = tpm2_pcr_extend(dev, index, TPM2_ALG_SHA256, digest,
+			     TPM2_DIGEST_LEN);
 
 	unmap_sysmem(digest);
 
@@ -150,7 +151,8 @@ static int do_tpm_pcr_read(struct cmd_tbl *cmdtp, int flag, int argc,
 
 	data = map_sysmem(simple_strtoul(argv[2], NULL, 0), 0);
 
-	rc = tpm2_pcr_read(dev, index, priv->pcr_select_min, data, &updates);
+	rc = tpm2_pcr_read(dev, index, priv->pcr_select_min, TPM2_ALG_SHA256,
+			   data, TPM2_DIGEST_LEN, &updates);
 	if (!rc) {
 		printf("PCR #%u content (%u known updates):\n", index, updates);
 		print_byte_string(data, TPM2_DIGEST_LEN);
@@ -357,6 +359,7 @@ static int do_tpm_pcr_setauthvalue(struct cmd_tbl *cmdtp, int flag,
 static struct cmd_tbl tpm2_commands[] = {
 	U_BOOT_CMD_MKENT(device, 0, 1, do_tpm_device, "", ""),
 	U_BOOT_CMD_MKENT(info, 0, 1, do_tpm_info, "", ""),
+	U_BOOT_CMD_MKENT(state, 0, 1, do_tpm_report_state, "", ""),
 	U_BOOT_CMD_MKENT(init, 0, 1, do_tpm_init, "", ""),
 	U_BOOT_CMD_MKENT(startup, 0, 1, do_tpm2_startup, "", ""),
 	U_BOOT_CMD_MKENT(self_test, 0, 1, do_tpm2_self_test, "", ""),
@@ -387,6 +390,8 @@ U_BOOT_CMD(tpm2, CONFIG_SYS_MAXARGS, 1, do_tpm, "Issue a TPMv2.x command",
 "    Show all devices or set the specified device\n"
 "info\n"
 "    Show information about the TPM.\n"
+"state\n"
+"    Show internal state from the TPM (if available)\n"
 "init\n"
 "    Initialize the software stack. Always the first command to issue.\n"
 "startup <mode>\n"

@@ -292,7 +292,7 @@ static int virtio_pci_bind(struct udevice *udev)
 
 static int virtio_pci_probe(struct udevice *udev)
 {
-	struct pci_child_platdata *pplat = dev_get_parent_platdata(udev);
+	struct pci_child_plat *pplat = dev_get_parent_plat(udev);
 	struct virtio_dev_priv *uc_priv = dev_get_uclass_priv(udev);
 	struct virtio_pci_priv *priv = dev_get_priv(udev);
 	u16 subvendor, subdevice;
@@ -319,7 +319,8 @@ static int virtio_pci_probe(struct udevice *udev)
 	uc_priv->device = subdevice;
 	uc_priv->vendor = subvendor;
 
-	priv->ioaddr = dm_pci_map_bar(udev, PCI_BASE_ADDRESS_0, PCI_REGION_IO);
+	priv->ioaddr = dm_pci_map_bar(udev, PCI_BASE_ADDRESS_0, 0, 0,
+				      PCI_REGION_TYPE, PCI_REGION_IO);
 	if (!priv->ioaddr)
 		return -ENXIO;
 	debug("(%s): virtio legacy device reg base %04lx\n",
@@ -350,7 +351,7 @@ U_BOOT_DRIVER(virtio_pci_legacy) = {
 	.ops	= &virtio_pci_ops,
 	.bind	= virtio_pci_bind,
 	.probe	= virtio_pci_probe,
-	.priv_auto_alloc_size = sizeof(struct virtio_pci_priv),
+	.priv_auto	= sizeof(struct virtio_pci_priv),
 };
 
 static struct pci_device_id virtio_pci_supported[] = {

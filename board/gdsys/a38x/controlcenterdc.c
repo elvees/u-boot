@@ -11,6 +11,7 @@
 #include <miiphy.h>
 #include <net.h>
 #include <tpm-v1.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/cpu.h>
 #include <asm-generic/gpio.h>
@@ -70,6 +71,7 @@ static struct mv_ddr_topology_map ddr_topology_map = {
 	    MV_DDR_TIM_DEFAULT} },	/* timing */
 	BUS_MASK_32BIT,			/* Busses mask */
 	MV_DDR_CFG_DEFAULT,		/* ddr configuration data source */
+	NOT_COMBINED,			/* ddr twin-die combined */
 	{ {0} },			/* raw spd data */
 	{0}				/* timing parameters */
 
@@ -92,11 +94,15 @@ int hws_board_topology_load(struct serdes_map **serdes_map_array, u8 *count)
 	return 0;
 }
 
-void board_pex_config(void)
+void spl_board_init(void)
 {
 #ifdef CONFIG_SPL_BUILD
 	uint k;
 	struct gpio_desc gpio = {};
+
+	/* Enable PCIe link 2 */
+	setbits_32(MVEBU_REGISTER(0x18204), BIT(2));
+	mdelay(10);
 
 	if (!request_gpio_by_name(&gpio, "pca9698@22", 31, "fpga-program-gpio")) {
 		/* prepare FPGA reconfiguration */
@@ -188,11 +194,12 @@ void init_host_phys(struct mii_dev *bus)
 	for (k = 0; k < 2; ++k) {
 		struct phy_device *phydev;
 
-		phydev = phy_find_by_mask(bus, 1 << k,
-					  PHY_INTERFACE_MODE_SGMII);
+		phydev = phy_find_by_mask(bus, 1 << k);
 
-		if (phydev)
+		if (phydev) {
+			phydev->interface = PHY_INTERFACE_MODE_SGMII;
 			phy_config(phydev);
+		}
 	}
 }
 
@@ -286,8 +293,8 @@ int last_stage_init(void)
 	ccdc_eth_init();
 #endif
 	ret = get_tpm(&tpm);
-	if (ret || tpm_init(tpm) || tpm_startup(tpm, TPM_ST_CLEAR) ||
-	    tpm_continue_self_test(tpm)) {
+	if (ret || tpm_init(tpm) || tpm1_startup(tpm, TPM_ST_CLEAR) ||
+	    tpm1_continue_self_test(tpm)) {
 		return 1;
 	}
 

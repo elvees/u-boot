@@ -13,8 +13,6 @@
 #include "mx6_common.h"
 
 /* Machine config */
-#define CONFIG_SYS_LITTLE_ENDIAN
-#define CONFIG_MACH_TYPE		4273
 
 /* MMC */
 #define CONFIG_SYS_FSL_USDHC_NUM	3
@@ -26,32 +24,25 @@
 #define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM_1
 #define CONFIG_SYS_INIT_RAM_ADDR	IRAM_BASE_ADDR
 #define CONFIG_SYS_INIT_RAM_SIZE	IRAM_SIZE
-#define CONFIG_SYS_INIT_SP_OFFSET \
-	(CONFIG_SYS_INIT_RAM_SIZE - GENERATED_GBL_DATA_SIZE)
-#define CONFIG_SYS_INIT_SP_ADDR \
-	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
 
 /* Serial console */
 #define CONFIG_MXC_UART_BASE		UART4_BASE
-#define CONFIG_SYS_BAUDRATE_TABLE	{9600, 19200, 38400, 57600, 115200}
 
 /* Environment */
 
-#ifndef CONFIG_SPL_BUILD
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"fdt_high=0xffffffff\0" \
 	"initrd_high=0xffffffff\0" \
 	"fdt_addr_r=0x18000000\0" \
 	"ramdisk_addr_r=0x13000000\0" \
-	"kernel_addr_r=" __stringify(CONFIG_LOADADDR) "\0" \
-	"pxefile_addr_r=" __stringify(CONFIG_LOADADDR) "\0" \
-	"scriptaddr=" __stringify(CONFIG_LOADADDR) "\0" \
+	"kernel_addr_r=" __stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
+	"pxefile_addr_r=" __stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
+	"scriptaddr=" __stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
 	"fdtfile=undefined\0" \
 	"stdin=serial,usbkbd\0" \
 	"stdout=serial,vidconsole\0" \
 	"stderr=serial,vidconsole\0" \
 	"panel=HDMI\0" \
-	"autoload=no\0" \
 	"uImage=uImage-cm-fx6\0" \
 	"zImage=zImage-cm-fx6\0" \
 	"kernel=uImage-cm-fx6\0" \
@@ -62,8 +53,6 @@
 	"video_dvi=mxcfb0:dev=dvi,1280x800M-32@50,if=RGB32\0" \
 	"doboot=bootm ${kernel_addr_r}\0" \
 	"doloadfdt=false\0" \
-	"mtdids=" CONFIG_MTDIDS_DEFAULT "\0" \
-	"mtdparts=" CONFIG_MTDPARTS_DEFAULT "\0" \
 	"setboottypez=setenv kernel ${zImage};" \
 		"setenv doboot bootz ${kernel_addr_r} - ${fdt_addr_r};" \
 		"setenv doloadfdt true;\0" \
@@ -137,59 +126,23 @@
 	func(SATA, sata, 0)
 
 #include <config_distro_bootcmd.h>
-#else
-#define CONFIG_EXTRA_ENV_SETTINGS
-#endif
 
 /* NAND */
-#ifndef CONFIG_SPL_BUILD
 #define CONFIG_SYS_NAND_BASE		0x40000000
-#define CONFIG_SYS_NAND_MAX_CHIPS	1
 #define CONFIG_SYS_MAX_NAND_DEVICE	1
-#define CONFIG_SYS_NAND_ONFI_DETECTION
 /* APBH DMA is required for NAND support */
-#endif
 
 /* Ethernet */
-#define CONFIG_FEC_MXC
 #define CONFIG_FEC_MXC_PHYADDR		0
-#define CONFIG_FEC_XCV_TYPE		RGMII
-#define IMX_FEC_BASE			ENET_BASE_ADDR
-#define CONFIG_ETHPRIME			"FEC0"
-#define CONFIG_ARP_TIMEOUT		200UL
-#define CONFIG_NET_RETRY_COUNT		5
 
 /* USB */
 #define CONFIG_MXC_USB_PORTSC		(PORT_PTS_UTMI | PORT_PTS_PTW)
 #define CONFIG_MXC_USB_FLAGS		0
-#define CONFIG_USB_MAX_CONTROLLER_COUNT	2
-#define CONFIG_EHCI_HCD_INIT_AFTER_RESET	/* For OTG port */
-
-/* I2C */
-#define CONFIG_SYS_I2C
-#define CONFIG_SYS_I2C_MXC
-#define CONFIG_SYS_I2C_MXC_I2C1		/* enable I2C bus 1 */
-#define CONFIG_SYS_I2C_MXC_I2C2		/* enable I2C bus 2 */
-#define CONFIG_SYS_I2C_MXC_I2C3		/* enable I2C bus 3 */
-#define CONFIG_SYS_I2C_SPEED		100000
-#define CONFIG_SYS_MXC_I2C3_SPEED	400000
-
-#define CONFIG_SYS_I2C_EEPROM_ADDR	0x50
-#define CONFIG_SYS_I2C_EEPROM_ADDR_LEN	1
-#define CONFIG_SYS_I2C_EEPROM_BUS	2
-
-/* SATA */
-#define CONFIG_SYS_SATA_MAX_DEVICE	1
-#define CONFIG_LBA48
-#define CONFIG_DWC_AHSATA_PORT_ID	0
-#define CONFIG_DWC_AHSATA_BASE_ADDR	SATA_ARB_BASE_ADDR
 
 /* Boot */
 #define CONFIG_SYS_BOOTMAPSZ	        (8 << 20)
-#define CONFIG_SERIAL_TAG
 
 /* misc */
-#define CONFIG_SYS_MALLOC_LEN			(10 * 1024 * 1024)
 
 /* SPL */
 #include "imx6_spl.h"
@@ -197,14 +150,6 @@
 /* Display */
 #define CONFIG_IMX_HDMI
 
-#define CONFIG_VIDEO_LOGO
-#define CONFIG_VIDEO_BMP_LOGO
-
 /* EEPROM */
-#define CONFIG_ENV_EEPROM_IS_ON_I2C
-#define CONFIG_SYS_I2C_EEPROM_ADDR_LEN		1
-#define CONFIG_SYS_EEPROM_PAGE_WRITE_BITS	4
-#define CONFIG_SYS_EEPROM_PAGE_WRITE_DELAY_MS	5
-#define CONFIG_SYS_EEPROM_SIZE			256
 
 #endif	/* __CONFIG_CM_FX6_H */

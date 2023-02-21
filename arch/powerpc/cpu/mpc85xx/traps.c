@@ -20,6 +20,7 @@
  */
 
 #include <common.h>
+#include <asm/global_data.h>
 #include <asm/ptrace.h>
 #include <command.h>
 #include <init.h>
@@ -58,10 +59,6 @@ static __inline__ unsigned long get_esr(void)
 #define ESR_DST 0x00800000
 #define ESR_DIZ 0x00400000
 #define ESR_U0F 0x00008000
-
-#if defined(CONFIG_CMD_BEDBUG)
-extern void do_bedbug_breakpoint(struct pt_regs *);
-#endif
 
 /*
  * Trap & Exception support
@@ -284,7 +281,4 @@ void DebugException(struct pt_regs *regs)
 {
 	printf("Debugger trap at @ %lx\n", regs->nip );
 	show_regs(regs);
-#if defined(CONFIG_CMD_BEDBUG)
-	do_bedbug_breakpoint( regs );
-#endif
 }

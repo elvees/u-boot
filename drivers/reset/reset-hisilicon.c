@@ -46,16 +46,6 @@ static int hisi_reset_assert(struct reset_ctl *rst)
 	return 0;
 }
 
-static int hisi_reset_free(struct reset_ctl *rst)
-{
-	return 0;
-}
-
-static int hisi_reset_request(struct reset_ctl *rst)
-{
-	return 0;
-}
-
 static int hisi_reset_of_xlate(struct reset_ctl *rst,
 			       struct ofnode_phandle_args *args)
 {
@@ -74,8 +64,6 @@ static int hisi_reset_of_xlate(struct reset_ctl *rst,
 
 static const struct reset_ops hisi_reset_reset_ops = {
 	.of_xlate = hisi_reset_of_xlate,
-	.request = hisi_reset_request,
-	.rfree = hisi_reset_free,
 	.rst_assert = hisi_reset_assert,
 	.rst_deassert = hisi_reset_deassert,
 };
@@ -102,5 +90,5 @@ U_BOOT_DRIVER(hisi_reset) = {
 	.of_match = hisi_reset_ids,
 	.ops = &hisi_reset_reset_ops,
 	.probe = hisi_reset_probe,
-	.priv_auto_alloc_size = sizeof(struct hisi_reset_priv),
+	.priv_auto	= sizeof(struct hisi_reset_priv),
 };

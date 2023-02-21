@@ -317,11 +317,6 @@ static int scpsys_power_request(struct power_domain *power_domain)
 	return 0;
 }
 
-static int scpsys_power_free(struct power_domain *power_domain)
-{
-	return 0;
-}
-
 static int mtk_power_domain_hook(struct udevice *dev)
 {
 	struct scp_domain *scpd = dev_get_priv(dev);
@@ -399,7 +394,6 @@ static const struct udevice_id mtk_power_domain_ids[] = {
 };
 
 struct power_domain_ops mtk_power_domain_ops = {
-	.rfree = scpsys_power_free,
 	.off = scpsys_power_off,
 	.on = scpsys_power_on,
 	.request = scpsys_power_request,
@@ -411,5 +405,5 @@ U_BOOT_DRIVER(mtk_power_domain) = {
 	.ops = &mtk_power_domain_ops,
 	.probe = mtk_power_domain_probe,
 	.of_match = mtk_power_domain_ids,
-	.priv_auto_alloc_size = sizeof(struct scp_domain),
+	.priv_auto	= sizeof(struct scp_domain),
 };

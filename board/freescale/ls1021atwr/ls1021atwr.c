@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2014 Freescale Semiconductor, Inc.
- * Copyright 2019 NXP
+ * Copyright 2019, 2021-2022 NXP
  */
 
 #include <common.h>
@@ -11,6 +11,7 @@
 #include <i2c.h>
 #include <init.h>
 #include <net.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/immap_ls102xa.h>
 #include <asm/arch/clock.h>
@@ -25,7 +26,6 @@
 #include <netdev.h>
 #include <fsl_mdio.h>
 #include <tsec.h>
-#include <fsl_sec.h>
 #include <fsl_devdis.h>
 #include <spl.h>
 #include <linux/delay.h>
@@ -34,13 +34,13 @@
 #include <fsl_qe.h>
 #endif
 #include <fsl_validate.h>
-
+#include <dm/uclass.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
 #define VERSION_MASK		0x00FF
 #define BANK_MASK		0x0001
-#define CONFIG_RESET		0x1
+#define CFG_RESET		0x1
 #define INIT_RESET		0x1
 
 #define CPLD_SET_MUX_SERDES	0x20
@@ -106,7 +106,7 @@ static void cpld_show(void)
 	       in_8(&cpld_data->pcba_ver) & VERSION_MASK,
 	       in_8(&cpld_data->vbank) & BANK_MASK);
 
-#ifdef CONFIG_DEBUG
+#ifdef DEBUG
 	printf("soft_mux_on =%x\n",
 	       in_8(&cpld_data->soft_mux_on));
 	printf("cfg_rcw_src1 =%x\n",
@@ -282,7 +282,7 @@ static void convert_serdes_mux(int type, int need_reset)
 
 	if (need_reset == 1) {
 		printf("Reset board to enable configuration\n");
-		cpld_data->system_rst = CONFIG_RESET;
+		cpld_data->system_rst = CFG_RESET;
 	}
 }
 
@@ -457,7 +457,7 @@ void ls1twr_program_regulator(void)
 #define MC34VR500_ADDR			0x8
 #define MC34VR500_DEVICEID		0x4
 #define MC34VR500_DEVICEID_MASK		0x0f
-#ifdef CONFIG_DM_I2C
+#if CONFIG_IS_ENABLED(DM_I2C)
 	struct udevice *dev;
 	int ret;
 
@@ -530,6 +530,15 @@ int board_init(void)
 #if defined(CONFIG_SPL_BUILD)
 void spl_board_init(void)
 {
+	if (IS_ENABLED(CONFIG_FSL_CAAM)) {
+		struct udevice *dev;
+		int ret;
+
+		ret = uclass_get_device_by_driver(UCLASS_MISC, DM_DRIVER_GET(caam_jr), &dev);
+		if (ret)
+			printf("Failed to initialize caam_jr: %d\n", ret);
+	}
+
 	ls102xa_smmu_stream_id_init();
 }
 #endif
@@ -554,10 +563,7 @@ int misc_init_r(void)
 #if !defined(CONFIG_QSPI_BOOT) && !defined(CONFIG_SD_BOOT_QSPI)
 	config_board_mux();
 #endif
-
-#ifdef CONFIG_FSL_CAAM
-	return sec_init();
-#endif
+	return 0;
 }
 #endif
 
@@ -611,7 +617,7 @@ static void convert_flash_bank(char bank)
 	cpld_data->vbank = bank;
 
 	printf("Reset board to enable configuration.\n");
-	cpld_data->system_rst = CONFIG_RESET;
+	cpld_data->system_rst = CFG_RESET;
 }
 
 static int flash_bank_cmd(struct cmd_tbl *cmdtp, int flag, int argc,
@@ -643,7 +649,7 @@ static int cpld_reset_cmd(struct cmd_tbl *cmdtp, int flag, int argc,
 	if (argc > 2)
 		return CMD_RET_USAGE;
 	if ((argc == 1) || (strcmp(argv[1], "conf") == 0))
-		cpld_data->system_rst = CONFIG_RESET;
+		cpld_data->system_rst = CFG_RESET;
 	else if (strcmp(argv[1], "init") == 0)
 		cpld_data->global_rst = INIT_RESET;
 	else

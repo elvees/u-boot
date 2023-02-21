@@ -12,6 +12,7 @@
 #include <hang.h>
 #include <log.h>
 #include <asm/cache.h>
+#include <asm/global_data.h>
 #include <asm/system.h>
 #include <asm/armv8/mmu.h>
 
@@ -38,8 +39,28 @@ DECLARE_GLOBAL_DATA_PTR;
  *    off:          FFF
  */
 
-u64 get_tcr(int el, u64 *pips, u64 *pva_bits)
+static int get_effective_el(void)
 {
+	int el = current_el();
+
+	if (el == 2) {
+		u64 hcr_el2;
+
+		/*
+		 * If we are using the EL2&0 translation regime, the TCR_EL2
+		 * looks like the EL1 version, even though we are in EL2.
+		 */
+		__asm__ ("mrs %0, HCR_EL2\n" : "=r" (hcr_el2));
+		if (hcr_el2 & BIT(HCR_EL2_E2H_BIT))
+			return 1;
+	}
+
+	return el;
+}
+
+u64 get_tcr(u64 *pips, u64 *pva_bits)
+{
+	int el = get_effective_el();
 	u64 max_addr = 0;
 	u64 ips, va_bits;
 	u64 tcr;
@@ -114,7 +135,7 @@ static u64 *find_pte(u64 addr, int level)
 
 	debug("addr=%llx level=%d\n", addr, level);
 
-	get_tcr(0, NULL, &va_bits);
+	get_tcr(NULL, &va_bits);
 	if (va_bits < 39)
 		start_level = 1;
 
@@ -342,7 +363,7 @@ __weak u64 get_page_table_size(void)
 	u64 va_bits;
 	int start_level = 0;
 
-	get_tcr(0, NULL, &va_bits);
+	get_tcr(NULL, &va_bits);
 	if (va_bits < 39)
 		start_level = 1;
 
@@ -414,7 +435,7 @@ __weak void mmu_setup(void)
 		setup_all_pgtables();
 
 	el = current_el();
-	set_ttbr_tcr_mair(el, gd->arch.tlb_addr, get_tcr(el, NULL, NULL),
+	set_ttbr_tcr_mair(el, gd->arch.tlb_addr, get_tcr(NULL, NULL),
 			  MEMORY_ATTRIBUTES);
 
 	/* enable the mmu */
@@ -718,6 +739,11 @@ int icache_status(void)
 	return (get_sctlr() & CR_I) != 0;
 }
 
+int mmu_status(void)
+{
+	return (get_sctlr() & CR_M) != 0;
+}
+
 void invalidate_icache_all(void)
 {
 	__asm_invalidate_icache_all();
@@ -735,6 +761,11 @@ void icache_disable(void)
 }
 
 int icache_status(void)
+{
+	return 0;
+}
+
+int mmu_status(void)
 {
 	return 0;
 }

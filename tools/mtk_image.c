@@ -6,7 +6,9 @@
  * Author: Weijie Gao <weijie.gao@mediatek.com>
  */
 
+#include <time.h>
 #include <image.h>
+#include <u-boot/crc.h>
 #include <u-boot/sha256.h>
 #include "imagetool.h"
 #include "mtk_image.h"
@@ -243,18 +245,52 @@ static const struct brom_img_type {
 	}
 };
 
+/* Indicates whether we're generating or verifying */
+static bool img_gen;
+static uint32_t img_size;
+
 /* Image type selected by user */
 static enum brlyt_img_type hdr_media;
+static uint32_t hdr_offset;
 static int use_lk_hdr;
+static int use_mt7621_hdr;
+static bool is_arm64_image;
 
 /* LK image name */
 static char lk_name[32] = "U-Boot";
+
+/* CRC32 normal table required by MT7621 image */
+static uint32_t crc32tbl[256];
 
 /* NAND header selected by user */
 static const union nand_boot_header *hdr_nand;
 
 /* GFH header + 2 * 4KB pages of NAND */
 static char hdr_tmp[sizeof(struct gfh_header) + 0x2000];
+
+static uint32_t crc32_normal_cal(uint32_t crc, const void *data, size_t length,
+				 const uint32_t *crc32c_table)
+{
+	const uint8_t *p = data;
+
+	while (length--)
+		crc = crc32c_table[(uint8_t)((crc >> 24) ^ *p++)] ^ (crc << 8);
+
+	return crc;
+}
+
+static void crc32_normal_init(uint32_t *crc32c_table, uint32_t poly)
+{
+	uint32_t v, i, j;
+
+	for (i = 0; i < 256; i++) {
+		v = i << 24;
+		for (j = 0; j < 8; j++)
+			v = (v << 1) ^ ((v & (1 << 31)) ? poly : 0);
+
+		crc32c_table[i] = v;
+	}
+}
 
 static int mtk_image_check_image_types(uint8_t type)
 {
@@ -274,8 +310,11 @@ static int mtk_brom_parse_imagename(const char *imagename)
 
 	/* User passed arguments from image name */
 	static const char *media = "";
+	static const char *hdr_offs = "";
 	static const char *nandinfo = "";
 	static const char *lk = "";
+	static const char *mt7621 = "";
+	static const char *arm64_param = "";
 
 	key = buf;
 	while (key) {
@@ -315,14 +354,23 @@ static int mtk_brom_parse_imagename(const char *imagename)
 			if (!strcmp(key, "media"))
 				media = val;
 
+			if (!strcmp(key, "hdroffset"))
+				hdr_offs = val;
+
 			if (!strcmp(key, "nandinfo"))
 				nandinfo = val;
 
 			if (!strcmp(key, "lk"))
 				lk = val;
 
+			if (!strcmp(key, "mt7621"))
+				mt7621 = val;
+
 			if (!strcmp(key, "lkname"))
 				snprintf(lk_name, sizeof(lk_name), "%s", val);
+
+			if (!strcmp(key, "arm64"))
+				arm64_param = val;
 		}
 
 		if (next)
@@ -334,6 +382,13 @@ static int mtk_brom_parse_imagename(const char *imagename)
 	/* if user specified LK image header, skip following checks */
 	if (lk && lk[0] == '1') {
 		use_lk_hdr = 1;
+		free(buf);
+		return 0;
+	}
+
+	/* if user specified MT7621 image header, skip following checks */
+	if (mt7621 && mt7621[0] == '1') {
+		use_mt7621_hdr = 1;
 		free(buf);
 		return 0;
 	}
@@ -353,6 +408,13 @@ static int mtk_brom_parse_imagename(const char *imagename)
 			break;
 		}
 	}
+
+	/* parse device header offset */
+	if (hdr_offs && hdr_offs[0])
+		hdr_offset = strtoul(hdr_offs, NULL, 0);
+
+	if (arm64_param && arm64_param[0] == '1')
+		is_arm64_image = true;
 
 	free(buf);
 
@@ -398,6 +460,13 @@ static int mtk_image_vrec_header(struct image_tool_params *params,
 		return 0;
 	}
 
+	if (use_mt7621_hdr) {
+		tparams->header_size = image_get_header_size();
+		tparams->hdr = &hdr_tmp;
+		memset(&hdr_tmp, 0, tparams->header_size);
+		return 0;
+	}
+
 	if (hdr_media == BRLYT_TYPE_NAND || hdr_media == BRLYT_TYPE_SNAND)
 		tparams->header_size = 2 * le16_to_cpu(hdr_nand->pagesize);
 	else
@@ -414,6 +483,7 @@ static int mtk_image_vrec_header(struct image_tool_params *params,
 static int mtk_image_verify_gen_header(const uint8_t *ptr, int print)
 {
 	union gen_boot_header *gbh = (union gen_boot_header *)ptr;
+	uint32_t gfh_offset, total_size, devh_size;
 	struct brom_layout_header *bh;
 	struct gfh_header *gfh;
 	const char *bootmedia;
@@ -445,7 +515,32 @@ static int mtk_image_verify_gen_header(const uint8_t *ptr, int print)
 	    le32_to_cpu(bh->type) != BRLYT_TYPE_SDMMC))
 		return -1;
 
-	gfh = (struct gfh_header *)(ptr + le32_to_cpu(bh->header_size));
+	devh_size = sizeof(struct gen_device_header);
+
+	if (img_gen) {
+		gfh_offset = devh_size;
+	} else {
+		gfh_offset = le32_to_cpu(bh->header_size);
+
+		if (gfh_offset + sizeof(struct gfh_header) > img_size) {
+			/*
+			 * This may happen if the hdr_offset used to generate
+			 * this image is not zero.
+			 * Since device header size is not fixed, we can't
+			 * cover all possible cases.
+			 * Assuming the image is valid only if the real
+			 * device header size equals to devh_size.
+			 */
+			total_size = le32_to_cpu(bh->total_size);
+
+			if (total_size - gfh_offset > img_size - devh_size)
+				return -1;
+
+			gfh_offset = devh_size;
+		}
+	}
+
+	gfh = (struct gfh_header *)(ptr + gfh_offset);
 
 	if (strcmp(gfh->file_info.name, GFH_FILE_INFO_NAME))
 		return -1;
@@ -457,6 +552,9 @@ static int mtk_image_verify_gen_header(const uint8_t *ptr, int print)
 		printf("Load Address: %08x\n",
 		       le32_to_cpu(gfh->file_info.load_addr) +
 		       le32_to_cpu(gfh->file_info.jump_offset));
+
+	if (print)
+		printf("Architecture: %s\n", is_arm64_image ? "ARM64" : "ARM");
 
 	return 0;
 }
@@ -523,17 +621,106 @@ static int mtk_image_verify_nand_header(const uint8_t *ptr, int print)
 		       le32_to_cpu(gfh->file_info.load_addr) +
 		       le32_to_cpu(gfh->file_info.jump_offset));
 
+	if (print)
+		printf("Architecture: %s\n", is_arm64_image ? "ARM64" : "ARM");
+
+	return 0;
+}
+
+static uint32_t crc32be_cal(const void *data, size_t length)
+{
+	uint32_t crc = 0;
+	uint8_t c;
+
+	if (crc32tbl[1] != MT7621_IH_CRC_POLYNOMIAL)
+		crc32_normal_init(crc32tbl, MT7621_IH_CRC_POLYNOMIAL);
+
+	crc = crc32_normal_cal(crc, data, length, crc32tbl);
+
+	for (; length; length >>= 8) {
+		c = length & 0xff;
+		crc = crc32_normal_cal(crc, &c, 1, crc32tbl);
+	}
+
+	return ~crc;
+}
+
+static int mtk_image_verify_mt7621_header(const uint8_t *ptr, int print)
+{
+	const image_header_t *hdr = (const image_header_t *)ptr;
+	struct mt7621_nand_header *nhdr;
+	uint32_t spl_size, crcval;
+	image_header_t header;
+	int ret;
+
+	spl_size = image_get_size(hdr);
+
+	if (spl_size > img_size) {
+		if (print)
+			printf("Incomplete SPL image\n");
+		return -1;
+	}
+
+	ret = image_check_hcrc(hdr);
+	if (!ret) {
+		if (print)
+			printf("Bad header CRC\n");
+		return -1;
+	}
+
+	ret = image_check_dcrc(hdr);
+	if (!ret) {
+		if (print)
+			printf("Bad data CRC\n");
+		return -1;
+	}
+
+	/* Copy header so we can blank CRC field for re-calculation */
+	memmove(&header, hdr, image_get_header_size());
+	image_set_hcrc(&header, 0);
+
+	nhdr = (struct mt7621_nand_header *)header.ih_name;
+	crcval = be32_to_cpu(nhdr->crc);
+	nhdr->crc = 0;
+
+	if (crcval != crc32be_cal(&header, image_get_header_size())) {
+		if (print)
+			printf("Bad NAND header CRC\n");
+		return -1;
+	}
+
+	if (print) {
+		printf("Load Address: %08x\n", image_get_load(hdr));
+
+		printf("Image Name:   %.*s\n", MT7621_IH_NMLEN,
+		       image_get_name(hdr));
+
+		if (IMAGE_ENABLE_TIMESTAMP) {
+			printf("Created:      ");
+			genimg_print_time((time_t)image_get_time(hdr));
+		}
+
+		printf("Data Size:    ");
+		genimg_print_size(image_get_data_size(hdr));
+	}
+
 	return 0;
 }
 
 static int mtk_image_verify_header(unsigned char *ptr, int image_size,
 				   struct image_tool_params *params)
 {
+	image_header_t *hdr = (image_header_t *)ptr;
 	union lk_hdr *lk = (union lk_hdr *)ptr;
 
 	/* nothing to verify for LK image header */
 	if (le32_to_cpu(lk->magic) == LK_PART_MAGIC)
 		return 0;
+
+	img_size = image_size;
+
+	if (image_get_magic(hdr) == IH_MAGIC)
+		return mtk_image_verify_mt7621_header(ptr, 0);
 
 	if (!strcmp((char *)ptr, NAND_BOOT_NAME))
 		return mtk_image_verify_nand_header(ptr, 0);
@@ -545,6 +732,7 @@ static int mtk_image_verify_header(unsigned char *ptr, int image_size,
 
 static void mtk_image_print_header(const void *ptr)
 {
+	image_header_t *hdr = (image_header_t *)ptr;
 	union lk_hdr *lk = (union lk_hdr *)ptr;
 
 	if (le32_to_cpu(lk->magic) == LK_PART_MAGIC) {
@@ -554,6 +742,11 @@ static void mtk_image_print_header(const void *ptr)
 	}
 
 	printf("Image Type:   MediaTek BootROM Loadable Image\n");
+
+	if (image_get_magic(hdr) == IH_MAGIC) {
+		mtk_image_verify_mt7621_header(ptr, 1);
+		return;
+	}
 
 	if (!strcmp((char *)ptr, NAND_BOOT_NAME))
 		mtk_image_verify_nand_header(ptr, 1);
@@ -581,6 +774,8 @@ static void put_ghf_common_header(struct gfh_common_header *gfh, int size,
 static void put_ghf_header(struct gfh_header *gfh, int file_size,
 			   int dev_hdr_size, int load_addr, int flash_type)
 {
+	uint32_t cfg_bits;
+
 	memset(gfh, 0, sizeof(struct gfh_header));
 
 	/* GFH_FILE_INFO header */
@@ -608,11 +803,15 @@ static void put_ghf_header(struct gfh_header *gfh, int file_size,
 	/* GFH_BROM_CFG header */
 	put_ghf_common_header(&gfh->brom_cfg.gfh, sizeof(gfh->brom_cfg),
 			      GFH_TYPE_BROM_CFG, 3);
-	gfh->brom_cfg.cfg_bits = cpu_to_le32(
-		GFH_BROM_CFG_USBDL_AUTO_DETECT_DIS |
-		GFH_BROM_CFG_USBDL_BY_KCOL0_TIMEOUT_EN |
-		GFH_BROM_CFG_USBDL_BY_FLAG_TIMEOUT_EN);
+	cfg_bits = GFH_BROM_CFG_USBDL_AUTO_DETECT_DIS |
+		   GFH_BROM_CFG_USBDL_BY_KCOL0_TIMEOUT_EN |
+		   GFH_BROM_CFG_USBDL_BY_FLAG_TIMEOUT_EN;
 	gfh->brom_cfg.usbdl_by_kcol0_timeout_ms = cpu_to_le32(5000);
+	if (is_arm64_image) {
+		gfh->brom_cfg.jump_bl_arm64 = GFH_BROM_CFG_JUMP_BL_ARM64;
+		cfg_bits |= GFH_BROM_CFG_JUMP_BL_ARM64_EN;
+	}
+	gfh->brom_cfg.cfg_bits = cpu_to_le32(cfg_bits);
 
 	/* GFH_BL_SEC_KEY header */
 	put_ghf_common_header(&gfh->bl_sec_key.gfh, sizeof(gfh->bl_sec_key),
@@ -662,8 +861,8 @@ static void mtk_image_set_gen_header(void *ptr, off_t filesize,
 
 	/* BRLYT header */
 	put_brom_layout_header(&hdr->brlyt, hdr_media);
-	hdr->brlyt.header_size = cpu_to_le32(sizeof(struct gen_device_header));
-	hdr->brlyt.total_size = cpu_to_le32(filesize);
+	hdr->brlyt.header_size = cpu_to_le32(hdr_offset + sizeof(*hdr));
+	hdr->brlyt.total_size = cpu_to_le32(hdr_offset + filesize);
 	hdr->brlyt.header_size_2 = hdr->brlyt.header_size;
 	hdr->brlyt.total_size_2 = hdr->brlyt.total_size;
 
@@ -712,6 +911,45 @@ static void mtk_image_set_nand_header(void *ptr, off_t filesize,
 		 filesize - 2 * le16_to_cpu(hdr_nand->pagesize) - SHA256_SUM_LEN);
 }
 
+static void mtk_image_set_mt7621_header(void *ptr, off_t filesize,
+					uint32_t loadaddr)
+{
+	image_header_t *hdr = (image_header_t *)ptr;
+	struct mt7621_stage1_header *shdr;
+	struct mt7621_nand_header *nhdr;
+	uint32_t datasize, crcval;
+
+	datasize = filesize - image_get_header_size();
+	nhdr = (struct mt7621_nand_header *)hdr->ih_name;
+	shdr = (struct mt7621_stage1_header *)(ptr + image_get_header_size());
+
+	shdr->ep = cpu_to_be32(loadaddr);
+	shdr->stage_size = cpu_to_be32(datasize);
+
+	image_set_magic(hdr, IH_MAGIC);
+	image_set_time(hdr, time(NULL));
+	image_set_size(hdr, datasize);
+	image_set_load(hdr, loadaddr);
+	image_set_ep(hdr, loadaddr);
+	image_set_os(hdr, IH_OS_U_BOOT);
+	image_set_arch(hdr, IH_ARCH_MIPS);
+	image_set_type(hdr, IH_TYPE_STANDALONE);
+	image_set_comp(hdr, IH_COMP_NONE);
+
+	crcval = crc32(0, (uint8_t *)shdr, datasize);
+	image_set_dcrc(hdr, crcval);
+
+	strncpy(nhdr->ih_name, "MT7621 NAND", MT7621_IH_NMLEN);
+
+	nhdr->ih_stage_offset = cpu_to_be32(image_get_header_size());
+
+	crcval = crc32be_cal(hdr, image_get_header_size());
+	nhdr->crc = cpu_to_be32(crcval);
+
+	crcval = crc32(0, (uint8_t *)hdr, image_get_header_size());
+	image_set_hcrc(hdr, crcval);
+}
+
 static void mtk_image_set_header(void *ptr, struct stat *sbuf, int ifd,
 				 struct image_tool_params *params)
 {
@@ -724,6 +962,14 @@ static void mtk_image_set_header(void *ptr, struct stat *sbuf, int ifd,
 		lk->mode = 0xffffffff; /* must be non-zero */
 		memset(lk->name, 0, sizeof(lk->name));
 		strncpy(lk->name, lk_name, sizeof(lk->name));
+		return;
+	}
+
+	img_gen = true;
+	img_size = sbuf->st_size;
+
+	if (use_mt7621_hdr) {
+		mtk_image_set_mt7621_header(ptr, sbuf->st_size, params->addr);
 		return;
 	}
 

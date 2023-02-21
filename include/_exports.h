@@ -40,7 +40,7 @@
 	EXPORT_FUNC(simple_strtol, long, simple_strtol,
 		    const char *, char **, unsigned int)
 	EXPORT_FUNC(strcmp, int, strcmp, const char *cs, const char *ct)
-#if defined(CONFIG_CMD_I2C) && !defined(CONFIG_DM_I2C)
+#if defined(CONFIG_CMD_I2C) && !CONFIG_IS_ENABLED(DM_I2C)
 	EXPORT_FUNC(i2c_write, int, i2c_write, uchar, uint, int , uchar * , int)
 	EXPORT_FUNC(i2c_read, int, i2c_read, uchar, uint, int , uchar * , int)
 #else
@@ -77,8 +77,7 @@
 	EXPORT_FUNC(mdio_get_current_dev, struct mii_dev *,
 		    mdio_get_current_dev, void)
 	EXPORT_FUNC(phy_find_by_mask, struct phy_device *, phy_find_by_mask,
-		    struct mii_dev *bus, unsigned phy_mask,
-		    phy_interface_t interface)
+		    struct mii_dev *bus, unsigned phy_mask)
 	EXPORT_FUNC(mdio_phydev_for_ethname, struct phy_device *,
 		    mdio_phydev_for_ethname, const char *ethname)
 	EXPORT_FUNC(miiphy_set_current_dev, int, miiphy_set_current_dev,

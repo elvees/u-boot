@@ -9,6 +9,7 @@
 #include <env.h>
 #include <init.h>
 #include <net.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/imx-regs.h>
@@ -344,7 +345,7 @@ int board_eth_init(struct bd_info *bis)
 	if (!bus)
 		return -EINVAL;
 	/* scan phy 4,5,6,7 */
-	phydev = phy_find_by_mask(bus, (0xf << 4), PHY_INTERFACE_MODE_RGMII);
+	phydev = phy_find_by_mask(bus, (0xf << 4));
 	if (!phydev) {
 		ret = -EINVAL;
 		goto free_bus;
@@ -355,10 +356,6 @@ int board_eth_init(struct bd_info *bis)
 		goto free_phydev;
 #endif
 
-#ifdef CONFIG_CI_UDC
-	/* For otg ethernet*/
-	usb_eth_initialize(bis);
-#endif
 	return 0;
 
 free_phydev:

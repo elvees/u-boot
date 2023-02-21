@@ -48,6 +48,7 @@ static const struct r8152_dongle r8152_dongles[] = {
 
 	/* TP-LINK */
 	{ 0x2357, 0x0601 },
+	{ 0x2357, 0x0602 },
 
 	/* Nvidia */
 	{ 0x0955, 0x09ff },
@@ -1792,7 +1793,7 @@ static int r8152_free_pkt(struct udevice *dev, uchar *packet, int packet_len)
 
 static int r8152_write_hwaddr(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct r8152 *tp = dev_get_priv(dev);
 
 	unsigned char enetaddr[8] = { 0 };
@@ -1810,7 +1811,7 @@ static int r8152_write_hwaddr(struct udevice *dev)
 
 int r8152_read_rom_hwaddr(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct r8152 *tp = dev_get_priv(dev);
 
 	debug("** %s (%d)\n", __func__, __LINE__);
@@ -1821,7 +1822,7 @@ int r8152_read_rom_hwaddr(struct udevice *dev)
 static int r8152_eth_probe(struct udevice *dev)
 {
 	struct usb_device *udev = dev_get_parent_priv(dev);
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct r8152 *tp = dev_get_priv(dev);
 	struct ueth_data *ueth = &tp->ueth;
 	int ret;
@@ -1860,8 +1861,8 @@ U_BOOT_DRIVER(r8152_eth) = {
 	.id	= UCLASS_ETH,
 	.probe = r8152_eth_probe,
 	.ops	= &r8152_eth_ops,
-	.priv_auto_alloc_size = sizeof(struct r8152),
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
+	.priv_auto	= sizeof(struct r8152),
+	.plat_auto	= sizeof(struct eth_pdata),
 };
 
 static const struct usb_device_id r8152_eth_id_table[] = {
@@ -1885,6 +1886,7 @@ static const struct usb_device_id r8152_eth_id_table[] = {
 
 	/* TP-LINK */
 	{ USB_DEVICE(0x2357, 0x0601) },
+	{ USB_DEVICE(0x2357, 0x0602) },
 
 	/* Nvidia */
 	{ USB_DEVICE(0x0955, 0x09ff) },
@@ -1894,4 +1896,3 @@ static const struct usb_device_id r8152_eth_id_table[] = {
 
 U_BOOT_USB_DEVICE(r8152_eth, r8152_eth_id_table);
 #endif /* CONFIG_DM_ETH */
-

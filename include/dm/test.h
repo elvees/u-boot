@@ -6,6 +6,8 @@
 #ifndef __DM_TEST_H
 #define __DM_TEST_H
 
+struct udevice;
+
 /**
  * struct dm_test_cdata - configuration data for test instance
  *
@@ -24,7 +26,7 @@ struct dm_test_pdata {
  *	@dev: Device to operate on
  *	@pingval: Value to ping the device with
  *	@pingret: Returns resulting value from driver
- *	@return 0 if OK, -ve on error
+ *	Return: 0 if OK, -ve on error
  */
 struct test_ops {
 	int (*ping)(struct udevice *dev, int pingval, int *pingret);
@@ -71,6 +73,11 @@ struct dm_test_priv {
 	int uclass_postp;
 };
 
+/* struct dm_test_uc_priv - private data for the testdrv uclass */
+struct dm_test_uc_priv {
+	int dummy;
+};
+
 /**
  * struct dm_test_perdev_class_priv - private per-device data for test uclass
  */
@@ -83,6 +90,13 @@ struct dm_test_uclass_perdev_priv {
  */
 struct dm_test_uclass_priv {
 	int total_add;
+};
+
+/**
+ * struct dm_test_uclass_plat - private plat data for test uclass
+ */
+struct dm_test_uclass_plat {
+	char dummy[32];
 };
 
 /**
@@ -125,27 +139,9 @@ extern int dm_testdrv_op_count[DM_TEST_OP_COUNT];
 
 extern struct unit_test_state global_dm_test_state;
 
-/*
- * struct dm_test_state - Entire state of dm test system
- *
- * This is often abreviated to dms.
- *
- * @root: Root device
- * @testdev: Test device
- * @force_fail_alloc: Force all memory allocs to fail
- * @skip_post_probe: Skip uclass post-probe processing
- * @removed: Used to keep track of a device that was removed
- */
-struct dm_test_state {
-	struct udevice *root;
-	struct udevice *testdev;
-	int force_fail_alloc;
-	int skip_post_probe;
-	struct udevice *removed;
-};
-
 /* Declare a new driver model test */
-#define DM_TEST(_name, _flags)	UNIT_TEST(_name, _flags, dm_test)
+#define DM_TEST(_name, _flags) \
+	UNIT_TEST(_name, UT_TESTF_DM | UT_TESTF_CONSOLE_REC | (_flags), dm_test)
 
 /*
  * struct sandbox_sdl_plat - Platform data for the SDL video driver
@@ -169,6 +165,24 @@ struct sandbox_sdl_plat {
 	int font_size;
 };
 
+/**
+ * struct dm_test_parent_plat - Used to track state in bus tests
+ *
+ * @count:
+ * @bind_flag: Indicates that the child post-bind method was called
+ * @uclass_bind_flag: Also indicates that the child post-bind method was called
+ */
+struct dm_test_parent_plat {
+	int count;
+	int bind_flag;
+	int uclass_bind_flag;
+};
+
+enum {
+	TEST_FLAG_CHILD_PROBED	= 10,
+	TEST_FLAG_CHILD_REMOVED	= -7,
+};
+
 /* Declare ping methods for the drivers */
 int test_ping(struct udevice *dev, int pingval, int *pingret);
 int testfdt_ping(struct udevice *dev, int pingval, int *pingret);
@@ -182,7 +196,7 @@ int testfdt_ping(struct udevice *dev, int pingval, int *pingret);
  * @dev: Device to test
  * @base: Base address, used to check ping return value
  * @priv: Pointer to private test information
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int dm_check_operations(struct unit_test_state *uts, struct udevice *dev,
 			uint32_t base, struct dm_test_priv *priv);
@@ -192,7 +206,7 @@ int dm_check_operations(struct unit_test_state *uts, struct udevice *dev,
  *
  * @dms: Overall test state
  * @num_devices: Number of test devices to check
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int dm_check_devices(struct unit_test_state *uts, int num_devices);
 

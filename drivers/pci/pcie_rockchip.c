@@ -14,6 +14,7 @@
 #include <common.h>
 #include <clk.h>
 #include <dm.h>
+#include <asm/global_data.h>
 #include <dm/device_compat.h>
 #include <generic-phy.h>
 #include <pci.h>
@@ -100,15 +101,6 @@ struct rockchip_pcie {
 	struct phy pcie_phy;
 };
 
-static int rockchip_pcie_off_conf(pci_dev_t bdf, uint offset)
-{
-	unsigned int bus = PCI_BUS(bdf);
-	unsigned int dev = PCI_DEV(bdf);
-	unsigned int func = PCI_FUNC(bdf);
-
-	return (bus << 20) | (dev << 15) | (func << 12) | (offset & ~0x3);
-}
-
 static int rockchip_pcie_rd_conf(const struct udevice *udev, pci_dev_t bdf,
 				 uint offset, ulong *valuep,
 				 enum pci_size_t size)
@@ -116,7 +108,7 @@ static int rockchip_pcie_rd_conf(const struct udevice *udev, pci_dev_t bdf,
 	struct rockchip_pcie *priv = dev_get_priv(udev);
 	unsigned int bus = PCI_BUS(bdf);
 	unsigned int dev = PCI_DEV(bdf);
-	int where = rockchip_pcie_off_conf(bdf, offset);
+	int where = PCIE_ECAM_OFFSET(PCI_BUS(bdf), PCI_DEV(bdf), PCI_FUNC(bdf), offset & ~0x3);
 	ulong value;
 
 	if (bus == priv->first_busno && dev == 0) {
@@ -143,7 +135,7 @@ static int rockchip_pcie_wr_conf(struct udevice *udev, pci_dev_t bdf,
 	struct rockchip_pcie *priv = dev_get_priv(udev);
 	unsigned int bus = PCI_BUS(bdf);
 	unsigned int dev = PCI_DEV(bdf);
-	int where = rockchip_pcie_off_conf(bdf, offset);
+	int where = PCIE_ECAM_OFFSET(PCI_BUS(bdf), PCI_DEV(bdf), PCI_FUNC(bdf), offset & ~0x3);
 	ulong old;
 
 	if (bus == priv->first_busno && dev == 0) {
@@ -359,7 +351,7 @@ static int rockchip_pcie_init_port(struct udevice *dev)
 
 	/* Initialize Root Complex registers. */
 	writel(PCIE_LM_VENDOR_ROCKCHIP, priv->apb_base + PCIE_LM_VENDOR_ID);
-	writel(PCI_CLASS_BRIDGE_PCI << 16,
+	writel(PCI_CLASS_BRIDGE_PCI_NORMAL << 8,
 	       priv->apb_base + PCIE_RC_BASE + PCI_CLASS_REVISION);
 	writel(PCIE_LM_RCBARPIE | PCIE_LM_RCBARPIS,
 	       priv->apb_base + PCIE_LM_RCBAR);
@@ -373,7 +365,7 @@ static int rockchip_pcie_init_port(struct udevice *dev)
 	/* Configure Address Translation. */
 	ret = rockchip_pcie_atr_init(priv);
 	if (ret) {
-		dev_err(dev, "PCIE-%d: ATR init failed\n", dev->seq);
+		dev_err(dev, "PCIE-%d: ATR init failed\n", dev_seq(dev));
 		goto err_power_off_phy;
 	}
 
@@ -528,7 +520,7 @@ static int rockchip_pcie_probe(struct udevice *dev)
 	struct pci_controller *hose = dev_get_uclass_priv(ctlr);
 	int ret;
 
-	priv->first_busno = dev->seq;
+	priv->first_busno = dev_seq(dev);
 	priv->dev = dev;
 
 	ret = rockchip_pcie_parse_dt(dev);
@@ -544,7 +536,7 @@ static int rockchip_pcie_probe(struct udevice *dev)
 		return ret;
 
 	dev_info(dev, "PCIE-%d: Link up (Bus%d)\n",
-		 dev->seq, hose->first_busno);
+		 dev_seq(dev), hose->first_busno);
 
 	return 0;
 }
@@ -565,5 +557,5 @@ U_BOOT_DRIVER(rockchip_pcie) = {
 	.of_match		= rockchip_pcie_ids,
 	.ops			= &rockchip_pcie_ops,
 	.probe			= rockchip_pcie_probe,
-	.priv_auto_alloc_size	= sizeof(struct rockchip_pcie),
+	.priv_auto	= sizeof(struct rockchip_pcie),
 };

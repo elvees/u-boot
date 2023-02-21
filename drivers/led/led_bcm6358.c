@@ -113,7 +113,7 @@ static const struct led_ops bcm6358_led_ops = {
 
 static int bcm6358_led_probe(struct udevice *dev)
 {
-	struct led_uc_plat *uc_plat = dev_get_uclass_platdata(dev);
+	struct led_uc_plat *uc_plat = dev_get_uclass_plat(dev);
 
 	/* Top-level LED node */
 	if (!uc_plat->label) {
@@ -174,26 +174,14 @@ static int bcm6358_led_bind(struct udevice *parent)
 	ofnode node;
 
 	dev_for_each_subnode(node, parent) {
-		struct led_uc_plat *uc_plat;
 		struct udevice *dev;
-		const char *label;
 		int ret;
-
-		label = ofnode_read_string(node, "label");
-		if (!label) {
-			debug("%s: node %s has no label\n", __func__,
-			      ofnode_get_name(node));
-			return -EINVAL;
-		}
 
 		ret = device_bind_driver_to_node(parent, "bcm6358-led",
 						 ofnode_get_name(node),
 						 node, &dev);
 		if (ret)
 			return ret;
-
-		uc_plat = dev_get_uclass_platdata(dev);
-		uc_plat->label = label;
 	}
 
 	return 0;
@@ -210,6 +198,6 @@ U_BOOT_DRIVER(bcm6358_led) = {
 	.of_match = bcm6358_led_ids,
 	.bind = bcm6358_led_bind,
 	.probe = bcm6358_led_probe,
-	.priv_auto_alloc_size = sizeof(struct bcm6358_led_priv),
+	.priv_auto	= sizeof(struct bcm6358_led_priv),
 	.ops = &bcm6358_led_ops,
 };

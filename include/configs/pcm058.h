@@ -14,9 +14,6 @@
 
 #define PHYS_SDRAM_SIZE		(1u * 1024 * 1024 * 1024)
 
-/* Size of malloc() pool */
-#define CONFIG_SYS_MALLOC_LEN		(8 * SZ_1M)
-
 /* Enable NAND support */
 #define CONFIG_SYS_MAX_NAND_DEVICE	1
 
@@ -26,11 +23,6 @@
 #define CONFIG_SYS_SDRAM_BASE          PHYS_SDRAM
 #define CONFIG_SYS_INIT_RAM_ADDR       IRAM_BASE_ADDR
 #define CONFIG_SYS_INIT_RAM_SIZE       IRAM_SIZE
-
-#define CONFIG_SYS_INIT_SP_OFFSET \
-	(CONFIG_SYS_INIT_RAM_SIZE - GENERATED_GBL_DATA_SIZE)
-#define CONFIG_SYS_INIT_SP_ADDR \
-	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
 
 /* Environment organization */
 #define ENV_MMC \
@@ -45,8 +37,6 @@
 	"mmcboot=run mmcloadfit;run mmcargs;bootm ${loadaddr}\0"
 
 #define ENV_NAND \
-	"mtdids=" CONFIG_MTDIDS_DEFAULT "\0" \
-	"mtdparts=" CONFIG_MTDPARTS_DEFAULT "\0" \
 	"nandroot=ubi0:root ubi.mtd=rootfs\0" \
 	"nandrootfstype=ubifs\0" \
 	"nandargs=setenv bootargs root=${nandroot} " \
@@ -59,6 +49,4 @@
 	"optargs=rw rootwait\0" \
 	ENV_MMC \
 	ENV_NAND
-
-#define CONFIG_BOOTCOMMAND "run mmcboot;run nandboot"
 #endif

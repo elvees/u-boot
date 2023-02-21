@@ -11,6 +11,7 @@
 
 #include <common.h>
 #include <init.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/at91_common.h>
 #include <asm/arch/at91_pmc.h>
@@ -29,7 +30,6 @@
 #include <netdev.h>
 #include <nand.h>
 #include <spi.h>
-#include <version.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -204,9 +204,6 @@ int board_eth_init(struct bd_info *bis)
 
 #ifdef CONFIG_USB_GADGET_ATMEL_USBA
 	usba_udc_probe(&pdata);
-#ifdef CONFIG_USB_ETH_RNDIS
-	usb_eth_initialize(bis);
-#endif
 #endif
 
 	return rc;

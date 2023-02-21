@@ -98,5 +98,5 @@ U_BOOT_DRIVER(mcom03_reset) = {
 	.of_match = mcom03_reset_ids,
 	.ops = &mcom03_reset_reset_ops,
 	.probe = mcom03_reset_probe,
-	.priv_auto_alloc_size = sizeof(struct mcom03_reset_priv),
+	.priv_auto = sizeof(struct mcom03_reset_priv),
 };

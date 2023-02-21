@@ -54,7 +54,6 @@
 #   error "is set"
 #  endif
 extern unsigned long nand_env_oob_offset;
-#  define CONFIG_ENV_OFFSET nand_env_oob_offset
 # endif /* CONFIG_ENV_OFFSET_OOB */
 #endif /* CONFIG_ENV_IS_IN_NAND */
 
@@ -111,7 +110,11 @@ typedef struct environment_s {
 extern env_t embedded_environment;
 #endif /* ENV_IS_EMBEDDED */
 
-extern const unsigned char default_environment[];
+#ifdef DEFAULT_ENV_IS_RW
+extern char default_environment[];
+#else
+extern const char default_environment[];
+#endif
 
 #ifndef DO_DEPS_ONLY
 
@@ -207,6 +210,7 @@ struct env_driver {
 #endif
 
 #define ENV_SAVE_PTR(x) (CONFIG_IS_ENABLED(SAVEENV) ? (x) : NULL)
+#define ENV_ERASE_PTR(x) (CONFIG_IS_ENABLED(CMD_ERASEENV) ? (x) : NULL)
 
 extern struct hsearch_data env_htab;
 
@@ -216,7 +220,7 @@ extern struct hsearch_data env_htab;
  * It is a weak function allowing board to overidde the default interface for
  * U-Boot env in EXT4: CONFIG_ENV_EXT4_INTERFACE
  *
- * @return string of interface, empty if not supported
+ * Return: string of interface, empty if not supported
  */
 const char *env_ext4_get_intf(void);
 
@@ -226,21 +230,57 @@ const char *env_ext4_get_intf(void);
  * It is a weak function allowing board to overidde the default device and
  * partition used for U-Boot env in EXT4: CONFIG_ENV_EXT4_DEVICE_AND_PART
  *
- * @return string of device and partition
+ * Return: string of device and partition
  */
 const char *env_ext4_get_dev_part(void);
+
+/**
+ * arch_env_get_location()- Provide the best location for the U-Boot environment
+ *
+ * It is a weak function allowing board to overidde the environment location
+ * on architecture level. This has lower priority than env_get_location(),
+ * which can be defined on board level.
+ *
+ * @op: operations performed on the environment
+ * @prio: priority between the multiple environments, 0 being the
+ *        highest priority
+ * Return:  an enum env_location value on success, or -ve error code.
+ */
+enum env_location arch_env_get_location(enum env_operation op, int prio);
 
 /**
  * env_get_location()- Provide the best location for the U-Boot environment
  *
  * It is a weak function allowing board to overidde the environment location
+ * on board level. This has higher priority than arch_env_get_location(),
+ * which can be defined on architecture level.
  *
  * @op: operations performed on the environment
  * @prio: priority between the multiple environments, 0 being the
  *        highest priority
- * @return  an enum env_location value on success, or -ve error code.
+ * Return:  an enum env_location value on success, or -ve error code.
  */
 enum env_location env_get_location(enum env_operation op, int prio);
+
+/**
+ * env_fat_get_intf() - Provide the interface for env in FAT
+ *
+ * It is a weak function allowing board to overidde the default interface for
+ * U-Boot env in FAT: CONFIG_ENV_FAT_INTERFACE
+ *
+ * Return: string of interface, empty if not supported
+ */
+const char *env_fat_get_intf(void);
+
+/**
+ * env_fat_get_dev_part() - Provide the device and partition for env in FAT
+ *
+ * It is a weak function allowing board to overidde the default device and
+ * partition used for U-Boot env in FAT: CONFIG_ENV_FAT_DEVICE_AND_PART
+ *
+ * Return: string of device and partition
+ */
+char *env_fat_get_dev_part(void);
 #endif /* DO_DEPS_ONLY */
 
 #endif /* _ENV_INTERNAL_H_ */

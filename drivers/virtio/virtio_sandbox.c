@@ -160,8 +160,8 @@ static int virtio_sandbox_probe(struct udevice *udev)
 	struct virtio_dev_priv *uc_priv = dev_get_uclass_priv(udev);
 
 	/* fake some information for testing */
-	priv->device_features = VIRTIO_F_VERSION_1;
-	uc_priv->device = VIRTIO_ID_BLOCK;
+	priv->device_features = BIT_ULL(VIRTIO_F_VERSION_1);
+	uc_priv->device = VIRTIO_ID_RNG;
 	uc_priv->vendor = ('u' << 24) | ('b' << 16) | ('o' << 8) | 't';
 
 	return 0;
@@ -204,7 +204,7 @@ U_BOOT_DRIVER(virtio_sandbox1) = {
 	.ops	= &virtio_sandbox1_ops,
 	.probe	= virtio_sandbox_probe,
 	.child_post_remove = virtio_sandbox_child_post_remove,
-	.priv_auto_alloc_size = sizeof(struct virtio_sandbox_priv),
+	.priv_auto	= sizeof(struct virtio_sandbox_priv),
 };
 
 /* this one without notify op */
@@ -231,5 +231,5 @@ U_BOOT_DRIVER(virtio_sandbox2) = {
 	.of_match = virtio_sandbox2_ids,
 	.ops	= &virtio_sandbox2_ops,
 	.probe	= virtio_sandbox_probe,
-	.priv_auto_alloc_size = sizeof(struct virtio_sandbox_priv),
+	.priv_auto	= sizeof(struct virtio_sandbox_priv),
 };

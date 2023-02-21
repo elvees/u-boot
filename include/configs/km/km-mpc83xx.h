@@ -18,18 +18,12 @@
 /*
  * Manually set up DDR parameters
  */
-#define CONFIG_DDR_II
-#define CONFIG_SYS_DDR_SIZE		2048 /* MB */
+#define CONFIG_SYS_SDRAM_SIZE		0x80000000 /* 2048 MiB */
 
 /*
  * The reserved memory
  */
-#define CONFIG_SYS_MONITOR_BASE	CONFIG_SYS_TEXT_BASE /* start of monitor */
 #define CONFIG_SYS_FLASH_BASE		0xF0000000
-
-#if (CONFIG_SYS_MONITOR_BASE < CONFIG_SYS_FLASH_BASE)
-#define CONFIG_SYS_RAMBOOT
-#endif
 
 /* Reserve 768 kB for Mon */
 #define CONFIG_SYS_MONITOR_LEN		(768 * 1024)
@@ -40,8 +34,6 @@
 #define CONFIG_SYS_INIT_RAM_LOCK
 #define CONFIG_SYS_INIT_RAM_ADDR	0xE6000000 /* Initial RAM address */
 #define CONFIG_SYS_INIT_RAM_SIZE	0x1000 /* End of used area in RAM */
-#define CONFIG_SYS_GBL_DATA_OFFSET	(CONFIG_SYS_INIT_RAM_SIZE - \
-						GENERATED_GBL_DATA_SIZE)
 /*
  * Init Local Bus Memory Controller:
  *
@@ -57,22 +49,11 @@
  */
 #define CONFIG_SYS_FLASH_SIZE		256 /* max FLASH size is 256M */
 
-#define CONFIG_SYS_MAX_FLASH_BANKS	1   /* max num of flash banks	*/
-#define CONFIG_SYS_MAX_FLASH_SECT	512 /* max num of sects on one chip */
 #define CONFIG_SYS_FLASH_BANKS_LIST { CONFIG_SYS_FLASH_BASE }
 
 /* I2C */
-#define CONFIG_SYS_I2C
 #define CONFIG_SYS_NUM_I2C_BUSES	4
 #define CONFIG_SYS_I2C_MAX_HOPS		1
-#define CONFIG_SYS_I2C_FSL
-#define CONFIG_SYS_FSL_I2C_SPEED	200000
-#define CONFIG_SYS_FSL_I2C_SLAVE	0x7F
-#define CONFIG_SYS_FSL_I2C_OFFSET	0x3000
-#define CONFIG_SYS_I2C_OFFSET		0x3000
-#define CONFIG_SYS_FSL_I2C2_SPEED	200000
-#define CONFIG_SYS_FSL_I2C2_SLAVE	0x7F
-#define CONFIG_SYS_FSL_I2C2_OFFSET	0x3100
 #define CONFIG_SYS_I2C_BUSES	{{0, {I2C_NULL_HOP} }, \
 		{0, {{I2C_MUX_PCA9547, 0x70, 2} } }, \
 		{0, {{I2C_MUX_PCA9547, 0x70, 1} } }, \
@@ -95,10 +76,6 @@
  * Environment
  */
 
-#ifndef CONFIG_SYS_RAMBOOT
-/* Address and size of Redundant Environment Sector	*/
-#endif /* CFG_SYS_RAMBOOT */
-
 /*
  * Environment Configuration
  */
@@ -119,12 +96,7 @@
 	"unlock=yes\0"							 \
 	""
 
-#if defined(CONFIG_UEC_ETH)
-#define CONFIG_HAS_ETH0
-#endif
-
 /*
  * QE UEC ethernet configuration
  */
 #define CONFIG_UEC_ETH
-#define CONFIG_ETHPRIME		"UEC0"

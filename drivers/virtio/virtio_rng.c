@@ -41,6 +41,9 @@ static int virtio_rng_read(struct udevice *dev, void *data, size_t len)
 		while (!virtqueue_get_buf(priv->rng_vq, &rsize))
 			;
 
+		if (rsize > sg.length)
+			return -EIO;
+
 		memcpy(ptr, buf, rsize);
 		len -= rsize;
 		ptr += rsize;
@@ -84,6 +87,6 @@ U_BOOT_DRIVER(virtio_rng) = {
 	.probe	= virtio_rng_probe,
 	.remove = virtio_reset,
 	.ops	= &virtio_rng_ops,
-	.priv_auto_alloc_size = sizeof(struct virtio_rng_priv),
+	.priv_auto	= sizeof(struct virtio_rng_priv),
 	.flags	= DM_FLAG_ACTIVE_DMA,
 };

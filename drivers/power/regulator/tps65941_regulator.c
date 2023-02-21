@@ -10,7 +10,6 @@
 #include <fdtdec.h>
 #include <errno.h>
 #include <dm.h>
-#include <i2c.h>
 #include <log.h>
 #include <linux/delay.h>
 #include <power/pmic.h>
@@ -30,9 +29,9 @@ static int tps65941_buck_enable(struct udevice *dev, int op, bool *enable)
 {
 	int ret;
 	unsigned int adr;
-	struct dm_regulator_uclass_platdata *uc_pdata;
+	struct dm_regulator_uclass_plat *uc_pdata;
 
-	uc_pdata = dev_get_uclass_platdata(dev);
+	uc_pdata = dev_get_uclass_plat(dev);
 	adr = uc_pdata->ctrl_reg;
 
 	ret = pmic_reg_read(dev->parent, adr);
@@ -121,9 +120,9 @@ static int tps65941_buck_val(struct udevice *dev, int op, int *uV)
 {
 	unsigned int hex, adr;
 	int ret, delta, uwait, slew;
-	struct dm_regulator_uclass_platdata *uc_pdata;
+	struct dm_regulator_uclass_plat *uc_pdata;
 
-	uc_pdata = dev_get_uclass_platdata(dev);
+	uc_pdata = dev_get_uclass_plat(dev);
 
 	if (op == PMIC_OP_GET)
 		*uV = 0;
@@ -182,9 +181,9 @@ static int tps65941_ldo_enable(struct udevice *dev, int op, bool *enable)
 {
 	int ret;
 	unsigned int adr;
-	struct dm_regulator_uclass_platdata *uc_pdata;
+	struct dm_regulator_uclass_plat *uc_pdata;
 
-	uc_pdata = dev_get_uclass_platdata(dev);
+	uc_pdata = dev_get_uclass_plat(dev);
 	adr = uc_pdata->ctrl_reg;
 
 	ret = pmic_reg_read(dev->parent, adr);
@@ -227,9 +226,9 @@ static int tps65941_ldo_val(struct udevice *dev, int op, int *uV)
 {
 	unsigned int hex, adr;
 	int ret;
-	struct dm_regulator_uclass_platdata *uc_pdata;
+	struct dm_regulator_uclass_plat *uc_pdata;
 
-	uc_pdata = dev_get_uclass_platdata(dev);
+	uc_pdata = dev_get_uclass_plat(dev);
 
 	if (op == PMIC_OP_GET)
 		*uV = 0;
@@ -264,10 +263,10 @@ static int tps65941_ldo_val(struct udevice *dev, int op, int *uV)
 
 static int tps65941_ldo_probe(struct udevice *dev)
 {
-	struct dm_regulator_uclass_platdata *uc_pdata;
+	struct dm_regulator_uclass_plat *uc_pdata;
 	int idx;
 
-	uc_pdata = dev_get_uclass_platdata(dev);
+	uc_pdata = dev_get_uclass_plat(dev);
 	uc_pdata->type = REGULATOR_TYPE_LDO;
 
 	idx = dev->driver_data;
@@ -286,10 +285,10 @@ static int tps65941_ldo_probe(struct udevice *dev)
 
 static int tps65941_buck_probe(struct udevice *dev)
 {
-	struct dm_regulator_uclass_platdata *uc_pdata;
+	struct dm_regulator_uclass_plat *uc_pdata;
 	int idx;
 
-	uc_pdata = dev_get_uclass_platdata(dev);
+	uc_pdata = dev_get_uclass_plat(dev);
 	uc_pdata->type = REGULATOR_TYPE_BUCK;
 
 	idx = dev->driver_data;
@@ -299,6 +298,8 @@ static int tps65941_buck_probe(struct udevice *dev)
 		idx = 1;
 	} else if (idx == 34) {
 		idx = 3;
+	} else if (idx == 123) {
+		idx = 1;
 	} else if (idx == 1234) {
 		idx = 1;
 	} else {

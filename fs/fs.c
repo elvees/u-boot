@@ -7,6 +7,7 @@
 
 #include <command.h>
 #include <config.h>
+#include <display_options.h>
 #include <errno.h>
 #include <common.h>
 #include <env.h>
@@ -18,13 +19,16 @@
 #include <fat.h>
 #include <fs.h>
 #include <sandboxfs.h>
+#include <semihostingfs.h>
 #include <ubifs_uboot.h>
 #include <btrfs.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <div64.h>
 #include <linux/math64.h>
 #include <efi_loader.h>
 #include <squashfs.h>
+#include <erofs.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -33,10 +37,15 @@ static int fs_dev_part;
 static struct disk_partition fs_partition;
 static int fs_type = FS_TYPE_ANY;
 
+void fs_set_type(int type)
+{
+	fs_type = type;
+}
+
 static inline int fs_probe_unsupported(struct blk_desc *fs_dev_desc,
 				      struct disk_partition *fs_partition)
 {
-	log_err("** Unrecognized filesystem type **\n");
+	log_debug("Unrecognized filesystem type\n");
 	return -1;
 }
 
@@ -174,7 +183,7 @@ struct fstype_info {
 };
 
 static struct fstype_info fstypes[] = {
-#ifdef CONFIG_FS_FAT
+#if CONFIG_IS_ENABLED(FS_FAT)
 	{
 		.fstype = FS_TYPE_FAT,
 		.name = "fat",
@@ -194,7 +203,7 @@ static struct fstype_info fstypes[] = {
 		.unlink = fs_unlink_unsupported,
 		.mkdir = fs_mkdir_unsupported,
 #endif
-		.uuid = fs_uuid_unsupported,
+		.uuid = fat_uuid,
 		.opendir = fat_opendir,
 		.readdir = fat_readdir,
 		.closedir = fat_closedir,
@@ -245,6 +254,26 @@ static struct fstype_info fstypes[] = {
 		.ln = fs_ln_unsupported,
 	},
 #endif
+#ifdef CONFIG_SEMIHOSTING
+	{
+		.fstype = FS_TYPE_SEMIHOSTING,
+		.name = "semihosting",
+		.null_dev_desc_ok = true,
+		.probe = smh_fs_set_blk_dev,
+		.close = fs_close_unsupported,
+		.ls = fs_ls_unsupported,
+		.exists = fs_exists_unsupported,
+		.size = smh_fs_size,
+		.read = smh_fs_read,
+		.write = smh_fs_write,
+		.uuid = fs_uuid_unsupported,
+		.opendir = fs_opendir_unsupported,
+		.unlink = fs_unlink_unsupported,
+		.mkdir = fs_mkdir_unsupported,
+		.ln = fs_ln_unsupported,
+	},
+#endif
+#ifndef CONFIG_SPL_BUILD
 #ifdef CONFIG_CMD_UBIFS
 	{
 		.fstype = FS_TYPE_UBIFS,
@@ -264,6 +293,8 @@ static struct fstype_info fstypes[] = {
 		.ln = fs_ln_unsupported,
 	},
 #endif
+#endif
+#ifndef CONFIG_SPL_BUILD
 #ifdef CONFIG_FS_BTRFS
 	{
 		.fstype = FS_TYPE_BTRFS,
@@ -283,7 +314,8 @@ static struct fstype_info fstypes[] = {
 		.ln = fs_ln_unsupported,
 	},
 #endif
-#if IS_ENABLED(CONFIG_FS_SQUASHFS)
+#endif
+#if CONFIG_IS_ENABLED(FS_SQUASHFS)
 	{
 		.fstype = FS_TYPE_SQUASHFS,
 		.name = "squashfs",
@@ -297,6 +329,27 @@ static struct fstype_info fstypes[] = {
 		.close = sqfs_close,
 		.closedir = sqfs_closedir,
 		.exists = sqfs_exists,
+		.uuid = fs_uuid_unsupported,
+		.write = fs_write_unsupported,
+		.ln = fs_ln_unsupported,
+		.unlink = fs_unlink_unsupported,
+		.mkdir = fs_mkdir_unsupported,
+	},
+#endif
+#if IS_ENABLED(CONFIG_FS_EROFS)
+	{
+		.fstype = FS_TYPE_EROFS,
+		.name = "erofs",
+		.null_dev_desc_ok = false,
+		.probe = erofs_probe,
+		.opendir = erofs_opendir,
+		.readdir = erofs_readdir,
+		.ls = fs_ls_generic,
+		.read = erofs_read,
+		.size = erofs_size,
+		.close = erofs_close,
+		.closedir = erofs_closedir,
+		.exists = erofs_exists,
 		.uuid = fs_uuid_unsupported,
 		.write = fs_write_unsupported,
 		.ln = fs_ln_unsupported,
@@ -384,8 +437,8 @@ int fs_set_blk_dev(const char *ifname, const char *dev_part_str, int fstype)
 	}
 #endif
 
-	part = blk_get_device_part_str(ifname, dev_part_str, &fs_dev_desc,
-					&fs_partition, 1);
+	part = part_get_info_by_dev_and_name_or_num(ifname, dev_part_str, &fs_dev_desc,
+						    &fs_partition, 1);
 	if (part < 0)
 		return -1;
 
@@ -710,17 +763,19 @@ int do_load(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[],
 	if (argc > 7)
 		return CMD_RET_USAGE;
 
-	if (fs_set_blk_dev(argv[1], (argc >= 3) ? argv[2] : NULL, fstype))
+	if (fs_set_blk_dev(argv[1], (argc >= 3) ? argv[2] : NULL, fstype)) {
+		log_err("Can't set block device\n");
 		return 1;
+	}
 
 	if (argc >= 4) {
-		addr = simple_strtoul(argv[3], &ep, 16);
+		addr = hextoul(argv[3], &ep);
 		if (ep == argv[3] || *ep != '\0')
 			return CMD_RET_USAGE;
 	} else {
 		addr_str = env_get("loadaddr");
 		if (addr_str != NULL)
-			addr = simple_strtoul(addr_str, NULL, 16);
+			addr = hextoul(addr_str, NULL);
 		else
 			addr = CONFIG_SYS_LOAD_ADDR;
 	}
@@ -734,11 +789,11 @@ int do_load(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[],
 		}
 	}
 	if (argc >= 6)
-		bytes = simple_strtoul(argv[5], NULL, 16);
+		bytes = hextoul(argv[5], NULL);
 	else
 		bytes = 0;
 	if (argc >= 7)
-		pos = simple_strtoul(argv[6], NULL, 16);
+		pos = hextoul(argv[6], NULL);
 	else
 		pos = 0;
 
@@ -752,7 +807,8 @@ int do_load(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[],
 
 	if (IS_ENABLED(CONFIG_CMD_BOOTEFI))
 		efi_set_bootdev(argv[1], (argc > 2) ? argv[2] : "",
-				(argc > 4) ? argv[4] : "");
+				(argc > 4) ? argv[4] : "", map_sysmem(addr, 0),
+				len_read);
 
 	printf("%llu bytes read in %lu ms", len_read, time);
 	if (time > 0) {
@@ -811,11 +867,11 @@ int do_save(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[],
 	if (fs_set_blk_dev(argv[1], argv[2], fstype))
 		return 1;
 
-	addr = simple_strtoul(argv[3], NULL, 16);
+	addr = hextoul(argv[3], NULL);
 	filename = argv[4];
-	bytes = simple_strtoul(argv[5], NULL, 16);
+	bytes = hextoul(argv[5], NULL);
 	if (argc >= 7)
-		pos = simple_strtoul(argv[6], NULL, 16);
+		pos = hextoul(argv[6], NULL);
 	else
 		pos = 0;
 

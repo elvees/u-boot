@@ -27,6 +27,16 @@ config TPL_TIMER
 	  function. This enables the drivers in drivers/timer as part of an
 	  TPL build.
 
+config VPL_TIMER
+	bool "Enable driver model for timer drivers in VPL"
+	depends on TIMER && VPL
+	default y if TPL_TIMER
+	help
+	  Enable support for timer drivers in VPL. These can be used to get
+	  a timer value when in VPL, or perhaps for implementing a delay
+	  function. This enables the drivers in drivers/timer as part of an
+	  TPL build.
+
 config TIMER_EARLY
 	bool "Allow timer to be used early in U-Boot"
 	depends on TIMER
@@ -39,12 +49,6 @@ config TIMER_EARLY
 	  execution before driver model is set up. Enable this option to
 	  use an early timer. These functions must be supported by your timer
 	  driver: timer_early_get_count() and timer_early_get_rate().
-
-config AG101P_TIMER
-	bool "AG101P timer support"
-	depends on TIMER && NDS32
-	help
-	  Select this to enable a timer for AG01P devices.
 
 config ALTERA_TIMER
 	bool "Altera timer support"
@@ -96,6 +100,31 @@ config ATMEL_PIT_TIMER
 	  it is designed to offer maximum accuracy and efficient management,
 	  even for systems with long response time.
 
+config SPL_ATMEL_PIT_TIMER
+	bool "Atmel periodic interval timer support in SPL"
+	depends on SPL_TIMER
+	help
+	  Select this to enable a periodic interval timer for Atmel devices,
+	  it is designed to offer maximum accuracy and efficient management,
+	  even for systems with long response time.
+	  Select this to be available in SPL.
+
+config ATMEL_TCB_TIMER
+	bool "Atmel timer counter support"
+	depends on TIMER
+	depends on ARCH_AT91
+	help
+	  Select this to enable the use of the timer counter as a monotonic
+	  counter.
+
+config SPL_ATMEL_TCB_TIMER
+	bool "Atmel timer counter support in SPL"
+	depends on SPL_TIMER
+	depends on ARCH_AT91
+	help
+	  Select this to enable the use of the timer counter as a monotonic
+	  counter in SPL.
+
 config CADENCE_TTC_TIMER
 	bool "Cadence TTC (Triple Timer Counter)"
 	depends on TIMER
@@ -109,6 +138,13 @@ config DESIGNWARE_APB_TIMER
 	help
 	  Enables support for the Designware APB Timer driver. This timer is
 	  present on Altera SoCFPGA SoCs.
+
+config GXP_TIMER
+	bool "HPE GXP Timer"
+	depends on TIMER
+	help
+	  Enables support for the GXP Timer driver. This timer is
+	  present on HPE GXP SoCs.
 
 config MPC83XX_TIMER
 	bool "MPC83xx timer support"
@@ -124,12 +160,12 @@ config RENESAS_OSTM_TIMER
 	  Enables support for the Renesas OSTM Timer driver.
 	  This timer is present on Renesas RZ/A1 R7S72100 SoCs.
 
-config X86_TSC_TIMER_EARLY_FREQ
-	int "x86 TSC timer frequency in MHz when used as the early timer"
+config X86_TSC_TIMER_FREQ
+	int "x86 TSC timer frequency in Hz"
 	depends on X86_TSC_TIMER
-	default 1000
+	default 1000000000
 	help
-	  Sets the estimated CPU frequency in MHz when TSC is used as the
+	  Sets the estimated CPU frequency in Hz when TSC is used as the
 	  early timer and the frequency can neither be calibrated via some
 	  hardware ways, nor got from device tree at the time when device
 	  tree is not available yet.
@@ -143,11 +179,26 @@ config NOMADIK_MTU_TIMER
 	  The MTU provides 4 decrementing free-running timers.
 	  At the moment, only the first timer is used by the driver.
 
+config NPCM_TIMER
+	bool "Nuvoton NPCM timer support"
+	depends on TIMER
+	help
+	  Select this to enable a timer on Nuvoton NPCM SoCs.
+	  NPCM timer module has 5 down-counting timers, only the first timer
+	  is used to implement timer ops. No support for early timer and
+	  boot timer.
+
 config OMAP_TIMER
 	bool "Omap timer support"
 	depends on TIMER
 	help
 	  Select this to enable an timer for Omap devices.
+
+config ORION_TIMER
+	bool "Orion timer support"
+	depends on TIMER
+	help
+	  Select this to enable an timer for Orion devices.
 
 config RISCV_TIMER
 	bool "RISC-V timer support"
@@ -226,5 +277,21 @@ config MCHP_PIT64B_TIMER
 	help
 	  Select this to enable support for Microchip 64-bit periodic
 	  interval timer.
+
+config IMX_GPT_TIMER
+	bool "NXP i.MX GPT timer support"
+	depends on TIMER
+	help
+	  Select this to enable support for the timer found on
+	  NXP i.MX devices.
+
+config XILINX_TIMER
+	bool "Xilinx timer support"
+	depends on TIMER
+	select REGMAP
+	select SPL_REGMAP if SPL
+	help
+	  Select this to enable support for the timer found on
+	  any Xilinx boards (axi timer).
 
 endmenu

@@ -264,19 +264,7 @@ static int imx7_reset_deassert(struct reset_ctl *rst)
 	return priv->ops.rst_deassert(rst);
 }
 
-static int imx7_reset_free(struct reset_ctl *rst)
-{
-	return 0;
-}
-
-static int imx7_reset_request(struct reset_ctl *rst)
-{
-	return 0;
-}
-
 static const struct reset_ops imx7_reset_reset_ops = {
-	.request = imx7_reset_request,
-	.rfree = imx7_reset_free,
 	.rst_assert = imx7_reset_assert,
 	.rst_deassert = imx7_reset_deassert,
 };
@@ -312,5 +300,5 @@ U_BOOT_DRIVER(imx7_reset) = {
 	.of_match = imx7_reset_ids,
 	.ops = &imx7_reset_reset_ops,
 	.probe = imx7_reset_probe,
-	.priv_auto_alloc_size = sizeof(struct imx7_reset_priv),
+	.priv_auto	= sizeof(struct imx7_reset_priv),
 };

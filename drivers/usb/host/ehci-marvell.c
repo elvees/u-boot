@@ -7,6 +7,7 @@
 
 #include <common.h>
 #include <log.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <usb.h>
 #include <linux/delay.h>
@@ -122,7 +123,7 @@ static int ehci_mvebu_probe(struct udevice *dev)
 	 * Also, the address decoder doesn't need to get setup with this
 	 * SoC, so don't call usb_brg_adrdec_setup().
 	 */
-	if (device_is_compatible(dev, "marvell,armada3700-ehci"))
+	if (device_is_compatible(dev, "marvell,armada-3700-ehci"))
 		marvell_ehci_ops.powerup_fixup = marvell_ehci_powerup_fixup;
 	else
 		usb_brg_adrdec_setup((void *)priv->hcd_base);
@@ -141,7 +142,7 @@ static int ehci_mvebu_probe(struct udevice *dev)
 
 static const struct udevice_id ehci_usb_ids[] = {
 	{ .compatible = "marvell,orion-ehci", },
-	{ .compatible = "marvell,armada3700-ehci", },
+	{ .compatible = "marvell,armada-3700-ehci", },
 	{ }
 };
 
@@ -152,8 +153,8 @@ U_BOOT_DRIVER(ehci_mvebu) = {
 	.probe = ehci_mvebu_probe,
 	.remove = ehci_deregister,
 	.ops	= &ehci_usb_ops,
-	.platdata_auto_alloc_size = sizeof(struct usb_platdata),
-	.priv_auto_alloc_size = sizeof(struct ehci_mvebu_priv),
+	.plat_auto	= sizeof(struct usb_plat),
+	.priv_auto	= sizeof(struct ehci_mvebu_priv),
 	.flags	= DM_FLAG_ALLOC_PRIV_DMA,
 };
 

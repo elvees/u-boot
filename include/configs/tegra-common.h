@@ -12,7 +12,6 @@
 /*
  * High Level Configuration Options
  */
-#define CONFIG_SYS_L2CACHE_OFF		/* No L2 cache */
 
 #include <asm/arch/tegra.h>		/* get chip and board defs */
 
@@ -21,8 +20,6 @@
 #define CONFIG_SYS_TIMER_RATE		1000000
 #define CONFIG_SYS_TIMER_COUNTER	NV_PA_TMRUS_BASE
 #endif
-
-#define CONFIG_CMDLINE_TAG		/* enable passing of ATAGs */
 
 /* Environment */
 
@@ -37,17 +34,6 @@
  * Note: This is number of devices, not max device ID.
  */
 #define CONFIG_SYS_MMC_MAX_DEVICE 4
-
-/*
- * Increasing the size of the IO buffer as default nfsargs size is more
- *  than 256 and so it is not possible to edit it
- */
-#define CONFIG_SYS_CBSIZE		(1024 * 2) /* Console I/O Buffer Size */
-/* Print Buffer Size */
-#define CONFIG_SYS_MAXARGS		64	/* max number of command args */
-
-/* Boot Argument Buffer Size */
-#define CONFIG_SYS_BARGSIZE		(CONFIG_SYS_CBSIZE)
 
 #ifdef CONFIG_ARM64
 #define FDTFILE "nvidia/" CONFIG_DEFAULT_DEVICE_TREE ".dtb"
@@ -68,16 +54,8 @@
 #ifndef CONFIG_ARM64
 #define CONFIG_SYS_INIT_RAM_ADDR	CONFIG_STACKBASE
 #define CONFIG_SYS_INIT_RAM_SIZE	CONFIG_SYS_MALLOC_LEN
-#define CONFIG_SYS_INIT_SP_ADDR		(CONFIG_SYS_INIT_RAM_ADDR + \
-						CONFIG_SYS_INIT_RAM_SIZE - \
-						GENERATED_GBL_DATA_SIZE)
-#endif
 
-#ifndef CONFIG_ARM64
 /* Defines for SPL */
-#define CONFIG_SPL_MAX_FOOTPRINT	(CONFIG_SYS_TEXT_BASE - \
-						CONFIG_SPL_TEXT_BASE)
-#define CONFIG_SYS_SPL_MALLOC_SIZE	0x00010000
 #endif
 
 #endif /* _TEGRA_COMMON_H_ */

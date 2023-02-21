@@ -17,10 +17,10 @@
 #include <splash.h>
 #include <st_logo_data.h>
 #include <video.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/armv7m.h>
 #include <asm/arch/stm32.h>
-#include <asm/arch/gpio.h>
 #include <asm/arch/syscfg.h>
 #include <asm/gpio.h>
 #include <linux/delay.h>
@@ -29,7 +29,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 int dram_init(void)
 {
-#ifndef CONFIG_SUPPORT_SPL
+#ifndef CONFIG_SPL_BUILD
 	int rv;
 	struct udevice *dev;
 	rv = uclass_get_device(UCLASS_RAM, 0, &dev);
@@ -45,11 +45,6 @@ int dram_init(void)
 int dram_init_banksize(void)
 {
 	return fdtdec_setup_memory_banksize();
-}
-
-int board_early_init_f(void)
-{
-	return 0;
 }
 
 #ifdef CONFIG_SPL_BUILD
@@ -73,20 +68,15 @@ int spl_dram_init(void)
 }
 void spl_board_init(void)
 {
-	spl_dram_init();
 	preloader_console_init();
+	spl_dram_init();
 	arch_cpu_init(); /* to configure mpu for sdram rw permissions */
 }
 u32 spl_boot_device(void)
 {
 	return BOOT_DEVICE_XIP;
 }
-
 #endif
-u32 get_board_rev(void)
-{
-	return 0;
-}
 
 int board_late_init(void)
 {
@@ -126,19 +116,14 @@ int board_late_init(void)
 
 int board_init(void)
 {
-	gd->bd->bi_boot_params = gd->bd->bi_dram[0].start + 0x100;
-
 #ifdef CONFIG_ETH_DESIGNWARE
-	const char *phy_mode;
-	int node;
+	ofnode node;
 
-	node = fdt_node_offset_by_compatible(gd->fdt_blob, 0, "st,stm32-dwmac");
-	if (node < 0)
+	node = ofnode_by_compatible(ofnode_null(), "st,stm32-dwmac");
+	if (!ofnode_valid(node))
 		return -1;
 
-	phy_mode = fdt_getprop(gd->fdt_blob, node, "phy-mode", NULL);
-
-	switch (phy_get_interface_by_name(phy_mode)) {
+	switch (ofnode_read_phy_mode(node)) {
 	case PHY_INTERFACE_MODE_RMII:
 		STM32_SYSCFG->pmc |= SYSCFG_PMC_MII_RMII_SEL;
 		break;
@@ -146,7 +131,7 @@ int board_init(void)
 		STM32_SYSCFG->pmc &= ~SYSCFG_PMC_MII_RMII_SEL;
 		break;
 	default:
-		printf("PHY interface %s not supported !\n", phy_mode);
+		printf("Unsupported PHY interface!\n");
 	}
 #endif
 

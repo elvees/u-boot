@@ -6,22 +6,10 @@
 #include <common.h>
 #include <compiler.h>
 #include <image.h>
-#include <lz4.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <asm/unaligned.h>
-
-static u16 LZ4_readLE16(const void *src) { return le16_to_cpu(*(u16 *)src); }
-static void LZ4_copy4(void *dst, const void *src) { *(u32 *)dst = *(u32 *)src; }
-static void LZ4_copy8(void *dst, const void *src) { *(u64 *)dst = *(u64 *)src; }
-
-typedef  uint8_t BYTE;
-typedef uint16_t U16;
-typedef uint32_t U32;
-typedef  int32_t S32;
-typedef uint64_t U64;
-
-#define FORCE_INLINE static inline __attribute__((always_inline))
+#include <u-boot/lz4.h>
 
 /* lz4.c is unaltered (except removing unrelated code) from github.com/Cyan4973/lz4. */
 #include "lz4.c"	/* #include for inlining, do not link! */
@@ -92,7 +80,7 @@ int ulz4fn(const void *src, size_t srcn, void *dst, size_t *dstn)
 		}
 
 		if (block_header & LZ4F_BLOCKUNCOMPRESSED_FLAG) {
-			size_t size = min((ptrdiff_t)block_size, end - out);
+			size_t size = min((ptrdiff_t)block_size, (ptrdiff_t)(end - out));
 			memcpy(out, in, size);
 			out += size;
 			if (size < block_size) {
@@ -103,7 +91,7 @@ int ulz4fn(const void *src, size_t srcn, void *dst, size_t *dstn)
 			/* constant folding essential, do not touch params! */
 			ret = LZ4_decompress_generic(in, out, block_size,
 					end - out, endOnInputSize,
-					full, 0, noDict, out, NULL, 0);
+					decode_full_block, noDict, out, NULL, 0);
 			if (ret < 0) {
 				ret = -EPROTO;	/* decompression error */
 				break;

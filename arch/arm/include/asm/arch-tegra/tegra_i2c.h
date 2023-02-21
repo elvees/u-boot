@@ -10,6 +10,8 @@
 
 #include <asm/types.h>
 
+struct udevice;
+
 enum {
 	I2C_TIMEOUT_USEC = 10000,	/* Wait time for completion */
 	I2C_FIFO_DEPTH = 8,		/* I2C fifo depth */
@@ -148,7 +150,7 @@ struct i2c_ctlr {
 /**
  * Returns the bus number of the DVC controller
  *
- * @return number of bus, or -1 if there is no DVC active
+ * Return: number of bus, or -1 if there is no DVC active
  */
 int tegra_i2c_get_dvc_bus(struct udevice **busp);
 

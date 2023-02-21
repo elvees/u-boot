@@ -10,16 +10,19 @@
 #ifndef __INIT_H_
 #define __INIT_H_	1
 
-#include <linux/types.h>
-
-struct global_data;
-
 #ifndef __ASSEMBLY__		/* put C only stuff in this section */
 
-/* Avoid using CONFIG_EFI_STUB directly as we may boot from other loaders */
-#ifdef CONFIG_EFI_STUB
+#include <linux/types.h>
+
+/*
+ * In case of the EFI app the UEFI firmware provides the low-level
+ * initialisation.
+ */
+#ifdef CONFIG_EFI
 #define ll_boot_init()	false
 #else
+#include <asm/global_data.h>
+
 #define ll_boot_init()	(!(gd->flags & GD_FLG_SKIP_LL_INIT))
 #endif
 
@@ -41,17 +44,6 @@ void board_init_f(ulong dummy);
  * Return: 0 on success, otherwise error
  */
 int arch_cpu_init(void);
-
-/**
- * arch_cpu_init_dm() - init CPU after driver model is available
- *
- * This is called immediately after driver model is available before
- * relocation. This is similar to arch_cpu_init() but is able to reference
- * devices
- *
- * Return: 0 if OK, -ve on error
- */
-int arch_cpu_init_dm(void);
 
 /**
  * mach_cpu_init() - SoC/machine dependent CPU setup
@@ -163,6 +155,54 @@ int arch_setup_bdinfo(void);
  */
 int setup_bdinfo(void);
 
+#if defined(CONFIG_SAVE_PREV_BL_INITRAMFS_START_ADDR) || \
+defined(CONFIG_SAVE_PREV_BL_FDT_ADDR)
+/**
+ * save_prev_bl_data - Save prev bl data in env vars.
+ *
+ * When u-boot is chain-loaded, save previous bootloader data,
+ * like initramfs address to environment variables.
+ *
+ * Return: 0 if ok; -ENODATA on error
+ */
+int save_prev_bl_data(void);
+#endif
+
+/**
+ * cpu_secondary_init_r() - CPU-specific secondary initialization
+ *
+ * After non-volatile devices, environment and cpu code are setup, have
+ * another round to deal with any initialization that might require
+ * full access to the environment or loading of some image (firmware)
+ * from a non-volatile device.
+ *
+ * It is called during the generic post-relocation init sequence.
+ *
+ * Return: 0 if OK
+ */
+int cpu_secondary_init_r(void);
+
+/**
+ * pci_ep_init() - Initialize pci endpoint devices
+ *
+ * It is called during the generic post-relocation init sequence.
+ *
+ * Return: 0 if OK
+ */
+int pci_ep_init(void);
+
+/**
+ * pci_init() - Enumerate pci devices
+ *
+ * It is called during the generic post-relocation init sequence to enumerate
+ * pci buses. This is needed, for instance, in the case of DM PCI-based
+ * Ethernet devices, which will not be detected without having the enumeration
+ * performed earlier.
+ *
+ * Return: 0 if OK
+ */
+int pci_init(void);
+
 /**
  * init_cache_f_r() - Turn on the cache in preparation for relocation
  *
@@ -179,7 +219,6 @@ int init_cache_f_r(void);
 int print_cpuinfo(void);
 #endif
 int timer_init(void);
-int misc_init_f(void);
 
 #if defined(CONFIG_DTB_RESELECT)
 int embedded_dtb_select(void);
@@ -234,8 +273,6 @@ int mac_read_from_eeprom(void);
 int set_cpu_clk_info(void);
 int update_flash_size(int flash_size);
 int arch_early_init_r(void);
-void pci_init(void);
-void pci_ep_init(void);
 int misc_init_r(void);
 #if defined(CONFIG_VID)
 int init_func_vid(void);
@@ -264,10 +301,25 @@ int board_late_init(void);
 int board_postclk_init(void); /* after clocks/timebase, before env/serial */
 int board_early_init_r(void);
 
-/* TODO(sjg@chromium.org): Drop this when DM_PCI migration is completed */
-void pci_init_board(void);
+/**
+ * arch_initr_trap() - Init traps
+ *
+ * Arch specific routine for initializing traps. It is called during the
+ * generic board init sequence, after relocation.
+ *
+ * Return: 0 if OK
+ */
+int arch_initr_trap(void);
 
-void trap_init(unsigned long reloc_addr);
+/**
+ * init_addr_map()
+ *
+ * Initialize non-identity virtual-physical memory mappings for 32bit CPUs.
+ * It is called during the generic board init sequence, after relocation.
+ *
+ * Return: 0 if OK
+ */
+int init_addr_map(void);
 
 /**
  * main_loop() - Enter the main loop of U-Boot
@@ -285,13 +337,16 @@ void relocate_code(ulong start_addr_sp, struct global_data *new_gd,
 #endif
 
 /* Print a numeric value (for use in arch_print_bdinfo()) */
-void bdinfo_print_num(const char *name, ulong value);
+void bdinfo_print_num_l(const char *name, ulong value);
+void bdinfo_print_num_ll(const char *name, unsigned long long value);
 
 /* Print a clock speed in MHz */
 void bdinfo_print_mhz(const char *name, unsigned long hz);
 
 /* Show arch-specific information for the 'bd' command */
 void arch_print_bdinfo(void);
+
+int do_bdinfo(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[]);
 
 #endif	/* __ASSEMBLY__ */
 /* Put only stuff here that the assembler can digest */

@@ -17,7 +17,9 @@
 #include <errno.h>
 #include <fat.h>
 #include <mmc.h>
+#include <scsi.h>
 #include <asm/cache.h>
+#include <asm/global_data.h>
 #include <linux/stddef.h>
 
 #ifdef CONFIG_SPL_BUILD
@@ -29,7 +31,14 @@
 # define LOADENV
 #endif
 
-static char *env_fat_device_and_part(void)
+DECLARE_GLOBAL_DATA_PTR;
+
+__weak const char *env_fat_get_intf(void)
+{
+	return (const char *)CONFIG_ENV_FAT_INTERFACE;
+}
+
+__weak char *env_fat_get_dev_part(void)
 {
 #ifdef CONFIG_MMC
 	static char *part_str;
@@ -53,17 +62,19 @@ static int env_fat_save(void)
 	env_t __aligned(ARCH_DMA_MINALIGN) env_new;
 	struct blk_desc *dev_desc = NULL;
 	struct disk_partition info;
+	const char *file = CONFIG_ENV_FAT_FILE;
 	int dev, part;
 	int err;
 	loff_t size;
+	const char *ifname = env_fat_get_intf();
+	const char *dev_and_part = env_fat_get_dev_part();
 
 	err = env_export(&env_new);
 	if (err)
 		return err;
 
-	part = blk_get_device_part_str(CONFIG_ENV_FAT_INTERFACE,
-					env_fat_device_and_part(),
-					&dev_desc, &info, 1);
+	part = blk_get_device_part_str(ifname, dev_and_part,
+				       &dev_desc, &info, 1);
 	if (part < 0)
 		return 1;
 
@@ -73,22 +84,28 @@ static int env_fat_save(void)
 		 * This printf is embedded in the messages from env_save that
 		 * will calling it. The missing \n is intentional.
 		 */
-		printf("Unable to use %s %d:%d... ",
-		       CONFIG_ENV_FAT_INTERFACE, dev, part);
+		printf("Unable to use %s %d:%d...\n", ifname, dev, part);
 		return 1;
 	}
 
-	err = file_fat_write(CONFIG_ENV_FAT_FILE, (void *)&env_new, 0, sizeof(env_t),
-			     &size);
+#ifdef CONFIG_SYS_REDUNDAND_ENVIRONMENT
+	if (gd->env_valid == ENV_VALID)
+		file = CONFIG_ENV_FAT_FILE_REDUND;
+#endif
+
+	err = file_fat_write(file, (void *)&env_new, 0, sizeof(env_t), &size);
 	if (err == -1) {
 		/*
 		 * This printf is embedded in the messages from env_save that
 		 * will calling it. The missing \n is intentional.
 		 */
-		printf("Unable to write \"%s\" from %s%d:%d... ",
-			CONFIG_ENV_FAT_FILE, CONFIG_ENV_FAT_INTERFACE, dev, part);
+		printf("Unable to write \"%s\" from %s%d:%d...\n", file, ifname, dev, part);
 		return 1;
 	}
+
+#ifdef CONFIG_SYS_REDUNDAND_ENVIRONMENT
+	gd->env_valid = (gd->env_valid == ENV_REDUND) ? ENV_VALID : ENV_REDUND;
+#endif
 
 	return 0;
 }
@@ -96,20 +113,30 @@ static int env_fat_save(void)
 #ifdef LOADENV
 static int env_fat_load(void)
 {
-	ALLOC_CACHE_ALIGN_BUFFER(char, buf, CONFIG_ENV_SIZE);
+	ALLOC_CACHE_ALIGN_BUFFER(char, buf1, CONFIG_ENV_SIZE);
+#ifdef CONFIG_SYS_REDUNDAND_ENVIRONMENT
+	ALLOC_CACHE_ALIGN_BUFFER(char, buf2, CONFIG_ENV_SIZE);
+	int err2;
+#endif
 	struct blk_desc *dev_desc = NULL;
 	struct disk_partition info;
 	int dev, part;
-	int err;
+	int err1;
+	const char *ifname = env_fat_get_intf();
+	const char *dev_and_part = env_fat_get_dev_part();
 
 #ifdef CONFIG_MMC
-	if (!strcmp(CONFIG_ENV_FAT_INTERFACE, "mmc"))
+	if (!strcmp(ifname, "mmc"))
 		mmc_initialize(NULL);
 #endif
-
-	part = blk_get_device_part_str(CONFIG_ENV_FAT_INTERFACE,
-					env_fat_device_and_part(),
-					&dev_desc, &info, 1);
+#ifndef CONFIG_SPL_BUILD
+#if defined(CONFIG_AHCI) || defined(CONFIG_SCSI)
+	if (!strcmp(CONFIG_ENV_FAT_INTERFACE, "scsi"))
+		scsi_scan(true);
+#endif
+#endif
+	part = blk_get_device_part_str(ifname, dev_and_part,
+				       &dev_desc, &info, 1);
 	if (part < 0)
 		goto err_env_relocate;
 
@@ -119,23 +146,30 @@ static int env_fat_load(void)
 		 * This printf is embedded in the messages from env_save that
 		 * will calling it. The missing \n is intentional.
 		 */
-		printf("Unable to use %s %d:%d... ",
-		       CONFIG_ENV_FAT_INTERFACE, dev, part);
+		printf("Unable to use %s %d:%d...\n", ifname, dev, part);
 		goto err_env_relocate;
 	}
 
-	err = file_fat_read(CONFIG_ENV_FAT_FILE, buf, CONFIG_ENV_SIZE);
-	if (err == -1) {
+	err1 = file_fat_read(CONFIG_ENV_FAT_FILE, buf1, CONFIG_ENV_SIZE);
+#ifdef CONFIG_SYS_REDUNDAND_ENVIRONMENT
+	err2 = file_fat_read(CONFIG_ENV_FAT_FILE_REDUND, buf2, CONFIG_ENV_SIZE);
+
+	err1 = (err1 >= 0) ? 0 : -1;
+	err2 = (err2 >= 0) ? 0 : -1;
+	return env_import_redund(buf1, err1, buf2, err2, H_EXTERNAL);
+#else
+	if (err1 < 0) {
 		/*
 		 * This printf is embedded in the messages from env_save that
 		 * will calling it. The missing \n is intentional.
 		 */
-		printf("Unable to read \"%s\" from %s%d:%d... ",
-			CONFIG_ENV_FAT_FILE, CONFIG_ENV_FAT_INTERFACE, dev, part);
+		printf("Unable to read \"%s\" from %s%d:%d... \n",
+			CONFIG_ENV_FAT_FILE, ifname, dev, part);
 		goto err_env_relocate;
 	}
 
-	return env_import(buf, 1, H_EXTERNAL);
+	return env_import(buf1, 1, H_EXTERNAL);
+#endif
 
 err_env_relocate:
 	env_set_default(NULL, 0);

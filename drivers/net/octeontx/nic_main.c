@@ -713,7 +713,7 @@ int nic_initialize(struct udevice *dev)
 		return -ENOMEM;
 
 	/* MAP PF's configuration registers */
-	nic->reg_base = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_0,
+	nic->reg_base = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_0, 0, 0, PCI_REGION_TYPE,
 				       PCI_REGION_MEM);
 	if (!nic->reg_base) {
 		printf("Cannot map config register space, aborting\n");
@@ -766,7 +766,7 @@ U_BOOT_DRIVER(octeontx_nic) = {
 	.name	= "octeontx_nic",
 	.id	= UCLASS_MISC,
 	.probe	= octeontx_nic_probe,
-	.priv_auto_alloc_size = sizeof(struct nicpf),
+	.priv_auto	= sizeof(struct nicpf),
 };
 
 static struct pci_device_id octeontx_nic_supported[] = {
@@ -775,4 +775,3 @@ static struct pci_device_id octeontx_nic_supported[] = {
 };
 
 U_BOOT_PCI_DEVICE(octeontx_nic, octeontx_nic_supported);
-

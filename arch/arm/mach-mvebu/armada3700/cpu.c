@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2016 Stefan Roese <sr@denx.de>
- * Copyright (C) 2020 Marek Behun <marek.behun@nic.cz>
+ * Copyright (C) 2020 Marek Behún <kabel@kernel.org>
  */
 
 #include <common.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <fdtdec.h>
+#include <fdt_support.h>
 #include <init.h>
+#include <asm/global_data.h>
 #include <linux/bitops.h>
 #include <linux/libfdt.h>
+#include <linux/sizes.h>
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/arch/cpu.h>
@@ -44,15 +47,15 @@
 #define MVEBU_CPU_DEC_WIN_REMAP(w)	(MVEBU_CPU_DEC_WIN_CTRL(w) + 0xc)
 #define MVEBU_CPU_DEC_WIN_GRANULARITY	16
 #define MVEBU_CPU_DEC_WINS		5
+#define MVEBU_CPU_DEC_CCI_BASE		(MVEBU_CPU_DEC_WIN_REG_BASE + 0xe0)
+#define MVEBU_CPU_DEC_ROM_BASE		(MVEBU_CPU_DEC_WIN_REG_BASE + 0xf4)
 
-#define MAX_MEM_MAP_REGIONS		(MVEBU_CPU_DEC_WINS + 2)
+#define MAX_MEM_MAP_REGIONS		(MVEBU_CPU_DEC_WINS + 4)
 
 #define A3700_PTE_BLOCK_NORMAL \
 	(PTE_BLOCK_MEMTYPE(MT_NORMAL) | PTE_BLOCK_INNER_SHARE)
 #define A3700_PTE_BLOCK_DEVICE \
 	(PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) | PTE_BLOCK_NON_SHARE)
-
-#define PCIE_PATH			"/soc/pcie@d0070000"
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -60,7 +63,7 @@ static struct mm_region mvebu_mem_map[MAX_MEM_MAP_REGIONS] = {
 	{
 		/*
 		 * SRAM, MMIO regions
-		 * Don't remove this, a3700_build_mem_map needs it.
+		 * Don't remove this, build_mem_map needs it.
 		 */
 		.phys = SOC_REGS_PHY_BASE,
 		.virt = SOC_REGS_PHY_BASE,
@@ -110,8 +113,26 @@ static int get_cpu_dec_win(int win, u32 *tgt, u32 *base, u32 *size)
 static void build_mem_map(void)
 {
 	int win, region;
+	u32 reg;
 
 	region = 1;
+
+	/* CCI-400 */
+	reg = readl(MVEBU_CPU_DEC_CCI_BASE);
+	mvebu_mem_map[region].phys = reg << 20;
+	mvebu_mem_map[region].virt = reg << 20;
+	mvebu_mem_map[region].size = SZ_64K;
+	mvebu_mem_map[region].attrs = A3700_PTE_BLOCK_DEVICE;
+	++region;
+
+	/* AP BootROM */
+	reg = readl(MVEBU_CPU_DEC_ROM_BASE);
+	mvebu_mem_map[region].phys = reg << 20;
+	mvebu_mem_map[region].virt = reg << 20;
+	mvebu_mem_map[region].size = SZ_1M;
+	mvebu_mem_map[region].attrs = A3700_PTE_BLOCK_NORMAL;
+	++region;
+
 	for (win = 0; win < MVEBU_CPU_DEC_WINS; ++win) {
 		u32 base, tgt, size;
 		u64 attrs;
@@ -142,8 +163,6 @@ static void build_mem_map(void)
 
 void enable_caches(void)
 {
-	build_mem_map();
-
 	icache_enable();
 	dcache_enable();
 }
@@ -151,6 +170,8 @@ void enable_caches(void)
 int a3700_dram_init(void)
 {
 	int win;
+
+	build_mem_map();
 
 	gd->ram_size = 0;
 	for (win = 0; win < MVEBU_CPU_DEC_WINS; ++win) {
@@ -281,39 +302,117 @@ static u32 find_pcie_window_base(void)
 	return -1;
 }
 
+static int fdt_setprop_inplace_u32_partial(void *blob, int node,
+					   const char *name,
+					   u32 idx, u32 val)
+{
+	val = cpu_to_fdt32(val);
+
+	return fdt_setprop_inplace_namelen_partial(blob, node, name,
+						   strlen(name),
+						   idx * sizeof(u32),
+						   &val, sizeof(u32));
+}
+
 int a3700_fdt_fix_pcie_regions(void *blob)
 {
-	u32 new_ranges[14], base;
+	u32 base, lowest_cpu_addr, fix_offset;
+	int pci_cells, cpu_cells, size_cells;
 	const u32 *ranges;
-	int node, len;
-
-	node = fdt_path_offset(blob, PCIE_PATH);
-	if (node < 0)
-		return node;
-
-	ranges = fdt_getprop(blob, node, "ranges", &len);
-	if (!ranges)
-		return -ENOENT;
-
-	if (len != sizeof(new_ranges))
-		return -EINVAL;
-
-	memcpy(new_ranges, ranges, len);
+	int node, pnode;
+	int ret, i, len;
 
 	base = find_pcie_window_base();
 	if (base == -1)
 		return -ENOENT;
 
-	new_ranges[2] = cpu_to_fdt32(base);
-	new_ranges[4] = new_ranges[2];
+	node = fdt_node_offset_by_compatible(blob, -1, "marvell,armada-3700-pcie");
+	if (node < 0)
+		return node;
 
-	new_ranges[9] = cpu_to_fdt32(base + 0x1000000);
-	new_ranges[11] = new_ranges[9];
+	ranges = fdt_getprop(blob, node, "ranges", &len);
+	if (!ranges || !len || len % sizeof(u32))
+		return -EINVAL;
 
-	return fdt_setprop_inplace(blob, node, "ranges", new_ranges, len);
+	/*
+	 * The "ranges" property is an array of
+	 *   { <PCI address> <CPU address> <size in PCI address space> }
+	 * where number of PCI address cells and size cells is stored in the
+	 * "#address-cells" and "#size-cells" properties of the same node
+	 * containing the "ranges" property and number of CPU address cells
+	 * is stored in the parent's "#address-cells" property.
+	 *
+	 * All 3 elements can span a diffent number of cells. Fetch them.
+	 */
+	pnode = fdt_parent_offset(blob, node);
+	pci_cells = fdt_address_cells(blob, node);
+	cpu_cells = fdt_address_cells(blob, pnode);
+	size_cells = fdt_size_cells(blob, node);
+
+	/* PCI addresses always use 3 cells */
+	if (pci_cells != 3)
+		return -EINVAL;
+
+	/* CPU addresses on Armada 37xx always use 2 cells */
+	if (cpu_cells != 2)
+		return -EINVAL;
+
+	for (i = 0; i < len / sizeof(u32);
+	     i += pci_cells + cpu_cells + size_cells) {
+		/*
+		 * Parent CPU addresses on Armada 37xx are always 32-bit, so
+		 * check that the high word is zero.
+		 */
+		if (fdt32_to_cpu(ranges[i + pci_cells]))
+			return -EINVAL;
+
+		if (i == 0 ||
+		    fdt32_to_cpu(ranges[i + pci_cells + 1]) < lowest_cpu_addr)
+			lowest_cpu_addr = fdt32_to_cpu(ranges[i + pci_cells + 1]);
+	}
+
+	/* Calculate fixup offset from the lowest (first) CPU address */
+	fix_offset = base - lowest_cpu_addr;
+
+	/* If fixup offset is zero there is nothing to fix */
+	if (!fix_offset)
+		return 0;
+
+	/*
+	 * Fix each CPU address and corresponding PCI address if PCI address
+	 * is not already remapped (has the same value)
+	 */
+	for (i = 0; i < len / sizeof(u32);
+	     i += pci_cells + cpu_cells + size_cells) {
+		u32 cpu_addr;
+		u64 pci_addr;
+		int idx;
+
+		/* Fix CPU address */
+		idx = i + pci_cells + cpu_cells - 1;
+		cpu_addr = fdt32_to_cpu(ranges[idx]);
+		ret = fdt_setprop_inplace_u32_partial(blob, node, "ranges", idx,
+						      cpu_addr + fix_offset);
+		if (ret)
+			return ret;
+
+		/* Fix PCI address only if it isn't remapped (is same as CPU) */
+		idx = i + pci_cells - 1;
+		pci_addr = ((u64)fdt32_to_cpu(ranges[idx - 1]) << 32) |
+			   fdt32_to_cpu(ranges[idx]);
+		if (cpu_addr != pci_addr)
+			continue;
+
+		ret = fdt_setprop_inplace_u32_partial(blob, node, "ranges", idx,
+						      cpu_addr + fix_offset);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
 }
 
-void reset_cpu(ulong ignored)
+void reset_cpu(void)
 {
 	/*
 	 * Write magic number of 0x1d1e to North Bridge Warm Reset register

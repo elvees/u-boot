@@ -1048,13 +1048,6 @@ static int eth_set_config(struct eth_dev *dev, unsigned number,
 	int			result = 0;
 	struct usb_gadget	*gadget = dev->gadget;
 
-	if (gadget_is_sa1100(gadget)
-			&& dev->config
-			&& dev->tx_qlen != 0) {
-		/* tx fifo is full, but we can't clear it...*/
-		pr_err("can't change configurations");
-		return -ESPIPE;
-	}
 	eth_reset_config(dev);
 
 	switch (number) {
@@ -1325,24 +1318,6 @@ eth_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		if (!cdc_active(dev) && wIndex != 0)
 			break;
 
-		/*
-		 * PXA hardware partially handles SET_INTERFACE;
-		 * we need to kluge around that interference.
-		 */
-		if (gadget_is_pxa(gadget)) {
-			value = eth_set_config(dev, DEV_CONFIG_VALUE,
-						GFP_ATOMIC);
-			/*
-			 * PXA25x driver use non-CDC ethernet gadget.
-			 * But only _CDC and _RNDIS code can signalize
-			 * that network is working. So we signalize it
-			 * here.
-			 */
-			dev->network_started = 1;
-			debug("USB network up!\n");
-			goto done_set_intf;
-		}
-
 #ifdef CONFIG_USB_ETH_CDC
 		switch (wIndex) {
 		case 0:		/* control/master intf */
@@ -1386,8 +1361,6 @@ eth_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		 */
 		debug("set_interface ignored!\n");
 #endif /* CONFIG_USB_ETH_CDC */
-
-done_set_intf:
 		break;
 	case USB_REQ_GET_INTERFACE:
 		if (ctrl->bRequestType != (USB_DIR_IN|USB_RECIP_INTERFACE)
@@ -1860,10 +1833,18 @@ static int rndis_control_ack(struct eth_device *net)
 static int rndis_control_ack(struct udevice *net)
 #endif
 {
-	struct ether_priv	*priv = (struct ether_priv *)net->priv;
-	struct eth_dev		*dev = &priv->ethdev;
-	int                     length;
-	struct usb_request      *resp = dev->stat_req;
+	struct ether_priv *priv;
+	struct eth_dev *dev;
+	int length;
+	struct usb_request *resp;
+
+#ifndef CONFIG_DM_ETH
+	priv = (struct ether_priv *)net->priv;
+#else
+	priv = dev_get_priv(net);
+#endif
+	dev = &priv->ethdev;
+	resp = dev->stat_req;
 
 	/* in case RNDIS calls this after disconnect */
 	if (!dev->status) {
@@ -2009,7 +1990,7 @@ static int eth_bind(struct usb_gadget *gadget)
 	int			gcnum;
 	u8			tmp[7];
 #ifdef CONFIG_DM_ETH
-	struct eth_pdata	*pdata = dev_get_platdata(l_priv->netdev);
+	struct eth_pdata	*pdata = dev_get_plat(l_priv->netdev);
 #endif
 
 	/* these flags are only ever cleared; compiler take note */
@@ -2024,24 +2005,13 @@ static int eth_bind(struct usb_gadget *gadget)
 	 * standard protocol is _strongly_ preferred for interop purposes.
 	 * (By everyone except Microsoft.)
 	 */
-	if (gadget_is_pxa(gadget)) {
-		/* pxa doesn't support altsettings */
-		cdc = 0;
-	} else if (gadget_is_musbhdrc(gadget)) {
+	if (gadget_is_musbhdrc(gadget)) {
 		/* reduce tx dma overhead by avoiding special cases */
 		zlp = 0;
 	} else if (gadget_is_sh(gadget)) {
 		/* sh doesn't support multiple interfaces or configs */
 		cdc = 0;
 		rndis = 0;
-	} else if (gadget_is_sa1100(gadget)) {
-		/* hardware can't write zlps */
-		zlp = 0;
-		/*
-		 * sa1100 CAN do CDC, without status endpoint ... we use
-		 * non-CDC to be compatible with ARM Linux-2.4 "usb-eth".
-		 */
-		cdc = 0;
 	}
 
 	gcnum = usb_gadget_controller_number(gadget);
@@ -2393,8 +2363,7 @@ static int _usb_eth_init(struct ether_priv *priv)
 	usb_gadget_connect(gadget);
 
 	if (env_get("cdc_connect_timeout"))
-		timeout = simple_strtoul(env_get("cdc_connect_timeout"),
-						NULL, 10) * CONFIG_SYS_HZ;
+		timeout = dectoul(env_get("cdc_connect_timeout"), NULL) * CONFIG_SYS_HZ;
 	ts = get_timer(0);
 	while (!dev->network_started) {
 		/* Handle control-c and timeouts */
@@ -2646,7 +2615,7 @@ static void usb_eth_stop(struct udevice *dev)
 static int usb_eth_probe(struct udevice *dev)
 {
 	struct ether_priv *priv = dev_get_priv(dev);
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 
 	priv->netdev = dev;
 	l_priv = priv;
@@ -2691,8 +2660,8 @@ U_BOOT_DRIVER(eth_usb) = {
 	.id	= UCLASS_ETH,
 	.probe	= usb_eth_probe,
 	.ops	= &usb_eth_ops,
-	.priv_auto_alloc_size = sizeof(struct ether_priv),
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
+	.priv_auto	= sizeof(struct ether_priv),
+	.plat_auto	= sizeof(struct eth_pdata),
 	.flags = DM_FLAG_ALLOC_PRIV_DMA,
 };
 #endif /* CONFIG_DM_ETH */

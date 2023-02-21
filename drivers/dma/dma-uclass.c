@@ -9,6 +9,8 @@
  * Author: Mugunthan V N <mugunthanvnm@ti.com>
  */
 
+#define LOG_CATEGORY UCLASS_DMA
+
 #include <common.h>
 #include <cpu_func.h>
 #include <dm.h>
@@ -33,7 +35,7 @@ static int dma_of_xlate_default(struct dma *dma,
 	debug("%s(dma=%p)\n", __func__, dma);
 
 	if (args->args_count > 1) {
-		pr_err("Invaild args_count: %d\n", args->args_count);
+		pr_err("Invalid args_count: %d\n", args->args_count);
 		return -EINVAL;
 	}
 
@@ -254,5 +256,5 @@ UCLASS_DRIVER(dma) = {
 	.id		= UCLASS_DMA,
 	.name		= "dma",
 	.flags		= DM_UC_FLAG_SEQ_ALIAS,
-	.per_device_auto_alloc_size = sizeof(struct dma_dev_priv),
+	.per_device_auto	= sizeof(struct dma_dev_priv),
 };

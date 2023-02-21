@@ -8,6 +8,7 @@
 #include <common.h>
 #include <command.h>
 #include <cpu.h>
+#include <display_options.h>
 #include <dm.h>
 #include <errno.h>
 
@@ -26,13 +27,13 @@ static int print_cpu_list(bool detail)
 	for (uclass_first_device(UCLASS_CPU, &dev);
 		     dev;
 		     uclass_next_device(&dev)) {
-		struct cpu_platdata *plat = dev_get_parent_platdata(dev);
+		struct cpu_plat *plat = dev_get_parent_plat(dev);
 		struct cpu_info info;
 		bool first = true;
 		int ret, i;
 
 		ret = cpu_get_desc(dev, buf, sizeof(buf));
-		printf("%3d: %-10s %s\n", dev->seq, dev->name,
+		printf("%3d: %-10s %s\n", dev_seq(dev), dev->name,
 		       ret ? "<no description>" : buf);
 		if (!detail)
 			continue;
@@ -82,36 +83,13 @@ static int do_cpu_detail(struct cmd_tbl *cmdtp, int flag, int argc,
 	return 0;
 }
 
-static struct cmd_tbl cmd_cpu_sub[] = {
-	U_BOOT_CMD_MKENT(list, 2, 1, do_cpu_list, "", ""),
-	U_BOOT_CMD_MKENT(detail, 4, 0, do_cpu_detail, "", ""),
-};
-
-/*
- * Process a cpu sub-command
- */
-static int do_cpu(struct cmd_tbl *cmdtp, int flag, int argc,
-		  char *const argv[])
-{
-	struct cmd_tbl *c = NULL;
-
-	/* Strip off leading 'cpu' command argument */
-	argc--;
-	argv++;
-
-	if (argc)
-		c = find_cmd_tbl(argv[0], cmd_cpu_sub,
-				 ARRAY_SIZE(cmd_cpu_sub));
-
-	if (c)
-		return c->cmd(cmdtp, flag, argc, argv);
-	else
-		return CMD_RET_USAGE;
-}
-
-U_BOOT_CMD(
-	cpu, 2, 1, do_cpu,
-	"display information about CPUs",
+#if CONFIG_IS_ENABLED(SYS_LONGHELP)
+static char cpu_help_text[] =
 	"list	- list available CPUs\n"
 	"cpu detail	- show CPU detail"
-);
+	;
+#endif
+
+U_BOOT_CMD_WITH_SUBCMDS(cpu, "display information about CPUs", cpu_help_text,
+	U_BOOT_SUBCMD_MKENT(list, 1, 1, do_cpu_list),
+	U_BOOT_SUBCMD_MKENT(detail, 1, 0, do_cpu_detail));

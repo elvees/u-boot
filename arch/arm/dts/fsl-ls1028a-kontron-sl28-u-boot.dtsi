@@ -4,19 +4,20 @@
 
 / {
 	aliases {
-		mmc0 = &esdhc1;
-		mmc1 = &esdhc0;
 		i2c0 = &i2c0;
 		i2c1 = &i2c3;
 		i2c2 = &i2c4;
-		rtc0 = &rtc;
-		ethernet0 = &enetc0;
-		ethernet1 = &enetc1;
-		ethernet2 = &enetc2;
-		ethernet3 = &enetc6;
+		ethernet2 = &enetc_port2;
+		ethernet3 = &enetc_port3;
 	};
 
-	binman {
+	binman: binman {
+		multiple-images;
+	};
+};
+
+&binman {
+	u_boot_rom: u-boot-rom {
 		filename = "u-boot.rom";
 		pad-byte = <0xff>;
 
@@ -26,6 +27,7 @@
 		fit {
 			offset = <CONFIG_SPL_PAD_TO>;
 			description = "FIT image with multiple configurations";
+			fit,fdt-list = "of-list";
 
 			images {
 				uboot {
@@ -40,72 +42,115 @@
 					};
 				};
 
-				fdt-1 {
-					description = "fsl-ls1028a-kontron-sl28";
+				@fdt-SEQ {
+					description = "NAME";
 					type = "flat_dt";
-					arch = "arm";
 					compression = "none";
-
-					blob {
-						filename = "arch/arm/dts/fsl-ls1028a-kontron-sl28.dtb";
-					};
-				};
-
-				fdt-2 {
-					description = "fsl-ls1028a-kontron-sl28-var3";
-					type = "flat_dt";
-					arch = "arm";
-					compression = "none";
-
-					blob {
-						filename = "arch/arm/dts/fsl-ls1028a-kontron-sl28-var3.dtb";
-					};
-				};
-
-				fdt-3 {
-					description = "fsl-ls1028a-kontron-sl28-var4";
-					type = "flat_dt";
-					arch = "arm";
-					compression = "none";
-
-					blob {
-						filename = "arch/arm/dts/fsl-ls1028a-kontron-sl28-var4.dtb";
-					};
 				};
 			};
 
 			configurations {
-				default = "conf-1";
+				default = "@config-DEFAULT-SEQ";
 
-				conf-1 {
-					description = "fsl-ls1028a-kontron-sl28";
+				@config-SEQ {
+					description = "NAME";
 					firmware = "uboot";
-					loadables = "uboot";
-					fdt = "fdt-1";
-				};
-
-				conf-2 {
-					description = "fsl-ls1028a-kontron-sl28-var3";
-					firmware = "uboot";
-					loadables = "uboot";
-					fdt = "fdt-2";
-				};
-
-				conf-3 {
-					description = "fsl-ls1028a-kontron-sl28-var4";
-					firmware = "uboot";
-					loadables = "uboot";
-					fdt = "fdt-3";
+					fdt = "fdt-SEQ";
 				};
 			};
 		};
 	};
 };
 
-&i2c0 {
-	rtc: rtc@32 {
+&binman {
+	u-boot-update {
+		filename = "u-boot.update";
+
+		fit {
+			description = "FIT update image";
+
+			images {
+				u-boot-bin {
+					description = "U-Boot";
+					type = "firmware";
+					os = "u-boot";
+					arch = "arm";
+					compression = "none";
+					load = <0>; /* unused */
+
+					blob {
+						filename = "u-boot.rom";
+					};
+				};
+			};
+		};
 	};
 };
+
+#ifdef CONFIG_SL28_ENABLE_SER0_CONSOLE
+/ {
+	chosen {
+		stdout-path = "serial2:115200n8";
+	};
+};
+#endif
+
+#ifdef CONFIG_SL28_SPL_LOADS_ATF_BL31
+&u_boot_rom {
+	fit {
+		images {
+			bl31 {
+				description = "ARM Trusted Firmware (bl31)";
+				type = "firmware";
+				arch = "arm";
+				os = "arm-trusted-firmware";
+				compression = "none";
+				load = <CONFIG_SL28_BL31_ENTRY_ADDR>;
+				entry = <CONFIG_SL28_BL31_ENTRY_ADDR>;
+
+				blob-ext {
+					filename = "bl31.bin";
+				};
+			};
+		};
+
+		configurations {
+			@config-SEQ {
+				firmware = "bl31";
+				loadables = "uboot";
+			};
+		};
+	};
+};
+#endif
+
+#ifdef CONFIG_SL28_SPL_LOADS_OPTEE_BL32
+&u_boot_rom {
+	fit {
+		images {
+			bl32 {
+				description = "OP-TEE Trusted OS (bl32)";
+				type = "firmware";
+				arch = "arm";
+				os = "tee";
+				compression = "none";
+				load = <CONFIG_SL28_BL32_ENTRY_ADDR>;
+				entry = <CONFIG_SL28_BL32_ENTRY_ADDR>;
+
+				blob-ext {
+					filename = "tee.bin";
+				};
+			};
+		};
+
+		configurations {
+			@config-SEQ {
+				loadables = "uboot", "bl32";
+			};
+		};
+	};
+};
+#endif
 
 &fspi {
 	u-boot,dm-pre-reloc;
@@ -118,7 +163,7 @@
 	u-boot,dm-pre-reloc;
 };
 
-&esdhc0 {
+&esdhc {
 	u-boot,dm-pre-reloc;
 };
 
@@ -126,7 +171,32 @@
 	u-boot,dm-pre-reloc;
 };
 
-&serial0 {
+&lpuart1 {
+	u-boot,dm-pre-reloc;
+};
+
+&duart0 {
+	u-boot,dm-pre-reloc;
+};
+
+/*
+ * u-boot will enable the device in the linux device tree in place. Because
+ * we are using the linux device tree, we have to enable the PCI controller
+ * ourselves.
+ */
+&pcie1 {
+	status = "okay";
+};
+
+&pcie2 {
+	status = "okay";
+};
+
+&sata {
+	status = "okay";
+};
+
+&soc {
 	u-boot,dm-pre-reloc;
 };
 

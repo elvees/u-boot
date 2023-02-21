@@ -28,6 +28,17 @@ else
 KEY=$(patsubst "%",$(srctree)/%,$(CONFIG_SYS_K3_KEY))
 endif
 
+# X509 SWRV default
+SWRV = $(CONFIG_K3_X509_SWRV)
+# On HS use SECDEV provided software revision or warn if not available
+ifeq ($(CONFIG_TI_SECURE_DEVICE),y)
+ifneq ($(wildcard $(TI_SECURE_DEV_PKG)/keys/swrv.txt),)
+SWRV= $(shell cat $(TI_SECURE_DEV_PKG)/keys/swrv.txt)
+else
+$(warning "WARNING: Software revision file not found. Default may not work on HS hardware.")
+endif
+endif
+
 # tiboot3.bin is mandated by ROM and ROM only supports R5 boot.
 # So restrict tiboot3.bin creation for CPU_V7R.
 ifdef CONFIG_CPU_V7R
@@ -42,12 +53,16 @@ image_check: $(obj)/u-boot-spl.bin FORCE
 
 tiboot3.bin: image_check FORCE
 	$(srctree)/tools/k3_gen_x509_cert.sh -c 16 -b $(obj)/u-boot-spl.bin \
-				-o $@ -l $(CONFIG_SPL_TEXT_BASE) -k $(KEY)
+				-o $@ -l $(CONFIG_SPL_TEXT_BASE) -r $(SWRV) -k $(KEY)
 
 INPUTS-y	+= tiboot3.bin
 endif
 
 ifdef CONFIG_ARM64
+
+ifeq ($(CONFIG_SOC_K3_J721E),)
+export DM := /dev/null
+endif
 
 ifeq ($(CONFIG_TI_SECURE_DEVICE),y)
 SPL_ITS := u-boot-spl-k3_HS.its
@@ -67,6 +82,7 @@ endif
 quiet_cmd_k3_mkits = MKITS   $@
 cmd_k3_mkits = \
 	$(srctree)/tools/k3_fit_atf.sh \
+	$(CONFIG_K3_ATF_LOAD_ADDR) \
 	$(patsubst %,$(obj)/dts/%.dtb,$(subst ",,$(LIST_OF_DTB))) > $@
 
 $(SPL_ITS): FORCE

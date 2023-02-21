@@ -3,6 +3,8 @@
  * Copyright (c) 2014 Google, Inc
  */
 
+#define LOG_CATEGORY UCLASS_I2C_EEPROM
+
 #include <common.h>
 #include <eeprom.h>
 #include <linux/delay.h>
@@ -31,7 +33,8 @@ int i2c_eeprom_read(struct udevice *dev, int offset, uint8_t *buf, int size)
 	return ops->read(dev, offset, buf, size);
 }
 
-int i2c_eeprom_write(struct udevice *dev, int offset, uint8_t *buf, int size)
+int i2c_eeprom_write(struct udevice *dev, int offset, const uint8_t *buf,
+		     int size)
 {
 	const struct i2c_eeprom_ops *ops = device_get_ops(dev);
 
@@ -93,7 +96,7 @@ static const struct i2c_eeprom_ops i2c_eeprom_std_ops = {
 	.size	= i2c_eeprom_std_size,
 };
 
-static int i2c_eeprom_std_ofdata_to_platdata(struct udevice *dev)
+static int i2c_eeprom_std_of_to_plat(struct udevice *dev)
 {
 	struct i2c_eeprom *priv = dev_get_priv(dev);
 	struct i2c_eeprom_drv_data *data =
@@ -131,8 +134,8 @@ static int i2c_eeprom_std_bind(struct udevice *dev)
 		if (!name)
 			continue;
 
-		device_bind_ofnode(dev, DM_GET_DRIVER(i2c_eeprom_partition),
-				   name, NULL, partition, NULL);
+		device_bind(dev, DM_DRIVER_GET(i2c_eeprom_partition), name,
+			    NULL, partition, NULL);
 	}
 
 	return 0;
@@ -163,13 +166,6 @@ static int i2c_eeprom_std_probe(struct udevice *dev)
 static const struct i2c_eeprom_drv_data eeprom_data = {
 	.size = 0,
 	.pagesize = 1,
-	.addr_offset_mask = 0,
-	.offset_len = 1,
-};
-
-static const struct i2c_eeprom_drv_data mc24aa02e48_data = {
-	.size = 256,
-	.pagesize = 8,
 	.addr_offset_mask = 0,
 	.offset_len = 1,
 };
@@ -261,7 +257,7 @@ static const struct i2c_eeprom_drv_data atmel24c512_data = {
 
 static const struct udevice_id i2c_eeprom_std_ids[] = {
 	{ .compatible = "i2c-eeprom", (ulong)&eeprom_data },
-	{ .compatible = "microchip,24aa02e48", (ulong)&mc24aa02e48_data },
+	{ .compatible = "atmel,24c01", (ulong)&atmel24c01a_data },
 	{ .compatible = "atmel,24c01a", (ulong)&atmel24c01a_data },
 	{ .compatible = "atmel,24c02", (ulong)&atmel24c02_data },
 	{ .compatible = "atmel,24c04", (ulong)&atmel24c04_data },
@@ -283,8 +279,8 @@ U_BOOT_DRIVER(i2c_eeprom_std) = {
 	.of_match		= i2c_eeprom_std_ids,
 	.bind			= i2c_eeprom_std_bind,
 	.probe			= i2c_eeprom_std_probe,
-	.ofdata_to_platdata	= i2c_eeprom_std_ofdata_to_platdata,
-	.priv_auto_alloc_size	= sizeof(struct i2c_eeprom),
+	.of_to_plat	= i2c_eeprom_std_of_to_plat,
+	.priv_auto	= sizeof(struct i2c_eeprom),
 	.ops			= &i2c_eeprom_std_ops,
 };
 
@@ -298,7 +294,7 @@ static int i2c_eeprom_partition_probe(struct udevice *dev)
 	return 0;
 }
 
-static int i2c_eeprom_partition_ofdata_to_platdata(struct udevice *dev)
+static int i2c_eeprom_partition_of_to_plat(struct udevice *dev)
 {
 	struct i2c_eeprom_partition *priv = dev_get_priv(dev);
 	u32 reg[2];
@@ -365,8 +361,8 @@ U_BOOT_DRIVER(i2c_eeprom_partition) = {
 	.name			= "i2c_eeprom_partition",
 	.id			= UCLASS_I2C_EEPROM,
 	.probe			= i2c_eeprom_partition_probe,
-	.ofdata_to_platdata	= i2c_eeprom_partition_ofdata_to_platdata,
-	.priv_auto_alloc_size	= sizeof(struct i2c_eeprom_partition),
+	.of_to_plat	= i2c_eeprom_partition_of_to_plat,
+	.priv_auto	= sizeof(struct i2c_eeprom_partition),
 	.ops			= &i2c_eeprom_partition_ops,
 };
 

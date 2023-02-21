@@ -232,7 +232,7 @@ static int setup_fec(void)
 	return 0;
 }
 
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 }
 
@@ -243,10 +243,6 @@ static int board_led_init(void)
 	struct udevice *bus, *dev;
 	u8 pca_led[2] = { 0x00, 0x00 };
 	int ret;
-
-	/* init all GPIO LED's */
-	if (IS_ENABLED(CONFIG_LED))
-		led_default_state();
 
 	/* enable all leds on PCA9552 */
 	ret = uclass_get_device_by_seq(UCLASS_I2C, PCA9552_1_I2C_BUS, &bus);

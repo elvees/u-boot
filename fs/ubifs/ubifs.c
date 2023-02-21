@@ -17,6 +17,7 @@
 #include <log.h>
 #include <malloc.h>
 #include <memalign.h>
+#include <asm/global_data.h>
 #include "ubifs.h"
 #include <part.h>
 #include <dm/devres.h>
@@ -787,6 +788,8 @@ static int do_readpage(struct ubifs_info *c, struct inode *inode,
 
 				if (last_block_size)
 					dlen = last_block_size;
+				else if (ret)
+					dlen = UBIFS_BLOCK_SIZE;
 				else
 					dlen = le32_to_cpu(dn->size);
 

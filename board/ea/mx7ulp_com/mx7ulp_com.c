@@ -5,6 +5,7 @@
 
 #include <common.h>
 #include <init.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/arch/mx7ulp-pins.h>
@@ -18,6 +19,10 @@ DECLARE_GLOBAL_DATA_PTR;
 int dram_init(void)
 {
 	gd->ram_size = imx_ddr_size();
+
+#ifdef CONFIG_OPTEE_TZDRAM_SIZE
+	gd->ram_size -= CONFIG_OPTEE_TZDRAM_SIZE;
+#endif
 
 	return 0;
 }
@@ -47,3 +52,29 @@ int board_init(void)
 
 	return 0;
 }
+
+#ifdef CONFIG_SPL_BUILD
+#include <spl.h>
+
+#ifdef CONFIG_SPL_LOAD_FIT
+int board_fit_config_name_match(const char *name)
+{
+	if (!strcmp(name, "imx7ulp-com"))
+		return 0;
+
+	return -1;
+}
+#endif
+
+void spl_board_init(void)
+{
+	preloader_console_init();
+}
+
+void board_init_f(ulong dummy)
+{
+	arch_cpu_init();
+
+	board_early_init_f();
+}
+#endif

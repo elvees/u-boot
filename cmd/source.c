@@ -107,7 +107,7 @@ int image_source_script(ulong addr, const char *fit_uname)
 #if defined(CONFIG_FIT)
 	case IMAGE_FORMAT_FIT:
 		fit_hdr = buf;
-		if (!fit_check_format (fit_hdr)) {
+		if (fit_check_format(fit_hdr, IMAGE_SIZE_INVAL)) {
 			puts ("Bad FIT image format\n");
 			return 1;
 		}
@@ -179,7 +179,7 @@ static int do_source(struct cmd_tbl *cmdtp, int flag, int argc,
 		      fit_uname, addr);
 #endif
 	} else {
-		addr = simple_strtoul(argv[1], NULL, 16);
+		addr = hextoul(argv[1], NULL);
 		debug("*  source: cmdline image address = 0x%08lx\n", addr);
 	}
 

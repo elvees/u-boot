@@ -4,6 +4,8 @@
  * Author(s): Patrice Chotard, <patrice.chotard@foss.st.com> for STMicroelectronics.
  */
 
+#define LOG_CATEGORY UCLASS_NOP
+
 #include <common.h>
 #include <dm.h>
 #include <log.h>
@@ -37,6 +39,11 @@ struct stm32_rcc_clk stm32_rcc_clk_mp1 = {
 	.soc = STM32MP1,
 };
 
+struct stm32_rcc_clk stm32_rcc_clk_mp13 = {
+	.drv_name = "stm32mp13_clk",
+	.soc = STM32MP1,
+};
+
 static int stm32_rcc_bind(struct udevice *dev)
 {
 	struct udevice *child;
@@ -45,14 +52,14 @@ static int stm32_rcc_bind(struct udevice *dev)
 		(struct stm32_rcc_clk *)dev_get_driver_data(dev);
 	int ret;
 
-	debug("%s(dev=%p)\n", __func__, dev);
+	dev_dbg(dev, "RCC bind\n");
 	drv = lists_driver_lookup_name(rcc_clk->drv_name);
 	if (!drv) {
-		debug("Cannot find driver '%s'\n", rcc_clk->drv_name);
+		dev_err(dev, "Cannot find driver '%s'\n", rcc_clk->drv_name);
 		return -ENOENT;
 	}
 
-	ret = device_bind_with_driver_data(dev, drv, rcc_clk->drv_name,
+	ret = device_bind_with_driver_data(dev, drv, dev->name,
 					   rcc_clk->soc,
 					   dev_ofnode(dev), &child);
 
@@ -65,7 +72,7 @@ static int stm32_rcc_bind(struct udevice *dev)
 		return -ENOENT;
 	}
 
-	return device_bind_with_driver_data(dev, drv, "stm32_rcc_reset",
+	return device_bind_with_driver_data(dev, drv, dev->name,
 					    rcc_clk->soc,
 					    dev_ofnode(dev), &child);
 }
@@ -77,6 +84,8 @@ static const struct udevice_id stm32_rcc_ids[] = {
 	{.compatible = "st,stm32f746-rcc", .data = (ulong)&stm32_rcc_clk_f7 },
 	{.compatible = "st,stm32h743-rcc", .data = (ulong)&stm32_rcc_clk_h7 },
 	{.compatible = "st,stm32mp1-rcc", .data = (ulong)&stm32_rcc_clk_mp1 },
+	{.compatible = "st,stm32mp1-rcc-secure", .data = (ulong)&stm32_rcc_clk_mp1 },
+	{.compatible = "st,stm32mp13-rcc", .data = (ulong)&stm32_rcc_clk_mp13 },
 	{ }
 };
 

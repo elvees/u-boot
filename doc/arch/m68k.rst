@@ -72,7 +72,7 @@ A bash script similar to the one below may be used:
 
    export CROSS_COMPILE=/opt/toolchains/m68k/gcc-4.9.0-nolibc/bin/m68k-linux-
 
-   board=M5475DFE
+   board=M5249EVB
 
    make distclean
    make ${board}_defconfig
@@ -114,8 +114,6 @@ apply to one or more cpu for the ColdFire family:
 
 CONFIG_SYS_MBAR:
   defines the base address of the MCF5272 configuration registers
-CONFIG_SYS_ENET_BD_BASE:
-  defines the base address of the FEC buffer descriptors
 CONFIG_SYS_SCR:
   defines the contents of the System Configuration Register
 CONFIG_SYS_SPR:

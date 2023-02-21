@@ -57,7 +57,7 @@ static int do_fpga_check_params(long *dev, long *fpga_data, size_t *data_size,
 	}
 	*fpga_data = local_fpga_data;
 
-	local_data_size = simple_strtoul(argv[2], NULL, 16);
+	local_data_size = hextoul(argv[2], NULL);
 	if (!local_data_size) {
 		debug("fpga: zero size\n");
 		return CMD_RET_USAGE;
@@ -95,8 +95,8 @@ int do_fpga_loads(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		 */
 		argc++;
 
-	fpga_sec_info.encflag = (u8)simple_strtoul(argv[4], NULL, 16);
-	fpga_sec_info.authflag = (u8)simple_strtoul(argv[3], NULL, 16);
+	fpga_sec_info.encflag = (u8)hextoul(argv[4], NULL);
+	fpga_sec_info.authflag = (u8)hextoul(argv[3], NULL);
 
 	if (fpga_sec_info.authflag >= FPGA_NO_ENC_OR_NO_AUTH &&
 	    fpga_sec_info.encflag >= FPGA_NO_ENC_OR_NO_AUTH) {
@@ -134,7 +134,7 @@ static int do_fpga_loadfs(struct cmd_tbl *cmdtp, int flag, int argc,
 		return ret;
 
 	fpga_fsinfo.fstype = FS_TYPE_ANY;
-	fpga_fsinfo.blocksize = (unsigned int)simple_strtoul(argv[3], NULL, 16);
+	fpga_fsinfo.blocksize = (unsigned int)hextoul(argv[3], NULL);
 	fpga_fsinfo.interface = argv[4];
 	fpga_fsinfo.dev_part = argv[5];
 	fpga_fsinfo.filename = argv[6];
@@ -178,7 +178,7 @@ static int do_fpga_load(struct cmd_tbl *cmdtp, int flag, int argc,
 	if (ret)
 		return ret;
 
-	return fpga_load(dev, (void *)fpga_data, data_size, BIT_FULL);
+	return fpga_load(dev, (void *)fpga_data, data_size, BIT_FULL, 0);
 }
 
 static int do_fpga_loadb(struct cmd_tbl *cmdtp, int flag, int argc,
@@ -209,7 +209,7 @@ static int do_fpga_loadp(struct cmd_tbl *cmdtp, int flag, int argc,
 	if (ret)
 		return ret;
 
-	return fpga_load(dev, (void *)fpga_data, data_size, BIT_PARTIAL);
+	return fpga_load(dev, (void *)fpga_data, data_size, BIT_PARTIAL, 0);
 }
 #endif
 
@@ -274,7 +274,7 @@ static int do_fpga_loadmk(struct cmd_tbl *cmdtp, int flag, int argc,
 	} else
 #endif
 	{
-		fpga_data = (void *)simple_strtoul(datastr, NULL, 16);
+		fpga_data = (void *)hextoul(datastr, NULL);
 		debug("*  fpga: cmdline image address = 0x%08lx\n",
 		      (ulong)fpga_data);
 	}
@@ -315,14 +315,14 @@ static int do_fpga_loadmk(struct cmd_tbl *cmdtp, int flag, int argc,
 			data_size = image_get_data_size(hdr);
 		}
 		return fpga_load(dev, (void *)data, data_size,
-				  BIT_FULL);
+				  BIT_FULL, 0);
 	}
 #endif
 #if defined(CONFIG_FIT)
 	case IMAGE_FORMAT_FIT:
 	{
 		const void *fit_hdr = (const void *)fpga_data;
-		int noffset;
+		int err;
 		const void *fit_data;
 
 		if (!fit_uname) {
@@ -330,32 +330,20 @@ static int do_fpga_loadmk(struct cmd_tbl *cmdtp, int flag, int argc,
 			return CMD_RET_FAILURE;
 		}
 
-		if (!fit_check_format(fit_hdr)) {
+		if (fit_check_format(fit_hdr, IMAGE_SIZE_INVAL)) {
 			puts("Bad FIT image format\n");
 			return CMD_RET_FAILURE;
 		}
 
-		/* get fpga component image node offset */
-		noffset = fit_image_get_node(fit_hdr, fit_uname);
-		if (noffset < 0) {
-			printf("Can't find '%s' FIT subimage\n", fit_uname);
+		err = fit_get_data_node(fit_hdr, fit_uname, &fit_data,
+					&data_size);
+		if (err) {
+			printf("Could not load '%s' subimage (err %d)\n",
+			       fit_uname, err);
 			return CMD_RET_FAILURE;
 		}
 
-		/* verify integrity */
-		if (!fit_image_verify(fit_hdr, noffset)) {
-			puts("Bad Data Hash\n");
-			return CMD_RET_FAILURE;
-		}
-
-		/* get fpga subimage/external data address and length */
-		if (fit_image_get_data_and_size(fit_hdr, noffset,
-					       &fit_data, &data_size)) {
-			puts("Fpga subimage data not found\n");
-			return CMD_RET_FAILURE;
-		}
-
-		return fpga_load(dev, fit_data, data_size, BIT_FULL);
+		return fpga_load(dev, fit_data, data_size, BIT_FULL, 0);
 	}
 #endif
 	default:

@@ -8,22 +8,7 @@
 #ifndef __CONFIG_EXYNOS5_COMMON_H
 #define __CONFIG_EXYNOS5_COMMON_H
 
-#define CONFIG_EXYNOS5			/* Exynos5 Family */
-
 #include "exynos-common.h"
-
-#define CONFIG_EXYNOS_SPL
-
-#ifdef FTRACE
-#define CONFIG_TRACE
-#define CONFIG_TRACE_BUFFER_SIZE	(16 << 20)
-#define CONFIG_TRACE_EARLY_SIZE		(8 << 20)
-#define CONFIG_TRACE_EARLY
-#define CONFIG_TRACE_EARLY_ADDR		0x50000000
-#endif
-
-/* Enable ACE acceleration for SHA1 and SHA256 */
-#define CONFIG_EXYNOS_ACE_SHA
 
 /* Power Down Modes */
 #define S5P_CHECK_SLEEP			0x00000BAD
@@ -39,17 +24,8 @@
 /* select serial console configuration */
 #define EXYNOS5_DEFAULT_UART_OFFSET	0x010000
 
-/* Thermal Management Unit */
-#define CONFIG_EXYNOS_TMU
-
 /* MMC SPL */
 #define COPY_BL2_FNPTR_ADDR	0x02020030
-
-/* specific .lds file */
-
-/* Boot Argument Buffer Size */
-/* memtest works on */
-#define CONFIG_SYS_LOAD_ADDR		(CONFIG_SYS_SDRAM_BASE + 0x3E00000)
 
 #define CONFIG_RD_LVL
 
@@ -69,37 +45,6 @@
 #define PHYS_SDRAM_7_SIZE	SDRAM_BANK_SIZE
 #define PHYS_SDRAM_8		(CONFIG_SYS_SDRAM_BASE + (7 * SDRAM_BANK_SIZE))
 #define PHYS_SDRAM_8_SIZE	SDRAM_BANK_SIZE
-
-#define CONFIG_SYS_MONITOR_BASE	0x00000000
-
-#define CONFIG_SECURE_BL1_ONLY
-
-/* Secure FW size configuration */
-#ifdef CONFIG_SECURE_BL1_ONLY
-#define CONFIG_SEC_FW_SIZE (8 << 10) /* 8KB */
-#else
-#define CONFIG_SEC_FW_SIZE 0
-#endif
-
-/* Configuration of BL1, BL2, ENV Blocks on mmc */
-#define CONFIG_RES_BLOCK_SIZE	(512)
-#define CONFIG_BL1_SIZE	(16 << 10) /*16 K reserved for BL1*/
-#define CONFIG_BL2_SIZE	(512UL << 10UL) /* 512 KB */
-
-#define CONFIG_BL1_OFFSET	(CONFIG_RES_BLOCK_SIZE + CONFIG_SEC_FW_SIZE)
-#define CONFIG_BL2_OFFSET	(CONFIG_BL1_OFFSET + CONFIG_BL1_SIZE)
-
-/* U-Boot copy size from boot Media to DRAM.*/
-#define BL2_START_OFFSET	(CONFIG_BL2_OFFSET/512)
-#define BL2_SIZE_BLOC_COUNT	(CONFIG_BL2_SIZE/512)
-
-#define EXYNOS_COPY_SPI_FNPTR_ADDR	0x02020058
-#define SPI_FLASH_UBOOT_POS	(CONFIG_SEC_FW_SIZE + CONFIG_BL1_SIZE)
-
-/* I2C */
-#define CONFIG_SYS_I2C_S3C24X0
-#define CONFIG_SYS_I2C_S3C24X0_SPEED	100000		/* 100 Kbps */
-#define CONFIG_SYS_I2C_S3C24X0_SLAVE    0x0
 
 /* SPI */
 

@@ -52,7 +52,7 @@ int exynos_init(void)
 	return 0;
 }
 
-#ifndef CONFIG_DM_I2C /* TODO(maintainer): Convert to driver model */
+#if !CONFIG_IS_ENABLED(DM_I2C) /* TODO(maintainer): Convert to driver model */
 static void trats_low_power_mode(void)
 {
 	struct exynos4_clock *clk =
@@ -114,7 +114,7 @@ static void trats_low_power_mode(void)
 
 int exynos_power_init(void)
 {
-#ifndef CONFIG_DM_I2C /* TODO(maintainer): Convert to driver model */
+#if !CONFIG_IS_ENABLED(DM_I2C) /* TODO(maintainer): Convert to driver model */
 	int chrg, ret;
 	struct power_battery *pb;
 	struct pmic *p_fg, *p_chrg, *p_muic, *p_bat;
@@ -293,7 +293,7 @@ int board_usb_init(int index, enum usb_init_type init)
 
 int g_dnl_board_usb_cable_connected(void)
 {
-#ifndef CONFIG_DM_I2C /* TODO(maintainer): Convert to driver model */
+#if !CONFIG_IS_ENABLED(DM_I2C) /* TODO(maintainer): Convert to driver model */
 	struct pmic *muic = pmic_get("MAX8997_MUIC");
 	if (!muic)
 		return 0;
@@ -403,19 +403,9 @@ int exynos_early_init_f(void)
 	return 0;
 }
 
-void exynos_reset_lcd(void)
-{
-	gpio_request(EXYNOS4_GPIO_Y45, "lcd_reset");
-	gpio_direction_output(EXYNOS4_GPIO_Y45, 1);
-	udelay(10000);
-	gpio_direction_output(EXYNOS4_GPIO_Y45, 0);
-	udelay(10000);
-	gpio_direction_output(EXYNOS4_GPIO_Y45, 1);
-}
-
 int lcd_power(void)
 {
-#ifndef CONFIG_DM_I2C /* TODO(maintainer): Convert to driver model */
+#if !CONFIG_IS_ENABLED(DM_I2C) /* TODO(maintainer): Convert to driver model */
 	int ret = 0;
 	struct pmic *p = pmic_get("MAX8997_PMIC");
 	if (!p)
@@ -439,7 +429,7 @@ int lcd_power(void)
 
 int mipi_power(void)
 {
-#ifndef CONFIG_DM_I2C /* TODO(maintainer): Convert to driver model */
+#if !CONFIG_IS_ENABLED(DM_I2C) /* TODO(maintainer): Convert to driver model */
 	int ret = 0;
 	struct pmic *p = pmic_get("MAX8997_PMIC");
 	if (!p)
@@ -460,16 +450,3 @@ int mipi_power(void)
 #endif
 	return 0;
 }
-
-#ifdef CONFIG_LCD
-void exynos_lcd_misc_init(vidinfo_t *vid)
-{
-#ifdef CONFIG_TIZEN
-	get_tizen_logo_info(vid);
-#endif
-#ifdef CONFIG_S6E8AX0
-	s6e8ax0_init();
-	env_set("lcdinfo", "lcd=s6e8ax0");
-#endif
-}
-#endif

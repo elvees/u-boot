@@ -1,21 +1,23 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2017-2020 NXP
+ * Copyright 2017-2021 NXP
  * Copyright 2014-2015 Freescale Semiconductor, Inc.
  */
 
 #include <common.h>
+#include <clock_legacy.h>
 #include <cpu_func.h>
 #include <env.h>
-#include <fsl_ddr_sdram.h>
 #include <init.h>
 #include <hang.h>
 #include <log.h>
 #include <net.h>
 #include <vsprintf.h>
 #include <asm/cache.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/ptrace.h>
+#include <linux/arm-smccc.h>
 #include <linux/errno.h>
 #include <asm/system.h>
 #include <fm_eth.h>
@@ -34,6 +36,7 @@
 #endif
 #include <asm/armv8/sec_firmware.h>
 #ifdef CONFIG_SYS_FSL_DDR
+#include <fsl_ddr_sdram.h>
 #include <fsl_ddr.h>
 #endif
 #include <asm/arch/clock.h>
@@ -47,6 +50,7 @@
 #endif
 #endif
 #include <linux/mii.h>
+#include <dm.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -450,7 +454,7 @@ static inline void early_mmu_setup(void)
 
 	/* point TTBR to the new table */
 	set_ttbr_tcr_mair(el, gd->arch.tlb_addr,
-			  get_tcr(el, NULL, NULL) &
+			  get_tcr(NULL, NULL) &
 			  ~(TCR_ORGN_MASK | TCR_IRGN_MASK),
 			  MEMORY_ATTRIBUTES);
 
@@ -605,7 +609,7 @@ static inline void final_mmu_setup(void)
 	invalidate_icache_all();
 
 	/* point TTBR to the new table */
-	set_ttbr_tcr_mair(el, gd->arch.tlb_addr, get_tcr(el, NULL, NULL),
+	set_ttbr_tcr_mair(el, gd->arch.tlb_addr, get_tcr(NULL, NULL),
 			  MEMORY_ATTRIBUTES);
 
 	set_sctlr(get_sctlr() | CR_M);
@@ -765,7 +769,7 @@ enum boot_src __get_boot_src(u32 porsr1)
 
 enum boot_src get_boot_src(void)
 {
-	struct pt_regs regs;
+	struct arm_smccc_res res;
 	u32 porsr1 = 0;
 
 #if defined(CONFIG_FSL_LSCH3)
@@ -775,11 +779,9 @@ enum boot_src get_boot_src(void)
 #endif
 
 	if (current_el() == 2) {
-		regs.regs[0] = SIP_SVC_RCW;
-
-		smc_call(&regs);
-		if (!regs.regs[0])
-			porsr1 = regs.regs[1];
+		arm_smccc_smc(SIP_SVC_RCW, 0, 0, 0, 0, 0, 0, 0, &res);
+		if (!res.a0)
+			porsr1 = res.a1;
 	}
 
 	if (current_el() == 3 || !porsr1) {
@@ -816,7 +818,7 @@ int mmc_get_env_dev(void)
 }
 #endif
 
-enum env_location env_get_location(enum env_operation op, int prio)
+enum env_location arch_env_get_location(enum env_operation op, int prio)
 {
 	enum boot_src src = get_boot_src();
 	enum env_location env_loc = ENVL_NOWHERE;
@@ -1062,7 +1064,7 @@ int cpu_eth_init(struct bd_info *bis)
 	return error;
 }
 
-static inline int check_psci(void)
+int check_psci(void)
 {
 	unsigned int psci_ver;
 
@@ -1078,9 +1080,9 @@ static void config_core_prefetch(void)
 	char *buf = NULL;
 	char buffer[HWCONFIG_BUFFER_SIZE];
 	const char *prefetch_arg = NULL;
+	struct arm_smccc_res res;
 	size_t arglen;
 	unsigned int mask;
-	struct pt_regs regs;
 
 	if (env_get_f("hwconfig", buffer, sizeof(buffer)) > 0)
 		buf = buffer;
@@ -1098,11 +1100,10 @@ static void config_core_prefetch(void)
 		}
 
 #define SIP_PREFETCH_DISABLE_64 0xC200FF13
-		regs.regs[0] = SIP_PREFETCH_DISABLE_64;
-		regs.regs[1] = mask;
-		smc_call(&regs);
+		arm_smccc_smc(SIP_PREFETCH_DISABLE_64, mask, 0, 0, 0, 0, 0, 0,
+			      &res);
 
-		if (regs.regs[0])
+		if (res.a0)
 			printf("Prefetch disable config failed for mask ");
 		else
 			printf("Prefetch disable config passed for mask ");
@@ -1146,7 +1147,7 @@ int arch_early_init_r(void)
 #endif
 #ifdef CONFIG_SYS_FSL_HAS_RGMII
 	/* some dpmacs in armv8a based freescale layerscape SOCs can be
-	 * configured via both serdes(sgmii, xfi, xlaui etc) bits and via
+	 * configured via both serdes(sgmii, 10gbase-r, xlaui etc) bits and via
 	 * EC*_PMUX(rgmii) bits in RCW.
 	 * e.g. dpmac 17 and 18 in LX2160A can be configured as SGMII from
 	 * serdes bits and as RGMII via EC1_PMUX/EC2_PMUX bits
@@ -1230,7 +1231,7 @@ int timer_init(void)
 
 __efi_runtime_data u32 __iomem *rstcr = (u32 *)CONFIG_SYS_FSL_RST_ADDR;
 
-void __efi_runtime reset_cpu(ulong addr)
+void __efi_runtime reset_cpu(void)
 {
 #if defined(CONFIG_ARCH_LX2160A) || defined(CONFIG_ARCH_LX2162A)
 	/* clear the RST_REQ_MSK and SW_RST_REQ */
@@ -1259,7 +1260,7 @@ void __efi_runtime EFIAPI efi_reset_system(
 	case EFI_RESET_COLD:
 	case EFI_RESET_WARM:
 	case EFI_RESET_PLATFORM_SPECIFIC:
-		reset_cpu(0);
+		reset_cpu();
 		break;
 	case EFI_RESET_SHUTDOWN:
 		/* Nothing we can do */
@@ -1342,25 +1343,20 @@ phys_size_t get_effective_memsize(void)
 #ifdef CONFIG_TFABOOT
 phys_size_t tfa_get_dram_size(void)
 {
-	struct pt_regs regs;
-	phys_size_t dram_size = 0;
+	struct arm_smccc_res res;
 
-	regs.regs[0] = SMC_DRAM_BANK_INFO;
-	regs.regs[1] = -1;
-
-	smc_call(&regs);
-	if (regs.regs[0])
+	arm_smccc_smc(SMC_DRAM_BANK_INFO, -1, 0, 0, 0, 0, 0, 0, &res);
+	if (res.a0)
 		return 0;
 
-	dram_size = regs.regs[1];
-	return dram_size;
+	return res.a1;
 }
 
 static int tfa_dram_init_banksize(void)
 {
 	int i = 0, ret = 0;
-	struct pt_regs regs;
 	phys_size_t dram_size = tfa_get_dram_size();
+	struct arm_smccc_res res;
 
 	debug("dram_size %llx\n", dram_size);
 
@@ -1368,19 +1364,15 @@ static int tfa_dram_init_banksize(void)
 		return -EINVAL;
 
 	do {
-		regs.regs[0] = SMC_DRAM_BANK_INFO;
-		regs.regs[1] = i;
-
-		smc_call(&regs);
-		if (regs.regs[0]) {
+		arm_smccc_smc(SMC_DRAM_BANK_INFO, i, 0, 0, 0, 0, 0, 0, &res);
+		if (res.a0) {
 			ret = -EINVAL;
 			break;
 		}
 
-		debug("bank[%d]: start %lx, size %lx\n", i, regs.regs[1],
-		      regs.regs[2]);
-		gd->bd->bi_dram[i].start = regs.regs[1];
-		gd->bd->bi_dram[i].size = regs.regs[2];
+		debug("bank[%d]: start %lx, size %lx\n", i, res.a1, res.a2);
+		gd->bd->bi_dram[i].start = res.a1;
+		gd->bd->bi_dram[i].size = res.a2;
 
 		dram_size -= gd->bd->bi_dram[i].size;
 
@@ -1630,11 +1622,13 @@ void update_early_mmu_table(void)
 
 __weak int dram_init(void)
 {
+#ifdef CONFIG_SYS_FSL_DDR
 	fsl_initdram();
 #if (!defined(CONFIG_SPL) && !defined(CONFIG_TFABOOT)) || \
 	defined(CONFIG_SPL_BUILD)
 	/* This will break-before-make MMU for DDR */
 	update_early_mmu_table();
+#endif
 #endif
 
 	return 0;
@@ -1648,6 +1642,14 @@ __weak int serdes_misc_init(void)
 
 int arch_misc_init(void)
 {
+	if (IS_ENABLED(CONFIG_FSL_CAAM)) {
+		struct udevice *dev;
+		int ret;
+
+		ret = uclass_get_device_by_driver(UCLASS_MISC, DM_DRIVER_GET(caam_jr), &dev);
+		if (ret)
+			printf("Failed to initialize caam_jr: %d\n", ret);
+	}
 	serdes_misc_init();
 
 	return 0;

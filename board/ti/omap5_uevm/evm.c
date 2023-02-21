@@ -15,6 +15,7 @@
 #include <serial.h>
 #include <tca642x.h>
 #include <usb.h>
+#include <asm/global_data.h>
 #include <linux/delay.h>
 #include <linux/usb/gadget.h>
 #include <dwc3-uboot.h>
@@ -137,7 +138,7 @@ int usb_gadget_handle_interrupts(int index)
 /**
  * @brief board_init
  *
- * @return 0
+ * Return: 0
  */
 int board_init(void)
 {
@@ -171,7 +172,7 @@ int board_eth_init(struct bd_info *bis)
  * such as power configurations, ethernet initialization as phase2 of
  * boot sequence
  *
- * @return 0
+ * Return: 0
  */
 int misc_init_r(void)
 {
@@ -211,7 +212,7 @@ int board_mmc_init(struct bd_info *bis)
  * @brief board_usb_init - Configure EVM board specific configurations
  * for the LDO's and clocks for the USB blocks.
  *
- * @return 0
+ * Return: 0
  */
 int board_usb_init(int index, enum usb_init_type init)
 {

@@ -20,12 +20,11 @@
 #include <reset.h>
 #include <asm/gpio.h>
 #include <asm/io.h>
-#include <asm/arch/clock.h>
-#include <asm/arch/cpu.h>
 #include <dm/device_compat.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/err.h>
+#include <power/regulator.h>
 
 #define REG_ISCR			0x00
 #define REG_PHYCTL_A10			0x04
@@ -33,7 +32,8 @@
 #define REG_PHYTUNE			0x0c
 #define REG_PHYCTL_A33			0x10
 #define REG_PHY_OTGCTL			0x20
-#define REG_PMU_UNK1			0x10
+
+#define REG_HCI_PHY_CTL			0x10
 
 /* Common Control Bits for Both PHYs */
 #define PHY_PLL_BW			0x03
@@ -64,6 +64,7 @@
 /* A83T specific control bits for PHY0 */
 #define PHY_CTL_VBUSVLDEXT		BIT(5)
 #define PHY_CTL_SIDDQ			BIT(3)
+#define PHY_CTL_H3_SIDDQ		BIT(1)
 
 /* A83T specific control bits for PHY2 HSIC */
 #define SUNXI_EHCI_HS_FORCE		BIT(20)
@@ -88,9 +89,9 @@ struct sun4i_usb_phy_cfg {
 	int num_phys;
 	enum sun4i_usb_phy_type type;
 	u32 disc_thresh;
+	u32 hci_phy_ctl_clear;
 	u8 phyctl_offset;
 	bool dedicated_clocks;
-	bool enable_pmu_unk1;
 	bool phy0_dual_route;
 	int missing_phys;
 };
@@ -124,10 +125,9 @@ struct sun4i_usb_phy_info {
 
 struct sun4i_usb_phy_plat {
 	void __iomem *pmu;
-	int power_on_count;
-	int gpio_vbus;
-	int gpio_vbus_det;
-	int gpio_id_det;
+	struct gpio_desc gpio_vbus;
+	struct gpio_desc gpio_vbus_det;
+	struct gpio_desc gpio_id_det;
 	struct clk clocks;
 	struct reset_ctl resets;
 	int id;
@@ -137,6 +137,7 @@ struct sun4i_usb_phy_data {
 	void __iomem *base;
 	const struct sun4i_usb_phy_cfg *cfg;
 	struct sun4i_usb_phy_plat *usb_phy;
+	struct udevice *vbus_power_supply;
 };
 
 static int initial_usb_scan_delay = CONFIG_INITIAL_USB_SCAN_DELAY;
@@ -223,12 +224,8 @@ static int sun4i_usb_phy_power_on(struct phy *phy)
 		initial_usb_scan_delay = 0;
 	}
 
-	usb_phy->power_on_count++;
-	if (usb_phy->power_on_count != 1)
-		return 0;
-
-	if (usb_phy->gpio_vbus >= 0)
-		gpio_set_value(usb_phy->gpio_vbus, SUNXI_GPIO_PULL_UP);
+	if (dm_gpio_is_valid(&usb_phy->gpio_vbus))
+		dm_gpio_set_value(&usb_phy->gpio_vbus, 1);
 
 	return 0;
 }
@@ -238,12 +235,8 @@ static int sun4i_usb_phy_power_off(struct phy *phy)
 	struct sun4i_usb_phy_data *data = dev_get_priv(phy->dev);
 	struct sun4i_usb_phy_plat *usb_phy = &data->usb_phy[phy->id];
 
-	usb_phy->power_on_count--;
-	if (usb_phy->power_on_count != 0)
-		return 0;
-
-	if (usb_phy->gpio_vbus >= 0)
-		gpio_set_value(usb_phy->gpio_vbus, SUNXI_GPIO_PULL_DISABLE);
+	if (dm_gpio_is_valid(&usb_phy->gpio_vbus))
+		dm_gpio_set_value(&usb_phy->gpio_vbus, 0);
 
 	return 0;
 }
@@ -284,6 +277,12 @@ static int sun4i_usb_phy_init(struct phy *phy)
 		return ret;
 	}
 
+	if (usb_phy->pmu && data->cfg->hci_phy_ctl_clear) {
+		val = readl(usb_phy->pmu + REG_HCI_PHY_CTL);
+		val &= ~data->cfg->hci_phy_ctl_clear;
+		writel(val, usb_phy->pmu + REG_HCI_PHY_CTL);
+	}
+
 	if (data->cfg->type == sun8i_a83t_phy ||
 	    data->cfg->type == sun50i_h6_phy) {
 		if (phy->id == 0) {
@@ -293,11 +292,6 @@ static int sun4i_usb_phy_init(struct phy *phy)
 			writel(val, data->base + data->cfg->phyctl_offset);
 		}
 	} else {
-		if (usb_phy->pmu && data->cfg->enable_pmu_unk1) {
-			val = readl(usb_phy->pmu + REG_PMU_UNK1);
-			writel(val & ~2, usb_phy->pmu + REG_PMU_UNK1);
-		}
-
 		if (usb_phy->id == 0)
 			sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN,
 					    PHY_RES45_CAL_DATA,
@@ -313,9 +307,21 @@ static int sun4i_usb_phy_init(struct phy *phy)
 				    data->cfg->disc_thresh, PHY_DISCON_TH_LEN);
 	}
 
+#ifdef CONFIG_USB_MUSB_SUNXI
+	/* Needed for HCI and conflicts with MUSB, keep PHY0 on MUSB */
+	if (usb_phy->id != 0)
+		sun4i_usb_phy_passby(phy, true);
+
+	/* Route PHY0 to MUSB to allow USB gadget */
+	if (data->cfg->phy0_dual_route)
+		sun4i_usb_phy0_reroute(data, true);
+#else
 	sun4i_usb_phy_passby(phy, true);
 
-	sun4i_usb_phy0_reroute(data, true);
+	/* Route PHY0 to HCI to allow USB host */
+	if (data->cfg->phy0_dual_route)
+		sun4i_usb_phy0_reroute(data, false);
+#endif
 
 	return 0;
 }
@@ -379,22 +385,21 @@ int sun4i_usb_phy_vbus_detect(struct phy *phy)
 {
 	struct sun4i_usb_phy_data *data = dev_get_priv(phy->dev);
 	struct sun4i_usb_phy_plat *usb_phy = &data->usb_phy[phy->id];
-	int err, retries = 3;
+	int err = 1, retries = 3;
 
-	debug("%s: id_det = %d\n", __func__, usb_phy->gpio_id_det);
-
-	if (usb_phy->gpio_vbus_det < 0)
-		return usb_phy->gpio_vbus_det;
-
-	err = gpio_get_value(usb_phy->gpio_vbus_det);
-	/*
-	 * Vbus may have been provided by the board and just been turned of
-	 * some milliseconds ago on reset, what we're measuring then is a
-	 * residual charge on Vbus, sleep a bit and try again.
-	 */
-	while (err > 0 && retries--) {
-		mdelay(100);
-		err = gpio_get_value(usb_phy->gpio_vbus_det);
+	if (dm_gpio_is_valid(&usb_phy->gpio_vbus_det)) {
+		err = dm_gpio_get_value(&usb_phy->gpio_vbus_det);
+		/*
+		 * Vbus may have been provided by the board and just turned off
+		 * some milliseconds ago on reset. What we're measuring then is
+		 * a residual charge on Vbus. Sleep a bit and try again.
+		 */
+		while (err > 0 && retries--) {
+			mdelay(100);
+			err = dm_gpio_get_value(&usb_phy->gpio_vbus_det);
+		}
+	} else if (data->vbus_power_supply) {
+		err = regulator_get_enable(data->vbus_power_supply);
 	}
 
 	return err;
@@ -405,12 +410,10 @@ int sun4i_usb_phy_id_detect(struct phy *phy)
 	struct sun4i_usb_phy_data *data = dev_get_priv(phy->dev);
 	struct sun4i_usb_phy_plat *usb_phy = &data->usb_phy[phy->id];
 
-	debug("%s: id_det = %d\n", __func__, usb_phy->gpio_id_det);
+	if (!dm_gpio_is_valid(&usb_phy->gpio_id_det))
+		return -1;
 
-	if (usb_phy->gpio_id_det < 0)
-		return usb_phy->gpio_id_det;
-
-	return gpio_get_value(usb_phy->gpio_id_det);
+	return dm_gpio_get_value(&usb_phy->gpio_id_det);
 }
 
 void sun4i_usb_phy_set_squelch_detect(struct phy *phy, bool enabled)
@@ -428,7 +431,7 @@ static struct phy_ops sun4i_usb_phy_ops = {
 
 static int sun4i_usb_phy_probe(struct udevice *dev)
 {
-	struct sun4i_usb_phy_plat *plat = dev_get_platdata(dev);
+	struct sun4i_usb_phy_plat *plat = dev_get_plat(dev);
 	struct sun4i_usb_phy_data *data = dev_get_priv(dev);
 	int i, ret;
 
@@ -440,6 +443,9 @@ static int sun4i_usb_phy_probe(struct udevice *dev)
 	if (IS_ERR(data->base))
 		return PTR_ERR(data->base);
 
+	device_get_supply_regulator(dev, "usb0_vbus_power-supply",
+				    &data->vbus_power_supply);
+
 	data->usb_phy = plat;
 	for (i = 0; i < data->cfg->num_phys; i++) {
 		struct sun4i_usb_phy_plat *phy = &plat[i];
@@ -449,35 +455,42 @@ static int sun4i_usb_phy_probe(struct udevice *dev)
 		if (data->cfg->missing_phys & BIT(i))
 			continue;
 
-		phy->gpio_vbus = sunxi_name_to_gpio(info->gpio_vbus);
-		if (phy->gpio_vbus >= 0) {
-			ret = gpio_request(phy->gpio_vbus, "usb_vbus");
+		ret = dm_gpio_lookup_name(info->gpio_vbus, &phy->gpio_vbus);
+		if (ret == 0) {
+			ret = dm_gpio_request(&phy->gpio_vbus, "usb_vbus");
 			if (ret)
 				return ret;
-			ret = gpio_direction_output(phy->gpio_vbus, 0);
+			ret = dm_gpio_set_dir_flags(&phy->gpio_vbus,
+						    GPIOD_IS_OUT);
 			if (ret)
 				return ret;
-		}
-
-		phy->gpio_vbus_det = sunxi_name_to_gpio(info->gpio_vbus_det);
-		if (phy->gpio_vbus_det >= 0) {
-			ret = gpio_request(phy->gpio_vbus_det, "usb_vbus_det");
-			if (ret)
-				return ret;
-			ret = gpio_direction_input(phy->gpio_vbus_det);
+			ret = dm_gpio_set_value(&phy->gpio_vbus, 0);
 			if (ret)
 				return ret;
 		}
 
-		phy->gpio_id_det = sunxi_name_to_gpio(info->gpio_id_det);
-		if (phy->gpio_id_det >= 0) {
-			ret = gpio_request(phy->gpio_id_det, "usb_id_det");
+		ret = dm_gpio_lookup_name(info->gpio_vbus_det,
+					  &phy->gpio_vbus_det);
+		if (ret == 0) {
+			ret = dm_gpio_request(&phy->gpio_vbus_det,
+					      "usb_vbus_det");
 			if (ret)
 				return ret;
-			ret = gpio_direction_input(phy->gpio_id_det);
+			ret = dm_gpio_set_dir_flags(&phy->gpio_vbus_det,
+						    GPIOD_IS_IN);
 			if (ret)
 				return ret;
-			sunxi_gpio_set_pull(phy->gpio_id_det, SUNXI_GPIO_PULL_UP);
+		}
+
+		ret = dm_gpio_lookup_name(info->gpio_id_det, &phy->gpio_id_det);
+		if (ret == 0) {
+			ret = dm_gpio_request(&phy->gpio_id_det, "usb_id_det");
+			if (ret)
+				return ret;
+			ret = dm_gpio_set_dir_flags(&phy->gpio_id_det,
+						GPIOD_IS_IN | GPIOD_PULL_UP);
+			if (ret)
+				return ret;
 		}
 
 		if (data->cfg->dedicated_clocks)
@@ -518,7 +531,6 @@ static const struct sun4i_usb_phy_cfg sun4i_a10_cfg = {
 	.disc_thresh = 3,
 	.phyctl_offset = REG_PHYCTL_A10,
 	.dedicated_clocks = false,
-	.enable_pmu_unk1 = false,
 };
 
 static const struct sun4i_usb_phy_cfg sun5i_a13_cfg = {
@@ -527,7 +539,6 @@ static const struct sun4i_usb_phy_cfg sun5i_a13_cfg = {
 	.disc_thresh = 2,
 	.phyctl_offset = REG_PHYCTL_A10,
 	.dedicated_clocks = false,
-	.enable_pmu_unk1 = false,
 };
 
 static const struct sun4i_usb_phy_cfg sun6i_a31_cfg = {
@@ -536,7 +547,6 @@ static const struct sun4i_usb_phy_cfg sun6i_a31_cfg = {
 	.disc_thresh = 3,
 	.phyctl_offset = REG_PHYCTL_A10,
 	.dedicated_clocks = true,
-	.enable_pmu_unk1 = false,
 };
 
 static const struct sun4i_usb_phy_cfg sun7i_a20_cfg = {
@@ -545,7 +555,6 @@ static const struct sun4i_usb_phy_cfg sun7i_a20_cfg = {
 	.disc_thresh = 2,
 	.phyctl_offset = REG_PHYCTL_A10,
 	.dedicated_clocks = false,
-	.enable_pmu_unk1 = false,
 };
 
 static const struct sun4i_usb_phy_cfg sun8i_a23_cfg = {
@@ -554,7 +563,6 @@ static const struct sun4i_usb_phy_cfg sun8i_a23_cfg = {
 	.disc_thresh = 3,
 	.phyctl_offset = REG_PHYCTL_A10,
 	.dedicated_clocks = true,
-	.enable_pmu_unk1 = false,
 };
 
 static const struct sun4i_usb_phy_cfg sun8i_a33_cfg = {
@@ -563,7 +571,6 @@ static const struct sun4i_usb_phy_cfg sun8i_a33_cfg = {
 	.disc_thresh = 3,
 	.phyctl_offset = REG_PHYCTL_A33,
 	.dedicated_clocks = true,
-	.enable_pmu_unk1 = false,
 };
 
 static const struct sun4i_usb_phy_cfg sun8i_a83t_cfg = {
@@ -579,7 +586,7 @@ static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
 	.disc_thresh = 3,
 	.phyctl_offset = REG_PHYCTL_A33,
 	.dedicated_clocks = true,
-	.enable_pmu_unk1 = true,
+	.hci_phy_ctl_clear = PHY_CTL_H3_SIDDQ,
 	.phy0_dual_route = true,
 };
 
@@ -589,7 +596,7 @@ static const struct sun4i_usb_phy_cfg sun8i_r40_cfg = {
 	.disc_thresh = 3,
 	.phyctl_offset = REG_PHYCTL_A33,
 	.dedicated_clocks = true,
-	.enable_pmu_unk1 = true,
+	.hci_phy_ctl_clear = PHY_CTL_H3_SIDDQ,
 	.phy0_dual_route = true,
 };
 
@@ -599,7 +606,16 @@ static const struct sun4i_usb_phy_cfg sun8i_v3s_cfg = {
 	.disc_thresh = 3,
 	.phyctl_offset = REG_PHYCTL_A33,
 	.dedicated_clocks = true,
-	.enable_pmu_unk1 = true,
+	.hci_phy_ctl_clear = PHY_CTL_H3_SIDDQ,
+	.phy0_dual_route = true,
+};
+
+static const struct sun4i_usb_phy_cfg sun20i_d1_cfg = {
+	.num_phys = 2,
+	.type = sun50i_h6_phy,
+	.phyctl_offset = REG_PHYCTL_A33,
+	.dedicated_clocks = true,
+	.hci_phy_ctl_clear = PHY_CTL_SIDDQ,
 	.phy0_dual_route = true,
 };
 
@@ -609,7 +625,7 @@ static const struct sun4i_usb_phy_cfg sun50i_a64_cfg = {
 	.disc_thresh = 3,
 	.phyctl_offset = REG_PHYCTL_A33,
 	.dedicated_clocks = true,
-	.enable_pmu_unk1 = true,
+	.hci_phy_ctl_clear = PHY_CTL_H3_SIDDQ,
 	.phy0_dual_route = true,
 };
 
@@ -619,7 +635,6 @@ static const struct sun4i_usb_phy_cfg sun50i_h6_cfg = {
 	.disc_thresh = 3,
 	.phyctl_offset = REG_PHYCTL_A33,
 	.dedicated_clocks = true,
-	.enable_pmu_unk1 = true,
 	.phy0_dual_route = true,
 	.missing_phys = BIT(1) | BIT(2),
 };
@@ -635,6 +650,7 @@ static const struct udevice_id sun4i_usb_phy_ids[] = {
 	{ .compatible = "allwinner,sun8i-h3-usb-phy", .data = (ulong)&sun8i_h3_cfg },
 	{ .compatible = "allwinner,sun8i-r40-usb-phy", .data = (ulong)&sun8i_r40_cfg },
 	{ .compatible = "allwinner,sun8i-v3s-usb-phy", .data = (ulong)&sun8i_v3s_cfg },
+	{ .compatible = "allwinner,sun20i-d1-usb-phy", .data = (ulong)&sun20i_d1_cfg },
 	{ .compatible = "allwinner,sun50i-a64-usb-phy", .data = (ulong)&sun50i_a64_cfg},
 	{ .compatible = "allwinner,sun50i-h6-usb-phy", .data = (ulong)&sun50i_h6_cfg},
 	{ }
@@ -646,6 +662,6 @@ U_BOOT_DRIVER(sun4i_usb_phy) = {
 	.of_match = sun4i_usb_phy_ids,
 	.ops = &sun4i_usb_phy_ops,
 	.probe = sun4i_usb_phy_probe,
-	.platdata_auto_alloc_size = sizeof(struct sun4i_usb_phy_plat[MAX_PHYS]),
-	.priv_auto_alloc_size = sizeof(struct sun4i_usb_phy_data),
+	.plat_auto	= sizeof(struct sun4i_usb_phy_plat[MAX_PHYS]),
+	.priv_auto	= sizeof(struct sun4i_usb_phy_data),
 };

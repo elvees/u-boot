@@ -26,7 +26,7 @@ struct altera_jtaguart_regs {
 	u32	control;		/* Control register */
 };
 
-struct altera_jtaguart_platdata {
+struct altera_jtaguart_plat {
 	struct altera_jtaguart_regs *regs;
 };
 
@@ -37,7 +37,7 @@ static int altera_jtaguart_setbrg(struct udevice *dev, int baudrate)
 
 static int altera_jtaguart_putc(struct udevice *dev, const char ch)
 {
-	struct altera_jtaguart_platdata *plat = dev->platdata;
+	struct altera_jtaguart_plat *plat = dev_get_plat(dev);
 	struct altera_jtaguart_regs *const regs = plat->regs;
 	u32 st = readl(&regs->control);
 
@@ -56,7 +56,7 @@ static int altera_jtaguart_putc(struct udevice *dev, const char ch)
 
 static int altera_jtaguart_pending(struct udevice *dev, bool input)
 {
-	struct altera_jtaguart_platdata *plat = dev->platdata;
+	struct altera_jtaguart_plat *plat = dev_get_plat(dev);
 	struct altera_jtaguart_regs *const regs = plat->regs;
 	u32 st = readl(&regs->control);
 
@@ -68,7 +68,7 @@ static int altera_jtaguart_pending(struct udevice *dev, bool input)
 
 static int altera_jtaguart_getc(struct udevice *dev)
 {
-	struct altera_jtaguart_platdata *plat = dev->platdata;
+	struct altera_jtaguart_plat *plat = dev_get_plat(dev);
 	struct altera_jtaguart_regs *const regs = plat->regs;
 	u32 val;
 
@@ -83,7 +83,7 @@ static int altera_jtaguart_getc(struct udevice *dev)
 static int altera_jtaguart_probe(struct udevice *dev)
 {
 #ifdef CONFIG_ALTERA_JTAG_UART_BYPASS
-	struct altera_jtaguart_platdata *plat = dev->platdata;
+	struct altera_jtaguart_plat *plat = dev_get_plat(dev);
 	struct altera_jtaguart_regs *const regs = plat->regs;
 
 	writel(ALTERA_JTAG_AC, &regs->control); /* clear AC flag */
@@ -91,9 +91,9 @@ static int altera_jtaguart_probe(struct udevice *dev)
 	return 0;
 }
 
-static int altera_jtaguart_ofdata_to_platdata(struct udevice *dev)
+static int altera_jtaguart_of_to_plat(struct udevice *dev)
 {
-	struct altera_jtaguart_platdata *plat = dev_get_platdata(dev);
+	struct altera_jtaguart_plat *plat = dev_get_plat(dev);
 
 	plat->regs = map_physmem(dev_read_addr(dev),
 				 sizeof(struct altera_jtaguart_regs),
@@ -118,8 +118,8 @@ U_BOOT_DRIVER(altera_jtaguart) = {
 	.name	= "altera_jtaguart",
 	.id	= UCLASS_SERIAL,
 	.of_match = altera_jtaguart_ids,
-	.ofdata_to_platdata = altera_jtaguart_ofdata_to_platdata,
-	.platdata_auto_alloc_size = sizeof(struct altera_jtaguart_platdata),
+	.of_to_plat = altera_jtaguart_of_to_plat,
+	.plat_auto	= sizeof(struct altera_jtaguart_plat),
 	.probe = altera_jtaguart_probe,
 	.ops	= &altera_jtaguart_ops,
 };
@@ -134,7 +134,7 @@ static inline void _debug_uart_init(void)
 
 static inline void _debug_uart_putc(int ch)
 {
-	struct altera_jtaguart_regs *regs = (void *)CONFIG_DEBUG_UART_BASE;
+	struct altera_jtaguart_regs *regs = (void *)CONFIG_VAL(DEBUG_UART_BASE);
 
 	while (1) {
 		u32 st = readl(&regs->control);

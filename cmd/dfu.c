@@ -28,13 +28,11 @@ static int do_dfu(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 #ifdef CONFIG_DFU_OVER_USB
 	char *usb_controller = argv[1];
 #endif
-#if defined(CONFIG_DFU_OVER_USB) || defined(CONFIG_DFU_OVER_TFTP)
 	char *interface = NULL;
 	char *devstring = NULL;
 #if defined(CONFIG_DFU_TIMEOUT) || defined(CONFIG_DFU_OVER_TFTP)
 	unsigned long value = 0;
 #endif
-
 	if (argc >= 4) {
 		interface = argv[2];
 		devstring = argv[3];
@@ -44,14 +42,12 @@ static int do_dfu(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	if (argc == 5 || argc == 3)
 		value = simple_strtoul(argv[argc - 1], NULL, 0);
 #endif
-#endif
 
 	int ret = 0;
 #ifdef CONFIG_DFU_OVER_TFTP
 	if (!strcmp(argv[1], "tftp"))
 		return update_tftp(value, interface, devstring);
 #endif
-#ifdef CONFIG_DFU_OVER_USB
 	ret = dfu_init_env_entities(interface, devstring);
 	if (ret)
 		goto done;
@@ -66,13 +62,24 @@ static int do_dfu(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		goto done;
 	}
 
+#ifdef CONFIG_DFU_OVER_USB
 	int controller_index = simple_strtoul(usb_controller, NULL, 0);
+	bool retry = false;
+	do {
+		ret = run_usb_dnl_gadget(controller_index, "usb_dnl_dfu");
 
-	run_usb_dnl_gadget(controller_index, "usb_dnl_dfu");
+		if (dfu_reinit_needed) {
+			dfu_free_entities();
+			ret = dfu_init_env_entities(interface, devstring);
+			if (ret)
+				goto done;
+			retry = true;
+		}
+	} while (retry);
 
+#endif
 done:
 	dfu_free_entities();
-#endif
 	return ret;
 }
 
@@ -91,8 +98,8 @@ U_BOOT_CMD(dfu, CONFIG_SYS_MAXARGS, 1, do_dfu,
 #ifdef CONFIG_DFU_TIMEOUT
 	"    [<timeout>] - specify inactivity timeout in seconds\n"
 #endif
-	"    [list] - list available alt settings\n"
 #endif
+	"    [list] - list available alt settings\n"
 #ifdef CONFIG_DFU_OVER_TFTP
 #ifdef CONFIG_DFU_OVER_USB
 	"dfu "

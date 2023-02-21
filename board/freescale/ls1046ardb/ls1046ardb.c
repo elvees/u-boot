@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2016 Freescale Semiconductor, Inc.
+ * Copyright 2021 NXP
  */
 
 #include <common.h>
 #include <i2c.h>
 #include <fdt_support.h>
 #include <init.h>
+#include <semihosting.h>
+#include <serial.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/fsl_serdes.h>
@@ -22,9 +26,17 @@
 #include <fsl_esdhc.h>
 #include <power/mc34vr500_pmic.h>
 #include "cpld.h"
-#include <fsl_sec.h>
 
 DECLARE_GLOBAL_DATA_PTR;
+
+struct serial_device *default_serial_console(void)
+{
+#if IS_ENABLED(CONFIG_SEMIHOSTING_SERIAL)
+	if (semihosting_enabled())
+		return &serial_smh_device;
+#endif
+	return &eserial1_device;
+}
 
 int board_early_init_f(void)
 {
@@ -84,12 +96,12 @@ int board_init(void)
 	out_le32(SMMU_NSCR0, val);
 #endif
 
-#ifdef CONFIG_FSL_CAAM
-	sec_init();
-#endif
-
 #ifdef CONFIG_FSL_LS_PPA
 	ppa_init();
+#endif
+
+#if !defined(CONFIG_SYS_EARLY_PCI_INIT) && defined(CONFIG_DM_ETH)
+	pci_init();
 #endif
 
 	/* invert AQR105 IRQ pins polarity */

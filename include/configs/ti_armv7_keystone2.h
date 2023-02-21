@@ -9,19 +9,13 @@
 #ifndef __CONFIG_KS2_EVM_H
 #define __CONFIG_KS2_EVM_H
 
-#define CONFIG_SOC_KEYSTONE
-
 /* U-Boot Build Configuration */
-#define CONFIG_SKIP_LOWLEVEL_INIT	/* U-Boot is a 2nd stage loader */
 
 /* SoC Configuration */
-#define CONFIG_SPL_TARGET		"u-boot-spi.gph"
 
 /* Memory Configuration */
 #define CONFIG_SYS_LPAE_SDRAM_BASE	0x800000000
 #define CONFIG_MAX_RAM_BANK_SIZE	(2 << 30)       /* 2GB */
-#define CONFIG_SYS_INIT_SP_ADDR		(CONFIG_ISW_ENTRY_ADDR - \
-					GENERATED_GBL_DATA_SIZE)
 
 #ifdef CONFIG_SYS_MALLOC_F_LEN
 #define SPL_MALLOC_F_SIZE	CONFIG_SYS_MALLOC_F_LEN
@@ -30,22 +24,10 @@
 #endif
 
 /* SPL SPI Loader Configuration */
-#define CONFIG_SPL_PAD_TO		65536
-#define CONFIG_SPL_MAX_SIZE		(CONFIG_SPL_PAD_TO - 8)
-#define CONFIG_SPL_BSS_START_ADDR	(CONFIG_ISW_ENTRY_ADDR + \
-					CONFIG_SPL_MAX_SIZE)
-#define CONFIG_SPL_BSS_MAX_SIZE		(32 * 1024)
-#define CONFIG_SYS_SPL_MALLOC_START	(CONFIG_SPL_BSS_START_ADDR + \
-					CONFIG_SPL_BSS_MAX_SIZE)
-#define CONFIG_SYS_SPL_MALLOC_SIZE	(32 * 1024)
 #define KEYSTONE_SPL_STACK_SIZE		(8 * 1024)
-#define CONFIG_SPL_STACK		(CONFIG_SYS_SPL_MALLOC_START + \
-					CONFIG_SYS_SPL_MALLOC_SIZE + \
-					SPL_MALLOC_F_SIZE + \
-					KEYSTONE_SPL_STACK_SIZE - 4)
 
 /* SRAM scratch space entries  */
-#define SRAM_SCRATCH_SPACE_ADDR	CONFIG_SPL_STACK + 0x8
+#define SRAM_SCRATCH_SPACE_ADDR		0xc0c23fc
 
 #define TI_SRAM_SCRATCH_BOARD_EEPROM_START	(SRAM_SCRATCH_SPACE_ADDR)
 #define TI_SRAM_SCRATCH_BOARD_EEPROM_END	(SRAM_SCRATCH_SPACE_ADDR + 0x200)
@@ -66,41 +48,9 @@
 #define CONFIG_SYS_SPI_CLK		ks_clk_get_rate(KS2_CLK1_6)
 
 /* Network Configuration */
-#define CONFIG_NET_RETRY_COUNT		32
 #define CONFIG_SYS_SGMII_REFCLK_MHZ	312
 #define CONFIG_SYS_SGMII_LINERATE_MHZ	1250
 #define CONFIG_SYS_SGMII_RATESCALE	2
-
-/* Keyston Navigator Configuration */
-#define CONFIG_TI_KSNAV
-#define CONFIG_KSNAV_QM_BASE_ADDRESS		KS2_QM_BASE_ADDRESS
-#define CONFIG_KSNAV_QM_CONF_BASE		KS2_QM_CONF_BASE
-#define CONFIG_KSNAV_QM_DESC_SETUP_BASE		KS2_QM_DESC_SETUP_BASE
-#define CONFIG_KSNAV_QM_STATUS_RAM_BASE		KS2_QM_STATUS_RAM_BASE
-#define CONFIG_KSNAV_QM_INTD_CONF_BASE		KS2_QM_INTD_CONF_BASE
-#define CONFIG_KSNAV_QM_PDSP1_CMD_BASE		KS2_QM_PDSP1_CMD_BASE
-#define CONFIG_KSNAV_QM_PDSP1_CTRL_BASE		KS2_QM_PDSP1_CTRL_BASE
-#define CONFIG_KSNAV_QM_PDSP1_IRAM_BASE		KS2_QM_PDSP1_IRAM_BASE
-#define CONFIG_KSNAV_QM_MANAGER_QUEUES_BASE	KS2_QM_MANAGER_QUEUES_BASE
-#define CONFIG_KSNAV_QM_MANAGER_Q_PROXY_BASE	KS2_QM_MANAGER_Q_PROXY_BASE
-#define CONFIG_KSNAV_QM_QUEUE_STATUS_BASE	KS2_QM_QUEUE_STATUS_BASE
-#define CONFIG_KSNAV_QM_LINK_RAM_BASE		KS2_QM_LINK_RAM_BASE
-#define CONFIG_KSNAV_QM_REGION_NUM		KS2_QM_REGION_NUM
-#define CONFIG_KSNAV_QM_QPOOL_NUM		KS2_QM_QPOOL_NUM
-
-/* NETCP pktdma */
-#define CONFIG_KSNAV_PKTDMA_NETCP
-#define CONFIG_KSNAV_NETCP_PDMA_CTRL_BASE	KS2_NETCP_PDMA_CTRL_BASE
-#define CONFIG_KSNAV_NETCP_PDMA_TX_BASE		KS2_NETCP_PDMA_TX_BASE
-#define CONFIG_KSNAV_NETCP_PDMA_TX_CH_NUM	KS2_NETCP_PDMA_TX_CH_NUM
-#define CONFIG_KSNAV_NETCP_PDMA_RX_BASE		KS2_NETCP_PDMA_RX_BASE
-#define CONFIG_KSNAV_NETCP_PDMA_RX_CH_NUM	KS2_NETCP_PDMA_RX_CH_NUM
-#define CONFIG_KSNAV_NETCP_PDMA_SCHED_BASE	KS2_NETCP_PDMA_SCHED_BASE
-#define CONFIG_KSNAV_NETCP_PDMA_RX_FLOW_BASE	KS2_NETCP_PDMA_RX_FLOW_BASE
-#define CONFIG_KSNAV_NETCP_PDMA_RX_FLOW_NUM	KS2_NETCP_PDMA_RX_FLOW_NUM
-#define CONFIG_KSNAV_NETCP_PDMA_RX_FREE_QUEUE	KS2_NETCP_PDMA_RX_FREE_QUEUE
-#define CONFIG_KSNAV_NETCP_PDMA_RX_RCV_QUEUE	KS2_NETCP_PDMA_RX_RCV_QUEUE
-#define CONFIG_KSNAV_NETCP_PDMA_TX_SND_QUEUE	KS2_NETCP_PDMA_TX_SND_QUEUE
 
 /* Keystone net */
 #define CONFIG_KSNET_MAC_ID_BASE		KS2_MAC_ID_BASE_ADDR
@@ -109,26 +59,9 @@
 #define CONFIG_KSNET_SERDES_SGMII2_BASE		KS2_SGMII_SERDES2_BASE
 #define CONFIG_KSNET_SERDES_LANES_PER_SGMII	KS2_LANES_PER_SGMII_SERDES
 
-#define CONFIG_AEMIF_CNTRL_BASE		KS2_AEMIF_CNTRL_BASE
-
-/* I2C Configuration */
-#define CONFIG_SYS_DAVINCI_I2C_SPEED	100000
-#define CONFIG_SYS_DAVINCI_I2C_SLAVE	0x10 /* SMBus host address */
-#define CONFIG_SYS_DAVINCI_I2C_SPEED1	100000
-#define CONFIG_SYS_DAVINCI_I2C_SLAVE1	0x10 /* SMBus host address */
-#define CONFIG_SYS_DAVINCI_I2C_SPEED2	100000
-#define CONFIG_SYS_DAVINCI_I2C_SLAVE2	0x10 /* SMBus host address */
-
 /* EEPROM definitions */
-#define CONFIG_SYS_I2C_EEPROM_ADDR_LEN		2
-#define CONFIG_SYS_I2C_EEPROM_ADDR		0x50
-#define CONFIG_SYS_EEPROM_PAGE_WRITE_BITS	6
-#define CONFIG_SYS_EEPROM_PAGE_WRITE_DELAY_MS	20
-#define CONFIG_ENV_EEPROM_IS_ON_I2C
 
 /* NAND Configuration */
-#define CONFIG_KEYSTONE_RBL_NAND
-#define CONFIG_KEYSTONE_NAND_MAX_RBL_SIZE	CONFIG_ENV_OFFSET
 #define CONFIG_SYS_NAND_MASK_CLE		0x4000
 #define CONFIG_SYS_NAND_MASK_ALE		0x2000
 #define CONFIG_SYS_NAND_CS			2
@@ -137,7 +70,6 @@
 #define CONFIG_SYS_NAND_LARGEPAGE
 #define CONFIG_SYS_NAND_BASE_LIST		{ 0x30000000, }
 #define CONFIG_SYS_MAX_NAND_DEVICE		1
-#define CONFIG_SYS_NAND_MAX_CHIPS		1
 #define CONFIG_SYS_NAND_NO_SUBPAGE_WRITE
 
 #define DFU_ALT_INFO_MMC \
@@ -152,10 +84,8 @@
 	DFU_ALT_INFO_MMC \
 
 /* U-Boot general configuration */
-#define CONFIG_TIMESTAMP
 
 /* EDMA3 */
-#define CONFIG_TI_EDMA3
 
 #define KERNEL_MTD_PARTS						\
 	"mtdparts="							\
@@ -187,7 +117,7 @@
 
 #define CONFIG_EXTRA_ENV_SETTINGS					\
 	DEFAULT_LINUX_BOOT_ENV						\
-	CONFIG_EXTRA_ENV_KS2_BOARD_SETTINGS				\
+	ENV_KS2_BOARD_SETTINGS						\
 	DFUARGS								\
 	"bootdir=/boot\0" \
 	"tftp_root=/\0"							\
@@ -227,7 +157,7 @@
 		"sf write ${loadaddr} 0 ${filesize}\0"		\
 	"burn_uboot_nand=nand erase 0 0x100000; "			\
 		"nand write ${loadaddr} 0 ${filesize}\0"		\
-	"args_all=setenv bootargs console=ttyS0,115200n8 rootwait=1 "	\
+	"args_all=setenv bootargs console=ttyS0,115200n8 rootwait "	\
 		KERNEL_MTD_PARTS					\
 	"args_net=setenv bootargs ${bootargs} rootfstype=nfs "		\
 		"root=/dev/nfs rw nfsroot=${serverip}:${nfs_root},"	\
@@ -246,27 +176,7 @@
 	"args_ramfs=setenv bootargs ${bootargs} "			\
 		"rdinit=/sbin/init rw root=/dev/ram0 "			\
 		"initrd=0x808080000,80M\0"				\
-	"no_post=1\0"							\
-	"mtdparts=mtdparts=davinci_nand.0:"				\
-		"1024k(bootloader)ro,512k(params)ro,-(ubifs)\0"
-
-#ifndef CONFIG_BOOTCOMMAND
-#ifndef CONFIG_TI_SECURE_DEVICE
-#define CONFIG_BOOTCOMMAND						\
-	"run init_${boot}; "						\
-	"run get_mon_${boot} run_mon; "					\
-	"run get_kern_${boot}; "					\
-	"run init_fw_rd_${boot}; "					\
-	"run get_fdt_${boot}; "						\
-	"run run_kern"
-#else
-#define CONFIG_BOOTCOMMAND						\
-	"run run_mon_hs; "						\
-	"run init_${boot}; "						\
-	"run get_fit_${boot}; "						\
-	"bootm ${addr_fit}#${name_fdt}"
-#endif
-#endif
+	"no_post=1\0"
 
 /* Now for the remaining common defines */
 #include <configs/ti_armv7_common.h>

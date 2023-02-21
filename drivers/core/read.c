@@ -8,6 +8,7 @@
 #include <dm.h>
 #include <dm/of_access.h>
 #include <mapmem.h>
+#include <asm/global_data.h>
 #include <asm/types.h>
 #include <asm/io.h>
 #include <linux/ioport.h>
@@ -204,6 +205,12 @@ int dev_read_string_count(const struct udevice *dev, const char *propname)
 	return ofnode_read_string_count(dev_ofnode(dev), propname);
 }
 
+int dev_read_string_list(const struct udevice *dev, const char *propname,
+			 const char ***listp)
+{
+	return ofnode_read_string_list(dev_ofnode(dev), propname, listp);
+}
+
 int dev_read_phandle_with_args(const struct udevice *dev, const char *list_name,
 			       const char *cells_name, int cell_count,
 			       int index, struct ofnode_phandle_args *out_args)
@@ -281,8 +288,10 @@ int dev_read_alias_seq(const struct udevice *dev, int *devnump)
 
 	if (ofnode_is_np(node)) {
 		ret = of_alias_get_id(ofnode_to_np(node), uc_name);
-		if (ret >= 0)
+		if (ret >= 0) {
 			*devnump = ret;
+			ret = 0;
+		}
 	} else {
 #if CONFIG_IS_ENABLED(OF_CONTROL)
 		ret = fdtdec_get_alias_seq(gd->fdt_blob, uc_name,
@@ -338,6 +347,12 @@ u64 dev_translate_dma_address(const struct udevice *dev, const fdt32_t *in_addr)
 	return ofnode_translate_dma_address(dev_ofnode(dev), in_addr);
 }
 
+int dev_get_dma_range(const struct udevice *dev, phys_addr_t *cpu,
+		      dma_addr_t *bus, u64 *size)
+{
+	return ofnode_get_dma_range(dev_ofnode(dev), cpu, bus, size);
+}
+
 int dev_read_alias_highest_id(const char *stem)
 {
 	if (of_live_active())
@@ -376,4 +391,20 @@ int dev_read_pci_bus_range(const struct udevice *dev,
 	res->end = *values;
 
 	return 0;
+}
+
+int dev_decode_display_timing(const struct udevice *dev, int index,
+			      struct display_timing *config)
+{
+	return ofnode_decode_display_timing(dev_ofnode(dev), index, config);
+}
+
+ofnode dev_get_phy_node(const struct udevice *dev)
+{
+	return ofnode_get_phy_node(dev_ofnode(dev));
+}
+
+phy_interface_t dev_read_phy_mode(const struct udevice *dev)
+{
+	return ofnode_read_phy_mode(dev_ofnode(dev));
 }

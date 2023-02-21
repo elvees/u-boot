@@ -10,8 +10,10 @@
 #include <log.h>
 #include <ram.h>
 #include <spl.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/armv7m.h>
+#include <serial.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -59,8 +61,8 @@ int spl_dram_init(void)
 
 void spl_board_init(void)
 {
-	spl_dram_init();
 	preloader_console_init();
+	spl_dram_init();
 	arch_cpu_init(); /* to configure mpu for sdram rw permissions */
 }
 
@@ -69,11 +71,6 @@ u32 spl_boot_device(void)
 	return BOOT_DEVICE_MMC1;
 }
 #endif
-
-u32 get_board_rev(void)
-{
-	return 0;
-}
 
 int board_init(void)
 {

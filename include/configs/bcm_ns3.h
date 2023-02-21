@@ -16,7 +16,6 @@
 #define PHYS_SDRAM_1			V2M_BASE
 
 #define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM_1
-#define CONFIG_SYS_LOAD_ADDR		(PHYS_SDRAM_1 + 0x80000)
 
 /*
  * Initial SP before reloaction is placed at end of first DRAM bank,
@@ -24,30 +23,19 @@
  * Just before re-loaction, new SP is updated and re-location happens.
  * So pointing the initial SP to end of 2GB DDR is not a problem
  */
-#define CONFIG_SYS_INIT_SP_ADDR		(PHYS_SDRAM_1 + 0x80000000)
 /* 12MB Malloc size */
-#define CONFIG_SYS_MALLOC_LEN		(SZ_8M + SZ_4M)
 
 /* console configuration */
 #define CONFIG_SYS_NS16550_CLK		25000000
-
-#define CONFIG_SYS_CBSIZE		SZ_1K
-#define CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE + \
-					 sizeof(CONFIG_SYS_PROMPT) + 16)
-#define CONFIG_SYS_MAXARGS		64
-#define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
 
 /*
  * Increase max uncompressed/gunzip size, keeping size same as EMMC linux
  * partition.
  */
-#define CONFIG_SYS_BOOTM_LEN		0x01800000
 
 /* Access eMMC Boot_1 and Boot_2 partitions */
-#define CONFIG_SUPPORT_EMMC_BOOT
 
 /* enable 64-bit PCI resources */
-#define CONFIG_SYS_PCI_64BIT		1
 
 #define CONSOLE_ARGS "console_args=console=ttyS0,115200n8\0"
 #define MAX_CPUS "max_cpus=maxcpus=8\0"
@@ -279,12 +267,6 @@
 		"fi;" \
 		"setenv bl_flash_pending_rfs_imgs;" \
 	"fi; \0"
-
-#define CONFIG_BOOTCOMMAND "run flash_pending_rfs_imgs;" \
-			   "run fastboot_nitro && "\
-			   "run bootcmd_mmc_fits || "\
-			   "run bootcmd_usb || "\
-			   "run bootcmd_pxe"
 
 /* Flashing commands */
 #define TFTP_QSPI_PARAM \

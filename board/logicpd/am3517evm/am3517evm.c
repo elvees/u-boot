@@ -16,6 +16,7 @@
 #include <net.h>
 #include <ns16550.h>
 #include <serial.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/omap_musb.h>
 #include <asm/arch/am35x_def.h>
@@ -116,16 +117,9 @@ static void am3517_evm_musb_init(void)
  */
 int misc_init_r(void)
 {
-	u32 reset;
-
 	omap_die_id_display();
 
 	am3517_evm_musb_init();
-
-	/* ensure that the Ethernet module is out of reset */
-	reset = readl(AM3517_IP_SW_RESET);
-	reset &= (~CPGMACSS_SW_RST);
-	writel(reset, AM3517_IP_SW_RESET);
 
 	return 0;
 }
@@ -140,7 +134,6 @@ void set_muxconf_regs(void)
 {
 	MUX_AM3517EVM();
 }
-
 
 #if defined(CONFIG_USB_ETHER) && defined(CONFIG_USB_MUSB_GADGET)
 int board_eth_init(struct bd_info *bis)

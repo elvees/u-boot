@@ -18,6 +18,7 @@
 #include <miiphy.h>
 #include <net.h>
 #include <asm/cache.h>
+#include <asm/global_data.h>
 #include <linux/dma-mapping.h>
 #include <asm/io.h>
 #include "altera_tse.h"
@@ -434,11 +435,11 @@ static int tse_phy_init(struct altera_tse_priv *priv, void *dev)
 	if (priv->phyaddr)
 		mask = 1 << priv->phyaddr;
 
-	phydev = phy_find_by_mask(priv->bus, mask, priv->interface);
+	phydev = phy_find_by_mask(priv->bus, mask);
 	if (!phydev)
 		return -ENODEV;
 
-	phy_connect_dev(phydev, dev);
+	phy_connect_dev(phydev, dev, priv->interface);
 
 	phydev->supported &= PHY_GBIT_FEATURES;
 	phydev->advertising = phydev->supported;
@@ -453,7 +454,7 @@ static int altera_tse_write_hwaddr(struct udevice *dev)
 {
 	struct altera_tse_priv *priv = dev_get_priv(dev);
 	struct alt_tse_mac *mac_dev = priv->mac_dev;
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	u8 *hwaddr = pdata->enetaddr;
 	u32 mac_lo, mac_hi;
 
@@ -575,7 +576,7 @@ static const struct tse_ops tse_msgdma_ops = {
 
 static int altera_tse_probe(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct altera_tse_priv *priv = dev_get_priv(dev);
 	void *blob = (void *)gd->fdt_blob;
 	int node = dev_of_offset(dev);
@@ -672,20 +673,13 @@ static int altera_tse_probe(struct udevice *dev)
 	return ret;
 }
 
-static int altera_tse_ofdata_to_platdata(struct udevice *dev)
+static int altera_tse_of_to_plat(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
-	const char *phy_mode;
+	struct eth_pdata *pdata = dev_get_plat(dev);
 
-	pdata->phy_interface = -1;
-	phy_mode = fdt_getprop(gd->fdt_blob, dev_of_offset(dev), "phy-mode",
-			       NULL);
-	if (phy_mode)
-		pdata->phy_interface = phy_get_interface_by_name(phy_mode);
-	if (pdata->phy_interface == -1) {
-		debug("%s: Invalid PHY interface '%s'\n", __func__, phy_mode);
+	pdata->phy_interface = dev_read_phy_mode(dev);
+	if (pdata->phy_interface == PHY_INTERFACE_MODE_NA)
 		return -EINVAL;
-	}
 
 	return 0;
 }
@@ -710,8 +704,8 @@ U_BOOT_DRIVER(altera_tse) = {
 	.id	= UCLASS_ETH,
 	.of_match = altera_tse_ids,
 	.ops	= &altera_tse_ops,
-	.ofdata_to_platdata = altera_tse_ofdata_to_platdata,
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
-	.priv_auto_alloc_size = sizeof(struct altera_tse_priv),
+	.of_to_plat = altera_tse_of_to_plat,
+	.plat_auto	= sizeof(struct eth_pdata),
+	.priv_auto	= sizeof(struct altera_tse_priv),
 	.probe	= altera_tse_probe,
 };

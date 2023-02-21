@@ -7,7 +7,7 @@
 #define __PINCTRL_H
 
 #define PINNAME_SIZE	10
-#define PINMUX_SIZE	40
+#define PINMUX_SIZE	80
 
 /**
  * struct pinconf_param - pin config parameters
@@ -453,30 +453,30 @@ struct pinctrl_ops {
  *	presented using the packed format.
  */
 enum pin_config_param {
-	PIN_CONFIG_BIAS_BUS_HOLD,
-	PIN_CONFIG_BIAS_DISABLE,
-	PIN_CONFIG_BIAS_HIGH_IMPEDANCE,
-	PIN_CONFIG_BIAS_PULL_DOWN,
-	PIN_CONFIG_BIAS_PULL_PIN_DEFAULT,
-	PIN_CONFIG_BIAS_PULL_UP,
-	PIN_CONFIG_DRIVE_OPEN_DRAIN,
-	PIN_CONFIG_DRIVE_OPEN_SOURCE,
-	PIN_CONFIG_DRIVE_PUSH_PULL,
-	PIN_CONFIG_DRIVE_STRENGTH,
-	PIN_CONFIG_DRIVE_STRENGTH_UA,
-	PIN_CONFIG_INPUT_DEBOUNCE,
-	PIN_CONFIG_INPUT_ENABLE,
-	PIN_CONFIG_INPUT_SCHMITT,
-	PIN_CONFIG_INPUT_SCHMITT_ENABLE,
-	PIN_CONFIG_LOW_POWER_MODE,
-	PIN_CONFIG_OUTPUT_ENABLE,
-	PIN_CONFIG_OUTPUT,
-	PIN_CONFIG_POWER_SOURCE,
-	PIN_CONFIG_SLEEP_HARDWARE_STATE,
-	PIN_CONFIG_SLEW_RATE,
-	PIN_CONFIG_SKEW_DELAY,
-	PIN_CONFIG_END = 0x7F,
-	PIN_CONFIG_MAX = 0xFF,
+	PIN_CONFIG_BIAS_BUS_HOLD = 0,
+	PIN_CONFIG_BIAS_DISABLE = 1,
+	PIN_CONFIG_BIAS_HIGH_IMPEDANCE = 2,
+	PIN_CONFIG_BIAS_PULL_DOWN = 3,
+	PIN_CONFIG_BIAS_PULL_PIN_DEFAULT = 4,
+	PIN_CONFIG_BIAS_PULL_UP = 5,
+	PIN_CONFIG_DRIVE_OPEN_DRAIN = 6,
+	PIN_CONFIG_DRIVE_OPEN_SOURCE = 7,
+	PIN_CONFIG_DRIVE_PUSH_PULL = 8,
+	PIN_CONFIG_DRIVE_STRENGTH = 9,
+	PIN_CONFIG_DRIVE_STRENGTH_UA = 10,
+	PIN_CONFIG_INPUT_DEBOUNCE = 11,
+	PIN_CONFIG_INPUT_ENABLE = 12,
+	PIN_CONFIG_INPUT_SCHMITT = 13,
+	PIN_CONFIG_INPUT_SCHMITT_ENABLE = 14,
+	PIN_CONFIG_LOW_POWER_MODE = 15,
+	PIN_CONFIG_OUTPUT_ENABLE = 16,
+	PIN_CONFIG_OUTPUT = 17,
+	PIN_CONFIG_POWER_SOURCE = 18,
+	PIN_CONFIG_SLEEP_HARDWARE_STATE = 19,
+	PIN_CONFIG_SLEW_RATE = 20,
+	PIN_CONFIG_SKEW_DELAY = 21,
+	PIN_CONFIG_END = 127,	/* 0x7F */
+	PIN_CONFIG_MAX = 255, /* 0xFF */
 };
 
 #if CONFIG_IS_ENABLED(PINCTRL_GENERIC)
@@ -491,11 +491,13 @@ enum pin_config_param {
  * Return: 0 on success, or negative error code on failure
  */
 int pinctrl_generic_set_state(struct udevice *pctldev, struct udevice *config);
+int pinctrl_generic_set_state_prefix(struct udevice *pctldev, struct udevice *config,
+				     const char *prefix);
 #else
 static inline int pinctrl_generic_set_state(struct udevice *pctldev,
 					    struct udevice *config)
 {
-	return -EINVAL;
+	return -ENOSYS;
 }
 #endif
 
@@ -512,7 +514,7 @@ int pinctrl_select_state(struct udevice *dev, const char *statename);
 static inline int pinctrl_select_state(struct udevice *dev,
 				       const char *statename)
 {
-	return -EINVAL;
+	return -ENOSYS;
 }
 #endif
 
@@ -587,7 +589,7 @@ int pinctrl_get_pin_muxing(struct udevice *dev, int selector, char *buf,
  *
  * This allows to know the number of pins owned by a given pin-controller
  *
- * Return: Number of pins if OK, or negative error code on failure
+ * Return: Number of pins if OK, or -ENOSYS when not supported
  */
 int pinctrl_get_pins_count(struct udevice *dev);
 
@@ -609,10 +611,11 @@ int pinctrl_get_pin_name(struct udevice *dev, int selector, char *buf,
  * pinctrl_gpio_request() - Request a single pin to be used as GPIO
  * @dev:	GPIO peripheral device
  * @offset:	GPIO pin offset from the GPIO controller
+ * @label:	GPIO label
  *
  * Return: 0 on success, or negative error code on failure
  */
-int pinctrl_gpio_request(struct udevice *dev, unsigned offset);
+int pinctrl_gpio_request(struct udevice *dev, unsigned offset, const char *label);
 
 /**
  * pinctrl_gpio_free() - Free a single pin used as GPIO

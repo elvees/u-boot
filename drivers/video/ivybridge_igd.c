@@ -10,8 +10,9 @@
 #include <fdtdec.h>
 #include <log.h>
 #include <pci_rom.h>
-#include <vbe.h>
+#include <vesa.h>
 #include <video.h>
+#include <asm/global_data.h>
 #include <asm/intel_regs.h>
 #include <asm/io.h>
 #include <asm/mtrr.h>
@@ -753,7 +754,7 @@ static int gma_func0_init(struct udevice *dev)
 
 static int bd82x6x_video_probe(struct udevice *dev)
 {
-	struct video_uc_platdata *plat = dev_get_uclass_platdata(dev);
+	struct video_uc_plat *plat = dev_get_uclass_plat(dev);
 	ulong fbbase;
 	void *gtt_bar;
 	int ret, rev;
@@ -761,7 +762,7 @@ static int bd82x6x_video_probe(struct udevice *dev)
 	rev = gma_func0_init(dev);
 	if (rev < 0)
 		return rev;
-	ret = vbe_setup_video(dev, int15_handler);
+	ret = vesa_setup_video(dev, int15_handler);
 	if (ret)
 		return ret;
 
@@ -781,7 +782,7 @@ static int bd82x6x_video_probe(struct udevice *dev)
 
 static int bd82x6x_video_bind(struct udevice *dev)
 {
-	struct video_uc_platdata *uc_plat = dev_get_uclass_platdata(dev);
+	struct video_uc_plat *uc_plat = dev_get_uclass_plat(dev);
 
 	/* Set the maximum supported resolution */
 	uc_plat->size = 2560 * 1600 * 4;

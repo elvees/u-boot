@@ -13,6 +13,7 @@
 #include <reset-uclass.h>
 #include <regmap.h>
 #include <syscon.h>
+#include <asm/global_data.h>
 #include <dt-bindings/reset/stih407-resets.h>
 #include <linux/bitops.h>
 
@@ -279,16 +280,6 @@ static int sti_reset_program_hw(struct reset_ctl *reset_ctl, int assert)
 	return 0;
 }
 
-static int sti_reset_request(struct reset_ctl *reset_ctl)
-{
-	return 0;
-}
-
-static int sti_reset_free(struct reset_ctl *reset_ctl)
-{
-	return 0;
-}
-
 static int sti_reset_assert(struct reset_ctl *reset_ctl)
 {
 	return sti_reset_program_hw(reset_ctl, true);
@@ -300,8 +291,6 @@ static int sti_reset_deassert(struct reset_ctl *reset_ctl)
 }
 
 struct reset_ops sti_reset_ops = {
-	.request = sti_reset_request,
-	.rfree = sti_reset_free,
 	.rst_assert = sti_reset_assert,
 	.rst_deassert = sti_reset_deassert,
 };
@@ -336,6 +325,6 @@ U_BOOT_DRIVER(sti_reset) = {
 	.id = UCLASS_RESET,
 	.of_match = sti_reset_ids,
 	.probe = sti_reset_probe,
-	.priv_auto_alloc_size = sizeof(struct sti_reset),
+	.priv_auto	= sizeof(struct sti_reset),
 	.ops = &sti_reset_ops,
 };

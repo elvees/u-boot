@@ -21,6 +21,12 @@ config FPGA_SOCFPGA
 
 	  This provides common functionality for Gen5 and Arria10 devices.
 
+config FPGA_STRATIX_V
+	bool "Enable Stratix V FPGA drivers"
+	depends on FPGA_ALTERA
+	help
+	  Say Y here to enable the Altera Stratix V FPGA specific driver.
+
 config FPGA_CYCLON2
 	bool "Enable Altera FPGA driver for Cyclone II"
 	depends on FPGA_ALTERA
@@ -33,7 +39,7 @@ config FPGA_CYCLON2
 
 config FPGA_INTEL_SDM_MAILBOX
 	bool "Enable Intel FPGA Full Reconfiguration SDM Mailbox driver"
-	depends on TARGET_SOCFPGA_STRATIX10 || TARGET_SOCFPGA_AGILEX
+	depends on TARGET_SOCFPGA_SOC64
 	select FPGA_ALTERA
 	help
 	  Say Y here to enable the Intel FPGA Full Reconfig SDM Mailbox driver
@@ -84,5 +90,32 @@ config FPGA_ZYNQPL
 	help
 	  Enable FPGA driver for loading bitstream in BIT and BIN format
 	  on Xilinx Zynq devices.
+
+config SYS_FPGA_CHECK_CTRLC
+	bool "Allow Control-C to interrupt FPGA configuration"
+	depends on FPGA
+	help
+	  User can interrupt FPGA configuration by pressing CTRL+C.
+
+config SYS_FPGA_PROG_FEEDBACK
+	bool "Progress output during FPGA configuration"
+	depends on FPGA
+	default y if FPGA_VIRTEX2
+	help
+	  Enable printing of hash marks during FPGA configuration.
+
+config FPGA_LOAD_SECURE
+	bool "Enable loading secure bitstreams"
+	depends on FPGA
+	help
+	  Enables the fpga loads() functions that are used to load secure
+	  (authenticated or encrypted or both) bitstreams on to FPGA.
+
+config SPL_FPGA_LOAD_SECURE
+	bool "Enable loading secure bitstreams for SPL"
+	depends on SPL_FPGA
+	help
+	  Enables the fpga loads() functions that are used to load secure
+	  (authenticated or encrypted or both) bitstreams on to FPGA.
 
 endmenu

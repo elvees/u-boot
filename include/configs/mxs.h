@@ -43,14 +43,7 @@
 
 /* Startup hooks */
 
-/* SPL */
-#ifndef CONFIG_SPL_FRAMEWORK
-#define CONFIG_SPL_NO_CPU_SUPPORT
-#define CONFIG_SPL_START_S_PATH	"arch/arm/cpu/arm926ejs/mxs"
-#endif
-
 /* Memory sizes */
-#define CONFIG_SYS_MALLOC_LEN		0x00400000	/* 4 MB for malloc */
 
 /* OCRAM at 0x0 ; 32kB on MX23 ; 128kB on MX28 */
 #define CONFIG_SYS_INIT_RAM_ADDR	0x00000000
@@ -61,10 +54,6 @@
 #endif
 
 /* Point initial SP in SRAM so SPL can use it too. */
-#define CONFIG_SYS_INIT_SP_OFFSET \
-	(CONFIG_SYS_INIT_RAM_SIZE - GENERATED_GBL_DATA_SIZE)
-#define CONFIG_SYS_INIT_SP_ADDR \
-	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
 
 /*
  * We need to sacrifice first 4 bytes of RAM here to avoid triggering some
@@ -80,14 +69,6 @@
  */
 
 /* U-Boot general configuration */
-#define CONFIG_SYS_CBSIZE	1024		/* Console I/O buffer size */
-#define CONFIG_SYS_MAXARGS	32		/* Max number of command args */
-#define CONFIG_SYS_BARGSIZE	CONFIG_SYS_CBSIZE
-						/* Boot argument buffer size */
-
-/* Booting Linux */
-#define CONFIG_CMDLINE_TAG
-#define CONFIG_SETUP_MEMORY_TAGS
 
 /*
  * Drivers
@@ -100,26 +81,10 @@
 #define CONFIG_PL01x_PORTS		{ (void *)MXS_UARTDBG_BASE }
 /* Default baudrate can be overridden by board! */
 
-/* FEC Ethernet on SoC */
-#ifdef CONFIG_FEC_MXC
-#ifndef CONFIG_ETHPRIME
-#define CONFIG_ETHPRIME			"FEC0"
-#endif
-#ifndef CONFIG_FEC_XCV_TYPE
-#define CONFIG_FEC_XCV_TYPE		RMII
-#endif
-#endif
-
-/* LCD */
-#ifdef CONFIG_VIDEO
-#define CONFIG_VIDEO_MXS
-#endif
-
 /* NAND */
 #ifdef CONFIG_CMD_NAND
 #define CONFIG_SYS_MAX_NAND_DEVICE	1
 #define CONFIG_SYS_NAND_BASE		0x60000000
-#define CONFIG_SYS_NAND_5_ADDR_CYCLE
 #endif
 
 /* OCOTP */
@@ -130,12 +95,6 @@
 /* SPI */
 #ifdef CONFIG_CMD_SPI
 #define CONFIG_SPI_HALF_DUPLEX
-#endif
-
-/* USB */
-#ifdef CONFIG_CMD_USB
-#define CONFIG_USB_EHCI_MXS
-#define CONFIG_EHCI_IS_TDI
 #endif
 
 #endif	/* __CONFIGS_MXS_H__ */

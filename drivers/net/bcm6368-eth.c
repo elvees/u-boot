@@ -506,7 +506,7 @@ static int bcm6368_mdio_init(const char *name, struct bcm6368_eth_priv *priv)
 
 static int bcm6368_eth_probe(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct bcm6368_eth_priv *priv = dev_get_priv(dev);
 	int num_ports, ret, i;
 	ofnode node;
@@ -546,11 +546,7 @@ static int bcm6368_eth_probe(struct udevice *dev)
 			return ret;
 		}
 
-		ret = clk_free(&clk);
-		if (ret < 0) {
-			pr_err("%s: error freeing clock %d\n", __func__, i);
-			return ret;
-		}
+		clk_free(&clk);
 	}
 
 	/* try to perform resets */
@@ -637,7 +633,7 @@ U_BOOT_DRIVER(bcm6368_eth) = {
 	.id = UCLASS_ETH,
 	.of_match = bcm6368_eth_ids,
 	.ops = &bcm6368_eth_ops,
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
-	.priv_auto_alloc_size = sizeof(struct bcm6368_eth_priv),
+	.plat_auto	= sizeof(struct eth_pdata),
+	.priv_auto	= sizeof(struct bcm6368_eth_priv),
 	.probe = bcm6368_eth_probe,
 };

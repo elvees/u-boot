@@ -25,7 +25,7 @@
 
 static int pcf2127_rtc_read(struct udevice *dev, uint offset, u8 *buffer, uint len)
 {
-	struct dm_i2c_chip *chip = dev_get_parent_platdata(dev);
+	struct dm_i2c_chip *chip = dev_get_parent_plat(dev);
 	struct i2c_msg msg;
 	int ret;
 
@@ -120,7 +120,9 @@ static const struct rtc_ops pcf2127_rtc_ops = {
 };
 
 static const struct udevice_id pcf2127_rtc_ids[] = {
-	{ .compatible = "pcf2127-rtc" },
+	{ .compatible = "nxp,pcf2127" },
+	{ .compatible = "nxp,pcf2129" },
+	{ .compatible = "nxp,pca2129" },
 	{ }
 };
 

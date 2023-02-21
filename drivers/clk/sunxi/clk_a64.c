@@ -8,12 +8,14 @@
 #include <clk-uclass.h>
 #include <dm.h>
 #include <errno.h>
-#include <asm/arch/ccu.h>
+#include <clk/sunxi.h>
 #include <dt-bindings/clock/sun50i-a64-ccu.h>
 #include <dt-bindings/reset/sun50i-a64-ccu.h>
 #include <linux/bitops.h>
 
 static const struct ccu_clk_gate a64_gates[] = {
+	[CLK_PLL_PERIPH0]	= GATE(0x028, BIT(31)),
+
 	[CLK_BUS_MMC0]		= GATE(0x060, BIT(8)),
 	[CLK_BUS_MMC1]		= GATE(0x060, BIT(9)),
 	[CLK_BUS_MMC2]		= GATE(0x060, BIT(10)),
@@ -26,6 +28,11 @@ static const struct ccu_clk_gate a64_gates[] = {
 	[CLK_BUS_OHCI0]		= GATE(0x060, BIT(28)),
 	[CLK_BUS_OHCI1]		= GATE(0x060, BIT(29)),
 
+	[CLK_BUS_PIO]		= GATE(0x068, BIT(5)),
+
+	[CLK_BUS_I2C0]		= GATE(0x06c, BIT(0)),
+	[CLK_BUS_I2C1]		= GATE(0x06c, BIT(1)),
+	[CLK_BUS_I2C2]		= GATE(0x06c, BIT(2)),
 	[CLK_BUS_UART0]		= GATE(0x06c, BIT(16)),
 	[CLK_BUS_UART1]		= GATE(0x06c, BIT(17)),
 	[CLK_BUS_UART2]		= GATE(0x06c, BIT(18)),
@@ -60,6 +67,9 @@ static const struct ccu_reset a64_resets[] = {
 	[RST_BUS_OHCI0]         = RESET(0x2c0, BIT(28)),
 	[RST_BUS_OHCI1]         = RESET(0x2c0, BIT(29)),
 
+	[RST_BUS_I2C0]		= RESET(0x2d8, BIT(0)),
+	[RST_BUS_I2C1]		= RESET(0x2d8, BIT(1)),
+	[RST_BUS_I2C2]		= RESET(0x2d8, BIT(2)),
 	[RST_BUS_UART0]		= RESET(0x2d8, BIT(16)),
 	[RST_BUS_UART1]		= RESET(0x2d8, BIT(17)),
 	[RST_BUS_UART2]		= RESET(0x2d8, BIT(18)),
@@ -67,28 +77,9 @@ static const struct ccu_reset a64_resets[] = {
 	[RST_BUS_UART4]		= RESET(0x2d8, BIT(20)),
 };
 
-static const struct ccu_desc a64_ccu_desc = {
+const struct ccu_desc a64_ccu_desc = {
 	.gates = a64_gates,
 	.resets = a64_resets,
-};
-
-static int a64_clk_bind(struct udevice *dev)
-{
-	return sunxi_reset_bind(dev, ARRAY_SIZE(a64_resets));
-}
-
-static const struct udevice_id a64_ccu_ids[] = {
-	{ .compatible = "allwinner,sun50i-a64-ccu",
-	  .data = (ulong)&a64_ccu_desc },
-	{ }
-};
-
-U_BOOT_DRIVER(clk_sun50i_a64) = {
-	.name		= "sun50i_a64_ccu",
-	.id		= UCLASS_CLK,
-	.of_match	= a64_ccu_ids,
-	.priv_auto_alloc_size	= sizeof(struct ccu_priv),
-	.ops		= &sunxi_clk_ops,
-	.probe		= sunxi_clk_probe,
-	.bind		= a64_clk_bind,
+	.num_gates = ARRAY_SIZE(a64_gates),
+	.num_resets = ARRAY_SIZE(a64_resets),
 };

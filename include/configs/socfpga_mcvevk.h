@@ -10,12 +10,6 @@
 /* Memory configurations */
 #define PHYS_SDRAM_1_SIZE		0x40000000	/* 1GiB on MCV */
 
-/* Booting Linux */
-#define CONFIG_BOOTFILE		"fitImage"
-#define CONFIG_BOOTCOMMAND	"run mmc_mmc"
-#define CONFIG_LOADADDR		0x01000000
-#define CONFIG_SYS_LOAD_ADDR	CONFIG_LOADADDR
-
 /* Environment is in MMC */
 
 /* Extra Environment */

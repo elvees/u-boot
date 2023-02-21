@@ -18,16 +18,6 @@ struct mtmips_reset_priv {
 	void __iomem *base;
 };
 
-static int mtmips_reset_request(struct reset_ctl *reset_ctl)
-{
-	return 0;
-}
-
-static int mtmips_reset_free(struct reset_ctl *reset_ctl)
-{
-	return 0;
-}
-
 static int mtmips_reset_assert(struct reset_ctl *reset_ctl)
 {
 	struct mtmips_reset_priv *priv = dev_get_priv(reset_ctl->dev);
@@ -47,8 +37,6 @@ static int mtmips_reset_deassert(struct reset_ctl *reset_ctl)
 }
 
 static const struct reset_ops mtmips_reset_ops = {
-	.request	= mtmips_reset_request,
-	.rfree		= mtmips_reset_free,
 	.rst_assert	= mtmips_reset_assert,
 	.rst_deassert	= mtmips_reset_deassert,
 };
@@ -58,7 +46,7 @@ static int mtmips_reset_probe(struct udevice *dev)
 	return 0;
 }
 
-static int mtmips_reset_ofdata_to_platdata(struct udevice *dev)
+static int mtmips_reset_of_to_plat(struct udevice *dev)
 {
 	struct mtmips_reset_priv *priv = dev_get_priv(dev);
 
@@ -78,8 +66,9 @@ U_BOOT_DRIVER(mtmips_reset) = {
 	.name = "mtmips-reset",
 	.id = UCLASS_RESET,
 	.of_match = mtmips_reset_ids,
-	.ofdata_to_platdata = mtmips_reset_ofdata_to_platdata,
+	.of_to_plat = mtmips_reset_of_to_plat,
 	.probe = mtmips_reset_probe,
-	.priv_auto_alloc_size = sizeof(struct mtmips_reset_priv),
+	.priv_auto	= sizeof(struct mtmips_reset_priv),
 	.ops = &mtmips_reset_ops,
+	.flags = DM_FLAG_PRE_RELOC,
 };

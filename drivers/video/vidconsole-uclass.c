@@ -7,6 +7,8 @@
  * Bernecker & Rainer Industrieelektronik GmbH - http://www.br-automation.com
  */
 
+#define LOG_CATEGORY UCLASS_VIDEO_CONSOLE
+
 #include <common.h>
 #include <command.h>
 #include <console.h>
@@ -89,9 +91,7 @@ static int vidconsole_back(struct udevice *dev)
 		if (priv->ycur < 0)
 			priv->ycur = 0;
 	}
-	video_sync(dev->parent, false);
-
-	return 0;
+	return video_sync(dev->parent, false);
 }
 
 /* Move to a newline, scrolling the display if necessary */
@@ -101,7 +101,7 @@ static void vidconsole_newline(struct udevice *dev)
 	struct udevice *vid_dev = dev->parent;
 	struct video_priv *vid_priv = dev_get_uclass_priv(vid_dev);
 	const int rows = CONFIG_CONSOLE_SCROLL_LINES;
-	int i;
+	int i, ret;
 
 	priv->xcur_frac = priv->xstart_frac;
 	priv->ycur += priv->y_charsize;
@@ -116,7 +116,12 @@ static void vidconsole_newline(struct udevice *dev)
 	}
 	priv->last_ch = 0;
 
-	video_sync(dev->parent, false);
+	ret = video_sync(dev->parent, false);
+	if (ret) {
+#ifdef DEBUG
+		console_puts_select_stderr(true, "[vc err: video_sync]");
+#endif
+	}
 }
 
 static const struct vid_rgb colors[VID_COLOR_COUNT] = {
@@ -150,9 +155,14 @@ u32 vid_console_color(struct video_priv *priv, unsigned int idx)
 		break;
 	case VIDEO_BPP32:
 		if (CONFIG_IS_ENABLED(VIDEO_BPP32)) {
-			return (colors[idx].r << 16) |
-			       (colors[idx].g <<  8) |
-			       (colors[idx].b <<  0);
+			if (priv->format == VIDEO_X2R10G10B10)
+				return (colors[idx].r << 22) |
+				       (colors[idx].g << 12) |
+				       (colors[idx].b <<  2);
+			else
+				return (colors[idx].r << 16) |
+				       (colors[idx].g <<  8) |
+				       (colors[idx].b <<  0);
 		}
 		break;
 	default:
@@ -348,8 +358,15 @@ static void vidconsole_escape_char(struct udevice *dev, char ch)
 		parsenum(priv->escape_buf + 1, &mode);
 
 		if (mode == 2) {
+			int ret;
+
 			video_clear(dev->parent);
-			video_sync(dev->parent, false);
+			ret = video_sync(dev->parent, false);
+			if (ret) {
+#ifdef DEBUG
+				console_puts_select_stderr(true, "[vc err: video_sync]");
+#endif
+			}
 			priv->ycur = 0;
 			priv->xcur_frac = priv->xstart_frac;
 		} else {
@@ -565,7 +582,12 @@ static void vidconsole_putc(struct stdio_dev *sdev, const char ch)
 		console_puts_select_stderr(true, "[vc err: putc]");
 #endif
 	}
-	video_sync(dev->parent, false);
+	ret = video_sync(dev->parent, false);
+	if (ret) {
+#ifdef DEBUG
+		console_puts_select_stderr(true, "[vc err: video_sync]");
+#endif
+	}
 }
 
 static void vidconsole_puts(struct stdio_dev *sdev, const char *s)
@@ -582,7 +604,12 @@ static void vidconsole_puts(struct stdio_dev *sdev, const char *s)
 		console_puts_select_stderr(true, str);
 #endif
 	}
-	video_sync(dev->parent, false);
+	ret = video_sync(dev->parent, false);
+	if (ret) {
+#ifdef DEBUG
+		console_puts_select_stderr(true, "[vc err: video_sync]");
+#endif
+	}
 }
 
 /* Set up the number of rows and colours (rotated drivers override this) */
@@ -606,9 +633,9 @@ static int vidconsole_post_probe(struct udevice *dev)
 	if (!priv->tab_width_frac)
 		priv->tab_width_frac = VID_TO_POS(priv->x_charsize) * 8;
 
-	if (dev->seq) {
+	if (dev_seq(dev)) {
 		snprintf(sdev->name, sizeof(sdev->name), "vidconsole%d",
-			 dev->seq);
+			 dev_seq(dev));
 	} else {
 		strcpy(sdev->name, "vidconsole");
 	}
@@ -626,7 +653,7 @@ UCLASS_DRIVER(vidconsole) = {
 	.name		= "vidconsole0",
 	.pre_probe	= vidconsole_pre_probe,
 	.post_probe	= vidconsole_post_probe,
-	.per_device_auto_alloc_size	= sizeof(struct vidconsole_priv),
+	.per_device_auto	= sizeof(struct vidconsole_priv),
 };
 
 #ifdef CONFIG_VIDEO_COPY
@@ -670,8 +697,8 @@ static int do_video_setcursor(struct cmd_tbl *cmdtp, int flag, int argc,
 
 	if (uclass_first_device_err(UCLASS_VIDEO_CONSOLE, &dev))
 		return CMD_RET_FAILURE;
-	col = simple_strtoul(argv[1], NULL, 10);
-	row = simple_strtoul(argv[2], NULL, 10);
+	col = dectoul(argv[1], NULL);
+	row = dectoul(argv[2], NULL);
 	vidconsole_position_cursor(dev, col, row);
 
 	return 0;
@@ -691,9 +718,7 @@ static int do_video_puts(struct cmd_tbl *cmdtp, int flag, int argc,
 	for (s = argv[1]; *s; s++)
 		vidconsole_put_char(dev, *s);
 
-	video_sync(dev->parent, false);
-
-	return 0;
+	return video_sync(dev->parent, false);
 }
 
 U_BOOT_CMD(

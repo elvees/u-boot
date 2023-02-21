@@ -2,7 +2,8 @@
 /*
  * Copyright (C) 2019, STMicroelectronics - All Rights Reserved
  */
-#define pr_fmt(fmt) "%s: " fmt, __func__
+#define LOG_CATEGORY UCLASS_REMOTEPROC
+
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
@@ -29,7 +30,7 @@ struct stm32_copro_privdata {
 /**
  * stm32_copro_probe() - Basic probe
  * @dev:	corresponding STM32 remote processor device
- * @return 0 if all went ok, else corresponding -ve error
+ * Return: 0 if all went ok, else corresponding -ve error
  */
 static int stm32_copro_probe(struct udevice *dev)
 {
@@ -60,7 +61,7 @@ static int stm32_copro_probe(struct udevice *dev)
  * @dev:	corresponding STM32 remote processor device
  * @da:		device address
  * @size:	Size of the memory region @da is pointing to
- * @return converted virtual address
+ * Return: converted virtual address
  */
 static void *stm32_copro_device_to_virt(struct udevice *dev, ulong da,
 					ulong size)
@@ -88,7 +89,7 @@ static void *stm32_copro_device_to_virt(struct udevice *dev, ulong da,
  * @dev:	corresponding STM32 remote processor device
  * @addr:	Address in memory where image is stored
  * @size:	Size in bytes of the image
- * @return 0 if all went ok, else corresponding -ve error
+ * Return: 0 if all went ok, else corresponding -ve error
  */
 static int stm32_copro_load(struct udevice *dev, ulong addr, ulong size)
 {
@@ -122,7 +123,7 @@ static int stm32_copro_load(struct udevice *dev, ulong addr, ulong size)
 /**
  * stm32_copro_start() - Start the STM32 remote processor
  * @dev:	corresponding STM32 remote processor device
- * @return 0 if all went ok, else corresponding -ve error
+ * Return: 0 if all went ok, else corresponding -ve error
  */
 static int stm32_copro_start(struct udevice *dev)
 {
@@ -156,7 +157,7 @@ static int stm32_copro_start(struct udevice *dev)
 /**
  * stm32_copro_reset() - Reset the STM32 remote processor
  * @dev:	corresponding STM32 remote processor device
- * @return 0 if all went ok, else corresponding -ve error
+ * Return: 0 if all went ok, else corresponding -ve error
  */
 static int stm32_copro_reset(struct udevice *dev)
 {
@@ -185,7 +186,7 @@ static int stm32_copro_reset(struct udevice *dev)
 /**
  * stm32_copro_stop() - Stop the STM32 remote processor
  * @dev:	corresponding STM32 remote processor device
- * @return 0 if all went ok, else corresponding -ve error
+ * Return: 0 if all went ok, else corresponding -ve error
  */
 static int stm32_copro_stop(struct udevice *dev)
 {
@@ -195,7 +196,7 @@ static int stm32_copro_stop(struct udevice *dev)
 /**
  * stm32_copro_is_running() - Is the STM32 remote processor running
  * @dev:	corresponding STM32 remote processor device
- * @return 0 if the remote processor is running, 1 otherwise
+ * Return: 0 if the remote processor is running, 1 otherwise
  */
 static int stm32_copro_is_running(struct udevice *dev)
 {
@@ -222,5 +223,5 @@ U_BOOT_DRIVER(stm32_copro) = {
 	.id = UCLASS_REMOTEPROC,
 	.ops = &stm32_copro_ops,
 	.probe = stm32_copro_probe,
-	.priv_auto_alloc_size = sizeof(struct stm32_copro_privdata),
+	.priv_auto	= sizeof(struct stm32_copro_privdata),
 };

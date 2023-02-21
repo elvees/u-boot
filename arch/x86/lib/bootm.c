@@ -12,6 +12,7 @@
 #include <command.h>
 #include <hang.h>
 #include <log.h>
+#include <asm/global_data.h>
 #include <dm/device.h>
 #include <dm/root.h>
 #include <errno.h>
@@ -35,7 +36,7 @@ void bootm_announce_and_cleanup(void)
 	printf("\nStarting kernel ...\n\n");
 
 #ifdef CONFIG_SYS_COREBOOT
-	timestamp_add_now(TS_U_BOOT_START_KERNEL);
+	timestamp_add_now(TS_START_KERNEL);
 #endif
 	bootstage_mark_name(BOOTSTAGE_ID_BOOTM_HANDOFF, "start_kernel");
 #if CONFIG_IS_ENABLED(BOOTSTAGE_REPORT)
@@ -77,15 +78,14 @@ static int boot_prep_linux(bootm_headers_t *images)
 	size_t len;
 	int ret;
 
-#ifdef CONFIG_OF_LIBFDT
-	if (images->ft_len) {
+	if (CONFIG_IS_ENABLED(OF_LIBFDT) && CONFIG_IS_ENABLED(LMB) && images->ft_len) {
 		debug("using: FDT\n");
 		if (image_setup_linux(images)) {
 			puts("FDT creation failed! hanging...");
 			hang();
 		}
 	}
-#endif
+
 	if (images->legacy_hdr_valid) {
 		hdr = images->legacy_hdr_os;
 		if (image_check_type(hdr, IH_TYPE_MULTI)) {
@@ -178,10 +178,14 @@ int boot_linux_kernel(ulong setup_base, ulong load_address, bool image_64bit)
 		* U-Boot is setting them up that way for itself in
 		* arch/i386/cpu/cpu.c.
 		*
-		* Note that we cannot currently boot a kernel while running as
-		* an EFI application. Please use the payload option for that.
+		* Note: this is incomplete for EFI kernels!
+		*
+		* This can boot a kernel while running as an EFI application,
+		* but if the kernel requires EFI support then that support needs
+		* to be enabled first (see EFI_LOADER). Also the EFI information
+		* must enabled with setup_efi_info(). See setup_zimage() for
+		* how this is done with the stub.
 		*/
-#ifndef CONFIG_EFI_APP
 		__asm__ __volatile__ (
 		"movl $0, %%ebp\n"
 		"cli\n"
@@ -190,7 +194,6 @@ int boot_linux_kernel(ulong setup_base, ulong load_address, bool image_64bit)
 		[boot_params] "S"(setup_base),
 		"b"(0), "D"(0)
 		);
-#endif
 	}
 
 	/* We can't get to here */
@@ -221,4 +224,22 @@ int do_bootm_linux(int flag, int argc, char *const argv[],
 		return boot_jump_linux(images);
 
 	return boot_jump_linux(images);
+}
+
+static ulong get_sp(void)
+{
+	ulong ret;
+
+#if CONFIG_IS_ENABLED(X86_64)
+	ret = gd->start_addr_sp;
+#else
+	asm("mov %%esp, %0" : "=r"(ret) : );
+#endif
+
+	return ret;
+}
+
+void arch_lmb_reserve(struct lmb *lmb)
+{
+	arch_lmb_reserve_generic(lmb, get_sp(), gd->ram_top, 4096);
 }

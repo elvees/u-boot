@@ -36,7 +36,7 @@
  * @param elem_size Size of each element
  * @param msg       Text string to show when allocation fails
  *
- * @return A valid memory location or NULL on failure
+ * Return: A valid memory location or NULL on failure
  */
 static void *nix_memalloc(int num_elements, size_t elem_size, const char *msg)
 {
@@ -727,7 +727,7 @@ int nix_lf_setup_mac(struct udevice *dev)
 {
 	struct rvu_pf *rvu = dev_get_priv(dev);
 	struct nix *nix = rvu->nix;
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 
 	/* If lower level firmware fails to set proper MAC
 	 * u-boot framework updates MAC to random address.
@@ -736,7 +736,7 @@ int nix_lf_setup_mac(struct udevice *dev)
 	 */
 	if (memcmp(nix->lmac->mac_addr, pdata->enetaddr, ARP_HLEN)) {
 		memcpy(nix->lmac->mac_addr, pdata->enetaddr, 6);
-		eth_env_set_enetaddr_by_index("eth", rvu->dev->seq,
+		eth_env_set_enetaddr_by_index("eth", dev_seq(rvu->dev),
 					      pdata->enetaddr);
 		cgx_lmac_mac_filter_setup(nix->lmac);
 		/* Update user given MAC address to ATF for update
@@ -828,4 +828,3 @@ void nix_print_mac_info(struct udevice *dev)
 	printf(" CGX%d LMAC%d [%s]", lmac->cgx->cgx_id, lmac->lmac_id,
 	       lmac_type_to_str[lmac->lmac_type]);
 }
-

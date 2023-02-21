@@ -13,6 +13,7 @@
 #include <dm.h>
 #include <console.h>
 #include <malloc.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <phy.h>
 #include <miiphy.h>
@@ -21,6 +22,7 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <asm/io.h>
+#include <eth_phy.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -322,7 +324,7 @@ static int setup_phy(struct udevice *dev)
 static int emaclite_start(struct udevice *dev)
 {
 	struct xemaclite *emaclite = dev_get_priv(dev);
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct emaclite_regs *regs = emaclite->regs;
 
 	debug("EmacLite Initialization Started\n");
@@ -457,7 +459,7 @@ static int emaclite_recv(struct udevice *dev, int flags, uchar **packetp)
 {
 	u32 length, first_read, reg, attempt = 0;
 	void *addr, *ack;
-	struct xemaclite *emaclite = dev->priv;
+	struct xemaclite *emaclite = dev_get_priv(dev);
 	struct emaclite_regs *regs = emaclite->regs;
 	struct ethernet_hdr *eth;
 	struct ip_udp_hdr *ip;
@@ -563,14 +565,27 @@ static int emaclite_probe(struct udevice *dev)
 	struct xemaclite *emaclite = dev_get_priv(dev);
 	int ret;
 
-	emaclite->bus = mdio_alloc();
-	emaclite->bus->read = emaclite_miiphy_read;
-	emaclite->bus->write = emaclite_miiphy_write;
-	emaclite->bus->priv = emaclite;
+	if (IS_ENABLED(CONFIG_DM_ETH_PHY))
+		emaclite->bus = eth_phy_get_mdio_bus(dev);
 
-	ret = mdio_register_seq(emaclite->bus, dev->seq);
-	if (ret)
-		return ret;
+	if (!emaclite->bus) {
+		emaclite->bus = mdio_alloc();
+		emaclite->bus->read = emaclite_miiphy_read;
+		emaclite->bus->write = emaclite_miiphy_write;
+		emaclite->bus->priv = emaclite;
+
+		ret = mdio_register_seq(emaclite->bus, dev_seq(dev));
+		if (ret)
+			return ret;
+	}
+
+	if (IS_ENABLED(CONFIG_DM_ETH_PHY)) {
+		eth_phy_set_mdio_bus(dev, emaclite->bus);
+		emaclite->phyaddr = eth_phy_get_addr(dev);
+	}
+
+	printf("EMACLITE: %lx, phyaddr %d, %d/%d\n", (ulong)emaclite->regs,
+	       emaclite->phyaddr, emaclite->txpp, emaclite->rxpp);
 
 	return 0;
 }
@@ -593,9 +608,9 @@ static const struct eth_ops emaclite_ops = {
 	.stop = emaclite_stop,
 };
 
-static int emaclite_ofdata_to_platdata(struct udevice *dev)
+static int emaclite_of_to_plat(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct xemaclite *emaclite = dev_get_priv(dev);
 	int offset = 0;
 
@@ -605,19 +620,18 @@ static int emaclite_ofdata_to_platdata(struct udevice *dev)
 
 	emaclite->phyaddr = -1;
 
-	offset = fdtdec_lookup_phandle(gd->fdt_blob, dev_of_offset(dev),
-				      "phy-handle");
-	if (offset > 0)
-		emaclite->phyaddr = fdtdec_get_int(gd->fdt_blob, offset,
-						   "reg", -1);
+	if (!(IS_ENABLED(CONFIG_DM_ETH_PHY))) {
+		offset = fdtdec_lookup_phandle(gd->fdt_blob, dev_of_offset(dev),
+					       "phy-handle");
+		if (offset > 0)
+			emaclite->phyaddr = fdtdec_get_int(gd->fdt_blob,
+							   offset, "reg", -1);
+	}
 
 	emaclite->txpp = fdtdec_get_int(gd->fdt_blob, dev_of_offset(dev),
 					"xlnx,tx-ping-pong", 0);
 	emaclite->rxpp = fdtdec_get_int(gd->fdt_blob, dev_of_offset(dev),
 					"xlnx,rx-ping-pong", 0);
-
-	printf("EMACLITE: %lx, phyaddr %d, %d/%d\n", (ulong)emaclite->regs,
-	       emaclite->phyaddr, emaclite->txpp, emaclite->rxpp);
 
 	return 0;
 }
@@ -631,10 +645,10 @@ U_BOOT_DRIVER(emaclite) = {
 	.name   = "emaclite",
 	.id     = UCLASS_ETH,
 	.of_match = emaclite_ids,
-	.ofdata_to_platdata = emaclite_ofdata_to_platdata,
+	.of_to_plat = emaclite_of_to_plat,
 	.probe  = emaclite_probe,
 	.remove = emaclite_remove,
 	.ops    = &emaclite_ops,
-	.priv_auto_alloc_size = sizeof(struct xemaclite),
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
+	.priv_auto	= sizeof(struct xemaclite),
+	.plat_auto	= sizeof(struct eth_pdata),
 };

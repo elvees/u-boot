@@ -12,7 +12,8 @@
 
 / {
 	model = "Sipeed Maix Bit 2.0";
-	compatible = "sipeed,maix-bitm", "sipeed,maix-bit", "kendryte,k210";
+	compatible = "sipeed,maix-bitm", "sipeed,maix-bit",
+		     "canaan,kendryte-k210";
 
 	chosen {
 		stdout-path = "serial0:115200";
@@ -200,6 +201,8 @@
 		compatible = "jedec,spi-nor";
 		reg = <0>;
 		spi-max-frequency = <50000000>;
+		spi-tx-bus-width = <4>;
+		spi-rx-bus-width = <4>;
 		m25p,fast-read;
 		broken-flash-reset;
 	};

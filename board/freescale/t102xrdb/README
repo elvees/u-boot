@@ -39,7 +39,7 @@ The T1024 SoC includes the following function and features:
   - One QSGMII interface
   - Four SGMII interface supporting 1000 Mbps
   - Three SGMII interfaces supporting up to 2500 Mbps
-  - 10GbE XFI or 10Base-KR interface
+  - 10GBase-R or 10Base-KR interface
 - Additional peripheral interfaces
   - Two USB 2.0 controllers with integrated PHY
   - SD/eSDHC/eMMC
@@ -267,7 +267,7 @@ enabled in relative defconfig file,
    config_reset_vector_address - 0xffc
 
 if device tree support is enabled in defconfig,
-1. use 'u-boot-with-dtb.bin' for nor boot.
+1. use 'u-boot.bin' for nor boot.
 2. use 'u-boot-with-spl-pbl.bin' for other boot.
 
 2-stage NAND/SPI/SD boot loader

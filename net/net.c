@@ -302,12 +302,12 @@ void net_auto_load(void)
 	if (s != NULL && strcmp(s, "NFS") == 0) {
 		if (net_check_prereq(NFS)) {
 /* We aren't expecting to get a serverip, so just accept the assigned IP */
-#ifdef CONFIG_BOOTP_SERVERIP
-			net_set_state(NETLOOP_SUCCESS);
-#else
-			printf("Cannot autoload with NFS\n");
-			net_set_state(NETLOOP_FAIL);
-#endif
+			if (IS_ENABLED(CONFIG_BOOTP_SERVERIP)) {
+				net_set_state(NETLOOP_SUCCESS);
+			} else {
+				printf("Cannot autoload with NFS\n");
+				net_set_state(NETLOOP_FAIL);
+			}
 			return;
 		}
 		/*
@@ -327,12 +327,12 @@ void net_auto_load(void)
 	}
 	if (net_check_prereq(TFTPGET)) {
 /* We aren't expecting to get a serverip, so just accept the assigned IP */
-#ifdef CONFIG_BOOTP_SERVERIP
-		net_set_state(NETLOOP_SUCCESS);
-#else
-		printf("Cannot autoload with TFTPGET\n");
-		net_set_state(NETLOOP_FAIL);
-#endif
+		if (IS_ENABLED(CONFIG_BOOTP_SERVERIP)) {
+			net_set_state(NETLOOP_SUCCESS);
+		} else {
+			printf("Cannot autoload with TFTPGET\n");
+			net_set_state(NETLOOP_FAIL);
+		}
 		return;
 	}
 	tftp_start(TFTPGET);
@@ -412,7 +412,7 @@ int net_loop(enum proto_t protocol)
 
 	bootstage_mark_name(BOOTSTAGE_ID_ETH_START, "eth_start");
 	net_init();
-	if (eth_is_on_demand_init() || protocol != NETCONS) {
+	if (eth_is_on_demand_init()) {
 		eth_halt();
 		eth_set_current();
 		ret = eth_init();
@@ -907,6 +907,9 @@ static struct ip_udp_hdr *__net_defragment(struct ip_udp_hdr *ip, int *lenp)
 	int offset8, start, len, done = 0;
 	u16 ip_off = ntohs(ip->ip_off);
 
+	if (ip->ip_len < IP_MIN_FRAG_DATAGRAM_SIZE)
+		return NULL;
+
 	/* payload starts after IP header, this fragment is in there */
 	payload = (struct hole *)(pkt_buff + IP_HDR_SIZE);
 	offset8 =  (ip_off & IP_OFFS);
@@ -1264,8 +1267,7 @@ void net_process_received_packet(uchar *in_packet, int len)
 			   "received UDP (to=%pI4, from=%pI4, len=%d)\n",
 			   &dst_ip, &src_ip, len);
 
-#ifdef CONFIG_UDP_CHECKSUM
-		if (ip->udp_xsum != 0) {
+		if (IS_ENABLED(CONFIG_UDP_CHECKSUM) && ip->udp_xsum != 0) {
 			ulong   xsum;
 			u8 *sumptr;
 			ushort  sumlen;
@@ -1298,7 +1300,6 @@ void net_process_received_packet(uchar *in_packet, int len)
 				return;
 			}
 		}
-#endif
 
 #if defined(CONFIG_NETCONSOLE) && !defined(CONFIG_SPL_BUILD)
 		nc_input_packet((uchar *)ip + IP_UDP_HDR_SIZE,
@@ -1540,14 +1541,19 @@ int is_serverip_in_cmd(void)
 int net_parse_bootfile(struct in_addr *ipaddr, char *filename, int max_len)
 {
 	char *colon;
+	struct in_addr ip;
+	ip.s_addr = 0;
 
 	if (net_boot_file_name[0] == '\0')
 		return 0;
 
 	colon = strchr(net_boot_file_name, ':');
 	if (colon) {
-		if (ipaddr)
-			*ipaddr = string_to_ip(net_boot_file_name);
+		ip = string_to_ip(net_boot_file_name);
+		if (ipaddr && ip.s_addr)
+			*ipaddr = ip;
+	}
+	if (ip.s_addr) {
 		strncpy(filename, colon + 1, max_len);
 	} else {
 		strncpy(filename, net_boot_file_name, max_len);
@@ -1591,7 +1597,7 @@ ushort string_to_vlan(const char *s)
 	if (*s < '0' || *s > '9')
 		id = VLAN_NONE;
 	else
-		id = (ushort)simple_strtoul(s, NULL, 10);
+		id = (ushort)dectoul(s, NULL);
 
 	return htons(id);
 }

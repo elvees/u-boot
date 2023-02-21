@@ -28,7 +28,10 @@
 
 #include <common.h>
 #include <command.h>
+#include <display_options.h>
+#ifdef CONFIG_SYS_DIRECT_FLASH_NFS
 #include <flash.h>
+#endif
 #include <image.h>
 #include <log.h>
 #include <net.h>
@@ -40,11 +43,6 @@
 
 #define HASHES_PER_LINE 65	/* Number of "loading" hashes per line	*/
 #define NFS_RETRY_COUNT 30
-#ifndef CONFIG_NFS_TIMEOUT
-# define NFS_TIMEOUT 2000UL
-#else
-# define NFS_TIMEOUT CONFIG_NFS_TIMEOUT
-#endif
 
 #define NFS_RPC_ERR	1
 #define NFS_RPC_DROP	124
@@ -53,11 +51,11 @@ static int fs_mounted;
 static unsigned long rpc_id;
 static int nfs_offset = -1;
 static int nfs_len;
-static ulong nfs_timeout = NFS_TIMEOUT;
+static const ulong nfs_timeout = CONFIG_NFS_TIMEOUT;
 
 static char dirfh[NFS_FHSIZE];	/* NFSv2 / NFSv3 file handle of directory */
 static char filefh[NFS3_FHSIZE]; /* NFSv2 / NFSv3 file handle */
-static int filefh3_length;	/* (variable) length of filefh when NFSv3 */
+static unsigned int filefh3_length;	/* (variable) length of filefh when NFSv3 */
 
 static enum net_loop_state nfs_download_state;
 static struct in_addr nfs_server_ip;
@@ -578,8 +576,6 @@ static int nfs_lookup_reply(uchar *pkt, unsigned len)
 		filefh3_length = ntohl(rpc_pkt.u.reply.data[1]);
 		if (filefh3_length > NFS3_FHSIZE)
 			filefh3_length  = NFS3_FHSIZE;
-		if (((uchar *)&(rpc_pkt.u.reply.data[0]) - (uchar *)(&rpc_pkt) + filefh3_length) > len)
-			return -NFS_RPC_DROP;
 		memcpy(filefh, rpc_pkt.u.reply.data + 2, filefh3_length);
 	}
 
@@ -733,7 +729,7 @@ static void nfs_timeout_handler(void)
 	} else {
 		puts("T ");
 		net_set_timeout_handler(nfs_timeout +
-					NFS_TIMEOUT * nfs_timeout_count,
+					nfs_timeout * nfs_timeout_count,
 					nfs_timeout_handler);
 		nfs_send();
 	}

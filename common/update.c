@@ -20,14 +20,12 @@
 
 #include <command.h>
 #include <env.h>
-#include <flash.h>
 #include <net.h>
 #include <net/tftp.h>
 #include <malloc.h>
 #include <mapmem.h>
 #include <dfu.h>
 #include <errno.h>
-#include <mtd/cfi_flash.h>
 
 #if defined(CONFIG_DFU_TFTP) || defined(CONFIG_UPDATE_TFTP)
 /* env variable holding the location of the update file */
@@ -49,7 +47,8 @@
 extern ulong tftp_timeout_ms;
 extern int tftp_timeout_count_max;
 #ifdef CONFIG_MTD_NOR_FLASH
-extern flash_info_t flash_info[];
+#include <flash.h>
+#include <mtd/cfi_flash.h>
 static uchar *saved_prot_info;
 #endif
 static int update_load(char *filename, ulong msec_max, int cnt_max, ulong addr)
@@ -112,12 +111,12 @@ static int update_flash_protect(int prot, ulong addr_first, ulong addr_last)
 
 	if (prot == 0) {
 		saved_prot_info =
-			calloc(CONFIG_SYS_MAX_FLASH_BANKS * CONFIG_SYS_MAX_FLASH_SECT, 1);
+			calloc(CFI_FLASH_BANKS * CONFIG_SYS_MAX_FLASH_SECT, 1);
 		if (!saved_prot_info)
 			return 1;
 	}
 
-	for (bank = 0; bank < CONFIG_SYS_MAX_FLASH_BANKS; ++bank) {
+	for (bank = 0; bank < CFI_FLASH_BANKS; ++bank) {
 		cnt = 0;
 		info = &flash_info[bank];
 
@@ -272,7 +271,7 @@ int update_tftp(ulong addr, char *interface, char *devstring)
 	/* get load address of downloaded update file */
 	env_addr = env_get("loadaddr");
 	if (env_addr)
-		addr = simple_strtoul(env_addr, NULL, 16);
+		addr = hextoul(env_addr, NULL);
 	else
 		addr = CONFIG_UPDATE_LOAD_ADDR;
 
@@ -286,7 +285,7 @@ int update_tftp(ulong addr, char *interface, char *devstring)
 got_update_file:
 	fit = map_sysmem(addr, 0);
 
-	if (!fit_check_format((void *)fit)) {
+	if (fit_check_format((void *)fit, IMAGE_SIZE_INVAL)) {
 		printf("Bad FIT format of the update file, aborting "
 							"auto-update\n");
 		return 1;
@@ -363,7 +362,7 @@ int fit_update(const void *fit)
 	if (!fit)
 		return -EINVAL;
 
-	if (!fit_check_format((void *)fit)) {
+	if (fit_check_format((void *)fit, IMAGE_SIZE_INVAL)) {
 		printf("Bad FIT format of the update file, aborting auto-update\n");
 		return -EINVAL;
 	}

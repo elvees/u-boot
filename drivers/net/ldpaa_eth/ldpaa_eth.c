@@ -20,6 +20,7 @@
 #include <linux/bug.h>
 #include <linux/compat.h>
 #include <linux/delay.h>
+#include <asm/global_data.h>
 #include "ldpaa_eth.h"
 
 #ifdef CONFIG_PHYLIB
@@ -511,7 +512,7 @@ static int ldpaa_get_dpmac_state(struct ldpaa_eth_priv *priv,
 #ifdef CONFIG_DM_ETH
 static int ldpaa_eth_open(struct udevice *dev)
 {
-	struct eth_pdata *plat = dev_get_platdata(dev);
+	struct eth_pdata *plat = dev_get_plat(dev);
 	struct ldpaa_eth_priv *priv = dev_get_priv(dev);
 #else
 static int ldpaa_eth_open(struct eth_device *net_dev, struct bd_info *bd)
@@ -1119,31 +1120,14 @@ static uint32_t ldpaa_eth_get_dpmac_id(struct udevice *dev)
 	return fdtdec_get_uint(gd->fdt_blob, port_node, "reg", -1);
 }
 
-static const char *ldpaa_eth_get_phy_mode_str(struct udevice *dev)
-{
-	int port_node = dev_of_offset(dev);
-	const char *phy_mode_str;
-
-	phy_mode_str = fdt_getprop(gd->fdt_blob, port_node,
-				   "phy-connection-type", NULL);
-	if (phy_mode_str)
-		return phy_mode_str;
-
-	phy_mode_str = fdt_getprop(gd->fdt_blob, port_node, "phy-mode", NULL);
-	return phy_mode_str;
-}
-
 static int ldpaa_eth_bind(struct udevice *dev)
 {
-	const char *phy_mode_str = NULL;
 	uint32_t dpmac_id;
 	char eth_name[16];
 	int phy_mode = -1;
 
-	phy_mode_str = ldpaa_eth_get_phy_mode_str(dev);
-	if (phy_mode_str)
-		phy_mode = phy_get_interface_by_name(phy_mode_str);
-	if (phy_mode == -1) {
+	phy_mode = dev_read_phy_mode(dev);
+	if (phy_mode == PHY_INTERFACE_MODE_NA) {
 		dev_err(dev, "incorrect phy mode\n");
 		return -EINVAL;
 	}
@@ -1154,20 +1138,19 @@ static int ldpaa_eth_bind(struct udevice *dev)
 		return -EINVAL;
 	}
 
-	sprintf(eth_name, "DPMAC%d@%s", dpmac_id, phy_mode_str);
+	sprintf(eth_name, "DPMAC%d@%s", dpmac_id,
+		phy_string_for_interface(phy_mode));
 	device_set_name(dev, eth_name);
 
 	return 0;
 }
 
-static int ldpaa_eth_ofdata_to_platdata(struct udevice *dev)
+static int ldpaa_eth_of_to_plat(struct udevice *dev)
 {
 	struct ldpaa_eth_priv *priv = dev_get_priv(dev);
-	const char *phy_mode_str;
 
 	priv->dpmac_id = ldpaa_eth_get_dpmac_id(dev);
-	phy_mode_str = ldpaa_eth_get_phy_mode_str(dev);
-	priv->phy_mode = phy_get_interface_by_name(phy_mode_str);
+	priv->phy_mode = dev_read_phy_mode(dev);
 
 	return 0;
 }
@@ -1187,12 +1170,12 @@ U_BOOT_DRIVER(ldpaa_eth) = {
 	.name = "ldpaa_eth",
 	.id = UCLASS_ETH,
 	.of_match = ldpaa_eth_of_ids,
-	.ofdata_to_platdata = ldpaa_eth_ofdata_to_platdata,
+	.of_to_plat = ldpaa_eth_of_to_plat,
 	.bind = ldpaa_eth_bind,
 	.probe = ldpaa_eth_probe,
 	.ops = &ldpaa_eth_ops,
-	.priv_auto_alloc_size = sizeof(struct ldpaa_eth_priv),
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
+	.priv_auto	= sizeof(struct ldpaa_eth_priv),
+	.plat_auto	= sizeof(struct eth_pdata),
 };
 
 #else

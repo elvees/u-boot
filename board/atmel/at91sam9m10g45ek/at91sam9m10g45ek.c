@@ -10,6 +10,7 @@
 #include <init.h>
 #include <net.h>
 #include <vsprintf.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/clk.h>
 #include <asm/arch/at91sam9g45_matrix.h>
@@ -213,7 +214,8 @@ static void at91sam9m10g45ek_lcd_hw_init(void)
 
 	at91_periph_clk_enable(ATMEL_ID_LCDC);
 
-	gd->fb_base = CONFIG_AT91SAM9G45_LCD_BASE;
+	/* board specific(not enough SRAM) */
+	gd->fb_base = 0x73E00000;
 }
 
 #ifdef CONFIG_LCD_INFO
@@ -256,9 +258,6 @@ void board_debug_uart_init(void)
 #ifdef CONFIG_BOARD_EARLY_INIT_F
 int board_early_init_f(void)
 {
-#ifdef CONFIG_DEBUG_UART
-	debug_uart_init();
-#endif
 	return 0;
 }
 #endif
@@ -266,11 +265,7 @@ int board_early_init_f(void)
 int board_init(void)
 {
 	/* arch number of AT91SAM9M10G45EK-Board */
-#ifdef CONFIG_AT91SAM9M10G45EK
 	gd->bd->bi_arch_number = MACH_TYPE_AT91SAM9M10G45EK;
-#elif defined CONFIG_AT91SAM9G45EKES
-	gd->bd->bi_arch_number = MACH_TYPE_AT91SAM9G45EKES;
-#endif
 
 	/* adress of boot parameters */
 	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;

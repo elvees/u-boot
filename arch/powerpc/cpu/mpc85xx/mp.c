@@ -7,6 +7,7 @@
 #include <cpu_func.h>
 #include <env.h>
 #include <log.h>
+#include <asm/global_data.h>
 #include <asm/processor.h>
 #include <env.h>
 #include <ioports.h>
@@ -166,7 +167,7 @@ int cpu_release(u32 nr, int argc, char *const argv[])
 	for (i = 1; i < 3; i++) {
 		if (argv[i][0] != '-') {
 			u8 entry = boot_entry_map[i];
-			val = simple_strtoul(argv[i], NULL, 16);
+			val = hextoul(argv[i], NULL);
 			table[entry] = val;
 		}
 	}
@@ -455,18 +456,18 @@ void setup_mp(void)
 	flush_cache(bootpg, 4096);
 
 	/* look for the tlb covering the reset page, there better be one */
-	i = find_tlb_idx((void *)CONFIG_BPTR_VIRT_ADDR, 1);
+	i = find_tlb_idx((void *)BPTR_VIRT_ADDR, 1);
 
 	/* we found a match */
 	if (i != -1) {
 		/* map reset page to bootpg so we can copy code there */
 		disable_tlb(i);
 
-		set_tlb(1, CONFIG_BPTR_VIRT_ADDR, bootpg, /* tlb, epn, rpn */
+		set_tlb(1, BPTR_VIRT_ADDR, bootpg, /* tlb, epn, rpn */
 			MAS3_SX|MAS3_SW|MAS3_SR, MAS2_I|MAS2_G, /* perms, wimge */
 			0, i, BOOKE_PAGESZ_4K, 1); /* ts, esel, tsize, iprot */
 
-		memcpy((void *)CONFIG_BPTR_VIRT_ADDR, (void *)fixup, 4096);
+		memcpy((void *)BPTR_VIRT_ADDR, (void *)fixup, 4096);
 
 		plat_mp_up(bootpg_map, pagesize);
 	} else {

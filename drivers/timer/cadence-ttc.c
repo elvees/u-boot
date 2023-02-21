@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <init.h>
 #include <timer.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <linux/bitops.h>
 #include <linux/err.h>
@@ -84,7 +85,7 @@ static int cadence_ttc_probe(struct udevice *dev)
 	return 0;
 }
 
-static int cadence_ttc_ofdata_to_platdata(struct udevice *dev)
+static int cadence_ttc_of_to_plat(struct udevice *dev)
 {
 	struct cadence_ttc_priv *priv = dev_get_priv(dev);
 
@@ -92,6 +93,17 @@ static int cadence_ttc_ofdata_to_platdata(struct udevice *dev)
 				 sizeof(struct cadence_ttc_regs), MAP_NOCACHE);
 	if (IS_ERR(priv->regs))
 		return PTR_ERR(priv->regs);
+
+	return 0;
+}
+
+static int cadence_ttc_bind(struct udevice *dev)
+{
+	const char *cells;
+
+	cells = dev_read_prop(dev, "#pwm-cells", NULL);
+	if (cells)
+		return -ENODEV;
 
 	return 0;
 }
@@ -109,8 +121,9 @@ U_BOOT_DRIVER(cadence_ttc) = {
 	.name = "cadence_ttc",
 	.id = UCLASS_TIMER,
 	.of_match = cadence_ttc_ids,
-	.ofdata_to_platdata = cadence_ttc_ofdata_to_platdata,
-	.priv_auto_alloc_size = sizeof(struct cadence_ttc_priv),
+	.of_to_plat = cadence_ttc_of_to_plat,
+	.priv_auto	= sizeof(struct cadence_ttc_priv),
 	.probe = cadence_ttc_probe,
 	.ops = &cadence_ttc_ops,
+	.bind = cadence_ttc_bind,
 };

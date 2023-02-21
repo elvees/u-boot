@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2019 NXP
+ * Copyright 2019, 2021 NXP
  */
 
 #include <common.h>
@@ -11,6 +11,7 @@
 #include <init.h>
 #include <log.h>
 #include <spl.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/mach-imx/iomux-v3.h>
 #include <asm/arch/clock.h>
@@ -25,7 +26,7 @@
 #include <dm/device-internal.h>
 
 #include <power/pmic.h>
-#include <power/bd71837.h>
+#include <power/pca9450.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -38,6 +39,8 @@ int spl_board_boot_device(enum boot_device boot_dev_spl)
 	case SD3_BOOT:
 	case MMC3_BOOT:
 		return BOOT_DEVICE_MMC2;
+	case QSPI_BOOT:
+		return BOOT_DEVICE_NOR;
 	default:
 		return BOOT_DEVICE_NONE;
 	}
@@ -50,6 +53,14 @@ static void spl_dram_init(void)
 
 void spl_board_init(void)
 {
+	if (IS_ENABLED(CONFIG_FSL_CAAM)) {
+		struct udevice *dev;
+		int ret;
+
+		ret = uclass_get_device_by_driver(UCLASS_MISC, DM_DRIVER_GET(caam_jr), &dev);
+		if (ret)
+			printf("Failed to initialize caam_jr: %d\n", ret);
+	}
 	puts("Normal Boot\n");
 }
 
@@ -63,37 +74,12 @@ int board_fit_config_name_match(const char *name)
 }
 #endif
 
-#define UART_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_FSEL1)
-#define WDOG_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_ODE | PAD_CTL_PUE | PAD_CTL_PE)
-
-static iomux_v3_cfg_t const uart_pads[] = {
-	IMX8MM_PAD_UART2_RXD_UART2_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
-	IMX8MM_PAD_UART2_TXD_UART2_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
-};
-
-static iomux_v3_cfg_t const wdog_pads[] = {
-	IMX8MM_PAD_GPIO1_IO02_WDOG1_WDOG_B  | MUX_PAD_CTRL(WDOG_PAD_CTRL),
-};
-
-int board_early_init_f(void)
-{
-	struct wdog_regs *wdog = (struct wdog_regs *)WDOG1_BASE_ADDR;
-
-	imx_iomux_v3_setup_multiple_pads(wdog_pads, ARRAY_SIZE(wdog_pads));
-
-	set_wdog_reset(wdog);
-
-	imx_iomux_v3_setup_multiple_pads(uart_pads, ARRAY_SIZE(uart_pads));
-
-	return 0;
-}
-
 static int power_init_board(void)
 {
 	struct udevice *dev;
 	int ret;
 
-	ret = pmic_get("pmic@4b", &dev);
+	ret = pmic_get("pca9450@25", &dev);
 	if (ret == -ENODEV) {
 		puts("No pmic\n");
 		return 0;
@@ -101,25 +87,26 @@ static int power_init_board(void)
 	if (ret != 0)
 		return ret;
 
-	/* decrease RESET key long push time from the default 10s to 10ms */
-	pmic_reg_write(dev, BD718XX_PWRONCONFIG1, 0x0);
+	/* BUCKxOUT_DVS0/1 control BUCK123 output */
+	pmic_reg_write(dev, PCA9450_BUCK123_DVS, 0x29);
 
-	/* unlock the PMIC regs */
-	pmic_reg_write(dev, BD718XX_REGLOCK, 0x1);
+	/* Buck 1 DVS control through PMIC_STBY_REQ */
+	pmic_reg_write(dev, PCA9450_BUCK1CTRL, 0x59);
 
-	/* increase VDD_SOC to typical value 0.85v before first DRAM access */
-	pmic_reg_write(dev, BD718XX_BUCK1_VOLT_RUN, 0x0f);
+	/* Set DVS1 to 0.8v for suspend */
+	pmic_reg_write(dev, PCA9450_BUCK1OUT_DVS1, 0x10);
 
-	/* increase VDD_DRAM to 0.975v for 3Ghz DDR */
-	pmic_reg_write(dev, BD718XX_1ST_NODVS_BUCK_VOLT, 0x83);
+	/* increase VDD_DRAM to 0.95v for 3Ghz DDR */
+	pmic_reg_write(dev, PCA9450_BUCK3OUT_DVS0, 0x1C);
 
-#ifndef CONFIG_IMX8M_LPDDR4
-	/* increase NVCC_DRAM_1V2 to 1.2v for DDR4 */
-	pmic_reg_write(dev, BD718XX_4TH_NODVS_BUCK_VOLT, 0x28);
-#endif
+	/* VDD_DRAM needs off in suspend, set B1_ENMODE=10 (ON by PMIC_ON_REQ = H && PMIC_STBY_REQ = L) */
+	pmic_reg_write(dev, PCA9450_BUCK3CTRL, 0x4a);
 
-	/* lock the PMIC regs */
-	pmic_reg_write(dev, BD718XX_REGLOCK, 0x11);
+	/* set VDD_SNVS_0V8 from default 0.85V */
+	pmic_reg_write(dev, PCA9450_LDO2CTRL, 0xC0);
+
+	/* set WDOG_B_CFG to cold reset */
+	pmic_reg_write(dev, PCA9450_RESET_CTRL, 0xA1);
 
 	return 0;
 }
@@ -133,11 +120,7 @@ void board_init_f(ulong dummy)
 
 	init_uart_clk(1);
 
-	board_early_init_f();
-
 	timer_init();
-
-	preloader_console_init();
 
 	/* Clear the BSS. */
 	memset(__bss_start, 0, __bss_end - __bss_start);
@@ -155,6 +138,8 @@ void board_init_f(ulong dummy)
 		printf("Failed to find clock node. Check device tree\n");
 		hang();
 	}
+
+	preloader_console_init();
 
 	enable_tzc380();
 

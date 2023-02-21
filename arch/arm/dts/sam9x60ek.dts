@@ -7,6 +7,7 @@
  * Author: Sandeep Sheriker M <Sandeepsheriker.mallikarjun@microchip.com>
  */
 /dts-v1/;
+#include <dt-bindings/mfd/atmel-flexcom.h>
 #include "sam9x60.dtsi"
 
 / {
@@ -29,7 +30,7 @@
 	};
 
 	onewire_tm: onewire {
-		gpios = <&pioD 14 0>;
+		gpios = <&pioD 14 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_onewire_tm_default>;
 		status = "okay";
@@ -48,7 +49,7 @@
 				status = "okay";
 
 				nor_flash: sst26vf064@0 {
-					compatible = "spi-flash";
+					compatible = "jedec,spi-nor";
 					reg = <0>;
 					spi-max-frequency = <80000000>;
 					spi-rx-bus-width = <4>;
@@ -57,7 +58,7 @@
 			};
 
 			flx0: flexcom@f801c600 {
-				atmel,flexcom-mode = <3>;
+				atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_TWI>;
 				status = "okay";
 
 				i2c@600 {
@@ -71,7 +72,7 @@
 					status = "okay";
 
 					eeprom@53 {
-						compatible = "atmel,24c32";
+						compatible = "atmel,24c02"; /* EEPROM is 2Kbits microchip 24aa025e48, an at24c02 with page size of 16 */
 						reg = <0x53>;
 						pagesize = <16>;
 					};

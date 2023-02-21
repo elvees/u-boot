@@ -12,22 +12,10 @@
 #include <env.h>
 #include <image.h>
 #include <asm/byteorder.h>
+#include <asm/global_data.h>
 #include <asm/zimage.h>
 
-#ifdef CONFIG_SYS_DEBUG
-static void hexdump(unsigned char *buf, int len)
-{
-	int i;
-
-	for (i = 0; i < len; i++) {
-		if ((i % 16) == 0)
-			printf("%s%08x: ", i ? "\n" : "",
-							(unsigned int)&buf[i]);
-		printf("%02x ", buf[i]);
-	}
-	printf("\n");
-}
-#endif
+DECLARE_GLOBAL_DATA_PTR;
 
 #ifdef CONFIG_SH_SDRAM_OFFSET
 #define GET_INITRD_START(initrd, linux) (initrd - linux + CONFIG_SH_SDRAM_OFFSET)
@@ -110,4 +98,17 @@ int do_bootm_linux(int flag, int argc, char *const argv[],
 
 	/* does not return */
 	return 1;
+}
+
+static ulong get_sp(void)
+{
+	ulong ret;
+
+	asm("mov r15, %0" : "=r"(ret) : );
+	return ret;
+}
+
+void arch_lmb_reserve(struct lmb *lmb)
+{
+	arch_lmb_reserve_generic(lmb, get_sp(), gd->ram_top, 4096);
 }

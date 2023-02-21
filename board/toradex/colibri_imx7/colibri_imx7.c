@@ -12,6 +12,7 @@
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/mx7-pins.h>
 #include <asm/arch/sys_proto.h>
+#include <asm/global_data.h>
 #include <asm/gpio.h>
 #include <asm/mach-imx/iomux-v3.h>
 #include <asm/io.h>
@@ -206,7 +207,7 @@ int power_init_board(void)
 	int ret;
 
 
-	ret = pmic_get("rn5t567@33", &dev);
+	ret = pmic_get("pmic@33", &dev);
 	if (ret)
 		return ret;
 	ver = pmic_reg_read(dev, RN5T567_LSIVER);
@@ -236,11 +237,11 @@ int power_init_board(void)
 	return 0;
 }
 
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 	struct udevice *dev;
 
-	pmic_get("rn5t567@33", &dev);
+	pmic_get("pmic@33", &dev);
 
 	/* Use PMIC to reset, set REPWRTIM to 0 and REPWRON to 1 */
 	pmic_reg_write(dev, RN5T567_REPCNT, 0x1);
@@ -318,48 +319,34 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 #endif
 
 #ifdef CONFIG_USB_EHCI_MX7
-static iomux_v3_cfg_t const usb_otg2_pads[] = {
-	MX7D_PAD_UART3_CTS_B__USB_OTG2_PWR | MUX_PAD_CTRL(NO_PAD_CTRL),
-};
-
-int board_ehci_hcd_init(int port)
+int board_fix_fdt(void *rw_fdt_blob)
 {
-	switch (port) {
-	case 0:
-		break;
-	case 1:
-		if (is_cpu_type(MXC_CPU_MX7S))
-			return -ENODEV;
+	/* i.MX 7Solo has only one single USB OTG1 but no USB host port */
+	if (is_cpu_type(MXC_CPU_MX7S)) {
+		int offset = fdt_path_offset(rw_fdt_blob, "/soc/bus@30800000/usb@30b20000");
 
-		imx_iomux_v3_setup_multiple_pads(usb_otg2_pads,
-						 ARRAY_SIZE(usb_otg2_pads));
-		break;
-	default:
-		return -EINVAL;
+		return fdt_status_disabled(rw_fdt_blob, offset);
 	}
+
 	return 0;
 }
 
-int board_usb_phy_mode(int port)
-{
-	switch (port) {
-	case 0:
-		if (gpio_get_value(USB_CDET_GPIO))
-			return USB_INIT_DEVICE;
-		else
-			return USB_INIT_HOST;
-	case 1:
-	default:
-		return USB_INIT_HOST;
-	}
-}
-
+#if defined(CONFIG_BOARD_LATE_INIT)
 int board_late_init(void)
 {
 #if defined(CONFIG_DM_VIDEO)
 	setup_lcd();
 #endif
+
+#if defined(CONFIG_CMD_USB_SDP)
+	if (is_boot_from_usb()) {
+		printf("Serial Downloader recovery mode, using sdp command\n");
+		env_set("bootdelay", "0");
+		env_set("bootcmd", "sdp 0");
+	}
+#endif
 	return 0;
 }
+#endif /* CONFIG_BOARD_LATE_INIT */
 
-#endif
+#endif /* CONFIG_USB_EHCI_MX7 */

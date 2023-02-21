@@ -18,7 +18,6 @@
 #include <common.h>
 #include <command.h>
 #include <dm.h>
-#include <flash.h>
 #include <i2c.h>
 #include <cros_ec.h>
 #include <fdtdec.h>
@@ -44,6 +43,10 @@ enum {
 	CROS_EC_CMD_TIMEOUT_MS	= 5000,
 	/* Timeout waiting for a synchronous hash to be recomputed */
 	CROS_EC_CMD_HASH_TIMEOUT_MS = 2000,
+
+	/* Wait 10 ms between attempts to check if EC's hash is ready */
+	CROS_EC_HASH_CHECK_DELAY_MS = 10,
+
 };
 
 #define INVALID_HCMD 0xFF
@@ -113,7 +116,7 @@ void cros_ec_dump_data(const char *name, int cmd, const uint8_t *data, int len)
  *
  * @param data	Data block to checksum
  * @param size	Size of data block in bytes
- * @return checksum value (0 to 255)
+ * Return: checksum value (0 to 255)
  */
 int cros_ec_calc_checksum(const uint8_t *data, int size)
 {
@@ -134,7 +137,7 @@ int cros_ec_calc_checksum(const uint8_t *data, int size)
  * @param cmd_version	Version of command to send (EC_VER_...)
  * @param dout          Output data (may be NULL If dout_len=0)
  * @param dout_len      Size of output data in bytes
- * @return packet size in bytes, or <0 if error.
+ * Return: packet size in bytes, or <0 if error.
  */
 static int create_proto3_request(struct cros_ec_dev *cdev,
 				 int cmd, int cmd_version,
@@ -174,7 +177,7 @@ static int create_proto3_request(struct cros_ec_dev *cdev,
  *
  * @param dev		CROS-EC device
  * @param din_len       Maximum size of response in bytes
- * @return maximum expected number of bytes in response, or <0 if error.
+ * Return: maximum expected number of bytes in response, or <0 if error.
  */
 static int prepare_proto3_response_buffer(struct cros_ec_dev *cdev, int din_len)
 {
@@ -198,7 +201,7 @@ static int prepare_proto3_response_buffer(struct cros_ec_dev *cdev, int din_len)
  * @param dev		CROS-EC device
  * @param dinp          Returns pointer to response data
  * @param din_len       Maximum size of response in bytes
- * @return number of bytes of response data, or <0 if error. Note that error
+ * Return: number of bytes of response data, or <0 if error. Note that error
  * codes can be from errno.h or -ve EC_RES_INVALID_CHECKSUM values (and they
  * overlap!)
  */
@@ -314,7 +317,7 @@ static int send_command(struct cros_ec_dev *dev, uint cmd, int cmd_version,
  *			If not NULL, it will be updated to point to the data
  *			and will always be double word aligned (64-bits)
  * @param din_len       Maximum size of response in bytes
- * @return number of bytes in response, or -ve on error
+ * Return: number of bytes in response, or -ve on error
  */
 static int ec_command_inptr(struct udevice *dev, uint cmd,
 			    int cmd_version, const void *dout, int dout_len,
@@ -381,7 +384,7 @@ static int ec_command_inptr(struct udevice *dev, uint cmd,
  *			It not NULL, it is a place for ec_command() to copy the
  *      data to.
  * @param din_len       Maximum size of response in bytes
- * @return number of bytes in response, or -ve on error
+ * Return: number of bytes in response, or -ve on error
  */
 static int ec_command(struct udevice *dev, uint cmd, int cmd_version,
 		      const void *dout, int dout_len,
@@ -400,6 +403,8 @@ static int ec_command(struct udevice *dev, uint cmd, int cmd_version,
 		 */
 		if (din && in_buffer) {
 			assert(len <= din_len);
+			if (len > din_len)
+				return -ENOSPC;
 			memmove(din, in_buffer, len);
 		}
 	}
@@ -408,7 +413,7 @@ static int ec_command(struct udevice *dev, uint cmd, int cmd_version,
 
 int cros_ec_scan_keyboard(struct udevice *dev, struct mbkp_keyscan *scan)
 {
- 	if (ec_command(dev, EC_CMD_MKBP_STATE, 0, NULL, 0, scan,
+	if (ec_command(dev, EC_CMD_MKBP_STATE, 0, NULL, 0, scan,
 		       sizeof(scan->data)) != sizeof(scan->data))
 		return -1;
 
@@ -502,9 +507,10 @@ static int cros_ec_wait_on_hash_done(struct udevice *dev,
 
 	start = get_timer(0);
 	while (hash->status == EC_VBOOT_HASH_STATUS_BUSY) {
-		mdelay(50);	/* Insert some reasonable delay */
+		mdelay(CROS_EC_HASH_CHECK_DELAY_MS);
 
 		p->cmd = EC_VBOOT_HASH_GET;
+
 		if (ec_command(dev, EC_CMD_VBOOT_HASH, 0, p, sizeof(*p), hash,
 			       sizeof(*hash)) < 0)
 			return -1;
@@ -591,6 +597,25 @@ static int cros_ec_invalidate_hash(struct udevice *dev)
 	return 0;
 }
 
+int cros_ec_hello(struct udevice *dev, uint *handshakep)
+{
+	struct ec_params_hello req;
+	struct ec_response_hello *resp;
+
+	req.in_data = 0x12345678;
+	if (ec_command_inptr(dev, EC_CMD_HELLO, 0, &req, sizeof(req),
+			     (uint8_t **)&resp, sizeof(*resp)) < 0)
+		return -EIO;
+	if (resp->out_data != req.in_data + 0x01020304) {
+		printf("Received invalid handshake %x\n", resp->out_data);
+		if (handshakep)
+			*handshakep = req.in_data;
+		return -ENOTSYNC;
+	}
+
+	return 0;
+}
+
 int cros_ec_reboot(struct udevice *dev, enum ec_reboot_cmd cmd, uint8_t flags)
 {
 	struct ec_params_reboot_ec p;
@@ -603,18 +628,23 @@ int cros_ec_reboot(struct udevice *dev, enum ec_reboot_cmd cmd, uint8_t flags)
 		return -1;
 
 	if (!(flags & EC_REBOOT_FLAG_ON_AP_SHUTDOWN)) {
+		ulong start;
+
 		/*
 		 * EC reboot will take place immediately so delay to allow it
 		 * to complete.  Note that some reboot types (EC_REBOOT_COLD)
 		 * will reboot the AP as well, in which case we won't actually
 		 * get to this point.
 		 */
-		/*
-		 * TODO(rspangler@chromium.org): Would be nice if we had a
-		 * better way to determine when the reboot is complete.  Could
-		 * we poll a memory-mapped LPC value?
-		 */
-		udelay(50000);
+		mdelay(50);
+		start = get_timer(0);
+		while (cros_ec_hello(dev, NULL)) {
+			if (get_timer(start) > 3000) {
+				log_err("EC did not return from reboot\n");
+				return -ETIMEDOUT;
+			}
+			mdelay(5);
+		}
 	}
 
 	return 0;
@@ -723,22 +753,10 @@ int cros_ec_flash_protect(struct udevice *dev, uint32_t set_mask,
 	return 0;
 }
 
-int cros_ec_entering_mode(struct udevice *dev, int mode)
-{
-	int rc;
-
-	rc = ec_command(dev, EC_CMD_ENTERING_MODE, 0, &mode, sizeof(mode),
-			NULL, 0);
-	if (rc)
-		return -1;
-	return 0;
-}
-
 static int cros_ec_check_version(struct udevice *dev)
 {
 	struct cros_ec_dev *cdev = dev_get_uclass_priv(dev);
 	struct ec_params_hello req;
-	struct ec_response_hello *resp;
 
 	struct dm_cros_ec_ops *ops;
 	int ret;
@@ -767,14 +785,14 @@ static int cros_ec_check_version(struct udevice *dev)
 	/* Try sending a version 3 packet */
 	cdev->protocol_version = 3;
 	req.in_data = 0;
-	if (ec_command_inptr(dev, EC_CMD_HELLO, 0, &req, sizeof(req),
-			     (uint8_t **)&resp, sizeof(*resp)) > 0)
+	ret = cros_ec_hello(dev, NULL);
+	if (!ret || ret == -ENOTSYNC)
 		return 0;
 
 	/* Try sending a version 2 packet */
 	cdev->protocol_version = 2;
-	if (ec_command_inptr(dev, EC_CMD_HELLO, 0, &req, sizeof(req),
-			     (uint8_t **)&resp, sizeof(*resp)) > 0)
+	ret = cros_ec_hello(dev, NULL);
+	if (!ret || ret == -ENOTSYNC)
 		return 0;
 
 	/*
@@ -790,18 +808,16 @@ static int cros_ec_check_version(struct udevice *dev)
 
 int cros_ec_test(struct udevice *dev)
 {
-	struct ec_params_hello req;
-	struct ec_response_hello *resp;
+	uint out_data;
+	int ret;
 
-	req.in_data = 0x12345678;
-	if (ec_command_inptr(dev, EC_CMD_HELLO, 0, &req, sizeof(req),
-		       (uint8_t **)&resp, sizeof(*resp)) < sizeof(*resp)) {
+	ret = cros_ec_hello(dev, &out_data);
+	if (ret == -ENOTSYNC) {
+		printf("Received invalid handshake %x\n", out_data);
+		return ret;
+	} else if (ret) {
 		printf("ec_command_inptr() returned error\n");
-		return -1;
-	}
-	if (resp->out_data != req.in_data + 0x01020304) {
-		printf("Received invalid handshake %x\n", resp->out_data);
-		return -1;
+		return ret;
 	}
 
 	return 0;
@@ -855,7 +871,7 @@ int cros_ec_flash_erase(struct udevice *dev, uint32_t offset, uint32_t size)
  * @param data		Pointer to data buffer to write
  * @param offset	Offset within flash to write to.
  * @param size		Number of bytes to write
- * @return 0 if ok, -1 on error
+ * Return: 0 if ok, -1 on error
  */
 static int cros_ec_flash_write_block(struct udevice *dev, const uint8_t *data,
 				     uint32_t offset, uint32_t size)
@@ -896,7 +912,7 @@ static int cros_ec_flash_write_burst_size(struct udevice *dev)
  *
  * @param data		Pointer to data to check (must be word-aligned)
  * @param size		Number of bytes to check (must be word-aligned)
- * @return 0 if erased, non-zero if any word is not erased
+ * Return: 0 if erased, non-zero if any word is not erased
  */
 static int cros_ec_data_is_erased(const uint32_t *data, int size)
 {
@@ -968,7 +984,7 @@ int cros_ec_flash_write(struct udevice *dev, const uint8_t *data,
  *
  * @param me     CrosEc instance
  * @param region Region to run verification on
- * @return 0 if success or not applicable. Non-zero if verification failed.
+ * Return: 0 if success or not applicable. Non-zero if verification failed.
  */
 int cros_ec_efs_verify(struct udevice *dev, enum ec_flash_region region)
 {
@@ -1005,7 +1021,7 @@ int cros_ec_efs_verify(struct udevice *dev, enum ec_flash_region region)
  * @param data		Pointer to data buffer to read into
  * @param offset	Offset within flash to read from
  * @param size		Number of bytes to read
- * @return 0 if ok, -1 on error
+ * Return: 0 if ok, -1 on error
  */
 static int cros_ec_flash_read_block(struct udevice *dev, uint8_t *data,
 				    uint32_t offset, uint32_t size)
@@ -1077,6 +1093,19 @@ int cros_ec_flash_update_rw(struct udevice *dev, const uint8_t *image,
 	return 0;
 }
 
+int cros_ec_get_sku_id(struct udevice *dev)
+{
+	struct ec_sku_id_info *r;
+	int ret;
+
+	ret = ec_command_inptr(dev, EC_CMD_GET_SKU_ID, 0, NULL, 0,
+			       (uint8_t **)&r, sizeof(*r));
+	if (ret != sizeof(*r))
+		return -ret;
+
+	return r->sku_id;
+}
+
 int cros_ec_read_nvdata(struct udevice *dev, uint8_t *block, int size)
 {
 	struct ec_params_vbnvcontext p;
@@ -1126,6 +1155,23 @@ int cros_ec_battery_cutoff(struct udevice *dev, uint8_t flags)
 
 	if (len < 0)
 		return -1;
+	return 0;
+}
+
+int cros_ec_set_pwm_duty(struct udevice *dev, uint8_t index, uint16_t duty)
+{
+	struct ec_params_pwm_set_duty p;
+	int ret;
+
+	p.duty = duty;
+	p.pwm_type = EC_PWM_TYPE_GENERIC;
+	p.index = index;
+
+	ret = ec_command(dev, EC_CMD_PWM_SET_DUTY, 0, &p, sizeof(p),
+			 NULL, 0);
+	if (ret < 0)
+		return ret;
+
 	return 0;
 }
 
@@ -1303,19 +1349,33 @@ int cros_ec_i2c_tunnel(struct udevice *dev, int port, struct i2c_msg *in,
 	return 0;
 }
 
-int cros_ec_check_feature(struct udevice *dev, int feature)
+int cros_ec_get_features(struct udevice *dev, u64 *featuresp)
 {
 	struct ec_response_get_features r;
 	int rv;
 
-	rv = ec_command(dev, EC_CMD_GET_FEATURES, 0, &r, sizeof(r), NULL, 0);
-	if (rv)
-		return rv;
+	rv = ec_command(dev, EC_CMD_GET_FEATURES, 0, NULL, 0, &r, sizeof(r));
+	if (rv != sizeof(r))
+		return -EIO;
+	*featuresp = r.flags[0] | (u64)r.flags[1] << 32;
+
+	return 0;
+}
+
+int cros_ec_check_feature(struct udevice *dev, uint feature)
+{
+	struct ec_response_get_features r;
+	int rv;
+
+	rv = ec_command(dev, EC_CMD_GET_FEATURES, 0, NULL, 0, &r, sizeof(r));
+	if (rv != sizeof(r))
+		return -EIO;
 
 	if (feature >= 8 * sizeof(r.flags))
-		return -1;
+		return -EINVAL;
 
-	return r.flags[feature / 32] & EC_FEATURE_MASK_0(feature);
+	return r.flags[feature / 32] & EC_FEATURE_MASK_0(feature) ? true :
+		 false;
 }
 
 /*
@@ -1502,10 +1562,116 @@ int cros_ec_set_lid_shutdown_mask(struct udevice *dev, int enable)
 	return 0;
 }
 
+int cros_ec_vstore_supported(struct udevice *dev)
+{
+	return cros_ec_check_feature(dev, EC_FEATURE_VSTORE);
+}
+
+int cros_ec_vstore_info(struct udevice *dev, u32 *lockedp)
+{
+	struct ec_response_vstore_info *resp;
+
+	if (ec_command_inptr(dev, EC_CMD_VSTORE_INFO, 0, NULL, 0,
+			     (uint8_t **)&resp, sizeof(*resp)) != sizeof(*resp))
+		return -EIO;
+
+	if (lockedp)
+		*lockedp = resp->slot_locked;
+
+	return resp->slot_count;
+}
+
+/*
+ * cros_ec_vstore_read - Read data from EC vstore slot
+ *
+ * @slot: vstore slot to read from
+ * @data: buffer to store read data, must be EC_VSTORE_SLOT_SIZE bytes
+ */
+int cros_ec_vstore_read(struct udevice *dev, int slot, uint8_t *data)
+{
+	struct ec_params_vstore_read req;
+	struct ec_response_vstore_read *resp;
+
+	req.slot = slot;
+	if (ec_command_inptr(dev, EC_CMD_VSTORE_READ, 0, &req, sizeof(req),
+			     (uint8_t **)&resp, sizeof(*resp)) != sizeof(*resp))
+		return -EIO;
+
+	if (!data || req.slot >= EC_VSTORE_SLOT_MAX)
+		return -EINVAL;
+
+	memcpy(data, resp->data, sizeof(resp->data));
+
+	return 0;
+}
+
+/*
+ * cros_ec_vstore_write - Save data into EC vstore slot
+ *
+ * @slot: vstore slot to write into
+ * @data: data to write
+ * @size: size of data in bytes
+ *
+ * Maximum size of data is EC_VSTORE_SLOT_SIZE.  It is the callers
+ * responsibility to check the number of implemented slots by
+ * querying the vstore info.
+ */
+int cros_ec_vstore_write(struct udevice *dev, int slot, const uint8_t *data,
+			 size_t size)
+{
+	struct ec_params_vstore_write req;
+
+	if (slot >= EC_VSTORE_SLOT_MAX || size > EC_VSTORE_SLOT_SIZE)
+		return -EINVAL;
+
+	req.slot = slot;
+	memcpy(req.data, data, size);
+
+	if (ec_command(dev, EC_CMD_VSTORE_WRITE, 0, &req, sizeof(req), NULL, 0))
+		return -EIO;
+
+	return 0;
+}
+
+int cros_ec_get_switches(struct udevice *dev)
+{
+	struct dm_cros_ec_ops *ops;
+	int ret;
+
+	ops = dm_cros_ec_get_ops(dev);
+	if (!ops->get_switches)
+		return -ENOSYS;
+
+	ret = ops->get_switches(dev);
+	if (ret < 0)
+		return log_msg_ret("get", ret);
+
+	return ret;
+}
+
+int cros_ec_read_batt_charge(struct udevice *dev, uint *chargep)
+{
+	struct ec_params_charge_state req;
+	struct ec_response_charge_state resp;
+	int ret;
+
+	req.cmd = CHARGE_STATE_CMD_GET_STATE;
+	ret = ec_command(dev, EC_CMD_CHARGE_STATE, 0, &req, sizeof(req),
+			 &resp, sizeof(resp));
+	if (ret)
+		return log_msg_ret("read", ret);
+
+	*chargep = resp.get_state.batt_state_of_charge;
+
+	return 0;
+}
+
 UCLASS_DRIVER(cros_ec) = {
 	.id		= UCLASS_CROS_EC,
 	.name		= "cros-ec",
-	.per_device_auto_alloc_size = sizeof(struct cros_ec_dev),
+	.per_device_auto	= sizeof(struct cros_ec_dev),
+#if CONFIG_IS_ENABLED(OF_REAL)
 	.post_bind	= dm_scan_fdt_dev,
+#endif
 	.flags		= DM_UC_FLAG_ALLOC_PRIV_DMA,
 };

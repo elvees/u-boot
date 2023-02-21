@@ -16,6 +16,7 @@
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/iomux.h>
 #include <asm/arch/mx6-pins.h>
+#include <asm/global_data.h>
 #include <linux/errno.h>
 #include <asm/gpio.h>
 #include <asm/mach-imx/iomux-v3.h>
@@ -38,7 +39,6 @@
 #include <power/regulator.h>
 #include <power/da9063_pmic.h>
 #include <splash.h>
-#include <video_fb.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -418,7 +418,6 @@ int board_late_init(void)
 	int x, y;
 	int ret;
 
-	led_default_state();
 	splash_get_pos(&x, &y);
 	bmp_display((ulong)&bmp_logo_bitmap[0], x, y);
 

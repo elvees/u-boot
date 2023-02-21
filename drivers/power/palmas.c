@@ -149,7 +149,7 @@ int twl603x_audio_power(u8 on)
  * @brief palmas_enable_ss_ldo - Configure EVM board specific configurations
  * for the USB Super speed SMPS10 regulator.
  *
- * @return 0
+ * Return: 0
  */
 int palmas_enable_ss_ldo(void)
 {
@@ -176,7 +176,7 @@ int twl603x_enable_bb_charge(u8 bb_fields)
 	return err;
 }
 
-#ifdef CONFIG_DM_I2C
+#if CONFIG_IS_ENABLED(DM_I2C)
 int palmas_i2c_write_u8(u8 chip_no, u8 reg, u8 val)
 {
 	struct udevice *dev;

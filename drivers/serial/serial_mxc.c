@@ -9,6 +9,7 @@
 #include <watchdog.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/clock.h>
+#include <asm/global_data.h>
 #include <dm/platform_data/serial_mxc.h>
 #include <serial.h>
 #include <linux/compiler.h>
@@ -60,6 +61,11 @@
 #define UCR3_AWAKEN	(1<<4)  /* Async wake interrupt enable */
 #define UCR3_REF25	(1<<3)  /* Ref freq 25 MHz */
 #define UCR3_REF30	(1<<2)  /* Ref Freq 30 MHz */
+
+/* imx8 names these bitsfields instead: */
+#define UCR3_DTRDEN	BIT(3)  /* bit not used in this chip */
+#define UCR3_RXDMUXSEL	BIT(2)  /* RXD muxed input selected; 'should always be set' */
+
 #define UCR3_INVT	(1<<1)  /* Inverted Infrared transmission */
 #define UCR3_BPEN	(1<<0)  /* Preset registers enable */
 #define UCR4_CTSTL_32	(32<<10) /* CTS trigger level (32 chars) */
@@ -175,6 +181,14 @@ static void _mxc_serial_setbrg(struct mxc_uart *base, unsigned long clk,
 
 	writel(UCR2_WS | UCR2_IRTS | UCR2_RXEN | UCR2_TXEN | UCR2_SRST,
 	       &base->cr2);
+
+	/*
+	 * setting the baudrate triggers a reset, returning cr3 to its
+	 * reset value but UCR3_RXDMUXSEL "should always be set."
+	 * according to the imx8 reference-manual
+	 */
+	writel(readl(&base->cr3) | UCR3_RXDMUXSEL, &base->cr3);
+
 	writel(UCR1_UARTEN, &base->cr1);
 }
 
@@ -264,7 +278,7 @@ __weak struct serial_device *default_serial_console(void)
 
 int mxc_serial_setbrg(struct udevice *dev, int baudrate)
 {
-	struct mxc_serial_platdata *plat = dev->platdata;
+	struct mxc_serial_plat *plat = dev_get_plat(dev);
 	u32 clk = imx_get_uartclk();
 
 	_mxc_serial_setbrg(plat->reg, clk, baudrate, plat->use_dte);
@@ -274,7 +288,7 @@ int mxc_serial_setbrg(struct udevice *dev, int baudrate)
 
 static int mxc_serial_probe(struct udevice *dev)
 {
-	struct mxc_serial_platdata *plat = dev->platdata;
+	struct mxc_serial_plat *plat = dev_get_plat(dev);
 
 	_mxc_serial_init(plat->reg, plat->use_dte);
 
@@ -283,7 +297,7 @@ static int mxc_serial_probe(struct udevice *dev)
 
 static int mxc_serial_getc(struct udevice *dev)
 {
-	struct mxc_serial_platdata *plat = dev->platdata;
+	struct mxc_serial_plat *plat = dev_get_plat(dev);
 	struct mxc_uart *const uart = plat->reg;
 
 	if (readl(&uart->ts) & UTS_RXEMPTY)
@@ -294,10 +308,10 @@ static int mxc_serial_getc(struct udevice *dev)
 
 static int mxc_serial_putc(struct udevice *dev, const char ch)
 {
-	struct mxc_serial_platdata *plat = dev->platdata;
+	struct mxc_serial_plat *plat = dev_get_plat(dev);
 	struct mxc_uart *const uart = plat->reg;
 
-	if (!(readl(&uart->ts) & UTS_TXEMPTY))
+	if (readl(&uart->ts) & UTS_TXFULL)
 		return -EAGAIN;
 
 	writel(ch, &uart->txd);
@@ -307,7 +321,7 @@ static int mxc_serial_putc(struct udevice *dev, const char ch)
 
 static int mxc_serial_pending(struct udevice *dev, bool input)
 {
-	struct mxc_serial_platdata *plat = dev->platdata;
+	struct mxc_serial_plat *plat = dev_get_plat(dev);
 	struct mxc_uart *const uart = plat->reg;
 	uint32_t sr2 = readl(&uart->sr2);
 
@@ -325,9 +339,9 @@ static const struct dm_serial_ops mxc_serial_ops = {
 };
 
 #if CONFIG_IS_ENABLED(OF_CONTROL)
-static int mxc_serial_ofdata_to_platdata(struct udevice *dev)
+static int mxc_serial_of_to_plat(struct udevice *dev)
 {
-	struct mxc_serial_platdata *plat = dev->platdata;
+	struct mxc_serial_plat *plat = dev_get_plat(dev);
 	fdt_addr_t addr;
 
 	addr = dev_read_addr(dev);
@@ -357,8 +371,8 @@ U_BOOT_DRIVER(serial_mxc) = {
 	.id	= UCLASS_SERIAL,
 #if CONFIG_IS_ENABLED(OF_CONTROL)
 	.of_match = mxc_serial_ids,
-	.ofdata_to_platdata = mxc_serial_ofdata_to_platdata,
-	.platdata_auto_alloc_size = sizeof(struct mxc_serial_platdata),
+	.of_to_plat = mxc_serial_of_to_plat,
+	.plat_auto	= sizeof(struct mxc_serial_plat),
 #endif
 	.probe = mxc_serial_probe,
 	.ops	= &mxc_serial_ops,
@@ -371,7 +385,7 @@ U_BOOT_DRIVER(serial_mxc) = {
 
 static inline void _debug_uart_init(void)
 {
-	struct mxc_uart *base = (struct mxc_uart *)CONFIG_DEBUG_UART_BASE;
+	struct mxc_uart *base = (struct mxc_uart *)CONFIG_VAL(DEBUG_UART_BASE);
 
 	_mxc_serial_init(base, false);
 	_mxc_serial_setbrg(base, CONFIG_DEBUG_UART_CLOCK,
@@ -380,7 +394,7 @@ static inline void _debug_uart_init(void)
 
 static inline void _debug_uart_putc(int ch)
 {
-	struct mxc_uart *base = (struct mxc_uart *)CONFIG_DEBUG_UART_BASE;
+	struct mxc_uart *base = (struct mxc_uart *)CONFIG_VAL(DEBUG_UART_BASE);
 
 	while (!(readl(&base->ts) & UTS_TXEMPTY))
 		WATCHDOG_RESET();

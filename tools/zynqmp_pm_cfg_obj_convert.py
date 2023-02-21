@@ -244,6 +244,8 @@ pm_define = {
 
     'SUSPEND_TIMEOUT'                    : 0xFFFFFFFF,
 
+    'PM_CONFIG_OBJECT_TYPE_BASE'         : 0x1,
+
     'PM_CONFIG_IPI_PSU_CORTEXA53_0_MASK' : 0x00000001,
     'PM_CONFIG_IPI_PSU_CORTEXR5_0_MASK'  : 0x00000100,
     'PM_CONFIG_IPI_PSU_CORTEXR5_1_MASK'  : 0x00000200,
@@ -289,7 +291,7 @@ code = in_file.read()
 code = re.sub('//.*?\n|/\*.*?\*/', '', code, flags=re.DOTALL)
 
 # remove everything outside the XPm_ConfigObject array definition
-code = re.search('const u32 XPm_ConfigObject.*= {\n(.*)};',
+code = re.search('const u32 XPm_ConfigObject.*=.*{\n(.*)};',
                  code, flags=re.DOTALL).group(1)
 
 # Process each comma-separated array item

@@ -81,6 +81,15 @@ config RESET_AST2500
 	  Say Y if you want to control reset signals of different peripherals
 	  through System Control Unit (SCU).
 
+config RESET_AST2600
+	bool "Reset controller driver for AST2600 SoCs"
+	depends on DM_RESET
+	default y if ASPEED_AST2600
+	help
+	  Support for reset controller on AST2600 SoC.
+	  Say Y if you want to control reset signals of different peripherals
+	  through System Control Unit (SCU).
+
 config RESET_ROCKCHIP
 	bool "Reset controller driver for Rockchip SoCs"
 	depends on DM_RESET && ARCH_ROCKCHIP && CLK
@@ -157,7 +166,7 @@ config RESET_IPQ419
 
 config RESET_SIFIVE
 	bool "Reset Driver for SiFive SoC's"
-	depends on DM_RESET && CLK_SIFIVE_FU540_PRCI && TARGET_SIFIVE_FU540
+	depends on DM_RESET && CLK_SIFIVE_PRCI && (TARGET_SIFIVE_UNLEASHED || TARGET_SIFIVE_UNMATCHED)
 	default y
 	help
 	  PRCI module within SiFive SoC's provides mechanism to reset
@@ -195,4 +204,18 @@ config RESET_MCOM03
 	help
 	  Support for reset controller on MCom-03 SoC.
 
+config RESET_ZYNQMP
+	bool "Reset Driver for Xilinx ZynqMP & Versal SoC's"
+	depends on DM_RESET && ZYNQMP_FIRMWARE
+	help
+	  Support for reset controller on Xilinx ZynqMP & Versal SoC's. Driver
+	  is only passing request via Xilinx firmware interface to TF-A and PMU
+	  firmware.
+
+config RESET_DRA7
+	bool "Support for TI's DRA7 Reset driver"
+	depends on DM_RESET
+	help
+	  Support for TI DRA7-RESET subsystem. Basic Assert/Deassert
+	  is supported.
 endmenu

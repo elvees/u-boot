@@ -35,6 +35,7 @@
 #include <malloc.h>
 #include <dm/device-internal.h>
 #include <dm/root.h>
+#include <dm/tag.h>
 
 /*
  * EFI attributes of the udevice handled by this driver.
@@ -42,7 +43,7 @@
  * handle	handle of the controller on which this driver is installed
  * io		block io protocol proxied by this driver
  */
-struct efi_blk_platdata {
+struct efi_blk_plat {
 	efi_handle_t		handle;
 	struct efi_block_io	*io;
 };
@@ -59,8 +60,8 @@ struct efi_blk_platdata {
 static ulong efi_bl_read(struct udevice *dev, lbaint_t blknr, lbaint_t blkcnt,
 			 void *buffer)
 {
-	struct efi_blk_platdata *platdata = dev_get_platdata(dev);
-	struct efi_block_io *io = platdata->io;
+	struct efi_blk_plat *plat = dev_get_plat(dev);
+	struct efi_block_io *io = plat->io;
 	efi_status_t ret;
 
 	EFI_PRINT("%s: read '%s', from block " LBAFU ", " LBAFU " blocks\n",
@@ -88,8 +89,8 @@ static ulong efi_bl_read(struct udevice *dev, lbaint_t blknr, lbaint_t blkcnt,
 static ulong efi_bl_write(struct udevice *dev, lbaint_t blknr, lbaint_t blkcnt,
 			  const void *buffer)
 {
-	struct efi_blk_platdata *platdata = dev_get_platdata(dev);
-	struct efi_block_io *io = platdata->io;
+	struct efi_blk_plat *plat = dev_get_plat(dev);
+	struct efi_block_io *io = plat->io;
 	efi_status_t ret;
 
 	EFI_PRINT("%s: write '%s', from block " LBAFU ", " LBAFU " blocks\n",
@@ -107,25 +108,6 @@ static ulong efi_bl_write(struct udevice *dev, lbaint_t blknr, lbaint_t blkcnt,
 }
 
 /**
- * Create partions for the block device.
- *
- * @handle:	EFI handle of the block device
- * @dev:	udevice of the block device
- * Return:	number of partitions created
- */
-static int efi_bl_bind_partitions(efi_handle_t handle, struct udevice *dev)
-{
-	struct blk_desc *desc;
-	const char *if_typename;
-
-	desc = dev_get_uclass_platdata(dev);
-	if_typename = blk_get_if_type_name(desc->if_type);
-
-	return efi_disk_create_partitions(handle, desc, if_typename,
-					  desc->devnum, dev->name);
-}
-
-/**
  * Create a block device for a handle
  *
  * @handle:	handle
@@ -139,15 +121,14 @@ static int efi_bl_bind(efi_handle_t handle, void *interface)
 	char *name;
 	struct efi_object *obj = efi_search_obj(handle);
 	struct efi_block_io *io = interface;
-	int disks;
-	struct efi_blk_platdata *platdata;
+	struct efi_blk_plat *plat;
 
 	EFI_PRINT("%s: handle %p, interface %p\n", __func__, handle, io);
 
 	if (!obj)
 		return -ENOENT;
 
-	devnum = blk_find_max_devnum(IF_TYPE_EFI);
+	devnum = blk_find_max_devnum(IF_TYPE_EFI_LOADER);
 	if (devnum == -ENODEV)
 		devnum = 0;
 	else if (devnum < 0)
@@ -159,8 +140,8 @@ static int efi_bl_bind(efi_handle_t handle, void *interface)
 	sprintf(name, "efiblk#%d", devnum);
 
 	/* Create driver model udevice for the EFI block io device */
-	ret = blk_create_device(parent, "efi_blk", name, IF_TYPE_EFI, devnum,
-				io->media->block_size,
+	ret = blk_create_device(parent, "efi_blk", name, IF_TYPE_EFI_LOADER,
+				devnum, io->media->block_size,
 				(lbaint_t)io->media->last_block, &bdev);
 	if (ret)
 		return ret;
@@ -169,18 +150,22 @@ static int efi_bl_bind(efi_handle_t handle, void *interface)
 	/* Set the DM_FLAG_NAME_ALLOCED flag to avoid a memory leak */
 	device_set_name_alloced(bdev);
 
-	platdata = dev_get_platdata(bdev);
-	platdata->handle = handle;
-	platdata->io = interface;
+	plat = dev_get_plat(bdev);
+	plat->handle = handle;
+	plat->io = interface;
+
+	/*
+	 * FIXME: necessary because we won't do almost nothing in
+	 * efi_disk_create() when called from device_probe().
+	 */
+	if (efi_link_dev(handle, bdev))
+		/* FIXME: cleanup for bdev */
+		return ret;
 
 	ret = device_probe(bdev);
 	if (ret)
 		return ret;
 	EFI_PRINT("%s: block device '%s' created\n", __func__, bdev->name);
-
-	/* Create handles for the partions of the block device */
-	disks = efi_bl_bind_partitions(handle, bdev);
-	EFI_PRINT("Found %d partitions\n", disks);
 
 	return 0;
 }
@@ -196,7 +181,7 @@ U_BOOT_DRIVER(efi_blk) = {
 	.name			= "efi_blk",
 	.id			= UCLASS_BLK,
 	.ops			= &efi_blk_ops,
-	.platdata_auto_alloc_size = sizeof(struct efi_blk_platdata),
+	.plat_auto	= sizeof(struct efi_blk_plat),
 };
 
 /* EFI driver operators */
@@ -209,6 +194,6 @@ static const struct efi_driver_ops driver_ops = {
 /* Identify as EFI driver */
 U_BOOT_DRIVER(efi_block) = {
 	.name		= "EFI block driver",
-	.id		= UCLASS_EFI,
+	.id		= UCLASS_EFI_LOADER,
 	.ops		= &driver_ops,
 };

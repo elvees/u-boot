@@ -9,6 +9,7 @@
 
 #include <common.h>
 #include <cpu.h>
+#include <display_options.h>
 #include <dm.h>
 #include <errno.h>
 #include <init.h>
@@ -425,7 +426,7 @@ static const struct cpu_ops bmips_cpu_ops = {
 /* BMIPS CPU driver */
 int bmips_cpu_bind(struct udevice *dev)
 {
-	struct cpu_platdata *plat = dev_get_parent_platdata(dev);
+	struct cpu_plat *plat = dev_get_parent_plat(dev);
 
 	plat->cpu_id = dev_read_u32_default(dev, "reg", -1);
 	plat->device_id = read_c0_prid();
@@ -489,7 +490,7 @@ U_BOOT_DRIVER(bmips_cpu_drv) = {
 	.of_match = bmips_cpu_ids,
 	.bind = bmips_cpu_bind,
 	.probe = bmips_cpu_probe,
-	.priv_auto_alloc_size = sizeof(struct bmips_cpu_priv),
+	.priv_auto	= sizeof(struct bmips_cpu_priv),
 	.ops = &bmips_cpu_ops,
 	.flags = DM_FLAG_PRE_RELOC,
 };

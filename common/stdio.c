@@ -19,7 +19,7 @@
 #include <serial.h>
 #include <splash.h>
 #include <i2c.h>
-
+#include <asm/global_data.h>
 #include <dm/device-internal.h>
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -28,6 +28,20 @@ static struct stdio_dev devs;
 struct stdio_dev *stdio_devices[] = { NULL, NULL, NULL };
 char *stdio_names[MAX_FILES] = { "stdin", "stdout", "stderr" };
 
+int stdio_file_to_flags(const int file)
+{
+	switch (file) {
+	case stdin:
+		return DEV_FLAGS_INPUT;
+	case stdout:
+	case stderr:
+		return DEV_FLAGS_OUTPUT;
+	default:
+		return -EINVAL;
+	}
+}
+
+#if CONFIG_IS_ENABLED(SYS_DEVICE_NULLDEV)
 static void nulldev_putc(struct stdio_dev *dev, const char c)
 {
 	/* nulldev is empty! */
@@ -43,6 +57,25 @@ static int nulldev_input(struct stdio_dev *dev)
 	/* nulldev is empty! */
 	return 0;
 }
+
+static void nulldev_register(void)
+{
+	struct stdio_dev dev;
+
+	memset(&dev, '\0', sizeof(dev));
+
+	strcpy(dev.name, "nulldev");
+	dev.flags = DEV_FLAGS_OUTPUT | DEV_FLAGS_INPUT;
+	dev.putc = nulldev_putc;
+	dev.puts = nulldev_puts;
+	dev.getc = nulldev_input;
+	dev.tstc = nulldev_input;
+
+	stdio_register(&dev);
+}
+#else
+static inline void nulldev_register(void) {}
+#endif	/* SYS_DEVICE_NULLDEV */
 
 static void stdio_serial_putc(struct stdio_dev *dev, const char c)
 {
@@ -83,18 +116,7 @@ static void drv_system_init (void)
 	dev.tstc = stdio_serial_tstc;
 	stdio_register (&dev);
 
-	if (CONFIG_IS_ENABLED(SYS_DEVICE_NULLDEV)) {
-		memset(&dev, '\0', sizeof(dev));
-
-		strcpy(dev.name, "nulldev");
-		dev.flags = DEV_FLAGS_OUTPUT | DEV_FLAGS_INPUT;
-		dev.putc = nulldev_putc;
-		dev.puts = nulldev_puts;
-		dev.getc = nulldev_input;
-		dev.tstc = nulldev_input;
-
-		stdio_register(&dev);
-	}
+	nulldev_register();
 }
 
 /**************************************************************************
@@ -122,7 +144,7 @@ struct list_head* stdio_get_list(void)
  * @name:	stdio device name (e.g. "vidconsole")
  * id:		Uclass ID of device to look for (e.g. UCLASS_VIDEO)
  * @sdevp:	Returns stdout device, if found, else NULL
- * @return 0 if found, -ENOENT if no device found with that name, other -ve
+ * Return: 0 if found, -ENOENT if no device found with that name, other -ve
  *	   on other error
  */
 static int stdio_probe_device(const char *name, enum uclass_id id,
@@ -181,7 +203,7 @@ struct stdio_dev *stdio_get_by_name(const char *name)
 		 * 'stdout', which may include a list of devices separate by
 		 * commas. Obviously this is not going to work, so we ignore
 		 * that case. The call path in that case is
-		 * console_init_r() -> search_device() -> stdio_get_by_name()
+		 * console_init_r() -> console_search_dev() -> stdio_get_by_name()
 		 */
 		if (!strncmp(name, "vidconsole", 10) && !strchr(name, ',') &&
 		    !stdio_probe_device(name, UCLASS_VIDEO, &sdev))
@@ -261,17 +283,6 @@ int stdio_deregister_dev(struct stdio_dev *dev, int force)
 	return 0;
 }
 
-int stdio_deregister(const char *devname, int force)
-{
-	struct stdio_dev *dev;
-
-	dev = stdio_get_by_name(devname);
-	if (!dev) /* device not found */
-		return -ENODEV;
-
-	return stdio_deregister_dev(dev, force);
-}
-
 int stdio_init_tables(void)
 {
 #if defined(CONFIG_NEEDS_MANUAL_RELOC)
@@ -325,14 +336,14 @@ int stdio_add_devices(void)
 				       dev->name);
 		}
 	}
-#ifdef CONFIG_SYS_I2C
+#if CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
 	i2c_init_all();
 #endif
 	if (IS_ENABLED(CONFIG_DM_VIDEO)) {
 		/*
 		 * If the console setting is not in environment variables then
 		 * console_init_r() will not be calling iomux_doenv() (which
-		 * calls search_device()). So we will not dynamically add
+		 * calls console_search_dev()). So we will not dynamically add
 		 * devices by calling stdio_probe_device().
 		 *
 		 * So just probe all video devices now so that whichever one is
@@ -356,9 +367,7 @@ int stdio_add_devices(void)
 	} else {
 		if (IS_ENABLED(CONFIG_LCD))
 			drv_lcd_init();
-		if (IS_ENABLED(CONFIG_VIDEO) ||
-		    IS_ENABLED(CONFIG_CFB_CONSOLE) ||
-		    IS_ENABLED(CONFIG_VIDEO_VCXK))
+		if (IS_ENABLED(CONFIG_VIDEO_VCXK))
 			drv_video_init();
 	}
 
@@ -369,6 +378,9 @@ int stdio_add_devices(void)
 	serial_stdio_init();
 #ifdef CONFIG_USB_TTY
 	drv_usbtty_init();
+#endif
+#ifdef CONFIG_USB_FUNCTION_ACM
+	drv_usbacm_init ();
 #endif
 	if (IS_ENABLED(CONFIG_NETCONSOLE))
 		drv_nc_init();

@@ -214,7 +214,7 @@ static void set_csn_config(int dimm_number, int i, fsl_ddr_cfg_regs_t *ddr,
 		odt_rd_cfg = popts->cs_local_opts[i].odt_rd_cfg;
 		odt_wr_cfg = popts->cs_local_opts[i].odt_wr_cfg;
 #ifdef CONFIG_SYS_FSL_DDR4
-		ba_bits_cs_n = dimm_params[dimm_number].bank_addr_bits;
+		ba_bits_cs_n = dimm_params[dimm_number].bank_addr_bits - 2;
 		bg_bits_cs_n = dimm_params[dimm_number].bank_group_bits;
 #else
 		n_banks_per_sdram_device
@@ -1863,25 +1863,13 @@ static void set_ddr_data_init(fsl_ddr_cfg_regs_t *ddr)
 static void set_ddr_sdram_clk_cntl(fsl_ddr_cfg_regs_t *ddr,
 					 const memctl_options_t *popts)
 {
-	unsigned int clk_adjust;	/* Clock adjust */
-	unsigned int ss_en = 0;		/* Source synchronous enable */
-
-#if defined(CONFIG_ARCH_MPC8541) || defined(CONFIG_ARCH_MPC8555)
-	/* Per FSL Application Note: AN2805 */
-	ss_en = 1;
-#endif
-	if (fsl_ddr_get_version(0) >= 0x40701) {
+	if (fsl_ddr_get_version(0) >= 0x40701)
 		/* clk_adjust in 5-bits on T-series and LS-series */
-		clk_adjust = (popts->clk_adjust & 0x1F) << 22;
-	} else {
+		ddr->ddr_sdram_clk_cntl = (popts->clk_adjust & 0x1F) << 22;
+	else
 		/* clk_adjust in 4-bits on earlier MPC85xx and P-series */
-		clk_adjust = (popts->clk_adjust & 0xF) << 23;
-	}
+		ddr->ddr_sdram_clk_cntl = (popts->clk_adjust & 0xF) << 23;
 
-	ddr->ddr_sdram_clk_cntl = (0
-				   | ((ss_en & 0x1) << 31)
-				   | clk_adjust
-				   );
 	debug("FSLDDR: clk_cntl = 0x%08x\n", ddr->ddr_sdram_clk_cntl);
 }
 

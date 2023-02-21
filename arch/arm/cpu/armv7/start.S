@@ -17,6 +17,7 @@
 #include <asm/system.h>
 #include <linux/linkage.h>
 #include <asm/armv7.h>
+#include <system-constants.h>
 
 /*************************************************************************
  *
@@ -39,6 +40,42 @@ reset:
 	/* Allow the board to save important registers */
 	b	save_boot_params
 save_boot_params_ret:
+#ifdef CONFIG_POSITION_INDEPENDENT
+	/*
+	 * Fix .rela.dyn relocations. This allows U-Boot to loaded to and
+	 * executed at a different address than it was linked at.
+	 */
+pie_fixup:
+	adr	r0, reset	/* r0 <- Runtime value of reset label */
+	ldr	r1, =reset	/* r1 <- Linked value of reset label */
+	subs	r4, r0, r1	/* r4 <- Runtime-vs-link offset */
+	beq	pie_fixup_done
+
+	adr	r0, pie_fixup
+	ldr	r1, _rel_dyn_start_ofs
+	add	r2, r0, r1	/* r2 <- Runtime &__rel_dyn_start */
+	ldr	r1, _rel_dyn_end_ofs
+	add	r3, r0, r1	/* r3 <- Runtime &__rel_dyn_end */
+
+pie_fix_loop:
+	ldr	r0, [r2]	/* r0 <- Link location */
+	ldr	r1, [r2, #4]	/* r1 <- fixup */
+	cmp	r1, #23		/* relative fixup? */
+	bne	pie_skip_reloc
+
+	/* relative fix: increase location by offset */
+	add	r0, r4
+	ldr	r1, [r0]
+	add	r1, r4
+	str	r1, [r0]
+	str	r0, [r2]
+	add	r2, #8
+pie_skip_reloc:
+	cmp	r2, r3
+	blo	pie_fix_loop
+pie_fixup_done:
+#endif
+
 #ifdef CONFIG_ARMV7_LPAE
 /*
  * check for Hypervisor support
@@ -61,12 +98,10 @@ switch_to_hypervisor_ret:
 	orr	r0, r0, #0xc0		@ disable FIQ and IRQ
 	msr	cpsr,r0
 
+#if !CONFIG_IS_ENABLED(SYS_NO_VECTOR_TABLE)
 /*
  * Setup vector:
- * (OMAP4 spl TEXT_BASE is not 32 byte aligned.
- * Continue to use ROM code vector only in OMAP4 spl)
  */
-#if !(defined(CONFIG_OMAP44XX) && defined(CONFIG_SPL_BUILD))
 	/* Set V=0 in CP15 SCTLR register - for VBAR to point to vector */
 	mrc	p15, 0, r0, c1, c0, 0	@ Read CP15 SCTLR Register
 	bic	r0, #CR_V		@ V = 0
@@ -80,11 +115,11 @@ switch_to_hypervisor_ret:
 #endif
 
 	/* the mask ROM code should have PLL and others stable */
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT)
 #ifdef CONFIG_CPU_V7A
 	bl	cpu_init_cp15
 #endif
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT_ONLY
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT_ONLY)
 	bl	cpu_init_crit
 #endif
 #endif
@@ -137,6 +172,17 @@ ENDPROC(switch_to_hypervisor)
  *
  *************************************************************************/
 ENTRY(cpu_init_cp15)
+
+#if CONFIG_IS_ENABLED(ARMV7_SET_CORTEX_SMPEN)
+	/*
+	 * The Arm Cortex-A7 TRM says this bit must be enabled before
+	 * "any cache or TLB maintenance operations are performed".
+	 */
+	mrc	p15, 0, r0, c1, c0, 1	@ read auxilary control register
+	orr	r0, r0, #1 << 6		@ set SMP bit to enable coherency
+	mcr	p15, 0, r0, c1, c0, 1	@ write auxilary control register
+#endif
+
 	/*
 	 * Invalidate L1 I/D
 	 */
@@ -209,7 +255,7 @@ ENTRY(cpu_init_cp15)
 #if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_STACK)
 	ldr	r0, =(CONFIG_SPL_STACK)
 #else
-	ldr	r0, =(CONFIG_SYS_INIT_SP_ADDR)
+	ldr	r0, =(SYS_INIT_SP_ADDR)
 #endif
 	bic	r0, r0, #7	/* 8-byte alignment for ABI compliance */
 	mov	sp, r0
@@ -320,8 +366,8 @@ skip_errata_801819:
 	mov	pc, r5			@ back to my caller
 ENDPROC(cpu_init_cp15)
 
-#if !defined(CONFIG_SKIP_LOWLEVEL_INIT) && \
-	!defined(CONFIG_SKIP_LOWLEVEL_INIT_ONLY)
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT) && \
+	!CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT_ONLY)
 /*************************************************************************
  *
  * CPU_init_critical registers
@@ -339,4 +385,11 @@ ENTRY(cpu_init_crit)
 	 */
 	b	lowlevel_init		@ go setup pll,mux,memory
 ENDPROC(cpu_init_crit)
+#endif
+
+#if CONFIG_POSITION_INDEPENDENT
+_rel_dyn_start_ofs:
+	.word	__rel_dyn_start - pie_fixup
+_rel_dyn_end_ofs:
+	.word	__rel_dyn_end - pie_fixup
 #endif

@@ -127,7 +127,7 @@ int rvu_af_probe(struct udevice *dev)
 {
 	struct rvu_af *af_ptr = dev_get_priv(dev);
 
-	af_ptr->af_base = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_0,
+	af_ptr->af_base = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_0, 0, 0, PCI_REGION_TYPE,
 					 PCI_REGION_MEM);
 	debug("%s RVU AF BAR %p\n", __func__, af_ptr->af_base);
 	af_ptr->dev = dev;
@@ -160,7 +160,7 @@ U_BOOT_DRIVER(rvu_af) = {
 	.id     = UCLASS_MISC,
 	.probe  = rvu_af_probe,
 	.remove = rvu_af_remove,
-	.priv_auto_alloc_size = sizeof(struct rvu_af),
+	.priv_auto	= sizeof(struct rvu_af),
 };
 
 static struct pci_device_id rvu_af_supported[] = {

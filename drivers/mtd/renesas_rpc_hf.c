@@ -21,6 +21,7 @@
 #include <wait_bit.h>
 #include <linux/bitops.h>
 #include <mtd/cfi_flash.h>
+#include <asm/global_data.h>
 
 #define RPC_CMNCR		0x0000	/* R/W */
 #define RPC_CMNCR_MD		BIT(31)
@@ -387,7 +388,8 @@ static int rpc_hf_probe(struct udevice *dev)
 }
 
 static const struct udevice_id rpc_hf_ids[] = {
-	{ .compatible = "renesas,rpc" },
+	{ .compatible = "renesas,r7s72100-rpc-if" },
+	{ .compatible = "renesas,rcar-gen3-rpc-if" },
 	{}
 };
 

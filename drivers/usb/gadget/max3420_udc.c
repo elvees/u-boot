@@ -819,19 +819,19 @@ int dm_usb_gadget_handle_interrupts(struct udevice *dev)
 static int max3420_udc_probe(struct udevice *dev)
 {
 	struct max3420_udc *udc = dev_get_priv(dev);
-	struct dm_spi_slave_platdata *slave_pdata;
+	struct dm_spi_slave_plat *slave_pdata;
 	struct udevice *bus = dev->parent;
-	int busnum = bus->seq;
+	int busnum = dev_seq(bus);
 	unsigned int cs;
 	uint speed, mode;
 	struct udevice *spid;
 
-	slave_pdata = dev_get_parent_platdata(dev);
+	slave_pdata = dev_get_parent_plat(dev);
 	cs = slave_pdata->cs;
 	speed = slave_pdata->max_hz;
 	mode = slave_pdata->mode;
-	spi_get_bus_and_cs(busnum, cs, speed, mode, "spi_generic_drv",
-			   NULL, &spid, &udc->slave);
+	_spi_get_bus_and_cs(busnum, cs, speed, mode, false, "spi_generic_drv",
+			    NULL, &spid, &udc->slave);
 
 	udc->dev = dev;
 	udc->gadget.ep0 = &udc->ep[0].ep_usb;
@@ -871,5 +871,5 @@ U_BOOT_DRIVER(max3420_generic_udc) = {
 	.of_match = max3420_ids,
 	.probe = max3420_udc_probe,
 	.remove = max3420_udc_remove,
-	.priv_auto_alloc_size = sizeof(struct max3420_udc),
+	.priv_auto	= sizeof(struct max3420_udc),
 };

@@ -9,6 +9,9 @@ from binman.entry import Entry
 from binman.etype.blob_dtb import Entry_blob_dtb
 from patman import tools
 
+# This is imported if needed
+state = None
+
 class Entry_u_boot_dtb_with_ucode(Entry_blob_dtb):
     """A U-Boot device tree file, with the microcode removed
 
@@ -19,9 +22,9 @@ class Entry_u_boot_dtb_with_ucode(Entry_blob_dtb):
     this process. This entry provides the U-Boot device-tree file, which
     contains the microcode. If the microcode is not being collated into one
     place then the offset and size of the microcode is recorded by this entry,
-    for use by u_boot_with_ucode_ptr. If it is being collated, then this
+    for use by u-boot-with-ucode_ptr. If it is being collated, then this
     entry deletes the microcode from the device tree (to save space) and makes
-    it available to u_boot_ucode.
+    it available to u-boot-ucode.
     """
     def __init__(self, section, etype, node):
         # Put this here to allow entry-docs and help to work without libfdt

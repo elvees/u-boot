@@ -18,6 +18,7 @@
 #include <malloc.h>
 #include <miiphy.h>
 #include <wait_bit.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
@@ -42,6 +43,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define MV_PHY_ADR_REQUEST 0xee
 #define MVGBE_SMI_REG (((struct mvgbe_registers *)MVGBE0_BASE)->smi)
+#define MVGBE_PGADR_REG	22
 
 #if defined(CONFIG_PHYLIB) || defined(CONFIG_MII) || defined(CONFIG_CMD_MII)
 static int smi_wait_ready(struct mvgbe_device *dmvgbe)
@@ -554,7 +556,7 @@ static int mvgbe_halt(struct eth_device *dev)
 #ifdef CONFIG_DM_ETH
 static int mvgbe_write_hwaddr(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 
 	port_uc_addr_set(dev_get_priv(dev), pdata->enetaddr);
 
@@ -744,6 +746,9 @@ static struct phy_device *__mvgbe_phy_init(struct eth_device *dev,
 	miiphy_write(dev->name, MV_PHY_ADR_REQUEST, MV_PHY_ADR_REQUEST,
 		     phyid);
 
+	/* Make sure the selected PHY page is 0 before connecting */
+	miiphy_write(dev->name, phyid, MVGBE_PGADR_REG, 0);
+
 	phydev = phy_connect(bus, phyid, dev, phy_interface);
 	if (!phydev) {
 		printf("phy_connect failed\n");
@@ -882,7 +887,7 @@ int mvgbe_initialize(struct bd_info *bis)
 		struct mii_dev *mdiodev = mdio_alloc();
 		if (!mdiodev)
 			return -ENOMEM;
-		strncpy(mdiodev->name, dev->name, MDIO_NAME_LEN);
+		strlcpy(mdiodev->name, dev->name, MDIO_NAME_LEN);
 		mdiodev->read = smi_reg_read;
 		mdiodev->write = smi_reg_write;
 
@@ -906,7 +911,7 @@ static int mvgbe_port_is_fixed_link(struct mvgbe_device *dmvgbe)
 
 static int mvgbe_start(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct mvgbe_device *dmvgbe = dev_get_priv(dev);
 	int ret;
 
@@ -948,7 +953,7 @@ static void mvgbe_stop(struct udevice *dev)
 
 static int mvgbe_probe(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct mvgbe_device *dmvgbe = dev_get_priv(dev);
 	struct mii_dev *bus;
 	int ret;
@@ -986,13 +991,12 @@ static const struct eth_ops mvgbe_ops = {
 	.write_hwaddr	= mvgbe_write_hwaddr,
 };
 
-static int mvgbe_ofdata_to_platdata(struct udevice *dev)
+static int mvgbe_of_to_plat(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct mvgbe_device *dmvgbe = dev_get_priv(dev);
 	void *blob = (void *)gd->fdt_blob;
 	int node = dev_of_offset(dev);
-	const char *phy_mode;
 	int fl_node;
 	int pnode;
 	unsigned long addr;
@@ -1004,10 +1008,8 @@ static int mvgbe_ofdata_to_platdata(struct udevice *dev)
 					      "marvell,kirkwood-eth-port");
 
 	/* Get phy-mode / phy_interface from DT */
-	phy_mode = fdt_getprop(gd->fdt_blob, pnode, "phy-mode", NULL);
-	if (phy_mode)
-		pdata->phy_interface = phy_get_interface_by_name(phy_mode);
-	else
+	pdata->phy_interface = dev_read_phy_mode(dev);
+	if (pdata->phy_interface == PHY_INTERFACE_MODE_NA)
 		pdata->phy_interface = PHY_INTERFACE_MODE_GMII;
 
 	dmvgbe->phy_interface = pdata->phy_interface;
@@ -1038,10 +1040,10 @@ U_BOOT_DRIVER(mvgbe) = {
 	.name	= "mvgbe",
 	.id	= UCLASS_ETH,
 	.of_match = mvgbe_ids,
-	.ofdata_to_platdata = mvgbe_ofdata_to_platdata,
+	.of_to_plat = mvgbe_of_to_plat,
 	.probe	= mvgbe_probe,
 	.ops	= &mvgbe_ops,
-	.priv_auto_alloc_size = sizeof(struct mvgbe_device),
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
+	.priv_auto	= sizeof(struct mvgbe_device),
+	.plat_auto	= sizeof(struct eth_pdata),
 };
 #endif /* CONFIG_DM_ETH */

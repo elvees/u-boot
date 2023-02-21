@@ -18,21 +18,14 @@
 /* ------------------------------------------------------------------------- */
 
 /* memory */
-#define CONFIG_SYS_MALLOC_LEN		(5 * 1024 * 1024)
-#define CONFIG_SYS_BOOTM_LEN		(32 * 1024 * 1024)
 
 /* Clock Defines */
 #define V_OSCK				26000000  /* Clock output from T2 */
 #define V_SCLK				(V_OSCK)
 
-#define CONFIG_MACH_TYPE		3589
-
-#ifndef CONFIG_SPL_BUILD
-
 /* Default environment */
 #define CONFIG_EXTRA_ENV_SETTINGS	\
 BUR_COMMON_ENV \
-"autoload=0\0" \
 "scradr=" __stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
 "cfgscr=mw ${dtbaddr} 0;" \
 " sf probe && sf read ${scradr} 0xC0000 0x10000 && source ${scradr};" \
@@ -59,12 +52,6 @@ BUR_COMMON_ENV \
 " fdt boardsetup\0" \
 "startsys=run vxargs && mw 0x80001100 0 && run vxfdt &&" \
 " bootm ${loadaddr} - ${dtbaddr}\0"
-#endif /* !CONFIG_SPL_BUILD*/
-
-/* Support both device trees and ATAGs. */
-#define CONFIG_CMDLINE_TAG
-#define CONFIG_SETUP_MEMORY_TAGS
-#define CONFIG_INITRD_TAG
 
 /* SPI Flash */
 

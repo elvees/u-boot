@@ -13,6 +13,11 @@
 
 #define MAX_UTF8_PER_UTF16 3
 
+/*
+ * codepage_437 - Unicode to codepage 437 translation table
+ */
+extern const u16 codepage_437[128];
+
 /**
  * console_read_unicode() - read Unicode code point from console
  *
@@ -196,18 +201,6 @@ int u16_strncmp(const u16 *s1, const u16 *s2, size_t n);
 #define u16_strcmp(s1, s2)	u16_strncmp((s1), (s2), SIZE_MAX)
 
 /**
- * u16_strlen - count non-zero words
- *
- * This function matches wsclen() if the -fshort-wchar compiler flag is set.
- * In the EFI context we explicitly need a function handling u16 strings.
- *
- * @in:			null terminated u16 string
- * Return:		number of non-zero words.
- *			This is not the number of utf-16 letters!
- */
-size_t u16_strlen(const void *in);
-
-/**
  * u16_strsize() - count size of u16 string in bytes including the null
  *		   character
  *
@@ -230,6 +223,20 @@ size_t u16_strsize(const void *in);
  *			This is not the number of utf-16 letters!
  */
 size_t u16_strnlen(const u16 *in, size_t count);
+
+/**
+ * u16_strlen - count non-zero words
+ *
+ * This function matches wsclen() if the -fshort-wchar compiler flag is set.
+ * In the EFI context we explicitly need a function handling u16 strings.
+ *
+ * @in:			null terminated u16 string
+ * Return:		number of non-zero words.
+ *			This is not the number of utf-16 letters!
+ */
+size_t u16_strlen(const void *in);
+
+#define u16_strlen(in) u16_strnlen(in, SIZE_MAX)
 
 /**
  * u16_strcpy() - copy u16 string
@@ -255,6 +262,20 @@ u16 *u16_strcpy(u16 *dest, const u16 *src);
 u16 *u16_strdup(const void *src);
 
 /**
+ * u16_strlcat() - Append a length-limited, %NUL-terminated string to another
+ *
+ * Append the source string @src to the destination string @dest, overwriting
+ * null word at the end of @dest adding  a terminating null word.
+ *
+ * @dest:		zero terminated u16 destination string
+ * @src:		zero terminated u16 source string
+ * @count:		size of buffer in u16 words including taling 0x0000
+ * Return:		required size including trailing 0x0000 in u16 words
+ *			If return value >= count, truncation occurred.
+ */
+size_t u16_strlcat(u16 *dest, const u16 *src, size_t count);
+
+/**
  * utf16_to_utf8() - Convert an utf16 string to utf8
  *
  * Converts 'size' characters of the utf16 string 'src' to utf8
@@ -269,5 +290,34 @@ u16 *u16_strdup(const void *src);
  * Return:	the pointer to the first unwritten byte in 'dest'
  */
 uint8_t *utf16_to_utf8(uint8_t *dest, const uint16_t *src, size_t size);
+
+/**
+ * utf_to_cp() - translate Unicode code point to 8bit codepage
+ *
+ * Codepoints that do not exist in the codepage are rendered as question mark.
+ *
+ * @c:		pointer to Unicode code point to be translated
+ * @codepage:	Unicode to codepage translation table
+ * Return:	0 on success, -ENOENT if codepoint cannot be translated
+ */
+int utf_to_cp(s32 *c, const u16 *codepage);
+
+/**
+ * utf8_to_cp437_stream() - convert UTF-8 stream to codepage 437
+ *
+ * @c:		next UTF-8 character to convert
+ * @buffer:	buffer, at least 5 characters
+ * Return:	next codepage 437 character or 0
+ */
+int utf8_to_cp437_stream(u8 c, char *buffer);
+
+/**
+ * utf8_to_utf32_stream() - convert UTF-8 stream to UTF-32
+ *
+ * @c:		next UTF-8 character to convert
+ * @buffer:	buffer, at least 5 characters
+ * Return:	next codepage 437 character or 0
+ */
+int utf8_to_utf32_stream(u8 c, char *buffer);
 
 #endif /* __CHARSET_H_ */

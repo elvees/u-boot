@@ -9,6 +9,7 @@
 #include <common.h>
 #include <malloc.h>
 #include <command.h>
+#include <asm/global_data.h>
 #include <linux/errno.h>
 #include <asm/io.h>
 #include <linux/immap_qe.h>
@@ -118,12 +119,10 @@ static void qe_sdma_init(void)
  */
 static u8 thread_snum[] = {
 /* Evthreads 16-29 are not supported in MPC8309 */
-#if !defined(CONFIG_ARCH_MPC8309)
 	0x04, 0x05, 0x0c, 0x0d,
 	0x14, 0x15, 0x1c, 0x1d,
 	0x24, 0x25, 0x2c, 0x2d,
 	0x34, 0x35,
-#endif
 	0x88, 0x89, 0x98, 0x99,
 	0xa8, 0xa9, 0xb8, 0xb9,
 	0xc8, 0xc9, 0xd8, 0xd9,
@@ -288,7 +287,6 @@ void u_qe_init(void)
 	struct mmc *mmc = find_mmc_device(CONFIG_SYS_MMC_ENV_DEV);
 
 	if (!mmc) {
-		free(addr);
 		printf("\nMMC cannot find device for ucode\n");
 	} else {
 		printf("\nMMC read: dev # %u, block # %u, count %u ...\n",
@@ -794,7 +792,7 @@ static int qe_cmd(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		return cmd_usage(cmdtp);
 
 	if (strcmp(argv[1], "fw") == 0) {
-		addr = simple_strtoul(argv[2], NULL, 16);
+		addr = hextoul(argv[2], NULL);
 
 		if (!addr) {
 			printf("Invalid address\n");
@@ -807,7 +805,7 @@ static int qe_cmd(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		 */
 
 		if (argc > 3) {
-			ulong length = simple_strtoul(argv[3], NULL, 16);
+			ulong length = hextoul(argv[3], NULL);
 			struct qe_firmware *firmware = (void *)addr;
 
 			if (length != be32_to_cpu(firmware->header.length)) {
