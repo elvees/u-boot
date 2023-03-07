@@ -285,11 +285,11 @@ static void arasan_gemac_adjust_link(struct udevice *dev)
 
 	writel(mac_global_ctrl, priv->base + MAC_GLOBAL_CTRL);
 
-#ifdef CONFIG_DM_GPIO
-	if (dm_gpio_is_valid(&priv->phy_txclk))
-		dm_gpio_set_value(&priv->phy_txclk,
-				  phydev->speed == SPEED_1000);
-#endif
+	if (IS_ENABLED(CONFIG_DM_GPIO)) {
+		if (dm_gpio_is_valid(&priv->phy_txclk))
+			dm_gpio_set_value(&priv->phy_txclk,
+					  phydev->speed == SPEED_1000);
+	}
 }
 
 static int arasan_gemac_start(struct udevice *dev)
@@ -491,18 +491,20 @@ static int arasan_gemac_mdio_write(struct mii_dev *bus, int addr, int devad,
 
 static int arasan_gemac_mdio_reset(struct mii_dev *bus)
 {
-#ifdef CONFIG_DM_GPIO
-	struct arasan_gemac_priv *priv = bus->priv;
+	if (IS_ENABLED(CONFIG_DM_GPIO)) {
+		struct arasan_gemac_priv *priv = bus->priv;
 
-	if (dm_gpio_is_valid(&priv->phy_reset)) {
-		dm_gpio_set_value(&priv->phy_reset, 1);
-		udelay(1000);
-		dm_gpio_set_value(&priv->phy_reset, 0);
+		if (dm_gpio_is_valid(&priv->phy_reset)) {
+			dm_gpio_set_value(&priv->phy_reset, 1);
+			udelay(1000);
+			dm_gpio_set_value(&priv->phy_reset, 0);
 
-		/* PHY on MCom-03 BuB requires delay after reset cycle. */
-		mdelay(100);
+			/* PHY on MCom-03 BuB requires delay after reset cycle.
+			 */
+			mdelay(100);
+		}
 	}
-#endif
+
 	return 0;
 }
 
@@ -559,17 +561,17 @@ static int arasan_gemac_probe(struct udevice *dev)
 	if (priv->phy_addr < 0)
 		return -EINVAL;
 
-#ifdef CONFIG_DM_GPIO
-	ret = gpio_request_by_name(dev, "phy-reset-gpios", 0,
-				   &priv->phy_reset, GPIOD_IS_OUT);
-	if (ret != 0 && ret != -ENOENT)
-		return ret;
+	if (IS_ENABLED(CONFIG_DM_GPIO)) {
+		ret = gpio_request_by_name(dev, "phy-reset-gpios", 0,
+					   &priv->phy_reset, GPIOD_IS_OUT);
+		if (ret != 0 && ret != -ENOENT)
+			return ret;
 
-	ret = gpio_request_by_name(dev, "txclk-125en-gpios", 0,
-				   &priv->phy_txclk, GPIOD_IS_OUT);
-	if (ret != 0 && ret != -ENOENT)
-		return ret;
-#endif
+		ret = gpio_request_by_name(dev, "txclk-125en-gpios", 0,
+					   &priv->phy_txclk, GPIOD_IS_OUT);
+		if (ret != 0 && ret != -ENOENT)
+			return ret;
+	}
 
 	ret = reset_get_by_index(dev, 0, &priv->rst_ctl);
 	if (ret != 0 && ret != -ENOTSUPP)
