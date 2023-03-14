@@ -40,6 +40,15 @@ config USB_XHCI_EXYNOS
 	  Enables support for he on-chip xHCI controller on Samsung Exynos5
 	  SoCs.
 
+config USB_XHCI_MCOM03
+	bool "Support for ELVEES MCom-03 family on-chip xHCI USB controller"
+	depends on ARCH_MCOM03
+	default y if ARCH_MCOM03
+	help
+	  Enables support for the on-chip xHCI controller on ELVEES MCom-03
+	  SoC. This is a driver for the dwc3 to provide the glue logic to
+	  configure the controller.
+
 config USB_XHCI_MTK
 	bool "Support for MediaTek on-chip xHCI USB controller"
 	depends on ARCH_MEDIATEK || SOC_MT7621
