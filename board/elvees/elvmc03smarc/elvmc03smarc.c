@@ -18,45 +18,58 @@ int power_init_board(void)
 {
 	u32 val;
 
-	/* Setup CARRIER_PWR_ON signal on ELV-MC03-SMARC */
-	/* TODO: rework to use GPIO driver */
-	val = readl(LSP1_GPIO_SWPORTC_DDR);
-	val |= BIT(5);
-	writel(val, LSP1_GPIO_SWPORTC_DDR);
+	if (of_machine_is_compatible("elvees,elvmc03smarc-r1.0")) {
+		/* Setup CARRIER_PWR_ON signal on ELV-MC03-SMARC */
+		/* TODO: rework to use GPIO driver */
+		val = readl(LSP1_GPIO_SWPORTC_DDR);
+		val |= BIT(5);
+		writel(val, LSP1_GPIO_SWPORTC_DDR);
 
-	val = readl(LSP1_GPIO_SWPORTC_DR);
-	val |= BIT(5);
-	writel(val, LSP1_GPIO_SWPORTC_DR);
+		val = readl(LSP1_GPIO_SWPORTC_DR);
+		val |= BIT(5);
+		writel(val, LSP1_GPIO_SWPORTC_DR);
 
-	/* Let carrier standby circuits switch on, 1ms should be enough */
-	mdelay(1);
+		/* Let carrier standby circuits switch on, 1ms should be enough */
+		mdelay(1);
 
-	/* Setup CARRIER_STBY# signal on ELV-MC03-SMARC */
-	val = readl(LSP1_GPIO_SWPORTD_DDR);
-	val |= BIT(0);
-	writel(val, LSP1_GPIO_SWPORTD_DDR);
+		/* Setup CARRIER_STBY# signal on ELV-MC03-SMARC */
+		val = readl(LSP1_GPIO_SWPORTD_DDR);
+		val |= BIT(0);
+		writel(val, LSP1_GPIO_SWPORTD_DDR);
 
-	val = readl(LSP1_GPIO_SWPORTD_DR);
-	val |= BIT(0);
-	writel(val, LSP1_GPIO_SWPORTD_DR);
+		val = readl(LSP1_GPIO_SWPORTD_DR);
+		val |= BIT(0);
+		writel(val, LSP1_GPIO_SWPORTD_DR);
 
-	/* Delay >100ms from CARRIER_PWR_ON to RESET_OUT# signals.
-	 * The SMARC specification does not explain why this 100ms is needed.
-	 * Perhaps we don't need it at all.
-	 */
-	mdelay(100);
+		/* Delay >100ms from CARRIER_PWR_ON to RESET_OUT# signals.
+			* The SMARC specification does not explain why this 100ms is needed.
+			* Perhaps we don't need it at all.
+			*/
+		mdelay(100);
 
-	if (of_machine_is_compatible("radxa,rockpi-n10"))
-		return 0;
+		if (of_machine_is_compatible("radxa,rockpi-n10"))
+			return 0;
 
-	/* Setup RESET_OUT# signal on ELV-MC03-SMARC */
-	val = readl(LSP1_GPIO_SWPORTD_DDR);
-	val |= BIT(7);
-	writel(val, LSP1_GPIO_SWPORTD_DDR);
+		/* Setup RESET_OUT# signal on ELV-MC03-SMARC */
+		val = readl(LSP1_GPIO_SWPORTD_DDR);
+		val |= BIT(7);
+		writel(val, LSP1_GPIO_SWPORTD_DDR);
 
-	val = readl(LSP1_GPIO_SWPORTD_DR);
-	val |= BIT(7);
-	writel(val, LSP1_GPIO_SWPORTD_DR);
+		val = readl(LSP1_GPIO_SWPORTD_DR);
+		val |= BIT(7);
+		writel(val, LSP1_GPIO_SWPORTD_DR);
+	};
+
+	if (of_machine_is_compatible("elvees,elvmc03smarc-r2.2")) {
+		/* Setup CARRIER_STBY# signal on ELV-MC03-SMARC r2.2*/
+		val = readl(LSP1_GPIO_SWPORTC_DDR);
+		val |= BIT(5);
+		writel(val, LSP1_GPIO_SWPORTC_DDR);
+
+		val = readl(LSP1_GPIO_SWPORTC_DR);
+		val |= BIT(5);
+		writel(val, LSP1_GPIO_SWPORTC_DR);
+	}
 
 	return 0;
 }
