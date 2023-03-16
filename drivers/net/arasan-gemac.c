@@ -545,6 +545,7 @@ static int arasan_gemac_probe(struct udevice *dev)
 {
 	struct arasan_gemac_priv *priv = dev_get_priv(dev);
 	int phy_handle, ret;
+	struct ofnode_phandle_args phandle_args;
 
 	priv->base = (void *)devfdt_get_addr(dev);
 
@@ -552,12 +553,12 @@ static int arasan_gemac_probe(struct udevice *dev)
 	if (priv->phy_interface == PHY_INTERFACE_MODE_NA)
 		return -EINVAL;
 
-	phy_handle = fdtdec_lookup_phandle(gd->fdt_blob, dev_of_offset(dev),
-					   "phy-handle");
+	phy_handle = dev_read_phandle_with_args(dev, "phy-handle", NULL,
+						0, 0, &phandle_args);
 	if (phy_handle < 0)
 		return -EINVAL;
 
-	priv->phy_addr = fdtdec_get_int(gd->fdt_blob, phy_handle, "reg", -1);
+	priv->phy_addr = ofnode_read_u32_default(phandle_args.node, "reg", -1);
 	if (priv->phy_addr < 0)
 		return -EINVAL;
 
