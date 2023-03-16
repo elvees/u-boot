@@ -57,6 +57,12 @@ config TARGET_ECAM02DM
 	help
 	  Support for ECAM02DM board
 
+config TARGET_ECAM02DM3
+	bool "ECAM02DM3"
+	select SUPPORT_SPL
+	help
+	  Support for ECAM02DM version 3 board
+
 endchoice
 
 source "board/elvees/ecam02dm/Kconfig"

@@ -1,4 +1,4 @@
-if TARGET_ECAM02DM
+if TARGET_ECAM02DM || TARGET_ECAM02DM3
 
 config SYS_BOARD
 	default "ecam02dm"

@@ -48,7 +48,10 @@ int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 	cfg->common.ranks = MCOM_SDRAM_ONE_RANK;
 	cfg->common.banks = 8;
 	cfg->common.columns = 512;
-	cfg->common.rows = 16384;
+	if (IS_ENABLED(CONFIG_TARGET_ECAM02DM3))
+		cfg->common.rows = 8192;
+	else
+		cfg->common.rows = 16384;
 	cfg->common.bl = 8;
 	cfg->common.cl = 8;
 	cfg->common.cwl = 4;
@@ -67,12 +70,18 @@ int set_sdram_cfg(struct ddr_cfg *cfg, int tck)
 	cfg->common.tcke = 3;
 	cfg->common.tckesr = to_clocks(max(3 * tck, 15000), tck);
 	cfg->common.tzqcs = to_clocks(max(6 * tck, 90000), tck);
-	cfg->common.trefi = to_clocks(3900000, tck);
+	if (IS_ENABLED(CONFIG_TARGET_ECAM02DM3))
+		cfg->common.trefi = to_clocks(7800000, tck);
+	else
+		cfg->common.trefi = to_clocks(3900000, tck);
 
 	cfg->lpddr2.device_type = MCOM_LPDDR2_TYPE_S4;
 	cfg->lpddr2.tdqsck = to_clocks(2500, tck);
 	cfg->lpddr2.tdqsck_max = to_clocks(5500, tck);
-	cfg->lpddr2.tmrw = 5;
+	if (IS_ENABLED(CONFIG_TARGET_ECAM02DM3))
+		cfg->lpddr2.tmrw = 3;
+	else
+		cfg->lpddr2.tmrw = 5;
 	cfg->lpddr2.trpab = to_clocks(max(3 * tck, 21000), tck);
 	cfg->lpddr2.trppb = to_clocks(max(3 * tck, 18000), tck);
 	cfg->lpddr2.tzqcl = to_clocks(max(6 * tck, 360000), tck);

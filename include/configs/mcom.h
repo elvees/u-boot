@@ -38,7 +38,7 @@
 #define CPLL_VALUE			0x0D
 #else
 
-#if defined(CONFIG_TARGET_ECAM02DM)
+#if defined(CONFIG_TARGET_ECAM02DM) || defined(CONFIG_TARGET_ECAM02DM3)
 #define CPLL_VALUE			0x10	/* 408 MHz */
 #else
 #define CPLL_VALUE			0x0F
@@ -63,12 +63,19 @@
 #define PHYS_SDRAM_0			CONFIG_SYS_SDRAM_BASE
 #if defined(CONFIG_TARGET_ECAM02DM)
 #define PHYS_SDRAM_0_SIZE		SZ_256M
+#elif defined(CONFIG_TARGET_ECAM02DM3)
+#define PHYS_SDRAM_0_SIZE		SZ_128M
 #else
 #define PHYS_SDRAM_0_SIZE		SZ_1G
 #endif
 #define PHYS_SDRAM_1			0xA0000000
 #if defined(CONFIG_TARGET_ECAM02DM)
 #define PHYS_SDRAM_1_SIZE		SZ_256M
+#elif defined(CONFIG_TARGET_ECAM02DM3)
+/* For now the second LPDDR2 is not installed on the board, but we
+ * determine the size of the second LPDDR2 in case it is installed.
+ */
+#define PHYS_SDRAM_1_SIZE		SZ_128M
 #else
 #define PHYS_SDRAM_1_SIZE		SZ_1G
 #endif
@@ -156,11 +163,11 @@
 #ifndef CONFIG_SPL_BUILD
 
 /* Default environment */
-#if defined(CONFIG_TARGET_ECAM02DM)
+#if defined(CONFIG_TARGET_ECAM02DM) || defined(CONFIG_TARGET_ECAM02DM3)
 #define CONFIG_BOOTFILE			"/boot/zImage"
 #else
 #define CONFIG_BOOTFILE			"zImage"
-#endif  /* CONFIG_TARGET_ECAM02DM */
+#endif  /* CONFIG_TARGET_ECAM02DM || CONFIG_TARGET_ECAM02DM3 */
 
 #define CONFIG_LOADADDR			0x40000000
 
@@ -188,7 +195,7 @@
 #define BOOTENV_DEV_NAME_LEGACY_USB	BOOTENV_DEV_NAME_BLKDEV
 #define BOOTENV_DEV_NAME_LEGACY_UBIFS	BOOTENV_DEV_NAME_BLKDEV
 
-#if defined(CONFIG_TARGET_ECAM02DM)
+#if defined(CONFIG_TARGET_ECAM02DM) || defined(CONFIG_TARGET_ECAM02DM3)
 #define BOOTENV_DEV_ECAM02DM		BOOTENV_DEV_BLKDEV
 #define BOOTENV_DEV_NAME_ECAM02DM	BOOTENV_DEV_NAME_BLKDEV
 #define BOOT_TARGET_DEVICES(func)	func(ECAM02DM, ecam02dm, 0)
@@ -202,11 +209,12 @@
 	func(LEGACY_USB, legacy_usb, 0) \
 	func(UBIFS, ubifs, 0) \
 	func(LEGACY_UBIFS, legacy_ubifs, 0)
-#endif  /* CONFIG_TARGET_ECAM02DM */
+#endif  /* CONFIG_TARGET_ECAM02DM || CONFIG_TARGET_ECAM02DM3 */
 
 #include <config_distro_bootcmd.h>
 
-#if defined(CONFIG_TARGET_SALUTE_PM) || defined(CONFIG_TARGET_ECAM02DM)
+#if defined(CONFIG_TARGET_SALUTE_PM) || defined(CONFIG_TARGET_ECAM02DM) || \
+defined(CONFIG_TARGET_ECAM02DM3)
 #define DDRCTL_CMD "ddrctl_cmd=enable\0"
 #else
 #define DDRCTL_CMD "ddrctl_cmd=disable\0"
@@ -230,7 +238,7 @@
 #define KERNEL_ADDR_R "kernel_addr_r=0x40000000\0"
 #endif
 
-#if defined(CONFIG_TARGET_ECAM02DM)
+#if defined(CONFIG_TARGET_ECAM02DM) || defined(CONFIG_TARGET_ECAM02DM3)
 #define ROOTFS_OPTIONS "ro UPPER_DEV=/dev/ubi0_2 init=/sbin/init-overlay-rootfs.sh"
 
 #define BOOTUBIVOL "bootubivol=system_a\0" \
@@ -266,7 +274,7 @@
 #define EXTRA_BOOTENV
 
 #define EXTRA_CMDLINE
-#endif  /* CONFIG_TARGET_ECAM02DM */
+#endif  /* CONFIG_TARGET_ECAM02DM || CONFIG_TARGET_ECAM02DM3 */
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"bootm_size=0x8000000\0" \
