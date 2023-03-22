@@ -51,10 +51,10 @@
 #define DIV_DDR0_CTR_VALUE              0
 #define DIV_DDR1_CTR_VALUE              0
 
-#define APLL_FREQ			(XTI_FREQ * (APLL_VALUE + 1))
-#define CPLL_FREQ			(XTI_FREQ * (CPLL_VALUE + 1))
-#define SPLL_FREQ			((XTI_FREQ * (SPLL_VALUE + 1)) >> DIV_SYS0_CTR_VALUE)
-#define TIMER_FREQ			(SPLL_FREQ >> DIV_SYS1_CTR_VALUE)
+#define APLL_FREQ	(XTI_FREQ * (APLL_VALUE + 1))
+#define CPLL_FREQ	(XTI_FREQ * (CPLL_VALUE + 1))
+#define SPLL_FREQ	((XTI_FREQ * (SPLL_VALUE + 1)) >> DIV_SYS0_CTR_VALUE)
+#define TIMER_FREQ	(SPLL_FREQ >> DIV_SYS1_CTR_VALUE)
 
 #include <asm/arch/cpu.h>   /* get chip and board defs */
 
@@ -113,7 +113,7 @@
 #ifdef CONFIG_HW_WATCHDOG
 #define CONFIG_DESIGNWARE_WATCHDOG
 #define CONFIG_DW_WDT_BASE		0x38031000
-#define CONFIG_DW_WDT_CLOCK_KHZ		((SPLL_FREQ >> DIV_SYS1_CTR_VALUE)/1000)
+#define CONFIG_DW_WDT_CLOCK_KHZ	((SPLL_FREQ >> DIV_SYS1_CTR_VALUE) / 1000)
 #define CONFIG_WATCHDOG_TIMEOUT_MSECS	25000
 #endif
 
@@ -269,7 +269,7 @@
 #endif  /* CONFIG_TARGET_ECAM02DM */
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
-	"bootm_size=0x10000000\0" \
+	"bootm_size=0x8000000\0" \
 	"stdin=serial\0" \
 	"bootelf_spioffset=0x100000\0" \
 	"bootelf_spibus=0\0" \
@@ -326,9 +326,9 @@
 		"ubi part ${bootubipart};" \
 		"ubifsmount ubi:boot;" \
 		"run legacy_bootcmd\0" \
-	"fdt_addr_r=0x48000000\0" \
-	"pxefile_addr_r=0x49000000\0" \
-	"scriptaddr=0x49000000\0" \
+	"fdt_addr_r=0x46000000\0" \
+	"pxefile_addr_r=0x47000000\0" \
+	"scriptaddr=0x47000000\0" \
 	KERNEL_ADDR_R \
 	"ramdisk_addr_r=0x50000000\0" \
 	"findfdt=" \
