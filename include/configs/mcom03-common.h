@@ -48,6 +48,12 @@
 #define BOOT_TARGET_DEVICES_PXE(func)
 #endif
 
+#if CONFIG_IS_ENABLED(CMD_DHCP)
+#define BOOT_TARGET_DEVICES_DHCP(func) func(DHCP, dhcp, na)
+#else
+#define BOOT_TARGET_DEVICES_DHCP(func)
+#endif
+
 #define MCOM03_COMMON_ENV_SETTINGS \
 	"kernel_addr_r=0x892400000\0" \
 	"scriptaddr=0x898400000\0" \
