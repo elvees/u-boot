@@ -44,3 +44,11 @@
 	 */
 	elvees,drive-strength-clk = <8>;
 };
+
+&emac0 {
+	status = "okay";
+};
+
+&emac1 {
+	status = "okay";
+};

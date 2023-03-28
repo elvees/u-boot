@@ -55,3 +55,31 @@ ser0: &uart3 { };
 ser1: &uart0 { };
 ser2: &uart2 { };
 ser3: &uart1 { };
+
+/* PHY VDD is 3.3V */
+&emac0 {
+	phy-mode = "rgmii-id";
+	phy-reset-gpios = <&gpio0a 4 GPIO_ACTIVE_LOW>;
+	phy-handle = <&ethernet_phy0>;
+
+	ethernet_phy0: ethernet-phy@0 {
+		reg = <0x0>;
+		motorcomm,clk-out-frequency-hz = <0>;
+		rx-internal-delay-ps = <1800>;
+		tx-internal-delay-ps = <1200>;
+	};
+};
+
+/* PHY VDD is 3.3V */
+&emac1 {
+	phy-mode = "rgmii-id";
+	phy-reset-gpios = <&gpio0a 3 GPIO_ACTIVE_LOW>;
+	phy-handle = <&ethernet_phy1>;
+
+	ethernet_phy1: ethernet-phy@2 {
+		reg = <0x2>;
+		motorcomm,clk-out-frequency-hz = <0>;
+		rx-internal-delay-ps = <1900>;
+		tx-internal-delay-ps = <1650>;
+	};
+};
