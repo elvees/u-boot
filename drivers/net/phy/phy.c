@@ -568,6 +568,9 @@ int phy_init(void)
 #ifdef CONFIG_PHY_XILINX_GMII2RGMII
 	phy_xilinx_gmii2rgmii_init();
 #endif
+#ifdef CONFIG_PHY_MOTORCOMM
+	phy_motorcomm_init();
+#endif
 	genphy_init();
 
 	return 0;
@@ -754,7 +757,6 @@ static struct phy_device *create_phy_by_mask(struct mii_dev *bus,
 	while (phy_mask) {
 		int addr = ffs(phy_mask) - 1;
 		int r = get_phy_id(bus, addr, devad, &phy_id);
-
 		/*
 		 * If the PHY ID is flat 0 we ignore it.  There are C45 PHYs
 		 * that return all 0s for C22 reads (like Aquantia AQR112) and
