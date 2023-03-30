@@ -132,6 +132,7 @@ struct arasan_gemac_priv {
 	struct phy_device *phydev;
 	int phy_addr;
 	phy_interface_t phy_interface;
+	int reset_delay;
 	struct gpio_desc phy_reset;
 	struct gpio_desc phy_txclk;
 	u8 *tx_buffer;
@@ -468,7 +469,7 @@ static int arasan_gemac_mdio_reset(struct mii_dev *bus)
 
 	if (dm_gpio_is_valid(&priv->phy_reset)) {
 		dm_gpio_set_value(&priv->phy_reset, 1);
-		udelay(1000);
+		udelay(priv->reset_delay * 1000);
 		dm_gpio_set_value(&priv->phy_reset, 0);
 	}
 
@@ -479,7 +480,6 @@ static int arasan_gemac_mdio_init(struct udevice *dev)
 {
 	struct arasan_gemac_priv *priv = dev_get_priv(dev);
 	u32 divisor;
-
 
 	priv->bus = mdio_alloc();
 	if (!priv->bus)
@@ -544,6 +544,9 @@ static int arasan_gemac_probe(struct udevice *dev)
 	priv->phy_addr = fdtdec_get_int(gd->fdt_blob, phy_handle, "reg", -1);
 	if (priv->phy_addr < 0)
 		return -EINVAL;
+
+	priv->reset_delay = fdtdec_get_int(gd->fdt_blob, dev_of_offset(dev),
+					   "phy-reset-duration", 1);
 
 	ret = gpio_request_by_name(dev, "phy-reset-gpios", 0,
 				   &priv->phy_reset, GPIOD_IS_OUT);
