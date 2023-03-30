@@ -71,6 +71,10 @@
 	};
 };
 
+&ethernet {
+	phy-reset-duration = <10>;
+};
+
 &gpioa {
 	/* Pin to PHY interrupt. */
 	skip-gpio-list = <2>;
