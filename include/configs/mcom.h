@@ -276,6 +276,12 @@ defined(CONFIG_TARGET_ECAM02DM3)
 #define EXTRA_CMDLINE
 #endif  /* CONFIG_TARGET_ECAM02DM || CONFIG_TARGET_ECAM02DM3 */
 
+#ifndef FDTFILE
+#define FDTFILE CONFIG_DEFAULT_DEVICE_TREE
+#endif
+
+#define FDTFILE_ENV "fdtfile=" __stringify(FDTFILE) ".dtb\0"
+
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"bootm_size=0x8000000\0" \
 	"stdin=serial\0" \
@@ -341,6 +347,7 @@ defined(CONFIG_TARGET_ECAM02DM3)
 	"ramdisk_addr_r=0x50000000\0" \
 	"findfdt=" \
 		"setenv fdt_addr ${fdtcontroladdr};\0" \
+	FDTFILE_ENV \
 	BOOTENV \
 	EXTRA_BOOTENV
 #endif

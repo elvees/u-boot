@@ -119,3 +119,7 @@ endif
 
 # deprecated
 -include $(machdirs)/config.mk
+
+ifneq ($(DEVICE_TREE),)
+PLATFORM_CPPFLAGS += "-DFDTFILE=$(DEVICE_TREE)"
+endif
