@@ -11,6 +11,7 @@
 #include <phy.h>
 #include <linux/bitfield.h>
 
+#define PHY_ID_YT8521				0x0000011a
 #define PHY_ID_YT8531				0x4f51e91b
 #define PHY_ID_MASK				GENMASK(31, 0)
 
@@ -442,9 +443,21 @@ static struct phy_driver motorcomm8531_driver = {
 	.shutdown      = &genphy_shutdown,
 };
 
+static struct phy_driver motorcomm8521_driver = {
+	.name          = "YT8521 Gigabit Ethernet",
+	.uid           = PHY_ID_YT8521,
+	.mask          = PHY_ID_MASK,
+	.features      = PHY_GBIT_FEATURES,
+	.probe	       = &yt8531_probe,
+	.config        = &yt8531_config,
+	.startup       = &yt8531_startup,
+	.shutdown      = &genphy_shutdown,
+};
+
 int phy_motorcomm_init(void)
 {
 	phy_register(&motorcomm8531_driver);
+	phy_register(&motorcomm8521_driver);
 
 	return 0;
 }
