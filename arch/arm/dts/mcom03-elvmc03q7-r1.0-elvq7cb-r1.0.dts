@@ -46,3 +46,8 @@
 &usb1 {
 	status = "okay";
 };
+
+/* Connected to RJ-45 (XS1) */
+&emac0 {
+	status = "okay";
+};
