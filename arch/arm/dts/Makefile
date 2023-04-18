@@ -784,6 +784,7 @@ dtb-$(CONFIG_TARGET_VEXPRESS_CA15_TC2) += vexpress-v2p-ca15_a7.dtb
 dtb-$(CONFIG_ARCH_MCOM) += \
 	mcom02-bgproto.dtb \
 	mcom02-ecam02dm-r1.1.dtb \
+	mcom02-ecam02dm-r3.0.dtb \
 	mcom02-salute-el24d1-r1.3.dtb \
 	mcom02-salute-el24d1-r1.4.dtb \
 	mcom02-salute-el24d1-r1.5.dtb \
@@ -809,4 +810,3 @@ dtbs: $(addprefix $(obj)/, $(dtb-y))
 	@:
 
 clean-files := *.dtb
-
