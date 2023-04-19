@@ -17,7 +17,6 @@
 #define MEDIA_PLL0_ADDR 0x1320000
 #define MEDIA_PLL1_ADDR 0x1320010
 #define MEDIA_PLL2_ADDR 0x1320020
-#define MEDIA_PLL3_ADDR 0x1320030
 #define LSP1_I2S_UCG_RSTN_PPOLICY 0x17e0008
 #define LSP1_I2S_UCG_RSTN_PSTATUS 0x17e000c
 #define SDR_PLL0_ADDR 0x1910000
@@ -57,7 +56,6 @@ enum pll_id {
 	MEDIA_PLL0,
 	MEDIA_PLL1,
 	MEDIA_PLL2,
-	MEDIA_PLL3,
 	SDR_PLL0,
 	SDR_PLL1,
 	SDR_PLL2,
@@ -86,10 +84,6 @@ static struct pll_settings pll_settings[] = {
 	{ SDR_PLL1, 27000000, 648000000, 0, 95, 3 },
 	{ SDR_PLL2, 27000000, 459000000, 0, 101, 5 },
 #endif
-	/* UCG3 channel 5 used as workaround for DISP_PIXCLK (UCG1 channel 2).
-	 * Setup PLL3 to frequency that can be divided by DISP_PIXCLK.
-	 */
-	{ MEDIA_PLL3, 27000000, 594000000, 0, 131, 5 },
 };
 
 struct ucg_channel {
@@ -160,14 +154,6 @@ static struct ucg_channel ucg_media_channels[] = {
 	{2, 0, 2},	/* MEDIA UCG2 GPU_SYS		247.5 MHz */
 	{2, 1, 2},	/* MEDIA UCG2 GPU_MEM		247.5 MHz */
 	{2, 2, 2},	/* MEDIA UCG2 GPU_CORE		247.5 MHz */
-	{3, 0, 22},	/* MEDIA UCG3 MIPI_RX_REF	27 MHz */
-	{3, 1, 22},	/* MEDIA UCG3 MIPI_RX0_CFG	27 MHz */
-	{3, 2, 22},	/* MEDIA UCG3 MIPI_RX1_CFG	27 MHz */
-	{3, 3, 22},	/* MEDIA UCG3 MIPI_TX_REF	27 MHz */
-	{3, 4, 22},	/* MEDIA UCG3 MIPI_TX_CFG	27 MHz */
-	{3, 5, 4},	/* MEDIA UCG3 CMOS0		148.5 as DISP_PIXCLK */
-	{3, 6, 22},	/* MEDIA UCG3 CMOS1		27 MHz */
-	{3, 7, 30},	/* MEDIA UCG3 MIPI_TXCLKESC	19.8 MHz */
 };
 
 #ifdef CONFIG_MCOM03_SUBSYSTEM_SDR
@@ -433,14 +419,12 @@ int clk_cfg(void)
 			      MEDIA_PLL0_ADDR,
 			      MEDIA_PLL1_ADDR,
 			      MEDIA_PLL2_ADDR,
-			      MEDIA_PLL3_ADDR
 		      },
 		      (enum pll_id []) {
 			      MEDIA_PLL0,
 			      MEDIA_PLL1,
 			      MEDIA_PLL2,
-			      MEDIA_PLL3
-		      }, 4, NULL);
+		      }, 3, NULL);
 	if (ret)
 		return ret;
 
