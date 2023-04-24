@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2019-2021 RnD Center "ELVEES", JSC
+ * Copyright 2019-2023 RnD Center "ELVEES", JSC
  */
 
 #include <common.h>
@@ -22,22 +22,6 @@ int dram_init_banksize(void)
 	gd->bd->bi_dram[1].size = PHYS_SDRAM_1_SIZE;
 
 	return 0;
-}
-
-/* If external DTB is passed to U-Boot, use it. Otherwise use
- * DTB appended to U-Boot image (default U-Boot behavior).
- */
-void *board_fdt_blob_setup(int *err)
-{
-	void *fdt_blob = NULL;
-
-	if (fdt_magic(CONFIG_MCOM03_EXTERNAL_DTB_ADDR) == FDT_MAGIC)
-		fdt_blob = (ulong *)CONFIG_MCOM03_EXTERNAL_DTB_ADDR;
-	else
-		fdt_blob = (ulong *)&_end;
-
-	*err = 0;
-	return fdt_blob;
 }
 
 void board_pads_cfg(void)

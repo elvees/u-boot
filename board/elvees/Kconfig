@@ -96,7 +96,8 @@ config CMDLINE_TAG
 
 config MCOM03_EXTERNAL_DTB_ADDR
 	hex "External DTB memory address"
-	default 0xD0000000
+	default 0x890402000
+	default 0xD0000000 if TARGET_HAPS
 	help
 	  This option contains memory address where U-Boot tries to
 	  find external DTB, which can be passed by previous bootloader.

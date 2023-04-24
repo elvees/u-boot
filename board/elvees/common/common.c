@@ -11,6 +11,7 @@
 #include <asm/armv8/mmu.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
+#include <asm/sections.h>
 #include <linux/bitfield.h>
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
@@ -102,6 +103,19 @@ int dram_init(void)
 {
 	gd->ram_size = PHYS_SDRAM_0_SIZE;
 	return 0;
+}
+
+void *board_fdt_blob_setup(int *err)
+{
+	void *fdt_blob = (void *)CONFIG_MCOM03_EXTERNAL_DTB_ADDR;
+
+	if (fdt_magic(fdt_blob) != FDT_MAGIC) {
+		*err = -ENOENT;
+		return NULL;
+	}
+
+	*err = 0;
+	return fdt_blob;
 }
 
 /* dram_init_banksize() for HAPS placed in board/elvees/haps/haps.c */
