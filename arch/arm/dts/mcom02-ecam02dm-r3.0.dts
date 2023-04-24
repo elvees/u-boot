@@ -79,3 +79,11 @@
 	/* Pin to PHY interrupt. */
 	skip-gpio-list = <2>;
 };
+
+&vinc_reserved {
+	size = <0xC00000>;
+};
+
+&vpu_reserved {
+	status = "disabled";
+};
