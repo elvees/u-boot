@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * Copyright 2019 RnD Center "ELVEES", JSC
+ * Copyright 2019-2023 RnD Center "ELVEES", JSC
  *
  * Configuration settings for the MCom-03 platform
  */
@@ -24,8 +24,5 @@
 
 /* Default environment */
 #define CONFIG_BOOTFILE			"Image"
-
-#define CONFIG_BOOTCOMMAND \
-	"booti ${loadaddr} - ${fdtcontroladdr}"
 
 #endif
