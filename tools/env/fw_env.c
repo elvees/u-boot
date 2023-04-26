@@ -1664,6 +1664,19 @@ static int check_device_config(int dev)
 		if (DEVESIZE(dev) == 0)
 			/* Assume the erase size is the same as the env-size */
 			DEVESIZE(dev) = ENVSIZE(dev);
+
+		/*
+		 * Check for negative offsets, treat it as backwards offset
+		 * from the end of the char device
+		 */
+		if (mtdinfo.type == MTD_NORFLASH && DEVOFFSET(dev) < 0) {
+			DEVOFFSET(dev) = DEVOFFSET(dev) + mtdinfo.size;
+#ifdef DEBUG
+			fprintf(stderr,
+				"Calculated device offset 0x%llx on %s\n",
+				DEVOFFSET(dev), DEVNAME(dev));
+#endif
+		}
 	} else {
 		uint64_t size;
 		DEVTYPE(dev) = MTD_ABSENT;
