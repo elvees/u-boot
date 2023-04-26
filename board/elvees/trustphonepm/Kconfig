@@ -1,9 +1,0 @@
-if TARGET_MCOM03_TRUSTPHONEPM
-
-config SYS_BOARD
-	default "trustphonepm"
-
-config SYS_CONFIG_NAME
-	default "mcom03"
-
-endif

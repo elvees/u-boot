@@ -15,23 +15,24 @@ config TARGET_HAPS
 	  Support for the following boards:
 	    HAPS prototype for MCom-03
 
-config TARGET_MCOM03_BUB
-	bool "MCom-03 BuB"
+config TARGET_MCOM03
+	bool "MCom-03"
 	select DM_ETH
 	select DM_MMC
 	select DM_GPIO
 	help
 	  Support for the following boards:
+	    ELV-MC03-SMARC r1.0-r1.1, NGFW-CB r1.0
+	    ELV-MC03-SMARC r1.0-r1.1, Rock Pi N10
+	    ELV-MC03-SMARC r1.0-r1.1, ELV-SMARC-CB r1.0
+	    ELV-MC03-SMARC r2.2, ELV-SMARC-CB r2.9
 	    MCom-03 Bring-Up Board r1.3.0
-
-config TARGET_ELVMC03SMARC
-	bool "ELV-MC03-SMARC"
-	select DM_ETH
-	select DM_MMC
-	select DM_GPIO
-	help
-	  Support for the following boards:
-	    ELV-MC03-SMARC r1.0
+	    MCom-03 Bring-Up Board r1.5.0
+	    Trustphone PM r1.5, Trustphone CB r1.1
+	    Trustphone PM r2.0, Trustphone CB r2.0
+	    ELV-MC03-Q7 r1.0, ELV-Q7-CB r1.0
+	    ELV-MC03 r2.2, ELV-MC03-CB r1.0
+	    EGW-PM r1.0, EGW-CB r1.0
 
 config TARGET_ECAM03BL
 	bool "ECAM03BL"
@@ -69,45 +70,14 @@ config TARGET_PM03CAM
 	  Support for the following boards:
 	    PM03CAM r1.0
 
-config TARGET_MCOM03_TRUSTPHONEPM
-	bool "Trustphone PM/CB"
-	select DM_ETH
-	select DM_MMC
-	select DM_GPIO
-	help
-	  Support for the following boards:
-	    Trustphone PM r1.5, Trustphone CB r1.1
-
-config TARGET_MCOM03_ELVMC03CB
-	bool "ELV-MC03-CB"
-	select DM_ETH
-	select DM_MMC
-	select DM_GPIO
-	help
-	  Support for the following boards:
-	    ELV-MC03-CB r1.1
-
-config TARGET_MCOM03_ELVMC03Q7
-	bool "ELV-MC03-Q7"
-	select DM_ETH
-	select DM_MMC
-	select DM_GPIO
-	help
-	  Support for the following boards:
-	    ELV-MC03-Q7 r1.0, ELV-Q7-CB r1.0
-
 endchoice
 
+source "board/elvees/common/Kconfig"
 source "board/elvees/ecam03bl/Kconfig"
 source "board/elvees/ecam03dm/Kconfig"
 source "board/elvees/ecam03ptz/Kconfig"
-source "board/elvees/elvmc03cb/Kconfig"
-source "board/elvees/elvmc03q7/Kconfig"
-source "board/elvees/elvmc03smarc/Kconfig"
 source "board/elvees/haps/Kconfig"
-source "board/elvees/mcom03-bub/Kconfig"
 source "board/elvees/pm03cam/Kconfig"
-source "board/elvees/trustphonepm/Kconfig"
 
 config SETUP_MEMORY_TAGS
 	bool "Enable memory tag"

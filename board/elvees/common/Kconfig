@@ -1,7 +1,7 @@
-if TARGET_MCOM03_ELVMC03CB
+if TARGET_MCOM03
 
 config SYS_BOARD
-	default "elvmc03cb"
+	default "common"
 
 config SYS_CONFIG_NAME
 	default "mcom03"

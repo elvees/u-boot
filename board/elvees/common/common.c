@@ -15,8 +15,9 @@
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
 
-#include "mcom03-common.h"
 #include <asm/arch/mcom03-clk.h>
+#include <configs/mcom03.h>
+#include "mcom03-common.h"
 
 #define DDR_SUBS_URB_BASE		0xC000000
 #define HSPERIPH_BAR			0xDC
@@ -115,6 +116,131 @@ int dram_init_banksize(void)
 	return 0;
 }
 #endif
+
+#ifdef CONFIG_TARGET_MCOM03
+void board_pads_cfg(void)
+{
+	if (of_machine_is_compatible("elvees,mcom03-bub")) {
+		nand_pad_cfg();
+
+		/* Set EMAC pads drive strength to 12 mA for data and 8 mA for clock.
+		 * Required for correct operation at 125 MHz 3.3V. See #MCOM03SW-823 */
+		pad_set_ctl(HSP_URB_EMAC0_TX_PADCFG, 0x3f);
+		pad_set_ctl(HSP_URB_EMAC0_TXC_PADCFG, 0xf);
+		pad_set_ctl(HSP_URB_EMAC1_TX_PADCFG, 0x3f);
+		pad_set_ctl(HSP_URB_EMAC1_TXC_PADCFG, 0xf);
+
+		for (int i = 0; i < 4; i++)
+			i2c_pad_cfg(i);
+	} else {
+		/* U-Boot don't have pinctrl driver, so switch pad voltage manually */
+		lsperiph1_v18_pad_cfg();
+	}
+}
+#endif
+
+static void power_init_elvmc03smarc_r10(void)
+{
+	u32 val;
+
+	/* Setup CARRIER_PWR_ON signal on ELV-MC03-SMARC */
+	/* TODO: rework to use GPIO driver */
+	val = readl(LSP1_GPIO_SWPORTC_DDR);
+	val |= BIT(5);
+	writel(val, LSP1_GPIO_SWPORTC_DDR);
+
+	val = readl(LSP1_GPIO_SWPORTC_DR);
+	val |= BIT(5);
+	writel(val, LSP1_GPIO_SWPORTC_DR);
+
+	/* Let carrier standby circuits switch on, 1ms should be enough */
+	mdelay(1);
+
+	/* Setup CARRIER_STBY# signal on ELV-MC03-SMARC */
+	val = readl(LSP1_GPIO_SWPORTD_DDR);
+	val |= BIT(0);
+	writel(val, LSP1_GPIO_SWPORTD_DDR);
+
+	val = readl(LSP1_GPIO_SWPORTD_DR);
+	val |= BIT(0);
+	writel(val, LSP1_GPIO_SWPORTD_DR);
+
+	/* Delay >100ms from CARRIER_PWR_ON to RESET_OUT# signals.
+	 * The SMARC specification does not explain why this 100ms is needed.
+	 * Perhaps we don't need it at all. */
+	mdelay(100);
+
+	if (of_machine_is_compatible("radxa,rockpi-n10"))
+		return;
+
+	/* Setup RESET_OUT# signal on ELV-MC03-SMARC */
+	val = readl(LSP1_GPIO_SWPORTD_DDR);
+	val |= BIT(7);
+	writel(val, LSP1_GPIO_SWPORTD_DDR);
+
+	val = readl(LSP1_GPIO_SWPORTD_DR);
+	val |= BIT(7);
+	writel(val, LSP1_GPIO_SWPORTD_DR);
+}
+
+static void power_init_elvmc03smarc_r22(void)
+{
+	u32 val;
+
+	/* Setup CARRIER_STBY# signal on ELV-MC03-SMARC r2.2*/
+	val = readl(LSP1_GPIO_SWPORTC_DDR);
+	val |= BIT(5);
+	writel(val, LSP1_GPIO_SWPORTC_DDR);
+
+	val = readl(LSP1_GPIO_SWPORTC_DR);
+	val |= BIT(5);
+	writel(val, LSP1_GPIO_SWPORTC_DR);
+}
+
+static void power_init_trustphonepm(void)
+{
+	u32 val;
+
+	/* LTE module requires a pulse on PWRKEY input pin to turn on.
+	 * Pulse duration must be at least 500ms.
+	 * TODO: Move it to userspace. */
+	/* Reset deassert */
+	val = readl(MFBSP1_DIR);
+	val |= BIT(7);
+	writel(val, MFBSP1_DIR);
+
+	val = readl(MFBSP1_DR);
+	val |= BIT(7);
+	writel(val, MFBSP1_DR);
+
+	/* PWR OFF */
+	val = readl(LSP1_GPIO_SWPORTD_DDR);
+	val |= BIT(4);
+	writel(val, LSP1_GPIO_SWPORTD_DDR);
+
+	val = readl(LSP1_GPIO_SWPORTD_DR);
+	val &= ~BIT(4);
+	writel(val, LSP1_GPIO_SWPORTD_DR);
+
+	mdelay(500);
+
+	/* PWR ON */
+	val = readl(LSP1_GPIO_SWPORTD_DR);
+	val |= BIT(4);
+	writel(val, LSP1_GPIO_SWPORTD_DR);
+}
+
+int power_init_board(void)
+{
+	if (of_machine_is_compatible("elvees,elvmc03smarc-r1.0"))
+		power_init_elvmc03smarc_r10();
+	else if (of_machine_is_compatible("elvees,elvmc03smarc-r2.2"))
+		power_init_elvmc03smarc_r22();
+	else if (of_machine_is_compatible("elvees,trustphonepm"))
+		power_init_trustphonepm();
+
+	return 0;
+}
 
 static int subsystem_reset_deassert(enum subsystem_reset_lines line)
 {
@@ -284,6 +410,10 @@ int misc_init_r(void)
 #if IS_ENABLED(CONFIG_BOARD_LATE_INIT)
 int board_late_init(void)
 {
+	if (of_machine_is_compatible("elvees,trustphonepm"))
+		env_set("boot_targets",
+			BOOT_TARGET_DEVICES_TRUSTPHONEPM(BOOTENV_DEV_NAME));
+
 	/* The following code gets first "compatible" value from the root node,
 	 * extracts DTB name and sets it to "board" environment variable for
 	 * dynamic DTB selection during Linux booting */

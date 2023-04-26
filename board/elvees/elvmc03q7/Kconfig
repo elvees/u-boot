@@ -1,9 +1,0 @@
-if TARGET_MCOM03_ELVMC03Q7
-
-config SYS_BOARD
-	default "elvmc03q7"
-
-config SYS_CONFIG_NAME
-	default "mcom03"
-
-endif
