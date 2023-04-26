@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0+
 #
-# Copyright 2021 RnD Center "ELVEES", JSC
+# Copyright 2021-2023 RnD Center "ELVEES", JSC
 #
 
-ifneq ($(CONFIG_TARGET_RTL),y)
-	obj-y += common.o
-endif
+obj-y += common.o

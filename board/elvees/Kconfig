@@ -69,11 +69,6 @@ config TARGET_PM03CAM
 	  Support for the following boards:
 	    PM03CAM r1.0
 
-config TARGET_RTL
-	bool "RTL"
-	help
-	  Support for RTL
-
 config TARGET_MCOM03_TRUSTPHONEPM
 	bool "Trustphone PM/CB"
 	select DM_ETH
@@ -112,7 +107,6 @@ source "board/elvees/elvmc03smarc/Kconfig"
 source "board/elvees/haps/Kconfig"
 source "board/elvees/mcom03-bub/Kconfig"
 source "board/elvees/pm03cam/Kconfig"
-source "board/elvees/rtl/Kconfig"
 source "board/elvees/trustphonepm/Kconfig"
 
 config SETUP_MEMORY_TAGS
