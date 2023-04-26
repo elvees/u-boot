@@ -10,27 +10,17 @@
 
 #include "mcom03-common.h"
 
-#define EXTRABOOTENV "bootvol=a\0" \
-	"safe_bootvol=a\0"
-
 #define BOOTENV_DEV_ECAM(devtypeu, devtypel, instance) "bootcmd_ecam=" \
-	"if test \"${bootvol}\" != \"${safe_bootvol}\"; then " \
-		"if env exists tried_to_boot; then " \
-			"setenv bootvol ${safe_bootvol};" \
-			"setenv tried_to_boot;" \
-			"saveenv;" \
-		"else " \
-			"setenv tried_to_boot true;" \
-			"saveenv;" \
-		"fi;" \
-	"fi;" \
+	"env export -t ${loadaddr};" \
+	"env append -0x30000;" \
 	"devtype=mmc;" \
 	"test -n \"$devnum\" || devnum=0;" \
-	"if test \"${bootvol}\" = \"a\"; then " \
-		"distro_bootpart=1;" \
-	"else " \
+	"if test \"${bootvol}\" = \"b\"; then " \
 		"distro_bootpart=2;" \
+	"else " \
+		"distro_bootpart=1;" \
 	"fi;" \
+	"env import -d -t ${loadaddr};" \
 	"load ${devtype} ${devnum}:${distro_bootpart} ${scriptaddr} /boot/boot.scr; " \
 	"source ${scriptaddr}\0"
 
@@ -45,7 +35,6 @@
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	MCOM03_COMMON_ENV_SETTINGS \
-	BOOTENV \
-	EXTRABOOTENV
+	BOOTENV
 
 #endif
