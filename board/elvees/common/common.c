@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2021 RnD Center "ELVEES", JSC
+ * Copyright 2021-2023 RnD Center "ELVEES", JSC
  */
 
 #include <common.h>
@@ -207,21 +207,31 @@ static int xip_disable(int qspi_num)
 	return readl_poll_timeout(xip_en_out, val, !(val & QSPI_XIP_EN), 100);
 }
 
-int board_init(void)
+static int mcom03_subsystem_init(enum subsystem_reset_lines line)
 {
-#ifdef CONFIG_MCOM03_SUBSYSTEM_SDR
-	enum subsystem_reset_lines reset_lines[] = { MEDIA_SUBS, SDR_SUBS };
-#else
-	enum subsystem_reset_lines reset_lines[] = { MEDIA_SUBS };
-#endif
-
 	/* Order as in subsystem_reset_lines. -1 means that no gate
 	 * for subsystem */
-	int clkgate_bits[] = {2, 3, 1, -1, 4, 5, 6, 7, 8, 0};
-	u32 val;
-	int clkgate_bit;
+	const int clkgate_bits[] = {2, 3, 1, -1, 4, 5, 6, 7, 8, 0};
+
+	int ret = subsystem_reset_deassert(line);
+
+	if (ret)
+		return ret;
+
+	if (line >= 0 && line < ARRAY_SIZE(clkgate_bits) &&
+	    clkgate_bits[line] != -1) {
+		u32 val = readl(SERV_URB_TOP_GATECLK);
+
+		val |= BIT(clkgate_bits[line]);
+		writel(val, SERV_URB_TOP_GATECLK);
+	}
+
+	return 0;
+}
+
+int board_init(void)
+{
 	int ret;
-	int i;
 
 	/* Configure all devices to see DDR High address range,
 	 * starting from 0x8_0000_0000.
@@ -231,24 +241,23 @@ int board_init(void)
 	writel(0x20, DDR_SUBS_URB_BASE + LSPERIPH0_BAR);
 	writel(0x20, DDR_SUBS_URB_BASE + LSPERIPH1_BAR);
 
-	for (i = 0; i < ARRAY_SIZE(reset_lines); i++) {
-		clkgate_bit = reset_lines[i];
-		ret = subsystem_reset_deassert(reset_lines[i]);
+	ret = mcom03_subsystem_init(MEDIA_SUBS);
+	if (ret)
+		return ret;
+
+	if (IS_ENABLED(CONFIG_MCOM03_SUBSYSTEM_SDR)) {
+		ret = mcom03_subsystem_init(SDR_SUBS);
 		if (ret)
 			return ret;
-		if (clkgate_bit >= 0) {
-			val = readl(SERV_URB_TOP_GATECLK);
-			val |= BIT(clkgate_bits[clkgate_bit]);
-			writel(val, SERV_URB_TOP_GATECLK);
-		}
 	}
 
 	writel(DISPLAY_PARALLEL_POR_EN, MEDIA_SUBSYSTEM_CFG);
 
 	board_pads_cfg();
 
-	for (i = 0; i < 2; i++) {
-		ret = xip_disable(i);
+	for (int i = 0; i < 2; i++) {
+		int ret = xip_disable(i);
+
 		if (ret)
 			return ret;
 	}
@@ -256,7 +265,7 @@ int board_init(void)
 	return clk_cfg();
 }
 
-#ifdef CONFIG_MISC_INIT_R
+#if IS_ENABLED(CONFIG_MISC_INIT_R)
 int misc_init_r(void)
 {
 	if (!IS_ENABLED(CONFIG_ENV_IS_NOWHERE))
