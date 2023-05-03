@@ -4,6 +4,8 @@
  */
 
 #include <common.h>
+#include <dm.h>
+#include <dm/of_access.h>
 #include <env.h>
 #include <init.h>
 #include <asm/armv8/mmu.h>
@@ -274,6 +276,27 @@ int misc_init_r(void)
 			env_set_hex("first_boot_checker", 0x0);
 			env_save();
 		}
+
+	return 0;
+}
+#endif
+
+#if IS_ENABLED(CONFIG_BOARD_LATE_INIT)
+int board_late_init(void)
+{
+	/* The following code gets first "compatible" value from the root node,
+	 * extracts DTB name and sets it to "board" environment variable for
+	 * dynamic DTB selection during Linux booting */
+	int compat_strlen;
+	const char *compat_str = ofnode_get_property(ofnode_root(), "compatible",
+						     &compat_strlen);
+
+	if (!compat_str || !compat_strlen)
+		return -ENODEV;
+
+	const char *dtb_name = strchr(compat_str, ',') + 1;
+
+	env_set("board", dtb_name);
 
 	return 0;
 }

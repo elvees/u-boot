@@ -10,7 +10,12 @@
 
 #include "mcom03-common.h"
 
+#ifndef CONFIG_FDTFILE
+#define CONFIG_FDTFILE CONFIG_DEFAULT_DEVICE_TREE ".dtb"
+#endif
+
 #define EXTRABOOTENV "bootvol=a\0" \
+	"fdtfile=" CONFIG_FDTFILE "\0" \
 	"safe_bootvol=a\0"
 
 #define BOOTENV_DEV_ECAM(devtypeu, devtypel, instance) "bootcmd_ecam=" \
