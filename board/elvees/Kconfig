@@ -113,12 +113,6 @@ config MEM_REGIONS_ADDR
 	  Address to read DDR memory bank sizes and start addresses
 	  from (written by ddrinit).
 
-config MCOM03_SUBSYSTEM_SDR
-	bool "Enable SDR subsystem"
-	default y
-	help
-	  SDR subsystem includes RISC1, DSP, PCIe, etc.
-
 config DDRMC_MAX_NUMBER
 	int
 	default 2

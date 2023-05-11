@@ -371,6 +371,13 @@ static int mcom03_subsystem_init(enum subsystem_reset_lines line)
 	return 0;
 }
 
+static inline bool is_sdr_enabled(void)
+{
+	ofnode sdr_node = ofnode_path("/sdr@1900000");
+
+	return ofnode_valid(sdr_node);
+}
+
 int board_init(void)
 {
 	int ret;
@@ -387,7 +394,7 @@ int board_init(void)
 	if (ret)
 		return ret;
 
-	if (IS_ENABLED(CONFIG_MCOM03_SUBSYSTEM_SDR)) {
+	if (is_sdr_enabled()) {
 		ret = mcom03_subsystem_init(SDR_SUBS);
 		if (ret)
 			return ret;
@@ -404,7 +411,14 @@ int board_init(void)
 			return ret;
 	}
 
-	return clk_cfg();
+	ret = clk_cfg();
+	if (ret)
+		return ret;
+
+	if (is_sdr_enabled())
+		ret = clk_cfg_sdr();
+
+	return ret;
 }
 
 #if IS_ENABLED(CONFIG_MISC_INIT_R)

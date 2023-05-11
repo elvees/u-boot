@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2021 RnD Center "ELVEES", JSC
+ * Copyright 2021-2023 RnD Center "ELVEES", JSC
  */
 
 #include <common.h>
@@ -78,12 +78,9 @@ static struct pll_settings pll_settings[] = {
 	{ MEDIA_PLL0, 27000000, 1998000000, 0, 73, 0 },
 	{ MEDIA_PLL1, 27000000, 594000000, 0, 131, 5 },
 	{ MEDIA_PLL2, 27000000, 495000000, 0, 109, 5 },
-
-#ifdef CONFIG_MCOM03_SUBSYSTEM_SDR
 	{ SDR_PLL0, 27000000, 1890000000, 0, 69, 0 },
 	{ SDR_PLL1, 27000000, 648000000, 0, 95, 3 },
 	{ SDR_PLL2, 27000000, 459000000, 0, 101, 5 },
-#endif
 };
 
 struct ucg_channel {
@@ -156,7 +153,6 @@ static struct ucg_channel ucg_media_channels[] = {
 	{2, 2, 2},	/* MEDIA UCG2 GPU_CORE		247.5 MHz */
 };
 
-#ifdef CONFIG_MCOM03_SUBSYSTEM_SDR
 static struct ucg_channel ucg_sdr_channels[] = {
 	{0, 0, 18},	/* SDR UCG0 CLK_CFG		105 MHz */
 	{0, 1, 6},	/* SDR UCG0 EXT_CLK		315 MHz */
@@ -172,7 +168,6 @@ static struct ucg_channel ucg_sdr_channels[] = {
 	{0, 11, -18},	/* SDR UCG0 VCU_TCK		off (105 MHz) */
 	{0, 12, -18},	/* SDR UCG0 LVDS_CLK		off (105 MHz) */
 };
-#endif
 
 enum ucg_qfsm_state {
 	Q_FSM_STOPPED = 0,
@@ -412,36 +407,36 @@ int clk_cfg(void)
 	if (ret)
 		return ret;
 
-	ret = ucg_cfg(ucg_media_channels, ARRAY_SIZE(ucg_media_channels),
-		      media_ucg_ctr_addr_get, media_ucg_bp_addr_get,
-		      0, 0x0,
-		      (unsigned long []) {
+	return ucg_cfg(ucg_media_channels, ARRAY_SIZE(ucg_media_channels),
+		       media_ucg_ctr_addr_get, media_ucg_bp_addr_get,
+		       0, 0x0,
+		       (unsigned long []) {
 			      MEDIA_PLL0_ADDR,
 			      MEDIA_PLL1_ADDR,
 			      MEDIA_PLL2_ADDR,
-		      },
-		      (enum pll_id []) {
+		       },
+		       (enum pll_id []) {
 			      MEDIA_PLL0,
 			      MEDIA_PLL1,
 			      MEDIA_PLL2,
-		      }, 3, NULL);
-	if (ret)
-		return ret;
+		       }, 3, NULL);
+}
 
-#ifdef CONFIG_MCOM03_SUBSYSTEM_SDR
-	ret = ucg_cfg(ucg_sdr_channels, ARRAY_SIZE(ucg_sdr_channels),
-		      sdr_ucg_ctr_addr_get, sdr_ucg_bp_addr_get,
-		      0, 0x0,
-		      (unsigned long []) {
-			      SDR_PLL0_ADDR,
-			      SDR_PLL1_ADDR,
-			      SDR_PLL2_ADDR
-		      },
-		      (enum pll_id []) {
-			      SDR_PLL0,
-			      SDR_PLL1,
-			      SDR_PLL2
-		      }, 3, NULL);
+int clk_cfg_sdr(void)
+{
+	int ret = ucg_cfg(ucg_sdr_channels, ARRAY_SIZE(ucg_sdr_channels),
+			  sdr_ucg_ctr_addr_get, sdr_ucg_bp_addr_get,
+			  0, 0x0,
+			  (unsigned long []) {
+				SDR_PLL0_ADDR,
+				SDR_PLL1_ADDR,
+				SDR_PLL2_ADDR
+			  },
+			  (enum pll_id []) {
+				SDR_PLL0,
+				SDR_PLL1,
+				SDR_PLL2
+			  }, 3, NULL);
 	if (ret)
 		return ret;
 	// Enable DSP clocks
@@ -451,7 +446,6 @@ int clk_cfg(void)
 	       SDR_URB_PCI0_CTL);
 	writel(SDR_URB_PCIE_CTL_ENABLE_CLK | SDR_URB_PCIE_CTL_PAD_EN,
 	       SDR_URB_PCI1_CTL);
-#endif
 
 	return 0;
 }
