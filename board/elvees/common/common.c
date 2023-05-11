@@ -17,7 +17,6 @@
 #include <linux/kernel.h>
 
 #include <asm/arch/mcom03-clk.h>
-#include <configs/mcom03.h>
 #include "mcom03-common.h"
 
 #define DDR_SUBS_URB_BASE		0xC000000
@@ -40,6 +39,11 @@
 #define DISPLAY_PARALLEL_POR_EN		BIT(0)
 
 #define PP_ON				0x10
+
+#define BOOT_TARGET_DEVICES_TRUSTPHONEPM(func) \
+	BOOT_TARGET_DEVICES_USB(func) \
+	BOOT_TARGET_DEVICES_MMC(func) \
+	BOOT_TARGET_DEVICES_PXE(func)
 
 struct ddrinfo {
 	u64 dram_size[CONFIG_DDRMC_MAX_NUMBER];

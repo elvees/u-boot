@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * Copyright 2021-2022 RnD Center "ELVEES", JSC
+ * Copyright 2021-2023 RnD Center "ELVEES", JSC
  *
  * Configuration settings for the MCom-03 Bring-Up board
  */
@@ -13,11 +13,6 @@
 #define BOOT_TARGET_DEVICES(func) \
 	BOOT_TARGET_DEVICES_MMC(func) \
 	BOOT_TARGET_DEVICES_USB(func) \
-	BOOT_TARGET_DEVICES_PXE(func)
-
-#define BOOT_TARGET_DEVICES_TRUSTPHONEPM(func) \
-	BOOT_TARGET_DEVICES_USB(func) \
-	BOOT_TARGET_DEVICES_MMC(func) \
 	BOOT_TARGET_DEVICES_PXE(func)
 
 #include <config_distro_bootcmd.h>
