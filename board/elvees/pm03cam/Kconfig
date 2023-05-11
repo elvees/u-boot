@@ -1,9 +1,0 @@
-if TARGET_PM03CAM
-
-config SYS_BOARD
-	default "pm03cam"
-
-config SYS_CONFIG_NAME
-	default "mcom03-ecam03"
-
-endif

@@ -135,7 +135,6 @@ int dram_init_banksize(void)
 }
 #endif
 
-#ifdef CONFIG_TARGET_MCOM03
 void board_pads_cfg(void)
 {
 	if (of_machine_is_compatible("elvees,mcom03-bub")) {
@@ -150,12 +149,17 @@ void board_pads_cfg(void)
 
 		for (int i = 0; i < 4; i++)
 			i2c_pad_cfg(i);
+	} else if (of_machine_is_compatible("elvees,ecam03bl") ||
+		   of_machine_is_compatible("elvees,ecam03dm")) {
+		nand_pad_cfg();
+
+		/* U-Boot doesn't have pinctrl driver, so switch pad voltage manually */
+		lsperiph1_v18_pad_cfg();
 	} else {
-		/* U-Boot don't have pinctrl driver, so switch pad voltage manually */
+		/* U-Boot doesn't have pinctrl driver, so switch pad voltage manually */
 		lsperiph1_v18_pad_cfg();
 	}
 }
-#endif
 
 static void power_init_elvmc03smarc_r10(void)
 {

@@ -7,3 +7,13 @@ config SYS_CONFIG_NAME
 	default "mcom03"
 
 endif
+
+if TARGET_MCOM03_ECAM03
+
+config SYS_BOARD
+	default "common"
+
+config SYS_CONFIG_NAME
+	default "mcom03-ecam03"
+
+endif

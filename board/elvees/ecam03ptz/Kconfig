@@ -1,9 +1,0 @@
-if TARGET_ECAM03PTZ
-
-config SYS_BOARD
-	default "ecam03ptz"
-
-config SYS_CONFIG_NAME
-	default "mcom03-ecam03"
-
-endif

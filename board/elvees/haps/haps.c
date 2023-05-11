@@ -23,7 +23,3 @@ int dram_init_banksize(void)
 
 	return 0;
 }
-
-void board_pads_cfg(void)
-{
-}

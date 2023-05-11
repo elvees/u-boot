@@ -34,50 +34,22 @@ config TARGET_MCOM03
 	    ELV-MC03 r2.2, ELV-MC03-CB r1.0
 	    EGW-PM r1.0, EGW-CB r1.0
 
-config TARGET_ECAM03BL
-	bool "ECAM03BL"
+config TARGET_MCOM03_ECAM03
+	bool "ECAM03"
 	select DM_ETH
 	select DM_MMC
 	select DM_GPIO
 	help
 	  Support for the following boards:
 	    ECAM03BL r1.0
-
-config TARGET_ECAM03DM
-	bool "ECAM03DM"
-	select DM_ETH
-	select DM_MMC
-	select DM_GPIO
-	help
-	  Support for the following boards:
 	    ECAM03DM r1.0
-
-config TARGET_ECAM03PTZ
-	bool "ECAM03PTZ"
-	select DM_ETH
-	select DM_MMC
-	select DM_GPIO
-	help
-	  Support for the following boards:
 	    ECAM03PTZ r1.0
-
-config TARGET_PM03CAM
-	bool "PM03CAM"
-	select DM_ETH
-	select DM_MMC
-	select DM_GPIO
-	help
-	  Support for the following boards:
 	    PM03CAM r1.0
 
 endchoice
 
 source "board/elvees/common/Kconfig"
-source "board/elvees/ecam03bl/Kconfig"
-source "board/elvees/ecam03dm/Kconfig"
-source "board/elvees/ecam03ptz/Kconfig"
 source "board/elvees/haps/Kconfig"
-source "board/elvees/pm03cam/Kconfig"
 
 config SETUP_MEMORY_TAGS
 	bool "Enable memory tag"
