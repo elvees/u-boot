@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2022 RnD Center "ELVEES", JSC
+ * Copyright 2022-2023 RnD Center "ELVEES", JSC
  */
 
 /dts-v1/;
@@ -22,6 +22,8 @@
 		regulator-max-microvolt = <1800000>;
 		regulator-always-on;
 	};
+
+	/delete-node/ sdr@1900000;
 };
 
 /* Connected to eMMC */
