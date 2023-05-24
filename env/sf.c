@@ -292,6 +292,44 @@ out:
 }
 #endif
 
+static int env_sf_append(off_t offset)
+{
+	int ret;
+	off_t env_offset;
+	char *buf = NULL;
+	struct spi_flash *env_flash;
+
+	buf = (char *)memalign(ARCH_DMA_MINALIGN, CONFIG_ENV_SIZE);
+	if (!buf)
+		return -EIO;
+
+	ret = setup_flash_device(&env_flash);
+	if (ret)
+		goto out;
+
+	if (offset < 0)
+		env_offset = (off_t)env_flash->size + offset;
+	else
+		env_offset = offset;
+
+	printf("offset 0x%lx... ", env_offset);
+
+	ret = spi_flash_read(env_flash, env_offset, CONFIG_ENV_SIZE, buf);
+	if (ret)
+		goto err;
+
+	ret = env_import(buf, 1, H_NOCLEAR);
+	if (!ret)
+		gd->env_valid = ENV_VALID;
+
+err:
+	spi_flash_free(env_flash);
+out:
+	free(buf);
+
+	return ret;
+}
+
 static int env_sf_erase(void)
 {
 	int ret;
@@ -448,6 +486,7 @@ U_BOOT_ENV_LOCATION(sf) = {
 	.location	= ENVL_SPI_FLASH,
 	ENV_NAME("SPIFlash")
 	.load		= env_sf_load,
+	.append		= ENV_APPEND_PTR(env_sf_append),
 	.save		= ENV_SAVE_PTR(env_sf_save),
 	.erase		= ENV_ERASE_PTR(env_sf_erase),
 	.init		= env_sf_init,

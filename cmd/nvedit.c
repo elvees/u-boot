@@ -633,6 +633,19 @@ static int do_env_load(struct cmd_tbl *cmdtp, int flag, int argc,
 }
 #endif
 
+#if defined(CONFIG_CMD_NVEDIT_APPEND)
+static int do_env_append(struct cmd_tbl *cmdtp, int flag, int argc,
+			 char *const argv[])
+{
+	if (argc != 2)
+		return CMD_RET_USAGE;
+
+	off_t offset = simple_strtol(argv[1], NULL, 0);
+
+	return env_append(offset) ? 1 : 0;
+}
+#endif
+
 #if defined(CONFIG_CMD_NVEDIT_SELECT)
 static int do_env_select(struct cmd_tbl *cmdtp, int flag, int argc,
 			 char *const argv[])
@@ -1197,6 +1210,9 @@ static int do_env_exists(struct cmd_tbl *cmdtp, int flag, int argc,
  * New command line interface: "env" command with subcommands
  */
 static struct cmd_tbl cmd_env_sub[] = {
+#if defined(CONFIG_CMD_NVEDIT_APPEND)
+	U_BOOT_CMD_MKENT(append, 2, 0, do_env_append, "", ""),
+#endif
 #if defined(CONFIG_CMD_ASKENV)
 	U_BOOT_CMD_MKENT(ask, CONFIG_SYS_MAXARGS, 1, do_env_ask, "", ""),
 #endif
@@ -1276,6 +1292,9 @@ static int do_env(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 
 #ifdef CONFIG_SYS_LONGHELP
 static char env_help_text[] =
+#if defined(CONFIG_CMD_NVEDIT_APPEND)
+	"append offset - append environment from storage offset\nenv "
+#endif
 #if defined(CONFIG_CMD_ASKENV)
 	"ask name [message] [size] - ask for environment variable\nenv "
 #endif

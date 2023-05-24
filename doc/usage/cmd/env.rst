@@ -8,6 +8,7 @@ Synopsis
 
 ::
 
+	env append offset
 	env ask name [message] [size]
 	env callbacks
 	env default [-f] (-a | var [...])
@@ -42,6 +43,16 @@ The next commands are kept as alias and for compatibility:
 + *setenv* = *env set*
 + *askenv* = *env ask*
 + *run* = *env run*
+
+Append
+~~~~~~
+
+The *env append* command appends addition environment from persistent storage
+offset to the U-Boot environment in memory.
+
+    offset
+        offset in the used persistent storage. Negative offset is treated as
+        offset from the end of persistent storage.
 
 Ask
 ~~~
@@ -334,6 +345,9 @@ Configuration
 
 The env command is always available but some sub-commands depend on
 configuration options:
+
+append
+    CONFIG_CMD_NVEDIT_APPEND
 
 ask
     CONFIG_CMD_ASKENV

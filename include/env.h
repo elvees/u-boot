@@ -270,6 +270,14 @@ int env_load(void);
 int env_reload(void);
 
 /**
+ * env_append() - Append the environment from the same storage
+ *
+ * @offset: Offset on storage where to load environment from
+ * Return: 0 if loaded successfully, -ve on error
+ */
+int env_append(off_t offset);
+
+/**
  * env_save() - Save the environment to storage
  *
  * Return: 0 if OK, -ve on error

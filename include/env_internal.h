@@ -148,6 +148,7 @@ enum env_operation {
 	ENVOP_LOAD,	/* we want to call the load function */
 	ENVOP_SAVE,	/* we want to call the save function */
 	ENVOP_ERASE,	/* we want to call the erase function */
+	ENVOP_APPEND,	/* we want to call the append function */
 };
 
 struct env_driver {
@@ -162,6 +163,19 @@ struct env_driver {
 	 * @return 0 if OK, -ve on error
 	 */
 	int (*load)(void);
+
+	/**
+	 * append() - Append env from storage offset
+	 *
+	 * This method is optional and required for appending additional
+	 * environment to existing environment from another location of
+	 * the same storage
+	 *
+	 * @offset: Offset on storage from where to load env
+	 *
+	 * @return 0 if OK, -ve on error
+	 */
+	int (*append)(off_t offset);
 
 	/**
 	 * save() - Save the environment to storage
@@ -211,6 +225,7 @@ struct env_driver {
 
 #define ENV_SAVE_PTR(x) (CONFIG_IS_ENABLED(SAVEENV) ? (x) : NULL)
 #define ENV_ERASE_PTR(x) (CONFIG_IS_ENABLED(CMD_ERASEENV) ? (x) : NULL)
+#define ENV_APPEND_PTR(x) (CONFIG_IS_ENABLED(CMD_NVEDIT_APPEND) ? (x) : NULL)
 
 extern struct hsearch_data env_htab;
 

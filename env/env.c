@@ -25,6 +25,8 @@ void env_fix_drivers(void)
 	for (entry = drv; entry != drv + n_ents; entry++) {
 		if (entry->name)
 			entry->name += gd->reloc_off;
+		if (entry->append)
+			entry->append += gd->reloc_off;
 		if (entry->load)
 			entry->load += gd->reloc_off;
 		if (entry->save)
@@ -259,6 +261,38 @@ int env_reload(void)
 		}
 
 		ret = drv->load();
+		if (ret)
+			printf("Failed (%d)\n", ret);
+		else
+			printf("OK\n");
+
+		if (!ret)
+			return 0;
+	}
+
+	return -ENODEV;
+}
+
+int env_append(off_t offset)
+{
+	struct env_driver *drv;
+
+	drv = env_driver_lookup(ENVOP_APPEND, gd->env_load_prio);
+	if (drv) {
+		int ret;
+
+		printf("Appending environment from %s... ", drv->name);
+		if (!drv->append) {
+			printf("not possible\n");
+			return -ENODEV;
+		}
+
+		if (!env_has_inited(drv->location)) {
+			printf("not initialized\n");
+			return -ENODEV;
+		}
+
+		ret = drv->append(offset);
 		if (ret)
 			printf("Failed (%d)\n", ret);
 		else

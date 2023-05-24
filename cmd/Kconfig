@@ -595,6 +595,12 @@ config CMD_ENV_FLAGS
 	  be deleted. This command shows the variables that have special
 	  flags.
 
+config CMD_NVEDIT_APPEND
+	bool "env append"
+	help
+	  Append additional environment from the offset of compiled-in
+	  persistent storage to the U-Boot environment in memory.
+
 config CMD_NVEDIT_EFI
 	bool "env [set|print] -e - set/print UEFI variables"
 	depends on EFI_LOADER
