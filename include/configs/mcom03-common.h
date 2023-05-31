@@ -54,6 +54,15 @@
 #define BOOT_TARGET_DEVICES_DHCP(func)
 #endif
 
+/*
+ * Define `BOOTENV_EFI_SET_FDTFILE_FALLBACK` will be used in
+ * include/config_distro_bootcmd.h file.
+ */
+#define BOOTENV_EFI_SET_FDTFILE_FALLBACK                                  \
+	"if test -z \"${fdtfile}\" -a -n \"${soc}\"; then "               \
+	  "setenv efi_fdtfile ${soc}-${board}${boardver}.dtb; "           \
+	"fi; "
+
 #define MCOM03_COMMON_ENV_SETTINGS \
 	"kernel_addr_r=0x892400000\0" \
 	"scriptaddr=0x898400000\0" \
