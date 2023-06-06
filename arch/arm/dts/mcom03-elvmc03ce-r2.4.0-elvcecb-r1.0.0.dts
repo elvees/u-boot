@@ -1,0 +1,54 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright 2023 RnD Center "ELVEES", JSC
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+
+#include "mcom03-elvmc03ce-r2.4.0.dtsi"
+
+/ {	model = "ELV-MC03-CE r2.4.0, ELV-CE-CB r1.0.0";
+	compatible = "elvees,elvmc03ce-r2.4.0-elvcecb-r1.0.0",
+		     "elvees,elvmc03ce-elvcecb",
+		     "elvees,elvcecb-r1.0.0",
+		     "elvees,elvcecb",
+		     "elvees,elvmc03ce-r2.4.0",
+		     "elvees,elvmc03ce",
+		     "elvees,mcom03";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+};
+
+/* Connected only to GPIO0/GPIO2 and not to DEBUG USB */
+&ser1 {
+	status = "okay";
+	clock-frequency = <27920454>;
+};
+
+&sdhci1 {
+	status = "okay";
+
+	/* Disable 1.8V support
+	 * Disable SDR50, SDR104 and DDR50 support
+	 */
+	sdhci-caps-mask = <0x7 0x4000000>;
+	sdhci-caps = <0x0 0x0>;
+
+	/* The default clock pad drive strength of 6 mA is insufficient
+	 * for ELV-CE-CB resulting in unstable SDMMC performance
+	 * (possibly due to a PCB bug).
+	 */
+	elvees,drive-strength-clk = <8>;
+};
+
+&usb0 {
+	status = "okay";
+};
+
+&usb1 {
+	status = "okay";
+};
