@@ -3,4 +3,4 @@
     # Run all jobs regardless which files were modified.
     experimental:
       jobs:
-        - mcom03-linux510-buildroot-build
+        - mcom03-linux419-buildroot-build
