@@ -432,12 +432,29 @@ int board_init(void)
 #if IS_ENABLED(CONFIG_MISC_INIT_R)
 int misc_init_r(void)
 {
-	if (!IS_ENABLED(CONFIG_ENV_IS_NOWHERE))
-		if (!env_get("first_boot_checker")) {
-			printf("*** First boot\n");
-			env_set_hex("first_boot_checker", 0x0);
-			env_save();
-		}
+	int compat_strlen;
+	/* Get first "compatible" value from the root node and extract
+	 * DTB name */
+	const char *compat_str = ofnode_get_property(ofnode_root(),
+						     "compatible",
+						     &compat_strlen);
+
+	if (!compat_str || !compat_strlen)
+		return -ENODEV;
+
+	const char *dtb_name = strchr(compat_str, ',') + 1;
+
+	if (IS_ENABLED(CONFIG_ENV_IS_NOWHERE)) {
+		env_set("board", dtb_name);
+		return 0;
+	}
+
+	if (!env_get("first_boot_checker")) {
+		printf("*** First boot\n");
+		env_set_hex("first_boot_checker", 0x0);
+		env_set("board", dtb_name);
+		env_save();
+	}
 
 	return 0;
 }
@@ -449,20 +466,6 @@ int board_late_init(void)
 	if (of_machine_is_compatible("elvees,trustphonepm"))
 		env_set("boot_targets",
 			BOOT_TARGET_DEVICES_TRUSTPHONEPM(BOOTENV_DEV_NAME));
-
-	/* The following code gets first "compatible" value from the root node,
-	 * extracts DTB name and sets it to "board" environment variable for
-	 * dynamic DTB selection during Linux booting */
-	int compat_strlen;
-	const char *compat_str = ofnode_get_property(ofnode_root(), "compatible",
-						     &compat_strlen);
-
-	if (!compat_str || !compat_strlen)
-		return -ENODEV;
-
-	const char *dtb_name = strchr(compat_str, ',') + 1;
-
-	env_set("board", dtb_name);
 
 	return 0;
 }
