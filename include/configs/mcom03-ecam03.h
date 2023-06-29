@@ -10,23 +10,29 @@
 
 #include "mcom03-common.h"
 
-#define BOOTENV_DEV_ECAM(devtypeu, devtypel, instance) "bootcmd_ecam=" \
+#define BOOTENV_DEV_ECAM(devtypeu, devtypel, instance) \
+	"bootcmd_ecam_mmc" #instance "=" \
 	"env export -t ${loadaddr};" \
 	"env append -0x30000;" \
 	"devtype=mmc;" \
-	"test -n \"$devnum\" || devnum=0;" \
+	"devnum=" #instance "; " \
 	"if test \"${bootvol}\" = \"b\"; then " \
 		"distro_bootpart=2;" \
 	"else " \
 		"distro_bootpart=1;" \
 	"fi;" \
 	"env import -d -t ${loadaddr};" \
-	"load ${devtype} ${devnum}:${distro_bootpart} ${scriptaddr} /boot/boot.scr; " \
-	"source ${scriptaddr}\0"
+	"echo \"Booting from mmc${devnum} ...\";" \
+	"if load ${devtype} ${devnum}:${distro_bootpart} ${scriptaddr} /boot/boot.scr; then " \
+		"source ${scriptaddr};" \
+	"fi;\0"
 
-#define BOOTENV_DEV_NAME_ECAM(devtypeu, devtypel, instance) "ecam "
+#define BOOTENV_DEV_NAME_ECAM(devtypeu, devtypel, instance) \
+	"ecam_mmc" #instance " "
 
-#define BOOT_TARGET_DEVICES_ECAM(func) func(ECAM, ecam, na)
+#define BOOT_TARGET_DEVICES_ECAM(func) \
+	func(ECAM, ecam_mmc, 1) \
+	func(ECAM, ecam_mmc, 0)
 
 #define BOOT_TARGET_DEVICES(func) \
 	BOOT_TARGET_DEVICES_ECAM(func)
