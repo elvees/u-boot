@@ -115,6 +115,8 @@ void *board_fdt_blob_setup(int *err)
 
 	if (fdt_magic(fdt_blob) != FDT_MAGIC) {
 		*err = -ENOENT;
+		printf("%s: DTB is missing or corrupted at address %p\n",
+		       __func__, fdt_blob);
 		return NULL;
 	}
 
