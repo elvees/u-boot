@@ -4,3 +4,4 @@
 #
 
 obj-y += common.o
+obj-$(CONFIG_MISC_INIT_R) += factory-settings.o

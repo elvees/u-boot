@@ -68,5 +68,6 @@ void nand_pad_cfg(void);
 void board_pads_cfg(void);
 void nand_pad_cfg(void);
 void pad_set_ctl(unsigned long reg, u32 value);
+int do_factory_settings(void);
 
 #endif

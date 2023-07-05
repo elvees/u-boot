@@ -434,31 +434,15 @@ int board_init(void)
 #if IS_ENABLED(CONFIG_MISC_INIT_R)
 int misc_init_r(void)
 {
-	int compat_strlen;
-	/* Get first "compatible" value from the root node and extract
-	 * DTB name */
-	const char *compat_str = ofnode_get_property(ofnode_root(),
-						     "compatible",
-						     &compat_strlen);
-
-	if (!compat_str || !compat_strlen)
-		return -ENODEV;
-
-	const char *dtb_name = strchr(compat_str, ',') + 1;
-
-	if (IS_ENABLED(CONFIG_ENV_IS_NOWHERE)) {
-		env_set("board", dtb_name);
-		return 0;
+	if (!IS_ENABLED(CONFIG_ENV_IS_NOWHERE)) {
+		if (!env_get("first_boot_checker")) {
+			printf("*** First boot\n");
+			env_set_hex("first_boot_checker", 0x0);
+			env_save();
+		}
 	}
 
-	if (!env_get("first_boot_checker")) {
-		printf("*** First boot\n");
-		env_set_hex("first_boot_checker", 0x0);
-		env_set("board", dtb_name);
-		env_save();
-	}
-
-	return 0;
+	return do_factory_settings();
 }
 #endif
 
