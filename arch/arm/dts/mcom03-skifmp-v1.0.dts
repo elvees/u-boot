@@ -1,0 +1,122 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright 2023 RnD Center "ELVEES", JSC
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/net/ti-dp83867.h>
+
+#include "mcom03.dtsi"
+
+/ {
+	model = "SKIF-MP v1.0";
+	compatible = "elvees,skifmp-v1.0",
+		     "elvees,skifmp",
+		     "elvees,mcom03";
+
+	sdhci0_supply: regulator@0 {
+		compatible = "regulator-fixed";
+		regulator-name = "sdhci0-supply";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		regulator-always-on;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+};
+
+&gpio0d {
+	reset-usb2517-hub-hog {
+		gpio-hog;
+		gpios = <1 GPIO_ACTIVE_HIGH>;
+		output-low;
+	};
+};
+
+/* Connected to eMMC */
+&sdhci0 {
+	status = "okay";
+
+	non-removable;
+	bus-width = <8>;
+
+	vqmmc-supply = <&sdhci0_supply>;
+};
+
+/* Connected to MicroSD card */
+&sdhci1 {
+	status = "okay";
+
+	max-frequency = <12000000>;
+
+	/* Disable High Speed support
+	 * Disable 1.8V support
+	 * Disable SDR50, SDR104 and DDR50 support
+	 */
+	sdhci-caps-mask = <0x7 0x4200000>;
+	sdhci-caps = <0x0 0x0>;
+
+	disable-wp;
+};
+
+/* Connected to RJ-45 */
+&emac0 {
+	status = "okay";
+
+	phy-mode = "rgmii";
+	phy-handle = <&ethernet_phy0>;
+	clocks = <&eth_bus_clk>;
+	phy-reset-gpios = <&gpio0d 6 GPIO_ACTIVE_LOW>;
+	elvees,pads-1v8-en;
+
+	/* TODO: Remove this extra PHY reset cycle.
+	 * DP83867 has to be reset twice on this module.
+	 * The reason is currently unknown.
+	 */
+	elvees,extra-phy-reset-cycle;
+
+	ethernet_phy0: ethernet-phy@4 {
+		reg = <0x4>;
+		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
+		ti,tx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
+		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_4_B_NIB>;
+	};
+};
+
+&qspi0 {
+	status = "okay";
+
+	flash0: s25fl128s@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor", "spi-flash";
+		reg = <0x0>;
+		/* This is the highest frequency at which all commands are
+		 * supported by the flash device.
+		 */
+		spi-max-frequency = <50000000>;
+
+		spi-tx-bus-width = <4>;
+		spi-rx-bus-width = <4>;
+	};
+};
+
+/* Connected to Raspberry Pi header */
+&uart0 {
+	status = "okay";
+	clock-frequency = <27920454>;
+};
+
+/* Connected to USB 3.0 Type-A */
+&usb0 {
+	status = "okay";
+};
+
+/* Connected to USB hub on SKIF-MP */
+&usb1 {
+	status = "okay";
+};
