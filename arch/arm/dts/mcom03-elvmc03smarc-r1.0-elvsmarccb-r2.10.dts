@@ -40,6 +40,11 @@
 
 	/* SDIO_WP is not connected on ELV-SMARC-CB r2.10.3 */
 	disable-wp;
+
+	/* The default clock pad drive strength of 6 mA is insufficient
+	* for some ELV-SMARC-CBs resulting in unstable SDMMC performance.
+	*/
+	elvees,drive-strength-clk = <8>;
 };
 
 &emac0 {
