@@ -1,0 +1,53 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright 2023 RnD Center "ELVEES", JSC
+ *
+ * This DTS is common for all PM03CAM r2.0 based boards. Its 'compatible'
+ * property shall contain string 'pm03cam-r2.0-ecam03common-r2.0' as it
+ * is used by U-Boot to find default DTS for these boards in Linux.
+ */
+
+/dts-v1/;
+
+#include "mcom03-pm03cam-r2.0.dtsi"
+#include <dt-bindings/input/input.h>
+
+/ {
+	model = "ECAM03COMMON r2.0";
+	compatible = "elvees,pm03cam-r2.0-ecam03common-r2.0",
+		     "elvees,pm03cam-r2.0",
+		     "elvees,mcom03";
+};
+
+&uart0 {
+	status = "okay";
+
+	clock-frequency = <27920454>;
+};
+
+&sdhci1 {
+	status = "okay";
+
+	/* Disable 1.8V support
+	 * Disable SDR50, SDR104 and DDR50 support
+	 */
+	sdhci-caps-mask = <0x7 0x4000000>;
+	sdhci-caps = <0x0 0x0>;
+};
+
+&emac0 {
+	status = "okay";
+
+	phy-handle = <&ethernet_phy0>;
+
+	reset-gpios = <&gpio0c 6 GPIO_ACTIVE_LOW>;
+
+	ethernet_phy0: ethernet-phy@0 {
+		compatible = "ethernet-phy-id0000.011a", "ethernet-phy-ieee802.3-c22";
+		reg = <0x0>;
+
+		motorcomm,clk-out-frequency-hz = <0>;
+		rx-internal-delay-ps = <1800>;
+		tx-internal-delay-ps = <1200>;
+	};
+};

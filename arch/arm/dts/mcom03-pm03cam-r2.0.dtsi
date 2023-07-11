@@ -10,11 +10,6 @@
 #include "mcom03.dtsi"
 
 / {
-	model = "PM03CAM r2.0";
-	compatible = "elvees,pm03cam-r2.0",
-		     "elvees,pm03cam",
-		     "elvees,mcom03";
-
 	chosen {
 		stdout-path = "serial0:115200n8";
 	};
@@ -30,12 +25,6 @@
 	/delete-node/ sdr@1900000;
 };
 
-&uart0 {
-	status = "okay";
-
-	clock-frequency = <27920454>;
-};
-
 &sdhci0 {
 	status = "okay";
 
@@ -43,16 +32,6 @@
 	bus-width = <8>;
 
 	vqmmc-supply = <&sdhci0_supply>;
-};
-
-&sdhci1 {
-	status = "okay";
-
-	/* Disable 1.8V support
-	 * Disable SDR50, SDR104 and DDR50 support
-	 */
-	sdhci-caps-mask = <0x7 0x4000000>;
-	sdhci-caps = <0x0 0x0>;
 };
 
 &qspi0 {
@@ -70,22 +49,5 @@
 
 		spi-tx-bus-width = <4>;
 		spi-rx-bus-width = <4>;
-	};
-};
-
-&emac0 {
-	status = "okay";
-
-	phy-handle = <&ethernet_phy0>;
-
-	reset-gpios = <&gpio0c 6 GPIO_ACTIVE_LOW>;
-
-	ethernet_phy0: ethernet-phy@0 {
-		compatible = "ethernet-phy-id0000.011a", "ethernet-phy-ieee802.3-c22";
-		reg = <0x0>;
-
-		motorcomm,clk-out-frequency-hz = <0>;
-		rx-internal-delay-ps = <1800>;
-		tx-internal-delay-ps = <1200>;
 	};
 };
