@@ -19,6 +19,8 @@
 		serial3 = &uart3;
 		spi0 = &qspi0;
 		spi1 = &qspi1;
+		mmc0 = &sdhci0;
+		mmc1 = &sdhci1;
 	};
 
 	cpus {
