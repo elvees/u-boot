@@ -527,7 +527,7 @@ static int arasan_gemac_mdio_init(struct udevice *dev)
 	return 0;
 }
 
-static int arasan_gemac_phy_init(struct udevice *dev)
+static int arasan_gemac_phy_init(struct udevice *dev, ofnode node)
 {
 	struct arasan_gemac_priv *priv = dev_get_priv(dev);
 
@@ -536,6 +536,7 @@ static int arasan_gemac_phy_init(struct udevice *dev)
 	if (!priv->phydev)
 		return -ENODEV;
 
+	priv->phydev->node = node;
 	phy_config(priv->phydev);
 
 	return 0;
@@ -544,7 +545,7 @@ static int arasan_gemac_phy_init(struct udevice *dev)
 static int arasan_gemac_probe(struct udevice *dev)
 {
 	struct arasan_gemac_priv *priv = dev_get_priv(dev);
-	int phy_handle, ret;
+	int ret;
 	struct ofnode_phandle_args phandle_args;
 
 	priv->base = (void *)devfdt_get_addr(dev);
@@ -553,9 +554,9 @@ static int arasan_gemac_probe(struct udevice *dev)
 	if (priv->phy_interface == PHY_INTERFACE_MODE_NA)
 		return -EINVAL;
 
-	phy_handle = dev_read_phandle_with_args(dev, "phy-handle", NULL,
-						0, 0, &phandle_args);
-	if (phy_handle < 0)
+	ret = dev_read_phandle_with_args(dev, "phy-handle", NULL, 0, 0,
+					 &phandle_args);
+	if (ret < 0)
 		return -EINVAL;
 
 	priv->phy_addr = ofnode_read_u32_default(phandle_args.node, "reg", -1);
@@ -597,7 +598,7 @@ static int arasan_gemac_probe(struct udevice *dev)
 	writel(dev_read_bool(dev, "elvees,pads-1v8-en"), HSP_EMAC_PADS_1V8_EN);
 	writel(1, HSP_EMAC_PADCFG(priv->ctrl_id));
 
-	ret = arasan_gemac_phy_init(dev);
+	ret = arasan_gemac_phy_init(dev, phandle_args.node);
 	if (ret != 0)
 		goto error_phy_init;
 
