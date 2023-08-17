@@ -22,9 +22,6 @@
 
 #define DDR_SUBS_URB_BASE		0xC000000
 #define HSPERIPH_BAR			0xDC
-#define GPU_BAR				0xD8
-#define LSPERIPH0_BAR			0xE0
-#define LSPERIPH1_BAR			0xE4
 
 #define SERVICE_PPOLICY(x)		(0x1F000000UL + (x) * 0x8)
 #define SERVICE_PSTATUS(x)		(0x1F000000UL + (x) * 0x8 + 0x4)
@@ -426,13 +423,10 @@ int board_init(void)
 {
 	int ret;
 
-	/* Configure all devices to see DDR High address range,
+	/* Configure HSPERIPH devices to see DDR High address range,
 	 * starting from 0x8_0000_0000.
 	 */
 	writel(0x20, DDR_SUBS_URB_BASE + HSPERIPH_BAR);
-	writel(0x20, DDR_SUBS_URB_BASE + GPU_BAR);
-	writel(0x20, DDR_SUBS_URB_BASE + LSPERIPH0_BAR);
-	writel(0x20, DDR_SUBS_URB_BASE + LSPERIPH1_BAR);
 
 #if CONFIG_IS_ENABLED(DM_I2C)
 	if (of_machine_is_compatible("elvees,pm03cam-osm-r1.04"))
