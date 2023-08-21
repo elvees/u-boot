@@ -2,7 +2,7 @@
 # This Dockerfile is used to build an image containing basic stuff to be used
 # to build U-Boot and run our test suites.
 
-FROM ubuntu:jammy-20220801
+FROM ubuntu:jammy-20230126
 MAINTAINER Tom Rini <trini@konsulko.com>
 LABEL Description=" This image is for building U-Boot inside a container"
 
@@ -12,19 +12,20 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Add LLVM repository
 RUN apt-get update && apt-get install -y gnupg2 wget xz-utils && rm -rf /var/lib/apt/lists/*
 RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
-RUN echo deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-13 main | tee /etc/apt/sources.list.d/llvm.list
+RUN echo deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-14 main | tee /etc/apt/sources.list.d/llvm.list
 
-# Manually install the kernel.org "Crosstool" based toolchains for gcc-11.1.0
-RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/11.1.0/x86_64-gcc-11.1.0-nolibc-aarch64-linux.tar.xz | tar -C /opt -xJ
-RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/11.1.0/x86_64-gcc-11.1.0-nolibc-arm-linux-gnueabi.tar.xz | tar -C /opt -xJ
-RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/11.1.0/x86_64-gcc-11.1.0-nolibc-i386-linux.tar.xz | tar -C /opt -xJ
-RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/11.1.0/x86_64-gcc-11.1.0-nolibc-m68k-linux.tar.xz | tar -C /opt -xJ
-RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/11.1.0/x86_64-gcc-11.1.0-nolibc-mips-linux.tar.xz | tar -C /opt -xJ
-RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/11.1.0/x86_64-gcc-11.1.0-nolibc-microblaze-linux.tar.xz | tar -C /opt -xJ
-RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/11.1.0/x86_64-gcc-11.1.0-nolibc-nios2-linux.tar.xz | tar -C /opt -xJ
-RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/11.1.0/x86_64-gcc-11.1.0-nolibc-powerpc-linux.tar.xz | tar -C /opt -xJ
-RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/11.1.0/x86_64-gcc-11.1.0-nolibc-riscv64-linux.tar.xz | tar -C /opt -xJ
-RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/11.1.0/x86_64-gcc-11.1.0-nolibc-sh2-linux.tar.xz | tar -C /opt -xJ
+# Manually install the kernel.org "Crosstool" based toolchains for gcc-12.2.0
+RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/12.2.0/x86_64-gcc-12.2.0-nolibc-aarch64-linux.tar.xz | tar -C /opt -xJ
+RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/12.2.0/x86_64-gcc-12.2.0-nolibc-arm-linux-gnueabi.tar.xz | tar -C /opt -xJ
+RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/12.2.0/x86_64-gcc-12.2.0-nolibc-i386-linux.tar.xz | tar -C /opt -xJ
+RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/12.2.0/x86_64-gcc-12.2.0-nolibc-m68k-linux.tar.xz | tar -C /opt -xJ
+RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/12.2.0/x86_64-gcc-12.2.0-nolibc-mips-linux.tar.xz | tar -C /opt -xJ
+RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/12.2.0/x86_64-gcc-12.2.0-nolibc-microblaze-linux.tar.xz | tar -C /opt -xJ
+RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/12.2.0/x86_64-gcc-12.2.0-nolibc-nios2-linux.tar.xz | tar -C /opt -xJ
+RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/12.2.0/x86_64-gcc-12.2.0-nolibc-powerpc-linux.tar.xz | tar -C /opt -xJ
+RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/12.2.0/x86_64-gcc-12.2.0-nolibc-riscv64-linux.tar.xz | tar -C /opt -xJ
+RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/12.2.0/x86_64-gcc-12.2.0-nolibc-riscv32-linux.tar.xz | tar -C /opt -xJ
+RUN wget -O - https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/12.2.0/x86_64-gcc-12.2.0-nolibc-sh2-linux.tar.xz | tar -C /opt -xJ
 
 # Manually install other toolchains
 RUN wget -O - https://github.com/foss-xtensa/toolchain/releases/download/2020.07/x86_64-2020.07-xtensa-dc233c-elf.tar.gz | tar -C /opt -xz
@@ -38,7 +39,7 @@ RUN apt-get update && apt-get install -y \
 	binutils-dev \
 	bison \
 	build-essential \
-	clang-13 \
+	clang-14 \
 	coreutils \
 	cpio \
 	cppcheck \
@@ -63,6 +64,7 @@ RUN apt-get update && apt-get install -y \
 	iasl \
 	imagemagick \
 	iputils-ping \
+	libc6-i386 \
 	libconfuse-dev \
 	libgit2-dev \
 	libjson-glib-dev \
@@ -96,6 +98,7 @@ RUN apt-get update && apt-get install -y \
 	python3 \
 	python3-dev \
 	python3-pip \
+	python3-pyelftools \
 	python3-sphinx \
 	python3-virtualenv \
 	rpm2cpio \
@@ -107,6 +110,7 @@ RUN apt-get update && apt-get install -y \
 	srecord \
 	sudo \
 	swig \
+	texinfo \
 	util-linux \
 	uuid-dev \
 	virtualenv \
@@ -121,15 +125,18 @@ RUN chmod +r /boot/vmlinu*
 RUN git clone git://git.savannah.gnu.org/grub.git /tmp/grub && \
 	cd /tmp/grub && \
 	git checkout grub-2.06 && \
+	git config --global user.name "GitLab CI Runner" && \
+	git config --global user.email trini@konsulko.com && \
+	git cherry-pick 049efdd72eb7baa7b2bf8884391ee7fe650da5a0 && \
 	./bootstrap && \
 	mkdir -p /opt/grub && \
 	./configure --target=aarch64 --with-platform=efi \
 	CC=gcc \
-	TARGET_CC=/opt/gcc-11.1.0-nolibc/aarch64-linux/bin/aarch64-linux-gcc \
-	TARGET_OBJCOPY=/opt/gcc-11.1.0-nolibc/aarch64-linux/bin/aarch64-linux-objcopy \
-	TARGET_STRIP=/opt/gcc-11.1.0-nolibc/aarch64-linux/bin/aarch64-linux-strip \
-	TARGET_NM=/opt/gcc-11.1.0-nolibc/aarch64-linux/bin/aarch64-linux-nm \
-	TARGET_RANLIB=/opt/gcc-11.1.0-nolibc/aarch64-linux/bin/aarch64-linux-ranlib && \
+	TARGET_CC=/opt/gcc-12.2.0-nolibc/aarch64-linux/bin/aarch64-linux-gcc \
+	TARGET_OBJCOPY=/opt/gcc-12.2.0-nolibc/aarch64-linux/bin/aarch64-linux-objcopy \
+	TARGET_STRIP=/opt/gcc-12.2.0-nolibc/aarch64-linux/bin/aarch64-linux-strip \
+	TARGET_NM=/opt/gcc-12.2.0-nolibc/aarch64-linux/bin/aarch64-linux-nm \
+	TARGET_RANLIB=/opt/gcc-12.2.0-nolibc/aarch64-linux/bin/aarch64-linux-ranlib && \
 	make && \
 	./grub-mkimage -O arm64-efi -o /opt/grub/grubaa64.efi --prefix= -d \
 	grub-core cat chain configfile echo efinet ext2 fat halt help linux \
@@ -139,11 +146,11 @@ RUN git clone git://git.savannah.gnu.org/grub.git /tmp/grub && \
 	make clean && \
 	./configure --target=arm --with-platform=efi \
 	CC=gcc \
-	TARGET_CC=/opt/gcc-11.1.0-nolibc/arm-linux-gnueabi/bin/arm-linux-gnueabi-gcc \
-	TARGET_OBJCOPY=/opt/gcc-11.1.0-nolibc/arm-linux-gnueabi/bin/arm-linux-gnueabi-objcopy \
-	TARGET_STRIP=/opt/gcc-11.1.0-nolibc/arm-linux-gnueabi/bin/arm-linux-gnueabi-strip \
-	TARGET_NM=/opt/gcc-11.1.0-nolibc/arm-linux-gnueabi/bin/arm-linux-gnueabi-nm \
-	TARGET_RANLIB=/opt/gcc-11.1.0-nolibc/arm-linux-gnueabi/bin/arm-linux-gnueabi-ranlib && \
+	TARGET_CC=/opt/gcc-12.2.0-nolibc/arm-linux-gnueabi/bin/arm-linux-gnueabi-gcc \
+	TARGET_OBJCOPY=/opt/gcc-12.2.0-nolibc/arm-linux-gnueabi/bin/arm-linux-gnueabi-objcopy \
+	TARGET_STRIP=/opt/gcc-12.2.0-nolibc/arm-linux-gnueabi/bin/arm-linux-gnueabi-strip \
+	TARGET_NM=/opt/gcc-12.2.0-nolibc/arm-linux-gnueabi/bin/arm-linux-gnueabi-nm \
+	TARGET_RANLIB=/opt/gcc-12.2.0-nolibc/arm-linux-gnueabi/bin/arm-linux-gnueabi-ranlib && \
 	make && \
 	./grub-mkimage -O arm-efi -o /opt/grub/grubarm.efi --prefix= -d \
 	grub-core cat chain configfile echo efinet ext2 fat halt help linux \
@@ -153,11 +160,11 @@ RUN git clone git://git.savannah.gnu.org/grub.git /tmp/grub && \
 	make clean && \
 	./configure --target=riscv64 --with-platform=efi \
 	CC=gcc \
-	TARGET_CC=/opt/gcc-11.1.0-nolibc/riscv64-linux/bin/riscv64-linux-gcc \
-	TARGET_OBJCOPY=/opt/gcc-11.1.0-nolibc/riscv64-linux/bin/riscv64-linux-objcopy \
-	TARGET_STRIP=/opt/gcc-11.1.0-nolibc/riscv64-linux/bin/riscv64-linux-strip \
-	TARGET_NM=/opt/gcc-11.1.0-nolibc/riscv64-linux/bin/riscv64-linux-nm \
-	TARGET_RANLIB=/opt/gcc-11.1.0-nolibc/riscv64-linux/bin/riscv64-linux-ranlib && \
+	TARGET_CC=/opt/gcc-12.2.0-nolibc/riscv64-linux/bin/riscv64-linux-gcc \
+	TARGET_OBJCOPY=/opt/gcc-12.2.0-nolibc/riscv64-linux/bin/riscv64-linux-objcopy \
+	TARGET_STRIP=/opt/gcc-12.2.0-nolibc/riscv64-linux/bin/riscv64-linux-strip \
+	TARGET_NM=/opt/gcc-12.2.0-nolibc/riscv64-linux/bin/riscv64-linux-nm \
+	TARGET_RANLIB=/opt/gcc-12.2.0-nolibc/riscv64-linux/bin/riscv64-linux-ranlib && \
 	make && \
 	./grub-mkimage -O riscv64-efi -o /opt/grub/grubriscv64.efi --prefix= -d \
 	grub-core cat chain configfile echo efinet ext2 fat halt help linux \
@@ -166,7 +173,7 @@ RUN git clone git://git.savannah.gnu.org/grub.git /tmp/grub && \
 	true && \
 	rm -rf /tmp/grub
 
-RUN git clone git://git.qemu.org/qemu.git /tmp/qemu && \
+RUN git clone https://gitlab.com/qemu-project/qemu.git /tmp/qemu && \
 	cd /tmp/qemu && \
 	git submodule update --init dtc && \
 	git checkout v6.1.0 && \
@@ -206,6 +213,22 @@ RUN git clone https://github.com/stefanberger/swtpm /tmp/swtpm && \
 	make install && \
 	rm -rf /tmp/swtpm
 
+# Build trace-cmd
+RUN mkdir /tmp/trace && \
+    git clone https://git.kernel.org/pub/scm/libs/libtrace/libtraceevent.git /tmp/trace/libtraceevent && \
+    cd /tmp/trace/libtraceevent && \
+    make -j$(nproc) && \
+    sudo make install && \
+    git clone https://git.kernel.org/pub/scm/libs/libtrace/libtracefs.git /tmp/trace/libtracefs && \
+    cd /tmp/trace/libtracefs && \
+    make -j$(nproc) && \
+    sudo make install && \
+    git clone https://github.com/rostedt/trace-cmd.git /tmp/trace/trace-cmd && \
+    cd /tmp/trace/trace-cmd && \
+    make -j$(nproc) && \
+    sudo make install && \
+    rm -rf /tmp/trace
+
 # Create our user/group
 RUN echo uboot ALL=NOPASSWD: ALL > /etc/sudoers.d/uboot
 RUN useradd -m -U uboot
@@ -213,10 +236,9 @@ USER uboot:uboot
 
 # Create the buildman config file
 RUN /bin/echo -e "[toolchain]\nroot = /usr" > ~/.buildman
-RUN /bin/echo -e "kernelorg = /opt/gcc-11.1.0-nolibc/*" >> ~/.buildman
+RUN /bin/echo -e "kernelorg = /opt/gcc-12.2.0-nolibc/*" >> ~/.buildman
 RUN /bin/echo -e "arc = /opt/arc_gnu_2021.03_prebuilt_uclibc_le_archs_linux_install" >> ~/.buildman
 RUN /bin/echo -e "\n[toolchain-prefix]\nxtensa = /opt/2020.07/xtensa-dc233c-elf/bin/xtensa-dc233c-elf-" >> ~/.buildman;
 RUN /bin/echo -e "\n[toolchain-alias]\nsh = sh2" >> ~/.buildman
-RUN /bin/echo -e "\nriscv = riscv64" >> ~/.buildman
 RUN /bin/echo -e "\nsandbox = x86_64" >> ~/.buildman
 RUN /bin/echo -e "\nx86 = i386" >> ~/.buildman;

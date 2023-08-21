@@ -13,12 +13,9 @@
 /* Specify available DDR memory.
  * These macros are also used for specifying DDR size available for Linux.
  */
-#define CONFIG_SYS_SDRAM_BASE		0x890400000
-#define PHYS_SDRAM_0			CONFIG_SYS_SDRAM_BASE
+#define CFG_SYS_SDRAM_BASE		0x890400000
+#define PHYS_SDRAM_0			CFG_SYS_SDRAM_BASE
 #define PHYS_SDRAM_0_SIZE		SZ_256M
-
-/* standalone support */
-#define CONFIG_STANDALONE_LOAD_ADDR	(CONFIG_SYS_SDRAM_BASE + 0x2000000)
 
 /* NAND flash */
 #if CONFIG_IS_ENABLED(CMD_NAND)

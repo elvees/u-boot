@@ -1746,6 +1746,7 @@ static int find_nvmem_device(void)
 
 	while (!nvmem && (dent = readdir(dir))) {
 		FILE *fp;
+		size_t size;
 
 		if (!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, "..")) {
 			continue;
@@ -1761,7 +1762,14 @@ static int find_nvmem_device(void)
 			continue;
 		}
 
-		fread(buf, sizeof(buf), 1, fp);
+		size = fread(buf, sizeof(buf), 1, fp);
+		if (size != 1) {
+			fprintf(stderr,
+				"read failed about %s\n", comp);
+			fclose(fp);
+			return -EIO;
+		}
+
 
 		if (!strcmp(buf, "u-boot,env")) {
 			bytes = asprintf(&nvmem, "%s/%s/nvmem", path, dent->d_name);

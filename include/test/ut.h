@@ -119,6 +119,11 @@ int ut_check_console_end(struct unit_test_state *uts);
  */
 int ut_check_console_dump(struct unit_test_state *uts, int total_bytes);
 
+/* Report a failure, with printf() string */
+#define ut_reportf(fmt, args...)					\
+	ut_failf(uts, __FILE__, __LINE__, __func__, "report",		\
+		 fmt, ##args)
+
 /* Assert that a condition is non-zero */
 #define ut_assert(cond)							\
 	if (!(cond)) {							\
@@ -329,6 +334,10 @@ int ut_check_console_dump(struct unit_test_state *uts, int total_bytes);
 		return CMD_RET_FAILURE;					\
 	}								\
 
+/* Assert that the next console output line is empty */
+#define ut_assert_nextline_empty()					\
+	ut_assert_nextline("%s", "")
+
 /**
  * ut_check_free() - Return the number of bytes free in the malloc() pool
  *
@@ -403,9 +412,17 @@ void test_set_state(struct unit_test_state *uts);
  * @count: Number of tests to run
  * @select_name: Name of a single test to run (from the list provided). If NULL
  *	then all tests are run
+ * @runs_per_test: Number of times to run each test (typically 1)
+ * @force_run: Run tests that are marked as manual-only (UT_TESTF_MANUAL)
+ * @test_insert: String describing a test to run after n other tests run, in the
+ * format n:name where n is the number of tests to run before this one and
+ * name is the name of the test to run. This is used to find which test causes
+ * another test to fail. If the one test fails, testing stops immediately.
+ * Pass NULL to disable this
  * Return: 0 if all tests passed, -1 if any failed
  */
 int ut_run_list(const char *name, const char *prefix, struct unit_test *tests,
-		int count, const char *select_name);
+		int count, const char *select_name, int runs_per_test,
+		bool force_run, const char *test_insert);
 
 #endif

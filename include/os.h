@@ -109,6 +109,27 @@ int os_unlink(const char *pathname);
 void os_exit(int exit_code) __attribute__((noreturn));
 
 /**
+ * os_alarm() - access to the OS alarm() system call
+ *
+ * @seconds: number of seconds before the signal is sent
+ * Returns: number of seconds remaining until any previously scheduled alarm was
+ * due to be delivered; 0 if there was no previously scheduled alarm
+ */
+unsigned int os_alarm(unsigned int seconds);
+
+/**
+ * os_set_alarm_handler() - set handler for SIGALRM
+ *
+ * @handler:   The handler function. Pass NULL for SIG_DFL.
+ */
+void os_set_alarm_handler(void (*handler)(int));
+
+/**
+ * os_raise_sigalrm() - do raise(SIGALRM)
+ */
+void os_raise_sigalrm(void);
+
+/**
  * os_tty_raw() - put tty into raw mode to mimic serial console better
  *
  * @fd:		File descriptor of stdin (normally 0)
@@ -294,6 +315,14 @@ void os_putc(int ch);
  * @str:	string to write (note that \n is not appended)
  */
 void os_puts(const char *str);
+
+/**
+ * os_flush() - flush controlling OS terminal
+ *
+ * This bypasses the U-Boot console support and flushes directly the OS
+ * stdout file descriptor.
+ */
+void os_flush(void);
 
 /**
  * os_write_ram_buf() - write the sandbox RAM buffer to a existing file

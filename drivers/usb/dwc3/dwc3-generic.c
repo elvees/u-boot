@@ -44,7 +44,7 @@ struct dwc3_generic_priv {
 	void *base;
 	struct dwc3 dwc3;
 	struct phy_bulk phys;
-	struct gpio_desc ulpi_reset;
+	struct gpio_desc *ulpi_reset;
 };
 
 struct dwc3_generic_host_priv {
@@ -59,12 +59,21 @@ static int dwc3_generic_probe(struct udevice *dev,
 	struct dwc3_generic_plat *plat = dev_get_plat(dev);
 	struct dwc3 *dwc3 = &priv->dwc3;
 	struct dwc3_glue_data *glue = dev_get_plat(dev->parent);
+	int __maybe_unused index;
+	ofnode __maybe_unused node;
 
 	dwc3->dev = dev;
 	dwc3->maximum_speed = plat->maximum_speed;
 	dwc3->dr_mode = plat->dr_mode;
 #if CONFIG_IS_ENABLED(OF_CONTROL)
 	dwc3_of_parse(dwc3);
+
+	node = dev_ofnode(dev->parent);
+	index = ofnode_stringlist_search(node, "clock-names", "ref");
+	if (index < 0)
+		index = ofnode_stringlist_search(node, "clock-names", "ref_clk");
+	if (index >= 0)
+		dwc3->ref_clk = &glue->clks.clks[index];
 #endif
 
 	/*
@@ -82,23 +91,23 @@ static int dwc3_generic_probe(struct udevice *dev,
 
 	if (CONFIG_IS_ENABLED(DM_GPIO) &&
 	    device_is_compatible(dev->parent, "xlnx,zynqmp-dwc3")) {
-		rc = gpio_request_by_name(dev->parent, "reset-gpios", 0,
-					  &priv->ulpi_reset, GPIOD_ACTIVE_LOW);
-		if (rc)
-			return rc;
+		priv->ulpi_reset = devm_gpiod_get_optional(dev->parent, "reset",
+								GPIOD_ACTIVE_LOW);
+		/* property is optional, don't return error! */
+		if (priv->ulpi_reset) {
+			/* Toggle ulpi to reset the phy. */
+			rc = dm_gpio_set_value(priv->ulpi_reset, 1);
+			if (rc)
+				return rc;
 
-		/* Toggle ulpi to reset the phy. */
-		rc = dm_gpio_set_value(&priv->ulpi_reset, 1);
-		if (rc)
-			return rc;
+			mdelay(5);
 
-		mdelay(5);
+			rc = dm_gpio_set_value(priv->ulpi_reset, 0);
+			if (rc)
+				return rc;
 
-		rc = dm_gpio_set_value(&priv->ulpi_reset, 0);
-		if (rc)
-			return rc;
-
-		mdelay(5);
+			mdelay(5);
+		}
 	}
 
 	if (device_is_compatible(dev->parent, "rockchip,rk3399-dwc3"))
@@ -124,7 +133,7 @@ static int dwc3_generic_remove(struct udevice *dev,
 
 	if (CONFIG_IS_ENABLED(DM_GPIO) &&
 	    device_is_compatible(dev->parent, "xlnx,zynqmp-dwc3")) {
-		struct gpio_desc *ulpi_reset = &priv->ulpi_reset;
+		struct gpio_desc *ulpi_reset = priv->ulpi_reset;
 
 		dm_gpio_free(ulpi_reset->dev, ulpi_reset);
 	}

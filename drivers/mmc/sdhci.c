@@ -211,7 +211,7 @@ static int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 	unsigned int stat = 0;
 	int ret = 0;
 	int trans_bytes = 0, is_aligned = 1;
-	u32 mask, flags, mode;
+	u32 mask, flags, mode = 0;
 	unsigned int time = 0;
 	int mmc_dev = mmc_get_blk_desc(mmc)->devnum;
 	ulong start = get_timer(0);
@@ -273,10 +273,12 @@ static int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 	/* Set Transfer mode regarding to data flag */
 	if (data) {
 		sdhci_writeb(host, 0xe, SDHCI_TIMEOUT_CONTROL);
-		mode = SDHCI_TRNS_BLK_CNT_EN;
+
+		if (!(host->quirks & SDHCI_QUIRK_SUPPORT_SINGLE))
+			mode = SDHCI_TRNS_BLK_CNT_EN;
 		trans_bytes = data->blocks * data->blocksize;
 		if (data->blocks > 1)
-			mode |= SDHCI_TRNS_MULTI;
+			mode |= SDHCI_TRNS_MULTI | SDHCI_TRNS_BLK_CNT_EN;
 
 		if (data->flags == MMC_DATA_READ)
 			mode |= SDHCI_TRNS_READ;
@@ -394,6 +396,14 @@ int sdhci_set_clock(struct mmc *mmc, unsigned int clock)
 		}
 	}
 
+	if (host->ops && host->ops->config_dll) {
+		ret = host->ops->config_dll(host, clock, false);
+		if (ret) {
+			printf("%s: Error while configuring dll\n", __func__);
+			return ret;
+		}
+	}
+
 	if (SDHCI_GET_VERSION(host) >= SDHCI_SPEC_300) {
 		/*
 		 * Check if the Host Controller supports Programmable Clock
@@ -436,6 +446,14 @@ int sdhci_set_clock(struct mmc *mmc, unsigned int clock)
 
 	if (host->ops && host->ops->set_clock)
 		host->ops->set_clock(host, div);
+
+	if (host->ops && host->ops->config_dll) {
+		ret = host->ops->config_dll(host, clock, true);
+		if (ret) {
+			printf("%s: Error while configuring dll\n", __func__);
+			return ret;
+		}
+	}
 
 	clk |= (div & SDHCI_DIV_MASK) << SDHCI_DIVIDER_SHIFT;
 	clk |= ((div & SDHCI_DIV_HI_MASK) >> SDHCI_DIV_MASK_LEN)
@@ -976,6 +994,10 @@ int sdhci_setup_cfg(struct mmc_config *cfg, struct sdhci_host *host,
 	} else if (caps_1 & SDHCI_SUPPORT_SDR50) {
 		cfg->host_caps |= MMC_CAP(UHS_SDR50);
 	}
+
+	if ((host->quirks & SDHCI_QUIRK_CAPS_BIT63_FOR_HS400) &&
+	    (caps_1 & SDHCI_SUPPORT_HS400))
+		cfg->host_caps |= MMC_CAP(MMC_HS_400);
 
 	if (caps_1 & SDHCI_SUPPORT_DDR50)
 		cfg->host_caps |= MMC_CAP(UHS_DDR50);

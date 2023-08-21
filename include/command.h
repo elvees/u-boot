@@ -18,8 +18,8 @@
 #endif
 
 /* Default to a width of 8 characters for help message command width */
-#ifndef CONFIG_SYS_HELP_CMD_WIDTH
-#define CONFIG_SYS_HELP_CMD_WIDTH	10
+#ifndef CFG_SYS_HELP_CMD_WIDTH
+#define CFG_SYS_HELP_CMD_WIDTH	10
 #endif
 
 #ifndef	__ASSEMBLY__
@@ -279,6 +279,18 @@ int run_commandf(const char *fmt, ...);
  * Return: 0 on success, or != 0 on error.
  */
 int run_command_list(const char *cmd, int len, int flag);
+
+/**
+ * cmd_source_script() - Execute a script
+ *
+ * Executes a U-Boot script at a particular address in memory. The script should
+ * have a header (FIT or legacy) with the script type (IH_TYPE_SCRIPT).
+ *
+ * @addr: Address of script
+ * @fit_uname: FIT subimage name
+ * Return: result code (enum command_ret_t)
+ */
+int cmd_source_script(ulong addr, const char *fit_uname, const char *confname);
 #endif	/* __ASSEMBLY__ */
 
 /*

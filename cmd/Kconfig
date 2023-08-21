@@ -86,6 +86,7 @@ config SYS_CBSIZE
 
 config SYS_PBSIZE
 	int "Buffer size for console output"
+	default 1024 if ARCH_SUNXI
 	default 1044
 
 config SYS_XTRACE
@@ -160,6 +161,12 @@ config CMD_CPU
 	  number of CPUs, type (e.g. manufacturer, architecture, product or
 	  internal name) and clock frequency. Other information may be
 	  available depending on the CPU driver.
+
+config CMD_FWU_METADATA
+	bool "fwu metadata read"
+	depends on FWU_MULTI_BANK_UPDATE
+	help
+	  Command to read the metadata and dump it's contents
 
 config CMD_LICENSE
 	bool "license"
@@ -330,6 +337,12 @@ config BOOTM_RTEMS
 	help
 	  Support booting RTEMS images via the bootm command.
 
+config CMD_SEAMA
+	bool "Support read SEAMA NAND images"
+	depends on MTD_RAW_NAND
+	help
+	  Support reading NAND Seattle Image (SEAMA) images.
+
 config CMD_VBE
 	bool "vbe - Verified Boot for Embedded"
 	depends on BOOTMETH_VBE
@@ -469,6 +482,11 @@ config CMD_XIMG
 	help
 	  Extract a part of a multi-image.
 
+config CMD_XXD
+	bool "xxd"
+	help
+	  Print file as hexdump to standard output
+
 config CMD_SPL
 	bool "spl export - Export boot information for Falcon boot"
 	depends on SPL
@@ -513,6 +531,10 @@ config CMD_THOR_DOWNLOAD
 	  downloading a software update over USB from an attached host.
 	  There is no documentation about this within the U-Boot source code
 	  but you should be able to find something on the interwebs.
+
+config THOR_RESET_OFF
+	bool "thor: Disable reset on completion"
+	depends on CMD_THOR_DOWNLOAD
 
 config CMD_ZBOOT
 	bool "zboot - x86 boot command"
@@ -1098,7 +1120,6 @@ config CMD_PWM
 config CMD_GPT
 	bool "GPT (GUID Partition Table) command"
 	select EFI_PARTITION
-	select HAVE_BLOCK_DEVICE
 	select PARTITION_UUIDS
 	imply RANDOM_UUID
 	help
@@ -1195,10 +1216,37 @@ config CMD_LOADM
 	  Load a binary over memory mapped.
 
 config CMD_LOADS
-	bool "loads"
+	bool "loads - Load a file over serial in S-Record format"
 	default y
 	help
 	  Load an S-Record file over serial line
+
+config LOADS_ECHO
+	bool "Echo all characters received during a loads back to console"
+	depends on CMD_LOADS
+	help
+	  If enabled, all characters received during a serial download (using
+	  the "loads" command) are echoed back. This might be needed by some
+	  terminal emulations (like "cu"), but may as well just take time on
+	  others. This sets the initial value of the "loads_echo" environment
+	  variable to 1.
+
+config CMD_SAVES
+	bool "saves - Save a file over serial in S-Record format"
+	help
+	  Provides a way to save a binary file using the Motorola S-Record
+	  format over the serial line.
+
+config SYS_LOADS_BAUD_CHANGE
+	bool "Enable a temporary baudrate change during loads/saves command"
+	depends on CMD_LOADS || CMD_SAVES
+
+config CMD_LOADXY_TIMEOUT
+	int "loadxy_timeout"
+	range 0 2000
+	default 90
+	help
+	  Initial timeout for loadx and loady commands. Zero means infinity.
 
 config CMD_LSBLK
 	depends on BLK
@@ -1210,7 +1258,6 @@ config CMD_LSBLK
 config CMD_MBR
 	bool "MBR (Master Boot Record) command"
 	select DOS_PARTITION
-	select HAVE_BLOCK_DEVICE
 	help
 	  Enable the 'mbr' command to ready and write MBR (Master Boot Record)
 	  style partition tables.
@@ -1342,7 +1389,6 @@ config CMD_OSD
 config CMD_PART
 	bool "part"
 	depends on PARTITIONS
-	select HAVE_BLOCK_DEVICE
 	select PARTITION_UUIDS
 	help
 	  Read and display information about the partition table on
@@ -1393,12 +1439,6 @@ config CMD_SATA
 	  SATA replaces PATA (originally just ATA), which stands for Parallel AT
 	  Attachment, where AT refers to an IBM AT (Advanced Technology)
 	  computer released in 1984.
-
-config CMD_SAVES
-	bool "saves - Save a file over serial in S-Record format"
-	help
-	  Provides a way to save a binary file using the Motorola S-Record
-	  format over the serial line.
 
 config CMD_SCSI
 	bool "scsi - Access to SCSI devices"
@@ -1451,6 +1491,12 @@ config DEFAULT_SPI_MODE
 	depends on CMD_SPI
 	default 0
 
+config CMD_TEMPERATURE
+	bool "temperature - display the temperature from thermal sensors"
+	depends on DM_THERMAL
+	help
+	  Provides a way to list thermal sensors and to get their readings.
+
 config CMD_TSI148
 	bool "tsi148 - Command to access tsi148 device"
 	help
@@ -1473,7 +1519,6 @@ config CMD_UNIVERSE
 config CMD_USB
 	bool "usb"
 	depends on USB_HOST
-	select HAVE_BLOCK_DEVICE
 	help
 	  USB support.
 
@@ -1513,7 +1558,6 @@ config CMD_PVBLOCK
 config CMD_VIRTIO
 	bool "virtio"
 	depends on VIRTIO
-	depends on HAVE_BLOCK_DEVICE
 	default y if VIRTIO
 	help
 	  VirtIO block device support
@@ -1536,6 +1580,11 @@ endmenu
 
 
 menu "Shell scripting commands"
+
+config CMD_CAT
+	bool "cat"
+	help
+	  Print file to standard output
 
 config CMD_ECHO
 	bool "echo"
@@ -1779,6 +1828,13 @@ config SYS_DISABLE_AUTOLOAD
 	  is complete.  Enable this option to disable this behavior and instead
 	  require files to be loaded over the network by subsequent commands.
 
+config CMD_WGET
+	bool "wget"
+	select PROT_TCP
+	help
+	  wget is a simple command to download kernel, or other files,
+	  from a http server over TCP.
+
 config CMD_MII
 	bool "mii"
 	imply CMD_MDIO
@@ -1807,6 +1863,13 @@ config CMD_PING
 	help
 	  Send ICMP ECHO_REQUEST to network host
 
+config CMD_PING6
+	bool "ping6"
+	depends on IPV6
+	default y if (CMD_PING && IPV6)
+	help
+	  Send ICMPv6 ECHO_REQUEST to network host
+
 config CMD_CDP
 	bool "cdp"
 	help
@@ -1828,6 +1891,14 @@ config CMD_LINK_LOCAL
 	select LIB_RAND
 	help
 	  Acquire a network IP address using the link-local protocol
+
+config CMD_NCSI
+	bool "ncsi"
+	depends on PHY_NCSI
+	help
+	  Manually configure the attached NIC via NC-SI.
+	  Normally this happens automatically before other network
+	  operations.
 
 endif
 
@@ -1856,7 +1927,7 @@ menu "Misc commands"
 
 config CMD_BMP
 	bool "Enable 'bmp' command"
-	depends on LCD || DM_VIDEO || VIDEO
+	depends on VIDEO
 	help
 	  This provides a way to obtain information about a BMP-format image
 	  and to display it. BMP (which presumably stands for BitMaP) is a
@@ -1918,8 +1989,7 @@ config CMD_CONITRACE
 
 config CMD_CLS
 	bool "Enable clear screen command 'cls'"
-	depends on DM_VIDEO || LCD || VIDEO
-	default y if LCD
+	default y if LCD || VIDEO
 	help
 	  Enable the 'cls' command which clears the screen contents
 	  on video frame buffer.
@@ -1933,6 +2003,15 @@ config CMD_EFIDEBUG
 	  shell utility with simplified functionality. It will be useful
 	  particularly for managing boot parameters as  well as examining
 	  various EFI status for debugging.
+
+config CMD_EFICONFIG
+	bool "eficonfig - provide menu-driven uefi variables maintenance interface"
+	default y if !HAS_BOARD_SIZE_LIMIT
+	depends on CMD_BOOTEFI_BOOTMGR
+	select MENU
+	help
+	  Enable the 'eficonfig' command which provides the menu-driven UEFI
+	  variable maintenance interface.
 
 config CMD_EXCEPTION
 	bool "exception - raise exception"
@@ -1949,6 +2028,13 @@ config CMD_LED
 	  by the board. The LEDs can be listed with 'led list' and controlled
 	  with led on/off/togle/blink. Any LED drivers can be controlled with
 	  this command, e.g. led_gpio.
+
+config CMD_INI
+	bool "ini"
+	help
+	  Enable the 'ini' command which allows a .ini file to be parsed and
+	  placed into environment variables. Please check the source code for
+	  this as there is no documentation.
 
 config CMD_DATE
 	bool "date"
@@ -1976,6 +2062,12 @@ config CMD_GETTIME
 	  U-Boot started running. This shows the time in seconds and
 	  milliseconds. See also the 'bootstage' command which provides more
 	  flexibility for boot timing.
+
+config CMD_PAUSE
+	bool "pause command"
+	help
+	  Delay execution waiting for any user input.
+	  Useful to allow the user to read a failure log.
 
 config CMD_RNG
 	bool "rng command"
@@ -2127,6 +2219,18 @@ config CMD_UUID
 
 	  The two commands are very similar except for the endianness of the
 	  output.
+
+config CMD_VIDCONSOLE
+	bool "lcdputs and setcurs"
+	depends on VIDEO
+	default y
+	help
+	  Enabling this will provide 'setcurs' and 'lcdputs' commands which
+	  support cursor positioning and drawing strings on the video
+	  console (framebuffer).
+
+	  The name 'lcdputs' is a bit of a misnomer, but so named because the
+	  video device is often an LCD.
 
 endmenu
 
@@ -2456,6 +2560,7 @@ config CMD_MTDPARTS_SHOW_NET_SIZES
 config MTDIDS_DEFAULT
 	string "Default MTD IDs"
 	depends on MTD || SPI_FLASH
+	depends on !SYS_MTDPARTS_RUNTIME
 	help
 	  Defines a default MTD IDs list for use with MTD partitions in the
 	  Linux MTD command line partitions format.
@@ -2463,6 +2568,7 @@ config MTDIDS_DEFAULT
 config MTDPARTS_DEFAULT
 	string "Default MTD partition scheme"
 	depends on MTD || SPI_FLASH
+	depends on !SYS_MTDPARTS_RUNTIME
 	help
 	  Defines a default MTD partitioning scheme in the Linux MTD command
 	  line partitions format
@@ -2511,6 +2617,22 @@ config CMD_CBSYSINFO
 	  memory by coreboot before jumping to U-Boot. It can be useful for
 	  debugging the beaaviour of coreboot or U-Boot.
 
+config CMD_CYCLIC
+	bool "cyclic - Show information about cyclic functions"
+	depends on CYCLIC
+	default y
+	help
+	  This enables the 'cyclic' command which provides information about
+	  cyclic execution functions. This infrastructure allows registering
+	  functions to be executed cyclically, e.g. every 100ms. These commands
+	  are supported:
+
+	    cyclic list - list cyclic functions
+	    cyclic cyclic demo <cycletime_ms> <delay_us> - register cyclic
+		demo function
+
+	  See doc/develop/cyclic.rst for more details.
+
 config CMD_DIAG
 	bool "diag - Board diagnostics"
 	help
@@ -2521,6 +2643,7 @@ config CMD_DIAG
 
 config CMD_EVENT
 	bool "event - Show information about events"
+	depends on EVENT
 	default y if EVENT_DEBUG
 	help
 	  This enables the 'event' command which provides information about
@@ -2631,4 +2754,11 @@ config MMC_SPEED_MODE_SET
 	  and is indicated using the index from enum bus_mode in
 	  include/mmc.h. A speed mode can be set only if it has already
 	  been enabled in the device tree.
+
+config CMD_MESON
+	bool "Amlogic Meson commands"
+	depends on ARCH_MESON
+	default y
+	help
+	  Enable useful commands for the Meson Soc family developed by Amlogic Inc.
 endmenu

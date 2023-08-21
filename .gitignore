@@ -6,6 +6,7 @@
 # Normal rules (sorted alphabetically)
 #
 .*
+!.checkpatch.conf
 *.a
 *.asn1.[ch]
 *.bin
@@ -104,3 +105,6 @@ __pycache__
 # pylint files
 /pylint.cur
 /pylint.out/
+
+# moveconfig database
+/moveconfig.db

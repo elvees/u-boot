@@ -245,6 +245,7 @@ static const struct sunxi_pinctrl_function suniv_f1c100s_pinctrl_functions[] = {
 #else
 	{ "uart0",	5 },	/* PE0-PE1 */
 #endif
+	{ "uart1",	5 },	/* PA0-PA3 */
 };
 
 static const struct sunxi_pinctrl_desc __maybe_unused suniv_f1c100s_pinctrl_desc = {
@@ -337,6 +338,7 @@ static const struct sunxi_pinctrl_function sun6i_a31_r_pinctrl_functions[] = {
 	{ "gpio_in",	0 },
 	{ "gpio_out",	1 },
 	{ "s_i2c",	2 },	/* PL0-PL1 */
+	{ "s_p2wi",	3 },	/* PL0-PL1 */
 	{ "s_uart",	2 },	/* PL2-PL3 */
 };
 
@@ -403,6 +405,7 @@ static const struct sunxi_pinctrl_function sun8i_a23_r_pinctrl_functions[] = {
 	{ "gpio_in",	0 },
 	{ "gpio_out",	1 },
 	{ "s_i2c",	3 },	/* PL0-PL1 */
+	{ "s_rsb",	2 },	/* PL0-PL1 */
 	{ "s_uart",	2 },	/* PL2-PL3 */
 };
 
@@ -468,6 +471,7 @@ static const struct sunxi_pinctrl_function sun8i_a83t_r_pinctrl_functions[] = {
 	{ "gpio_in",	0 },
 	{ "gpio_out",	1 },
 	{ "s_i2c",	2 },	/* PL8-PL9 */
+	{ "s_rsb",	2 },	/* PL0-PL1 */
 	{ "s_uart",	2 },	/* PL2-PL3 */
 };
 
@@ -573,6 +577,7 @@ static const struct sunxi_pinctrl_function sun9i_a80_r_pinctrl_functions[] = {
 	{ "gpio_out",	1 },
 	{ "s_i2c0",	2 },	/* PN0-PN1 */
 	{ "s_i2c1",	3 },	/* PM8-PM9 */
+	{ "s_rsb",	3 },	/* PN0-PN1 */
 	{ "s_uart",	3 },	/* PL0-PL1 */
 };
 
@@ -614,6 +619,7 @@ static const struct sunxi_pinctrl_function sun50i_a64_r_pinctrl_functions[] = {
 	{ "gpio_in",	0 },
 	{ "gpio_out",	1 },
 	{ "s_i2c",	2 },	/* PL8-PL9 */
+	{ "s_rsb",	2 },	/* PL0-PL1 */
 	{ "s_uart",	2 },	/* PL2-PL3 */
 };
 
@@ -679,6 +685,7 @@ static const struct sunxi_pinctrl_function sun50i_h6_r_pinctrl_functions[] = {
 	{ "gpio_in",	0 },
 	{ "gpio_out",	1 },
 	{ "s_i2c",	3 },	/* PL0-PL1 */
+	{ "s_rsb",	2 },	/* PL0-PL1 */
 	{ "s_uart",	2 },	/* PL2-PL3 */
 };
 
@@ -716,6 +723,7 @@ static const struct sunxi_pinctrl_function sun50i_h616_r_pinctrl_functions[] = {
 	{ "gpio_in",	0 },
 	{ "gpio_out",	1 },
 	{ "s_i2c",	3 },	/* PL0-PL1 */
+	{ "s_rsb",	2 },	/* PL0-PL1 */
 	{ "s_uart",	2 },	/* PL2-PL3 */
 };
 

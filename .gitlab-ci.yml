@@ -2,7 +2,7 @@
 
 # Grab our configured image.  The source for this is found
 # in the u-boot tree at tools/docker/Dockerfile
-image: trini/u-boot-gitlab-ci-runner:jammy-20220801-09Aug2022
+image: trini/u-boot-gitlab-ci-runner:jammy-20230126-10Feb2023
 
 # We run some tests in different order, to catch some failures quicker.
 stages:
@@ -14,6 +14,7 @@ stages:
   stage: test.py
   before_script:
     # Clone uboot-test-hooks
+    - git config --global --add safe.directory "${CI_PROJECT_DIR}"
     - git clone --depth=1 https://source.denx.de/u-boot/u-boot-test-hooks /tmp/uboot-test-hooks
     - ln -s travis-ci /tmp/uboot-test-hooks/bin/`hostname`
     - ln -s travis-ci /tmp/uboot-test-hooks/py/`hostname`
@@ -33,6 +34,10 @@ stages:
   script:
     # If we've been asked to use clang only do one configuration.
     - export UBOOT_TRAVIS_BUILD_DIR=/tmp/${TEST_PY_BD}
+    - echo BUILD_ENV ${BUILD_ENV}
+    - if [ -n "${BUILD_ENV}" ]; then
+        export ${BUILD_ENV};
+      fi
     - tools/buildman/buildman -o ${UBOOT_TRAVIS_BUILD_DIR} -w -E -W -e
         --board ${TEST_PY_BD} ${OVERRIDE}
     - cp ~/grub_x86.efi $UBOOT_TRAVIS_BUILD_DIR/
@@ -80,7 +85,8 @@ build all 32bit ARM platforms:
   stage: world build
   script:
     - ret=0;
-      ./tools/buildman/buildman -o /tmp -P -E -W arm -x aarch64 || ret=$?;
+      git config --global --add safe.directory "${CI_PROJECT_DIR}";
+      ./tools/buildman/buildman -o /tmp -PEWM arm -x aarch64 || ret=$?;
       if [[ $ret -ne 0 ]]; then
         ./tools/buildman/buildman -o /tmp -seP;
         exit $ret;
@@ -91,9 +97,9 @@ build all 64bit ARM platforms:
   script:
     - virtualenv -p /usr/bin/python3 /tmp/venv
     - . /tmp/venv/bin/activate
-    - pip install pyelftools
     - ret=0;
-      ./tools/buildman/buildman -o /tmp -P -E -W aarch64 || ret=$?;
+      git config --global --add safe.directory "${CI_PROJECT_DIR}";
+      ./tools/buildman/buildman -o /tmp -PEWM aarch64 || ret=$?;
       if [[ $ret -ne 0 ]]; then
         ./tools/buildman/buildman -o /tmp -seP;
         exit $ret;
@@ -103,6 +109,7 @@ build all PowerPC platforms:
   stage: world build
   script:
     - ret=0;
+      git config --global --add safe.directory "${CI_PROJECT_DIR}";
       ./tools/buildman/buildman -o /tmp -P -E -W powerpc || ret=$?;
       if [[ $ret -ne 0 ]]; then
         ./tools/buildman/buildman -o /tmp -seP;
@@ -113,37 +120,22 @@ build all other platforms:
   stage: world build
   script:
     - ret=0;
-      ./tools/buildman/buildman -o /tmp -P -E -W -x arm,powerpc || ret=$?;
+      git config --global --add safe.directory "${CI_PROJECT_DIR}";
+      ./tools/buildman/buildman -o /tmp -PEWM -x arm,powerpc || ret=$?;
       if [[ $ret -ne 0 ]]; then
         ./tools/buildman/buildman -o /tmp -seP;
         exit $ret;
       fi;
 
-check for migrated symbols in board header:
+check for new CONFIG symbols outside Kconfig:
   stage: testsuites
   script:
-    - KSYMLST=`mktemp`;
-      KUSEDLST=`mktemp`;
-      RET=0;
-      cat `find . -name "Kconfig*"` |
-         sed -n -e 's/^\s*config *\([A-Za-z0-9_]*\).*$/CONFIG_\1/p'
-         -e 's/^\s*menuconfig *\([A-Za-z0-9_]*\).*$/CONFIG_\1/p'
-         | sort -u > $KSYMLST;
-      for CFG in `find include/configs -name "*.h"`; do
-         (grep '#define[[:blank:]]CONFIG_' $CFG |
-            sed -n 's/#define.\(CONFIG_[A-Za-z0-9_]*\).*/\1/p' ;
-            grep '#undef[[:blank:]]CONFIG_' $CFG |
-            sed -n 's/#undef.\(CONFIG_[A-Za-z0-9_]*\).*/\1/p') |
-            sort -u > ${KUSEDLST} || true;
-         NUM=`comm -123 --total --output-delimiter=, ${KSYMLST} ${KUSEDLST} |
-            cut -d , -f 3`;
-         if [[ $NUM -ne 0 ]]; then
-            echo "Unmigrated symbols found in $CFG:";
-            comm -12 ${KSYMLST} ${KUSEDLST};
-            RET=1;
-         fi;
-      done;
-      exit $RET
+    - git config --global --add safe.directory "${CI_PROJECT_DIR}"
+    # If grep succeeds and finds a match the test fails as we should
+    # have no matches.
+    - git grep -E '^#[[:blank:]]*(define|undef)[[:blank:]]*CONFIG_'
+        :^doc/ :^arch/arm/dts/ :^scripts/kconfig/lkc.h
+        :^include/linux/kconfig.h :^tools/ && exit 1 || exit 0
 
 # QA jobs for code analytics
 # static code analysis with cppcheck (we can add --enable=all later)
@@ -161,14 +153,15 @@ grep TODO/FIXME/HACK:
     # search for HACK within source tree and ignore HACKKIT board
     - grep -r HACK . | grep -v HACKKIT
 
-# build HTML documentation
-htmldocs:
+# build documentation
+docs:
   stage: testsuites
   script:
     - virtualenv -p /usr/bin/python3 /tmp/venvhtml
     - . /tmp/venvhtml/bin/activate
     - pip install -r doc/sphinx/requirements.txt
     - make htmldocs
+    - make infodocs
 
 # some statistics about the code base
 sloccount:
@@ -220,7 +213,7 @@ Run binman, buildman, dtoc, Kconfig and patman testsuites:
 Run tests for Nokia RX-51 (aka N900):
   stage: testsuites
   script:
-    - export PATH=/opt/gcc-11.1.0-nolibc/arm-linux-gnueabi/bin:$PATH;
+    - export PATH=/opt/gcc-12.2.0-nolibc/arm-linux-gnueabi/bin:$PATH;
       test/nokia_rx51_test.sh
 
 # Check for any pylint regressions
@@ -251,7 +244,13 @@ sandbox test.py:
 sandbox with clang test.py:
   variables:
     TEST_PY_BD: "sandbox"
-    OVERRIDE: "-O clang-13"
+    OVERRIDE: "-O clang-14"
+  <<: *buildman_and_testpy_dfn
+
+sandbox without LTO test.py:
+  variables:
+    TEST_PY_BD: "sandbox"
+    BUILD_ENV: "NO_LTO=1"
   <<: *buildman_and_testpy_dfn
 
 sandbox_spl test.py:
@@ -270,6 +269,15 @@ sandbox_vpl test.py:
   variables:
     TEST_PY_BD: "sandbox_vpl"
     TEST_PY_TEST_SPEC: "test_vpl_help or test_spl"
+  <<: *buildman_and_testpy_dfn
+
+# Enable tracing and disable LTO, to ensure functions are not elided
+sandbox trace_test.py:
+  variables:
+    TEST_PY_BD: "sandbox"
+    BUILD_ENV: "FTRACE=1 NO_LTO=1"
+    TEST_PY_TEST_SPEC: "trace"
+    OVERRIDE: "-a CONFIG_TRACE=y -a CONFIG_TRACE_EARLY=y -a CONFIG_TRACE_EARLY_SIZE=0x01000000"
   <<: *buildman_and_testpy_dfn
 
 evb-ast2500 test.py:

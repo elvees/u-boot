@@ -191,33 +191,6 @@ config XEN
 
 	  [1] - https://xenproject.org/
 
-config DISTRO_DEFAULTS
-	bool "Select defaults suitable for booting general purpose Linux distributions"
-	select AUTO_COMPLETE
-	select CMDLINE_EDITING
-	select CMD_BOOTI if ARM64
-	select CMD_BOOTZ if ARM && !ARM64
-	select CMD_DHCP if CMD_NET
-	select CMD_ENV_EXISTS
-	select CMD_EXT2
-	select CMD_EXT4
-	select CMD_FAT
-	select CMD_FS_GENERIC
-	select CMD_PART if PARTITIONS
-	select CMD_PING if CMD_NET
-	select CMD_PXE if NET
-	select CMD_SYSBOOT
-	select ENV_VARS_UBOOT_CONFIG
-	select HUSH_PARSER
-	select SUPPORT_RAW_INITRD
-	select SYS_LONGHELP
-	imply CMD_MII if NET
-	imply USB_STORAGE
-	imply USE_BOOTCOMMAND
-	help
-	  Select this to enable various options and commands which are suitable
-	  for building u-boot for booting general purpose Linux distributions.
-
 config ENV_VARS_UBOOT_CONFIG
 	bool "Add arch, board, vendor and soc variables to default environment"
 	help
@@ -264,8 +237,8 @@ config HAS_CUSTOM_SYS_INIT_SP_ADDR
 	default y if TFABOOT
 	help
 	  Typically, we use an initial stack pointer address that is calculated
-	  by taking the statically defined CONFIG_SYS_INIT_RAM_ADDR, adding the
-	  statically defined CONFIG_SYS_INIT_RAM_SIZE and then subtracting the
+	  by taking the statically defined CFG_SYS_INIT_RAM_ADDR, adding the
+	  statically defined CFG_SYS_INIT_RAM_SIZE and then subtracting the
 	  build-time constant of GENERATED_GBL_DATA_SIZE.  On MIPS a different
 	  but statica calculation is performed.  However, some platforms will
 	  take a different approach.  Say Y here to define the address statically
@@ -274,7 +247,7 @@ config HAS_CUSTOM_SYS_INIT_SP_ADDR
 config CUSTOM_SYS_INIT_SP_ADDR
 	hex "Static location for the initial stack pointer"
 	depends on HAS_CUSTOM_SYS_INIT_SP_ADDR
-	default SYS_TEXT_BASE if TFABOOT
+	default TEXT_BASE if TFABOOT
 
 config SYS_MALLOC_F
 	bool "Enable malloc() pool before relocation"
@@ -316,6 +289,9 @@ config SYS_MALLOC_LEN
 	default 0x220000 if MACH_SUN8I_V3S
 	default 0x4020000 if ARCH_SUNXI
 	default 0x00800000 if ARCH_MCOM03
+	default 0x4020000 if SUNXI_MINIMUM_DRAM_MB >= 256
+	default 0x220000 if SUNXI_MINIMUM_DRAM_MB >= 64
+	default 0x120000 if SUNXI_MINIMUM_DRAM_MB >= 32
 	default 0x400000
 	help
 	  This defines memory to be allocated for Dynamic allocation
@@ -334,7 +310,7 @@ config SPL_SYS_MALLOC_F_LEN
 	  particular needs this to operate, so that it can allocate the
 	  initial serial device and any others that are needed.
 
-	  It is possible to enable CONFIG_SYS_SPL_MALLOC_START to start a new
+	  It is possible to enable CFG_SYS_SPL_MALLOC_START to start a new
 	  malloc() region in SDRAM once it is inited.
 
 config TPL_SYS_MALLOC_F_LEN
@@ -457,11 +433,12 @@ config BUILD_TARGET
 	string "Build target special images"
 	default "u-boot-with-spl.sfp" if TARGET_SOCFPGA_ARRIA10
 	default "u-boot-with-spl.sfp" if TARGET_SOCFPGA_GEN5
-	default "u-boot-spl.kwb" if ARCH_MVEBU && SPL
+	default "u-boot-with-spl.kwb" if ARMADA_32BIT && SPL
 	default "u-boot-elf.srec" if RCAR_GEN3
 	default "u-boot.itb" if !BINMAN && SPL_LOAD_FIT && (ARCH_ROCKCHIP || \
 				ARCH_SUNXI || RISCV || ARCH_ZYNQMP)
-	default "u-boot.kwb" if ARCH_KIRKWOOD
+	default "u-boot.kwb" if (ARCH_KIRKWOOD || ARMADA_32BIT) && !SPL
+	default "u-boot-with-spl.bin" if MPC85xx && !E500MC && !E5500 && !E6500 && SPL
 	default "u-boot-with-spl.bin" if ARCH_AT91 && SPL_NAND_SUPPORT
 	default "u-boot-with-spl.imx" if ARCH_MX6 && SPL
 	help
@@ -543,7 +520,7 @@ config PLATFORM_ELFENTRY
 
 config STACK_SIZE
 	hex "Define max stack size that can be used by U-Boot"
-	default 0x4000000 if ARCH_VERSAL || ARCH_ZYNQMP
+	default 0x4000000 if ARCH_VERSAL_NET || ARCH_VERSAL || ARCH_ZYNQMP
 	default 0x200000 if MICROBLAZE
 	default 0x1000000
 	help
@@ -585,6 +562,18 @@ config SYS_SRAM_SIZE
 	default 0x10000 if TARGET_DEVKIT8000
 	default 0x10000 if TARGET_TRICORDER
 	default 0x0
+
+config SYS_MONITOR_LEN
+	int "Maximum size in bytes reserved for U-Boot in memory"
+	default 1048576 if X86
+	default 786432 if ARCH_SUNXI
+	default 0
+	help
+	  Size of memory reserved for monitor code, used to determine
+	  _at_compile_time_ (!) if the environment is embedded within the
+	  U-Boot image, or in a separate flash sector, among other uses where
+	  we need to set a maximum size of the U-Boot binary itself that will
+	  be loaded.
 
 config MP
 	bool "Support for multiprocessor"

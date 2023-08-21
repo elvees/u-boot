@@ -281,7 +281,7 @@ efi_status_t efi_install_fdt(void *fdt)
 		return EFI_SUCCESS;
 	}
 #else
-	bootm_headers_t img = { 0 };
+	struct bootm_headers img = { 0 };
 	efi_status_t ret;
 
 	if (fdt == EFI_FDT_USE_INTERNAL) {
@@ -331,6 +331,14 @@ efi_status_t efi_install_fdt(void *fdt)
 	efi_carve_out_dt_rsv(fdt);
 
 	efi_try_purge_kaslr_seed(fdt);
+
+	if (CONFIG_IS_ENABLED(EFI_TCG2_PROTOCOL_MEASURE_DTB)) {
+		ret = efi_tcg2_measure_dtb(fdt);
+		if (ret == EFI_SECURITY_VIOLATION) {
+			log_err("ERROR: failed to measure DTB\n");
+			return ret;
+		}
+	}
 
 	/* Install device tree as UEFI table */
 	ret = efi_install_configuration_table(&efi_guid_fdt, fdt);
@@ -394,8 +402,10 @@ static efi_status_t do_bootefi_exec(efi_handle_t handle, void *load_options)
 out:
 	free(load_options);
 
-	if (IS_ENABLED(CONFIG_EFI_LOAD_FILE2_INITRD))
-		efi_initrd_deregister();
+	if (IS_ENABLED(CONFIG_EFI_LOAD_FILE2_INITRD)) {
+		if (efi_initrd_deregister() != EFI_SUCCESS)
+			log_err("Failed to remove loadfile2 for initrd\n");
+	}
 
 	/* Control is returned to U-Boot, disable EFI watchdog */
 	efi_set_watchdog(0);
@@ -492,7 +502,7 @@ efi_status_t efi_run_image(void *source_buffer, efi_uintn_t source_size)
 	efi_handle_t mem_handle = NULL, handle;
 	struct efi_device_path *file_path = NULL;
 	struct efi_device_path *msg_path;
-	efi_status_t ret;
+	efi_status_t ret, ret2;
 	u16 *load_options;
 
 	if (!bootefi_device_path || !bootefi_image_path) {
@@ -509,12 +519,9 @@ efi_status_t efi_run_image(void *source_buffer, efi_uintn_t source_size)
 		 * Make sure that device for device_path exist
 		 * in load_image(). Otherwise, shell and grub will fail.
 		 */
-		ret = efi_create_handle(&mem_handle);
-		if (ret != EFI_SUCCESS)
-			goto out;
-
-		ret = efi_add_protocol(mem_handle, &efi_guid_device_path,
-				       file_path);
+		ret = efi_install_multiple_protocol_interfaces(&mem_handle,
+							       &efi_guid_device_path,
+							       file_path, NULL);
 		if (ret != EFI_SUCCESS)
 			goto out;
 		msg_path = file_path;
@@ -542,9 +549,11 @@ efi_status_t efi_run_image(void *source_buffer, efi_uintn_t source_size)
 	ret = do_bootefi_exec(handle, load_options);
 
 out:
-	efi_delete_handle(mem_handle);
+	ret2 = efi_uninstall_multiple_protocol_interfaces(mem_handle,
+							  &efi_guid_device_path,
+							  file_path, NULL);
 	efi_free_pool(file_path);
-	return ret;
+	return (ret != EFI_SUCCESS) ? ret : ret2;
 }
 
 #ifdef CONFIG_CMD_BOOTEFI_SELFTEST

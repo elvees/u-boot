@@ -3,6 +3,7 @@ menu "Watchdog Timer Support"
 config WATCHDOG
 	bool "Enable U-Boot watchdog reset"
 	depends on !HW_WATCHDOG
+	select CYCLIC
 	help
 	  This option enables U-Boot watchdog support where U-Boot is using
 	  watchdog_reset function to service watchdog device in U-Boot. Enable
@@ -29,6 +30,7 @@ config WATCHDOG_TIMEOUT_MSECS
 	default 128000 if ARCH_MX7 || ARCH_VF610
 	default 30000 if ARCH_SOCFPGA
 	default 16000 if ARCH_SUNXI
+	default 5376 if ULP_WATCHDOG
 	default 60000
 	help
 	  Watchdog timeout in msec
@@ -74,6 +76,7 @@ config WDT
 	bool "Enable driver model for watchdog timer drivers"
 	depends on DM
 	imply WATCHDOG
+	select CYCLIC
 	help
 	  Enable driver model for watchdog timer. At the moment the API
 	  is very simple and only supports four operations:
@@ -128,9 +131,8 @@ config WDT_AT91
 
 config WDT_BCM6345
 	bool "BCM6345 watchdog timer support"
-	depends on WDT && (ARCH_BMIPS || ARCH_BCM68360 || \
-			   ARCH_BCM6858 || ARCH_BCM63158 || \
-			   ARCH_BCM6753)
+	depends on WDT && (ARCH_BMIPS || BCM6856 || \
+			   BCM6858 || BCM63158 || BCM6855)
 	help
 	  Select this to enable watchdog timer for BCM6345 SoCs.
 	  The watchdog timer is stopped when initialized.
@@ -278,6 +280,14 @@ config WDT_SANDBOX
 	  Enable Watchdog Timer support in Sandbox. This is a dummy device that
 	  can be probed and supports all of the methods of WDT, but does not
 	  really do anything.
+
+config WDT_ALARM_SANDBOX
+	bool "Enable SIGALRM-based Watchdog Timer support for Sandbox"
+	depends on SANDBOX && WDT
+	help
+	  Enable support for a SIGALRM-based watchdog timer in Sandbox. This is
+	  a watchdog device based on the host OS' alarm() function, which will
+	  kill the sandbox with SIGALRM unless properly maintained.
 
 config WDT_SBSA
 	bool "SBSA watchdog timer support"

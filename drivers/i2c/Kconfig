@@ -221,6 +221,16 @@ config SYS_I2C_DW
 	  controller is used in various SoCs, e.g. the ST SPEAr, Altera
 	  SoCFPGA, Synopsys ARC700 and some Intel x86 SoCs.
 
+config SYS_I2C_AST2600
+    bool "AST2600 I2C Controller"
+    depends on DM_I2C && ARCH_ASPEED
+    help
+      Say yes here to select AST2600 I2C Host Controller. The driver
+      support AST2600 I2C new mode register. This I2C controller supports:
+      _Standard-mode (up to 100 kHz)
+      _Fast-mode (up to 400 kHz)
+      _Fast-mode Plus (up to 1 MHz)
+
 config SYS_I2C_ASPEED
 	bool "Aspeed I2C Controller"
 	depends on DM_I2C && ARCH_ASPEED
@@ -260,6 +270,15 @@ config SYS_I2C_MESON
 	  software to define a flexible format of the bit streams. It has an
 	  internal buffer holding up to 8 bytes for transfers and supports
 	  both 7-bit and 10-bit addresses.
+
+config SYS_I2C_MTK
+	bool "MediaTek I2C driver"
+	help
+	  This selects the MediaTek Integrated Inter Circuit bus driver.
+	  The I2C bus adapter is the base for some other I2C client,
+	  eg: touch, sensors.
+	  If you want to use MediaTek I2C interface, say Y here.
+	  If unsure, say N.
 
 config SYS_I2C_MICROCHIP
 	bool "Microchip I2C driver"
@@ -571,6 +590,18 @@ config SYS_I2C_OCTEON
 	  chips have several I2C ports and all are provided, controlled by
 	  the device tree.
 
+config SYS_I2C_QUP
+	bool "Qualcomm QUP I2C controller"
+	depends on ARCH_SNAPDRAGON
+	help
+	  Support for Qualcomm QUP I2C controller based on Qualcomm Universal
+	  Peripherals (QUP) engine. The QUP engine is an advanced high
+	  performance slave port that provides a common data path (an output
+	  FIFO and an input FIFO) for I2C and SPI interfaces. The I2C/SPI QUP
+	  controller is publicly documented in the Snapdragon 410E (APQ8016E)
+	  Technical Reference Manual, chapter "6.1 Qualcomm Universal
+	  Peripherals Engine (QUP)".
+
 config SYS_I2C_S3C24X0
 	bool "Samsung I2C driver"
 	depends on (ARCH_EXYNOS4 || ARCH_EXYNOS5) && DM_I2C
@@ -695,7 +726,7 @@ config SYS_I2C_BUS_MAX
 	depends on ARCH_OMAP2PLUS || ARCH_SOCFPGA
 	default 2 if TI816X
 	default 3 if OMAP34XX || AM33XX || AM43XX
-	default 4 if ARCH_SOCFPGA || OMAP44XX || TI814X
+	default 4 if ARCH_SOCFPGA || OMAP44XX
 	default 5 if OMAP54XX
 	help
 	  Define the maximum number of available I2C buses.

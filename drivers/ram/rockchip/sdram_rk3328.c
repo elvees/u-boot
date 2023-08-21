@@ -506,7 +506,7 @@ static int sdram_init_detect(struct dram_info *dram,
 		writel(sys_reg3, &dram->grf->os_reg[3]);
 	}
 
-	sdram_print_ddr_info(&sdram_params->ch.cap_info, &sdram_params->base);
+	sdram_print_ddr_info(&sdram_params->ch.cap_info, &sdram_params->base, 0);
 
 	return 0;
 }
@@ -580,7 +580,7 @@ static int rk3328_dmc_probe(struct udevice *dev)
 
 	priv->grf = syscon_get_first_range(ROCKCHIP_SYSCON_GRF);
 	debug("%s: grf=%p\n", __func__, priv->grf);
-	priv->info.base = CONFIG_SYS_SDRAM_BASE;
+	priv->info.base = CFG_SYS_SDRAM_BASE;
 	priv->info.size = rockchip_sdram_size(
 				(phys_addr_t)&priv->grf->os_reg[2]);
 #endif

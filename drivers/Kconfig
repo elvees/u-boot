@@ -44,6 +44,8 @@ source "drivers/fuzz/Kconfig"
 
 source "drivers/fpga/Kconfig"
 
+source "drivers/fwu-mdata/Kconfig"
+
 source "drivers/gpio/Kconfig"
 
 source "drivers/hwspinlock/Kconfig"
@@ -59,6 +61,8 @@ source "drivers/led/Kconfig"
 source "drivers/mailbox/Kconfig"
 
 source "drivers/memory/Kconfig"
+
+source "drivers/mfd/Kconfig"
 
 source "drivers/misc/Kconfig"
 

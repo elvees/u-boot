@@ -17,6 +17,12 @@
 		pinctrl0 = &pinctrl;
 	};
 
+	firmware {
+		optee {
+			u-boot,dm-pre-reloc;
+		};
+	};
+
 	/* need PSCI for sysreset during board_f */
 	psci {
 		u-boot,dm-pre-proper;
@@ -82,11 +88,11 @@
 	u-boot,dm-pre-reloc;
 };
 
-&optee {
+&pinctrl {
 	u-boot,dm-pre-reloc;
 };
 
-&pinctrl {
+&rcc {
 	u-boot,dm-pre-reloc;
 };
 

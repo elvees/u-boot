@@ -54,7 +54,7 @@ struct arch_global_data {
 	unsigned long tlb_emerg;
 #endif
 #endif
-#ifdef CONFIG_SYS_MEM_RESERVE_SECURE
+#ifdef CFG_SYS_MEM_RESERVE_SECURE
 #define MEM_RESERVE_SECURE_SECURED	0x1
 #define MEM_RESERVE_SECURE_MAINTAINED	0x2
 #define MEM_RESERVE_SECURE_ADDR_MASK	(~0x3)
@@ -101,7 +101,7 @@ struct arch_global_data {
 
 #include <asm-generic/global_data.h>
 
-#if defined(__clang__) || defined(CONFIG_LTO)
+#if defined(__clang__) || defined(LTO_ENABLE)
 
 #define DECLARE_GLOBAL_DATA_PTR
 #define gd	get_gd()

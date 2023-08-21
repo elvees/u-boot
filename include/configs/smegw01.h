@@ -15,9 +15,9 @@
 #define PHYS_SDRAM_SIZE		SZ_512M
 
 /* MMC Config*/
-#define CONFIG_SYS_FSL_ESDHC_ADDR	0
+#define CFG_SYS_FSL_ESDHC_ADDR	0
 
-#define CONFIG_EXTRA_ENV_SETTINGS \
+#define CFG_EXTRA_ENV_SETTINGS \
 	"image=zImage\0" \
 	"console=ttymxc0\0" \
 	"fdtfile=imx7d-smegw01.dtb\0" \
@@ -38,8 +38,8 @@
 /* Physical Memory Map */
 #define PHYS_SDRAM			MMDC0_ARB_BASE_ADDR
 
-#define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM
-#define CONFIG_SYS_INIT_RAM_ADDR	IRAM_BASE_ADDR
-#define CONFIG_SYS_INIT_RAM_SIZE	IRAM_SIZE
+#define CFG_SYS_SDRAM_BASE		PHYS_SDRAM
+#define CFG_SYS_INIT_RAM_ADDR	IRAM_BASE_ADDR
+#define CFG_SYS_INIT_RAM_SIZE	IRAM_SIZE
 
 #endif

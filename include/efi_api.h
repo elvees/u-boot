@@ -21,7 +21,7 @@
 #include <pe.h>
 
 /* UEFI spec version 2.9 */
-#define EFI_SPECIFICATION_VERSION (2 << 16 | 90)
+#define EFI_SPECIFICATION_VERSION (2 << 16 | 100)
 
 /* Types and defines for EFI CreateEvent */
 enum efi_timer_delay {
@@ -232,7 +232,7 @@ enum efi_reset_type {
 
 #define EFI_CONFORMANCE_PROFILES_TABLE_VERSION 1
 
-#define EFI_CONFORMANCE_PROFILE_EBBR_2_0_GUID \
+#define EFI_CONFORMANCE_PROFILE_EBBR_2_1_GUID \
 	EFI_GUID(0xcce33c35, 0x74ac, 0x4087, 0xbc, 0xe7, \
 		 0x8b, 0x29, 0xb0, 0x2e, 0xeb, 0x27)
 
@@ -513,6 +513,16 @@ struct efi_system_table {
 	struct efi_configuration_table *tables;
 };
 
+/**
+ * efi_main() - entry point of EFI applications
+ *
+ * @image_handle:	handle with the Loaded Image Protocol
+ * @systab:		pointer to the system table
+ * Return:		status code
+ */
+efi_status_t EFIAPI efi_main(efi_handle_t image_handle,
+			     struct efi_system_table *systab);
+
 #define EFI_LOADED_IMAGE_PROTOCOL_GUID \
 	EFI_GUID(0x5b1b31a1, 0x9562, 0x11d2, \
 		 0x8e, 0x3f, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b)
@@ -560,6 +570,7 @@ struct efi_mac_addr {
 #define DEVICE_PATH_TYPE_HARDWARE_DEVICE	0x01
 #  define DEVICE_PATH_SUB_TYPE_MEMORY		0x03
 #  define DEVICE_PATH_SUB_TYPE_VENDOR		0x04
+#  define DEVICE_PATH_SUB_TYPE_CONTROLLER	0x05
 
 struct efi_device_path_memory {
 	struct efi_device_path dp;
@@ -572,6 +583,11 @@ struct efi_device_path_vendor {
 	struct efi_device_path dp;
 	efi_guid_t guid;
 	u8 vendor_data[];
+} __packed;
+
+struct efi_device_path_controller {
+	struct efi_device_path dp;
+	u32 controller_number;
 } __packed;
 
 #define DEVICE_PATH_TYPE_ACPI_DEVICE		0x02
@@ -594,6 +610,7 @@ struct efi_device_path_acpi_path {
 #  define DEVICE_PATH_SUB_TYPE_MSG_MAC_ADDR	0x0b
 #  define DEVICE_PATH_SUB_TYPE_MSG_UART		0x0e
 #  define DEVICE_PATH_SUB_TYPE_MSG_USB_CLASS	0x0f
+#  define DEVICE_PATH_SUB_TYPE_MSG_USB_WWI	0x10
 #  define DEVICE_PATH_SUB_TYPE_MSG_SATA		0x12
 #  define DEVICE_PATH_SUB_TYPE_MSG_NVME		0x17
 #  define DEVICE_PATH_SUB_TYPE_MSG_URI		0x18
@@ -817,7 +834,7 @@ struct efi_simple_text_output_protocol {
 
 struct efi_input_key {
 	u16 scan_code;
-	s16 unicode_char;
+	u16 unicode_char;
 };
 
 #define EFI_SHIFT_STATE_INVALID		0x00000000

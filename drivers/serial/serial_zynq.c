@@ -108,7 +108,7 @@ static void _uart_zynq_serial_init(struct uart_zynq *regs)
 
 static int _uart_zynq_serial_putc(struct uart_zynq *regs, const char c)
 {
-	if (CONFIG_IS_ENABLED(DEBUG_UART_ZYNQ)) {
+	if (IS_ENABLED(CONFIG_DEBUG_UART_ZYNQ)) {
 		if (!(readl(&regs->channel_sts) & ZYNQ_UART_SR_TXEMPTY))
 			return -EAGAIN;
 	} else {
@@ -307,7 +307,7 @@ static inline void _debug_uart_putc(int ch)
 	struct uart_zynq *regs = (struct uart_zynq *)CONFIG_VAL(DEBUG_UART_BASE);
 
 	while (_uart_zynq_serial_putc(regs, ch) == -EAGAIN)
-		WATCHDOG_RESET();
+		schedule();
 }
 
 DEBUG_UART_FUNCS

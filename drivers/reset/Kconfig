@@ -156,13 +156,12 @@ config RESET_IMX7
 	help
 	  Support for reset controller on i.MX7/8 SoCs.
 
-config RESET_IPQ419
-	bool "Reset driver for Qualcomm IPQ40xx SoCs"
-	depends on DM_RESET && ARCH_IPQ40XX
+config RESET_QCOM
+	bool "Reset driver for Qualcomm SoCs"
+	depends on DM_RESET && (ARCH_SNAPDRAGON || ARCH_IPQ40XX)
 	default y
 	help
-	  Support for reset controller on Qualcomm
-	  IPQ40xx SoCs.
+	  Support for reset controller on Qualcomm SoCs.
 
 config RESET_SIFIVE
 	bool "Reset Driver for SiFive SoC's"
@@ -218,4 +217,12 @@ config RESET_DRA7
 	help
 	  Support for TI DRA7-RESET subsystem. Basic Assert/Deassert
 	  is supported.
+
+config RESET_AT91
+	bool "Enable support for Microchip/Atmel Reset Controller driver"
+	depends on DM_RESET && ARCH_AT91
+	help
+	  This enables the Reset Controller driver support for Microchip/Atmel
+	  SoCs. Mainly used to expose assert/deassert methods to other drivers
+	  that require it.
 endmenu

@@ -13,14 +13,11 @@
 /* Specify available DDR memory.
  * These macros are also used for specifying DDR size available for Linux.
  */
-#define CONFIG_SYS_SDRAM_BASE		0xC0000000
-#define PHYS_SDRAM_0			CONFIG_SYS_SDRAM_BASE
+#define CFG_SYS_SDRAM_BASE		0xC0000000
+#define PHYS_SDRAM_0			CFG_SYS_SDRAM_BASE
 #define PHYS_SDRAM_0_SIZE		SZ_1G
 #define PHYS_SDRAM_1			0x80000000
 #define PHYS_SDRAM_1_SIZE		SZ_1G
-
-/* standalone support */
-#define CONFIG_STANDALONE_LOAD_ADDR	0xC2000000
 
 /* Default environment */
 #define CONFIG_BOOTFILE			"Image"

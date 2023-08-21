@@ -9,8 +9,6 @@ config AHCI
 
 config SATA
 	bool "Support SATA controllers"
-	depends on BLK
-	select HAVE_BLOCK_DEVICE
 	help
 	  This enables support for SATA (Serial Advanced Technology
 	  Attachment), a serial bus standard for connecting to hard drives and
@@ -137,6 +135,7 @@ config SATA_MV
 
 config SATA_SIL
 	bool "Enable Silicon Image SIL3131 / SIL3132 / SIL3124 SATA driver support"
+	depends on PCI
 	select AHCI
 	select LIBATA
 	help

@@ -17,14 +17,14 @@
 #include <environment/ti/k3_dfu.h>
 
 /* DDR Configuration */
-#define CONFIG_SYS_SDRAM_BASE1		0x880000000
+#define CFG_SYS_SDRAM_BASE1		0x880000000
 
 /* SPL Loader Configuration */
 #if defined(CONFIG_TARGET_J721S2_A72_EVM) || defined(CONFIG_TARGET_J7200_A72_EVM)
-#define CONFIG_SYS_UBOOT_BASE		0x50280000
+#define CFG_SYS_UBOOT_BASE		0x50280000
 /* Image load address in RAM for DFU boot*/
 #else
-#define CONFIG_SYS_UBOOT_BASE		0x50080000
+#define CFG_SYS_UBOOT_BASE		0x50080000
 #endif
 
 /* U-Boot general configuration */
@@ -32,6 +32,10 @@
 	"default_device_tree=" CONFIG_DEFAULT_DEVICE_TREE ".dtb\0"	\
 	"findfdt="							\
 		"setenv name_fdt ${default_device_tree};"		\
+		"if test $board_name = j721s2; then "			\
+			"setenv name_fdt k3-j721s2-common-proc-board.dtb; fi;" \
+		"if test $board_name = am68-sk; then "			\
+			"setenv name_fdt k3-am68-sk-base-board.dtb; fi;"\
 		"setenv fdtfile ${name_fdt}\0"				\
 	"name_kern=Image\0"						\
 	"console=ttyS2,115200n8\0"					\
@@ -127,7 +131,7 @@
 	DFU_ALT_INFO_OSPI
 
 /* Incorporate settings into the U-Boot environment */
-#define CONFIG_EXTRA_ENV_SETTINGS					\
+#define CFG_EXTRA_ENV_SETTINGS					\
 	DEFAULT_LINUX_BOOT_ENV						\
 	DEFAULT_MMC_TI_ARGS						\
 	DEFAULT_FIT_TI_ARGS						\

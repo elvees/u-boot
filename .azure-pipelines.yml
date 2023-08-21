@@ -2,7 +2,7 @@ variables:
   windows_vm: windows-2019
   ubuntu_vm: ubuntu-22.04
   macos_vm: macOS-12
-  ci_runner_image: trini/u-boot-gitlab-ci-runner:jammy-20220801-09Aug2022
+  ci_runner_image: trini/u-boot-gitlab-ci-runner:jammy-20230126-10Feb2023
   # Add '-u 0' options for Azure pipelines, otherwise we get "permission
   # denied" error when it tries to "useradd -m -u 1001 vsts_azpcontainer",
   # since our $(ci_runner_image) user is not root.
@@ -30,7 +30,7 @@ stages:
           %CD:~0,2%\msys64\usr\bin\bash -lc "pacman --noconfirm --needed -Sy make gcc bison flex diffutils openssl-devel libgnutls-devel libutil-linux-devel"
         displayName: 'Install Toolchain'
       - script: |
-          echo make tools-only_defconfig tools-only NO_SDL=1 > build-tools.sh
+          echo make tools-only_defconfig tools-only > build-tools.sh
           %CD:~0,2%\msys64\usr\bin\bash -lc "bash build-tools.sh"
         displayName: 'Build Host Tools'
         env:
@@ -47,43 +47,25 @@ stages:
       - script: brew install make ossp-uuid
         displayName: Brew install dependencies
       - script: |
-          gmake tools-only_config tools-only NO_SDL=1 \
+          gmake tools-only_config tools-only \
             HOSTCFLAGS="-I/usr/local/opt/openssl@1.1/include" \
             HOSTLDFLAGS="-L/usr/local/opt/openssl@1.1/lib" \
             -j$(sysctl -n hw.logicalcpu)
         displayName: 'Perform tools-only build'
 
-  - job: check_for_migrated_symbols_in_board_header
-    displayName: 'Check for migrated symbols in board header'
+  - job: check_for_new_CONFIG_symbols_outside_Kconfig
+    displayName: 'Check for new CONFIG symbols outside Kconfig'
     pool:
       vmImage: $(ubuntu_vm)
     container:
       image: $(ci_runner_image)
       options: $(container_option)
     steps:
-      - script: |
-          KSYMLST=`mktemp`
-          KUSEDLST=`mktemp`
-          RET=0
-          cat `find . -name "Kconfig*"` | \
-             sed -n -e 's/^\s*config *\([A-Za-z0-9_]*\).*$/CONFIG_\1/p' \
-             -e 's/^\s*menuconfig *\([A-Za-z0-9_]*\).*$/CONFIG_\1/p' \
-             | sort -u > $KSYMLST
-          for CFG in `find include/configs -name "*.h"`; do
-             (grep '#define[[:blank:]]CONFIG_' $CFG | \
-                sed -n 's/#define.\(CONFIG_[A-Za-z0-9_]*\).*/\1/p' ; \
-                grep '#undef[[:blank:]]CONFIG_' $CFG | \
-                sed -n 's/#undef.\(CONFIG_[A-Za-z0-9_]*\).*/\1/p') | \
-                sort -u > ${KUSEDLST} || true
-             NUM=`comm -123 --total --output-delimiter=, ${KSYMLST} ${KUSEDLST} | \
-                cut -d , -f 3`
-             if [[ $NUM -ne 0 ]]; then
-                echo "Unmigrated symbols found in $CFG:"
-                comm -12 ${KSYMLST} ${KUSEDLST}
-                RET=1
-             fi
-          done
-          exit $RET
+      # If grep succeeds and finds a match the test fails as we should
+      # have no matches.
+      - script: git grep -E '^#[[:blank:]]*(define|undef)[[:blank:]]*CONFIG_'
+                  :^doc/ :^arch/arm/dts/ :^scripts/kconfig/lkc.h
+                  :^include/linux/kconfig.h :^tools/ && exit 1 || exit 0
 
   - job: cppcheck
     displayName: 'Static code analysis with cppcheck'
@@ -95,8 +77,8 @@ stages:
     steps:
       - script: cppcheck -j$(nproc) --force --quiet --inline-suppr .
 
-  - job: htmldocs
-    displayName: 'Build HTML documentation'
+  - job: docs
+    displayName: 'Build documentation'
     pool:
       vmImage: $(ubuntu_vm)
     container:
@@ -108,6 +90,7 @@ stages:
           . /tmp/venvhtml/bin/activate
           pip install -r doc/sphinx/requirements.txt
           make htmldocs
+          make infodocs
 
   - job: todo
     displayName: 'Search for TODO within source tree'
@@ -204,7 +187,7 @@ stages:
       options: $(container_option)
     steps:
       - script: |
-          export PATH=/opt/gcc-11.1.0-nolibc/arm-linux-gnueabi/bin:$PATH
+          export PATH=/opt/gcc-12.2.0-nolibc/arm-linux-gnueabi/bin:$PATH
           test/nokia_rx51_test.sh
 
   - job: pylint
@@ -242,7 +225,10 @@ stages:
           TEST_PY_BD: "sandbox"
         sandbox_clang:
           TEST_PY_BD: "sandbox"
-          OVERRIDE: "-O clang-13"
+          OVERRIDE: "-O clang-14"
+        sandbox_nolto:
+          TEST_PY_BD: "sandbox"
+          BUILD_ENV: "NO_LTO=1"
         sandbox_spl:
           TEST_PY_BD: "sandbox_spl"
           TEST_PY_TEST_SPEC: "test_ofplatdata or test_handoff or test_spl"
@@ -254,6 +240,11 @@ stages:
           TEST_PY_TEST_SPEC: "test_ofplatdata or test_handoff or test_spl"
         sandbox_flattree:
           TEST_PY_BD: "sandbox_flattree"
+        sandbox_trace:
+          TEST_PY_BD: "sandbox"
+          BUILD_ENV: "FTRACE=1 NO_LTO=1"
+          TEST_PY_TEST_SPEC: "trace"
+          OVERRIDE: "-a CONFIG_TRACE=y -a CONFIG_TRACE_EARLY=y -a CONFIG_TRACE_EARLY_SIZE=0x01000000"
         coreboot:
           TEST_PY_BD: "coreboot"
           TEST_PY_ID: "--id qemu"
@@ -354,10 +345,12 @@ stages:
           export TEST_PY_ID="${TEST_PY_ID}"
           export TEST_PY_TEST_SPEC="${TEST_PY_TEST_SPEC}"
           export OVERRIDE="${OVERRIDE}"
+          export BUILD_ENV="${BUILD_ENV}"
           EOF
           cat << "EOF" >> test.sh
           # the below corresponds to .gitlab-ci.yml "before_script"
           cd ${WORK_DIR}
+          git config --global --add safe.directory ${WORK_DIR}
           git clone --depth=1 https://source.denx.de/u-boot/u-boot-test-hooks /tmp/uboot-test-hooks
           ln -s travis-ci /tmp/uboot-test-hooks/bin/`hostname`
           ln -s travis-ci /tmp/uboot-test-hooks/py/`hostname`
@@ -374,6 +367,9 @@ stages:
           # the below corresponds to .gitlab-ci.yml "script"
           cd ${WORK_DIR}
           export UBOOT_TRAVIS_BUILD_DIR=/tmp/${TEST_PY_BD};
+          if [ -n "${BUILD_ENV}" ]; then
+              export ${BUILD_ENV};
+          fi
           tools/buildman/buildman -o ${UBOOT_TRAVIS_BUILD_DIR} -w -E -W -e --board ${TEST_PY_BD} ${OVERRIDE}
           cp ~/grub_x86.efi ${UBOOT_TRAVIS_BUILD_DIR}/
           cp ~/grub_x64.efi ${UBOOT_TRAVIS_BUILD_DIR}/
@@ -442,6 +438,8 @@ stages:
       matrix:
         arc_microblaze_xtensa:
           BUILDMAN: "arc microblaze xtensa"
+        amlogic:
+          BUILDMAN: "amlogic"
         arm11_arm7_arm920t_arm946es:
           BUILDMAN: "arm11 arm7 arm920t arm946es"
         arm926ejs:
@@ -471,9 +469,9 @@ stages:
         imx6:
           BUILDMAN: "mx6 -x boundary,engicam,freescale,technexion,toradex"
         imx:
-          BUILDMAN: "mx -x mx6,freescale,technexion,toradex"
-        imx8:
-          BUILDMAN: "imx8"
+          BUILDMAN: "mx -x mx6,imx8,freescale,technexion,toradex"
+        imx8_imx9:
+          BUILDMAN: "imx8 imx9"
         keystone2_keystone3:
           BUILDMAN: "k2 k3"
         sandbox_asan:
@@ -481,7 +479,7 @@ stages:
           OVERRIDE: "-a ASAN"
         sandbox_clang_asan:
           BUILDMAN: "sandbox"
-          OVERRIDE: "-O clang-13 -a ASAN"
+          OVERRIDE: "-O clang-14 -a ASAN"
         samsung_socfpga:
           BUILDMAN: "samsung socfpga"
         sun4i:
@@ -527,9 +525,11 @@ stages:
         uniphier:
           BUILDMAN: "uniphier"
         aarch64_catch_all:
-          BUILDMAN: "aarch64 -x bcm,imx8,k3,tegra,ls1,ls2,lx216,mvebu,uniphier,renesas,sunxi,samsung,socfpga,rk,versal,zynq"
-        rockchip:
-          BUILDMAN: "rk"
+          BUILDMAN: "aarch64 -x amlogic,bcm,imx8,imx9,k3,tegra,ls1,ls2,lx216,mvebu,uniphier,renesas,sunxi,samsung,socfpga,rk,versal,zynq"
+        rockchip_32bit:
+          BUILDMAN: "rk -x aarch64"
+        rockchip_64bit:
+          BUILDMAN: "rk&aarch64"
         renesas:
           BUILDMAN: "renesas"
         zynq:
@@ -545,11 +545,12 @@ stages:
           cd ${WORK_DIR}
           # make environment variables available as tests are running inside a container
           export BUILDMAN="${BUILDMAN}"
+          git config --global --add safe.directory ${WORK_DIR}
           EOF
           cat << "EOF" >> build.sh
           if [[ "${BUILDMAN}" != "" ]]; then
               ret=0;
-              tools/buildman/buildman -o /tmp -P -E -W ${BUILDMAN} ${OVERRIDE} || ret=$?;
+              tools/buildman/buildman -o /tmp -PEWM ${BUILDMAN} ${OVERRIDE} || ret=$?;
               if [[ $ret -ne 0 ]]; then
                   tools/buildman/buildman -o /tmp -seP ${BUILDMAN};
                   exit $ret;

@@ -23,16 +23,16 @@
  * released the bus.  If not defined in the board header file, then use a
  * generic value.
  */
-#ifndef CONFIG_I2C_MBB_TIMEOUT
-#define CONFIG_I2C_MBB_TIMEOUT	100000
+#ifndef CFG_I2C_MBB_TIMEOUT
+#define CFG_I2C_MBB_TIMEOUT	100000
 #endif
 
 /* The maximum number of microseconds we will wait for a read or write
  * operation to complete.  If not defined in the board header file, then use a
  * generic value.
  */
-#ifndef CONFIG_I2C_TIMEOUT
-#define CONFIG_I2C_TIMEOUT	100000
+#ifndef CFG_I2C_TIMEOUT
+#define CFG_I2C_TIMEOUT	100000
 #endif
 
 #define I2C_READ_BIT  1
@@ -41,20 +41,22 @@
 DECLARE_GLOBAL_DATA_PTR;
 
 #ifdef CONFIG_M68K
-#define CONFIG_SYS_IMMR		CONFIG_SYS_MBAR
+#define CFG_FSL_I2C_BASE_ADDR	CFG_SYS_MBAR
+#else
+#define CFG_FSL_I2C_BASE_ADDR	CONFIG_SYS_IMMR
 #endif
 
 #if !CONFIG_IS_ENABLED(DM_I2C)
 static const struct fsl_i2c_base *i2c_base[4] = {
-	(struct fsl_i2c_base *)(CONFIG_SYS_IMMR + CONFIG_SYS_FSL_I2C_OFFSET),
+	(struct fsl_i2c_base *)(CFG_FSL_I2C_BASE_ADDR + CONFIG_SYS_FSL_I2C_OFFSET),
 #ifdef CONFIG_SYS_FSL_I2C2_OFFSET
-	(struct fsl_i2c_base *)(CONFIG_SYS_IMMR + CONFIG_SYS_FSL_I2C2_OFFSET),
+	(struct fsl_i2c_base *)(CFG_FSL_I2C_BASE_ADDR + CONFIG_SYS_FSL_I2C2_OFFSET),
 #endif
 #ifdef CONFIG_SYS_FSL_I2C3_OFFSET
-	(struct fsl_i2c_base *)(CONFIG_SYS_IMMR + CONFIG_SYS_FSL_I2C3_OFFSET),
+	(struct fsl_i2c_base *)(CFG_FSL_I2C_BASE_ADDR + CONFIG_SYS_FSL_I2C3_OFFSET),
 #endif
 #ifdef CONFIG_SYS_FSL_I2C4_OFFSET
-	(struct fsl_i2c_base *)(CONFIG_SYS_IMMR + CONFIG_SYS_FSL_I2C4_OFFSET)
+	(struct fsl_i2c_base *)(CFG_FSL_I2C_BASE_ADDR + CONFIG_SYS_FSL_I2C4_OFFSET)
 #endif
 };
 #endif
@@ -219,7 +221,7 @@ static uint get_i2c_clock(int bus)
 
 static int fsl_i2c_fixup(const struct fsl_i2c_base *base)
 {
-	const unsigned long long timeout = usec2ticks(CONFIG_I2C_MBB_TIMEOUT);
+	const unsigned long long timeout = usec2ticks(CFG_I2C_MBB_TIMEOUT);
 	unsigned long long timeval = 0;
 	int ret = -1;
 	uint flags = 0;
@@ -268,16 +270,9 @@ err:
 static void __i2c_init(const struct fsl_i2c_base *base, int speed, int
 		       slaveadd, int i2c_clk, int busnum)
 {
-	const unsigned long long timeout = usec2ticks(CONFIG_I2C_MBB_TIMEOUT);
+	const unsigned long long timeout = usec2ticks(CFG_I2C_MBB_TIMEOUT);
 	unsigned long long timeval;
 
-#ifdef CONFIG_SYS_I2C_INIT_BOARD
-	/* Call board specific i2c bus reset routine before accessing the
-	 * environment, which might be in a chip on that bus. For details
-	 * about this problem see doc/I2C_Edge_Conditions.
-	 */
-	i2c_init_board();
-#endif
 	writeb(0, &base->cr);		/* stop I2C controller */
 	udelay(5);			/* let it shutdown in peace */
 	set_i2c_bus_speed(base, i2c_clk, speed);
@@ -301,7 +296,7 @@ static void __i2c_init(const struct fsl_i2c_base *base, int speed, int
 static int i2c_wait4bus(const struct fsl_i2c_base *base)
 {
 	unsigned long long timeval = get_ticks();
-	const unsigned long long timeout = usec2ticks(CONFIG_I2C_MBB_TIMEOUT);
+	const unsigned long long timeout = usec2ticks(CFG_I2C_MBB_TIMEOUT);
 
 	while (readb(&base->sr) & I2C_SR_MBB) {
 		if ((get_ticks() - timeval) > timeout)
@@ -315,7 +310,7 @@ static int i2c_wait(const struct fsl_i2c_base *base, int write)
 {
 	u32 csr;
 	unsigned long long timeval = get_ticks();
-	const unsigned long long timeout = usec2ticks(CONFIG_I2C_TIMEOUT);
+	const unsigned long long timeout = usec2ticks(CFG_I2C_TIMEOUT);
 
 	do {
 		csr = readb(&base->sr);

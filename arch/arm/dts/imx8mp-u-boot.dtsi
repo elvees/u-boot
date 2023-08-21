@@ -10,7 +10,7 @@
 	};
 };
 
-&{/soc@0} {
+&soc {
 	u-boot,dm-pre-reloc;
 	u-boot,dm-spl;
 };
@@ -113,13 +113,14 @@
 					type = "standalone";
 					arch = "arm64";
 					compression = "none";
-					load = <CONFIG_SYS_TEXT_BASE>;
+					load = <CONFIG_TEXT_BASE>;
 
 					uboot_blob: blob-ext {
 						filename = "u-boot-nodtb.bin";
 					};
 				};
 
+#ifndef CONFIG_ARMV8_PSCI
 				atf {
 					description = "ARM Trusted Firmware";
 					type = "firmware";
@@ -133,6 +134,7 @@
 						type = "atf-bl31";
 					};
 				};
+#endif
 
 				@fdt-SEQ {
 					description = "NAME";
@@ -148,11 +150,13 @@
 			configurations {
 				default = "@config-DEFAULT-SEQ";
 
-				@config-SEQ {
+				binman_configuration: @config-SEQ {
 					description = "NAME";
 					fdt = "fdt-SEQ";
 					firmware = "uboot";
+#ifndef CONFIG_ARMV8_PSCI
 					loadables = "atf";
+#endif
 				};
 			};
 		};

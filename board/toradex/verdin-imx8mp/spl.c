@@ -17,6 +17,8 @@
 #include <asm/mach-imx/iomux-v3.h>
 #include <asm/mach-imx/mxc_i2c.h>
 #include <asm/arch/ddr.h>
+#include <dm/device.h>
+#include <dm/uclass.h>
 #include <power/pmic.h>
 #include <power/pca9450.h>
 
@@ -43,6 +45,15 @@ void spl_dram_init(void)
 
 void spl_board_init(void)
 {
+	if (IS_ENABLED(CONFIG_FSL_CAAM)) {
+		struct udevice *dev;
+		int ret;
+
+		ret = uclass_get_device_by_driver(UCLASS_MISC, DM_DRIVER_GET(caam_jr), &dev);
+		if (ret)
+			printf("Failed to initialize caam_jr: %d\n", ret);
+	}
+
 	/*
 	 * Set GIC clock to 500Mhz for OD VDD_SOC. Kernel driver does
 	 * not allow to change it. Should set the clock after PMIC
@@ -104,9 +115,6 @@ int power_init_board(void)
 	/* Kernel uses OD/OD freq for SoC */
 	/* To avoid timing risk from SoC to ARM, increase VDD_ARM to OD voltage 0.95v */
 	pmic_reg_write(p, PCA9450_BUCK2OUT_DVS0, 0x1c);
-
-	/* set WDOG_B_CFG to cold reset */
-	pmic_reg_write(p, PCA9450_RESET_CTRL, 0xA1);
 
 	/* set LDO4 and CONFIG2 to enable the I2C level translator */
 	pmic_reg_write(p, PCA9450_LDO4CTRL, 0x59);

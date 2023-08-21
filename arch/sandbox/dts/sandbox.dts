@@ -21,8 +21,11 @@
 		spi0 = &spi;
 	};
 
+	binman: binman {
+	};
+
 	memory {
-		reg = <0 CONFIG_SYS_SDRAM_SIZE>;
+		reg = <0 CFG_SYS_SDRAM_SIZE>;
 	};
 
 	reserved-memory {
@@ -65,10 +68,6 @@
 		reg = <0x10002000 0x1000>;
 	};
 
-	host-fs {
-		compatible = "sandbox,bootdev-host";
-	};
-
 	i2c_0: i2c@0 {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -103,3 +102,7 @@
 #include "sandbox.dtsi"
 #include "cros-ec-keyboard.dtsi"
 #include "sandbox_pmic.dtsi"
+
+#ifdef CONFIG_SANDBOX_VPL
+#include "sandbox_vpl.dtsi"
+#endif

@@ -7,7 +7,6 @@
 #include <clk.h>
 #include <dm.h>
 #include <dm/device_compat.h>
-#include <lcd.h>
 #include <log.h>
 #include <panel.h>
 #include <video.h>

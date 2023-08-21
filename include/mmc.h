@@ -767,7 +767,7 @@ struct mmc *mmc_create(const struct mmc_config *cfg, void *priv);
 /**
  * mmc_bind() - Set up a new MMC device ready for probing
  *
- * A child block device is bound with the IF_TYPE_MMC interface type. This
+ * A child block device is bound with the UCLASS_MMC interface type. This
  * allows the device to be used with CONFIG_BLK
  *
  * @dev:	MMC device to set up
@@ -892,9 +892,17 @@ int mmc_rpmb_write(struct mmc *mmc, void *addr, unsigned short blk,
 int mmc_rpmb_route_frames(struct mmc *mmc, void *req, unsigned long reqlen,
 			  void *rsp, unsigned long rsplen);
 
-#ifdef CONFIG_CMD_BKOPS_ENABLE
-int mmc_set_bkops_enable(struct mmc *mmc);
-#endif
+/**
+ * mmc_set_bkops_enable() - enable background operations
+ * @param mmc		Pointer to a MMC device struct
+ * @param autobkops	Enable automatic bkops, not manual bkops
+ * @param enable	Enable bkops, not disable
+ *
+ * Enable or disable automatic or manual background operation of the eMMC.
+ *
+ * Return: 0 on success, <0 on error.
+ */
+int mmc_set_bkops_enable(struct mmc *mmc, bool autobkops, bool enable);
 
 /**
  * Start device initialization and return immediately; it does not block on
@@ -951,11 +959,6 @@ int mmc_get_env_dev(void);
 
 /* Minimum partition switch timeout in units of 10-milliseconds */
 #define MMC_MIN_PART_SWITCH_TIME	30 /* 300 ms */
-
-/* Set block count limit because of 16 bit register limit on some hardware*/
-#ifndef CONFIG_SYS_MMC_MAX_BLK_COUNT
-#define CONFIG_SYS_MMC_MAX_BLK_COUNT 65535
-#endif
 
 /**
  * mmc_get_blk_desc() - Get the block descriptor for an MMC device

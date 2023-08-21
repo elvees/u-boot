@@ -28,11 +28,11 @@
 /mxsboot
 /ncb
 /prelink-riscv
+/printinitialenv
 /proftool
 /relocate-rela
 /spl_size_limit
 /sunxi-spl-image-builder
-/ubsha1
 /update_octeon_header
 /version.h
 /xway-swap-bytes

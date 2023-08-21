@@ -181,7 +181,7 @@ int load_firmware(char *name_fw, char *name_loadaddr, u32 *loadaddr)
 	if (!*loadaddr)
 		return 0;
 
-	if (!uclass_get_device(UCLASS_FS_FIRMWARE_LOADER, 0, &fsdev)) {
+	if (!get_fs_loader(&fsdev)) {
 		size = request_firmware_into_buf(fsdev, name, (void *)*loadaddr,
 						 0, 0);
 	}
@@ -493,7 +493,7 @@ bool soc_is_j7200(void)
 }
 
 #ifdef CONFIG_ARM64
-void board_prep_linux(bootm_headers_t *images)
+void board_prep_linux(struct bootm_headers *images)
 {
 	debug("Linux kernel Image start = 0x%lx end = 0x%lx\n",
 	      images->os.start, images->os.end);
@@ -561,7 +561,7 @@ void remove_fwl_configs(struct fwl_data *fwl_data, size_t fwl_data_size)
 void spl_enable_dcache(void)
 {
 #if !(defined(CONFIG_SYS_ICACHE_OFF) && defined(CONFIG_SYS_DCACHE_OFF))
-	phys_addr_t ram_top = CONFIG_SYS_SDRAM_BASE;
+	phys_addr_t ram_top = CFG_SYS_SDRAM_BASE;
 
 	dram_init();
 
@@ -605,6 +605,10 @@ int misc_init_r(void)
 		if (ret)
 			printf("Failed to probe am65_cpsw_nuss driver\n");
 	}
+
+	/* Default FIT boot on non-GP devices */
+	if (get_device_type() != K3_DEVICE_TYPE_GP)
+		env_set("boot_fit", "1");
 
 	return 0;
 }

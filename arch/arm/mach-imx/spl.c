@@ -341,7 +341,7 @@ void *board_spl_fit_buffer_addr(ulong fit_size, int sectors, int bl_len)
 	if (bl_len < 512)
 		bl_len = 512;
 
-	return  (void *)((CONFIG_SYS_TEXT_BASE - fit_size - bl_len -
+	return  (void *)((CONFIG_TEXT_BASE - fit_size - bl_len -
 			align_len) & ~align_len);
 }
 #endif
@@ -349,7 +349,7 @@ void *board_spl_fit_buffer_addr(ulong fit_size, int sectors, int bl_len)
 #if defined(CONFIG_MX6) && defined(CONFIG_SPL_OS_BOOT)
 int dram_init_banksize(void)
 {
-	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
+	gd->bd->bi_dram[0].start = CFG_SYS_SDRAM_BASE;
 	gd->bd->bi_dram[0].size = imx_ddr_size();
 
 	return 0;

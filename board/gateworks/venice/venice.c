@@ -111,7 +111,7 @@ int board_phy_config(struct phy_device *phydev)
 
 int board_init(void)
 {
-	eeprom_init(1);
+	venice_eeprom_init(1);
 
 	if (IS_ENABLED(CONFIG_FEC_MXC))
 		setup_fec();
@@ -178,22 +178,6 @@ int ft_board_setup(void *fdt, struct bd_info *bd)
 
 	/* set board model dt prop */
 	fdt_setprop_string(fdt, 0, "board", eeprom_get_model());
-
-	/* update temp thresholds */
-	off = fdt_path_offset(fdt, "/thermal-zones/cpu-thermal/trips");
-	if (off >= 0) {
-		int minc, maxc, prop;
-
-		get_cpu_temp_grade(&minc, &maxc);
-		fdt_for_each_subnode(prop, fdt, off) {
-			const char *type = fdt_getprop(fdt, prop, "type", NULL);
-
-			if (type && (!strcmp("critical", type)))
-				fdt_setprop_u32(fdt, prop, "temperature", maxc * 1000);
-			else if (type && (!strcmp("passive", type)))
-				fdt_setprop_u32(fdt, prop, "temperature", (maxc - 10) * 1000);
-		}
-	}
 
 	if (!strncmp(base_model, "GW73", 4)) {
 		pcbrev = get_pcb_rev(base_model);
