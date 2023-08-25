@@ -1,0 +1,98 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright 2023 RnD Center "ELVEES", JSC
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+
+#include "mcom03.dtsi"
+
+/ {
+	model = "ELV-MC03-SMARC r2.6.1";
+	compatible = "elvees,elvmc03smarc-r2.6.1",
+		     "elvees,elvmc03smarc",
+		     "elvees,mcom03";
+
+	sdhci0_supply: regulator@0 {
+		compatible = "regulator-fixed";
+		regulator-name = "sdhci0-supply";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		regulator-always-on;
+	};
+};
+
+/* Connected to eMMC */
+&sdhci0 {
+	status = "okay";
+
+	non-removable;
+	bus-width = <8>;
+
+	vqmmc-supply = <&sdhci0_supply>;
+};
+
+&qspi0 {
+	status = "okay";
+
+	flash0: w25q16@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor", "spi-flash";
+		reg = <0x0>;
+
+		spi-tx-bus-width = <4>;
+		spi-rx-bus-width = <4>;
+	};
+};
+
+/* Serial port definitions for SMARC */
+ser0: &uart3 { };
+ser1: &uart0 { };
+ser2: &uart2 { };
+ser3: &uart1 { };
+
+&emac0 {
+	phy-mode = "rgmii-id";
+	phy-reset-gpios = <&xl9555 9 GPIO_ACTIVE_LOW>;
+	phy-handle = <&ethernet_phy0>;
+
+	ethernet_phy0: ethernet-phy@0 {
+		reg = <0x0>;
+		motorcomm,clk-out-frequency-hz = <0>;
+		rx-internal-delay-ps = <1800>;
+		tx-internal-delay-ps = <1200>;
+	};
+};
+
+&emac1 {
+	phy-mode = "rgmii-id";
+	phy-reset-gpios = <&xl9555 8 GPIO_ACTIVE_LOW>;
+	phy-handle = <&ethernet_phy1>;
+
+	ethernet_phy1: ethernet-phy@2 {
+		reg = <0x2>;
+		motorcomm,clk-out-frequency-hz = <0>;
+		rx-internal-delay-ps = <1900>;
+		tx-internal-delay-ps = <1650>;
+	};
+};
+
+&i2c3 {
+	status = "okay";
+	clock-frequency = <100000>;
+
+	xl9555: gpio-expander@20 {
+		compatible = "nxp,pca9555";
+		reg = <0x20>;
+
+		#gpio-cells = <2>;
+		gpio-controller;
+
+		gpio-line-names = "GPIO4", "GPIO6", "GPIO7", "GPIO8", "GPIO9", "GPIO10",
+			"GPIO11", " PCIE_WAKE#", "nRST_ETH1", "nRST_ETH0", "nRST_HDMI", "",
+			"INT_HDMI", "nINT_RTC", "nINT_ETH0", "nINT_ETH1";
+	};
+};
