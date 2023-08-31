@@ -28,7 +28,7 @@
 #define PHYS_SDRAM_1_SIZE		0
 #endif
 
-#if CONFIG_IS_ENABLED(CMD_MMC)
+#if IS_ENABLED(CONFIG_CMD_MMC)
 #define BOOT_TARGET_DEVICES_MMC(func) \
 	func(MMC, mmc, 1) \
 	func(MMC, mmc, 0)
@@ -36,19 +36,19 @@
 #define BOOT_TARGET_DEVICES_MMC(func)
 #endif
 
-#if CONFIG_IS_ENABLED(CMD_USB)
+#if IS_ENABLED(CONFIG_CMD_USB)
 #define BOOT_TARGET_DEVICES_USB(func) func(USB, usb, 0)
 #else
 #define BOOT_TARGET_DEVICES_USB(func)
 #endif
 
-#if CONFIG_IS_ENABLED(CMD_PXE)
+#if IS_ENABLED(CONFIG_CMD_PXE)
 #define BOOT_TARGET_DEVICES_PXE(func) func(PXE, pxe, na)
 #else
 #define BOOT_TARGET_DEVICES_PXE(func)
 #endif
 
-#if CONFIG_IS_ENABLED(CMD_DHCP)
+#if IS_ENABLED(CONFIG_CMD_DHCP)
 #define BOOT_TARGET_DEVICES_DHCP(func) func(DHCP, dhcp, na)
 #else
 #define BOOT_TARGET_DEVICES_DHCP(func)

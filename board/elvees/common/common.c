@@ -144,7 +144,8 @@ void board_pads_cfg(void)
 		nand_pad_cfg();
 
 		/* Set EMAC pads drive strength to 12 mA for data and 8 mA for clock.
-		 * Required for correct operation at 125 MHz 3.3V. See #MCOM03SW-823 */
+		 * Required for correct operation at 125 MHz 3.3V. See #MCOM03SW-823.
+		 */
 		pad_set_ctl(HSP_URB_EMAC0_TX_PADCFG, 0x3f);
 		pad_set_ctl(HSP_URB_EMAC0_TXC_PADCFG, 0xf);
 		pad_set_ctl(HSP_URB_EMAC1_TX_PADCFG, 0x3f);
@@ -197,7 +198,8 @@ static void power_init_elvmc03smarc_r10(void)
 
 	/* Delay >100ms from CARRIER_PWR_ON to RESET_OUT# signals.
 	 * The SMARC specification does not explain why this 100ms is needed.
-	 * Perhaps we don't need it at all. */
+	 * Perhaps we don't need it at all.
+	 */
 	mdelay(100);
 
 	if (of_machine_is_compatible("radxa,rockpi-n10"))
@@ -233,7 +235,8 @@ static void power_init_trustphonepm(void)
 
 	/* LTE module requires a pulse on PWRKEY input pin to turn on.
 	 * Pulse duration must be at least 500ms.
-	 * TODO: Move it to userspace. */
+	 * TODO: Move it to userspace.
+	 */
 	/* Reset deassert */
 	val = readl(MFBSP1_DIR);
 	val |= BIT(7);
@@ -260,7 +263,6 @@ static void power_init_trustphonepm(void)
 	writel(val, LSP1_GPIO_SWPORTD_DR);
 }
 
-#if CONFIG_IS_ENABLED(DM_I2C)
 static void power_init_pm03cam_osm_r104(void)
 {
 	struct udevice *udev;
@@ -286,7 +288,6 @@ static void power_init_pm03cam_osm_r104(void)
 
 	mdelay(1);
 }
-#endif
 
 int power_init_board(void)
 {
@@ -340,7 +341,8 @@ void i2c_pad_cfg(int i2c_num)
 
 	if (i2c_num == 0) {
 		/* There are no registers for GPIO0 to enable
-		 * the pad receiver */
+		 * the pad receiver.
+		 */
 		writel(0x18, LSP0_GPIO_SWPORTD_CTL);
 	} else {
 		val = readl(GPIO1_PORTA_PAD_CTR(2 * i2c_num - 2));
@@ -398,7 +400,8 @@ static int xip_disable(int qspi_num)
 static int mcom03_subsystem_init(enum subsystem_reset_lines line)
 {
 	/* Order as in subsystem_reset_lines. -1 means that no gate
-	 * for subsystem */
+	 * for subsystem.
+	 */
 	const int clkgate_bits[] = {2, 3, 1, -1, 4, 5, 6, 7, 8, 0};
 
 	int ret = subsystem_reset_deassert(line);
@@ -432,10 +435,9 @@ int board_init(void)
 	if (ret)
 		return ret;
 
-#if CONFIG_IS_ENABLED(DM_I2C)
-	if (of_machine_is_compatible("elvees,pm03camosm-r1.04"))
-		power_init_pm03cam_osm_r104();
-#endif
+	if (IS_ENABLED(CONFIG_DM_I2C))
+		if (of_machine_is_compatible("elvees,pm03camosm-r1.04"))
+			power_init_pm03cam_osm_r104();
 
 	ret = mcom03_subsystem_init(MEDIA_SUBS);
 	if (ret)
@@ -468,7 +470,6 @@ int board_init(void)
 	return ret;
 }
 
-#if IS_ENABLED(CONFIG_MISC_INIT_R)
 int misc_init_r(void)
 {
 	if (!IS_ENABLED(CONFIG_ENV_IS_NOWHERE) &&
@@ -482,7 +483,6 @@ int misc_init_r(void)
 
 	return do_factory_settings();
 }
-#endif
 
 int board_late_init(void)
 {
