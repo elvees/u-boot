@@ -158,8 +158,6 @@ static int load_factory_settings(struct factory_settings *factory)
 	if (!factory)
 		return -EINVAL;
 
-	memset(factory, 0, sizeof(struct factory_settings));
-
 	factory->dev_num = get_mmc_device_num();
 	if (factory->dev_num < 0)
 		return 0;
@@ -236,9 +234,13 @@ int do_factory_settings(void)
 
 	struct factory_settings factory;
 
-	ret = load_factory_settings(&factory);
-	if (ret)
-		goto exit;
+	memset(&factory, 0, sizeof(struct factory_settings));
+
+	if (!IS_ENABLED(CONFIG_MCOM03_DISABLE_FACTORY)) {
+		ret = load_factory_settings(&factory);
+		if (ret)
+			goto exit;
+	}
 
 	/* Make the boot0 part of current eMMC to be write protected if necessary */
 	if (factory.wp) {

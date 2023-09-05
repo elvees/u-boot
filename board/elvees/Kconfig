@@ -103,4 +103,11 @@ config MCOM03_EMMC_BOOT_WP_DISABLED
 	  This ensures that U-Boot will boot the kernel without
 	  the Power-On write protection of eMMC boot0 partition.
 
+config MCOM03_DISABLE_FACTORY
+	bool "Disable factory settings"
+	default n
+	help
+	  This ensures that U-Boot will boot without factory settings
+	  applied.
+
 endif
