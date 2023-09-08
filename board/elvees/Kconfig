@@ -49,7 +49,6 @@ config TARGET_MCOM03_ECAM03
 endchoice
 
 source "board/elvees/common/Kconfig"
-source "board/elvees/haps/Kconfig"
 
 config SETUP_MEMORY_TAGS
 	bool "Enable memory tag"

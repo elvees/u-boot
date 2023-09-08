@@ -13,9 +13,20 @@
 /* Specify available DDR memory.
  * These macros are also used for specifying DDR size available for Linux.
  */
+#if IS_ENABLED(CONFIG_TARGET_HAPS)
+#define CFG_SYS_SDRAM_BASE		0xC0000000
+#define PHYS_SDRAM_0			CFG_SYS_SDRAM_BASE
+#define PHYS_SDRAM_0_SIZE		SZ_1G
+#define PHYS_SDRAM_1			0x80000000
+#define PHYS_SDRAM_1_SIZE		SZ_1G
+#else
 #define CFG_SYS_SDRAM_BASE		0x890400000
 #define PHYS_SDRAM_0			CFG_SYS_SDRAM_BASE
 #define PHYS_SDRAM_0_SIZE		SZ_256M
+/* Only used for HAPS */
+#define PHYS_SDRAM_1			0x0
+#define PHYS_SDRAM_1_SIZE		0
+#endif
 
 #if CONFIG_IS_ENABLED(CMD_MMC)
 #define BOOT_TARGET_DEVICES_MMC(func) \

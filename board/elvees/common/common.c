@@ -122,18 +122,23 @@ void *board_fdt_blob_setup(int *err)
 	return fdt_blob;
 }
 
-/* dram_init_banksize() for HAPS placed in board/elvees/haps/haps.c */
-#ifndef CONFIG_TARGET_HAPS
 int dram_init_banksize(void)
 {
-	struct ddrinfo *info = (struct ddrinfo *)CONFIG_MEM_REGIONS_ADDR;
+	if (IS_ENABLED(CONFIG_TARGET_HAPS)) {
+		gd->bd->bi_dram[0].start = PHYS_SDRAM_0;
+		gd->bd->bi_dram[0].size = PHYS_SDRAM_0_SIZE;
 
-	memcpy(gd->bd->bi_dram, info->mem_regions,
-	       FIELD_SIZEOF(struct bd_info, bi_dram));
+		gd->bd->bi_dram[1].start = PHYS_SDRAM_1;
+		gd->bd->bi_dram[1].size = PHYS_SDRAM_1_SIZE;
+	} else {
+		struct ddrinfo *info = (struct ddrinfo *)CONFIG_MEM_REGIONS_ADDR;
+
+		memcpy(gd->bd->bi_dram, info->mem_regions,
+		       FIELD_SIZEOF(struct bd_info, bi_dram));
+	}
 
 	return 0;
 }
-#endif
 
 void board_pads_cfg(void)
 {

@@ -1,7 +1,7 @@
-if TARGET_MCOM03
-
 config SYS_BOARD
 	default "common"
+
+if TARGET_MCOM03 || TARGET_HAPS
 
 config SYS_CONFIG_NAME
 	default "mcom03"
@@ -9,9 +9,6 @@ config SYS_CONFIG_NAME
 endif
 
 if TARGET_MCOM03_ECAM03
-
-config SYS_BOARD
-	default "common"
 
 config SYS_CONFIG_NAME
 	default "mcom03-ecam03"
