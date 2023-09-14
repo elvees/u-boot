@@ -353,13 +353,41 @@ int dw_i2c_gen_speed_config(const struct udevice *dev, int speed_hz,
 }
 
 /*
+ * i2c_wait_for_bb - Waits for bus busy
+ *
+ * Waits for bus busy
+ */
+static int i2c_wait_for_bb(struct i2c_regs *i2c_base)
+{
+	unsigned long start_time_bb = get_timer(0);
+
+	while ((readl(&i2c_base->ic_status) & IC_STATUS_MA) ||
+	       !(readl(&i2c_base->ic_status) & IC_STATUS_TFE)) {
+		/* Evaluate timeout */
+		if (get_timer(start_time_bb) > (unsigned long)(I2C_BYTE_TO_BB))
+			return 1;
+	}
+
+	return 0;
+}
+
+/*
  * i2c_setaddress - Sets the target slave address
  * @i2c_addr:	target i2c address
  *
  * Sets the target slave address.
  */
-static void i2c_setaddress(struct i2c_regs *i2c_base, unsigned int i2c_addr)
+static int i2c_setaddress(struct i2c_regs *i2c_base, unsigned int i2c_addr)
 {
+	if (readl(&i2c_base->ic_tar) == i2c_addr)
+		return 0;
+
+	/* Wait for bus busy previous transaction */
+	if (i2c_wait_for_bb(i2c_base)) {
+		printf("Timed out waiting for bus\n");
+		return -ETIMEDOUT;
+	}
+
 	/* Disable i2c */
 	dw_i2c_enable(i2c_base, false);
 
@@ -367,6 +395,8 @@ static void i2c_setaddress(struct i2c_regs *i2c_base, unsigned int i2c_addr)
 
 	/* Enable i2c */
 	dw_i2c_enable(i2c_base, true);
+
+	return 0;
 }
 
 /*
@@ -380,31 +410,10 @@ static void i2c_flush_rxfifo(struct i2c_regs *i2c_base)
 		readl(&i2c_base->ic_cmd_data);
 }
 
-/*
- * i2c_wait_for_bb - Waits for bus busy
- *
- * Waits for bus busy
- */
-static int i2c_wait_for_bb(struct i2c_regs *i2c_base)
-{
-	unsigned long start_time_bb = get_timer(0);
-
-	while ((readl(&i2c_base->ic_status) & IC_STATUS_MA) ||
-	       !(readl(&i2c_base->ic_status) & IC_STATUS_TFE)) {
-
-		/* Evaluate timeout */
-		if (get_timer(start_time_bb) > (unsigned long)(I2C_BYTE_TO_BB))
-			return 1;
-	}
-
-	return 0;
-}
-
 static int i2c_xfer_init(struct i2c_regs *i2c_base, uchar chip, uint addr,
 			 int alen)
 {
-	if (i2c_wait_for_bb(i2c_base))
-		return 1;
+	i2c_flush_rxfifo(i2c_base);
 
 	i2c_setaddress(i2c_base, chip);
 	while (alen) {
@@ -431,10 +440,8 @@ static int i2c_xfer_finish(struct i2c_regs *i2c_base)
 
 	if (i2c_wait_for_bb(i2c_base)) {
 		printf("Timed out waiting for bus\n");
-		return 1;
+		return -ETIMEDOUT;
 	}
-
-	i2c_flush_rxfifo(i2c_base);
 
 	return 0;
 }
@@ -505,7 +512,7 @@ static int __dw_i2c_read(struct i2c_regs *i2c_base, u8 dev, uint addr,
 		}
 	}
 
-	return i2c_xfer_finish(i2c_base);
+	return 0;
 }
 
 /*
@@ -564,7 +571,7 @@ static int __dw_i2c_write(struct i2c_regs *i2c_base, u8 dev, uint addr,
 		}
 	}
 
-	return i2c_xfer_finish(i2c_base);
+	return 0;
 }
 
 /*
@@ -645,13 +652,21 @@ static void dw_i2c_init(struct i2c_adapter *adap, int speed, int slaveaddr)
 static int dw_i2c_read(struct i2c_adapter *adap, u8 dev, uint addr,
 		       int alen, u8 *buffer, int len)
 {
-	return __dw_i2c_read(i2c_get_base(adap), dev, addr, alen, buffer, len);
+	int ret, ret2;
+
+	ret = __dw_i2c_read(i2c_get_base(adap), dev, addr, alen, buffer, len);
+	ret2 = i2c_xfer_finish(i2c->regs);
+	return (ret != 0) ? ret : ret2;
 }
 
 static int dw_i2c_write(struct i2c_adapter *adap, u8 dev, uint addr,
 			int alen, u8 *buffer, int len)
 {
-	return __dw_i2c_write(i2c_get_base(adap), dev, addr, alen, buffer, len);
+	int ret, ret2;
+
+	ret = __dw_i2c_write(i2c_get_base(adap), dev, addr, alen, buffer, len);
+	ret2 = i2c_xfer_finish(i2c->regs);
+	return (ret != 0) ? ret : ret2;
 }
 
 /* dw_i2c_probe - Probe the i2c chip */
@@ -684,6 +699,12 @@ static int designware_i2c_xfer(struct udevice *bus, struct i2c_msg *msg,
 	struct dw_i2c *i2c = dev_get_priv(bus);
 	int ret;
 
+	/* Wait for bus busy previous transaction */
+	if (i2c_wait_for_bb(i2c->regs)) {
+		printf("Timed out waiting for bus\n");
+		return -ETIMEDOUT;
+	}
+
 	debug("i2c_xfer: %d messages\n", nmsgs);
 	for (; nmsgs > 0; nmsgs--, msg++) {
 		debug("i2c_xfer: chip=0x%x, len=0x%x\n", msg->addr, msg->len);
@@ -695,8 +716,14 @@ static int designware_i2c_xfer(struct udevice *bus, struct i2c_msg *msg,
 					     msg->buf, msg->len);
 		}
 		if (ret) {
-			debug("i2c_write: error sending\n");
+			debug("i2c: Remote I/O error\n");
 			return -EREMOTEIO;
+		}
+
+		if (msg->flags & I2C_M_STOP || 1 == nmsgs)  {
+			ret = i2c_xfer_finish(i2c->regs);
+			if (ret)
+				return ret;
 		}
 	}
 

@@ -94,7 +94,7 @@ static int i2c_read_bytewise(struct udevice *dev, uint offset,
 			return -EINVAL;
 		ptr = msg + 1;
 		ptr->addr = msg->addr;
-		ptr->flags = msg->flags | I2C_M_RD;
+		ptr->flags = msg->flags | I2C_M_RD | I2C_M_STOP;
 		ptr->len = 1;
 		ptr->buf = &buffer[i];
 		ptr++;
@@ -122,6 +122,7 @@ static int i2c_write_bytewise(struct udevice *dev, uint offset,
 		if (i2c_setup_offset(chip, offset + i, buf, msg))
 			return -EINVAL;
 		buf[msg->len++] = buffer[i];
+		msg->flags |= I2C_M_STOP;
 
 		ret = ops->xfer(bus, msg, 1);
 		if (ret)
@@ -151,7 +152,7 @@ int dm_i2c_read(struct udevice *dev, uint offset, uint8_t *buffer, int len)
 	if (len) {
 		ptr->addr = msg->addr;
 		ptr->flags = chip->flags & DM_I2C_CHIP_10BIT ? I2C_M_TEN : 0;
-		ptr->flags |= I2C_M_RD;
+		ptr->flags |= I2C_M_RD | I2C_M_STOP;
 		ptr->len = len;
 		ptr->buf = buffer;
 		ptr++;
@@ -203,6 +204,7 @@ int dm_i2c_write(struct udevice *dev, uint offset, const uint8_t *buffer,
 
 	i2c_setup_offset(chip, offset, buf, msg);
 	msg->len += len;
+	msg->flags |= I2C_M_STOP;
 	memcpy(buf + chip->offset_len, buffer, len);
 
 	ret = ops->xfer(bus, msg, 1);
@@ -284,6 +286,7 @@ static int i2c_probe_chip(struct udevice *bus, uint chip_addr,
 	/* Probe with a zero-length message */
 	msg->addr = chip_addr;
 	msg->flags = chip_flags & DM_I2C_CHIP_10BIT ? I2C_M_TEN : 0;
+	msg->flags |= I2C_M_STOP;
 	msg->len = 0;
 	msg->buf = NULL;
 
