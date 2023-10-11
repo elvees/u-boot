@@ -1346,6 +1346,7 @@ dtb-$(CONFIG_ARCH_MCOM03) += \
 	mcom03-elvmc03smarc-r1.0-rockpi-n10.dtb \
 	mcom03-elvmc03smarc-r2.2-elvsmarccb-r2.9.dtb \
 	mcom03-elvmc03smarc-r2.6.1-elvsmarccb-r2.10.3.dtb \
+	mcom03-elvmc03smarc-r2.6.1-elvsmarccb-r3.1.0.dtb \
 	mcom03-bub-r1.3.0.dtb \
 	mcom03-haps-cpu.dtb \
 	mcom03-haps-sdr.dtb \
