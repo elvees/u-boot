@@ -10,10 +10,10 @@
 #include "mcom03-elvmc03q7-r2.1.1.dtsi"
 
 / {
-	model = "ELV-MC03-Q7 r2.1.1, ELV-Q7-CB r1.0";
-	compatible = "elvees,elvmc03q7-r2.1.1-elvq7cb-r1.0",
+	model = "ELV-MC03-Q7 r2.1.1, ELV-Q7-CB r1.0.0";
+	compatible = "elvees,elvmc03q7-r2.1.1-elvq7cb-r1.0.0",
 		     "elvees,elvmc03q7-elvq7cb",
-		     "elvees,elvq7cb-r1.0",
+		     "elvees,elvq7cb-r1.0.0",
 		     "elvees,elvq7cb",
 		     "elvees,elvmc03q7-r2.1.1",
 		     "elvees,elvmc03q7",
