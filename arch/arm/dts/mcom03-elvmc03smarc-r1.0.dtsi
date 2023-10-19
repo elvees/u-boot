@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0+
-/*
- * Copyright 2021 RnD Center "ELVEES", JSC
- */
+// Copyright 2021-2024 RnD Center "ELVEES", JSC
 
 /dts-v1/;
 
@@ -22,6 +20,10 @@
 		regulator-min-microvolt = <1800000>;
 		regulator-max-microvolt = <1800000>;
 		regulator-always-on;
+	};
+
+	aliases {
+		i2c_pm = &i2c0;
 	};
 };
 
@@ -108,3 +110,5 @@
 ser1: &uart0 { };
 ser2: &uart2 { };
 ser3: &uart1 { };
+
+i2c_pm: &i2c0 { };

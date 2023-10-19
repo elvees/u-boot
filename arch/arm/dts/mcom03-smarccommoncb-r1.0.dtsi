@@ -1,0 +1,52 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright 2024 RnD Center "ELVEES", JSC
+
+/* Connected to MicroSD card */
+&sdhci1 {
+	status = "okay";
+
+	/* Unstable at 25 MHz */
+	max-frequency = <12000000>;
+
+	/* Disable High Speed support
+	 * Disable 1.8V support
+	 * Disable SDR50, SDR104 and DDR50 support
+	 */
+	sdhci-caps-mask = <0x7 0x4200000>;
+	sdhci-caps = <0x0 0x0>;
+
+	/* SDIO_WP is not connected on Rock Pi N10 */
+	disable-wp;
+
+	/* The default clock pad drive strength of 6 mA is insufficient
+	 * for some NGFW-CBs resulting in unstable SDMMC performance,
+	 * especially at higher CPU temperatures.
+	 */
+	elvees,drive-strength-clk = <8>;
+};
+
+&ser1 {
+	status = "okay";
+	clock-frequency = <27920454>;
+};
+
+&usb0 {
+	status = "okay";
+};
+
+&usb1 {
+	status = "okay";
+};
+
+&emac0 {
+	status = "okay";
+};
+
+&i2c_pm {
+	status = "okay";
+
+	eeprom@57 {
+		compatible = "microchip,24c32", "atmel,24c32";
+		reg = <0x57>;
+	};
+};

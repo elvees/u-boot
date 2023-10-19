@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0+
-/*
- * Copyright 2023 RnD Center "ELVEES", JSC
- */
+// Copyright 2023-2024 RnD Center "ELVEES", JSC
 
 /dts-v1/;
 
@@ -14,6 +12,10 @@
 	compatible = "elvees,elvmc03smarc-r2.2",
 		     "elvees,elvmc03smarc",
 		     "elvees,mcom03";
+
+	aliases {
+		i2c_pm = &i2c0;
+	};
 
 	sdhci0_supply: regulator@0 {
 		compatible = "regulator-fixed";
@@ -55,6 +57,8 @@ ser0: &uart3 { };
 ser1: &uart0 { };
 ser2: &uart2 { };
 ser3: &uart1 { };
+
+i2c_pm: &i2c0 { };
 
 /* PHY VDD is 3.3V */
 &emac0 {
