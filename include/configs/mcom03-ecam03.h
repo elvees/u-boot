@@ -11,11 +11,11 @@
 #include "mcom03-common.h"
 
 #define BOOTENV_DEV_ECAM(devtypeu, devtypel, instance) \
-	"bootcmd_ecam_mmc" #instance "=" \
+	"bootcmd_" #devtypel #instance "=" \
 	"env export -t ${loadaddr};" \
 	"env append -0x30000;" \
 	"devtype=mmc;" \
-	"devnum=" #instance "; " \
+	"devnum=" #instance ";" \
 	"if test \"${bootvol}\" = \"b\"; then " \
 		"distro_bootpart=2;" \
 	"else " \
@@ -28,11 +28,11 @@
 	"fi;\0"
 
 #define BOOTENV_DEV_NAME_ECAM(devtypeu, devtypel, instance) \
-	"ecam_mmc" #instance " "
+	#devtypel #instance " "
 
 #define BOOT_TARGET_DEVICES_ECAM(func) \
-	func(ECAM, ecam_mmc, 1) \
-	func(ECAM, ecam_mmc, 0)
+	func(ECAM, mmc, 1) \
+	func(ECAM, mmc, 0)
 
 #define BOOT_TARGET_DEVICES(func) \
 	BOOT_TARGET_DEVICES_ECAM(func)
