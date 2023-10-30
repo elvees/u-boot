@@ -31,6 +31,7 @@ struct factory_settings {
 	char *eth0_mac;
 	char *eth1_mac;
 	char *serial;
+	char *boot_targets;
 };
 
 static int set_board_from_dtb(void)
@@ -207,6 +208,9 @@ static int load_factory_settings(struct factory_settings *factory)
 	/* Duplicate factory_serial */
 	factory->serial = strdup(env_get("factory_serial"));
 
+	/* Duplicate factory_boot_targets */
+	factory->boot_targets = strdup(env_get("factory_boot_targets"));
+
 	/* Restore saved environment */
 	if (!himport_r(&env_htab, saved_env, saved_size, '\n', 0, 0, 0, NULL)) {
 		printf("\n   Unable to restore env: (%d)\n", errno);
@@ -316,6 +320,16 @@ int do_factory_settings(void)
 		}
 	}
 
+	/* Set boot_targets with factory value if necessary */
+	if (factory.boot_targets) {
+		if (env_set("boot_targets", factory.boot_targets)) {
+			printf("\n   Unable to set boot_targets using factory value %s\n",
+			       factory.boot_targets);
+			ret = -EINVAL;
+			goto exit;
+		}
+	}
+
 exit:
 	/* Free allocated resources if necessary */
 	if (factory.wp)
@@ -328,6 +342,8 @@ exit:
 		free(factory.eth1_mac);
 	if (factory.serial)
 		free(factory.serial);
+	if (factory.boot_targets)
+		free(factory.boot_targets);
 
 	return ret;
 }
