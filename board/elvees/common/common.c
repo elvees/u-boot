@@ -7,6 +7,7 @@
 #include <dm.h>
 #include <dm/of_access.h>
 #include <env.h>
+#include <i2c.h>
 #include <init.h>
 #include <asm/armv8/mmu.h>
 #include <asm/global_data.h>
@@ -258,6 +259,34 @@ static void power_init_trustphonepm(void)
 	writel(val, LSP1_GPIO_SWPORTD_DR);
 }
 
+#if CONFIG_IS_ENABLED(DM_I2C)
+static void power_init_pm03cam_osm_r104(void)
+{
+	struct udevice *udev;
+	int ret;
+
+	ret = i2c_get_chip_for_busnum(0, 0x4B, 1, &udev);
+	if (ret) {
+		printf("%s: Cannot find udev for a bus 0\n", __func__);
+		return;
+	}
+
+	/* Enable the write access to BUCK1 and BUCK5 registers */
+	dm_i2c_reg_write(udev, 0x2F, 0x01);
+
+	/* Set BUCK1 RUN voltage to 0.9V */
+	dm_i2c_reg_write(udev, 0x0D, 0x14);
+
+	/* Enable BUCK5 */
+	dm_i2c_reg_write(udev, 0x09, 0x03);
+
+	/* Disable the write access to BUCK1 and BUCK5 registers */
+	dm_i2c_reg_write(udev, 0x2F, 0x03);
+
+	mdelay(1);
+}
+#endif
+
 int power_init_board(void)
 {
 	if (of_machine_is_compatible("elvees,elvmc03smarc-r1.0"))
@@ -404,6 +433,11 @@ int board_init(void)
 	writel(0x20, DDR_SUBS_URB_BASE + GPU_BAR);
 	writel(0x20, DDR_SUBS_URB_BASE + LSPERIPH0_BAR);
 	writel(0x20, DDR_SUBS_URB_BASE + LSPERIPH1_BAR);
+
+#if CONFIG_IS_ENABLED(DM_I2C)
+	if (of_machine_is_compatible("elvees,pm03cam-osm-r1.04"))
+		power_init_pm03cam_osm_r104();
+#endif
 
 	ret = mcom03_subsystem_init(MEDIA_SUBS);
 	if (ret)
