@@ -63,7 +63,7 @@
 	};
 };
 
-&qlic0 {
+&qlic1 {
 	status = "okay";
 };
 
