@@ -148,6 +148,16 @@
 			status = "disabled";
 		};
 
+		i2c4: i2c@1f090000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "snps,designware-i2c";
+			reg = <0 0x1f090000 0 0x10000>;
+			clocks = <&i2c4_ext_clk>,  <&i2c4_clk>;
+			i2c-sda-hold-time-ns = <300>;
+			status = "disabled";
+		};
+
 		qspi0_axi_clk: qspi0_axi_clk {
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
@@ -158,6 +168,18 @@
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <27000000>;
+		};
+
+		i2c4_clk: i2c4_clk {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <99000000>;
+		};
+
+		i2c4_ext_clk: i2c4_ext_clk {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <49500000>;
 		};
 
 		apb_clk: apb_clk {
