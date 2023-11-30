@@ -434,7 +434,7 @@ int board_init(void)
 	writel(0x20, DDR_SUBS_URB_BASE + HSPERIPH_BAR);
 
 #if CONFIG_IS_ENABLED(DM_I2C)
-	if (of_machine_is_compatible("elvees,pm03cam-osm-r1.04"))
+	if (of_machine_is_compatible("elvees,pm03camosm-r1.04"))
 		power_init_pm03cam_osm_r104();
 #endif
 
