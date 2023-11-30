@@ -34,3 +34,16 @@
 	sdhci-caps-mask = <0x7 0x4000000>;
 	sdhci-caps = <0x0 0x0>;
 };
+
+&emac0 {
+	status = "okay";
+	phy-mode = "rgmii-id";
+	elvees,pads-1v8-en;
+
+	phy-handle = <&ethernet_phy0>;
+
+	ethernet_phy0: ethernet-phy@0 {
+		compatible = "ethernet-phy-id001c.c916", "ethernet-phy-ieee802.3-c22";
+		reg = <0x4>;
+	};
+};
