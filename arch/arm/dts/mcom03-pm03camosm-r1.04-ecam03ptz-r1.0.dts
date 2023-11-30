@@ -9,7 +9,7 @@
 #include <dt-bindings/input/input.h>
 
 / {
-	model = "ECAM03PTZ r1.0";
+	model = "PM03CAM-OSM r1.04, ECAM03PTZ r1.0";
 	compatible = "elvees,pm03camosm-r1.04-ecam03ptz-r1.0",
 		     "elvees,pm03camosm-ecam03ptz",
 		     "elvees,ecam03ptz-r1.0",
