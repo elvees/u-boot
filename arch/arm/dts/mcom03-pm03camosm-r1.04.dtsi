@@ -26,8 +26,6 @@
 		regulator-max-microvolt = <1800000>;
 		regulator-always-on;
 	};
-
-	/delete-node/ sdr@1900000;
 };
 
 &i2c4 {
