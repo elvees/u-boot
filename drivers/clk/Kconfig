@@ -137,6 +137,14 @@ config CLK_K210_SET_RATE
 	  Add functionality to calculate new rates for K210 PLLs. Enabling this
 	  feature adds around 1K to U-Boot's final size.
 
+config CLK_MCOM03
+	bool "Enable MCom-03 clock driver"
+	depends on CLK && ARCH_MCOM03
+	select CLK_CCF
+	default y
+	help
+	  Support for the clock driver of the MCom-03 SoC.
+
 config CLK_MPC83XX
 	bool "Enable MPC83xx clock driver"
 	depends on CLK
