@@ -5,6 +5,7 @@
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/soc/elvees,mcom03.h>
+#include <dt-bindings/clock/mcom03-clock.h>
 
 / {
 	compatible = "elvees,mcom03";
@@ -118,6 +119,30 @@
 		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_LOW>;
 	};
 
+	clk125: clk125 {
+		#clock-cells = <0>;
+		compatible = "elvees,mcom03-clk-fixed";
+		clock-frequency = <125000000>;
+		elvees,id = <CLK_CLK125>;
+	};
+
+	i2s_sclk_in: i2s_sclk_in {
+		#clock-cells = <0>;
+		compatible = "elvees,mcom03-clk-fixed";
+		clock-frequency = <12288000>;
+		elvees,id = <CLK_I2S0_SCLK_IN>;
+	};
+
+	clock: clock-controller {
+		#clock-cells = <1>;
+		compatible = "elvees,mcom03-clk";
+		clocks = <&xti_clk>, <&clk125>, <&i2s_sclk_in>;
+		elvees,pll-max-nr = <CLK_HSP_PLL0 3>;
+		elvees,ucg-fixed-freq-mask = <CLK_CPU_UCG0 0x7>,
+					     <CLK_SERVICE_UCG0 0xfff>;
+		elvees,service-urb = <&service_urb>;
+	};
+
 	service@1f000000 {
 		compatible = "simple-bus";
 		#address-cells = <2>;
@@ -142,7 +167,8 @@
 			#size-cells = <0>;
 			reg = <0 0x1ff00000 0 0x10000>;
 			clock-names = "clk_axi", "clk_ext";
-			clocks = <&qspi0_axi_clk>, <&qspi0_ext_clk>;
+			clocks = <&clock CLK_SERVICE_UCG0_QSPI0>,
+				 <&clock CLK_SERVICE_UCG0_QSPI0_EXT>;
 			elvees,urb = <&service_urb>;
 			num-cs = <4>;
 			status = "disabled";
@@ -153,39 +179,10 @@
 			#size-cells = <0>;
 			compatible = "snps,designware-i2c";
 			reg = <0 0x1f090000 0 0x10000>;
-			clocks = <&i2c4_ext_clk>,  <&i2c4_clk>;
+			clocks = <&clock CLK_SERVICE_UCG0_I2C4_EXT>,
+				 <&clock CLK_SERVICE_UCG0_I2C4>;
 			i2c-sda-hold-time-ns = <300>;
 			status = "disabled";
-		};
-
-		qspi0_axi_clk: qspi0_axi_clk {
-			#clock-cells = <0>;
-			compatible = "fixed-clock";
-			clock-frequency = <297000000>;
-		};
-
-		qspi0_ext_clk: qspi0_ext_clk {
-			#clock-cells = <0>;
-			compatible = "fixed-clock";
-			clock-frequency = <27000000>;
-		};
-
-		i2c4_clk: i2c4_clk {
-			#clock-cells = <0>;
-			compatible = "fixed-clock";
-			clock-frequency = <99000000>;
-		};
-
-		i2c4_ext_clk: i2c4_ext_clk {
-			#clock-cells = <0>;
-			compatible = "fixed-clock";
-			clock-frequency = <49500000>;
-		};
-
-		apb_clk: apb_clk {
-			#clock-cells = <0>;
-			compatible = "fixed-clock";
-			clock-frequency = <54000000>;
 		};
 	};
 
@@ -243,8 +240,10 @@
 			interrupt-names = "DE", "SE";
 			reg = <0 0x1300000 0 0x10000>;
 			resets = <&media_reset MEDIA_RST_DISPLAY>;
-			clocks = <&dp_dummy_clk>, <&dp_dummy_clk>,
-				 <&dp_pix_clk>, <&dp_pix_clk>;
+			clocks = <&clock CLK_MEDIA_UCG0_SYSA>,
+				 <&clock CLK_MEDIA_UCG1_DISP_A>,
+				 <&clock CLK_MEDIA_UCG1_DISP_M>,
+				 <&clock CLK_MEDIA_UCG1_DISP_PXL>;
 			clock-names = "pclk", "aclk", "mclk", "pxlclk";
 			arm,malidp-output-port-lines = /bits/ 8 <8 8 8>;
 			status = "disabled";
@@ -262,7 +261,7 @@
 			#size-cells = <0>;
 			compatible = "snps,designware-i2c";
 			reg = <0 0x1630000 0 0x10000>;
-			clocks = <&i2c0_clk>;
+			clocks = <&clock CLK_LSP0_UCG0_I2C0>;
 			interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
 			i2c-sda-hold-time-ns = <300>;
 			status = "disabled";
@@ -383,7 +382,9 @@
 				#size-cells = <0>;
 				compatible = "elvees,arasan-gemac";
 				reg = <0 0x10200000 0 0x1000>;
-				clocks = <&eth_bus_clk>;
+				clock-names = "axiahb", "txc";
+				clocks = <&clock CLK_HSP_UCG0_EMAC0>,
+					 <&clock CLK_HSP_UCG2_EMAC0_RGMII_TXC>;
 				interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&hsperiph_reset HSPERIPH_RST_EMAC0>;
 				elvees,ctrl-id = <0>;
@@ -395,7 +396,9 @@
 				#size-cells = <0>;
 				compatible = "elvees,arasan-gemac";
 				reg = <0 0x10210000 0 0x1000>;
-				clocks = <&eth_bus_clk>;
+				clock-names = "axiahb", "txc";
+				clocks = <&clock CLK_HSP_UCG0_EMAC1>,
+					 <&clock CLK_HSP_UCG2_EMAC1_RGMII_TXC>;
 				interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&hsperiph_reset HSPERIPH_RST_EMAC1>;
 				elvees,ctrl-id = <1>;
@@ -410,7 +413,8 @@
 			interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
 			/* Linux driver requires the following clock names */
 			clock-names = "clk_xin", "clk_ahb";
-			clocks = <&sdmmc_clk>, <&sdmmc_clk>;
+			clocks = <&clock CLK_HSP_UCG1_SDMMC0_XIN>,
+				 <&clock CLK_HSP_UCG0_SDMMC0>;
 			resets = <&hsperiph_reset HSPERIPH_RST_SDMMC0>;
 			elvees,ctrl-id = <0>;
 			status = "disabled";
@@ -440,7 +444,8 @@
 			arasan,soc-ctl-syscon = <&hsperiph_urb>;
 			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
 			clock-names = "clk_xin", "clk_ahb";
-			clocks = <&sdmmc_clk>, <&sdmmc_clk>;
+			clocks = <&clock CLK_HSP_UCG1_SDMMC1_XIN>,
+				 <&clock CLK_HSP_UCG0_SDMMC1>;
 			resets = <&hsperiph_reset HSPERIPH_RST_SDMMC1>;
 			elvees,ctrl-id = <1>;
 			status = "disabled";
@@ -459,7 +464,8 @@
 		};
 
 		nand: nfc@10240000 {
-			clocks = <&nfc_clk>, <&nfc_axi_clk>;
+			clocks = <&clock CLK_HSP_UCG1_NFC_FLASH>,
+				 <&clock CLK_HSP_UCG0_NFC>;
 			clock-names = "clk_flash", "clk_sys";
 			compatible = "arasan,nfc-v3p16";
 			reg = <0 0x10240000 0 0x10000>;
@@ -475,23 +481,12 @@
 			#size-cells = <0>;
 			reg = <0 0x10260000 0 0x10000>;
 			clock-names = "clk_axi", "clk_ext";
-			clocks = <&qspi1_axi_clk>, <&qspi1_ext_clk>;
+			clocks = <&clock CLK_HSP_UCG0_QSPI>,
+				 <&clock CLK_HSP_UCG1_QSPI_EXT>;
 			resets = <&hsperiph_reset HSPERIPH_RST_QSPI>;
 			elvees,urb = <&hsperiph_urb>;
 			num-cs = <4>;
 			status = "disabled";
-		};
-
-		qspi1_axi_clk: qspi1_axi_clk {
-			#clock-cells = <0>;
-			compatible = "fixed-clock";
-			clock-frequency = <93750000>;
-		};
-
-		qspi1_ext_clk: qspi1_ext_clk {
-			#clock-cells = <0>;
-			compatible = "fixed-clock";
-			clock-frequency = <25000000>;
 		};
 
 		usb0: usb@10000000 {
@@ -500,7 +495,9 @@
 			ranges;
 			compatible = "elvees,mcom03-dwc3";
 			clock-names = "bus_early", "ref", "suspend";
-			clocks = <&usb_bus_clk>, <&usb_ref_clk>, <&usb_suspend_clk>;
+			clocks = <&clock CLK_HSP_UCG0_USB0>,
+				 <&usb_ref_clk>,
+				 <&clock CLK_HSP_UCG3_USB0_SUSPEND>;
 			resets = <&hsperiph_reset HSPERIPH_RST_USB0>;
 			elvees,urb = <&hsperiph_urb>;
 			elvees,ctrl-id = <0>;
@@ -519,7 +516,9 @@
 			ranges;
 			compatible = "elvees,mcom03-dwc3";
 			clock-names = "bus_early", "ref", "suspend";
-			clocks = <&usb_bus_clk>, <&usb_ref_clk>, <&usb_suspend_clk>;
+			clocks = <&clock CLK_HSP_UCG0_USB1>,
+				 <&usb_ref_clk>,
+				 <&clock CLK_HSP_UCG3_USB1_SUSPEND>;
 			resets = <&hsperiph_reset HSPERIPH_RST_USB1>;
 			elvees,urb = <&hsperiph_urb>;
 			elvees,ctrl-id = <1>;
@@ -585,7 +584,7 @@
 			#size-cells = <0>;
 			compatible = "snps,designware-i2c";
 			reg = <0 0x1710000 0 0x10000>;
-			clocks = <&i2c_clk>;
+			clocks = <&clock CLK_LSP1_UCG0_I2C1>;
 			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
 			i2c-sda-hold-time-ns = <300>;
 			status = "disabled";
@@ -596,7 +595,7 @@
 			#size-cells = <0>;
 			compatible = "snps,designware-i2c";
 			reg = <0 0x1720000 0 0x10000>;
-			clocks = <&i2c_clk>;
+			clocks = <&clock CLK_LSP1_UCG0_I2C2>;
 			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
 			i2c-sda-hold-time-ns = <300>;
 			status = "disabled";
@@ -607,7 +606,7 @@
 			#size-cells = <0>;
 			compatible = "snps,designware-i2c";
 			reg = <0 0x1730000 0 0x10000>;
-			clocks = <&i2c_clk>;
+			clocks = <&clock CLK_LSP1_UCG0_I2C3>;
 			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
 			i2c-sda-hold-time-ns = <300>;
 			status = "disabled";
@@ -749,40 +748,10 @@
 		};
 	};
 
-	cpu_clk: cpu_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <1400000000>;
-	};
-
 	xti_clk: xti_clk {
 		#clock-cells = <0>;
 		compatible = "fixed-clock";
 		clock-frequency = <27000000>;
-	};
-
-	eth_bus_clk: eth_bus_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <125000000>;
-	};
-
-	sdmmc_clk: sdmmc_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <125000000>;
-	};
-
-	usb_suspend_clk: usb_suspend_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <25000000>;
-	};
-
-	usb_bus_clk: usb_bus_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <125000000>;
 	};
 
 	/* External low-jitter clock for USB */
@@ -790,41 +759,5 @@
 		#clock-cells = <0>;
 		compatible = "fixed-clock";
 		clock-frequency = <100000000>;
-	};
-
-	i2c0_clk: i2c0_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <94500000>;
-	};
-
-	i2c_clk: i2c_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <102375000>;
-	};
-
-	dp_pix_clk: dp_pix_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <148500000>;
-	};
-
-	dp_dummy_clk: dp_dummy_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <594000000>;
-	};
-
-	nfc_axi_clk: nfc_axi_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <125000000>;
-	};
-
-	nfc_clk: nfc_clk {
-		#clock-cells = <0>;
-		compatible = "fixed-clock";
-		clock-frequency = <93750000>;
 	};
 };

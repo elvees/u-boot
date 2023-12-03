@@ -15,10 +15,6 @@
 	};
 };
 
-&cpu_clk {
-	clock-frequency = <10000000>;
-};
-
 &xti_clk {
 	clock-frequency = <5000000>;
 };

@@ -37,7 +37,6 @@
 &emac0 {
 	phy-mode = "rgmii";
 	phy-handle = <&ethernet_phy0>;
-	clocks = <&eth_bus_clk>;
 	phy-reset-gpios = <&gpio0d 6 GPIO_ACTIVE_LOW>;
 	elvees,pads-1v8-en;
 
@@ -58,7 +57,6 @@
 &emac1 {
 	phy-mode = "rgmii";
 	phy-handle = <&ethernet_phy1>;
-	clocks = <&eth_bus_clk>;
 	phy-reset-gpios = <&gpio0c 7 GPIO_ACTIVE_LOW>;
 	elvees,pads-1v8-en;
 
