@@ -1,0 +1,100 @@
+Bindings for ELVEES MCom-03 clocks.
+
+MCom-03 SoC has several UCG (Universal Clock Generator) and several PLL.
+UCG has up to four reference clock inputs and up to 16 output channels.
+Each channel has own 20-bit divider and gate. All output channels use
+single reference clock. Some UCGs (in HSPERIPH, LSPERIPH1 and SDR
+subsystems) can use one of several (up to four) reference clocks.
+In this case reference clock for dividing can be selected by reference
+clock multiplexor (REF MUX).
+MCom-03 datasheet says that REF MUX is part of UCG, but in U-Boot using
+separate driver for REF MUX is more convenient.
+           +---------+   +-------------------+
+           | REF MUX |   |         UCG       |
+           |         |   |    +------------+ |
+           |         |   | +--|-DIV---GATE-|-|- channel 0
+  clk_ref0-|         |   | |  +------------+ |
+  clk_ref1-|         |---|-+--|-DIV---GATE-|-|- channel 1
+  clk_ref2-|         |   | |  +------------+ |
+  clk_ref3-|         |   | +................ |...
+           |         |   | |  +------------+ |
+           |         |   | +--|-DIV---GATE-|-|- channel 15
+           |         |   |    +------------+ |
+           +---------+   +-------------------+
+
+Required properties:
+ - compatible: Shall be "elvees,mcom03-clk"
+ - clocks: Points to a fixed parent clocks that provides the input frequency.
+           Shall contain three values:
+            * XTI clock;
+            * CLK125;
+            * I2S_SCLK_IN.
+ - #clock-cells: From common clock bindings: Shall be 1.
+ - elvees,service-urb: Shall contain a pointer to URB of Service subsystem.
+
+Optional properties:
+ - elvees,pll-max-nr: Maximal NR parameter for PLL setup. Large value increases
+                      the number of available frequencies that PLL can be tuned
+                      to, but increases output jitter.
+                      Driver try to use minimal NR parameter from range
+                      [1 ... pll_max_nr] to set requested frequency.
+                      If requested frequency can not be set accurately then
+                      driver will use nearest frequency that does not exceed
+                      the requested frequency.
+                      Property specifies PLL and maximal NR value by pairs:
+                      <CLK_*_PLL* value1>, <CLK_*_PLL* value2>, ...
+ - elvees,ucg-fixed-freq-mask: Mask of UCG channels that must be read only.
+                               Property specified UCG and mask by pair.
+ - elvees,ucg-round-up-mask: Mask of UCG channels which rate must be set with
+                             rounding up. By default rate is rounded down.
+                             Property specifies UCG and mask by pair.
+
+
+Example:
+
+	clk125: clk125 {
+		#clock-cells = <0>;
+		compatible = "elvees,mcom03-clk-fixed";
+		clock-frequency = <125000000>;
+		elvees,id = <CLK_CLK125>;
+	};
+
+	clock: clock-controller {
+		#clock-cells = <1>;
+		compatible = "elvees,mcom03-clk";
+		clocks = <&xti_clk>, <&clk125>;
+		assigned-clocks = <&clock CLK_MEDIA_PLL3>,
+				  <&clock CLK_LSP0_UCG0_SYS>,
+				  <&clock CLK_MEDIA_UCG3_MIPI_TXCLKESC>;
+		assigned-clock-rates = <2376000000
+					94500000
+					19800000>;
+		elvees,pll-max-nr = <CLK_HSP_PLL0 3>;
+		elvees,ucg-fixed-freq-mask = <CLK_CPU_UCG0 0x7>,
+					     <CLK_SERVICE_UCG0 0xfff>;
+		elvees,ucg-round-up-mask = <CLK_LSP0_UCG0 0xe>,
+					   <CLK_LSP1_UCG0 0x40>;
+		elvees,service-urb = <&service_urb>;
+	};
+
+	xti_clk: xti_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <27000000>;
+	};
+
+	hsperiph@0 {
+		compatible = "simple-bus";
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+		assigned-clocks = <&clock CLK_HSP_REFMUX0>,
+				  <&clock CLK_HSP_REFMUX1>,
+				  <&clock CLK_HSP_REFMUX2>,
+				  <&clock CLK_HSP_REFMUX3>;
+		assigned-clock-parents = <&clock CLK_HSP_PLL0>,
+					 <&clock CLK_HSP_PLL0>,
+					 <&clock CLK_CLK125>,
+					 <&clock CLK_HSP_PLL0>;
+		..........
+	};

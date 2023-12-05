@@ -1,0 +1,19 @@
+Bindings for ELVEES MCom-03 fixed input clocks.
+
+See elvees,mcom03-clk.txt for MCom-03 clocks description.
+
+Required properties:
+ - compatible: Shall be "elvees,mcom03-clk-fixed"
+ - #clock-cells: From common clock bindings: Shall be 0.
+ - elvees,id: Shall contain ID of clock (CLK_CLK125 or CLK_I2S0_SCLK_IN).
+ - clock-frequency: Shall contain fixed clock frequency.
+
+
+Example:
+
+	clk125: clk125 {
+		#clock-cells = <0>;
+		compatible = "elvees,mcom03-clk-fixed";
+		clock-frequency = <125000000>;
+		elvees,id = <CLK_CLK125>;
+	};
