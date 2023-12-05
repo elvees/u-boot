@@ -5,6 +5,7 @@
  * Arasan Gigabit Ethernet MAC driver
  */
 
+#include <clk.h>
 #include <common.h>
 #include <asm/gpio.h>
 #include <dm.h>
@@ -136,6 +137,8 @@ struct arasan_gemac_priv {
 	struct reset_ctl rst_ctl;
 	struct mii_dev *bus;
 	struct phy_device *phydev;
+	struct clk axiahb_clk;
+	struct clk tx_clk;
 	int phy_addr;
 	phy_interface_t phy_interface;
 	struct gpio_desc phy_reset;
@@ -261,6 +264,7 @@ static void arasan_gemac_adjust_link(struct udevice *dev)
 	struct arasan_gemac_priv *priv = dev_get_priv(dev);
 	struct phy_device *phydev = priv->phydev;
 	u32 mac_global_ctrl = 0;
+	ulong new_rate = 2500000;
 
 	if (phydev->duplex == DUPLEX_FULL)
 		mac_global_ctrl |= MAC_GLOBAL_CTRL_FULL_DUPLEX_MODE;
@@ -276,11 +280,17 @@ static void arasan_gemac_adjust_link(struct udevice *dev)
 	case SPEED_100:
 		mac_global_ctrl |= MAC_GLOBAL_CTRL_SPEED_100_MBPS;
 		writel(128, priv->base + MAC_TX_PACKET_START_THRESHOLD);
+		new_rate = 25000000;
 		break;
 	case SPEED_1000:
 		mac_global_ctrl |= MAC_GLOBAL_CTRL_SPEED_1000_MBPS;
 		writel(1024, priv->base + MAC_TX_PACKET_START_THRESHOLD);
+		new_rate = 125000000;
 		break;
+	}
+	if (clk_get_rate(&priv->tx_clk) != new_rate) {
+		if (clk_set_rate(&priv->tx_clk, new_rate) != new_rate)
+			log_err("Can not setup txc clock to %ld Hz\n", new_rate);
 	}
 
 	writel(mac_global_ctrl, priv->base + MAC_GLOBAL_CTRL);
@@ -575,13 +585,24 @@ static int arasan_gemac_probe(struct udevice *dev)
 			return ret;
 	}
 
+	ret = clk_get_by_name(dev, "axiahb", &priv->axiahb_clk);
+	if (ret && ret != -ENODATA)
+		return ret;
+
+	ret = clk_get_by_name(dev, "txc", &priv->tx_clk);
+	if (ret && ret != -ENODATA)
+		return ret;
+
+	clk_enable(&priv->axiahb_clk);
+	clk_enable(&priv->tx_clk);
+
 	ret = reset_get_by_index(dev, 0, &priv->rst_ctl);
 	if (ret != 0 && ret != -ENOTSUPP)
-		return ret;
+		goto error_disable_clock;
 
 	ret = reset_deassert(&priv->rst_ctl);
 	if (ret != 0)
-		return ret;
+		goto error_disable_clock;
 
 	/* TODO: Is it really required ? */
 	mdelay(100);
@@ -622,6 +643,10 @@ error_phy_init:
 
 error_assert_reset:
 	reset_assert(&priv->rst_ctl);
+
+error_disable_clock:
+	clk_disable(&priv->tx_clk);
+	clk_disable(&priv->axiahb_clk);
 	return ret;
 }
 
@@ -635,6 +660,9 @@ int arasan_gemac_remove(struct udevice *dev)
 
 	mdio_unregister(priv->bus);
 	mdio_free(priv->bus);
+
+	clk_disable(&priv->tx_clk);
+	clk_disable(&priv->axiahb_clk);
 
 	return reset_assert(&priv->rst_ctl);
 }
