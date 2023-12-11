@@ -6,7 +6,6 @@
 #ifndef __MCOM03_CLK
 #define __MCOM03_CLK
 
-int clk_cfg(void);
 int clk_cfg_sdr(void);
 
 #endif

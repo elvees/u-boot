@@ -460,10 +460,6 @@ int board_init(void)
 			return ret;
 	}
 
-	ret = clk_cfg();
-	if (ret)
-		return ret;
-
 	if (is_sdr_enabled())
 		ret = clk_cfg_sdr();
 

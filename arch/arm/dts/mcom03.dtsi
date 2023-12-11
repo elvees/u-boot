@@ -137,6 +137,42 @@
 		#clock-cells = <1>;
 		compatible = "elvees,mcom03-clk";
 		clocks = <&xti_clk>, <&clk125>, <&i2s_sclk_in>;
+
+		assigned-clocks = <&clock CLK_HSP_PLL0>,
+				  <&clock CLK_LSP0_PLL0>,
+				  <&clock CLK_LSP1_PLL0>,
+
+		/* Setup common subsystem clocks here instead of corresponding
+		 * bus nodes. If common subsystem clocks are setup inside bus
+		 * nodes, simple-bus driver configures clocks too early in
+		 * case of gpio hog is also describe inside bus node.
+		 * As a result MEDIA_PLL and MEDIA_UCG are configured before
+		 * MEDIA subsystem reset is deasserted. CLK_HSP_UCG0_* clocks
+		 * setup can be moved to HSPERIPH bus node because there is no
+		 * GPIO controllers in HSPERIPH but these clocks are setup
+		 * here for uniformity.
+		 */
+				  <&clock CLK_HSP_UCG0_SYS>,
+				  <&clock CLK_HSP_UCG0_DMA>,
+				  <&clock CLK_HSP_UCG0_CTR>,
+				  <&clock CLK_HSP_UCG0_SPRAM>,
+				  <&clock CLK_LSP0_UCG0_SYS>,
+				  <&clock CLK_LSP1_UCG0_SYS>,
+
+		/* We can not setup UART0 clock in uart0 node because UART0
+		 * driver starts before clock driver.
+		 */
+				  <&clock CLK_LSP1_UCG0_UART0>;
+		assigned-clock-rates = <1125000000  /* CLK_HSP_PLL0 */
+					189000000   /* CLK_LSP0_PLL0 */
+					614250000   /* CLK_LSP1_PLL0 */
+					225000000   /* CLK_HSP_UCG0_SYS */
+					225000000   /* CLK_HSP_UCG0_DMA */
+					93750000    /* CLK_HSP_UCG0_CTR */
+					225000000   /* CLK_HSP_UCG0_SPRAM */
+					94500000    /* CLK_LSP0_UCG0_SYS */
+					87750000    /* CLK_LSP1_UCG0_SYS */
+					27920454>;  /* CLK_LSP1_UCG0_UART0 */
 		elvees,pll-max-nr = <CLK_HSP_PLL0 3>;
 		elvees,ucg-fixed-freq-mask = <CLK_CPU_UCG0 0x7>,
 					     <CLK_SERVICE_UCG0 0xfff>;
@@ -262,6 +298,8 @@
 			compatible = "snps,designware-i2c";
 			reg = <0 0x1630000 0 0x10000>;
 			clocks = <&clock CLK_LSP0_UCG0_I2C0>;
+			assigned-clocks = <&clock CLK_LSP0_UCG0_I2C0>;
+			assigned-clock-rates = <94500000>;
 			interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
 			i2c-sda-hold-time-ns = <300>;
 			status = "disabled";
@@ -354,6 +392,14 @@
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;
+		assigned-clocks = <&clock CLK_HSP_REFMUX0>,
+				  <&clock CLK_HSP_REFMUX1>,
+				  <&clock CLK_HSP_REFMUX2>,
+				  <&clock CLK_HSP_REFMUX3>;
+		assigned-clock-parents = <&clock CLK_HSP_PLL0>,
+					 <&clock CLK_HSP_PLL0>,
+					 <&clock CLK_HSP_PLL0>,
+					 <&clock CLK_HSP_PLL0>;
 
 		hsperiph_urb: urb@10400000 {
 			compatible = "elvees,mcom03-urb", "syscon", "simple-mfd";
@@ -385,6 +431,8 @@
 				clock-names = "axiahb", "txc";
 				clocks = <&clock CLK_HSP_UCG0_EMAC0>,
 					 <&clock CLK_HSP_UCG2_EMAC0_RGMII_TXC>;
+				assigned-clocks = <&clock CLK_HSP_UCG0_EMAC0>;
+				assigned-clock-rates = <125000000>;
 				interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&hsperiph_reset HSPERIPH_RST_EMAC0>;
 				elvees,ctrl-id = <0>;
@@ -399,6 +447,8 @@
 				clock-names = "axiahb", "txc";
 				clocks = <&clock CLK_HSP_UCG0_EMAC1>,
 					 <&clock CLK_HSP_UCG2_EMAC1_RGMII_TXC>;
+				assigned-clocks = <&clock CLK_HSP_UCG0_EMAC1>;
+				assigned-clock-rates = <125000000>;
 				interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&hsperiph_reset HSPERIPH_RST_EMAC1>;
 				elvees,ctrl-id = <1>;
@@ -415,6 +465,10 @@
 			clock-names = "clk_xin", "clk_ahb";
 			clocks = <&clock CLK_HSP_UCG1_SDMMC0_XIN>,
 				 <&clock CLK_HSP_UCG0_SDMMC0>;
+			assigned-clocks = <&clock CLK_HSP_UCG0_SDMMC0>,
+					  <&clock CLK_HSP_UCG1_SDMMC0_XIN>;
+			assigned-clock-rates = <93750000
+						125000000>;
 			resets = <&hsperiph_reset HSPERIPH_RST_SDMMC0>;
 			elvees,ctrl-id = <0>;
 			status = "disabled";
@@ -446,6 +500,10 @@
 			clock-names = "clk_xin", "clk_ahb";
 			clocks = <&clock CLK_HSP_UCG1_SDMMC1_XIN>,
 				 <&clock CLK_HSP_UCG0_SDMMC1>;
+			assigned-clocks = <&clock CLK_HSP_UCG0_SDMMC1>,
+					  <&clock CLK_HSP_UCG1_SDMMC1_XIN>;
+			assigned-clock-rates = <93750000
+						125000000>;
 			resets = <&hsperiph_reset HSPERIPH_RST_SDMMC1>;
 			elvees,ctrl-id = <1>;
 			status = "disabled";
@@ -467,6 +525,10 @@
 			clocks = <&clock CLK_HSP_UCG1_NFC_FLASH>,
 				 <&clock CLK_HSP_UCG0_NFC>;
 			clock-names = "clk_flash", "clk_sys";
+			assigned-clocks = <&clock CLK_HSP_UCG0_NFC>,
+					  <&clock CLK_HSP_UCG1_NFC_FLASH>;
+			assigned-clock-rates = <125000000
+						93750000>;
 			compatible = "arasan,nfc-v3p16";
 			reg = <0 0x10240000 0 0x10000>;
 			#address-cells = <1>;
@@ -483,6 +545,10 @@
 			clock-names = "clk_axi", "clk_ext";
 			clocks = <&clock CLK_HSP_UCG0_QSPI>,
 				 <&clock CLK_HSP_UCG1_QSPI_EXT>;
+			assigned-clocks = <&clock CLK_HSP_UCG0_QSPI>,
+					  <&clock CLK_HSP_UCG1_QSPI_EXT>;
+			assigned-clock-rates = <93750000
+						25000000>;
 			resets = <&hsperiph_reset HSPERIPH_RST_QSPI>;
 			elvees,urb = <&hsperiph_urb>;
 			num-cs = <4>;
@@ -498,6 +564,10 @@
 			clocks = <&clock CLK_HSP_UCG0_USB0>,
 				 <&usb_ref_clk>,
 				 <&clock CLK_HSP_UCG3_USB0_SUSPEND>;
+			assigned-clocks = <&clock CLK_HSP_UCG0_USB0>,
+					  <&clock CLK_HSP_UCG3_USB0_SUSPEND>;
+			assigned-clock-rates = <125000000
+						25000000>;
 			resets = <&hsperiph_reset HSPERIPH_RST_USB0>;
 			elvees,urb = <&hsperiph_urb>;
 			elvees,ctrl-id = <0>;
@@ -519,6 +589,10 @@
 			clocks = <&clock CLK_HSP_UCG0_USB1>,
 				 <&usb_ref_clk>,
 				 <&clock CLK_HSP_UCG3_USB1_SUSPEND>;
+			assigned-clocks = <&clock CLK_HSP_UCG0_USB1>,
+					  <&clock CLK_HSP_UCG3_USB1_SUSPEND>;
+			assigned-clock-rates = <125000000
+						25000000>;
 			resets = <&hsperiph_reset HSPERIPH_RST_USB1>;
 			elvees,urb = <&hsperiph_urb>;
 			elvees,ctrl-id = <1>;
@@ -585,6 +659,8 @@
 			compatible = "snps,designware-i2c";
 			reg = <0 0x1710000 0 0x10000>;
 			clocks = <&clock CLK_LSP1_UCG0_I2C1>;
+			assigned-clocks = <&clock CLK_LSP1_UCG0_I2C1>;
+			assigned-clock-rates = <102375000>;
 			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
 			i2c-sda-hold-time-ns = <300>;
 			status = "disabled";
@@ -596,6 +672,8 @@
 			compatible = "snps,designware-i2c";
 			reg = <0 0x1720000 0 0x10000>;
 			clocks = <&clock CLK_LSP1_UCG0_I2C2>;
+			assigned-clocks = <&clock CLK_LSP1_UCG0_I2C2>;
+			assigned-clock-rates = <102375000>;
 			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
 			i2c-sda-hold-time-ns = <300>;
 			status = "disabled";
@@ -607,6 +685,8 @@
 			compatible = "snps,designware-i2c";
 			reg = <0 0x1730000 0 0x10000>;
 			clocks = <&clock CLK_LSP1_UCG0_I2C3>;
+			assigned-clocks = <&clock CLK_LSP1_UCG0_I2C3>;
+			assigned-clock-rates = <102375000>;
 			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
 			i2c-sda-hold-time-ns = <300>;
 			status = "disabled";
