@@ -35,10 +35,11 @@
 
 #define PP_ON				0x10
 
-#define BOOT_TARGET_DEVICES_TRUSTPHONEPM(func) \
-	BOOT_TARGET_DEVICES_USB(func) \
-	BOOT_TARGET_DEVICES_MMC(func) \
-	BOOT_TARGET_DEVICES_PXE(func)
+#define BOOT_TARGET_DEVICES_TRUSTPHONEPM \
+	BOOT_TARGET_DEVICES_USB(BOOTENV_DEV_NAME) \
+	BOOT_TARGET_DEVICES_MMC(BOOTENV_DEV_NAME) \
+	BOOT_TARGET_DEVICES_PXE(BOOTENV_DEV_NAME) \
+	""
 
 struct ddrinfo {
 	u64 dram_size[CONFIG_DDRMC_MAX_NUMBER];
@@ -483,13 +484,11 @@ int misc_init_r(void)
 }
 #endif
 
-#if IS_ENABLED(CONFIG_BOARD_LATE_INIT)
 int board_late_init(void)
 {
 	if (of_machine_is_compatible("elvees,trustphonepm"))
 		env_set("boot_targets",
-			BOOT_TARGET_DEVICES_TRUSTPHONEPM(BOOTENV_DEV_NAME));
+			BOOT_TARGET_DEVICES_TRUSTPHONEPM);
 
 	return 0;
 }
-#endif
