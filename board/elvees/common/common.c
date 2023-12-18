@@ -468,7 +468,8 @@ int board_init(void)
 #if IS_ENABLED(CONFIG_MISC_INIT_R)
 int misc_init_r(void)
 {
-	if (!IS_ENABLED(CONFIG_ENV_IS_NOWHERE)) {
+	if (!IS_ENABLED(CONFIG_ENV_IS_NOWHERE) &&
+	    !IS_ENABLED(CONFIG_TARGET_MCOM03_ECAM03_RECOVERY)) {
 		if (!env_get("first_boot_checker")) {
 			printf("*** First boot\n");
 			env_set_hex("first_boot_checker", 0x0);

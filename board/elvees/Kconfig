@@ -46,6 +46,16 @@ config TARGET_MCOM03_ECAM03
 	    ECAM03PTZ r1.0
 	    PM03CAM r1.0
 
+config TARGET_MCOM03_ECAM03_RECOVERY
+	bool "ECAM03 recovery"
+	select DM_ETH
+	select DM_MMC
+	select DM_GPIO
+	help
+	  Support for the following boards:
+	    ECAM03*
+	    PM03CAM*
+
 endchoice
 
 source "board/elvees/common/Kconfig"
