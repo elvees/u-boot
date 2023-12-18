@@ -4,4 +4,5 @@
 #
 
 obj-y += common.o
+obj-y += mcom03-dma.o
 obj-$(CONFIG_MISC_INIT_R) += factory-settings.o

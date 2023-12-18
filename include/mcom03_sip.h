@@ -18,6 +18,12 @@
 #define MCOM03_SIP_WDT_GET_MAX_TIMEOUT_S		0x06
 #define MCOM03_SIP_WDT_GET_MIN_TIMEOUT_S		0x07
 
+#define MCOM03_SIP_DDR_SUBS				0xC2000004
+#define MCOM03_SIP_DDR_SUBS_SET_HSPERIPH_BAR		0x01
+#define MCOM03_SIP_DDR_SUBS_SET_LSPERIPH0_BAR		0x02
+#define MCOM03_SIP_DDR_SUBS_SET_LSPERIPH1_BAR		0x03
+#define MCOM03_SIP_DDR_SUBS_SET_GPU_BAR			0x04
+
 static inline unsigned long mcom03_sip_smccc_smc(unsigned long a0, unsigned long a1,
 						 unsigned long a2, unsigned long a3,
 						 unsigned long a4, unsigned long a5,

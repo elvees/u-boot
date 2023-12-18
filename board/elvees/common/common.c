@@ -20,9 +20,6 @@
 #include <asm/arch/mcom03-clk.h>
 #include "mcom03-common.h"
 
-#define DDR_SUBS_URB_BASE		0xC000000
-#define HSPERIPH_BAR			0xDC
-
 #define SERVICE_PPOLICY(x)		(0x1F000000UL + (x) * 0x8)
 #define SERVICE_PSTATUS(x)		(0x1F000000UL + (x) * 0x8 + 0x4)
 #define HSPERIPH_URB_NAND_PADCFG	0x10400184
@@ -428,10 +425,9 @@ int board_init(void)
 {
 	int ret;
 
-	/* Configure HSPERIPH devices to see DDR High address range,
-	 * starting from 0x8_0000_0000.
-	 */
-	writel(0x20, DDR_SUBS_URB_BASE + HSPERIPH_BAR);
+	ret = hsperiph_dma32_bus_init();
+	if (ret)
+		return ret;
 
 #if CONFIG_IS_ENABLED(DM_I2C)
 	if (of_machine_is_compatible("elvees,pm03camosm-r1.04"))

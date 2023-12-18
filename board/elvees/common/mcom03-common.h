@@ -62,6 +62,7 @@
 
 #define QSPI_XIP_EN			BIT(0)
 
+int hsperiph_dma32_bus_init(void);
 void lsperiph1_v18_pad_cfg(void);
 void i2c_pad_cfg(int i2c_num);
 void nand_pad_cfg(void);
