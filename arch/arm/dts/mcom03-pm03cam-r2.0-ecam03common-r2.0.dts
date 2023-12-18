@@ -10,6 +10,7 @@
 /dts-v1/;
 
 #include "mcom03-pm03cam-r2.0.dtsi"
+#include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/input.h>
 
 / {
@@ -17,6 +18,16 @@
 	compatible = "elvees,pm03cam-r2.0-ecam03common-r2.0",
 		     "elvees,pm03cam-r2.0",
 		     "elvees,mcom03";
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		factory-reset {
+			label = "Factory reset";
+			gpios = <&gpio0a 7 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
 };
 
 &uart0 {
