@@ -40,6 +40,8 @@ DECLARE_GLOBAL_DATA_PTR;
 #define SUBSYSTEM_LSP1 6
 #define SUBSYSTEM_DDR 7
 #define SUBSYSTEM_TOP 8
+#define SUBSYSTEM_LSP1_I2S_UCG 9
+#define LSP1_I2S_UCG_RSTN_PSTATUS 0x17e000c
 #define PP_ON 0x10
 
 #define LPI_EN BIT(0)
@@ -74,6 +76,7 @@ enum property_type {
 struct mcom03_clk_plat {
 	struct clk xti_clk;
 	struct regmap *serv_urb;
+	void __iomem *i2s_ucg_rstn_pstatus;
 };
 
 struct mcom03_pll {
@@ -432,7 +435,7 @@ static struct mcom03_ucg ucg_clocks[] = {
 		.base_addr = 0x17d0000,
 		.names = { "lsp1_i2s_clk" },
 		.parent_name = "lsperiph1_refmux_i2s",
-		.subsystem = SUBSYSTEM_LSP1,
+		.subsystem = SUBSYSTEM_LSP1_I2S_UCG,
 	},
 };
 
@@ -852,8 +855,16 @@ static bool mcom03_is_subsystem_available(struct mcom03_clk_plat *plat,
 {
 	u32 value;
 
-	if (regmap_read(plat->serv_urb, subsystem * 8 + 4, &value))
-		return false;
+	if (subsystem == SUBSYSTEM_LSP1_I2S_UCG) {
+		/* Check LSP1 subsystem before read register from LSP1 URB */
+		if (!mcom03_is_subsystem_available(plat, SUBSYSTEM_LSP1))
+			return false;
+
+		value = readl(plat->i2s_ucg_rstn_pstatus);
+	} else {
+		if (regmap_read(plat->serv_urb, subsystem * 8 + 4, &value))
+			return false;
+	}
 
 	return value == PP_ON;
 }
@@ -1114,6 +1125,7 @@ static int mcom03_clk_of_to_plat(struct udevice *dev)
 	if (res)
 		return res;
 
+	plat->i2s_ucg_rstn_pstatus = map_sysmem(LSP1_I2S_UCG_RSTN_PSTATUS, 0x4);
 	plat->serv_urb = syscon_regmap_lookup_by_phandle(dev,
 							 "elvees,service-urb");
 	if (IS_ERR(plat->serv_urb))
