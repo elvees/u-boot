@@ -37,6 +37,12 @@
 	 */
 	sdhci-caps-mask = <0x7 0x4000000>;
 	sdhci-caps = <0x0 0x0>;
+
+	/* The default clock pad drive strength of 6 mA is insufficient
+	 * for ELV-CE-CB resulting in unstable SDMMC performance
+	 * (possibly due to a PCB bug).
+	 */
+	elvees,drive-strength-clk = <8>;
 };
 
 &usb0 {
