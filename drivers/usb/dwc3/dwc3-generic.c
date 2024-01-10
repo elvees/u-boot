@@ -27,6 +27,9 @@
 #include <clk.h>
 #include <usb/xhci.h>
 #include <asm/gpio.h>
+#include <linux/bitfield.h>
+#include <regmap.h>
+#include <syscon.h>
 
 struct dwc3_glue_data {
 	struct clk_bulk		clks;
@@ -398,6 +401,126 @@ struct dwc3_glue_ops ti_ops = {
 	.glue_configure = dwc3_ti_glue_configure,
 };
 
+void dwc3_mcom03_glue_configure(struct udevice *dev, int index,
+				enum usb_dr_mode mode)
+{
+	u32 ctrl_id;
+	struct regmap *urb;
+	u32 val;
+	int ret;
+	size_t i;
+	ulong ref_clk_rate;
+	struct clk ref_clk;
+	struct dwc3_glue_data *glue = dev_get_plat(dev);
+
+	urb = syscon_regmap_lookup_by_phandle(dev, "elvees,urb");
+	if (IS_ERR(urb)) {
+		pr_err("Failed to get subsystem URB\n");
+		return;
+	}
+
+	ret = ofnode_read_u32(dev_ofnode(dev), "elvees,ctrl-id",
+			      &ctrl_id);
+	if (ret) {
+		pr_err("Failed to get controller ID\n");
+		return;
+	}
+	/*
+	 * PHY configuration starts:
+	 *
+	 * PHY regs should be programmed in reset state
+	 */
+	ret = reset_assert(&glue->resets.resets[0]);
+	if (ret) {
+		pr_err("Failed to assert reset\n");
+		return;
+	}
+
+	/* Wait until PHY goes into reset state, 1 ms should be enough */
+	udelay(1000);
+
+	const struct dwc3_mcom03_phy_cfg {
+		u32 refclk_rate;
+		u8 fsel, mpll, refclk_div;
+		u16 ssc_refclk_sel;
+	} phy_cfg[] = {
+		/* From Synopsys DesignWare SuperSpeed USB 3.0 femtoPHY
+		 * for TSMC 28-nm HPCP 0.9/1.8 V databook, table 3-1 */
+		{ 19200000, 0x38, 0, 0, 0 },
+		{ 20000000, 0x31, 0, 0, 0 },
+		{ 24000000, 0x2a, 0, 0, 0 },
+		{ 25000000, 0x2, 0x64, 0, 0 },
+		{ 26000000, 0x2, 0x60, 0, 0x108 },
+		{ 38400000, 0x38, 0, 1, 0 },
+		{ 40000000, 0x31, 0, 1, 0 },
+		{ 48000000, 0x2a, 0, 1, 0 },
+		{ 50000000, 0x2, 0x64, 1, 0 },
+		{ 52000000, 0x2, 0x60, 1, 0x108 },
+		{ 100000000, 0x27, 0, 0, 0 },
+		{ 200000000, 0x27, 0, 1, 0 },
+	};
+
+	ret = clk_get_by_name(dev, "ref", &ref_clk);
+	if (ret) {
+		pr_err("'ref' clock not found in DTS\n");
+		return;
+	}
+
+	ref_clk_rate = clk_get_rate(&ref_clk);
+	if (ref_clk_rate <= 0) {
+		pr_err("Can't get 'ref' clock rate\n");
+		return;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(phy_cfg); i++)
+		if (ref_clk_rate == phy_cfg[i].refclk_rate)
+			break;
+
+	if (i == ARRAY_SIZE(phy_cfg)) {
+		pr_err("Unsupported refclk frequency: %lu\n", ref_clk_rate);
+		return;
+	}
+
+#define USB_PHY_CTR_OFFSET(x)		(0xdc + (x) * 0x34)
+
+#define USB_PHY_CTR_FSEL		GENMASK(29, 24)
+#define USB_PHY_CTR_MPLL_MULT		GENMASK(23, 17)
+#define USB_PHY_CTR_REF_CLKDIV2		BIT(15)
+#define USB_PHY_CTR_REF_SSP_EN		BIT(14)
+#define USB_PHY_CTR_REF_USE_PAD		BIT(13)
+#define USB_PHY_CTR_SSC_EN		BIT(12)
+#define USB_PHY_CTR_SSC_RANGE		GENMASK(11, 9)
+#define USB_PHY_CTR_SSC_REF_CLK_SEL	GENMASK(8, 0)
+
+	val = FIELD_PREP(USB_PHY_CTR_FSEL, phy_cfg[i].fsel) |
+	      FIELD_PREP(USB_PHY_CTR_MPLL_MULT, phy_cfg[i].mpll) |
+	      FIELD_PREP(USB_PHY_CTR_REF_CLKDIV2, phy_cfg[i].refclk_div) |
+	      FIELD_PREP(USB_PHY_CTR_REF_SSP_EN, 1) |
+	      FIELD_PREP(USB_PHY_CTR_REF_USE_PAD, 1) |
+	      FIELD_PREP(USB_PHY_CTR_SSC_EN, 1) |
+	      FIELD_PREP(USB_PHY_CTR_SSC_RANGE, 0) |
+	      FIELD_PREP(USB_PHY_CTR_SSC_REF_CLK_SEL,
+			 phy_cfg[i].ssc_refclk_sel);
+
+	if (ofnode_read_bool(dev_ofnode(dev), "elvees,clk-ref-alt"))
+		val &= ~USB_PHY_CTR_REF_USE_PAD;
+
+	regmap_write(urb, USB_PHY_CTR_OFFSET(ctrl_id), val);
+
+	ret = reset_deassert(&glue->resets.resets[0]);
+	if (ret) {
+		pr_err("Failed to deassert reset\n");
+		return;
+	}
+
+	/* Wait until PHY goes from reset state, 1 ms should be enough */
+	udelay(1000);
+}
+
+struct dwc3_glue_ops mcom03_ops = {
+	.glue_configure = dwc3_mcom03_glue_configure,
+};
+
 static int dwc3_glue_bind(struct udevice *parent)
 {
 	ofnode node;
@@ -577,6 +700,7 @@ static const struct udevice_id dwc3_glue_ids[] = {
 	{ .compatible = "fsl,imx8mp-dwc3", .data = (ulong)&imx8mp_ops },
 	{ .compatible = "fsl,imx8mq-dwc3" },
 	{ .compatible = "intel,tangier-dwc3" },
+	{ .compatible = "elvees,mcom03-dwc3", .data = (ulong)&mcom03_ops },
 	{ }
 };
 
