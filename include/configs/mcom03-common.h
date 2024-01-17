@@ -66,9 +66,9 @@
 #define MCOM03_COMMON_ENV_SETTINGS \
 	"kernel_addr_r=0x892400000\0" \
 	"scriptaddr=0x898400000\0" \
-	"ramdisk_addr_r=0x899400000\0" \
-	"pxefile_addr_r=0x89a400000\0" \
 	"fdt_addr_r=0x898c00000\0" \
+	"ramdisk_addr_r=0x899400000\0" \
+	"pxefile_addr_r=0x8a1400000\0" \
 	"serverip=127.0.0.0\0"
 
 #endif
