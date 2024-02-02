@@ -157,7 +157,8 @@ void board_pads_cfg(void)
 
 		/* U-Boot doesn't have pinctrl driver, so switch pad voltage manually */
 		lsperiph1_v18_pad_cfg();
-	} else if (of_machine_is_compatible("elvees,elvmc03smarc-r2.6.1")) {
+	} else if (of_machine_is_compatible("elvees,elvmc03smarc-r2.6.1") ||
+		   of_machine_is_compatible("elvees,elvmc03smarc-r2.7.1")) {
 		/* I2C3 is used by i2c gpio-expander for ETH PHY resets */
 		i2c_pad_cfg(3);
 		lsperiph1_v18_pad_cfg();
@@ -291,7 +292,8 @@ int power_init_board(void)
 	if (of_machine_is_compatible("elvees,elvmc03smarc-r1.0"))
 		power_init_elvmc03smarc_r10();
 	else if (of_machine_is_compatible("elvees,elvmc03smarc-r2.2") ||
-		 of_machine_is_compatible("elvees,elvmc03smarc-r2.6.1"))
+		 of_machine_is_compatible("elvees,elvmc03smarc-r2.6.1") ||
+		 of_machine_is_compatible("elvees,elvmc03smarc-r2.7.1"))
 		power_init_elvmc03smarc_r22();
 	else if (of_machine_is_compatible("elvees,trustphonepm"))
 		power_init_trustphonepm();
