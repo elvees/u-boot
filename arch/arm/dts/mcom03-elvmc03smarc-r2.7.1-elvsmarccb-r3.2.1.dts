@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright 2024 RnD Center "ELVEES", JSC
+ */
+
+/dts-v1/;
+
+#include "mcom03-elvmc03smarc-r2.6.1-elvsmarccb-r3.1.0.dts"
+
+/ {
+	model = "ELV-MC03-SMARC r2.7.1, ELV-SMARC-CB r3.2.1";
+	compatible = "elvees,elvmc03smarc-r2.7.1-elvsmarccb-r3.2.1",
+		     "elvees,elvmc03smarc-elvsmarccb",
+		     "elvees,elvsmarccb-r3.2.1",
+		     "elvees,elvsmarccb",
+		     "elvees,elvmc03smarc-r2.7.1",
+		     "elvees,elvmc03smarc",
+		     "elvees,mcom03";
+};
+
+&xl9555 {
+	gpio-line-names = "GPIO4", "nPOWER_BTN", "GPIO7", "GPIO8", "GPIO9", "GPIO10",
+		"GPIO11", " PCIE_WAKE#", "nRST_ETH1", "nRST_ETH0", "nRST_HDMI", "nLID",
+		"INT_HDMI", "nINT_RTC", "nINT_ETH0", "nINT_ETH1";
+};
