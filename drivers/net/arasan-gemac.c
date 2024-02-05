@@ -152,6 +152,7 @@ struct arasan_gemac_priv {
 	struct arasan_gemac_dma_desc *tx_desc_ring;
 	struct arasan_gemac_dma_desc *rx_desc_ring;
 	u32 ctrl_id;
+	u32 max_speed;
 };
 
 static inline void arasan_gemac_flush_dcache(uintptr_t start, size_t size)
@@ -540,11 +541,18 @@ static int arasan_gemac_mdio_init(struct udevice *dev)
 static int arasan_gemac_phy_init(struct udevice *dev, ofnode node)
 {
 	struct arasan_gemac_priv *priv = dev_get_priv(dev);
+	int ret;
 
 	priv->phydev = phy_connect(priv->bus, priv->phy_addr, dev,
 				   priv->phy_interface);
 	if (!priv->phydev)
 		return -ENODEV;
+
+	if (priv->max_speed) {
+		ret = phy_set_supported(priv->phydev, priv->max_speed);
+		if (ret)
+			return ret;
+	}
 
 	priv->phydev->node = node;
 	phy_config(priv->phydev);
@@ -572,6 +580,9 @@ static int arasan_gemac_probe(struct udevice *dev)
 	priv->phy_addr = ofnode_read_u32_default(phandle_args.node, "reg", -1);
 	if (priv->phy_addr < 0)
 		return -EINVAL;
+
+	priv->max_speed = ofnode_read_u32_default(phandle_args.node, "max-speed",
+						  0);
 
 	if (IS_ENABLED(CONFIG_DM_GPIO)) {
 		ret = gpio_request_by_name(dev, "phy-reset-gpios", 0,
