@@ -49,3 +49,16 @@
 };
 
 ser1: &uart0 { };
+
+&emac0 {
+	phy-mode = "rgmii-id";
+	phy-reset-gpios = <&gpio0c 7 GPIO_ACTIVE_LOW>;
+	phy-handle = <&ethernet_phy0>;
+
+	ethernet_phy0: ethernet-phy@0 {
+		reg = <0x0>;
+		motorcomm,clk-out-frequency-hz = <0>;
+		rx-internal-delay-ps = <1950>;
+		tx-internal-delay-ps = <1350>;
+	};
+};
