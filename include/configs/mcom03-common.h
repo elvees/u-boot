@@ -22,7 +22,7 @@
 #else
 #define CFG_SYS_SDRAM_BASE		0x890400000
 #define PHYS_SDRAM_0			CFG_SYS_SDRAM_BASE
-#define PHYS_SDRAM_0_SIZE		SZ_256M
+#define PHYS_SDRAM_0_SIZE		SZ_1G
 /* Only used for HAPS */
 #define PHYS_SDRAM_1			0x0
 #define PHYS_SDRAM_1_SIZE		0
