@@ -17,6 +17,16 @@
 		     "elvees,pm03camosm-r1.04",
 		     "elvees,pm03camosm",
 		     "elvees,mcom03";
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		factory-reset {
+			label = "Factory reset";
+			gpios = <&gpio0a 0 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
 };
 
 &uart0 {
