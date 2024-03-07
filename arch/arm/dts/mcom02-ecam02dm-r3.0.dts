@@ -18,7 +18,8 @@
 		compatible = "gpio-keys";
 		factory-reset {
 			label = "Factory reset";
-			gpios = <&gpioa 1 GPIO_ACTIVE_LOW>;
+			interrupt-parent = <&gpioa>;
+			interrupts = <1 IRQ_TYPE_LEVEL_LOW>;
 			linux,code = <KEY_RESTART>;
 		};
 	};
