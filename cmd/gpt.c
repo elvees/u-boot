@@ -1037,7 +1037,7 @@ static int do_gpt(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		return CMD_RET_FAILURE;
 	}
 
-	printf("success!\n");
+	debug("success!\n");
 	return CMD_RET_SUCCESS;
 }
 
