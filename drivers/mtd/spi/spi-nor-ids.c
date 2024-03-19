@@ -86,6 +86,13 @@ const struct flash_info spi_nor_ids[] = {
 	{ INFO("en25qh128",  0x1c7018, 0, 64 * 1024,  256, 0) },
 	{ INFO("en25s64",    0x1c3817, 0, 64 * 1024,  128, SECT_4K) },
 #endif
+#ifdef CONFIG_SPI_FLASH_FM		/* FM */
+	/* FM -- FM25xxx */
+	{
+		INFO("fm25w128", 0xa12818, 0, 64 * 1024, 256,
+		     SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ)
+	},
+#endif
 #ifdef CONFIG_SPI_FLASH_GIGADEVICE	/* GIGADEVICE */
 	/* GigaDevice */
 	{
