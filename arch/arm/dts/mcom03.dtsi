@@ -582,6 +582,7 @@
 				compatible = "snps,dwc3";
 				reg = <0 0x10000000 0 0x100000>;
 				interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+				dr_mode = "host";
 			};
 		};
 
@@ -607,6 +608,7 @@
 				compatible = "snps,dwc3";
 				reg = <0 0x10100000 0 0x100000>;
 				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+				dr_mode = "host";
 			};
 		};
 	};
