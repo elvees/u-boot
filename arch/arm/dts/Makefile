@@ -1363,6 +1363,7 @@ dtb-$(CONFIG_ARCH_MCOM03) += \
 	mcom03-pm03cam-r2.0-ecam03common-r2.0.dtb \
 	mcom03-pm03camosm-r1.04-ecam03ptz-r1.0.dtb \
 	mcom03-rtl.dtb \
+	mcom03-pico-itx-r2.dtb \
 	mcom03-skifmp-v1.0.dtb \
 	mcom03-trustphonepm-r1.5-trustphonecb-r1.1.dtb \
 	mcom03-trustphonepm-r2.1-trustphonecb-r2.0.dtb
