@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2021 RnD Center "ELVEES", JSC
+ * Copyright 2021-2024 RnD Center "ELVEES", JSC
  */
 
 /dts-v1/;
 
-#include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/interrupt-controller/irq.h>
 
 #include "mcom03-egwpm-r1.0.dtsi"

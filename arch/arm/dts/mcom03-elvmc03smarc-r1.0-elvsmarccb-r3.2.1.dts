@@ -5,8 +5,6 @@
 
 /dts-v1/;
 
-#include <dt-bindings/gpio/gpio.h>
-
 #include "mcom03-elvmc03smarc-r1.0-elvsmarccb-r3.1.0.dts"
 
 / {	model = "ELV-MC03-SMARC r1.0, ELV-SMARC-CB r3.2.1";

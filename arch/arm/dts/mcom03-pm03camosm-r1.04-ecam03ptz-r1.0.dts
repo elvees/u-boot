@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2023 RnD Center "ELVEES", JSC
+ * Copyright 2023-2024 RnD Center "ELVEES", JSC
  */
 
 /dts-v1/;
 
-#include "mcom03-pm03camosm-r1.04.dtsi"
+#include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/input.h>
+
+#include "mcom03-pm03camosm-r1.04.dtsi"
 
 / {
 	model = "PM03CAM-OSM r1.04, ECAM03PTZ r1.0";
