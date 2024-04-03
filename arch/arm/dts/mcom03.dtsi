@@ -22,6 +22,10 @@
 		spi1 = &qspi1;
 		mmc0 = &sdhci0;
 		mmc1 = &sdhci1;
+		i2c0 = &i2c0;
+		i2c1 = &i2c1;
+		i2c2 = &i2c2;
+		i2c3 = &i2c3;
 	};
 
 	cpus {
