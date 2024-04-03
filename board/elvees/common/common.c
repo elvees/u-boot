@@ -138,6 +138,41 @@ int dram_init_banksize(void)
 	return 0;
 }
 
+static void i2c_pad_cfg(int i2c_num)
+{
+	u32 val;
+
+	if (i2c_num == 0) {
+		/* There are no registers for GPIO0 to enable
+		 * the pad receiver */
+		writel(0x18, LSP0_GPIO_SWPORTD_CTL);
+	} else {
+		val = readl(GPIO1_PORTA_PAD_CTR(2 * i2c_num - 2));
+		val |= GPIO_PAD_CTR_EN;
+		writel(val, GPIO1_PORTA_PAD_CTR(2 * i2c_num - 2));
+		val = readl(GPIO1_PORTA_PAD_CTR(2 * i2c_num - 1));
+		val |= GPIO_PAD_CTR_EN;
+		writel(val, GPIO1_PORTA_PAD_CTR(2 * i2c_num - 1));
+		val = readl(LSP1_GPIO_SWPORTA_CTL);
+		val |= BIT(2 * i2c_num - 2) | BIT(2 * i2c_num - 1);
+		writel(val, LSP1_GPIO_SWPORTA_CTL);
+	}
+}
+
+static void i2c_enable(void)
+{
+	for (int i = 0; i < 4; i++) {
+		ofnode i2c_node;
+		char i2c_alias_name[5];
+
+		sprintf(i2c_alias_name, "i2c%d", i);
+		i2c_node = ofnode_get_aliases_node(i2c_alias_name);
+
+		if (ofnode_valid(i2c_node) && ofnode_is_enabled(i2c_node))
+			i2c_pad_cfg(i);
+	}
+}
+
 void board_pads_cfg(void)
 {
 	if (of_machine_is_compatible("elvees,mcom03-bub")) {
@@ -150,9 +185,6 @@ void board_pads_cfg(void)
 		pad_set_ctl(HSP_URB_EMAC0_TXC_PADCFG, 0xf);
 		pad_set_ctl(HSP_URB_EMAC1_TX_PADCFG, 0x3f);
 		pad_set_ctl(HSP_URB_EMAC1_TXC_PADCFG, 0xf);
-
-		for (int i = 0; i < 4; i++)
-			i2c_pad_cfg(i);
 	} else if (of_machine_is_compatible("elvees,ecam03bl") ||
 		   of_machine_is_compatible("elvees,ecam03dm")) {
 		nand_pad_cfg();
@@ -161,13 +193,13 @@ void board_pads_cfg(void)
 		lsperiph1_v18_pad_cfg();
 	} else if (of_machine_is_compatible("elvees,elvmc03smarc-r2.6.1") ||
 		   of_machine_is_compatible("elvees,elvmc03smarc-r2.7.1")) {
-		/* I2C3 is used by i2c gpio-expander for ETH PHY resets */
-		i2c_pad_cfg(3);
 		lsperiph1_v18_pad_cfg();
 	} else {
 		/* U-Boot doesn't have pinctrl driver, so switch pad voltage manually */
 		lsperiph1_v18_pad_cfg();
 	}
+
+	i2c_enable();
 }
 
 static void power_init_elvmc03smarc_r10(void)
@@ -333,28 +365,6 @@ void lsperiph1_v18_pad_cfg(void)
 	val = readl(LSP1_URB_GPIO1_V18);
 	val |= LSP1_URB_GPIO1_V18_V18;
 	writel(val, LSP1_URB_GPIO1_V18);
-}
-
-void i2c_pad_cfg(int i2c_num)
-{
-	u32 val;
-
-	if (i2c_num == 0) {
-		/* There are no registers for GPIO0 to enable
-		 * the pad receiver.
-		 */
-		writel(0x18, LSP0_GPIO_SWPORTD_CTL);
-	} else {
-		val = readl(GPIO1_PORTA_PAD_CTR(2 * i2c_num - 2));
-		val |= GPIO_PAD_CTR_EN;
-		writel(val, GPIO1_PORTA_PAD_CTR(2 * i2c_num - 2));
-		val = readl(GPIO1_PORTA_PAD_CTR(2 * i2c_num - 1));
-		val |= GPIO_PAD_CTR_EN;
-		writel(val, GPIO1_PORTA_PAD_CTR(2 * i2c_num - 1));
-		val = readl(LSP1_GPIO_SWPORTA_CTL);
-		val |= BIT(2 * i2c_num - 2) | BIT(2 * i2c_num - 1);
-		writel(val, LSP1_GPIO_SWPORTA_CTL);
-	}
 }
 
 void nand_pad_cfg(void)
