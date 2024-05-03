@@ -17,7 +17,6 @@
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
 
-#include <asm/arch/mcom03-clk.h>
 #include "mcom03-common.h"
 
 #define SERVICE_PPOLICY(x)		(0x1F000000UL + (x) * 0x8)
@@ -469,9 +468,6 @@ int board_init(void)
 		if (ret)
 			return ret;
 	}
-
-	if (is_sdr_enabled())
-		ret = clk_cfg_sdr();
 
 	return ret;
 }
