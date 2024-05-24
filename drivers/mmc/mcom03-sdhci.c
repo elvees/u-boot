@@ -435,19 +435,19 @@ static int mcom03_sdhci_probe(struct udevice *dev)
 	struct mcom03_sdhci_priv *priv = dev_get_priv(dev);
 	struct sdhci_host *host = &priv->host;
 	struct reset_ctl rst_ctl;
-	struct clk clk;
+	struct clk_bulk clocks;
 	int ret;
 
-	ret = clk_get_by_index(dev, 0, &clk);
+	ret = clk_get_bulk(dev, &clocks);
 	if (ret < 0)
 		return ret;
 
-	priv->freq = clk_get_rate(&clk);
+	priv->freq = clk_get_rate(&clocks.clks[0]);
 	if (IS_ERR_VALUE(priv->freq))
 		return priv->freq;
 
-	ret = clk_enable(&clk);
-	if (ret < 0 && ret != -ENOSYS)
+	ret = clk_enable_bulk(&clocks);
+	if (ret < 0)
 		return ret;
 
 	ret = reset_get_by_index(dev, 0, &rst_ctl);
@@ -494,7 +494,7 @@ assert_reset:
 	ret = reset_assert(&rst_ctl);
 
 disable_clk:
-	clk_disable(&clk);
+	clk_disable_bulk(&clocks);
 	return ret;
 }
 
