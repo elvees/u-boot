@@ -8,6 +8,7 @@
 #include <common.h>
 #include <malloc.h>
 #include <asm/io.h>
+#include <clk.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/mtd/mtd.h>
@@ -1232,9 +1233,23 @@ static int arasan_probe(struct udevice *dev)
 	struct nand_config *nand = &info->config;
 	struct mtd_info *mtd;
 	struct reset_ctl reset;
+	struct clk_bulk clocks;
 	int err = -1, ret;
 
 	info->reg = (struct nand_regs *)dev_read_addr(dev);
+	clocks.count = 0;
+	ret = clk_get_bulk(dev, &clocks);
+	if (ret && ret != -ENOENT) {
+		printf("%s: failed to get clocks (%d)\n", __func__, ret);
+		goto fail;
+	}
+
+	ret = clk_enable_bulk(&clocks);
+	if (ret) {
+		printf("%s: failed to enable clocks (%d)\n", __func__, ret);
+		goto fail;
+	}
+
 	mtd = nand_to_mtd(nand_chip);
 	nand_set_controller_data(nand_chip, &arasan->nand_ctrl);
 
