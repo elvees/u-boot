@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2021-2023 RnD Center "ELVEES", JSC
+ * Copyright 2021-2024 RnD Center "ELVEES", JSC
  */
 
 #include <common.h>
@@ -9,6 +9,7 @@
 #include <env.h>
 #include <i2c.h>
 #include <init.h>
+#include <mmc.h>
 #include <asm/armv8/mmu.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
@@ -336,18 +337,6 @@ static void power_init_elvmc03smarc_r10(void)
 	 * Perhaps we don't need it at all.
 	 */
 	mdelay(100);
-
-	if (of_machine_is_compatible("radxa,rockpi-n10"))
-		return;
-
-	/* Setup RESET_OUT# signal on ELV-MC03-SMARC */
-	val = readl(LSP1_GPIO_SWPORTD_DDR);
-	val |= BIT(7);
-	writel(val, LSP1_GPIO_SWPORTD_DDR);
-
-	val = readl(LSP1_GPIO_SWPORTD_DR);
-	val |= BIT(7);
-	writel(val, LSP1_GPIO_SWPORTD_DR);
 }
 
 static void power_init_elvmc03smarc_r22(void)
@@ -544,6 +533,8 @@ int board_init(void)
 
 int misc_init_r(void)
 {
+	char board_name[BOARD_NAME_MAX_SIZE] = { };
+
 	if (!IS_ENABLED(CONFIG_ENV_IS_NOWHERE) &&
 	    !IS_ENABLED(CONFIG_TARGET_MCOM03_ECAM03_RECOVERY)) {
 		if (!env_get("first_boot_checker")) {
@@ -553,7 +544,24 @@ int misc_init_r(void)
 		}
 	}
 
-	return do_factory_settings();
+	load_factory_settings();
+	detect_board_name(board_name);
+
+	// Setup RESET_OUT# signal on ELV-MC03-SMARC (except Rock Pi)
+	if (of_machine_is_compatible("elvees,elvmc03smarc-r1.0") &&
+	    strcmp(board_name, "elvmc03smarc-r1.0-rockpi-n10")) {
+		u32 val;
+
+		val = readl(LSP1_GPIO_SWPORTD_DDR);
+		val |= BIT(7);
+		writel(val, LSP1_GPIO_SWPORTD_DDR);
+
+		val = readl(LSP1_GPIO_SWPORTD_DR);
+		val |= BIT(7);
+		writel(val, LSP1_GPIO_SWPORTD_DR);
+	}
+
+	return do_factory_settings(board_name);
 }
 
 int board_late_init(void)

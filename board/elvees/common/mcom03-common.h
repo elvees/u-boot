@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright 2021 RnD Center "ELVEES", JSC
+ * Copyright 2021-2024 RnD Center "ELVEES", JSC
  */
 
 #ifndef __MCOM03_COMMON
@@ -67,7 +67,13 @@
 
 #define QSPI_XIP_EN			BIT(0)
 
-int do_factory_settings(void);
+#define I2C_PM_CHIP_ADDR		0x57
+#define EEPROM_BOARD_NAME_MAX_SIZE	128
+#define BOARD_NAME_MAX_SIZE		256
+
+int detect_board_name(char board_name[]);
+int do_factory_settings(const char *board_name);
 int hsperiph_dma32_bus_init(void);
+int load_factory_settings(void);
 
 #endif
