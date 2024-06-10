@@ -299,7 +299,7 @@ static void power_init_pm03cam_osm_r104(void)
 	struct udevice *udev;
 	int ret;
 
-	ret = i2c_get_chip_for_busnum(0, 0x4B, 1, &udev);
+	ret = i2c_get_chip_for_busnum(4, 0x4B, 1, &udev);
 	if (ret) {
 		printf("%s: Cannot find udev for a bus 0\n", __func__);
 		return;
