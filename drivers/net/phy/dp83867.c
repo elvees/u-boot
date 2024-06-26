@@ -92,6 +92,7 @@
 #define MII_DP83867_CFG2_SPEEDOPT_10EN		0x0040
 #define MII_DP83867_CFG2_SGMII_AUTONEGEN	0x0080
 #define MII_DP83867_CFG2_SPEEDOPT_ENH		0x0100
+#define MII_DP83867_CFG2_SPEEDOPT_EN		0x0200
 #define MII_DP83867_CFG2_SPEEDOPT_CNT		0x0800
 #define MII_DP83867_CFG2_SPEEDOPT_INTLOW	0x2000
 #define MII_DP83867_CFG2_MASK			0x003F
@@ -336,6 +337,10 @@ static int dp83867_config(struct phy_device *phydev)
 		phy_write_mmd(phydev, DP83867_DEVADDR,
 			      DP83867_RGMIIDCTL, delay);
 	}
+
+	cfg2 = phy_read(phydev, MDIO_DEVAD_NONE, MII_DP83867_CFG2);
+	cfg2 |= MII_DP83867_CFG2_SPEEDOPT_EN;
+	phy_write(phydev, MDIO_DEVAD_NONE, MII_DP83867_CFG2, cfg2);
 
 	if (phydev->interface == PHY_INTERFACE_MODE_SGMII) {
 		if (dp83867->sgmii_ref_clk_en)
