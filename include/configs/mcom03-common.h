@@ -54,6 +54,11 @@
 #define BOOT_TARGET_DEVICES_DHCP(func)
 #endif
 
+/* Some Ethernet PHY (ex. DP83867) needs more than 20 seconds timeout for
+ * autonegotiation if link downshift is used.
+ */
+#define PHY_ANEG_TIMEOUT		30000
+
 /*
  * Define `BOOTENV_EFI_SET_FDTFILE_FALLBACK` will be used in
  * include/config_distro_bootcmd.h file.
