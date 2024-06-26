@@ -638,9 +638,6 @@ static int arasan_gemac_probe(struct udevice *dev)
 	if (ret != 0)
 		goto error_buffers_alloc;
 
-	if (dev_read_bool(dev, "elvees,extra-phy-reset-cycle"))
-		arasan_gemac_mdio_reset(priv->bus);
-
 	return 0;
 
 error_buffers_alloc:
