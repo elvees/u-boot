@@ -66,21 +66,15 @@
 
 &emac1 {
 	status = "okay";
-	phy-mode = "rgmii";
+	phy-mode = "rgmii-id";
 	phy-handle = <&ethernet_phy1>;
 	phy-reset-gpios = <&gpio1d 6 GPIO_ACTIVE_LOW>;
 	elvees,pads-1v8-en;
 
-	/* TODO: Remove this extra PHY reset cycle.
-	 * DP83867 has to be reset twice on this module.
-	 * The reason is currently unknown.
-	 */
-	elvees,extra-phy-reset-cycle;
-
 	ethernet_phy1: ethernet-phy@8 {
 		reg = <0x8>;
-		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_50_NS>;
-		ti,tx-internal-delay = <DP83867_RGMIIDCTL_2_50_NS>;
+		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
+		ti,tx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
 		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_4_B_NIB>;
 	};
 };
