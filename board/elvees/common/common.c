@@ -191,7 +191,8 @@ void board_pads_cfg(void)
 		/* U-Boot doesn't have pinctrl driver, so switch pad voltage manually */
 		lsperiph1_v18_pad_cfg();
 	} else if (of_machine_is_compatible("elvees,elvmc03smarc-r2.6.1") ||
-		   of_machine_is_compatible("elvees,elvmc03smarc-r2.7.1")) {
+		   of_machine_is_compatible("elvees,elvmc03smarc-r2.7.1") ||
+		   of_machine_is_compatible("elvees,elvmc03smarc-r2.9.1")) {
 		lsperiph1_v18_pad_cfg();
 	} else {
 		/* U-Boot doesn't have pinctrl driver, so switch pad voltage manually */
@@ -326,7 +327,8 @@ int power_init_board(void)
 		power_init_elvmc03smarc_r10();
 	else if (of_machine_is_compatible("elvees,elvmc03smarc-r2.2") ||
 		 of_machine_is_compatible("elvees,elvmc03smarc-r2.6.1") ||
-		 of_machine_is_compatible("elvees,elvmc03smarc-r2.7.1"))
+		 of_machine_is_compatible("elvees,elvmc03smarc-r2.7.1") ||
+		 of_machine_is_compatible("elvees,elvmc03smarc-r2.9.1"))
 		power_init_elvmc03smarc_r22();
 	else if (of_machine_is_compatible("elvees,trustphonepm"))
 		power_init_trustphonepm();
