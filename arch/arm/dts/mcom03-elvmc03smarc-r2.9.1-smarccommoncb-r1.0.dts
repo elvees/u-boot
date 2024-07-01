@@ -1,0 +1,22 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright 2024 RnD Center "ELVEES", JSC
+
+/dts-v1/;
+
+#include "mcom03-elvmc03smarc-r2.6.1.dtsi"
+#include "mcom03-smarccommoncb-r1.0.dtsi"
+
+/ {
+	model = "ELV-MC03-SMARC r2.9.1, SMARC-COMMON-CB r1.0";
+	compatible = "elvees,elvmc03smarc-r2.9.1-smarccommoncb-r1.0",
+		     "elvees,elvmc03smarc-smarccommoncb",
+		     "elvees,smarccommoncb-r1.0",
+		     "elvees,smarccommoncb",
+		     "elvees,elvmc03smarc-r2.9.1",
+		     "elvees,elvmc03smarc",
+		     "elvees,mcom03";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+};
