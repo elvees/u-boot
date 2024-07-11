@@ -74,6 +74,7 @@
 	phy-mode = "rgmii";
 	phy-handle = <&ethernet_phy0>;
 	phy-reset-gpios = <&gpio0c 6 GPIO_ACTIVE_LOW>;
+	elvees,pads-1v8-en;
 
 	ethernet_phy0: ethernet-phy@1 {
 		reg = <0x1>;
@@ -88,6 +89,7 @@
 	phy-mode = "rgmii";
 	phy-handle = <&ethernet_phy1>;
 	phy-reset-gpios = <&gpio0c 7 GPIO_ACTIVE_LOW>;
+	elvees,pads-1v8-en;
 
 	ethernet_phy1: ethernet-phy@5 {
 		reg = <0x5>;
