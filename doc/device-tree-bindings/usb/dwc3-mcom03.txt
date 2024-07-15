@@ -1,0 +1,99 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+# Copyright 2024 RnD Center "ELVEES", JSC
+
+MCom-03 DWC3 glue logic
+
+Required properties:
+ - compatible	      : must be "elvees,mcom03-dwc3"
+ - elvees,ctrl-id     : the id of USB controller, it used to write to the correct
+		        URB registers and it shall be one of:
+			  - 0 for usb0
+			  - 1 for usb1
+ - elvees,urb	      :  a phandle to HSPERIPH urb registers so the glue can configure
+			 the phy
+ - resets	      :  a phandle and reset specifier pair, because PHY regs requires
+			 reset state in order to be programmed. The specifier shall be
+			 one of:
+			  - 6 for usb0
+			  - 7 for usb1
+ - clocks	      : a list of three phandle + clock-specifier pairs for different device clocks
+ - clock-names	      : Must include the following entries:
+			  - "bus_early"
+			  - "ref"
+			  - "suspend"
+
+Optional properties:
+ - elvees,clk-ref-alt : a reference clock multiplexer, if set the ref clock is sourced from UCG3,
+			if not, the ref clock is 100MHz from HCSL pad.
+
+NB: The dr_mode property is NOT optional for this driver, In case this attribute
+isn't passed via DT, binding the glue node will fail.
+
+Sub-nodes:
+The dwc3 core should be added as subnode to MCom-03 DWC3 glue as shown in the
+example below.
+
+Example ref clock sourced from HCSL:
+
+	#include <dt-bindings/interrupt-controller/arm-gic.h>
+	#include <dt-bindings/soc/elvees,mcom03.h>
+	#include <dt-bindings/clock/mcom03-clock.h>
+
+	/* External low-jitter clock for USB */
+	usb_ref_clk: usb_ref_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <100000000>;
+	};
+
+	usb0: usb@10000000 {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		elvees,ctrl-id = <0>;
+		status = "disabled";
+		compatible = "elvees,mcom03-dwc3";
+		resets = <&hsperiph_reset HSPERIPH_RST_USB0>;
+		clock-names = "bus_early", "ref", "suspend";
+		clocks = <&clock CLK_HSP_UCG0_USB0>,
+			 <&usb_ref_clk>,
+			 <&clock CLK_HSP_UCG3_USB0_SUSPEND>;
+		assigned-clocks = <&clock CLK_HSP_UCG0_USB0>,
+				  <&clock CLK_HSP_UCG3_USB0_SUSPEND>;
+		assigned-clock-rates = <125000000 25000000>;
+
+		dwc3@10000000 {
+			compatible = "snps,dwc3";
+			reg = <0 0x10000000 0 0x100000>;
+			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+		};
+	};
+
+Example ref clock sourced from UCG3:
+
+	#include <dt-bindings/interrupt-controller/arm-gic.h>
+	#include <dt-bindings/soc/elvees,mcom03.h>
+	#include <dt-bindings/clock/mcom03-clock.h>
+
+	usb0: usb@10000000 {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		elvees,ctrl-id = <0>;
+		status = "disabled";
+		compatible = "elvees,mcom03-dwc3";
+		resets = <&hsperiph_reset HSPERIPH_RST_USB0>;
+		elvees,clk-ref-alt;
+		clock-names = "bus_early", "ref", "suspend";
+		clocks = <&clock CLK_HSP_UCG0_USB0>,
+			 <&clock CLK_HSP_UCG3_USB0_REF_ALT>,
+			 <&clock CLK_HSP_UCG3_USB0_SUSPEND>;
+		assigned-clocks = <&clock CLK_HSP_UCG0_USB0>,
+				  <&clock CLK_HSP_UCG3_USB0_REF_ALT>,
+				  <&clock CLK_HSP_UCG3_USB0_SUSPEND>;
+		assigned-clock-rates = <125000000 25000000 25000000>;
+
+		dwc3@10000000 {
+			compatible = "snps,dwc3";
+			reg = <0 0x10000000 0 0x100000>;
+			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+		};
+	};
