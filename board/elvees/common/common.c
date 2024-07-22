@@ -172,7 +172,42 @@ static void i2c_enable(void)
 	}
 }
 
-void board_pads_cfg(void)
+static void lsperiph1_v18_pad_cfg(void)
+{
+	u32 val;
+
+	val = readl(LSP1_URB_GPIO1_V18);
+	val |= LSP1_URB_GPIO1_V18_V18;
+	writel(val, LSP1_URB_GPIO1_V18);
+}
+
+static void nand_pad_cfg(void)
+{
+	// temporary code until NAND support is added to pinctrl
+	u32 val = PAD_MUX_NAND | NAND_CLE | NAND_ENABLE;
+
+	if (of_machine_is_compatible("elvees,ecam03bl") ||
+	    of_machine_is_compatible("elvees,ecam03dm"))
+		val |= NAND_V18;
+
+	writel(val, HSPERIPH_URB_NAND_PADCFG);
+}
+
+static void pad_set_bits(unsigned long reg, u32 field, u32 value)
+{
+	u32 val = readl(reg);
+
+	val &= ~field;
+	val |= FIELD_PREP(field, value);
+	writel(val, reg);
+}
+
+static void pad_set_ctl(unsigned long reg, u32 value)
+{
+	pad_set_bits(reg, LSP1_URB_GPIO1_PAD_CTR_CTL, value);
+}
+
+static void board_pads_cfg(void)
 {
 	if (of_machine_is_compatible("elvees,mcom03-bub")) {
 		nand_pad_cfg();
@@ -343,41 +378,6 @@ static int subsystem_reset_deassert(enum subsystem_reset_lines line)
 	writel(PP_ON, SERVICE_PPOLICY(line));
 	return readl_poll_timeout(SERVICE_PSTATUS(line), val, val == PP_ON,
 				  1000);
-}
-
-static void pad_set_bits(unsigned long reg, u32 field, u32 value)
-{
-	u32 val = readl(reg);
-
-	val &= ~field;
-	val |= FIELD_PREP(field, value);
-	writel(val, reg);
-}
-
-void pad_set_ctl(unsigned long reg, u32 value)
-{
-	pad_set_bits(reg, LSP1_URB_GPIO1_PAD_CTR_CTL, value);
-}
-
-void lsperiph1_v18_pad_cfg(void)
-{
-	u32 val;
-
-	val = readl(LSP1_URB_GPIO1_V18);
-	val |= LSP1_URB_GPIO1_V18_V18;
-	writel(val, LSP1_URB_GPIO1_V18);
-}
-
-void nand_pad_cfg(void)
-{
-	// temporary code until NAND support is added to pinctrl
-	u32 val = PAD_MUX_NAND | NAND_CLE | NAND_ENABLE;
-
-	if (of_machine_is_compatible("elvees,ecam03bl") ||
-	    of_machine_is_compatible("elvees,ecam03dm"))
-		val |= NAND_V18;
-
-	writel(val, HSPERIPH_URB_NAND_PADCFG);
 }
 
 static int xip_disable(int qspi_num)

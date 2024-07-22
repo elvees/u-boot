@@ -62,12 +62,7 @@
 
 #define QSPI_XIP_EN			BIT(0)
 
-int hsperiph_dma32_bus_init(void);
-void lsperiph1_v18_pad_cfg(void);
-void nand_pad_cfg(void);
-void board_pads_cfg(void);
-void nand_pad_cfg(void);
-void pad_set_ctl(unsigned long reg, u32 value);
 int do_factory_settings(void);
+int hsperiph_dma32_bus_init(void);
 
 #endif
