@@ -12,7 +12,7 @@ from binman.etype.section import Entry_section
 from binman import elf
 from dtoc import fdt_util
 from dtoc.fdt import Fdt
-from patman import tools
+from u_boot_pylib import tools
 
 # Supported operations, with the fit,operation property
 OP_GEN_FDT_NODES, OP_SPLIT_ELF = range(2)
@@ -80,6 +80,12 @@ class Entry_fit(Entry_section):
             files for the gen-fdt-nodes operation (as below). This is often
             `of-list` meaning that `-a of-list="dtb1 dtb2..."` should be passed
             to binman.
+
+        fit,fdt-list-val
+            As an alternative to fit,fdt-list the list of device tree files
+            can be provided in this property as a string list, e.g.::
+
+                fit,fdt-list-val = "dtb1", "dtb2";
 
     Substitutions
     ~~~~~~~~~~~~~
@@ -361,6 +367,9 @@ class Entry_fit(Entry_section):
                 [EntryArg(self._fit_list_prop.value, str)])
             if fdts is not None:
                 self._fdts = fdts.split()
+        else:
+            self._fdts = fdt_util.GetStringList(self._node, 'fit,fdt-list-val')
+
         self._fit_default_dt = self.GetEntryArgsOrProps([EntryArg('default-dt',
                                                                   str)])[0]
 
@@ -453,6 +462,8 @@ class Entry_fit(Entry_section):
             args.update({'align': fdt_util.fdt32_to_cpu(align.value)})
         if self.mkimage.run(reset_timestamp=True, output_fname=output_fname,
                             **args) is None:
+            if not self.GetAllowMissing():
+                self.Raise("Missing tool: 'mkimage'")
             # Bintool is missing; just use empty data as the output
             self.record_missing_bintool(self.mkimage)
             return tools.get_bytes(0, 1024)
@@ -775,6 +786,8 @@ class Entry_fit(Entry_section):
         Args:
             image_pos (int): Position of this entry in the image
         """
+        if self.build_done:
+            return
         super().SetImagePos(image_pos)
 
         # If mkimage is missing we'll have empty data,
@@ -823,8 +836,34 @@ class Entry_fit(Entry_section):
         self.mkimage = self.AddBintool(btools, 'mkimage')
 
     def CheckMissing(self, missing_list):
-        # We must use our private entry list for this since generator notes
+        # We must use our private entry list for this since generator nodes
         # which are removed from self._entries will otherwise not show up as
         # missing
         for entry in self._priv_entries.values():
             entry.CheckMissing(missing_list)
+
+    def CheckOptional(self, optional_list):
+        # We must use our private entry list for this since generator nodes
+        # which are removed from self._entries will otherwise not show up as
+        # optional
+        for entry in self._priv_entries.values():
+            entry.CheckOptional(optional_list)
+
+    def CheckEntries(self):
+        pass
+
+    def UpdateSignatures(self, privatekey_fname, algo, input_fname):
+        uniq = self.GetUniqueName()
+        args = [ '-G', privatekey_fname, '-r', '-o', algo, '-F' ]
+        if input_fname:
+            fname = input_fname
+        else:
+            fname = tools.get_output_filename('%s.fit' % uniq)
+            tools.write_file(fname, self.GetData())
+        args.append(fname)
+
+        if self.mkimage.run_cmd(*args) is None:
+            self.Raise("Missing tool: 'mkimage'")
+
+        data = tools.read_file(fname)
+        self.WriteData(data)

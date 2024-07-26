@@ -1,26 +1,36 @@
 / {
-    aliases {
-        mmc0 = &usdhc3;
-        usb0 = &usbotg1;
-    };
+	aliases {
+		mmc0 = &usdhc3;
+		usb0 = &usbotg1;
+	};
 
-    chosen {
-        stdout-path = &uart1;
-    };
+	chosen {
+		stdout-path = &uart1;
+	};
+
+	wdt-reboot {
+		compatible = "wdt-reboot";
+		wdt = <&wdog1>;
+		bootph-pre-ram;
+	};
 };
 
 &aips3 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &pinctrl_uart1 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &soc {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &uart1 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
+};
+
+&wdog1 {
+	bootph-pre-ram;
 };

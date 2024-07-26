@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0+
 /**
- * ufs.c - UFS specific U-boot commands
+ * ufs.c - UFS specific U-Boot commands
  *
- * Copyright (C) 2019 Texas Instruments Incorporated - http://www.ti.com
+ * Copyright (C) 2019 Texas Instruments Incorporated - https://www.ti.com
  *
  */
 #include <common.h>
@@ -32,6 +32,6 @@ static int do_ufs(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 }
 
 U_BOOT_CMD(ufs, 3, 1, do_ufs,
-	   "UFS  sub system",
+	   "UFS sub-system",
 	   "init [dev] - init UFS subsystem\n"
 );

@@ -18,9 +18,6 @@
 #include "cadence_qspi.h"
 #include <dt-bindings/power/xlnx-versal-power.h>
 
-#define CMD_4BYTE_READ  0x13
-#define CMD_4BYTE_FAST_READ  0x0C
-
 int cadence_qspi_apb_dma_read(struct cadence_spi_priv *priv,
 			      const struct spi_mem_op *op)
 {
@@ -44,8 +41,10 @@ int cadence_qspi_apb_dma_read(struct cadence_spi_priv *priv,
 		       priv->regbase + CQSPI_REG_INDIR_TRIG_ADDR_RANGE);
 		writel(CQSPI_DFLT_DMA_PERIPH_CFG,
 		       priv->regbase + CQSPI_REG_DMA_PERIPH_CFG);
-		writel((unsigned long)rxbuf, priv->regbase +
+		writel(lower_32_bits((unsigned long)rxbuf), priv->regbase +
 		       CQSPI_DMA_DST_ADDR_REG);
+		writel(upper_32_bits((unsigned long)rxbuf), priv->regbase +
+		       CQSPI_DMA_DST_ADDR_MSB_REG);
 		writel(priv->trigger_address, priv->regbase +
 		       CQSPI_DMA_SRC_RD_ADDR_REG);
 		writel(bytes_to_dma, priv->regbase +
@@ -130,7 +129,6 @@ int cadence_qspi_apb_wait_for_dma_cmplt(struct cadence_spi_priv *priv)
 #if defined(CONFIG_DM_GPIO)
 int cadence_qspi_versal_flash_reset(struct udevice *dev)
 {
-#ifndef CONFIG_ARCH_VERSAL_NET
 	struct gpio_desc gpio;
 	u32 reset_gpio;
 	int ret;
@@ -166,7 +164,7 @@ int cadence_qspi_versal_flash_reset(struct udevice *dev)
 	/* Set value 1 to pin */
 	dm_gpio_set_value(&gpio, 1);
 	udelay(1);
-#endif
+
 	return 0;
 }
 #else

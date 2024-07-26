@@ -2,7 +2,7 @@
 /**
  * core.h - DesignWare USB3 DRD Core Header
  *
- * Copyright (C) 2015 Texas Instruments Incorporated - http://www.ti.com
+ * Copyright (C) 2015 Texas Instruments Incorporated - https://www.ti.com
  *
  * Authors: Felipe Balbi <balbi@ti.com>,
  *	    Sebastian Andrzej Siewior <bigeasy@linutronix.de>
@@ -404,6 +404,8 @@
 #define DWC3_DEPCMD_GETEPSTATE		(0x03 << 0)
 #define DWC3_DEPCMD_SETTRANSFRESOURCE	(0x02 << 0)
 #define DWC3_DEPCMD_SETEPCONFIG		(0x01 << 0)
+
+#define DWC3_DEPCMD_CMD(x)		((x) & 0xf)
 
 /* The EP number goes 0..31 so ep0 is always out and ep1 is always in */
 #define DWC3_DALEPENA_EP(n)		(1 << n)

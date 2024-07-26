@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0+
 #
-# Copyright (C) 2018 Texas Instruments Incorporated - http://www.ti.com/
+# Copyright (C) 2018 Texas Instruments Incorporated - https://www.ti.com/
 
 config DRIVER_TI_CPSW
 	bool "TI Common Platform Ethernet Switch"
@@ -41,9 +41,32 @@ endchoice
 config TI_AM65_CPSW_NUSS
 	bool "TI K3 AM65x MCU CPSW Nuss Ethernet controller driver"
 	depends on ARCH_K3
+	imply DM_MDIO
 	imply MISC_INIT_R
 	imply MISC
+	imply SYSCON
+	imply MDIO_TI_CPSW
 	select PHYLIB
 	help
 	  This driver supports TI K3 MCU CPSW Nuss Ethernet controller
 	  in Texas Instruments K3 AM65x SoCs.
+
+config MDIO_TI_CPSW
+	bool "TI CPSW MDIO interface support"
+	depends on DM_MDIO
+	help
+	  This driver supports the TI CPSW MDIO interface found in various
+	  TI SoCs.
+
+config TI_ICSSG_PRUETH
+	bool "TI Gigabit PRU Ethernet driver"
+	depends on ARCH_K3
+	imply DM_MDIO
+	imply MISC_INIT_R
+	imply MISC
+	imply MDIO_TI_CPSW
+	select PHYLIB
+	select FS_LOADER
+	help
+	  Support Gigabit Ethernet ports over the ICSSG PRU Subsystem
+	  This subsystem is available starting with the AM65 platform.

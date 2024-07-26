@@ -66,7 +66,7 @@
 #define MCU_CTRL_DEVICE_CLKOUT_32K_CTRL		(MCU_CTRL_MMR0_BASE + 0x8058)
 #define MCU_CTRL_DEVICE_CLKOUT_LFOSC_SELECT_VAL	(0x3)
 
-#define ROM_ENTENDED_BOOT_DATA_INFO		0x43c3f1e0
+#define ROM_EXTENDED_BOOT_DATA_INFO		0x43c3f1e0
 
 #define K3_BOOT_PARAM_TABLE_INDEX_OCRAM         0x7000F290
 
@@ -85,5 +85,13 @@
 #else
 #define TI_SRAM_SCRATCH_BOARD_EEPROM_START	0x70000001
 #endif /* CONFIG_CPU_V7R */
+
+#if defined(CONFIG_SYS_K3_SPL_ATF) && !defined(__ASSEMBLY__)
+
+static const u32 put_device_ids[] = {};
+
+static const u32 put_core_ids[] = {};
+
+#endif
 
 #endif /* __ASM_ARCH_AM62A_HARDWARE_H */

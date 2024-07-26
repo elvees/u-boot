@@ -81,6 +81,12 @@ Example::
         echo CONFIG_SYS_BOARD boot failed - please check your image
         echo Load address is CONFIG_SYS_LOAD_ADDR
 
+Settings which are common to a group of boards can use #include to bring in
+a common file in the `include/env` directory, containing environment
+settings. For example::
+
+   #include <env/ti/mmc.env>
+
 If CONFIG_ENV_SOURCE_FILE is empty and the default filename is not present, then
 the old-style C environment is used instead. See below.
 
@@ -94,7 +100,7 @@ to add environment variables.
 
 Board maintainers are encouraged to migrate to the text-based environment as it
 is easier to maintain. The distro-board script still requires the old-style
-environment but work is underway to address this.
+environments, so use :doc:`../develop/bootstd` instead.
 
 
 List of environment variables
@@ -184,6 +190,10 @@ bootm_size
 bootstopkeysha256, bootdelaykey, bootstopkey
     See README.autoboot
 
+button_cmd_0, button_cmd_0_name ... button_cmd_N, button_cmd_N_name
+    Used to map commands to run when a button is held during boot.
+    See CONFIG_BUTTON_CMD.
+
 updatefile
     Location of the software update file on a TFTP server, used
     by the automatic software update feature. Please refer to
@@ -210,7 +220,7 @@ fdt_high
     0xffffffffffffffff (64-bit machines) then
     the fdt will not be copied at all on boot.  For this
     to work it must reside in writable memory, have
-    sufficient padding on the end of it for u-boot to
+    sufficient padding on the end of it for U-Boot to
     add the information it needs into it, and the memory
     must be accessible by the kernel. This usage is strongly discouraged
     however as it also stops U-Boot from ensuring the device tree starting
@@ -300,6 +310,10 @@ ethrotate
     anything other than "no", U-Boot does go through all
     available network interfaces.
 
+httpdstp
+    If this is set, the value is used for HTTP's TCP
+    destination port instead of the default port 80.
+
 netretry
     When set to "no" each network operation will
     either succeed or fail without retrying.
@@ -351,6 +365,19 @@ tftpwindowsize
     window size as described by RFC 7440.
     This means the count of blocks we can receive before
     sending ack to server.
+
+usb_ignorelist
+    Ignore USB devices to prevent binding them to an USB device driver. This can
+    be used to ignore devices are for some reason undesirable or causes crashes
+    u-boot's USB stack.
+    An example for undesired behavior is the keyboard emulation of security keys
+    like Yubikeys. U-boot currently supports only a single USB keyboard device
+    so try to probe an useful keyboard device. The default environment blocks
+    Yubico devices as common devices emulating keyboards.
+    Devices are matched by idVendor and idProduct. The variable contains a comma
+    separated list of idVendor:idProduct pairs as hexadecimal numbers joined
+    by a colon. '*' functions as a wildcard for idProduct to block all devices
+    with the specified idVendor.
 
 vlan
     When set to a value < 4095 the traffic over

@@ -5,7 +5,6 @@
  */
 
 #include <common.h>
-#include <asm/io.h>
 #include <asm/arch-rockchip/bootrom.h>
 #include <asm/arch-rockchip/hardware.h>
 #include <asm/arch-rockchip/grf_rv1126.h>
@@ -16,6 +15,7 @@
 
 const char * const boot_devices[BROM_LAST_BOOTSOURCE + 1] = {
 	[BROM_BOOTSOURCE_EMMC] = "/mmc@ffc50000",
+	[BROM_BOOTSOURCE_SPINOR] = "/spi@ffc90000/flash@0",
 	[BROM_BOOTSOURCE_SD] = "/mmc@ffc60000",
 };
 

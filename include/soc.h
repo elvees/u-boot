@@ -1,11 +1,13 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * (C) Copyright 2020 - Texas Instruments Incorporated - http://www.ti.com/
+ * (C) Copyright 2020 - Texas Instruments Incorporated - https://www.ti.com/
  *	Dave Gerlach <d-gerlach@ti.com>
  */
 
 #ifndef __SOC_H
 #define __SOC_H
+
+#include <linux/errno.h>
 
 #define SOC_MAX_STR_SIZE	128
 

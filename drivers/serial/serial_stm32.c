@@ -18,16 +18,29 @@
 #include <dm/device_compat.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
+#include <linux/iopoll.h>
 #include "serial_stm32.h"
 #include <dm/device_compat.h>
 
-static void _stm32_serial_setbrg(fdt_addr_t base,
+/*
+ * At 115200 bits/s
+ * 1 bit = 1 / 115200 = 8,68 us
+ * 8 bits = 69,444 us
+ * 10 bits are needed for worst case (8 bits + 1 start + 1 stop) = 86.806 us
+ */
+#define ONE_BYTE_B115200_US		87
+
+static void _stm32_serial_setbrg(void __iomem *base,
 				 struct stm32_uart_info *uart_info,
 				 u32 clock_rate,
 				 int baudrate)
 {
 	bool stm32f4 = uart_info->stm32f4;
 	u32 int_div, mantissa, fraction, oversampling;
+	u8 uart_enable_bit = uart_info->uart_enable_bit;
+
+	/* BRR register must be set when uart is disabled */
+	clrbits_le32(base + CR1_OFFSET(stm32f4), BIT(uart_enable_bit));
 
 	int_div = DIV_ROUND_CLOSEST(clock_rate, baudrate);
 
@@ -43,6 +56,8 @@ static void _stm32_serial_setbrg(fdt_addr_t base,
 	fraction = int_div % oversampling;
 
 	writel(mantissa | fraction, base + BRR_OFFSET(stm32f4));
+
+	setbits_le32(base + CR1_OFFSET(stm32f4), BIT(uart_enable_bit));
 }
 
 static int stm32_serial_setbrg(struct udevice *dev, int baudrate)
@@ -60,7 +75,7 @@ static int stm32_serial_setconfig(struct udevice *dev, uint serial_config)
 	struct stm32x7_serial_plat *plat = dev_get_plat(dev);
 	bool stm32f4 = plat->uart_info->stm32f4;
 	u8 uart_enable_bit = plat->uart_info->uart_enable_bit;
-	u32 cr1 = plat->base + CR1_OFFSET(stm32f4);
+	void __iomem *cr1 = plat->base + CR1_OFFSET(stm32f4);
 	u32 config = 0;
 	uint parity = SERIAL_GET_PARITY(serial_config);
 	uint bits = SERIAL_GET_BITS(serial_config);
@@ -107,7 +122,7 @@ static int stm32_serial_getc(struct udevice *dev)
 {
 	struct stm32x7_serial_plat *plat = dev_get_plat(dev);
 	bool stm32f4 = plat->uart_info->stm32f4;
-	fdt_addr_t base = plat->base;
+	void __iomem *base = plat->base;
 	u32 isr = readl(base + ISR_OFFSET(stm32f4));
 
 	if ((isr & USART_ISR_RXNE) == 0)
@@ -126,7 +141,7 @@ static int stm32_serial_getc(struct udevice *dev)
 	return readl(base + RDR_OFFSET(stm32f4));
 }
 
-static int _stm32_serial_putc(fdt_addr_t base,
+static int _stm32_serial_putc(void __iomem *base,
 			      struct stm32_uart_info *uart_info,
 			      const char c)
 {
@@ -151,7 +166,7 @@ static int stm32_serial_pending(struct udevice *dev, bool input)
 {
 	struct stm32x7_serial_plat *plat = dev_get_plat(dev);
 	bool stm32f4 = plat->uart_info->stm32f4;
-	fdt_addr_t base = plat->base;
+	void __iomem *base = plat->base;
 
 	if (input)
 		return readl(base + ISR_OFFSET(stm32f4)) &
@@ -161,7 +176,7 @@ static int stm32_serial_pending(struct udevice *dev, bool input)
 			USART_ISR_TXE ? 0 : 1;
 }
 
-static void _stm32_serial_init(fdt_addr_t base,
+static void _stm32_serial_init(void __iomem *base,
 			       struct stm32_uart_info *uart_info)
 {
 	bool stm32f4 = uart_info->stm32f4;
@@ -181,9 +196,12 @@ static int stm32_serial_probe(struct udevice *dev)
 	struct stm32x7_serial_plat *plat = dev_get_plat(dev);
 	struct clk clk;
 	struct reset_ctl reset;
+	u32 isr;
 	int ret;
+	bool stm32f4;
 
 	plat->uart_info = (struct stm32_uart_info *)dev_get_driver_data(dev);
+	stm32f4 = plat->uart_info->stm32f4;
 
 	ret = clk_get_by_index(dev, 0, &clk);
 	if (ret < 0)
@@ -194,6 +212,15 @@ static int stm32_serial_probe(struct udevice *dev)
 		dev_err(dev, "failed to enable clock\n");
 		return ret;
 	}
+
+	/*
+	 * before uart initialization, wait for TC bit (Transmission Complete)
+	 * in case there is still chars from previous bootstage to transmit
+	 */
+	ret = read_poll_timeout(readl, isr, isr & USART_ISR_TC, 50,
+				16 * ONE_BYTE_B115200_US, plat->base + ISR_OFFSET(stm32f4));
+	if (ret)
+		dev_dbg(dev, "FIFO not empty, some character can be lost (%d)\n", ret);
 
 	ret = reset_get_by_index(dev, 0, &reset);
 	if (!ret) {
@@ -223,10 +250,13 @@ static const struct udevice_id stm32_serial_id[] = {
 static int stm32_serial_of_to_plat(struct udevice *dev)
 {
 	struct stm32x7_serial_plat *plat = dev_get_plat(dev);
+	fdt_addr_t addr;
 
-	plat->base = dev_read_addr(dev);
-	if (plat->base == FDT_ADDR_T_NONE)
+	addr = dev_read_addr(dev);
+	if (addr == FDT_ADDR_T_NONE)
 		return -EINVAL;
+
+	plat->base = (void __iomem *)addr;
 
 	return 0;
 }
@@ -270,7 +300,7 @@ static inline struct stm32_uart_info *_debug_uart_info(void)
 
 static inline void _debug_uart_init(void)
 {
-	fdt_addr_t base = CONFIG_VAL(DEBUG_UART_BASE);
+	void __iomem *base = (void __iomem *)CONFIG_VAL(DEBUG_UART_BASE);
 	struct stm32_uart_info *uart_info = _debug_uart_info();
 
 	_stm32_serial_init(base, uart_info);
@@ -281,7 +311,7 @@ static inline void _debug_uart_init(void)
 
 static inline void _debug_uart_putc(int c)
 {
-	fdt_addr_t base = CONFIG_VAL(DEBUG_UART_BASE);
+	void __iomem *base = (void __iomem *)CONFIG_VAL(DEBUG_UART_BASE);
 	struct stm32_uart_info *uart_info = _debug_uart_info();
 
 	while (_stm32_serial_putc(base, uart_info, c) == -EAGAIN)

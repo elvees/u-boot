@@ -29,6 +29,9 @@
 #include <fsl-mc/fsl_dpsparser.h>
 #include <fsl-mc/fsl_qbman_portal.h>
 #include <fsl-mc/ldpaa_wriop.h>
+#include <net/ldpaa_eth.h>
+#include <asm/arch/cpu.h>
+#include <asm/arch-fsl-layerscape/fsl_icid.h>
 
 #define MC_RAM_BASE_ADDR_ALIGNMENT  (512UL * 1024 * 1024)
 #define MC_RAM_BASE_ADDR_ALIGNMENT_MASK	(~(MC_RAM_BASE_ADDR_ALIGNMENT - 1))
@@ -383,37 +386,31 @@ static int mc_fixup_dpc_mac_addr(void *blob, int dpmac_id,
 
 static int mc_fixup_mac_addrs(void *blob, enum mc_fixup_type type)
 {
-	int i, err = 0, ret = 0;
-#define ETH_NAME_LEN 20
 	struct udevice *eth_dev;
-	char ethname[ETH_NAME_LEN];
+	int err = 0, ret = 0;
+	struct uclass *uc;
+	uint32_t dpmac_id;
 
-	for (i = WRIOP1_DPMAC1; i < NUM_WRIOP_PORTS; i++) {
-		/* port not enabled */
-		if (wriop_is_enabled_dpmac(i) != 1)
+	uclass_get(UCLASS_ETH, &uc);
+	uclass_foreach_dev(eth_dev, uc) {
+		if (!eth_dev->driver || !eth_dev->driver->name ||
+		    strcmp(eth_dev->driver->name, LDPAA_ETH_DRIVER_NAME))
 			continue;
 
-		snprintf(ethname, ETH_NAME_LEN, "DPMAC%d@%s", i,
-			 phy_interface_strings[wriop_get_enet_if(i)]);
-
-		eth_dev = eth_get_dev_by_name(ethname);
-		if (eth_dev == NULL)
-			continue;
-
+		dpmac_id = ldpaa_eth_get_dpmac_id(eth_dev);
 		switch (type) {
 		case MC_FIXUP_DPL:
-			err = mc_fixup_dpl_mac_addr(blob, i, eth_dev);
+			err = mc_fixup_dpl_mac_addr(blob, dpmac_id, eth_dev);
 			break;
 		case MC_FIXUP_DPC:
-			err = mc_fixup_dpc_mac_addr(blob, i, eth_dev);
+			err = mc_fixup_dpc_mac_addr(blob, dpmac_id, eth_dev);
 			break;
 		default:
 			break;
 		}
 
 		if (err)
-			printf("fsl-mc: ERROR fixing mac address for %s\n",
-			       ethname);
+			printf("fsl-mc: ERROR fixing mac address for %s\n", eth_dev->name);
 		ret |= err;
 	}
 
@@ -934,6 +931,114 @@ unsigned long mc_get_dram_block_size(void)
 	return dram_block_size;
 }
 
+/**
+ * Populate the device tree with MC reserved memory ranges.
+ */
+void fdt_reserve_mc_mem(void *blob, u32 mc_icid)
+{
+	u32 phandle, mc_ph;
+	int noff, ret, i;
+	char mem_name[16];
+	struct fdt_memory mc_mem_ranges[] = {
+		{
+			.start = 0,
+			.end = 0
+		},
+		{
+			.start = CFG_SYS_FSL_MC_BASE,
+			.end = CFG_SYS_FSL_MC_BASE + CFG_SYS_FSL_MC_SIZE - 1
+		},
+		{
+			.start = CFG_SYS_FSL_NI_BASE,
+			.end = CFG_SYS_FSL_NI_BASE + CFG_SYS_FSL_NI_SIZE - 1
+		},
+		{
+			.start = CFG_SYS_FSL_QBMAN_BASE,
+			.end = CFG_SYS_FSL_QBMAN_BASE +
+					CFG_SYS_FSL_QBMAN_SIZE - 1
+		},
+		{
+			.start = CFG_SYS_FSL_PEBUF_BASE,
+			.end = CFG_SYS_FSL_PEBUF_BASE +
+					CFG_SYS_FSL_PEBUF_SIZE - 1
+		},
+		{
+			.start = CFG_SYS_FSL_CCSR_BASE,
+			.end = CFG_SYS_FSL_CCSR_BASE + CFG_SYS_FSL_CCSR_SIZE - 1
+		}
+	};
+
+	mc_mem_ranges[0].start = gd->arch.resv_ram;
+	mc_mem_ranges[0].end = mc_mem_ranges[0].start +
+				mc_get_dram_block_size() - 1;
+
+	for (i = 0; i < ARRAY_SIZE(mc_mem_ranges); i++) {
+		noff = fdt_node_offset_by_compatible(blob, -1, "fsl,qoriq-mc");
+		if (noff < 0) {
+			printf("WARN: failed to get MC node: %d\n", noff);
+			return;
+		}
+		mc_ph = fdt_get_phandle(blob, noff);
+		if (!mc_ph) {
+			mc_ph = fdt_create_phandle(blob, noff);
+			if (!mc_ph) {
+				printf("WARN: failed to get MC node phandle\n");
+				return;
+			}
+		}
+
+		sprintf(mem_name, "mc-mem%d", i);
+		ret = fdtdec_add_reserved_memory(blob, mem_name,
+						 &mc_mem_ranges[i], NULL, 0,
+						 &phandle, 0);
+		if (ret < 0) {
+			printf("ERROR: failed to reserve MC memory: %d\n", ret);
+			return;
+		}
+
+		noff = fdt_node_offset_by_phandle(blob, phandle);
+		if (noff < 0) {
+			printf("ERROR: failed get resvmem node offset: %d\n",
+			       noff);
+			return;
+		}
+		ret = fdt_setprop_u32(blob, noff, "iommu-addresses", mc_ph);
+		if (ret < 0) {
+			printf("ERROR: failed to set 'iommu-addresses': %d\n",
+			       ret);
+			return;
+		}
+		ret = fdt_appendprop_u64(blob, noff, "iommu-addresses",
+					 mc_mem_ranges[i].start);
+		if (ret < 0) {
+			printf("ERROR: failed to set 'iommu-addresses': %d\n",
+			       ret);
+			return;
+		}
+		ret = fdt_appendprop_u64(blob, noff, "iommu-addresses",
+					 mc_mem_ranges[i].end -
+						mc_mem_ranges[i].start + 1);
+		if (ret < 0) {
+			printf("ERROR: failed to set 'iommu-addresses': %d\n",
+			       ret);
+			return;
+		}
+
+		noff = fdt_node_offset_by_phandle(blob, mc_ph);
+		if (noff < 0) {
+			printf("ERROR: failed get MC node offset: %d\n", noff);
+			return;
+		}
+		ret = fdt_appendprop_u32(blob, noff, "memory-region", phandle);
+		if (ret < 0) {
+			printf("ERROR: failed to set 'memory-region': %d\n",
+			       ret);
+		}
+	}
+
+	fdt_set_iommu_prop(blob, noff, fdt_get_smmu_phandle(blob), &mc_icid, 1);
+}
+
 int fsl_mc_ldpaa_init(struct bd_info *bis)
 {
 	int i;
@@ -1358,24 +1463,15 @@ err:
 
 static int dpni_init(void)
 {
-	int err;
-	uint8_t	cfg_buf[256] = {0};
-	struct dpni_cfg dpni_cfg;
+	struct dpni_cfg dpni_cfg = {0};
 	uint16_t major_ver, minor_ver;
+	int err;
 
 	dflt_dpni = calloc(sizeof(struct fsl_dpni_obj), 1);
 	if (!dflt_dpni) {
 		printf("No memory: calloc() failed\n");
 		err = -ENOMEM;
 		goto err_calloc;
-	}
-
-	memset(&dpni_cfg, 0, sizeof(dpni_cfg));
-	err = dpni_prepare_cfg(&dpni_cfg, &cfg_buf[0]);
-	if (err < 0) {
-		err = -ENODEV;
-		printf("dpni_prepare_cfg() failed: %d\n", err);
-		goto err_prepare_cfg;
 	}
 
 	err = dpni_create(dflt_mc_io,
@@ -1434,7 +1530,6 @@ err_get_version:
 		     MC_CMD_NO_FLAGS,
 		     dflt_dpni->dpni_id);
 err_create:
-err_prepare_cfg:
 	free(dflt_dpni);
 err_calloc:
 	return err;

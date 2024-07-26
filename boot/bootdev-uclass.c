@@ -39,7 +39,6 @@ int bootdev_add_bootflow(struct bootflow *bflow)
 	struct bootflow *new;
 	int ret;
 
-	assert(bflow->dev);
 	ret = bootstd_get_priv(&std);
 	if (ret)
 		return ret;
@@ -111,6 +110,8 @@ int bootdev_bind(struct udevice *parent, const char *drv_name, const char *name,
 int bootdev_find_in_blk(struct udevice *dev, struct udevice *blk,
 			struct bootflow_iter *iter, struct bootflow *bflow)
 {
+	struct bootmeth_uc_plat *plat = dev_get_uclass_plat(bflow->method);
+	bool allow_any_part = plat->flags & BOOTMETHF_ANY_PART;
 	struct blk_desc *desc = dev_get_uclass_plat(blk);
 	struct disk_partition info;
 	char partstr[20];
@@ -142,6 +143,7 @@ int bootdev_find_in_blk(struct udevice *dev, struct udevice *blk,
 	 * us whether there is valid media there
 	 */
 	ret = part_get_info(desc, iter->part, &info);
+	log_debug("part_get_info() returned %d\n", ret);
 	if (!iter->part && ret == -ENOENT)
 		ret = 0;
 
@@ -154,8 +156,15 @@ int bootdev_find_in_blk(struct udevice *dev, struct udevice *blk,
 		ret = -ESHUTDOWN;
 	else
 		bflow->state = BOOTFLOWST_MEDIA;
-	if (ret)
+	if (ret && !allow_any_part) {
+		/* allow partition 1 to be missing */
+		if (iter->part == 1) {
+			iter->max_part = 3;
+			ret = -ENOENT;
+		}
+
 		return log_msg_ret("part", ret);
+	}
 
 	/*
 	 * Currently we don't get the number of partitions, so just
@@ -163,29 +172,38 @@ int bootdev_find_in_blk(struct udevice *dev, struct udevice *blk,
 	 */
 	iter->max_part = MAX_PART_PER_BOOTDEV;
 
-	/* If this is the whole disk, check if we have bootable partitions */
-	if (!iter->part) {
+	if (iter->flags & BOOTFLOWIF_SINGLE_PARTITION) {
+		/* a particular partition was specified, scan it without checking */
+	} else if (!iter->part) {
+		/* This is the whole disk, check if we have bootable partitions */
 		iter->first_bootable = part_get_bootable(desc);
 		log_debug("checking bootable=%d\n", iter->first_bootable);
+	} else if (allow_any_part) {
+		/*
+		 * allow any partition to be scanned, by skipping any checks
+		 * for filesystems or partition contents on this disk
+		 */
 
 	/* if there are bootable partitions, scan only those */
-	} else if (iter->first_bootable ? !info.bootable : iter->part != 1) {
+	} else if (iter->first_bootable >= 0 &&
+		   (iter->first_bootable ? !info.bootable : iter->part != 1)) {
 		return log_msg_ret("boot", -EINVAL);
 	} else {
 		ret = fs_set_blk_dev_with_part(desc, bflow->part);
 		bflow->state = BOOTFLOWST_PART;
-
-		/* Use an #ifdef due to info.sys_ind */
-#ifdef CONFIG_DOS_PARTITION
-		log_debug("%s: Found partition %x type %x fstype %d\n",
-			  blk->name, bflow->part, info.sys_ind,
-			  ret ? -1 : fs_get_type());
-#endif
 		if (ret)
 			return log_msg_ret("fs", ret);
+
+		log_debug("%s: Found partition %x type %x fstype %d\n",
+			  blk->name, bflow->part,
+			  IS_ENABLED(CONFIG_DOS_PARTITION) ?
+			  disk_partition_sys_ind(&info) : 0,
+			  ret ? -1 : fs_get_type());
+		bflow->blk = blk;
 		bflow->state = BOOTFLOWST_FS;
 	}
 
+	log_debug("method %s\n", bflow->method->name);
 	ret = bootmeth_read_bootflow(bflow->method, bflow);
 	if (ret)
 		return log_msg_ret("method", ret);
@@ -208,7 +226,7 @@ void bootdev_list(bool probe)
 	for (i = 0; dev; i++) {
 		printf("%3x   [ %c ]  %6s  %-9.9s %s\n", dev_seq(dev),
 		       device_active(dev) ? '+' : ' ',
-		       ret ? simple_itoa(ret) : "OK",
+		       ret ? simple_itoa(-ret) : "OK",
 		       dev_get_uclass_name(dev_get_parent(dev)), dev->name);
 		if (probe)
 			ret = uclass_next_device_check(&dev);
@@ -254,7 +272,7 @@ static int bootdev_get_suffix_start(struct udevice *dev, const char *suffix)
 	return len;
 }
 
-int bootdev_setup_sibling_blk(struct udevice *blk, const char *drv_name)
+int bootdev_setup_for_sibling_blk(struct udevice *blk, const char *drv_name)
 {
 	struct udevice *parent, *dev;
 	char dev_name[50];
@@ -297,7 +315,9 @@ int bootdev_get_sibling_blk(struct udevice *dev, struct udevice **blkp)
 	if (device_get_uclass_id(dev) != UCLASS_BOOTDEV)
 		return -EINVAL;
 
-	/* This should always work if bootdev_setup_sibling_blk() was used */
+	/*
+	 * This should always work if bootdev_setup_for_sibling_blk() was used
+	 */
 	len = bootdev_get_suffix_start(dev, ".bootdev");
 	ret = device_find_child_by_namelen(parent, dev->name, len, &blk);
 	if (ret) {
@@ -327,7 +347,7 @@ static int bootdev_get_from_blk(struct udevice *blk, struct udevice **bootdevp)
 	if (device_get_uclass_id(blk) != UCLASS_BLK)
 		return -EINVAL;
 
-	/* This should always work if bootdev_setup_sibling_blk() was used */
+	/* This should always work if bootdev_setup_for_sibling_blk() was used */
 	len = bootdev_get_suffix_start(blk, ".blk");
 	snprintf(dev_name, sizeof(dev_name), "%.*s.%s", len, blk->name,
 		 "bootdev");
@@ -364,7 +384,8 @@ int bootdev_unbind_dev(struct udevice *parent)
  * @seqp: Returns the sequence number, or -1 if none
  * @method_flagsp: If non-NULL, returns any flags implied by the label
  * (enum bootflow_meth_flags_t), 0 if none
- * Returns: sequence number on success, else -ve error code
+ * Returns: sequence number on success, -EPFNOSUPPORT is the uclass is not
+ * known, other -ve error code on other error
  */
 static int label_to_uclass(const char *label, int *seqp, int *method_flagsp)
 {
@@ -394,8 +415,7 @@ static int label_to_uclass(const char *label, int *seqp, int *method_flagsp)
 			id = UCLASS_ETH;
 			method_flags |= BOOTFLOW_METHF_DHCP_ONLY;
 		} else {
-			log_warning("Unknown uclass '%s' in label\n", label);
-			return -EINVAL;
+			return -EPFNOSUPPORT;
 		}
 	}
 	if (id == UCLASS_USB)
@@ -450,15 +470,15 @@ int bootdev_find_by_label(const char *label, struct udevice **devp,
 			 * if no sequence number was provided, we must scan all
 			 * bootdevs for this media uclass
 			 */
-			if (IS_ENABLED(CONFIG_BOOTSTD_FULL) && seq == -1)
+			if (seq == -1)
 				method_flags |= BOOTFLOW_METHF_SINGLE_UCLASS;
 			if (method_flagsp)
 				*method_flagsp = method_flags;
+			log_debug("method flags %x\n", method_flags);
 			return 0;
 		}
 		log_debug("- no device in %s\n", media->name);
 	}
-	log_warning("Unknown seq %d for label '%s'\n", seq, label);
 
 	return -ENOENT;
 }
@@ -528,6 +548,8 @@ static int default_get_bootflow(struct udevice *dev, struct bootflow_iter *iter,
 	int ret;
 
 	ret = bootdev_get_sibling_blk(dev, &blk);
+	log_debug("sibling_blk ret=%d, blk=%s\n", ret,
+		  ret ? "(none)" : blk->name);
 	/*
 	 * If there is no media, indicate that no more partitions should be
 	 * checked
@@ -549,7 +571,8 @@ int bootdev_get_bootflow(struct udevice *dev, struct bootflow_iter *iter,
 {
 	const struct bootdev_ops *ops = bootdev_get_ops(dev);
 
-	log_debug("->get_bootflow %s=%p\n", dev->name, ops->get_bootflow);
+	log_debug("->get_bootflow %s,%x=%p\n", dev->name, iter->part,
+		  ops->get_bootflow);
 	bootflow_init(bflow, dev, iter->method);
 	if (!ops->get_bootflow)
 		return default_get_bootflow(dev, iter, bflow);
@@ -577,9 +600,28 @@ int bootdev_next_label(struct bootflow_iter *iter, struct udevice **devp,
 
 	log_debug("next\n");
 	for (dev = NULL; !dev && iter->labels[++iter->cur_label];) {
-		log_debug("Scanning: %s\n", iter->labels[iter->cur_label]);
-		bootdev_hunt_and_find_by_label(iter->labels[iter->cur_label],
-					       &dev, method_flagsp);
+		const char *label = iter->labels[iter->cur_label];
+		int ret;
+
+		log_debug("Scanning: %s\n", label);
+		ret = bootdev_hunt_and_find_by_label(label, &dev,
+						     method_flagsp);
+		if (iter->flags & BOOTFLOWIF_SHOW) {
+			if (ret == -EPFNOSUPPORT) {
+				log_warning("Unknown uclass '%s' in label\n",
+					    label);
+			} else if (ret == -ENOENT) {
+				/*
+				 * looking for, e.g. 'scsi0' should find
+				 * something if SCSI is present
+				 */
+				if (!trailing_strtol(label)) {
+					log_warning("No bootdevs for '%s'\n",
+						    label);
+				}
+			}
+		}
+
 	}
 
 	if (!dev)
@@ -591,7 +633,7 @@ int bootdev_next_label(struct bootflow_iter *iter, struct udevice **devp,
 
 int bootdev_next_prio(struct bootflow_iter *iter, struct udevice **devp)
 {
-	struct udevice *dev = *devp;
+	struct udevice *dev = *devp, *last_dev = NULL;
 	bool found;
 	int ret;
 
@@ -629,20 +671,31 @@ int bootdev_next_prio(struct bootflow_iter *iter, struct udevice **devp)
 			if (++iter->cur_prio == BOOTDEVP_COUNT)
 				return log_msg_ret("fin", -ENODEV);
 
-			if (iter->flags & BOOTFLOWF_HUNT) {
+			if (iter->flags & BOOTFLOWIF_HUNT) {
 				/* hunt to find new bootdevs */
 				ret = bootdev_hunt_prio(iter->cur_prio,
 							iter->flags &
-							BOOTFLOWF_SHOW);
-				log_debug("- hunt ret %d\n", ret);
+							BOOTFLOWIF_SHOW);
+				log_debug("- bootdev_hunt_prio() ret %d\n",
+					  ret);
 				if (ret)
 					return log_msg_ret("hun", ret);
 			}
 		} else {
 			ret = device_probe(dev);
+			if (!ret)
+				last_dev = dev;
 			if (ret) {
-				log_debug("Device '%s' failed to probe\n",
+				log_warning("Device '%s' failed to probe\n",
 					  dev->name);
+				if (last_dev == dev) {
+					/*
+					 * We have already tried this device
+					 * and it failed to probe. Give up.
+					 */
+					return log_msg_ret("probe", ret);
+				}
+				last_dev = dev;
 				dev = NULL;
 			}
 		}
@@ -657,9 +710,38 @@ int bootdev_setup_iter(struct bootflow_iter *iter, const char *label,
 		       struct udevice **devp, int *method_flagsp)
 {
 	struct udevice *bootstd, *dev = NULL;
-	bool show = iter->flags & BOOTFLOWF_SHOW;
+	bool show = iter->flags & BOOTFLOWIF_SHOW;
 	int method_flags;
+	char buf[32];
 	int ret;
+
+	if (label) {
+		const char *end = strchr(label, ':');
+
+		if (end) {
+			size_t len = (size_t)(end - label);
+			const char *part = end + 1;
+
+			if (len + 1 > sizeof(buf)) {
+				log_err("label \"%s\" is way too long\n", label);
+				return -EINVAL;
+			}
+
+			memcpy(buf, label, len);
+			buf[len] = '\0';
+			label = buf;
+
+			unsigned long tmp;
+
+			if (strict_strtoul(part, 0, &tmp)) {
+				log_err("Invalid partition number: %s\n", part);
+				return -EINVAL;
+			}
+
+			iter->flags |= BOOTFLOWIF_SINGLE_PARTITION;
+			iter->part = tmp;
+		}
+	}
 
 	ret = uclass_first_device_err(UCLASS_BOOTSTD, &bootstd);
 	if (ret) {
@@ -668,15 +750,16 @@ int bootdev_setup_iter(struct bootflow_iter *iter, const char *label,
 	}
 
 	/* hunt for any pre-scan devices */
-	if (iter->flags & BOOTFLOWF_HUNT) {
+	if (iter->flags & BOOTFLOWIF_HUNT) {
 		ret = bootdev_hunt_prio(BOOTDEVP_1_PRE_SCAN, show);
+		log_debug("- bootdev_hunt_prio() ret %d\n", ret);
 		if (ret)
 			return log_msg_ret("pre", ret);
 	}
 
 	/* Handle scanning a single device */
 	if (IS_ENABLED(CONFIG_BOOTSTD_FULL) && label) {
-		if (iter->flags & BOOTFLOWF_HUNT) {
+		if (iter->flags & BOOTFLOWIF_HUNT) {
 			ret = bootdev_hunt(label, show);
 			if (ret)
 				return log_msg_ret("hun", ret);
@@ -687,11 +770,11 @@ int bootdev_setup_iter(struct bootflow_iter *iter, const char *label,
 
 		log_debug("method_flags: %x\n", method_flags);
 		if (method_flags & BOOTFLOW_METHF_SINGLE_UCLASS)
-			iter->flags |= BOOTFLOWF_SINGLE_UCLASS;
+			iter->flags |= BOOTFLOWIF_SINGLE_UCLASS;
 		else if (method_flags & BOOTFLOW_METHF_SINGLE_DEV)
-			iter->flags |= BOOTFLOWF_SINGLE_DEV;
+			iter->flags |= BOOTFLOWIF_SINGLE_DEV;
 		else
-			iter->flags |= BOOTFLOWF_SINGLE_MEDIA;
+			iter->flags |= BOOTFLOWIF_SINGLE_MEDIA;
 		log_debug("Selected label: %s, flags %x\n", label, iter->flags);
 	} else {
 		bool ok;
@@ -740,7 +823,8 @@ static int bootdev_hunt_drv(struct bootdev_hunter *info, uint seq, bool show)
 		log_debug("Hunting with: %s\n", name);
 		if (info->hunt) {
 			ret = info->hunt(info, show);
-			if (ret)
+			log_debug("  - hunt result %d\n", ret);
+			if (ret && ret != -ENOENT)
 				return ret;
 		}
 		std->hunters_used |= BIT(seq);
@@ -787,6 +871,33 @@ int bootdev_hunt(const char *spec, bool show)
 	return result;
 }
 
+int bootdev_unhunt(enum uclass_id id)
+{
+	struct bootdev_hunter *start;
+	int n_ent, i;
+
+	start = ll_entry_start(struct bootdev_hunter, bootdev_hunter);
+	n_ent = ll_entry_count(struct bootdev_hunter, bootdev_hunter);
+	for (i = 0; i < n_ent; i++) {
+		struct bootdev_hunter *info = start + i;
+
+		if (info->uclass == id) {
+			struct bootstd_priv *std;
+			int ret;
+
+			ret = bootstd_get_priv(&std);
+			if (ret)
+				return log_msg_ret("std", ret);
+			if (!(std->hunters_used & BIT(i)))
+				return -EALREADY;
+			std->hunters_used &= ~BIT(i);
+			return 0;
+		}
+	}
+
+	return -ENOENT;
+}
+
 int bootdev_hunt_prio(enum bootdev_prio_t prio, bool show)
 {
 	struct bootdev_hunter *start;
@@ -805,9 +916,11 @@ int bootdev_hunt_prio(enum bootdev_prio_t prio, bool show)
 		if (prio != info->prio)
 			continue;
 		ret = bootdev_hunt_drv(info, i, show);
+		log_debug("bootdev_hunt_drv() return %d\n", ret);
 		if (ret && ret != -ENOENT)
 			result = ret;
 	}
+	log_debug("exit %d\n", result);
 
 	return result;
 }

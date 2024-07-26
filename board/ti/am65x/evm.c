@@ -2,18 +2,16 @@
 /*
  * Board specific initialization for AM654 EVM
  *
- * Copyright (C) 2017-2018 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2017-2018 Texas Instruments Incorporated - https://www.ti.com/
  *	Lokesh Vutla <lokeshvutla@ti.com>
  *
  */
 
-#include <common.h>
 #include <dm.h>
 #include <fdt_support.h>
 #include <image.h>
 #include <init.h>
 #include <net.h>
-#include <asm/arch/sys_proto.h>
 #include <asm/arch/hardware.h>
 #include <asm/global_data.h>
 #include <asm/gpio.h>
@@ -21,9 +19,10 @@
 #include <asm/omap_common.h>
 #include <env.h>
 #include <spl.h>
-#include <asm/arch/sys_proto.h>
+#include <linux/printk.h>
 
 #include "../common/board_detect.h"
+#include "../common/fdt_ops.h"
 
 #define board_is_am65x_base_board()	board_ti_is("AM6-COMPROCEVM")
 
@@ -61,7 +60,7 @@ int dram_init(void)
 	return 0;
 }
 
-phys_size_t board_get_usable_ram_top(phys_size_t total_size)
+phys_addr_t board_get_usable_ram_top(phys_size_t total_size)
 {
 #ifdef CONFIG_PHYS_64BIT
 	/* Limit RAM used by U-Boot to the DDR low region */
@@ -75,13 +74,13 @@ phys_size_t board_get_usable_ram_top(phys_size_t total_size)
 int dram_init_banksize(void)
 {
 	/* Bank 0 declares the memory available in the DDR low region */
-	gd->bd->bi_dram[0].start = CFG_SYS_SDRAM_BASE;
+	gd->bd->bi_dram[0].start = 0x80000000;
 	gd->bd->bi_dram[0].size = 0x80000000;
 	gd->ram_size = 0x80000000;
 
 #ifdef CONFIG_PHYS_64BIT
 	/* Bank 1 declares the memory available in the DDR high region */
-	gd->bd->bi_dram[1].start = CFG_SYS_SDRAM_BASE1;
+	gd->bd->bi_dram[1].start = 0x880000000;
 	gd->bd->bi_dram[1].size = 0x80000000;
 	gd->ram_size = 0x100000000;
 #endif
@@ -92,30 +91,15 @@ int dram_init_banksize(void)
 #ifdef CONFIG_SPL_LOAD_FIT
 int board_fit_config_name_match(const char *name)
 {
-#ifdef CONFIG_TARGET_AM654_A53_EVM
-	if (!strcmp(name, "k3-am654-base-board"))
+	if (IS_ENABLED(CONFIG_TI_ICSSG_PRUETH) &&
+	    strcmp(name, "k3-am654-icssg2") == 0)
 		return 0;
-#endif
+
+	if (IS_ENABLED(CONFIG_TARGET_AM654_A53_EVM) &&
+	    strcmp(name, "k3-am654-base-board") == 0)
+		return 0;
 
 	return -1;
-}
-#endif
-
-#if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)
-int ft_board_setup(void *blob, struct bd_info *bd)
-{
-	int ret;
-
-	ret = fdt_fixup_msmc_ram(blob, "/bus@100000", "sram@70000000");
-	if (ret < 0)
-		ret = fdt_fixup_msmc_ram(blob, "/interconnect@100000",
-					 "sram@70000000");
-	if (ret) {
-		printf("%s: fixing up msmc ram failed %d\n", __func__, ret);
-		return ret;
-	}
-
-	return 0;
 }
 #endif
 
@@ -161,6 +145,7 @@ static void setup_board_eeprom_env(void)
 
 invalid_eeprom:
 	set_board_info_env_am6(name);
+	ti_set_fdt_env(NULL, NULL);
 }
 
 static int init_daughtercard_det_gpio(char *gpio_name, struct gpio_desc *desc)

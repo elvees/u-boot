@@ -7,24 +7,15 @@
  */
 #include <common.h>
 #include <command.h>
+#include <console.h>
 #include <dm.h>
-#include <video.h>
-
-#define CSI "\x1b["
 
 static int do_video_clear(struct cmd_tbl *cmdtp, int flag, int argc,
 			  char *const argv[])
 {
-	__maybe_unused struct udevice *dev;
+	if (console_clear())
+		return CMD_RET_FAILURE;
 
-	/*  Send clear screen and home */
-	printf(CSI "2J" CSI "1;1H");
-	if (IS_ENABLED(CONFIG_VIDEO) && !IS_ENABLED(CONFIG_VIDEO_ANSI)) {
-		if (uclass_first_device_err(UCLASS_VIDEO, &dev))
-			return CMD_RET_FAILURE;
-		if (video_clear(dev))
-			return CMD_RET_FAILURE;
-	}
 	return CMD_RET_SUCCESS;
 }
 

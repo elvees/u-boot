@@ -9,10 +9,17 @@
 #ifndef	__ASM_GBL_DATA_H
 #define __ASM_GBL_DATA_H
 
+#include <linux/types.h>
+
 /* Architecture-specific global data */
 struct arch_global_data {
 	uint8_t		*ram_buf;	/* emulated RAM buffer */
 	void		*text_base;	/* pointer to base of text region */
+	ulong table_start;		/* Start address of x86 tables */
+	ulong table_end;		/* End address of x86 tables */
+	ulong table_start_high;		/* Start address of high x86 tables */
+	ulong table_end_high;		/* End address of high x86 tables */
+	ulong smbios_start;		/* Start address of SMBIOS table */
 };
 
 #include <asm-generic/global_data.h>

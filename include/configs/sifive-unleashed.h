@@ -14,8 +14,8 @@
 #define CFG_SYS_SDRAM_BASE		0x80000000
 
 #define RISCV_MMODE_TIMERBASE		0x2000000
+#define RISCV_MMODE_TIMEROFF		0xbff8
 #define RISCV_MMODE_TIMER_FREQ		1000000
-
 #define RISCV_SMODE_TIMER_FREQ		1000000
 
 /* Environment options */
@@ -26,7 +26,7 @@
 	func(DHCP, dhcp, na)
 
 #include <config_distro_bootcmd.h>
-#include <environment/distro/sf.h>
+#include <env/distro/sf.h>
 
 #define TYPE_GUID_LOADER1	"5B193300-FC78-40CD-8002-E86C45580B47"
 #define TYPE_GUID_LOADER2	"2E54B353-1271-4842-806F-E436D6AF6985"

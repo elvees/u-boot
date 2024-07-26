@@ -13,6 +13,7 @@
 #include <log.h>
 #include <asm/global_data.h>
 #include <asm-generic/gpio.h>
+#include <linux/printk.h>
 #include <power/pmic.h>
 #include <power/regulator.h>
 #include <power/pca9450.h>
@@ -120,6 +121,7 @@ static const struct udevice_id pca9450_ids[] = {
 	{ .compatible = "nxp,pca9450a", .data = NXP_CHIP_TYPE_PCA9450A, },
 	{ .compatible = "nxp,pca9450b", .data = NXP_CHIP_TYPE_PCA9450BC, },
 	{ .compatible = "nxp,pca9450c", .data = NXP_CHIP_TYPE_PCA9450BC, },
+	{ .compatible = "nxp,pca9451a", .data = NXP_CHIP_TYPE_PCA9451A, },
 	{ }
 };
 

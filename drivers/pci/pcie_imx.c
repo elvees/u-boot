@@ -7,6 +7,14 @@
  * Based on upstream Linux kernel driver:
  * pci-imx6.c:		Sean Cross <xobs@kosagi.com>
  * pcie-designware.c:	Jingoo Han <jg1.han@samsung.com>
+ *
+ * This is a legacy PCIe iMX driver kept to support older iMX6 SoCs. It is
+ * rather tied to quite old port of pcie-designware driver from Linux which
+ * suffices only iMX6 specific needs. But now we have modern PCIe iMX driver
+ * (drivers/pci/pcie_dw_imx.c) utilizing all the common DWC specific bits from
+ * (drivers/pci/pcie_dw_common.*). So you are encouraged to add any further iMX
+ * SoC support there or even better if you posses older iMX6 SoCs then switch
+ * those too in order to have a single modern PCIe iMX driver.
  */
 
 #include <common.h>
@@ -751,8 +759,8 @@ static int imx_pcie_of_to_plat(struct udevice *dev)
 {
 	struct imx_pcie_priv *priv = dev_get_priv(dev);
 
-	priv->dbi_base = (void __iomem *)devfdt_get_addr_index(dev, 0);
-	priv->cfg_base = (void __iomem *)devfdt_get_addr_index(dev, 1);
+	priv->dbi_base = devfdt_get_addr_index_ptr(dev, 0);
+	priv->cfg_base = devfdt_get_addr_index_ptr(dev, 1);
 	if (!priv->dbi_base || !priv->cfg_base)
 		return -EINVAL;
 

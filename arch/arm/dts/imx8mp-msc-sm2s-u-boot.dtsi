@@ -9,57 +9,70 @@
 	model = "MSC SM2S-IMX8MPLUS";
 	compatible = "avnet,sm2s-imx8mp", "fsl,imx8mp";
 
+	aliases {
+		mmc0 = &usdhc3;
+		mmc1 = &usdhc2;
+	};
+
 	wdt-reboot {
 		compatible = "wdt-reboot";
 		wdt = <&wdog1>;
-		u-boot,dm-spl;
+		bootph-pre-ram;
 	};
 };
 
 &reg_usdhc2_vmmc {
-	u-boot,dm-spl;
+	bootph-pre-ram;
 };
 
 &gpio1 {
-	u-boot,dm-spl;
+	bootph-pre-ram;
 };
 
 &gpio2 {
-	u-boot,dm-spl;
+	bootph-pre-ram;
 };
 
 &gpio3 {
-	u-boot,dm-spl;
+	bootph-pre-ram;
 };
 
 &i2c1 {
-	u-boot,dm-spl;
+	bootph-pre-ram;
 };
 
 &i2c2 {
-	u-boot,dm-spl;
+	bootph-pre-ram;
 };
 
 &i2c3 {
-	u-boot,dm-spl;
+	bootph-pre-ram;
 };
 
 &i2c4 {
-	u-boot,dm-spl;
+	bootph-pre-ram;
 };
 
 &i2c5 {
-	u-boot,dm-spl;
+	bootph-pre-ram;
 };
 
 &i2c6 {
-	u-boot,dm-spl;
+	bootph-pre-ram;
 };
 
 &pinctrl_i2c6 {
-	u-boot,dm-spl;
+	bootph-pre-ram;
 };
 
 &pmic {
-	u-boot,dm-spl;
+	bootph-pre-ram;
+};
+
+&uart2 {
+	bootph-pre-ram;
+};
+
+&pinctrl_uart2 {
+	bootph-pre-ram;
 };

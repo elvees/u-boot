@@ -1,5 +1,8 @@
 .. SPDX-License-Identifier: GPL-2.0-or-later:
 
+.. index::
+   single: env (command)
+
 env command
 ===========
 
@@ -14,18 +17,18 @@ Synopsis
 	env default [-f] (-a | var [...])
 	env delete [-f] var [...]
 	env edit name
+	env erase
 	env exists name
 	env export [-t | -b | -c] [-s size] addr [var ...]
 	env flags
 	env grep [-e] [-n | -v | -b] string [...]
 	env import [-d] [-t [-r] | -b | -c] addr [size] [var ...]
 	env info [-d] [-p] [-q]
+	env load
 	env print [-a | name ...]
 	env print -e [-guid guid] [-n] [name ...]
 	env run var [...]
 	env save
-	env erase
-	env load
 	env select [target]
 	env set [-f] name [value]
 	env set -e [-nv][-bs][-rt][-at][-a][-i addr:size][-v] name [value]
@@ -38,11 +41,12 @@ the UEFI variables.
 
 The next commands are kept as alias and for compatibility:
 
++ :doc:`askenv <askenv>` = *env ask*
 + *editenv* = *env edit*
 + *grepenv* = *env grep*
-+ *setenv* = *env set*
-+ *askenv* = *env ask*
++ :doc:`printenv <printenv>` = *env print*
 + *run* = *env run*
++ *setenv* = *env set*
 
 Append
 ~~~~~~
@@ -110,6 +114,11 @@ The *env edit* command edits an environment variable.
 
     name
         name of the variable.
+
+Erase
+~~~~~
+
+The *env erase* command erases the U-Boot environment.
 
 Exists
 ~~~~~~
@@ -212,6 +221,11 @@ environment information.
         quiet output,  use only for command result, by example with
         'test' command.
 
+Load
+~~~~
+
+The *env load* command loads the U-Boot environment from persistent storage.
+
 Print
 ~~~~~
 
@@ -223,7 +237,7 @@ in UEFI variables.
     \-a
         all U-Boot environment, when 'name' is absent.
     \-e
-        print UEFI variables, all by default when 'name'.
+        print UEFI variables, all by default if 'name' is not provided.
     \-guid guid
         print only the UEFI variables matching this GUID (any by default)
         with guid format = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx".
@@ -242,16 +256,6 @@ Save
 ~~~~
 
 The *env save* command saves the U-Boot environment in persistent storage.
-
-Erase
-~~~~~
-
-The *env erase* command erases the U-Boot environment.
-
-Load
-~~~~
-
-The *env load* command loads the U-Boot environment from persistent storage.
 
 Select
 ~~~~~~
@@ -361,14 +365,14 @@ edit
 exists
     CONFIG_CMD_ENV_EXISTS
 
-flsgs
-    CONFIG_CMD_ENV_FLAGS
-
 erase
     CONFIG_CMD_ERASEENV
 
 export
     CONFIG_CMD_EXPORTENV
+
+flags
+    CONFIG_CMD_ENV_FLAGS
 
 grep
     CONFIG_CMD_GREPENV, CONFIG_REGEX for '-e' option
@@ -382,6 +386,10 @@ info
 load
     CONFIG_CMD_NVEDIT_LOAD
 
+print
+    CONFIG_CMD_NVEDIT_EFI for UEFI variables support ('-e' option),
+    additionally CONFIG_HEXDUMP to display content of UEFI variables
+
 run
     CONFIG_CMD_RUN
 
@@ -391,5 +399,5 @@ save
 select
     CONFIG_CMD_NVEDIT_SELECT
 
-set, print
-    CONFIG_CMD_NVEDIT_EFI for '-e' option
+set
+    CONFIG_CMD_NVEDIT_EFI for UEFI variables support ('-e' option)

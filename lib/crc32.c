@@ -10,9 +10,7 @@
 
 #ifdef USE_HOSTCC
 #include <arpa/inet.h>
-#include <u-boot/crc.h>
 #else
-#include <common.h>
 #include <efi_loader.h>
 #endif
 #include <compiler.h>

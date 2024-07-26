@@ -290,7 +290,7 @@ static void usage(void)
 		"Options:\n"
 		"   -c <cfg>\tSpecify config file\n"
 		"   -f <subtype>\tSpecify output subtype\n"
-		"   -m <map>\tSpecify Systen.map file\n"
+		"   -m <map>\tSpecify System.map file\n"
 		"   -o <fname>\tSpecify output file\n"
 		"   -t <fname>\tSpecify trace data file (from U-Boot 'trace calls')\n"
 		"   -v <0-4>\tSpecify verbosity\n"
@@ -306,7 +306,7 @@ static void usage(void)
 }
 
 /**
- * h_cmp_offset - bsearch() function to compare two functions bny their offset
+ * h_cmp_offset - bsearch() function to compare two functions by their offset
  *
  * @v1: Pointer to first function (struct func_info)
  * @v2: Pointer to second function (struct func_info)
@@ -431,7 +431,7 @@ static struct func_info *find_func_by_offset(uint offset)
 static struct func_info *find_caller_by_offset(uint offset)
 {
 	int low;	/* least function that could be a match */
-	int high;	/* greated function that could be a match */
+	int high;	/* greatest function that could be a match */
 	struct func_info key;
 
 	low = 0;
@@ -1352,7 +1352,7 @@ static int write_pages(struct twriter *tw, enum out_format_t out_format,
 		}
 
 		if (!(func->flags & FUNCF_TRACE)) {
-			debug("Funcion '%s' is excluded from trace\n",
+			debug("Function '%s' is excluded from trace\n",
 			      func->name);
 			skip_count++;
 			continue;
@@ -1493,14 +1493,43 @@ static int write_pages(struct twriter *tw, enum out_format_t out_format,
 static int write_flyrecord(struct twriter *tw, enum out_format_t out_format,
 			   int *missing_countp, int *skip_countp)
 {
-	int start, ret, len;
+	unsigned long long start, start_ofs, len;
+	int ret;
 	FILE *fout = tw->fout;
 	char str[200];
 
+	/* Record start pointer */
+	start_ofs = tw->ptr;
+	debug("Start of flyrecord header at: 0x%llx\n", start_ofs);
+
 	tw->ptr += fprintf(fout, "flyrecord%c", 0);
 
+	/* flyrecord\0 - allocated 10 bytes */
+	start_ofs += 10;
+
+	/*
+	 * 8 bytes that are a 64-bit word containing the offset into the file
+	 * that holds the data for the CPU.
+	 *
+	 * 8 bytes that are a 64-bit word containing the size of the CPU
+	 * data at that offset.
+	 */
+	start_ofs += 16;
+
+	snprintf(str, sizeof(str),
+		 "[local] global counter uptime perf mono mono_raw boot x86-tsc\n");
+	len = strlen(str);
+
+	/* trace clock length - 8 bytes */
+	start_ofs += 8;
+	/* trace clock data */
+	start_ofs += len;
+
+	debug("Calculated flyrecord header end at: 0x%llx, trace clock len: 0x%llx\n",
+	      start_ofs, len);
+
 	/* trace data */
-	start = ALIGN(tw->ptr + 16, TRACE_PAGE_SIZE);
+	start = ALIGN(start_ofs, TRACE_PAGE_SIZE);
 	tw->ptr += tputq(fout, start);
 
 	/* use a placeholder for the size */
@@ -1509,11 +1538,11 @@ static int write_flyrecord(struct twriter *tw, enum out_format_t out_format,
 		return -1;
 	tw->ptr += ret;
 
-	snprintf(str, sizeof(str),
-		 "[local] global counter uptime perf mono mono_raw boot x86-tsc\n");
-	len = strlen(str);
 	tw->ptr += tputq(fout, len);
 	tw->ptr += tputs(fout, str);
+
+	debug("End of flyrecord header at: 0x%x, offset: 0x%llx\n",
+	      tw->ptr, start);
 
 	debug("trace text base %lx, map file %lx\n", text_base, text_offset);
 
@@ -1713,17 +1742,10 @@ static int make_flame_tree(enum out_format_t out_format,
 	struct flame_state state;
 	struct flame_node *tree;
 	struct trace_call *call;
-	int missing_count = 0;
-	int i, depth;
+	int i;
 
 	/* maintain a stack of start times, etc. for 'calling' functions */
 	state.stack_ptr = 0;
-
-	/*
-	 * The first thing in the trace may not be the top-level function, so
-	 * set the initial depth so that no function goes below depth 0
-	 */
-	depth = -calc_min_depth();
 
 	tree = create_node("tree");
 	if (!tree)
@@ -1736,16 +1758,10 @@ static int make_flame_tree(enum out_format_t out_format,
 		ulong timestamp = call->flags & FUNCF_TIMESTAMP_MASK;
 		struct func_info *func;
 
-		if (entry)
-			depth++;
-		else
-			depth--;
-
 		func = find_func_by_offset(call->func);
 		if (!func) {
 			warn("Cannot find function at %lx\n",
 			     text_offset + call->func);
-			missing_count++;
 			continue;
 		}
 
@@ -1765,7 +1781,8 @@ static int make_flame_tree(enum out_format_t out_format,
  *
  * This works by maintaining a string shared across all recursive calls. The
  * function name for this node is added to the existing string, to make up the
- * full call-stack description. For example, on entry, @str might contain:
+ * full call-stack description. For example, on entry, @str_buf->data might
+ * contain:
  *
  *    "initf_bootstage;bootstage_mark_name"
  *                                        ^ @base
@@ -1779,18 +1796,18 @@ static int make_flame_tree(enum out_format_t out_format,
  * @fout: Output file
  * @out_format: Output format to use
  * @node: Node to output (pass the whole tree at first)
- * @str: String to use to build the output line (e.g. 500 charas long)
- * @maxlen: Maximum length of string
+ * @str_buf: String buffer to use to build the output line
  * @base: Current base position in the string
  * @treep: Returns the resulting flamegraph tree
  * Returns 0 if OK, -1 on error
  */
 static int output_tree(FILE *fout, enum out_format_t out_format,
-		       const struct flame_node *node, char *str, int maxlen,
+		       const struct flame_node *node, struct abuf *str_buf,
 		       int base)
 {
 	const struct flame_node *child;
 	int pos;
+	char *str = abuf_data(str_buf);
 
 	if (node->count) {
 		if (out_format == OUT_FMT_FLAMEGRAPH_CALLS) {
@@ -1816,18 +1833,29 @@ static int output_tree(FILE *fout, enum out_format_t out_format,
 	if (pos)
 		str[pos++] = ';';
 	list_for_each_entry(child, &node->child_head, sibling_node) {
-		int len;
+		int len, needed;
 
 		len = strlen(child->func->name);
-		if (pos + len + 1 >= maxlen) {
-			fprintf(stderr, "String too short (%d chars)\n",
-				maxlen);
-			return -1;
+		needed = pos + len + 1;
+		if (needed > abuf_size(str_buf)) {
+			/*
+			 * We need to re-allocate the string buffer; increase
+			 * its size by multiples of 500 characters.
+			 */
+			needed = 500 * ((needed / 500) + 1);
+			if (!abuf_realloc(str_buf, needed))
+				return -1;
+			str = abuf_data(str_buf);
+			memset(str + pos, 0, abuf_size(str_buf) - pos);
 		}
 		strcpy(str + pos, child->func->name);
-		if (output_tree(fout, out_format, child, str, maxlen,
-				pos + len))
+		if (output_tree(fout, out_format, child, str_buf, pos + len))
 			return -1;
+		/*
+		 * Update our pointer as the string buffer might have been
+		 * re-allocated.
+		 */
+		str = abuf_data(str_buf);
 	}
 
 	return 0;
@@ -1843,16 +1871,24 @@ static int output_tree(FILE *fout, enum out_format_t out_format,
 static int make_flamegraph(FILE *fout, enum out_format_t out_format)
 {
 	struct flame_node *tree;
-	char str[500];
+	struct abuf str_buf;
+	char *str;
+	int ret = 0;
 
 	if (make_flame_tree(out_format, &tree))
 		return -1;
 
-	*str = '\0';
-	if (output_tree(fout, out_format, tree, str, sizeof(str), 0))
+	abuf_init(&str_buf);
+	if (!abuf_realloc(&str_buf, 500))
 		return -1;
 
-	return 0;
+	str = abuf_data(&str_buf);
+	memset(str, 0, abuf_size(&str_buf));
+	if (output_tree(fout, out_format, tree, &str_buf, 0))
+		ret = -1;
+
+	abuf_uninit(&str_buf);
+	return ret;
 }
 
 /**

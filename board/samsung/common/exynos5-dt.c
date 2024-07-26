@@ -26,6 +26,7 @@
 #include <asm/arch/pinmux.h>
 #include <asm/arch/power.h>
 #include <asm/arch/sromc.h>
+#include <linux/printk.h>
 #include <power/pmic.h>
 #include <power/max77686_pmic.h>
 #include <power/regulator.h>
@@ -36,11 +37,6 @@
 #include <tmu.h>
 
 DECLARE_GLOBAL_DATA_PTR;
-
-int exynos_init(void)
-{
-	return 0;
-}
 
 static int exynos_set_regulator(const char *name, uint uv)
 {
@@ -125,12 +121,6 @@ static struct dwc3_device dwc3_device_data = {
 	.dr_mode = USB_DR_MODE_PERIPHERAL,
 	.index = 0,
 };
-
-int usb_gadget_handle_interrupts(int index)
-{
-	dwc3_uboot_handle_interrupt(0);
-	return 0;
-}
 
 int board_usb_init(int index, enum usb_init_type init)
 {

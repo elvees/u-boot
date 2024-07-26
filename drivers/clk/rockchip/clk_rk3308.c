@@ -12,9 +12,8 @@
 #include <malloc.h>
 #include <syscon.h>
 #include <asm/global_data.h>
-#include <asm/io.h>
-#include <asm/arch/cru_rk3308.h>
 #include <asm/arch-rockchip/clock.h>
+#include <asm/arch-rockchip/cru_rk3308.h>
 #include <asm/arch-rockchip/hardware.h>
 #include <dm/device-internal.h>
 #include <dm/lists.h>
@@ -65,6 +64,57 @@ static struct rockchip_pll_clock rk3308_pll_clks[] = {
 	[VPLL1] = PLL(pll_rk3328, PLL_VPLL1, RK3308_PLL_CON(24),
 		      RK3308_MODE_CON, 6, 10, 0, NULL),
 };
+
+/*
+ *
+ * rational_best_approximation(31415, 10000,
+ *		(1 << 8) - 1, (1 << 5) - 1, &n, &d);
+ *
+ * you may look at given_numerator as a fixed point number,
+ * with the fractional part size described in given_denominator.
+ *
+ * for theoretical background, see:
+ * http://en.wikipedia.org/wiki/Continued_fraction
+ */
+static void rational_best_approximation(unsigned long given_numerator,
+					unsigned long given_denominator,
+					unsigned long max_numerator,
+					unsigned long max_denominator,
+					unsigned long *best_numerator,
+					unsigned long *best_denominator)
+{
+	unsigned long n, d, n0, d0, n1, d1;
+
+	n = given_numerator;
+	d = given_denominator;
+	n0 = 0;
+	d1 = 0;
+	n1 = 1;
+	d0 = 1;
+	for (;;) {
+		unsigned long t, a;
+
+		if (n1 > max_numerator || d1 > max_denominator) {
+			n1 = n0;
+			d1 = d0;
+			break;
+		}
+		if (d == 0)
+			break;
+		t = d;
+		a = n / d;
+		d = n % d;
+		n = t;
+		t = n0 + a * n1;
+		n0 = n1;
+		n1 = t;
+		t = d0 + a * d1;
+		d0 = d1;
+		d1 = t;
+	}
+	*best_numerator = n1;
+	*best_denominator = d1;
+}
 
 static ulong rk3308_armclk_set_clk(struct rk3308_clk_priv *priv, ulong hz)
 {
@@ -150,7 +200,7 @@ static ulong rk3308_i2c_get_clk(struct clk *clk)
 	}
 
 	con = readl(&cru->clksel_con[con_id]);
-	div = con >> CLK_I2C_DIV_CON_SHIFT & CLK_I2C_DIV_CON_MASK;
+	div = (con & CLK_I2C_DIV_CON_MASK) >> CLK_I2C_DIV_CON_SHIFT;
 
 	return DIV_TO_RATE(priv->dpll_hz, div);
 }
@@ -314,7 +364,7 @@ static ulong rk3308_saradc_get_clk(struct clk *clk)
 	u32 div, con;
 
 	con = readl(&cru->clksel_con[34]);
-	div = con >> CLK_SARADC_DIV_CON_SHIFT & CLK_SARADC_DIV_CON_MASK;
+	div = (con & CLK_SARADC_DIV_CON_MASK) >> CLK_SARADC_DIV_CON_SHIFT;
 
 	return DIV_TO_RATE(OSC_HZ, div);
 }
@@ -342,7 +392,7 @@ static ulong rk3308_tsadc_get_clk(struct clk *clk)
 	u32 div, con;
 
 	con = readl(&cru->clksel_con[33]);
-	div = con >> CLK_SARADC_DIV_CON_SHIFT & CLK_SARADC_DIV_CON_MASK;
+	div = (con & CLK_SARADC_DIV_CON_MASK) >> CLK_SARADC_DIV_CON_SHIFT;
 
 	return DIV_TO_RATE(OSC_HZ, div);
 }
@@ -385,7 +435,7 @@ static ulong rk3308_spi_get_clk(struct clk *clk)
 	}
 
 	con = readl(&cru->clksel_con[con_id]);
-	div = con >> CLK_SPI_DIV_CON_SHIFT & CLK_SPI_DIV_CON_MASK;
+	div = (con & CLK_SPI_DIV_CON_MASK) >> CLK_SPI_DIV_CON_SHIFT;
 
 	return DIV_TO_RATE(priv->dpll_hz, div);
 }
@@ -429,7 +479,7 @@ static ulong rk3308_pwm_get_clk(struct clk *clk)
 	u32 div, con;
 
 	con = readl(&cru->clksel_con[29]);
-	div = con >> CLK_PWM_DIV_CON_SHIFT & CLK_PWM_DIV_CON_MASK;
+	div = (con & CLK_PWM_DIV_CON_MASK) >> CLK_PWM_DIV_CON_SHIFT;
 
 	return DIV_TO_RATE(priv->dpll_hz, div);
 }
@@ -449,6 +499,58 @@ static ulong rk3308_pwm_set_clk(struct clk *clk, uint hz)
 		     (src_clk_div - 1) << CLK_PWM_DIV_CON_SHIFT);
 
 	return rk3308_pwm_get_clk(clk);
+}
+
+static ulong rk3308_uart_get_clk(struct clk *clk)
+{
+	struct rk3308_clk_priv *priv = dev_get_priv(clk->dev);
+	struct rk3308_cru *cru = priv->cru;
+	u32 div, pll_sel, con, con_id, parent;
+
+	switch (clk->id) {
+	case SCLK_UART0:
+		con_id = 10;
+		break;
+	case SCLK_UART1:
+		con_id = 13;
+		break;
+	case SCLK_UART2:
+		con_id = 16;
+		break;
+	case SCLK_UART3:
+		con_id = 19;
+		break;
+	case SCLK_UART4:
+		con_id = 22;
+		break;
+	default:
+		printf("do not support this uart interface\n");
+		return -EINVAL;
+	}
+
+	con = readl(&cru->clksel_con[con_id]);
+	pll_sel = (con & CLK_UART_PLL_SEL_MASK) >> CLK_UART_PLL_SEL_SHIFT;
+	div = (con & CLK_UART_DIV_CON_MASK) >> CLK_UART_DIV_CON_SHIFT;
+
+	switch (pll_sel) {
+	case CLK_UART_PLL_SEL_DPLL:
+		parent = priv->dpll_hz;
+		break;
+	case CLK_UART_PLL_SEL_VPLL0:
+		parent = priv->vpll0_hz;
+		break;
+	case CLK_UART_PLL_SEL_VPLL1:
+		parent = priv->vpll0_hz;
+		break;
+	case CLK_UART_PLL_SEL_24M:
+		parent = OSC_HZ;
+		break;
+	default:
+		printf("do not support this uart pll sel\n");
+		return -EINVAL;
+	}
+
+	return DIV_TO_RATE(parent, div);
 }
 
 static ulong rk3308_vop_get_clk(struct clk *clk)
@@ -781,6 +883,44 @@ static ulong rk3308_crypto_set_clk(struct rk3308_clk_priv *priv, ulong clk_id,
 	return rk3308_crypto_get_clk(priv, clk_id);
 }
 
+static ulong rk3308_rtc32k_get_clk(struct rk3308_clk_priv *priv, ulong clk_id)
+{
+	struct rk3308_cru *cru = priv->cru;
+	unsigned long m, n;
+	u32 con, fracdiv;
+
+	con = readl(&cru->clksel_con[2]);
+	if ((con & CLK_RTC32K_SEL_MASK) >> CLK_RTC32K_SEL_SHIFT !=
+	    CLK_RTC32K_FRAC_DIV)
+		return -EINVAL;
+
+	fracdiv = readl(&cru->clksel_con[3]);
+	m = fracdiv & CLK_RTC32K_FRAC_NUMERATOR_MASK;
+	m >>= CLK_RTC32K_FRAC_NUMERATOR_SHIFT;
+	n = fracdiv & CLK_RTC32K_FRAC_DENOMINATOR_MASK;
+	n >>= CLK_RTC32K_FRAC_DENOMINATOR_SHIFT;
+
+	return OSC_HZ * m / n;
+}
+
+static ulong rk3308_rtc32k_set_clk(struct rk3308_clk_priv *priv, ulong clk_id,
+				   ulong hz)
+{
+	struct rk3308_cru *cru = priv->cru;
+	unsigned long m, n, val;
+
+	rational_best_approximation(hz, OSC_HZ,
+				    GENMASK(16 - 1, 0),
+				    GENMASK(16 - 1, 0),
+				    &m, &n);
+	val = m << CLK_RTC32K_FRAC_NUMERATOR_SHIFT | n;
+	writel(val, &cru->clksel_con[3]);
+	rk_clrsetreg(&cru->clksel_con[2], CLK_RTC32K_SEL_MASK,
+		     CLK_RTC32K_FRAC_DIV << CLK_RTC32K_SEL_SHIFT);
+
+	return rk3308_rtc32k_get_clk(priv, clk_id);
+}
+
 static ulong rk3308_clk_get_rate(struct clk *clk)
 {
 	struct rk3308_clk_priv *priv = dev_get_priv(clk->dev);
@@ -812,6 +952,13 @@ static ulong rk3308_clk_get_rate(struct clk *clk)
 	case SCLK_EMMC:
 	case SCLK_EMMC_SAMPLE:
 		rate = rk3308_mmc_get_clk(clk);
+		break;
+	case SCLK_UART0:
+	case SCLK_UART1:
+	case SCLK_UART2:
+	case SCLK_UART3:
+	case SCLK_UART4:
+		rate = rk3308_uart_get_clk(clk);
 		break;
 	case SCLK_I2C0:
 	case SCLK_I2C1:
@@ -853,6 +1000,9 @@ static ulong rk3308_clk_get_rate(struct clk *clk)
 	case SCLK_CRYPTO:
 	case SCLK_CRYPTO_APK:
 		rate = rk3308_crypto_get_clk(priv, clk->id);
+		break;
+	case SCLK_RTC32K:
+		rate = rk3308_rtc32k_get_clk(priv, clk->id);
 		break;
 	default:
 		return -ENOENT;
@@ -932,6 +1082,11 @@ static ulong rk3308_clk_set_rate(struct clk *clk, ulong rate)
 	case SCLK_CRYPTO_APK:
 		ret = rk3308_crypto_set_clk(priv, clk->id, rate);
 		break;
+	case SCLK_RTC32K:
+		ret = rk3308_rtc32k_set_clk(priv, clk->id, rate);
+		break;
+	case USB480M:
+		return 0;
 	default:
 		return -ENOENT;
 	}
@@ -964,6 +1119,8 @@ static int __maybe_unused rk3308_clk_set_parent(struct clk *clk, struct clk *par
 	switch (clk->id) {
 	case SCLK_MAC:
 		return rk3308_mac_set_parent(clk, parent);
+	case USB480M:
+		return 0;
 	default:
 		break;
 	}
@@ -1054,7 +1211,7 @@ static int rk3308_clk_bind(struct udevice *dev)
 	ret = offsetof(struct rk3308_cru, softrst_con[0]);
 	ret = rockchip_reset_bind(dev, ret, 12);
 	if (ret)
-		debug("Warning: software reset driver bind faile\n");
+		debug("Warning: software reset driver bind failed\n");
 #endif
 
 	return 0;

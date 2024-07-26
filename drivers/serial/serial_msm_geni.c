@@ -11,20 +11,14 @@
 #include <clk.h>
 #include <common.h>
 #include <dm.h>
-#include <dm/pinctrl.h>
 #include <errno.h>
-#include <linux/compiler.h>
-#include <log.h>
 #include <linux/delay.h>
-#include <malloc.h>
+#include <linux/time.h>
+#include <misc.h>
 #include <serial.h>
-#include <watchdog.h>
-#include <linux/bug.h>
 
 #define UART_OVERSAMPLING	32
 #define STALE_TIMEOUT	160
-
-#define USEC_PER_SEC	1000000L
 
 /* Registers*/
 #define GENI_FORCE_DEFAULT_REG	0x20
@@ -116,6 +110,10 @@
 #define TX_FIFO_DEPTH_MSK	(GENMASK(21, 16))
 #define TX_FIFO_DEPTH_SHFT	16
 
+/* GENI SE QUP Registers */
+#define QUP_HW_VER_REG		0x4
+#define  QUP_SE_VERSION_2_5	0x20050000
+
 /*
  * Predefined packing configuration of the serial engine (CFG0, CFG1 regs)
  * for uart mode.
@@ -133,11 +131,12 @@ DECLARE_GLOBAL_DATA_PTR;
 struct msm_serial_data {
 	phys_addr_t base;
 	u32 baud;
+	u32 oversampling;
 };
 
 unsigned long root_freq[] = {7372800,  14745600, 19200000, 29491200,
-					 32000000, 48000000, 64000000, 80000000,
-					 96000000, 100000000};
+			     32000000, 48000000, 64000000, 80000000,
+			     96000000, 100000000};
 
 /**
  * get_clk_cfg() - Get clock rate to apply on clock supplier.
@@ -166,8 +165,7 @@ static int get_clk_cfg(unsigned long clk_freq)
  *
  * Return: frequency, supported by clock supplier, multiple of clk_freq.
  */
-static int get_clk_div_rate(u32 baud,
-							u64 sampling_rate, u32 *clk_div)
+static int get_clk_div_rate(u32 baud, u64 sampling_rate, u32 *clk_div)
 {
 	unsigned long ser_clk;
 	unsigned long desired_clk;
@@ -189,9 +187,9 @@ static int geni_serial_set_clock_rate(struct udevice *dev, u64 rate)
 	struct clk *clk;
 	int ret;
 
-	clk = devm_clk_get(dev, "se-clk");
-	if (!clk)
-		return -EINVAL;
+	clk = devm_clk_get(dev, NULL);
+	if (IS_ERR(clk))
+		return PTR_ERR(clk);
 
 	ret = clk_set_rate(clk, rate);
 	return ret;
@@ -234,7 +232,7 @@ static inline u32 geni_se_get_tx_fifo_width(long base)
 }
 
 static inline void geni_serial_baud(phys_addr_t base_address, u32 clk_div,
-									int baud)
+				    int baud)
 {
 	u32 s_clk_cfg = 0;
 
@@ -245,16 +243,21 @@ static inline void geni_serial_baud(phys_addr_t base_address, u32 clk_div,
 	writel(s_clk_cfg, base_address + GENI_SER_S_CLK_CFG);
 }
 
-int msm_serial_setbrg(struct udevice *dev, int baud)
+static int msm_serial_setbrg(struct udevice *dev, int baud)
 {
 	struct msm_serial_data *priv = dev_get_priv(dev);
+	u64 clk_rate;
+	u32 clk_div;
+	int ret;
 
 	priv->baud = baud;
-	u32 clk_div;
-	u64 clk_rate;
 
-	clk_rate = get_clk_div_rate(baud, UART_OVERSAMPLING, &clk_div);
-	geni_serial_set_clock_rate(dev, clk_rate);
+	clk_rate = get_clk_div_rate(baud, priv->oversampling, &clk_div);
+	ret = geni_serial_set_clock_rate(dev, clk_rate);
+	if (ret < 0) {
+		pr_err("%s: Couldn't set clock rate: %d\n", __func__, ret);
+		return ret;
+	}
 	geni_serial_baud(priv->base, clk_div, baud);
 
 	return 0;
@@ -274,7 +277,7 @@ int msm_serial_setbrg(struct udevice *dev, int baud)
  * reached.
  */
 static bool qcom_geni_serial_poll_bit(const struct udevice *dev, int offset,
-					  int field, bool set)
+				      int field, bool set)
 {
 	u32 reg;
 	struct msm_serial_data *priv = dev_get_priv(dev);
@@ -487,6 +490,35 @@ static const struct dm_serial_ops msm_serial_ops = {
 	.setbrg = msm_serial_setbrg,
 };
 
+static int geni_set_oversampling(struct udevice *dev)
+{
+	struct msm_serial_data *priv = dev_get_priv(dev);
+	ofnode parent_node = ofnode_get_parent(dev_ofnode(dev));
+	u32 geni_se_version;
+	fdt_addr_t addr;
+
+	priv->oversampling = UART_OVERSAMPLING;
+
+	/*
+	 * It could happen that GENI SE IP is missing in the board's device
+	 * tree or GENI UART node is a direct child of SoC device tree node.
+	 */
+	if (!ofnode_device_is_compatible(parent_node, "qcom,geni-se-qup")) {
+		pr_err("%s: UART node must be a child of geniqup node\n",
+		       __func__);
+		return -ENODEV;
+	}
+
+	/* Read the HW_VER register relative to the parents address space */
+	addr = ofnode_get_addr(parent_node);
+	geni_se_version = readl(addr + QUP_HW_VER_REG);
+
+	if (geni_se_version >= QUP_SE_VERSION_2_5)
+		priv->oversampling /= 2;
+
+	return 0;
+}
+
 static inline void geni_serial_init(struct udevice *dev)
 {
 	struct msm_serial_data *priv = dev_get_priv(dev);
@@ -529,6 +561,11 @@ static inline void geni_serial_init(struct udevice *dev)
 static int msm_serial_probe(struct udevice *dev)
 {
 	struct msm_serial_data *priv = dev_get_priv(dev);
+	int ret;
+
+	ret = geni_set_oversampling(dev);
+	if (ret < 0)
+		return ret;
 
 	/* No need to reinitialize the UART after relocation */
 	if (gd->flags & GD_FLG_RELOC)
@@ -554,7 +591,9 @@ static int msm_serial_ofdata_to_platdata(struct udevice *dev)
 }
 
 static const struct udevice_id msm_serial_ids[] = {
-	{.compatible = "qcom,msm-geni-uart"}, {}};
+	{ .compatible = "qcom,geni-debug-uart" },
+	{ }
+};
 
 U_BOOT_DRIVER(serial_msm_geni) = {
 	.name = "serial_msm_geni",
@@ -564,6 +603,20 @@ U_BOOT_DRIVER(serial_msm_geni) = {
 	.priv_auto = sizeof(struct msm_serial_data),
 	.probe = msm_serial_probe,
 	.ops = &msm_serial_ops,
+	.flags = DM_FLAG_PRE_RELOC | DM_FLAG_DEFAULT_PD_CTRL_OFF,
+};
+
+static const struct udevice_id geniqup_ids[] = {
+	{ .compatible = "qcom,geni-se-qup" },
+	{ }
+};
+
+U_BOOT_DRIVER(geni_se_qup) = {
+	.name = "geni-se-qup",
+	.id = UCLASS_NOP,
+	.of_match = geniqup_ids,
+	.bind = dm_scan_fdt_dev,
+	.flags = DM_FLAG_PRE_RELOC | DM_FLAG_DEFAULT_PD_CTRL_OFF,
 };
 
 #ifdef CONFIG_DEBUG_UART_MSM_GENI

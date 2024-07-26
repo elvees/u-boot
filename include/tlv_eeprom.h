@@ -7,6 +7,8 @@
 #ifndef __TLV_EEPROM_H_
 #define __TLV_EEPROM_H_
 
+#include <linux/errno.h>
+
 /*
  *  The Definition of the TlvInfo EEPROM format can be found at onie.org or
  *  github.com/onie
@@ -84,11 +86,12 @@ int read_tlv_eeprom(void *eeprom, int offset, int len, int dev);
  * write_tlv_eeprom - Write the entire EEPROM binary data to the hardware
  * @eeprom: Pointer to buffer to hold the binary data
  * @len   : Maximum size of buffer
+ * @dev   : EEPROM device to write
  *
  * Note: this routine does not validate the EEPROM data.
  *
  */
-int write_tlv_eeprom(void *eeprom, int len);
+int write_tlv_eeprom(void *eeprom, int len, int dev);
 
 /**
  * read_tlvinfo_tlv_eeprom - Read the TLV from EEPROM, and validate

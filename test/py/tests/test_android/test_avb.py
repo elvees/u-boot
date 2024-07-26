@@ -1,11 +1,10 @@
-# Copyright (c) 2018, Linaro Limited
-#
 # SPDX-License-Identifier:  GPL-2.0+
+# Copyright (c) 2018, Linaro Limited
 #
 # Android Verified Boot 2.0 Test
 
 """
-This tests Android Verified Boot 2.0 support in U-boot:
+This tests Android Verified Boot 2.0 support in U-Boot:
 
 For additional details about how to build proper vbmeta partition
 check doc/android/avb2.rst

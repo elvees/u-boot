@@ -575,11 +575,6 @@ int get_core_volt_from_fuse(void)
 	return vdd;
 }
 
-__weak int board_switch_core_volt(u32 vdd)
-{
-	return 0;
-}
-
 static int setup_core_volt(u32 vdd)
 {
 	return board_setup_core_volt(vdd);
@@ -810,11 +805,13 @@ int qspi_ahb_init(void)
 #ifdef CONFIG_TFABOOT
 #define MAX_BOOTCMD_SIZE	512
 
-int fsl_setenv_bootcmd(void)
+__weak int fsl_setenv_bootcmd(void)
 {
 	int ret;
 	enum boot_src src = get_boot_src();
 	char bootcmd_str[MAX_BOOTCMD_SIZE];
+
+	bootcmd_str[0] = 0;
 
 	switch (src) {
 #ifdef IFC_NOR_BOOTCOMMAND
@@ -863,6 +860,9 @@ int fsl_setenv_bootcmd(void)
 #endif
 		break;
 	}
+
+	if (!bootcmd_str[0])
+		return 0;
 
 	ret = env_set("bootcmd", bootcmd_str);
 	if (ret) {

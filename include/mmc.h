@@ -241,6 +241,7 @@ static inline bool mmc_is_tuning_cmd(uint cmdidx)
 #define EXT_CSD_HC_WP_GRP_SIZE		221	/* RO */
 #define EXT_CSD_HC_ERASE_GRP_SIZE	224	/* RO */
 #define EXT_CSD_BOOT_MULT		226	/* RO */
+#define EXT_CSD_SEC_FEATURE		231	/* RO */
 #define EXT_CSD_GENERIC_CMD6_TIME       248     /* RO */
 #define EXT_CSD_BKOPS_SUPPORT		502	/* RO */
 
@@ -314,6 +315,8 @@ static inline bool mmc_is_tuning_cmd(uint cmdidx)
 
 #define EXT_CSD_WR_DATA_REL_USR		(1 << 0)	/* user data area WR_REL */
 #define EXT_CSD_WR_DATA_REL_GP(x)	(1 << ((x)+1))	/* GP part (x+1) WR_REL */
+
+#define EXT_CSD_SEC_FEATURE_TRIM_EN	(1 << 4) /* Support secure & insecure trim */
 
 #define R1_ILLEGAL_COMMAND		(1 << 22)
 #define R1_APP_CMD			(1 << 5)
@@ -555,6 +558,8 @@ int mmc_deferred_probe(struct mmc *mmc);
 int mmc_reinit(struct mmc *mmc);
 int mmc_get_b_max(struct mmc *mmc, void *dst, lbaint_t blkcnt);
 int mmc_hs400_prepare_ddr(struct mmc *mmc);
+int mmc_send_stop_transmission(struct mmc *mmc, bool write);
+
 #else
 struct mmc_ops {
 	int (*send_cmd)(struct mmc *mmc,
@@ -585,7 +590,7 @@ struct mmc_config {
 	uint f_max;
 	uint b_max;
 	unsigned char part_type;
-#ifdef CONFIG_MMC_PWRSEQ
+#if CONFIG_IS_ENABLED(MMC_PWRSEQ)
 	struct udevice *pwr_dev;
 #endif
 };
@@ -687,6 +692,7 @@ struct mmc {
 	uint tran_speed;
 	uint legacy_speed; /* speed for the legacy mode provided by the card */
 	uint read_bl_len;
+	bool can_trim;
 #if CONFIG_IS_ENABLED(MMC_WRITE)
 	uint write_bl_len;
 	uint erase_grp_size;	/* in 512-byte sectors */
@@ -730,7 +736,8 @@ struct mmc {
 				  * accessing the boot partitions
 				  */
 	u32 quirks;
-	u8 hs400_tuning;
+	bool tuning:1;
+	bool hs400_tuning:1;
 
 	enum bus_mode user_speed_mode; /* input speed mode from user */
 };
@@ -789,7 +796,7 @@ int mmc_unbind(struct udevice *dev);
 int mmc_initialize(struct bd_info *bis);
 int mmc_init_device(int num);
 int mmc_init(struct mmc *mmc);
-int mmc_send_tuning(struct mmc *mmc, u32 opcode, int *cmd_error);
+int mmc_send_tuning(struct mmc *mmc, u32 opcode);
 int mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd, struct mmc_data *data);
 int mmc_deinit(struct mmc *mmc);
 
@@ -802,7 +809,7 @@ int mmc_deinit(struct mmc *mmc);
  */
 int mmc_of_parse(struct udevice *dev, struct mmc_config *cfg);
 
-#ifdef CONFIG_MMC_PWRSEQ
+#if CONFIG_IS_ENABLED(MMC_PWRSEQ)
 /**
  * mmc_pwrseq_get_power() - get a power device from device tree
  *

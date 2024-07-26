@@ -18,6 +18,8 @@ struct test_state {
 	int val;
 };
 
+static bool called;
+
 static int h_adder(void *ctx, struct event *event)
 {
 	struct event_data_test *data = &event->data.test;
@@ -27,6 +29,14 @@ static int h_adder(void *ctx, struct event *event)
 
 	return 0;
 }
+
+static int h_adder_simple(void)
+{
+	called = true;
+
+	return 0;
+}
+EVENT_SPY_SIMPLE(EVT_TEST, h_adder_simple);
 
 static int test_event_base(struct unit_test_state *uts)
 {
@@ -45,6 +55,18 @@ static int test_event_base(struct unit_test_state *uts)
 	return 0;
 }
 COMMON_TEST(test_event_base, 0);
+
+static int test_event_simple(struct unit_test_state *uts)
+{
+	called = false;
+
+	/* Check that the handler is called */
+	ut_assertok(event_notify_null(EVT_TEST));
+	ut_assert(called);
+
+	return 0;
+}
+COMMON_TEST(test_event_simple, 0);
 
 static int h_probe(void *ctx, struct event *event)
 {
@@ -69,6 +91,9 @@ static int test_event_probe(struct unit_test_state *uts)
 {
 	struct test_state state;
 	struct udevice *dev;
+
+	if (!IS_ENABLED(SANDBOX))
+		return -EAGAIN;
 
 	state.val = 0;
 	ut_assertok(event_register("pre", EVT_DM_PRE_PROBE, h_probe, &state));

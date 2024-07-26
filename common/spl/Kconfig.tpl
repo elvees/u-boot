@@ -23,7 +23,7 @@ config TPL_BINMAN_SYMBOLS
 config TPL_BINMAN_UBOOT_SYMBOLS
 	bool "Declare binman symbols for U-Boot phases in TPL"
 	depends on TPL_BINMAN_SYMBOLS
-	default n if ARCH_IMX8M
+	default n if ARCH_IMX8M || ARCH_IMX9
 	default y
 	help
 	  This enables use of symbols in TPL which refer to U-Boot phases,
@@ -43,6 +43,7 @@ config TPL_FRAMEWORK
 
 config TPL_BANNER_PRINT
 	bool "Enable output of the TPL banner 'U-Boot TPL ...'"
+	depends on DEBUG_UART && TPL_SERIAL
 	default y
 	help
 	  If this option is enabled, TPL will print the banner with version
@@ -125,7 +126,7 @@ config TPL_POWER
 
 config TPL_TEXT_BASE
 	hex "Base address for the .text section of the TPL stage"
-	default 0
+	default 0x0
 	help
 	  The base address for the .text section of the TPL stage.
 

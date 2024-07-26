@@ -4,7 +4,7 @@
  *
  * Board functions for TI AM43XX based boards
  *
- * Copyright (C) 2013, Texas Instruments, Incorporated - http://www.ti.com/
+ * Copyright (C) 2013, Texas Instruments, Incorporated - https://www.ti.com/
  */
 
 #include <common.h>
@@ -759,17 +759,6 @@ static struct ti_usb_phy_device usb_phy2_device = {
 	.usb2_phy_power = (void *)USB2_PHY2_POWER,
 	.index = 1,
 };
-
-int usb_gadget_handle_interrupts(int index)
-{
-	u32 status;
-
-	status = dwc3_omap_uboot_interrupt_status(index);
-	if (status)
-		dwc3_uboot_handle_interrupt(index);
-
-	return 0;
-}
 #endif /* CONFIG_USB_DWC3 */
 
 #if defined(CONFIG_USB_DWC3) || defined(CONFIG_USB_XHCI_OMAP)

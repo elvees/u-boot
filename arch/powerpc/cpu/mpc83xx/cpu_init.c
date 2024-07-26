@@ -3,7 +3,6 @@
  * Copyright (C) 2004-2009 Freescale Semiconductor, Inc.
  */
 
-#include <common.h>
 #include <asm-offsets.h>
 #include <mpc83xx.h>
 #include <system-constants.h>
@@ -19,6 +18,8 @@
 #ifdef CONFIG_QE
 #include <fsl_qe.h>
 #endif
+#include <asm/ppc.h>
+#include <asm/fsl_lbc.h>
 
 #include "lblaw/lblaw.h"
 #include "elbc/elbc.h"
@@ -226,30 +227,6 @@ void cpu_init_f (volatile immap_t * im)
 #if defined(CFG_SYS_LBLAWBAR3_PRELIM) && defined(CFG_SYS_LBLAWAR3_PRELIM)
 	im->sysconf.lblaw[3].bar = CFG_SYS_LBLAWBAR3_PRELIM;
 	im->sysconf.lblaw[3].ar = CFG_SYS_LBLAWAR3_PRELIM;
-#endif
-#if defined(CONFIG_SYS_LBLAWBAR4_PRELIM) && defined(CONFIG_SYS_LBLAWAR4_PRELIM)
-	im->sysconf.lblaw[4].bar = CONFIG_SYS_LBLAWBAR4_PRELIM;
-	im->sysconf.lblaw[4].ar = CONFIG_SYS_LBLAWAR4_PRELIM;
-#endif
-#if defined(CONFIG_SYS_LBLAWBAR5_PRELIM) && defined(CONFIG_SYS_LBLAWAR5_PRELIM)
-	im->sysconf.lblaw[5].bar = CONFIG_SYS_LBLAWBAR5_PRELIM;
-	im->sysconf.lblaw[5].ar = CONFIG_SYS_LBLAWAR5_PRELIM;
-#endif
-#if defined(CONFIG_SYS_LBLAWBAR6_PRELIM) && defined(CONFIG_SYS_LBLAWAR6_PRELIM)
-	im->sysconf.lblaw[6].bar = CONFIG_SYS_LBLAWBAR6_PRELIM;
-	im->sysconf.lblaw[6].ar = CONFIG_SYS_LBLAWAR6_PRELIM;
-#endif
-#if defined(CONFIG_SYS_LBLAWBAR7_PRELIM) && defined(CONFIG_SYS_LBLAWAR7_PRELIM)
-	im->sysconf.lblaw[7].bar = CONFIG_SYS_LBLAWBAR7_PRELIM;
-	im->sysconf.lblaw[7].ar = CONFIG_SYS_LBLAWAR7_PRELIM;
-#endif
-#ifdef CONFIG_SYS_GPIO1_PRELIM
-	im->gpio[0].dat = CONFIG_SYS_GPIO1_DAT;
-	im->gpio[0].dir = CONFIG_SYS_GPIO1_DIR;
-#endif
-#ifdef CONFIG_SYS_GPIO2_PRELIM
-	im->gpio[1].dat = CONFIG_SYS_GPIO2_DAT;
-	im->gpio[1].dir = CONFIG_SYS_GPIO2_DIR;
 #endif
 }
 

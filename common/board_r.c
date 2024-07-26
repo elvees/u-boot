@@ -126,9 +126,9 @@ static int initr_reloc_global_data(void)
 #ifdef __ARM__
 	monitor_flash_len = _end - __image_copy_start;
 #elif defined(CONFIG_RISCV)
-	monitor_flash_len = (ulong)&_end - (ulong)&_start;
+	monitor_flash_len = (ulong)_end - (ulong)_start;
 #elif !defined(CONFIG_SANDBOX) && !defined(CONFIG_NIOS2)
-	monitor_flash_len = (ulong)&__init_end - gd->relocaddr;
+	monitor_flash_len = (ulong)__init_end - gd->relocaddr;
 #endif
 #if defined(CONFIG_MPC85xx) || defined(CONFIG_MPC86xx)
 	/*
@@ -151,13 +151,6 @@ static int initr_reloc_global_data(void)
 	 */
 	gd->env_addr += gd->reloc_off;
 #endif
-	/*
-	 * The fdt_blob needs to be moved to new relocation address
-	 * incase of FDT blob is embedded with in image
-	 */
-	if (IS_ENABLED(CONFIG_OF_EMBED) && IS_ENABLED(CONFIG_NEEDS_MANUAL_RELOC))
-		gd->fdt_blob += gd->reloc_off;
-
 #ifdef CONFIG_EFI_LOADER
 	/*
 	 * On the ARM architecture gd is mapped to a fixed register (r9 or x18).
@@ -196,9 +189,9 @@ static int initr_barrier(void)
 
 static int initr_malloc(void)
 {
-	ulong malloc_start;
+	ulong start;
 
-#if CONFIG_VAL(SYS_MALLOC_F_LEN)
+#if CONFIG_IS_ENABLED(SYS_MALLOC_F)
 	debug("Pre-reloc malloc() used %#lx bytes (%ld KB)\n", gd->malloc_ptr,
 	      gd->malloc_ptr / 1024);
 #endif
@@ -207,8 +200,9 @@ static int initr_malloc(void)
 	 * This value MUST match the value of gd->start_addr_sp in board_f.c:
 	 * reserve_noncached().
 	 */
-	malloc_start = gd->relocaddr - TOTAL_MALLOC_LEN;
-	mem_malloc_init((ulong)map_sysmem(malloc_start, TOTAL_MALLOC_LEN),
+	start = gd->relocaddr - TOTAL_MALLOC_LEN;
+	gd_set_malloc_start(start);
+	mem_malloc_init((ulong)map_sysmem(start, TOTAL_MALLOC_LEN),
 			TOTAL_MALLOC_LEN);
 	return 0;
 }
@@ -293,15 +287,6 @@ static int initr_announce(void)
 	debug("Now running in RAM - U-Boot at: %08lx\n", gd->relocaddr);
 	return 0;
 }
-
-#ifdef CONFIG_NEEDS_MANUAL_RELOC
-static int initr_manual_reloc_cmdtable(void)
-{
-	fixup_cmdtable(ll_entry_start(struct cmd_tbl, cmd),
-		       ll_entry_count(struct cmd_tbl, cmd));
-	return 0;
-}
-#endif
 
 static int initr_binman(void)
 {
@@ -487,17 +472,6 @@ static int initr_status_led(void)
 }
 #endif
 
-#if defined(CONFIG_SCSI) && !defined(CONFIG_DM_SCSI)
-static int initr_scsi(void)
-{
-	puts("SCSI:  ");
-	scsi_init();
-	puts("\n");
-
-	return 0;
-}
-#endif
-
 #ifdef CONFIG_CMD_NET
 static int initr_net(void)
 {
@@ -515,20 +489,6 @@ static int initr_net(void)
 static int initr_post(void)
 {
 	post_run(NULL, POST_RAM | post_bootmode_get(0));
-	return 0;
-}
-#endif
-
-#if defined(CONFIG_IDE) && !defined(CONFIG_BLK)
-static int initr_ide(void)
-{
-	puts("IDE:   ");
-#if defined(CONFIG_START_IDE)
-	if (board_start_ide())
-		ide_init();
-#else
-	ide_init();
-#endif
 	return 0;
 }
 #endif
@@ -569,6 +529,13 @@ static int dm_announce(void)
 			printf("Warning: Unexpected devicetree source (not from a prior stage)");
 			printf("Warning: U-Boot may not function properly\n");
 		}
+		if (IS_ENABLED(CONFIG_OF_TAG_MIGRATE) &&
+		    (gd->flags & GD_FLG_OF_TAG_MIGRATE))
+			/*
+			 * U-Boot will silently fail to work after 2023.07 if
+			 * there are old tags present
+			 */
+			printf("Warning: Device tree includes old 'u-boot,dm-' tags: please fix by 2023.07!\n");
 	}
 
 	return 0;
@@ -589,7 +556,10 @@ static int run_main_loop(void)
 }
 
 /*
- * We hope to remove most of the driver-related init and do it if/when
+ * Over time we hope to remove these functions with code fragments and
+ * stub functions, and instead call the relevant function directly.
+ *
+ * We also hope to remove most of the driver-related init and do it if/when
  * the driver is later used.
  *
  * TODO: perhaps reset the watchdog in the initcall function after each call?
@@ -609,9 +579,6 @@ static init_fnc_t init_sequence_r[] = {
 	 */
 #endif
 	initr_reloc_global_data,
-#if IS_ENABLED(CONFIG_NEEDS_MANUAL_RELOC) && CONFIG_IS_ENABLED(EVENT)
-	event_manual_reloc,
-#endif
 #if defined(CONFIG_SYS_INIT_RAM_LOCK) && defined(CONFIG_E500)
 	initr_unlock_ram_in_cache,
 #endif
@@ -660,12 +627,6 @@ static init_fnc_t init_sequence_r[] = {
 	initr_watchdog,
 #endif
 	INIT_FUNC_WATCHDOG_RESET
-#if defined(CONFIG_NEEDS_MANUAL_RELOC) && defined(CONFIG_BLOCK_CACHE)
-	blkcache_init,
-#endif
-#ifdef CONFIG_NEEDS_MANUAL_RELOC
-	initr_manual_reloc_cmdtable,
-#endif
 	arch_initr_trap,
 #if defined(CONFIG_BOARD_EARLY_INIT_R)
 	board_early_init_r,
@@ -721,6 +682,7 @@ static init_fnc_t init_sequence_r[] = {
 #if defined(CONFIG_ID_EEPROM)
 	mac_read_from_eeprom,
 #endif
+	INITCALL_EVENT(EVT_SETTINGS_R),
 	INIT_FUNC_WATCHDOG_RESET
 #if defined(CONFIG_PCI_INIT_R) && !defined(CONFIG_SYS_EARLY_PCI_INIT)
 	/*
@@ -759,10 +721,6 @@ static init_fnc_t init_sequence_r[] = {
 #ifdef CONFIG_BOARD_LATE_INIT
 	board_late_init,
 #endif
-#if defined(CONFIG_SCSI) && !defined(CONFIG_DM_SCSI)
-	INIT_FUNC_WATCHDOG_RESET
-	initr_scsi,
-#endif
 #ifdef CONFIG_BITBANGMII
 	bb_miiphy_init,
 #endif
@@ -776,18 +734,8 @@ static init_fnc_t init_sequence_r[] = {
 #ifdef CONFIG_POST
 	initr_post,
 #endif
-#if defined(CONFIG_IDE) && !defined(CONFIG_BLK)
-	initr_ide,
-#endif
-#ifdef CONFIG_LAST_STAGE_INIT
 	INIT_FUNC_WATCHDOG_RESET
-	/*
-	 * Some parts can be only initialized if all others (like
-	 * Interrupts) are up and running (i.e. the PC-style ISA
-	 * keyboard).
-	 */
-	last_stage_init,
-#endif
+	INITCALL_EVENT(EVT_LAST_STAGE_INIT),
 #if defined(CFG_PRAM)
 	initr_mem,
 #endif
@@ -818,11 +766,6 @@ void board_init_r(gd_t *new_gd, ulong dest_addr)
 	gd = new_gd;
 #endif
 	gd->flags &= ~GD_FLG_LOG_READY;
-
-	if (IS_ENABLED(CONFIG_NEEDS_MANUAL_RELOC)) {
-		for (int i = 0; i < ARRAY_SIZE(init_sequence_r); i++)
-			MANUAL_RELOC(init_sequence_r[i]);
-	}
 
 	if (initcall_run_list(init_sequence_r))
 		hang();

@@ -28,7 +28,6 @@
  * iPXE uses the simple file protocol to load Grub or the Linux Kernel.
  */
 
-#include <common.h>
 #include <blk.h>
 #include <dm.h>
 #include <efi_driver.h>
@@ -124,10 +123,8 @@ efi_bl_create_block_device(efi_handle_t handle, void *interface)
 	struct efi_block_io *io = interface;
 	struct efi_blk_plat *plat;
 
-	devnum = blk_find_max_devnum(UCLASS_EFI_LOADER);
-	if (devnum == -ENODEV)
-		devnum = 0;
-	else if (devnum < 0)
+	devnum = blk_next_free_devnum(UCLASS_EFI_LOADER);
+	if (devnum < 0)
 		return EFI_OUT_OF_RESOURCES;
 
 	name = calloc(1, 18); /* strlen("efiblk#2147483648") + 1 */

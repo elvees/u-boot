@@ -61,7 +61,11 @@ static int do_font_size(struct cmd_tbl *cmdtp, int flag, int argc,
 
 	if (uclass_first_device_err(UCLASS_VIDEO_CONSOLE, &dev))
 		return CMD_RET_FAILURE;
-	font_name = vidconsole_get_font_size(dev, &size);
+	ret = vidconsole_get_font_size(dev, &font_name, &size);
+	if (ret) {
+		printf("Failed (error %d)\n", ret);
+		return CMD_RET_FAILURE;
+	}
 
 	size = dectoul(argv[1], NULL);
 
@@ -75,12 +79,10 @@ static int do_font_size(struct cmd_tbl *cmdtp, int flag, int argc,
 }
 
 
-#ifdef CONFIG_SYS_LONGHELP
-static char font_help_text[] =
+U_BOOT_LONGHELP(font,
 	"list       - list available fonts\n"
 	"font select <name> [<size>] - select font to use\n"
-	"font size <size> - select font size to";
-#endif
+	"font size <size> - select font size to");
 
 U_BOOT_CMD_WITH_SUBCMDS(font, "Fonts", font_help_text,
 	U_BOOT_SUBCMD_MKENT(list, 1, 1, do_font_list),

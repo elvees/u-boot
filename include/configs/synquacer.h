@@ -21,6 +21,7 @@
 /*
  * Boot info
  */
+#define SCB_PLAT_METADATA_OFFSET	(0x510000)
 
 /*
  * Hardware drivers support
@@ -40,23 +41,15 @@
 
 /* Since U-Boot 64bit PCIe support is limited, disable 64bit MMIO support */
 
-#define DEFAULT_DFU_ALT_INFO "dfu_alt_info="				\
-			"mtd nor1=u-boot.bin raw 200000 100000;"	\
-			"fip.bin raw 180000 78000;"			\
-			"optee.bin raw 500000 100000\0"
-
-/* GUIDs for capsule updatable firmware images */
-#define DEVELOPERBOX_UBOOT_IMAGE_GUID \
-	EFI_GUID(0x53a92e83, 0x4ef4, 0x473a, 0x8b, 0x0d, \
-		 0xb5, 0xd8, 0xc7, 0xb2, 0xd6, 0x00)
-
+#ifdef CONFIG_FWU_MULTI_BANK_UPDATE
+#define DEVELOPERBOX_FIP_IMAGE_GUID \
+	EFI_GUID(0x7d6dc310, 0x52ca, 0x43b8, 0xb7, 0xb9, \
+		 0xf9, 0xd6, 0xc5, 0x01, 0xd1, 0x08)
+#else
 #define DEVELOPERBOX_FIP_IMAGE_GUID \
 	EFI_GUID(0x880866e9, 0x84ba, 0x4793, 0xa9, 0x08, \
 		 0x33, 0xe0, 0xb9, 0x16, 0xf3, 0x98)
-
-#define DEVELOPERBOX_OPTEE_IMAGE_GUID \
-	EFI_GUID(0xc1b629f1, 0xce0e, 0x4894, 0x82, 0xbf, \
-		 0xf0, 0xa3, 0x83, 0x87, 0xe6, 0x30)
+#endif
 
 /* Distro boot settings */
 #ifdef CONFIG_CMD_USB
@@ -97,7 +90,6 @@
 	"ramdisk_addr_r=0xa0000000\0"		\
 	"scriptaddr=0x88000000\0"		\
 	"pxefile_addr_r=0x88100000\0"		\
-	DEFAULT_DFU_ALT_INFO			\
 	BOOTENV
 
 #endif /* __CONFIG_H */

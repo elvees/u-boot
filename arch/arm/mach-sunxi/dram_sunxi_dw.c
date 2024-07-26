@@ -8,7 +8,6 @@
  * (C) Copyright 2015      Hans de Goede <hdegoede@redhat.com>
  * (C) Copyright 2015      Jens Kuske <jenskuske@gmail.com>
  */
-#include <common.h>
 #include <init.h>
 #include <log.h>
 #include <asm/io.h>
@@ -16,7 +15,6 @@
 #include <asm/arch/dram.h>
 #include <asm/arch/cpu.h>
 #include <linux/delay.h>
-#include <linux/kconfig.h>
 
 static void mctl_phy_init(u32 val)
 {
@@ -81,15 +79,15 @@ enum {
 	MBUS_QOS_HIGHEST
 };
 
-static inline void mbus_configure_port(u8 port,
-				       bool bwlimit,
-				       bool priority,
-				       u8 qos,         /* MBUS_QOS_LOWEST .. MBUS_QOS_HIGEST */
-				       u8 waittime,    /* 0 .. 0xf */
-				       u8 acs,         /* 0 .. 0xff */
-				       u16 bwl0,       /* 0 .. 0xffff, bandwidth limit in MB/s */
-				       u16 bwl1,
-				       u16 bwl2)
+static void mbus_configure_port(u8 port,
+				bool bwlimit,
+				bool priority,
+				u8 qos,         /* MBUS_QOS_LOWEST .. MBUS_QOS_HIGEST */
+				u8 waittime,    /* 0 .. 0xf */
+				u8 acs,         /* 0 .. 0xff */
+				u16 bwl0,       /* 0 .. 0xffff, bandwidth limit in MB/s */
+				u16 bwl1,
+				u16 bwl2)
 {
 	struct sunxi_mctl_com_reg * const mctl_com =
 			(struct sunxi_mctl_com_reg *)SUNXI_DRAM_COM_BASE;
@@ -652,19 +650,6 @@ static int mctl_channel_init(uint16_t socid, struct dram_para *para)
 	return 0;
 }
 
-/*
- * Test if memory at offset offset matches memory at a certain base
- */
-static bool mctl_mem_matches_base(u32 offset, ulong base)
-{
-	/* Try to write different values to RAM at two addresses */
-	writel(0, base);
-	writel(0xaa55aa55, base + offset);
-	dsb();
-	/* Check if the same value is actually observed when reading back */
-	return readl(base) ==
-	       readl(base + offset);
-}
 
 static void mctl_auto_detect_dram_size_rank(uint16_t socid, struct dram_para *para, ulong base, struct rank_para *rank)
 {

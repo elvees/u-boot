@@ -2,7 +2,7 @@
 # Copyright (c) 2019, Linaro Limited
 # Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-""" Fixture for UEFI secure boot test """
+"""Fixture for UEFI secure boot test."""
 
 from subprocess import call, check_call, CalledProcessError
 import pytest
@@ -14,7 +14,7 @@ def efi_boot_env(request, u_boot_config):
 
     Args:
         request: Pytest request object.
-        u_boot_config: U-boot configuration.
+        u_boot_config: U-Boot configuration.
 
     Return:
         A path to disk image to be used for testing
@@ -64,6 +64,12 @@ def efi_boot_env(request, u_boot_config):
         check_call('cd %s; %scert-to-efi-sig-list -g %s db1.crt db1.esl; %ssign-efi-sig-list -t "2020-04-05" -c KEK.crt -k KEK.key db db1.esl db1.auth'
                    % (mnt_point, EFITOOLS_PATH, GUID, EFITOOLS_PATH),
                    shell=True)
+        # db2 (APPEND_WRITE)
+        check_call('cd %s; openssl req -x509 -sha256 -newkey rsa:2048 -subj /CN=TEST_db2/ -keyout db2.key -out db2.crt -nodes -days 365'
+                   % mnt_point, shell=True)
+        check_call('cd %s; %scert-to-efi-sig-list -g %s db2.crt db2.esl; %ssign-efi-sig-list -a -c KEK.crt -k KEK.key db db2.esl db2.auth'
+                   % (mnt_point, EFITOOLS_PATH, GUID, EFITOOLS_PATH),
+                   shell=True)
         # dbx (TEST_dbx certificate)
         check_call('cd %s; openssl req -x509 -sha256 -newkey rsa:2048 -subj /CN=TEST_dbx/ -keyout dbx.key -out dbx.crt -nodes -days 365'
                    % mnt_point, shell=True)
@@ -82,6 +88,10 @@ def efi_boot_env(request, u_boot_config):
                    shell=True)
         # dbx_hash1 (digest of TEST_db1 certificate)
         check_call('cd %s; %scert-to-efi-hash-list -g %s -s 256 db1.crt dbx_hash1.crl; %ssign-efi-sig-list -t "2020-04-06" -c KEK.crt -k KEK.key dbx dbx_hash1.crl dbx_hash1.auth'
+                   % (mnt_point, EFITOOLS_PATH, GUID, EFITOOLS_PATH),
+                   shell=True)
+        # dbx_hash2 (digest of TEST_db2 certificate, with APPEND_WRITE)
+        check_call('cd %s; %scert-to-efi-hash-list -g %s -s 256 db2.crt dbx_hash2.crl; %ssign-efi-sig-list -a -c KEK.crt -k KEK.key dbx dbx_hash2.crl dbx_hash2.auth'
                    % (mnt_point, EFITOOLS_PATH, GUID, EFITOOLS_PATH),
                    shell=True)
         # dbx_db (with TEST_db certificate)
@@ -132,12 +142,14 @@ def efi_boot_env(request, u_boot_config):
 
 @pytest.fixture(scope='session')
 def efi_boot_env_intca(request, u_boot_config):
-    """Set up a file system to be used in UEFI secure boot test
+    """Set up file system for secure boot test.
+
+    Set up a file system to be used in UEFI secure boot test
     of intermediate certificates.
 
     Args:
         request: Pytest request object.
-        u_boot_config: U-boot configuration.
+        u_boot_config: U-Boot configuration.
 
     Return:
         A path to disk image to be used for testing

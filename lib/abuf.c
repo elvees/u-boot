@@ -7,7 +7,6 @@
  */
 
 #ifndef USE_HOSTCC
-#include <common.h>
 #include <malloc.h>
 #include <mapmem.h>
 #include <string.h>
@@ -80,6 +79,11 @@ bool abuf_realloc(struct abuf *abuf, size_t new_size)
 		abuf->alloced = true;
 		return true;
 	}
+}
+
+bool abuf_realloc_inc(struct abuf *abuf, size_t inc)
+{
+	return abuf_realloc(abuf, abuf->size + inc);
 }
 
 void *abuf_uninit_move(struct abuf *abuf, size_t *sizep)

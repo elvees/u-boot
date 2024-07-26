@@ -1,4 +1,3 @@
-#include <common.h>
 #include <asm/io.h>
 #include <asm/arch/cpu.h>
 #include <asm/arch/clock.h>
@@ -18,8 +17,11 @@ void clock_init_safe(void)
 		setbits_le32(&prcm->res_cal_ctrl, 2);
 	}
 
-	clrbits_le32(&prcm->res_cal_ctrl, 1);
-	setbits_le32(&prcm->res_cal_ctrl, 1);
+	if (IS_ENABLED(CONFIG_MACH_SUN50I_H616) ||
+	    IS_ENABLED(CONFIG_MACH_SUN50I_H6)) {
+		clrbits_le32(&prcm->res_cal_ctrl, 1);
+		setbits_le32(&prcm->res_cal_ctrl, 1);
+	}
 
 	if (IS_ENABLED(CONFIG_MACH_SUN50I_H6)) {
 		/* set key field for ldo enable */
@@ -38,7 +40,9 @@ void clock_init_safe(void)
 			CCM_CPU_AXI_DEFAULT_FACTORS);
 
 	writel(CCM_PSI_AHB1_AHB2_DEFAULT, &ccm->psi_ahb1_ahb2_cfg);
+#ifdef CCM_AHB3_DEFAULT
 	writel(CCM_AHB3_DEFAULT, &ccm->ahb3_cfg);
+#endif
 	writel(CCM_APB1_DEFAULT, &ccm->apb1_cfg);
 
 	/*
@@ -47,7 +51,6 @@ void clock_init_safe(void)
 	 */
 	writel(MBUS_CLK_SRC_PLL6X2 | MBUS_CLK_M(3), &ccm->mbus_cfg);
 }
-#endif
 
 void clock_init_uart(void)
 {
@@ -69,7 +72,6 @@ void clock_init_uart(void)
 		     1 << (RESET_SHIFT + CONFIG_CONS_INDEX - 1));
 }
 
-#ifdef CONFIG_SPL_BUILD
 void clock_set_pll1(unsigned int clk)
 {
 	struct sunxi_ccm_reg * const ccm =
@@ -86,11 +88,13 @@ void clock_set_pll1(unsigned int clk)
 	writel(val, &ccm->cpu_axi_cfg);
 
 	/* clk = 24*n/p, p is ignored if clock is >288MHz */
-	writel(CCM_PLL1_CTRL_EN | CCM_PLL1_LOCK_EN | CCM_PLL1_CLOCK_TIME_2 |
-#ifdef CONFIG_MACH_SUN50I_H616
-	       CCM_PLL1_OUT_EN |
-#endif
-	       CCM_PLL1_CTRL_N(clk / 24000000), &ccm->pll1_cfg);
+	val = CCM_PLL1_CTRL_EN | CCM_PLL1_LOCK_EN | CCM_PLL1_CLOCK_TIME_2;
+	val |= CCM_PLL1_CTRL_N(clk / 24000000);
+	if (IS_ENABLED(CONFIG_MACH_SUN50I_H616))
+	       val |= CCM_PLL1_OUT_EN;
+	if (IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2))
+	       val |= CCM_PLL1_OUT_EN | CCM_PLL1_LDO_EN;
+	writel(val, &ccm->pll1_cfg);
 	while (!(readl(&ccm->pll1_cfg) & CCM_PLL1_LOCK)) {}
 
 	/* Switch CPU to PLL1 */
@@ -98,23 +102,6 @@ void clock_set_pll1(unsigned int clk)
 	val &= ~CCM_CPU_AXI_MUX_MASK;
 	val |= CCM_CPU_AXI_MUX_PLL_CPUX;
 	writel(val, &ccm->cpu_axi_cfg);
-}
-#endif
-
-unsigned int clock_get_pll6(void)
-{
-	struct sunxi_ccm_reg *const ccm =
-		(struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
-	int m = IS_ENABLED(CONFIG_MACH_SUN50I_H6) ? 4 : 2;
-
-	uint32_t rval = readl(&ccm->pll6_cfg);
-	int n = ((rval & CCM_PLL6_CTRL_N_MASK) >> CCM_PLL6_CTRL_N_SHIFT) + 1;
-	int div1 = ((rval & CCM_PLL6_CTRL_DIV1_MASK) >>
-			CCM_PLL6_CTRL_DIV1_SHIFT) + 1;
-	int div2 = ((rval & CCM_PLL6_CTRL_DIV2_MASK) >>
-			CCM_PLL6_CTRL_DIV2_SHIFT) + 1;
-	/* The register defines PLL6-2X or PLL6-4X, not plain PLL6 */
-	return 24000000 / m * n / div1 / div2;
 }
 
 int clock_twi_onoff(int port, int state)
@@ -143,4 +130,32 @@ int clock_twi_onoff(int port, int state)
 		clrbits_le32(ptr, value << shift);
 
 	return 0;
+}
+#endif /* CONFIG_SPL_BUILD */
+
+/* PLL_PERIPH0 clock, used by the MMC driver */
+unsigned int clock_get_pll6(void)
+{
+	struct sunxi_ccm_reg *const ccm =
+		(struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
+	uint32_t rval = readl(&ccm->pll6_cfg);
+	int n = ((rval & CCM_PLL6_CTRL_N_MASK) >> CCM_PLL6_CTRL_N_SHIFT) + 1;
+	int div2 = ((rval & CCM_PLL6_CTRL_DIV2_MASK) >>
+		    CCM_PLL6_CTRL_DIV2_SHIFT) + 1;
+	int div1, m;
+
+	if (IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2)) {
+		div1 = ((rval & CCM_PLL6_CTRL_P0_MASK) >>
+			CCM_PLL6_CTRL_P0_SHIFT) + 1;
+		m = 1;
+	} else {
+		div1 = ((rval & CCM_PLL6_CTRL_DIV1_MASK) >>
+			CCM_PLL6_CTRL_DIV1_SHIFT) + 1;
+		if (IS_ENABLED(CONFIG_MACH_SUN50I_H6))
+			m = 4;
+		else
+			m = 2;
+	}
+
+	return 24000000U * n / m / div1 / div2;
 }

@@ -19,6 +19,7 @@
 #include <asm/io.h>
 #include <dm/device_compat.h>
 #include <linux/delay.h>
+#include <linux/printk.h>
 
 #define ETH_PORT_STR			"brcm,enetsw-port"
 
@@ -545,8 +546,6 @@ static int bcm6368_eth_probe(struct udevice *dev)
 			pr_err("%s: error enabling clock %d\n", __func__, i);
 			return ret;
 		}
-
-		clk_free(&clk);
 	}
 
 	/* try to perform resets */

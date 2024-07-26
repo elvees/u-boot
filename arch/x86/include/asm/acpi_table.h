@@ -24,8 +24,6 @@ struct acpi_table_header;
 
 /* These can be used by the target port */
 
-void acpi_create_fadt(struct acpi_fadt *fadt, struct acpi_facs *facs,
-		      void *dsdt);
 int acpi_create_madt_lapics(u32 current);
 int acpi_create_madt_ioapic(struct acpi_madt_ioapic *ioapic, u8 id,
 			    u32 addr, u32 gsi_base);
@@ -65,15 +63,6 @@ int acpi_write_dbg2_pci_uart(struct acpi_ctx *ctx, struct udevice *dev,
  * Return: 0 if OK, -ve on error
  */
 int acpi_create_gnvs(struct acpi_global_nvs *gnvs);
-
-/**
- * acpi_get_rsdp_addr() - get ACPI RSDP table address
- *
- * This routine returns the ACPI RSDP table address in the system memory.
- *
- * @return:	ACPI RSDP table address
- */
-ulong acpi_get_rsdp_addr(void);
 
 /**
  * arch_read_sci_irq_select() - Read the system-control interrupt number

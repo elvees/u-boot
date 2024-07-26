@@ -9,7 +9,10 @@
 #define __CONFIG_STM32MP15_ST_COMMON_H__
 
 #define STM32MP_BOARD_EXTRA_ENV \
-	"console=ttySTM0\0"
+	"usb_pgood_delay=2000\0" \
+	"console=ttySTM0\0" \
+	"splashimage=" __stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
+	"splashpos=m,m\0"
 
 #include <configs/stm32mp15_common.h>
 
@@ -46,7 +49,6 @@
 #define CFG_EXTRA_ENV_SETTINGS \
 	STM32MP_MEM_LAYOUT \
 	ST_STM32MP1_BOOTCMD \
-	STM32MP_PARTS_DEFAULT \
 	BOOTENV \
 	STM32MP_EXTRA \
 	STM32MP_BOARD_EXTRA_ENV

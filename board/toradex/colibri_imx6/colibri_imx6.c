@@ -29,6 +29,7 @@
 #include <asm/mach-imx/iomux-v3.h>
 #include <asm/mach-imx/sata.h>
 #include <asm/mach-imx/video.h>
+#include <asm/sections.h>
 #include <cpu.h>
 #include <dm/platform_data/serial_mxc.h>
 #include <fsl_esdhc_imx.h>
@@ -620,36 +621,20 @@ int board_late_init(void)
 	env_set("board_rev", env_str);
 #endif
 
-#ifdef CONFIG_CMD_USB_SDP
-	if (is_boot_from_usb()) {
-		printf("Serial Downloader recovery mode, using sdp command\n");
+	if (IS_ENABLED(CONFIG_USB) && is_boot_from_usb()) {
 		env_set("bootdelay", "0");
-		env_set("bootcmd", "sdp 0");
+		if (IS_ENABLED(CONFIG_CMD_USB_SDP)) {
+			printf("Serial Downloader recovery mode, using sdp command\n");
+			env_set("bootcmd", "sdp 0");
+		} else if (IS_ENABLED(CONFIG_CMD_FASTBOOT)) {
+			printf("Fastboot recovery mode, using fastboot command\n");
+			env_set("bootcmd", "fastboot usb 0");
+		}
 	}
-#endif /* CONFIG_CMD_USB_SDP */
 
 	return 0;
 }
 #endif /* CONFIG_BOARD_LATE_INIT */
-
-int checkboard(void)
-{
-	char it[] = " IT";
-	int minc, maxc;
-
-	switch (get_cpu_temp_grade(&minc, &maxc)) {
-	case TEMP_AUTOMOTIVE:
-	case TEMP_INDUSTRIAL:
-		break;
-	case TEMP_EXTCOMMERCIAL:
-	default:
-		it[0] = 0;
-	};
-	printf("Model: Toradex Colibri iMX6 %s %sMB%s\n",
-	       is_cpu_type(MXC_CPU_MX6DL) ? "DualLite" : "Solo",
-	       (gd->ram_size == 0x20000000) ? "512" : "256", it);
-	return 0;
-}
 
 #if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)
 int ft_board_setup(void *blob, struct bd_info *bd)
@@ -767,8 +752,7 @@ MX6_MMDC_P1_MPRDDQBY3DL, 0x33333333,
 /*
  * MDMISC	mirroring	interleaved (row/bank/col)
  */
-/* TODO: check what the RALAT field does */
-MX6_MMDC_P0_MDMISC, 0x00081740,
+MX6_MMDC_P0_MDMISC, 0x000b17c0,
 
 /*
  * MDSCR	con_req
@@ -900,8 +884,7 @@ MX6_MMDC_P1_MPRDDQBY3DL, 0x33333333,
 /*
  * MDMISC	mirroring	interleaved (row/bank/col)
  */
-/* TODO: check what the RALAT field does */
-MX6_MMDC_P0_MDMISC, 0x00081740,
+MX6_MMDC_P0_MDMISC, 0x000b17c0,
 
 /*
  * MDSCR	con_req

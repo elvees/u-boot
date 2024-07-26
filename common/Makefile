@@ -8,8 +8,12 @@ ifndef CONFIG_SPL_BUILD
 obj-y += init/
 obj-y += main.o
 obj-y += exports.o
-obj-$(CONFIG_HUSH_PARSER) += cli_hush.o
+obj-y += cli_getch.o cli_simple.o cli_readline.o
+obj-$(CONFIG_HUSH_OLD_PARSER) += cli_hush.o
+obj-$(CONFIG_HUSH_MODERN_PARSER) += cli_hush_modern.o
 obj-$(CONFIG_AUTOBOOT) += autoboot.o
+obj-$(CONFIG_BUTTON_CMD) += button_cmd.o
+obj-y += version.o
 
 # # boards
 obj-y += board_f.o
@@ -17,8 +21,6 @@ obj-y += board_r.o
 obj-$(CONFIG_DISPLAY_BOARDINFO) += board_info.o
 obj-$(CONFIG_DISPLAY_BOARDINFO_LATE) += board_info.o
 
-obj-$(CONFIG_FDT_SIMPLEFB) += fdt_simplefb.o
-obj-$(CONFIG_$(SPL_TPL_)OF_LIBFDT) += fdt_support.o
 obj-$(CONFIG_MII) += miiphyutil.o
 obj-$(CONFIG_CMD_MII) += miiphyutil.o
 obj-$(CONFIG_PHYLIB) += miiphyutil.o
@@ -39,7 +41,6 @@ obj-$(CONFIG_SPLASH_SOURCE) += splash_source.o
 obj-$(CONFIG_MENU) += menu.o
 obj-$(CONFIG_UPDATE_COMMON) += update.o
 obj-$(CONFIG_USB_KEYBOARD) += usb_kbd.o
-obj-$(CONFIG_CMDLINE) += cli_getch.o cli_readline.o cli_simple.o
 
 endif # !CONFIG_SPL_BUILD
 
@@ -51,11 +52,12 @@ ifdef CONFIG_SPL_DFU
 obj-$(CONFIG_DFU_OVER_USB) += dfu.o
 endif
 obj-$(CONFIG_SPL_NET) += miiphyutil.o
-obj-$(CONFIG_$(SPL_TPL_)OF_LIBFDT) += fdt_support.o
 
 obj-$(CONFIG_SPL_USB_HOST) += usb.o usb_hub.o
 obj-$(CONFIG_SPL_USB_STORAGE) += usb_storage.o
 obj-$(CONFIG_SPL_MUSB_NEW) += usb.o
+obj-$(CONFIG_SPL_SPLASH_SCREEN) += splash.o
+obj-$(CONFIG_SPL_SPLASH_SOURCE) += splash_source.o
 endif # CONFIG_SPL_BUILD
 
 #others
@@ -75,11 +77,7 @@ endif # CONFIG_SPL_BUILD
 
 obj-$(CONFIG_CROS_EC) += cros_ec.o
 obj-y += dlmalloc.o
-ifdef CONFIG_SYS_MALLOC_F
-ifneq ($(CONFIG_$(SPL_TPL_)SYS_MALLOC_F_LEN),0)
-obj-y += malloc_simple.o
-endif
-endif
+obj-$(CONFIG_$(SPL_TPL_)SYS_MALLOC_F) += malloc_simple.o
 
 obj-$(CONFIG_CYCLIC) += cyclic.o
 obj-$(CONFIG_$(SPL_TPL_)EVENT) += event.o

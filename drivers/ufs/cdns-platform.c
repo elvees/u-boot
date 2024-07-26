@@ -2,7 +2,7 @@
 /**
  * cdns-platform.c - Platform driver for Cadence UFSHCI device
  *
- * Copyright (C) 2019 Texas Instruments Incorporated - http://www.ti.com
+ * Copyright (C) 2019 Texas Instruments Incorporated - https://www.ti.com
  */
 
 #include <clk.h>
@@ -13,10 +13,9 @@
 #include <dm/device_compat.h>
 #include <linux/bitops.h>
 #include <linux/err.h>
+#include <linux/time.h>
 
 #include "ufs.h"
-
-#define USEC_PER_SEC	1000000L
 
 #define CDNS_UFS_REG_HCLKDIV	0xFC
 #define CDNS_UFS_REG_PHY_XCFGD1	0x113C
@@ -119,7 +118,7 @@ static const struct udevice_id cdns_ufs_pltfm_ids[] = {
 
 U_BOOT_DRIVER(cdns_ufs_pltfm) = {
 	.name		= "cdns-ufs-pltfm",
-	.id		=  UCLASS_UFS,
+	.id		= UCLASS_UFS,
 	.of_match	= cdns_ufs_pltfm_ids,
 	.probe		= cdns_ufs_pltfm_probe,
 	.bind		= cdns_ufs_pltfm_bind,

@@ -5,6 +5,7 @@
  */
 /dts-v1/;
 #include "zynq-7000.dtsi"
+#include <dt-bindings/gpio/gpio.h>
 
 / {
 	model = "Xilinx ZC702 board";
@@ -34,14 +35,14 @@
 	gpio-keys {
 		compatible = "gpio-keys";
 		autorepeat;
-		sw14 {
+		switch-14 {
 			label = "sw14";
 			gpios = <&gpio0 12 0>;
 			linux,code = <108>; /* down */
 			wakeup-source;
 			autorepeat;
 		};
-		sw13 {
+		switch-13 {
 			label = "sw13";
 			gpios = <&gpio0 14 0>;
 			linux,code = <103>; /* up */
@@ -87,7 +88,6 @@
 
 	ethernet_phy: ethernet-phy@7 {
 		reg = <7>;
-		device_type = "ethernet-phy";
 	};
 };
 
@@ -102,8 +102,8 @@
 	pinctrl-names = "default", "gpio";
 	pinctrl-0 = <&pinctrl_i2c0_default>;
 	pinctrl-1 = <&pinctrl_i2c0_gpio>;
-	scl-gpios = <&gpio0 50 0>;
-	sda-gpios = <&gpio0 51 0>;
+	scl-gpios = <&gpio0 50 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+	sda-gpios = <&gpio0 51 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
 
 	i2c-mux@74 {
 		compatible = "nxp,pca9548";
@@ -294,7 +294,7 @@
 		};
 	};
 
-	pinctrl_i2c0_gpio: i2c0-gpio {
+	pinctrl_i2c0_gpio: i2c0-gpio-grp {
 		mux {
 			groups = "gpio0_50_grp", "gpio0_51_grp";
 			function = "gpio0";
@@ -396,7 +396,7 @@
 };
 
 &qspi {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 	status = "okay";
 	num-cs = <1>;
 	flash@0 {
@@ -405,18 +405,43 @@
 		spi-tx-bus-width = <1>;
 		spi-rx-bus-width = <4>;
 		spi-max-frequency = <50000000>;
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			partition@0 {
+				label = "qspi-fsbl-uboot";
+				reg = <0x0 0x100000>;
+			};
+			partition@100000 {
+				label = "qspi-linux";
+				reg = <0x100000 0x500000>;
+			};
+			partition@600000 {
+				label = "qspi-device-tree";
+				reg = <0x600000 0x20000>;
+			};
+			partition@620000 {
+				label = "qspi-rootfs";
+				reg = <0x620000 0x5e0000>;
+			};
+			partition@c00000 {
+				label = "qspi-bitstream";
+				reg = <0xc00000 0x400000>;
+			};
+		};
 	};
 };
 
 &sdhci0 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sdhci0_default>;
 };
 
 &uart1 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_uart1_default>;

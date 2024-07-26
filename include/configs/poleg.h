@@ -13,6 +13,8 @@
 #define CFG_SYS_BOOTMAPSZ            (0x30 << 20)
 #define CFG_SYS_SDRAM_BASE           0x0
 
+#define CFG_SYS_BAUDRATE_TABLE	{ 57600, 115200, 230400, 460800 }
+
 /* Default environemnt variables */
 #define CFG_EXTRA_ENV_SETTINGS   "uimage_flash_addr=80200000\0"   \
 		"stdin=serial\0"   \
@@ -27,8 +29,10 @@
 		"eth1addr=00:00:F7:A0:00:FD\0"   \
 		"eth2addr=00:00:F7:A0:00:FE\0"    \
 		"eth3addr=00:00:F7:A0:00:FF\0"    \
+		"console=ttyS0,115200n8\0" \
+		"earlycon=uart8250,mmio32,0xf0001000\0" \
 		"common_bootargs=setenv bootargs earlycon=${earlycon} root=/dev/ram "   \
-		"console=${console} mem=${mem} ramdisk_size=48000 basemac=${ethaddr}\0"    \
+		"console=${console} mem=${mem} ramdisk_size=48000 basemac=${ethaddr} oops=panic panic=20\0"    \
 		"sd_prog=fatload mmc 0 10000000 image-bmc; cp.b 10000000 80000000 ${filesize}\0"  \
 		"sd_run=fatload mmc 0 10000000 image-bmc; bootm 10200000\0"   \
 		"\0"

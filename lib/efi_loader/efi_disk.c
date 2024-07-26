@@ -7,7 +7,6 @@
 
 #define LOG_CATEGORY LOGC_EFI
 
-#include <common.h>
 #include <blk.h>
 #include <dm.h>
 #include <dm/device-internal.h>
@@ -32,20 +31,15 @@ const efi_guid_t efi_system_partition_guid = PARTITION_SYSTEM_GUID;
  *
  * @header:	EFI object header
  * @ops:	EFI disk I/O protocol interface
- * @dev_index:	device index of block device
  * @media:	block I/O media information
  * @dp:		device path to the block device
- * @part:	partition
  * @volume:	simple file system protocol of the partition
- * @dev:	associated DM device
  */
 struct efi_disk_obj {
 	struct efi_object header;
 	struct efi_block_io ops;
-	int dev_index;
 	struct efi_block_io_media media;
 	struct efi_device_path *dp;
-	unsigned int part;
 	struct efi_simple_file_system_protocol *volume;
 };
 
@@ -377,13 +371,26 @@ static int efi_fs_exists(struct blk_desc *desc, int part)
 	return 1;
 }
 
+static void efi_disk_free_diskobj(struct efi_disk_obj *diskobj)
+{
+	struct efi_device_path *dp = diskobj->dp;
+	struct efi_simple_file_system_protocol *volume = diskobj->volume;
+
+	/*
+	 * ignore error of efi_delete_handle() since this function
+	 * is expected to be called in error path.
+	 */
+	efi_delete_handle(&diskobj->header);
+	efi_free_pool(dp);
+	free(volume);
+}
+
 /**
  * efi_disk_add_dev() - create a handle for a partition or disk
  *
  * @parent:		parent handle
  * @dp_parent:		parent device path
  * @desc:		internal block device
- * @dev_index:		device index for block device
  * @part_info:		partition info
  * @part:		partition
  * @disk:		pointer to receive the created handle
@@ -394,7 +401,6 @@ static efi_status_t efi_disk_add_dev(
 				efi_handle_t parent,
 				struct efi_device_path *dp_parent,
 				struct blk_desc *desc,
-				int dev_index,
 				struct disk_partition *part_info,
 				unsigned int part,
 				struct efi_disk_obj **disk,
@@ -456,7 +462,6 @@ static efi_status_t efi_disk_add_dev(
 		diskobj->dp = efi_dp_from_part(desc, part);
 		diskobj->media.last_block = desc->lba - 1;
 	}
-	diskobj->part = part;
 
 	/*
 	 * Install the device path and the block IO protocol.
@@ -487,18 +492,18 @@ static efi_status_t efi_disk_add_dev(
 	 */
 	if ((part || desc->part_type == PART_TYPE_UNKNOWN) &&
 	    efi_fs_exists(desc, part)) {
-		diskobj->volume = efi_simple_file_system(desc, part,
-							 diskobj->dp);
+		ret = efi_create_simple_file_system(desc, part, diskobj->dp,
+						    &diskobj->volume);
+		if (ret != EFI_SUCCESS)
+			goto error;
+
 		ret = efi_add_protocol(&diskobj->header,
 				       &efi_simple_file_system_protocol_guid,
 				       diskobj->volume);
-		if (ret != EFI_SUCCESS) {
-			log_debug("simple FS failed\n");
-			return ret;
-		}
+		if (ret != EFI_SUCCESS)
+			goto error;
 	}
 	diskobj->ops = block_io_disk_template;
-	diskobj->dev_index = dev_index;
 
 	/* Fill in EFI IO Media info (for read/write callbacks) */
 	diskobj->media.removable_media = desc->removable;
@@ -518,7 +523,7 @@ static efi_status_t efi_disk_add_dev(
 
 	EFI_PRINT("BlockIO: part %u, present %d, logical %d, removable %d"
 		  ", last_block %llu\n",
-		  diskobj->part,
+		  part,
 		  diskobj->media.media_present,
 		  diskobj->media.logical_partition,
 		  diskobj->media.removable_media,
@@ -537,7 +542,7 @@ static efi_status_t efi_disk_add_dev(
 	}
 	return EFI_SUCCESS;
 error:
-	efi_delete_handle(&diskobj->header);
+	efi_disk_free_diskobj(diskobj);
 	return ret;
 }
 
@@ -563,21 +568,21 @@ static int efi_disk_create_raw(struct udevice *dev, efi_handle_t agent_handle)
 	diskid = desc->devnum;
 
 	ret = efi_disk_add_dev(NULL, NULL, desc,
-			       diskid, NULL, 0, &disk, agent_handle);
+			       NULL, 0, &disk, agent_handle);
 	if (ret != EFI_SUCCESS) {
 		if (ret == EFI_NOT_READY) {
 			log_notice("Disk %s not ready\n", dev->name);
 			ret = -EBUSY;
 		} else {
-			log_err("Adding disk for %s failed (err=%ld/%#lx)\n", dev->name, ret, ret);
+			log_err("Adding block device %s failed, r = %lu\n",
+				dev->name, ret & ~EFI_ERROR_MASK);
 			ret = -ENOENT;
 		}
 
 		return ret;
 	}
 	if (efi_link_dev(&disk->header, dev)) {
-		efi_free_pool(disk->dp);
-		efi_delete_handle(&disk->header);
+		efi_disk_free_diskobj(disk);
 
 		return -EINVAL;
 	}
@@ -624,15 +629,16 @@ static int efi_disk_create_part(struct udevice *dev, efi_handle_t agent_handle)
 		return -1;
 	dp_parent = (struct efi_device_path *)handler->protocol_interface;
 
-	ret = efi_disk_add_dev(parent, dp_parent, desc, diskid,
+	ret = efi_disk_add_dev(parent, dp_parent, desc,
 			       info, part, &disk, agent_handle);
 	if (ret != EFI_SUCCESS) {
 		log_err("Adding partition for %s failed\n", dev->name);
 		return -1;
 	}
 	if (efi_link_dev(&disk->header, dev)) {
-		efi_free_pool(disk->dp);
-		efi_delete_handle(&disk->header);
+		efi_disk_free_diskobj(disk);
+
+		/* TODO: closing the parent EFI_BLOCK_IO_PROTOCOL is missing. */
 
 		return -1;
 	}
@@ -687,92 +693,88 @@ int efi_disk_probe(void *ctx, struct event *event)
 			return -1;
 	}
 
-	return 0;
-}
-
-/*
- * Delete an efi_disk object for a whole raw disk
- *
- * @dev		uclass device (UCLASS_BLK)
- *
- * Delete an efi_disk object which is associated with @dev.
- * The type of @dev must be UCLASS_BLK.
- *
- * @return	0 on success, -1 otherwise
- */
-static int efi_disk_delete_raw(struct udevice *dev)
-{
-	efi_handle_t handle;
-	struct blk_desc *desc;
-	struct efi_disk_obj *diskobj;
-
-	if (dev_tag_get_ptr(dev, DM_TAG_EFI, (void **)&handle))
-		return -1;
-
-	desc = dev_get_uclass_plat(dev);
-	if (desc->uclass_id != UCLASS_EFI_LOADER) {
-		diskobj = container_of(handle, struct efi_disk_obj, header);
-		efi_free_pool(diskobj->dp);
+	/* only do the boot option management when UEFI sub-system is initialized */
+	if (IS_ENABLED(CONFIG_CMD_BOOTEFI_BOOTMGR) && efi_obj_list_initialized == EFI_SUCCESS) {
+		ret = efi_bootmgr_update_media_device_boot_option();
+		if (ret != EFI_SUCCESS)
+			return -1;
 	}
 
-	efi_delete_handle(handle);
-	dev_tag_del(dev, DM_TAG_EFI);
-
 	return 0;
 }
 
-/*
- * Delete an efi_disk object for a disk partition
+/**
+ * efi_disk_remove - delete an efi_disk object for a block device or partition
  *
- * @dev		uclass device (UCLASS_PARTITION)
+ * @ctx:	event context: driver binding protocol
+ * @event:	EV_PM_PRE_REMOVE event
  *
- * Delete an efi_disk object which is associated with @dev.
- * The type of @dev must be UCLASS_PARTITION.
+ * Delete an efi_disk object which is associated with the UCLASS_BLK or
+ * UCLASS_PARTITION device for which the EV_PM_PRE_REMOVE event is raised.
  *
- * @return	0 on success, -1 otherwise
- */
-static int efi_disk_delete_part(struct udevice *dev)
-{
-	efi_handle_t handle;
-	struct efi_disk_obj *diskobj;
-
-	if (dev_tag_get_ptr(dev, DM_TAG_EFI, (void **)&handle))
-		return -1;
-
-	diskobj = container_of(handle, struct efi_disk_obj, header);
-
-	efi_free_pool(diskobj->dp);
-	efi_delete_handle(handle);
-	dev_tag_del(dev, DM_TAG_EFI);
-
-	return 0;
-}
-
-/*
- * Delete an efi_disk object for a block device
- *
- * @dev		uclass device (UCLASS_BLK or UCLASS_PARTITION)
- *
- * Delete an efi_disk object which is associated with @dev.
- * The type of @dev must be either UCLASS_BLK or UCLASS_PARTITION.
- * This function is expected to be called at EV_PM_PRE_REMOVE.
- *
- * @return	0 on success, -1 otherwise
+ * Return:	0 on success, -1 otherwise
  */
 int efi_disk_remove(void *ctx, struct event *event)
 {
 	enum uclass_id id;
-	struct udevice *dev;
+	struct udevice *dev = event->data.dm.dev;
+	efi_handle_t handle;
+	struct blk_desc *desc;
+	struct efi_device_path *dp = NULL;
+	struct efi_disk_obj *diskobj = NULL;
+	struct efi_simple_file_system_protocol *volume = NULL;
+	efi_status_t ret;
 
-	dev = event->data.dm.dev;
-	id = device_get_uclass_id(dev);
-
-	if (id == UCLASS_BLK)
-		return efi_disk_delete_raw(dev);
-	else if (id == UCLASS_PARTITION)
-		return efi_disk_delete_part(dev);
-	else
+	if (dev_tag_get_ptr(dev, DM_TAG_EFI, (void **)&handle))
 		return 0;
+
+	id = device_get_uclass_id(dev);
+	switch (id) {
+	case UCLASS_BLK:
+		desc = dev_get_uclass_plat(dev);
+		if (desc && desc->uclass_id == UCLASS_EFI_LOADER)
+			/*
+			 * EFI application/driver manages the EFI handle,
+			 * no need to delete EFI handle.
+			 */
+			return 0;
+
+		diskobj = (struct efi_disk_obj *)handle;
+		break;
+	case UCLASS_PARTITION:
+		diskobj = (struct efi_disk_obj *)handle;
+
+		/* TODO: closing the parent EFI_BLOCK_IO_PROTOCOL is missing. */
+
+		break;
+	default:
+		return 0;
+	}
+
+	dp = diskobj->dp;
+	volume = diskobj->volume;
+
+	ret = efi_delete_handle(handle);
+	/* Do not delete DM device if there are still EFI drivers attached. */
+	if (ret != EFI_SUCCESS)
+		return -1;
+
+	efi_free_pool(dp);
+	free(volume);
+	dev_tag_del(dev, DM_TAG_EFI);
+
+	return 0;
+
+	/*
+	 * TODO A flag to distinguish below 2 different scenarios of this
+	 * function call is needed:
+	 * a) Unplugging of a removable media under U-Boot
+	 * b) U-Boot exiting and booting an OS
+	 * In case of scenario a), efi_bootmgr_update_media_device_boot_option()
+	 * needs to be invoked here to update the boot options and remove the
+	 * unnecessary ones.
+	 */
+
 }
 
 /**

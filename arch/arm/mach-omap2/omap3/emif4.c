@@ -6,7 +6,7 @@
  * Based on mem.c and sdrc.c
  *
  * Copyright (C) 2010
- * Texas Instruments Incorporated - http://www.ti.com/
+ * Texas Instruments Incorporated - https://www.ti.com/
  */
 
 #include <common.h>
@@ -159,10 +159,10 @@ int dram_init_banksize(void)
 }
 
 /*
- * mem_init() -
+ * omap3_mem_init() -
  *  - Initialize memory subsystem
  */
-void mem_init(void)
+void omap3_mem_init(void)
 {
 	do_emif4_init();
 }

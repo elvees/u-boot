@@ -4,7 +4,7 @@
  *
  * Phytec phyCORE-AM335x R2 (PCL060 / PCM060) boards information header
  *
- * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
+ * Copyright (C) 2011, Texas Instruments, Incorporated - https://www.ti.com/
  * Copyright (C) 2013 Lars Poeschel, Lemonage Software GmbH
  * Copyright (C) 2019 DENX Software Engineering GmbH
  */
@@ -59,8 +59,8 @@
 	func(NAND, nand, 0)
 
 #include <config_distro_bootcmd.h>
-#include <environment/ti/dfu.h>
-#include <environment/ti/mmc.h>
+#include <env/ti/dfu.h>
+#include <env/ti/mmc.h>
 
 #define CFG_EXTRA_ENV_SETTINGS \
 	DEFAULT_MMC_TI_ARGS \

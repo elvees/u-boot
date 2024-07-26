@@ -4,7 +4,6 @@
  * Copyright 2019, 2021-2022 NXP
  */
 
-#include <common.h>
 #include <clock_legacy.h>
 #include <command.h>
 #include <fdt_support.h>
@@ -18,6 +17,7 @@
 #include <asm/arch/fsl_serdes.h>
 #include <asm/arch/ls102xa_devdis.h>
 #include <asm/arch/ls102xa_soc.h>
+#include <asm/sections.h>
 #include <hwconfig.h>
 #include <mmc.h>
 #include <fsl_csu.h>

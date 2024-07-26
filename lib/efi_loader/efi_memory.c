@@ -5,14 +5,17 @@
  *  Copyright (c) 2016 Alexander Graf
  */
 
-#include <common.h>
+#define LOG_CATEGORY LOGC_EFI
+
 #include <efi_loader.h>
 #include <init.h>
+#include <log.h>
 #include <malloc.h>
 #include <mapmem.h>
 #include <watchdog.h>
 #include <asm/cache.h>
 #include <asm/global_data.h>
+#include <asm/sections.h>
 #include <linux/list_sort.h>
 #include <linux/sizes.h>
 
@@ -31,9 +34,10 @@ struct efi_mem_list {
 #define EFI_CARVE_NO_OVERLAP		-1
 #define EFI_CARVE_LOOP_AGAIN		-2
 #define EFI_CARVE_OVERLAPS_NONRAM	-3
+#define EFI_CARVE_OUT_OF_RESOURCES	-4
 
 /* This list contains all memory map items */
-LIST_HEAD(efi_mem);
+static LIST_HEAD(efi_mem);
 
 #ifdef CONFIG_EFI_LOADER_BOUNCE_BUFFER
 void *efi_bounce_buffer;
@@ -236,6 +240,8 @@ static s64 efi_mem_carve_out(struct efi_mem_list *map,
 
 	/* Create a new map from [ carve_start ... map_end ] */
 	newmap = calloc(1, sizeof(*newmap));
+	if (!newmap)
+		return EFI_CARVE_OUT_OF_RESOURCES;
 	newmap->desc = map->desc;
 	newmap->desc.physical_start = carve_start;
 	newmap->desc.virtual_start = carve_start;
@@ -279,6 +285,8 @@ static efi_status_t efi_add_memory_map_pg(u64 start, u64 pages,
 
 	++efi_memory_map_key;
 	newlist = calloc(1, sizeof(*newlist));
+	if (!newlist)
+		return EFI_OUT_OF_RESOURCES;
 	newlist->desc.type = memory_type;
 	newlist->desc.physical_start = start;
 	newlist->desc.virtual_start = start;
@@ -308,11 +316,15 @@ static efi_status_t efi_add_memory_map_pg(u64 start, u64 pages,
 			r = efi_mem_carve_out(lmem, &newlist->desc,
 					      overlap_only_ram);
 			switch (r) {
+			case EFI_CARVE_OUT_OF_RESOURCES:
+				free(newlist);
+				return EFI_OUT_OF_RESOURCES;
 			case EFI_CARVE_OVERLAPS_NONRAM:
 				/*
 				 * The user requested to only have RAM overlaps,
 				 * but we hit a non-RAM region. Error out.
 				 */
+				free(newlist);
 				return EFI_NO_MAPPING;
 			case EFI_CARVE_NO_OVERLAP:
 				/* Just ignore this list entry */
@@ -343,6 +355,7 @@ static efi_status_t efi_add_memory_map_pg(u64 start, u64 pages,
 		 * The payload wanted to have RAM overlaps, but we overlapped
 		 * with an unallocated region. Error out.
 		 */
+		free(newlist);
 		return EFI_NO_MAPPING;
 	}
 
@@ -484,7 +497,7 @@ efi_status_t efi_allocate_pages(enum efi_allocate_type type,
 				enum efi_memory_type memory_type,
 				efi_uintn_t pages, uint64_t *memory)
 {
-	u64 len = pages << EFI_PAGE_SHIFT;
+	u64 len;
 	efi_status_t ret;
 	uint64_t addr;
 
@@ -494,6 +507,11 @@ efi_status_t efi_allocate_pages(enum efi_allocate_type type,
 		return EFI_INVALID_PARAMETER;
 	if (!memory)
 		return EFI_INVALID_PARAMETER;
+	len = (u64)pages << EFI_PAGE_SHIFT;
+	/* Catch possible overflow on 64bit systems */
+	if (sizeof(efi_uintn_t) == sizeof(u64) &&
+	    (len >> EFI_PAGE_SHIFT) != (u64)pages)
+		return EFI_OUT_OF_RESOURCES;
 
 	switch (type) {
 	case EFI_ALLOCATE_ANY_PAGES:
@@ -531,27 +549,6 @@ efi_status_t efi_allocate_pages(enum efi_allocate_type type,
 	*memory = addr;
 
 	return EFI_SUCCESS;
-}
-
-/**
- * efi_alloc() - allocate memory pages
- *
- * @len:		size of the memory to be allocated
- * @memory_type:	usage type of the allocated memory
- * Return:		pointer to the allocated memory area or NULL
- */
-void *efi_alloc(uint64_t len, int memory_type)
-{
-	uint64_t ret = 0;
-	uint64_t pages = efi_size_in_pages(len);
-	efi_status_t r;
-
-	r = efi_allocate_pages(EFI_ALLOCATE_ANY_PAGES, memory_type, pages,
-			       &ret);
-	if (r == EFI_SUCCESS)
-		return (void*)(uintptr_t)ret;
-
-	return NULL;
 }
 
 /**
@@ -670,6 +667,28 @@ efi_status_t efi_allocate_pool(enum efi_memory_type pool_type, efi_uintn_t size,
 	}
 
 	return r;
+}
+
+/**
+ * efi_alloc() - allocate boot services data pool memory
+ *
+ * Allocate memory from pool and zero it out.
+ *
+ * @size:	number of bytes to allocate
+ * Return:	pointer to allocated memory or NULL
+ */
+void *efi_alloc(size_t size)
+{
+	void *buf;
+
+	if (efi_allocate_pool(EFI_BOOT_SERVICES_DATA, size, &buf) !=
+	    EFI_SUCCESS) {
+		log_err("out of memory");
+		return NULL;
+	}
+	memset(buf, 0, size);
+
+	return buf;
 }
 
 /**
@@ -858,7 +877,7 @@ efi_status_t efi_add_conventional_memory_map(u64 ram_start, u64 ram_end,
  */
 __weak void efi_add_known_memory(void)
 {
-	u64 ram_top = board_get_usable_ram_top(0) & ~EFI_PAGE_MASK;
+	u64 ram_top = gd->ram_top & ~EFI_PAGE_MASK;
 	int i;
 
 	/*
@@ -915,8 +934,8 @@ static void add_u_boot_and_runtime(void)
 	 * Add Runtime Services. We mark surrounding boottime code as runtime as
 	 * well to fulfill the runtime alignment constraints but avoid padding.
 	 */
-	runtime_start = (ulong)&__efi_runtime_start & ~runtime_mask;
-	runtime_end = (ulong)&__efi_runtime_stop;
+	runtime_start = (uintptr_t)__efi_runtime_start & ~runtime_mask;
+	runtime_end = (uintptr_t)__efi_runtime_stop;
 	runtime_end = (runtime_end + runtime_mask) & ~runtime_mask;
 	runtime_pages = (runtime_end - runtime_start) >> EFI_PAGE_SHIFT;
 	efi_add_memory_map_pg(runtime_start, runtime_pages,

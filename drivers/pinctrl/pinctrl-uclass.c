@@ -100,6 +100,22 @@ static int pinctrl_select_state_full(struct udevice *dev, const char *statename)
 	return 0;
 }
 
+static bool ofnode_pre_reloc_recursive(ofnode parent)
+{
+	ofnode child;
+
+	if (ofnode_pre_reloc(parent))
+		return true;
+
+	if (CONFIG_IS_ENABLED(PINCONF_RECURSIVE)) {
+		ofnode_for_each_subnode(child, parent)
+			if (ofnode_pre_reloc_recursive(child))
+				return true;
+	}
+
+	return false;
+}
+
 /**
  * pinconfig_post_bind() - post binding for PINCONFIG uclass
  * Recursively bind its children as pinconfig devices.
@@ -119,7 +135,7 @@ static int pinconfig_post_bind(struct udevice *dev)
 
 	dev_for_each_subnode(node, dev) {
 		if (pre_reloc_only &&
-		    !ofnode_pre_reloc(node))
+		    !ofnode_pre_reloc_recursive(node))
 			continue;
 		/*
 		 * If this node has "compatible" property, this is not
@@ -169,34 +185,33 @@ pinctrl_gpio_get_pinctrl_and_offset(struct udevice *dev, unsigned offset,
 {
 	struct ofnode_phandle_args args;
 	unsigned gpio_offset, pfc_base, pfc_pins;
-	int ret;
+	int ret = 0;
+	int i = 0;
 
-	ret = dev_read_phandle_with_args(dev, "gpio-ranges", NULL, 3,
-					 0, &args);
-	if (ret) {
-		dev_dbg(dev, "%s: dev_read_phandle_with_args: err=%d\n",
-			__func__, ret);
-		return ret;
-	}
+	while (ret == 0) {
+		ret = dev_read_phandle_with_args(dev, "gpio-ranges", NULL, 3,
+						 i++, &args);
+		if (ret) {
+			dev_dbg(dev, "%s: dev_read_phandle_with_args: err=%d\n",
+				__func__, ret);
+			return ret;
+		}
 
-	ret = uclass_get_device_by_ofnode(UCLASS_PINCTRL,
-					  args.node, pctldev);
-	if (ret) {
-		dev_dbg(dev,
-			"%s: uclass_get_device_by_of_offset failed: err=%d\n",
-			__func__, ret);
-		return ret;
-	}
+		ret = uclass_get_device_by_ofnode(UCLASS_PINCTRL,
+						  args.node, pctldev);
+		if (ret) {
+			dev_dbg(dev,
+				"%s: uclass_get_device_by_of_offset failed: err=%d\n",
+				__func__, ret);
+			return ret;
+		}
 
-	gpio_offset = args.args[0];
-	pfc_base = args.args[1];
-	pfc_pins = args.args[2];
+		gpio_offset = args.args[0];
+		pfc_base = args.args[1];
+		pfc_pins = args.args[2];
 
-	if (offset < gpio_offset || offset > gpio_offset + pfc_pins) {
-		dev_dbg(dev,
-			"%s: GPIO can not be mapped to pincontrol pin\n",
-			__func__);
-		return -EINVAL;
+		if (offset >= gpio_offset && offset <= gpio_offset + pfc_pins)
+			break;
 	}
 
 	offset -= gpio_offset;

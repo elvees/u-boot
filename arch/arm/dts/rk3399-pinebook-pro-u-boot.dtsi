@@ -6,32 +6,33 @@
 #include "rk3399-u-boot.dtsi"
 #include "rk3399-sdram-lpddr4-100.dtsi"
 
-/ {
-	chosen {
-		u-boot,spl-boot-order = "same-as-spl", &sdhci, &spiflash, &sdmmc;
-	};
-
-	config {
-		u-boot,spl-payload-offset = <0x60000>; /* @ 384KB */
-	};
-};
-
 &edp {
 	rockchip,panel = <&edp_panel>;
 };
 
+&gpio0 {
+	bootph-pre-ram;
+};
+
 &sdhci {
 	max-frequency = <25000000>;
-	u-boot,dm-pre-reloc;
 };
 
 &sdmmc {
 	max-frequency = <20000000>;
-	u-boot,dm-pre-reloc;
+};
+
+&sdmmc0_pwr_h_pin {
+	bootph-pre-ram;
 };
 
 &spiflash {
-	u-boot,dm-pre-reloc;
+	bootph-pre-ram;
+	bootph-some-ram;
+};
+
+&vcc3v0_sd {
+	bootph-pre-ram;
 };
 
 &vdd_log {

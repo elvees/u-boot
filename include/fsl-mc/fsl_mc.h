@@ -7,8 +7,9 @@
 #ifndef __FSL_MC_H__
 #define __FSL_MC_H__
 
-#include <common.h>
 #include <linux/bitops.h>
+
+struct bd_info;
 
 #define MC_CCSR_BASE_ADDR \
 	((struct mc_ccsr_registers __iomem *)0x8340000)
@@ -66,6 +67,7 @@ int get_mc_boot_status(void);
 int get_dpl_apply_status(void);
 int is_lazy_dpl_addr_valid(void);
 void fdt_fixup_mc_ddr(u64 *base, u64 *size);
+void fdt_reserve_mc_mem(void *blob, u32 mc_icid);
 #ifdef CFG_SYS_LS_MC_DRAM_AIOP_IMG_OFFSET
 int get_aiop_apply_status(void);
 #endif

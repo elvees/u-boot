@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (c) 2011 The Chromium OS Authors.
+ *
+ * NOTE: Please do not add new devicetree-reading functionality into this file.
+ * Add it to the ofnode API instead, since that is compatible with livetree.
  */
 
 #ifndef USE_HOSTCC
-#include <common.h>
+
+#define LOG_CATEGORY	LOGC_DT
+
+#include <bloblist.h>
 #include <boot_fit.h>
 #include <display_options.h>
 #include <dm.h>
@@ -65,7 +71,6 @@ static const char * const compat_names[COMPAT_COUNT] = {
 	COMPAT(INTEL_BAYTRAIL_FSP, "intel,baytrail-fsp"),
 	COMPAT(INTEL_BAYTRAIL_FSP_MDP, "intel,baytrail-fsp-mdp"),
 	COMPAT(INTEL_IVYBRIDGE_FSP, "intel,ivybridge-fsp"),
-	COMPAT(COMPAT_SUNXI_NAND, "allwinner,sun4i-a10-nand"),
 	COMPAT(ALTERA_SOCFPGA_CLK, "altr,clk-mgr"),
 	COMPAT(ALTERA_SOCFPGA_PINCTRL_SINGLE, "pinctrl-single"),
 	COMPAT(ALTERA_SOCFPGA_H2F_BRG, "altr,socfpga-hps2fpga-bridge"),
@@ -85,6 +90,7 @@ static const char *const fdt_src_name[] = {
 	[FDTSRC_BOARD] = "board",
 	[FDTSRC_EMBED] = "embed",
 	[FDTSRC_ENV] = "env",
+	[FDTSRC_BLOBLIST] = "bloblist",
 };
 
 const char *fdtdec_get_srcname(void)
@@ -1228,12 +1234,12 @@ static void *fdt_find_separate(void)
 #ifdef CONFIG_SPL_BUILD
 	/* FDT is at end of BSS unless it is in a different memory region */
 	if (IS_ENABLED(CONFIG_SPL_SEPARATE_BSS))
-		fdt_blob = (ulong *)&_image_binary_end;
+		fdt_blob = (ulong *)_image_binary_end;
 	else
-		fdt_blob = (ulong *)&__bss_end;
+		fdt_blob = (ulong *)__bss_end;
 #else
 	/* FDT is at end of image */
-	fdt_blob = (ulong *)&_end;
+	fdt_blob = (ulong *)_end;
 
 	if (_DEBUG && !fdtdec_prepare_fdt(fdt_blob)) {
 		int stack_ptr;
@@ -1661,23 +1667,42 @@ static void setup_multi_dtb_fit(void)
 
 int fdtdec_setup(void)
 {
-	int ret;
+	int ret = -ENOENT;
 
-	/* The devicetree is typically appended to U-Boot */
-	if (IS_ENABLED(CONFIG_OF_SEPARATE)) {
-		gd->fdt_blob = fdt_find_separate();
-		gd->fdt_src = FDTSRC_SEPARATE;
-	} else { /* embed dtb in ELF file for testing / development */
-		gd->fdt_blob = dtb_dt_embedded();
-		gd->fdt_src = FDTSRC_EMBED;
+	/* If allowing a bloblist, check that first */
+	if (CONFIG_IS_ENABLED(BLOBLIST)) {
+		ret = bloblist_maybe_init();
+		if (!ret) {
+			gd->fdt_blob = bloblist_find(BLOBLISTT_CONTROL_FDT, 0);
+			if (gd->fdt_blob) {
+				gd->fdt_src = FDTSRC_BLOBLIST;
+				log_debug("Devicetree is in bloblist at %p\n",
+					  gd->fdt_blob);
+			} else {
+				log_debug("No FDT found in bloblist\n");
+				ret = -ENOENT;
+			}
+		}
+	}
+
+	/* Otherwise, the devicetree is typically appended to U-Boot */
+	if (ret) {
+		if (IS_ENABLED(CONFIG_OF_SEPARATE)) {
+			gd->fdt_blob = fdt_find_separate();
+			gd->fdt_src = FDTSRC_SEPARATE;
+		} else { /* embed dtb in ELF file for testing / development */
+			gd->fdt_blob = dtb_dt_embedded();
+			gd->fdt_src = FDTSRC_EMBED;
+		}
 	}
 
 	/* Allow the board to override the fdt address. */
 	if (IS_ENABLED(CONFIG_OF_BOARD)) {
 		gd->fdt_blob = board_fdt_blob_setup(&ret);
-		if (ret)
+		if (!ret)
+			gd->fdt_src = FDTSRC_BOARD;
+		else if (ret != -EEXIST)
 			return ret;
-		gd->fdt_src = FDTSRC_BOARD;
 	}
 
 	/* Allow the early environment to override the fdt address */

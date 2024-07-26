@@ -8,6 +8,7 @@
 #include <common.h>
 #include <cpu_func.h>
 #include <dm.h>
+#include <dm/device_compat.h>
 #include <dm/lists.h>
 #include <log.h>
 #include <zynqmp_firmware.h>
@@ -23,10 +24,10 @@
 #define XST_PM_NO_ACCESS	2002L
 #define XST_PM_ALREADY_CONFIGURED	2009L
 
-struct zynqmp_power {
+static struct zynqmp_power {
 	struct mbox_chan tx_chan;
 	struct mbox_chan rx_chan;
-} zynqmp_power = {};
+} zynqmp_power __section(".data");
 
 #define NODE_ID_LOCATION	5
 
@@ -63,29 +64,32 @@ static unsigned int xpm_configobject_close[] = {
 
 int zynqmp_pmufw_config_close(void)
 {
-	zynqmp_pmufw_load_config_object(xpm_configobject_close,
-					sizeof(xpm_configobject_close));
-	return 0;
+	return zynqmp_pmufw_load_config_object(xpm_configobject_close,
+					       sizeof(xpm_configobject_close));
 }
 
 int zynqmp_pmufw_node(u32 id)
 {
-	static bool skip_config;
-	int ret;
+	static bool check = true;
+	static bool permission = true;
 
-	if (skip_config)
+	if (check) {
+		check = false;
+
+		if (zynqmp_pmufw_node(NODE_OCM_BANK_0) == -EACCES) {
+			printf("PMUFW:  No permission to change config object\n");
+			permission = false;
+		}
+	}
+
+	if (!permission)
 		return 0;
 
 	/* Record power domain id */
 	xpm_configobject[NODE_ID_LOCATION] = id;
 
-	ret = zynqmp_pmufw_load_config_object(xpm_configobject,
-					      sizeof(xpm_configobject));
-
-	if (ret == XST_PM_NO_ACCESS && id == NODE_OCM_BANK_0)
-		skip_config = true;
-
-	return 0;
+	return zynqmp_pmufw_load_config_object(xpm_configobject,
+					       sizeof(xpm_configobject));
 }
 
 static int do_pm_probe(void)
@@ -192,6 +196,21 @@ int zynqmp_pm_set_sd_config(u32 node, enum pm_sd_config_type config, u32 value)
 	return ret;
 }
 
+int zynqmp_pm_feature(const u32 api_id)
+{
+	int ret;
+	u32 ret_payload[PAYLOAD_ARG_CNT];
+
+	/* Check feature check API version */
+	ret = xilinx_pm_request(PM_FEATURE_CHECK, api_id, 0, 0, 0,
+				ret_payload);
+	if (ret)
+		return ret;
+
+	/* Return feature check version */
+	return ret_payload[1] & FIRMWARE_VERSION_MASK;
+}
+
 int zynqmp_pm_is_function_supported(const u32 api_id, const u32 id)
 {
 	int ret;
@@ -235,8 +254,7 @@ int zynqmp_pm_is_function_supported(const u32 api_id, const u32 id)
  *
  * @cfg_obj: Pointer to the configuration object
  * @size:    Size of @cfg_obj in bytes
- * Return:   0 on success otherwise negative errno. If the config object
- *           is not loadable returns positive errno XST_PM_NO_ACCESS(2002)
+ * Return:   0 on success otherwise negative errno.
  */
 int zynqmp_pmufw_load_config_object(const void *cfg_obj, size_t size)
 {
@@ -251,10 +269,6 @@ int zynqmp_pmufw_load_config_object(const void *cfg_obj, size_t size)
 	err = xilinx_pm_request(PM_SET_CONFIGURATION, (u32)(u64)cfg_obj, 0, 0,
 				0, ret_payload);
 	if (err == XST_PM_NO_ACCESS) {
-		if (((u32 *)cfg_obj)[NODE_ID_LOCATION] == NODE_OCM_BANK_0) {
-			printf("PMUFW:  No permission to change config object\n");
-			return err;
-		}
 		return -EACCES;
 	}
 
@@ -277,9 +291,30 @@ int zynqmp_pmufw_load_config_object(const void *cfg_obj, size_t size)
 
 static int zynqmp_power_probe(struct udevice *dev)
 {
+	struct udevice *ipi_dev;
+	ofnode ipi_node;
 	int ret;
 
 	debug("%s, (dev=%p)\n", __func__, dev);
+
+	/*
+	 * Probe all IPI parent node driver. It is important to have IPI
+	 * devices available when requested by mbox_get_by* API.
+	 * If IPI device isn't available, then mailbox request fails and
+	 * that causes system boot failure.
+	 * To avoid this make sure all IPI parent drivers are probed here,
+	 * and IPI parent driver binds each child node to mailbox driver.
+	 * This way mbox_get_by_* API will have correct mailbox device
+	 * driver probed.
+	 */
+	ofnode_for_each_compatible_node(ipi_node, "xlnx,zynqmp-ipi-mailbox") {
+		ret = uclass_get_device_by_ofnode(UCLASS_NOP, ipi_node, &ipi_dev);
+		if (ret) {
+			dev_err(dev, "failed to get IPI device from node %s\n",
+				ofnode_get_name(ipi_node));
+			return ret;
+		}
+	}
 
 	ret = mbox_get_by_name(dev, "tx", &zynqmp_power.tx_chan);
 	if (ret) {
@@ -297,9 +332,6 @@ static int zynqmp_power_probe(struct udevice *dev)
 	printf("PMUFW:\tv%d.%d\n",
 	       ret >> ZYNQMP_PM_VERSION_MAJOR_SHIFT,
 	       ret & ZYNQMP_PM_VERSION_MINOR_MASK);
-
-	if (IS_ENABLED(CONFIG_ARCH_ZYNQMP))
-		zynqmp_pmufw_node(NODE_OCM_BANK_0);
 
 	return 0;
 };
@@ -320,7 +352,8 @@ U_BOOT_DRIVER(zynqmp_power) = {
 int __maybe_unused xilinx_pm_request(u32 api_id, u32 arg0, u32 arg1, u32 arg2,
 				     u32 arg3, u32 *ret_payload)
 {
-	debug("%s at EL%d, API ID: 0x%0x\n", __func__, current_el(), api_id);
+	debug("%s at EL%d, API ID: 0x%0x, 0x%0x, 0x%0x, 0x%0x, 0x%0x\n",
+	      __func__, current_el(), api_id, arg0, arg1, arg2, arg3);
 
 	if (IS_ENABLED(CONFIG_SPL_BUILD) || current_el() == 3) {
 #if defined(CONFIG_ZYNQMP_IPI)
@@ -398,7 +431,7 @@ static int zynqmp_firmware_bind(struct udevice *dev)
 		}
 	}
 
-	return dm_scan_fdt_dev(dev);
+	return 0;
 }
 
 U_BOOT_DRIVER(zynqmp_firmware) = {

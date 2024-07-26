@@ -19,6 +19,10 @@ The following rules apply:
   applies only to Linux, not to U-Boot. Only large hunks which are copied
   unchanged from Linux may retain that comment format.
 
+* Python code shall conform to `PEP8 (Style Guide for Python Code)
+  <https://peps.python.org/pep-0008/>`_. Use `pylint
+  <https://github.com/pylint-dev/pylint>`_ for checking the code.
+
 * Use patman to send your patches (``tools/patman/patman -H`` for full
   instructions). With a few tags in your commits this will check your patches
   and take care of emailing them.
@@ -67,6 +71,9 @@ documentation is strongly advised. The Linux kernel `kernel-doc
 <https://www.kernel.org/doc/html/latest/doc-guide/kernel-doc.html>`_
 documentation applies with no changes.
 
+Our Python code documentation follows `PEP257 (Docstring Conventions)
+<https://peps.python.org/pep-0257/>`_.
+
 Use structures for I/O access
 -----------------------------
 
@@ -101,30 +108,29 @@ expected size, or that particular members appear at the right offset.
 Include files
 -------------
 
-You should follow this ordering in U-Boot. The common.h header (which is going
-away at some point) should always be first, followed by other headers in order,
-then headers with directories, then local files:
+You should follow this ordering in U-Boot. In all cases, they should be listed
+in alphabetical order. First comes headers which are located directly in our
+top-level include diretory. This excludes the common.h header file which is to
+be removed. Second are headers within subdirectories, Finally directory-local
+includes should be listed. See this example:
 
 .. code-block:: C
 
-   #include <common.h>
    #include <bootstage.h>
    #include <dm.h>
    #include <others.h>
    #include <asm/...>
-   #include <arm/arch/...>
-   #include <dm/device_compat/.h>
+   #include <asm/arch/...>
+   #include <dm/device_compat.h>
    #include <linux/...>
    #include "local.h"
 
-Within that order, sort your includes.
-
-It is important to include common.h first since it provides basic features used
-by most files, e.g. CONFIG options.
-
 For files that need to be compiled for the host (e.g. tools), you need to use
-``#ifndef USE_HOSTCC`` to avoid including common.h since it includes a lot of
-internal U-Boot things. See common/image.c for an example.
+``#ifndef USE_HOSTCC`` to avoid including U-Boot specific include files. See
+common/image.c for an example.
+
+If you encounter code which still uses <common.h> a patch to remove that and
+replace it with any required include files directly is much appreciated.
 
 If your file uses driver model, include <dm.h> in the C file. Do not include
 dm.h in a header file. Try to use forward declarations (e.g. ``struct

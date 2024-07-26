@@ -5,18 +5,63 @@
 
 #include "rk3588-u-boot.dtsi"
 
-/ {
-	aliases {
-		mmc0 = &sdmmc;
-	};
+&fspim2_pins {
+	bootph-pre-ram;
+	bootph-some-ram;
+};
 
-	chosen {
-		u-boot,spl-boot-order = &sdmmc;
+&sdhci {
+	cap-mmc-highspeed;
+	mmc-hs200-1_8v;
+};
+
+&sfc {
+	pinctrl-names = "default";
+	pinctrl-0 = <&fspim2_pins>;
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		bootph-pre-ram;
+		bootph-some-ram;
+		spi-max-frequency = <24000000>;
+		spi-rx-bus-width = <4>;
+		spi-tx-bus-width = <1>;
 	};
 };
 
-&sdmmc {
-	bus-width = <4>;
-	u-boot,dm-spl;
+&u2phy0 {
+	status = "okay";
+};
+
+&u2phy0_otg {
+	status = "okay";
+};
+
+&u2phy1 {
+	status = "okay";
+};
+
+&u2phy1_otg {
+	status = "okay";
+};
+
+&usbdp_phy1 {
+	status = "okay";
+};
+
+&usbdp_phy0 {
+	status = "okay";
+};
+
+&usb_host0_xhci {
+	dr_mode = "peripheral";
+	maximum-speed = "high-speed";
+	status = "okay";
+};
+
+&usb_host1_xhci {
+	dr_mode = "host";
 	status = "okay";
 };

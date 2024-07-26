@@ -88,6 +88,7 @@ config TARGET_GURNARD
 	select DM_GPIO
 	select DM_SERIAL
 	select DM_SPI
+	select MTD
 	select SPI
 	imply CMD_DM
 
@@ -204,6 +205,17 @@ config TARGET_SAMA5D27_WLSOM1_EK
 	  processor-based SAMA5D2 MPU with 2 Gbit LPDDR2-SDRAM
 	  in a single package.
 
+config TARGET_KSTR_SAMA5D27
+	bool "Conclusive KSTR-SAMA5D27 board"
+	select BOARD_EARLY_INIT_F
+	select SAMA5D2
+	help
+	  The KSTR-SAMA5D27 embeds SAMA5D27 SoC, together with
+	  256 MiB SDRAM, 10/100 Mbit/s Ethernet, 96 Mbit/s Wi-Fi b/g/n,
+	  Bluetooth 4.1 LE, USB OTG controller w/ type-C USB connector
+	  and stackable GPIO headers in an all-in-one SBC form factor:
+	  https://conclusive.pl/products/kstr-sama5d27-sbc/
+
 config TARGET_SAMA5D2_ICP
 	bool "SAMA5D2 Industrial Connectivity Platform (ICP)"
 	select SAMA5D2
@@ -214,6 +226,17 @@ config TARGET_SAMA5D2_ICP
 	  The SAMA5D2 ICP embeds SAMA5D27 rev. C SoC, together with
 	  a 64Mbit QSPI flash, 3xMikrobus connectors, 4xUSB ,
 	  EtherCat and WILC3000 devices on board.
+
+config TARGET_SAMA5D29_CURIOSITY
+	bool "SAMA5D29 CURIOSITY board"
+	select SAMA5D2
+	select BOARD_EARLY_INIT_F
+	select BOARD_LATE_INIT
+	select CPU_V7A
+	help
+	  The SAMA5D29 Curiosity embeds SAMA5D29 SoC with 4 Gbit LPDDR2-SDRAM,
+	  a 64Mbit QSPI flash with Mac-address, MCP16502 PMIC, RGB LCD connector,
+	  2 x Mikrobus connectors, 2 x SD-Card connectors, 2 x USB
 
 config TARGET_SAMA5D3_XPLAINED
 	bool "SAMA5D3 Xplained board"
@@ -263,6 +286,15 @@ config TARGET_SAMA7G5EK
        select BOARD_EARLY_INIT_F
        select BOARD_LATE_INIT
 
+config TARGET_SAMA7G54_CURIOSITY
+	bool "SAMA7G54 CURIOSITY board"
+	select SAMA7G5
+	select CPU_V7A
+	help
+	  The SAMA7G54 Curiosity embeds SAMA7G54D2G SiP (System in Package)
+	  with 2Gbit DDR3-SDRAM, 64Mbit QSPI nor-flash with MAC-address,
+	  4Gbit SLC nand-flash, MCP16502 PMIC, 2 x Mikrobus connectors,
+	  1 x SD-Card connector, 1 x M.2 slot, 3 x USB
 
 config TARGET_TAURUS
 	bool "Support taurus"
@@ -272,6 +304,7 @@ config TARGET_TAURUS
 	select DM_GPIO
 	select DM_SERIAL
 	select DM_SPI
+	select MTD
 	select SPI
 	select SUPPORT_SPL
 	imply CMD_DM
@@ -290,6 +323,7 @@ config TARGET_VINCO
 	bool "Support VINCO"
 	select DM
 	select DM_SPI
+	select MTD
 	select SAMA5D4
 	select SPI
 	select SUPPORT_SPL
@@ -341,17 +375,20 @@ source "board/atmel/at91sam9x5ek/Kconfig"
 source "board/atmel/sam9x60ek/Kconfig"
 source "board/atmel/sam9x60_curiosity/Kconfig"
 source "board/atmel/sama7g5ek/Kconfig"
+source "board/atmel/sama7g54_curiosity/Kconfig"
 source "board/atmel/sama5d2_ptc_ek/Kconfig"
 source "board/atmel/sama5d2_xplained/Kconfig"
 source "board/atmel/sama5d27_som1_ek/Kconfig"
 source "board/atmel/sama5d27_wlsom1_ek/Kconfig"
 source "board/atmel/sama5d2_icp/Kconfig"
+source "board/atmel/sama5d29_curiosity/Kconfig"
 source "board/atmel/sama5d3_xplained/Kconfig"
 source "board/atmel/sama5d3xek/Kconfig"
 source "board/atmel/sama5d4_xplained/Kconfig"
 source "board/atmel/sama5d4ek/Kconfig"
 source "board/bluewater/gurnard/Kconfig"
 source "board/calao/usb_a9263/Kconfig"
+source "board/conclusive/kstr-sama5d27/Kconfig"
 source "board/egnite/ethernut5/Kconfig"
 source "board/esd/meesc/Kconfig"
 source "board/gardena/smart-gateway-at91sam/Kconfig"

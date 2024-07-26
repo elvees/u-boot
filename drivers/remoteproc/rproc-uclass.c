@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2015
- * Texas Instruments Incorporated - http://www.ti.com/
+ * Texas Instruments Incorporated - https://www.ti.com/
  */
 
 #define LOG_CATEGORY UCLASS_REMOTEPROC
@@ -13,6 +13,7 @@
 #include <log.h>
 #include <malloc.h>
 #include <virtio_ring.h>
+#include <fs_loader.h>
 #include <remoteproc.h>
 #include <asm/io.h>
 #include <dm/device-internal.h>
@@ -20,6 +21,7 @@
 #include <dm/uclass.h>
 #include <dm/uclass-internal.h>
 #include <linux/compat.h>
+#include <linux/printk.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -689,7 +691,7 @@ static int alloc_vring(struct udevice *dev, struct fw_rsc_vdev *rsc, int i)
 	debug("alloc_mem(%#x, %d): %p\n", size, order, pa);
 	vring->da = (uintptr_t)pa;
 
-	return !pa;
+	return 0;
 }
 
 static int handle_vdev(struct udevice *dev, struct fw_rsc_vdev *rsc,
@@ -960,3 +962,106 @@ unsigned long rproc_parse_resource_table(struct udevice *dev, struct rproc *cfg)
 
 	return 1;
 }
+
+int rproc_set_firmware(struct udevice *rproc_dev, const char *fw_name)
+{
+	struct dm_rproc_uclass_pdata *uc_pdata;
+	int len;
+	char *p;
+
+	if (!rproc_dev || !fw_name)
+		return -EINVAL;
+
+	uc_pdata = dev_get_uclass_plat(rproc_dev);
+	if (!uc_pdata)
+		return -EINVAL;
+
+	len = strcspn(fw_name, "\n");
+	if (!len) {
+		debug("invalid firmware name\n");
+		return -EINVAL;
+	}
+
+	if (uc_pdata->fw_name)
+		free(uc_pdata->fw_name);
+
+	p = strndup(fw_name, len);
+	if (!p)
+		return -ENOMEM;
+
+	uc_pdata->fw_name = p;
+
+	return 0;
+}
+
+#if CONFIG_IS_ENABLED(FS_LOADER)
+int rproc_boot(struct udevice *rproc_dev)
+{
+	struct dm_rproc_uclass_pdata *uc_pdata;
+	struct udevice *fs_loader;
+	int core_id, ret = 0;
+	char *firmware;
+	void *addr;
+
+	if (!rproc_dev)
+		return -EINVAL;
+
+	uc_pdata = dev_get_uclass_plat(rproc_dev);
+	if (!uc_pdata)
+		return -EINVAL;
+
+	core_id = dev_seq(rproc_dev);
+	firmware = uc_pdata->fw_name;
+	if (!firmware) {
+		debug("No firmware name set for rproc core %d\n", core_id);
+		return -EINVAL;
+	}
+
+	/* Initialize all rproc cores */
+	if (!rproc_is_initialized()) {
+		ret = rproc_init();
+		if (ret) {
+			debug("rproc_init() failed: %d\n", ret);
+			return ret;
+		}
+	}
+
+	/* Loading firmware to a given address */
+	ret = get_fs_loader(&fs_loader);
+	if (ret) {
+		debug("could not get fs loader: %d\n", ret);
+		return ret;
+	}
+
+	if (CONFIG_REMOTEPROC_MAX_FW_SIZE) {
+		addr = malloc(CONFIG_REMOTEPROC_MAX_FW_SIZE);
+		if (!addr)
+			return -ENOMEM;
+	} else {
+		debug("CONFIG_REMOTEPROC_MAX_FW_SIZE not defined\n");
+		return -EINVAL;
+	}
+
+	ret = request_firmware_into_buf(fs_loader, firmware, addr, CONFIG_REMOTEPROC_MAX_FW_SIZE,
+					0);
+	if (ret < 0) {
+		debug("could not request %s: %d\n", firmware, ret);
+		goto free_buffer;
+	}
+
+	ret = rproc_load(core_id, (ulong)addr, ret);
+	if (ret) {
+		debug("failed to load %s to rproc core %d from addr 0x%08lX err %d\n",
+		      uc_pdata->fw_name, core_id, (ulong)addr, ret);
+		goto free_buffer;
+	}
+
+	ret = rproc_start(core_id);
+	if (ret)
+		debug("failed to start rproc core %d\n", core_id);
+
+free_buffer:
+	free(addr);
+	return ret;
+}
+#endif

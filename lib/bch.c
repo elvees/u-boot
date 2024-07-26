@@ -54,13 +54,13 @@
  */
 
 #ifndef USE_HOSTCC
-#include <common.h>
 #include <log.h>
 #include <malloc.h>
 #include <ubi_uboot.h>
 #include <dm/devres.h>
 
 #include <linux/bitops.h>
+#include <linux/printk.h>
 #else
 #include <errno.h>
 #if defined(__FreeBSD__)

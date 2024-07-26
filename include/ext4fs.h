@@ -31,6 +31,7 @@
 struct disk_partition;
 
 #define EXT4_INDEX_FL		0x00001000 /* Inode uses hash tree index */
+#define EXT4_TOPDIR_FL		0x00020000 /* Top of directory hierarchies*/
 #define EXT4_EXTENTS_FL		0x00080000 /* Inode uses extents */
 #define EXT4_EXT_MAGIC			0xf30a
 #define EXT4_FEATURE_RO_COMPAT_GDT_CSUM	0x0010
@@ -146,7 +147,7 @@ int ext4fs_create_link(const char *target, const char *fname);
 struct ext_filesystem *get_fs(void);
 int ext4fs_open(const char *filename, loff_t *len);
 int ext4fs_read(char *buf, loff_t offset, loff_t len, loff_t *actread);
-int ext4fs_mount(unsigned part_length);
+int ext4fs_mount(void);
 void ext4fs_close(void);
 void ext4fs_reinit_global(void);
 int ext4fs_ls(const char *dirname);

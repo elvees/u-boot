@@ -1,6 +1,9 @@
 .. SPDX-License-Identifier: GPL-2.0+
 .. Copyright 2023, Heinrich Schuchardt <heinrich.schuchardt@canonical.com>
 
+.. index::
+   single: bdinfo (command)
+
 bdinfo command
 ==============
 
@@ -106,7 +109,7 @@ sp start
 
 Early malloc usage
     amount of memory used in the early malloc memory and its maximum size
-    as defined by CONFIGSYS_MALLOC_F_LEN
+    as defined by CONFIG_SYS_MALLOC_F_LEN
 
 Configuration
 -------------

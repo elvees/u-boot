@@ -11,6 +11,7 @@
 #include <fdtdec.h>
 #include <init.h>
 #include <log.h>
+#include <usb.h>
 #include <virtio_types.h>
 #include <virtio.h>
 
@@ -47,10 +48,10 @@ struct efi_fw_image fw_images[] = {
 };
 
 struct efi_capsule_update_info update_info = {
+	.num_images = ARRAY_SIZE(fw_images)
 	.images = fw_images,
 };
 
-u8 num_image_type_guids = ARRAY_SIZE(fw_images);
 #endif /* EFI_HAVE_CAPSULE_SUPPORT */
 
 static struct mm_region qemu_arm64_mem_map[] = {
@@ -114,6 +115,10 @@ int board_late_init(void)
 	 */
 	virtio_init();
 
+	/* start usb so that usb keyboard can be used as input device */
+	if (CONFIG_IS_ENABLED(USB_KEYBOARD))
+		usb_init();
+
 	return 0;
 }
 
@@ -121,6 +126,18 @@ int dram_init(void)
 {
 	if (fdtdec_setup_mem_size_base() != 0)
 		return -EINVAL;
+
+	/*
+	 * When LPAE is enabled (ARMv7),
+	 * 1:1 mapping is created using 2 MB blocks.
+	 *
+	 * In case amount of memory provided to QEMU
+	 * is not multiple of 2 MB, round down the amount
+	 * of available memory to avoid hang during MMU
+	 * initialization.
+	 */
+	if (CONFIG_IS_ENABLED(ARMV7_LPAE))
+		gd->ram_size -= (gd->ram_size % 0x200000);
 
 	return 0;
 }

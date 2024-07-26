@@ -7,6 +7,8 @@
 #ifndef __SYSINFO_H__
 #define __SYSINFO_H__
 
+#include <linux/errno.h>
+
 struct udevice;
 
 /*
@@ -46,6 +48,9 @@ enum sysinfo_id {
 
 	/* For show_board_info() */
 	SYSINFO_ID_BOARD_MODEL,
+	SYSINFO_ID_BOARD_MANUFACTURER,
+	SYSINFO_ID_PRIOR_STAGE_VERSION,
+	SYSINFO_ID_PRIOR_STAGE_DATE,
 
 	/* First value available for downstream/board used */
 	SYSINFO_ID_USER = 0x1000,

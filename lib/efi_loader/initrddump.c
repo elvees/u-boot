@@ -9,7 +9,6 @@
  * clearing of the screen.
  */
 
-#include <common.h>
 #include <efi_api.h>
 #include <efi_load_initrd.h>
 
@@ -291,8 +290,9 @@ static efi_status_t get_initrd(void **initrd, efi_uintn_t *initrd_size)
 		error(u"Load File2 protocol not found\r\n");
 		return ret;
 	}
-	ret = bs->handle_protocol(handle, &load_file2_guid,
-				 (void **)&load_file2_prot);
+	ret = bs->open_protocol(handle, &load_file2_guid,
+				(void **)&load_file2_prot, NULL, NULL,
+				EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 	ret = load_file2_prot->load_file(load_file2_prot, dp, false,
 					 initrd_size, NULL);
 	if (ret != EFI_BUFFER_TOO_SMALL) {

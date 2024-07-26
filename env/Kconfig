@@ -55,20 +55,23 @@ config ENV_MAX_ENTRIES
 	  be generous and should work in most cases. This setting can be used
 	  to tune behaviour; see lib/hashtable.c for details.
 
-config ENV_IS_NOWHERE
-	bool "Environment is not stored"
-	default y if !ENV_IS_IN_EEPROM && !ENV_IS_IN_EXT4 && \
+config ENV_IS_DEFAULT
+	def_bool y if !ENV_IS_IN_EEPROM && !ENV_IS_IN_EXT4 && \
 		     !ENV_IS_IN_FAT && !ENV_IS_IN_FLASH && \
 		     !ENV_IS_IN_MMC && !ENV_IS_IN_NAND && \
 		     !ENV_IS_IN_NVRAM && !ENV_IS_IN_ONENAND && \
 		     !ENV_IS_IN_REMOTE && !ENV_IS_IN_SPI_FLASH && \
 		     !ENV_IS_IN_UBI
+	select ENV_IS_NOWHERE
+
+config ENV_IS_NOWHERE
+	bool "Environment is not stored"
 	help
-	  Define this if you don't want to or can't have an environment stored
+	  Define this if you don't care whether or not an environment is stored
 	  on a storage medium. In this case the environment will still exist
-	  while U-Boot is running, but once U-Boot exits it will not be
-	  stored. U-Boot will therefore always start up with a default
-	  environment.
+	  while U-Boot is running, but once U-Boot exits it may not be
+	  stored. If no other ENV_IS_IN_ is defined, U-Boot will always start
+	  up with the default environment.
 
 config ENV_IS_IN_EEPROM
 	bool "Environment in EEPROM"
@@ -339,7 +342,7 @@ config ENV_IS_IN_REMOTE
 
 config ENV_IS_IN_SPI_FLASH
 	bool "Environment is in SPI flash"
-	depends on !CHAIN_OF_TRUST && SPI
+	depends on !CHAIN_OF_TRUST && (SPI_FLASH || DM_SPI_FLASH)
 	default y if ARMADA_XP
 	default y if INTEL_BAYTRAIL
 	default y if INTEL_BRASWELL
@@ -469,7 +472,7 @@ config ENV_FAT_DEVICE_AND_PART
 	string "Device and partition for where to store the environemt in FAT"
 	depends on ENV_IS_IN_FAT
 	default "0:1" if TI_COMMON_CMD_OPTIONS
-	default "0:auto" if ARCH_ZYNQ || ARCH_ZYNQMP || ARCH_VERSAL
+	default "0:auto" if ARCH_ZYNQ || ARCH_ZYNQMP || ARCH_VERSAL || ARCH_VERSAL_NET
 	default ":auto" if ARCH_SUNXI
 	default "0" if ARCH_AT91
 	help
@@ -568,22 +571,32 @@ config ENV_OFFSET
 	default 0xE0000 if ARCH_ZYNQ
 	default 0x1E00000 if ARCH_ZYNQMP
 	default 0x7F40000 if ARCH_VERSAL || ARCH_VERSAL_NET
-	default 0 if ARC
+	default 0x0 if ARC
 	default 0x140000 if ARCH_AT91
 	default 0x260000 if ARCH_OMAP2PLUS
 	default 0x1080000 if MICROBLAZE && ENV_IS_IN_SPI_FLASH
 	help
-	  Offset from the start of the device (or partition)
+	  Offset from the start of the device (or partition).
+
+	  This offset may be interpreted differently depending on the chosen
+	  ENV_IS_IN_* options. For example, for ENV_IS_IN_MMC=y, this offset may
+	  be negative to indicate an offset backwards from the end of the
+	  partition. See the relevant help messages for more details.
 
 config ENV_OFFSET_REDUND
 	hex "Redundant environment offset"
 	depends on (ENV_IS_IN_EEPROM || ENV_IS_IN_MMC || ENV_IS_IN_NAND || \
 		    ENV_IS_IN_SPI_FLASH) && SYS_REDUNDAND_ENVIRONMENT
 	default 0x10C0000 if MICROBLAZE
-	default 0
+	default 0x0
 	help
 	  Offset from the start of the device (or partition) of the redundant
 	  environment location.
+
+	  This offset may be interpreted differently depending on the chosen
+	  ENV_IS_IN_* options. For example, for ENV_IS_IN_MMC=y, this offset may
+	  be negative to indicate an offset backwards from the end of the
+	  partition. See the relevant help messages for more details.
 
 config ENV_SIZE
 	hex "Environment Size"
@@ -642,7 +655,7 @@ config SYS_RELOC_GD_ENV_ADDR
 
 config SYS_MMC_ENV_DEV
 	int "mmc device number"
-	depends on ENV_IS_IN_MMC || ENV_IS_IN_FAT || SYS_LS_PPA_FW_IN_MMC || \
+	depends on ENV_IS_IN_MMC || ENV_IS_IN_FAT || \
 		CMD_MVEBU_BUBT || FMAN_ENET || QE || PHY_CORTINA
 	default 0
 	help
@@ -658,6 +671,18 @@ config SYS_MMC_ENV_PART
 	  defined partition table but instead if we are in the user area, which is
 	  partition 0 or the first boot partition, which is 1 or some other defined
 	  partition.
+
+config USE_ENV_MMC_PARTITION
+	bool "use the mmc environment partition name"
+	depends on ENV_IS_IN_MMC
+
+config ENV_MMC_PARTITION
+	string "mmc environment partition name"
+	depends on USE_ENV_MMC_PARTITION
+	help
+	  MMC partition name used to save environment variables.
+	  If this variable is unset, u-boot will try to get the env partition name
+	  from the device-tree's /config node.
 
 config ENV_MMC_USE_DT
 	bool "Read partition name and offset in DT"
@@ -859,6 +884,16 @@ config TPL_ENV_IS_IN_FLASH
 	  Similar to ENV_IS_IN_FLASH, used for TPL environment.
 
 endif
+
+if VPL_ENV_SUPPORT
+
+config VPL_ENV_IS_NOWHERE
+	bool "VPL Environment is not stored"
+	default y if ENV_IS_NOWHERE
+	help
+	  Similar to ENV_IS_NOWHERE, used for VPL environment.
+
+endif  # VPL_ENV_SUPPORT
 
 config USE_BOOTFILE
 	bool "Add a 'bootfile' environment variable"

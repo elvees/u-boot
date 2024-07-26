@@ -52,7 +52,18 @@
 #define EFI32_LOADER_SIGNATURE	"EL32"
 #define EFI64_LOADER_SIGNATURE	"EL64"
 
-struct efi_device_path;
+/**
+ * struct efi_device_path - device path protocol
+ *
+ * @type:	device path type
+ * @sub_type:	device path sub-type
+ * @length:	length of the device path node including the header
+ */
+struct efi_device_path {
+	u8 type;
+	u8 sub_type;
+	u16 length;
+} __packed;
 
 /*
  * The EFI spec defines the EFI_GUID as
@@ -481,13 +492,14 @@ extern char _binary_u_boot_bin_start[], _binary_u_boot_bin_end[];
 /*
  * Variable Attributes
  */
-#define EFI_VARIABLE_NON_VOLATILE       0x0000000000000001
-#define EFI_VARIABLE_BOOTSERVICE_ACCESS 0x0000000000000002
-#define EFI_VARIABLE_RUNTIME_ACCESS     0x0000000000000004
-#define EFI_VARIABLE_HARDWARE_ERROR_RECORD 0x0000000000000008
-#define EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS 0x0000000000000010
-#define EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS 0x0000000000000020
-#define EFI_VARIABLE_APPEND_WRITE	0x0000000000000040
+#define EFI_VARIABLE_NON_VOLATILE				0x00000001
+#define EFI_VARIABLE_BOOTSERVICE_ACCESS				0x00000002
+#define EFI_VARIABLE_RUNTIME_ACCESS				0x00000004
+#define EFI_VARIABLE_HARDWARE_ERROR_RECORD			0x00000008
+#define EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS			0x00000010
+#define EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS	0x00000020
+#define EFI_VARIABLE_APPEND_WRITE				0x00000040
+#define EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS		0x00000080
 
 #define EFI_VARIABLE_MASK	(EFI_VARIABLE_NON_VOLATILE | \
 				EFI_VARIABLE_BOOTSERVICE_ACCESS | \
@@ -495,7 +507,8 @@ extern char _binary_u_boot_bin_start[], _binary_u_boot_bin_end[];
 				EFI_VARIABLE_HARDWARE_ERROR_RECORD | \
 				EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS | \
 				EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS | \
-				EFI_VARIABLE_APPEND_WRITE)
+				EFI_VARIABLE_APPEND_WRITE | \
+				EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS)
 
 /**
  * efi_get_priv() - Get access to the EFI-private information
@@ -636,5 +649,14 @@ int efi_call_exit_boot_services(void);
  */
 int efi_get_mmap(struct efi_mem_desc **descp, int *sizep, uint *keyp,
 		 int *desc_sizep, uint *versionp);
+
+/**
+ * efi_show_tables() - Show a list of available tables
+ *
+ * Shows the address, GUID (and name where known) for each table
+ *
+ * @systab: System table containing the list of tables
+ */
+void efi_show_tables(struct efi_system_table *systab);
 
 #endif /* _LINUX_EFI_H */

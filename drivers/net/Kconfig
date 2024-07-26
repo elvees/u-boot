@@ -232,6 +232,14 @@ config DWC_ETH_QOS_IMX
 	  The Synopsys Designware Ethernet QOS IP block with the specific
 	  configuration used in IMX soc.
 
+config DWC_ETH_QOS_ROCKCHIP
+	bool "Synopsys DWC Ethernet QOS device support for Rockchip SoCs"
+	depends on DWC_ETH_QOS
+	select DM_ETH_PHY
+	help
+	  The Synopsys Designware Ethernet QOS IP block with specific
+	  configuration used in Rockchip SoCs.
+
 config DWC_ETH_QOS_STM32
 	bool "Synopsys DWC Ethernet QOS device support for STM32"
 	depends on DWC_ETH_QOS
@@ -255,6 +263,13 @@ config DWC_ETH_QOS_QCOM
 	help
 	  The Synopsys Designware Ethernet QOS IP block with specific
 	  configuration used in Qcom QCS404 SoC.
+
+config DWC_ETH_QOS_STARFIVE
+	bool "Synopsys DWC Ethernet QOS device support for STARFIVE"
+	depends on DWC_ETH_QOS
+	help
+	  The Synopsys Designware Ethernet QOS IP block with specific
+	  configuration used in STARFIVE  JH7110 soc.
 
 config E1000
 	bool "Intel PRO/1000 Gigabit Ethernet support"
@@ -463,14 +478,6 @@ config SYS_UNIFY_CACHE
 	depends on MCFFEC
 	bool "Invalidate icache during ethernet operations"
 
-config FSLDMAFEC
-        bool "ColdFire DMA Ethernet Support"
-	select PHYLIB
-	select SYS_DISCOVER_PHY
-	help
-	  This driver supports the network interface units in the
-	  ColdFire family.
-
 config KS8851_MLL
 	bool "Microchip KS8851-MLL controller driver"
 	help
@@ -640,6 +647,7 @@ config RTL8139
 
 config RTL8169
 	bool "Realtek 8169 series Ethernet controller driver"
+	depends on PCI
 	help
 	  This driver supports Realtek 8169 series gigabit ethernet family of
 	  PCI/PCIe chipsets/adapters.
@@ -702,6 +710,7 @@ config SUN8I_EMAC
 config SH_ETHER
 	bool "Renesas SH Ethernet MAC"
 	select PHYLIB
+	select PHY_ETHERNET_ID
 	help
 	  This driver supports the Ethernet for Renesas SH and ARM SoCs.
 
@@ -759,10 +768,19 @@ config GMAC_ROCKCHIP
 	  This driver provides Rockchip SoCs network support based on the
 	  Synopsys Designware driver.
 
+config RENESAS_ETHER_SWITCH
+	bool "Renesas Ethernet Switch support"
+	depends on DM_ETH && R8A779F0
+	select PHYLIB
+	help
+	  This driver implements support for the Renesas Ethernet Switch
+	  which is available on R-Car S4 SoC (r8a779f0).
+
 config RENESAS_RAVB
 	bool "Renesas Ethernet AVB MAC"
-	depends on RCAR_GEN3
+	depends on RCAR_64
 	select PHYLIB
+	select PHY_ETHERNET_ID
 	help
 	  This driver implements support for the Ethernet AVB block in
 	  Renesas M3 and H3 SoCs.
@@ -884,6 +902,23 @@ config MEDIATEK_ETH
 	  This Driver support MediaTek Ethernet GMAC
 	  Say Y to enable support for the MediaTek Ethernet GMAC.
 
+config HIFEMAC_ETH
+	bool "HiSilicon Fast Ethernet Controller"
+	select DM_CLK
+	select DM_RESET
+	select PHYLIB
+	help
+	  This driver supports HIFEMAC Ethernet controller found on
+	  HiSilicon SoCs.
+
+config HIFEMAC_MDIO
+	bool "HiSilicon Fast Ethernet Controller MDIO interface"
+	depends on DM_MDIO
+	select DM_CLK
+	help
+	  This driver supports the internal MDIO interface of HIFEMAC
+	  Ethernet controller.
+
 config HIGMACV300_ETH
 	bool "HiSilicon Gigabit Ethernet Controller"
 	select DM_RESET
@@ -950,6 +985,13 @@ config MDIO_MUX_MESON_G12A
 	depends on DM_MDIO_MUX
 	help
 	  This driver is used for the MDIO mux found on the Amlogic G12A & compatible
+	  SoCs.
+
+config MDIO_MUX_MESON_GXL
+	bool "MDIO MUX for Amlogic Meson GXL SoCs"
+	depends on DM_MDIO_MUX
+	help
+	  This driver is used for the MDIO mux found on the Amlogic GXL & compatible
 	  SoCs.
 
 endif # NETDEVICES

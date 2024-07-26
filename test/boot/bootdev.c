@@ -19,9 +19,9 @@
 
 /* Allow reseting the USB-started flag */
 #if defined(CONFIG_USB_HOST) || defined(CONFIG_USB_GADGET)
-extern char usb_started;
+extern bool usb_started;
 #else
-char usb_started;
+#include <usb.h>
 #endif
 
 /* Check 'bootdev list' command */
@@ -124,7 +124,8 @@ static int bootdev_test_labels(struct unit_test_state *uts)
 		    mflags);
 
 	/* Check invalid uclass */
-	ut_asserteq(-EINVAL, bootdev_find_by_label("fred0", &dev, &mflags));
+	ut_asserteq(-EPFNOSUPPORT,
+		    bootdev_find_by_label("fred0", &dev, &mflags));
 
 	/* Check unknown sequence number */
 	ut_asserteq(-ENOENT, bootdev_find_by_label("mmc6", &dev, &mflags));
@@ -179,9 +180,8 @@ static int bootdev_test_any(struct unit_test_state *uts)
 
 	/* Check invalid uclass */
 	mflags = 123;
-	ut_asserteq(-EINVAL, bootdev_find_by_any("fred0", &dev, &mflags));
-	ut_assert_nextline("Unknown uclass 'fred0' in label");
-	ut_assert_nextline("Cannot find bootdev 'fred0' (err=-22)");
+	ut_asserteq(-EPFNOSUPPORT, bootdev_find_by_any("fred0", &dev, &mflags));
+	ut_assert_nextline("Cannot find bootdev 'fred0' (err=-96)");
 	ut_asserteq(123, mflags);
 	ut_assert_console_end();
 
@@ -190,11 +190,20 @@ static int bootdev_test_any(struct unit_test_state *uts)
 BOOTSTD_TEST(bootdev_test_any, UT_TESTF_DM | UT_TESTF_SCAN_FDT |
 	     UT_TESTF_ETH_BOOTDEV);
 
-/* Check bootdev ordering with the bootdev-order property */
+/*
+ * Check bootdev ordering with the bootdev-order property and boot_targets
+ * environment variable
+ */
 static int bootdev_test_order(struct unit_test_state *uts)
 {
 	struct bootflow_iter iter;
 	struct bootflow bflow;
+
+	test_set_skip_delays(true);
+
+	/* Start up USB which gives us three additional bootdevs */
+	usb_started = false;
+	ut_assertok(run_command("usb start", 0));
 
 	/*
 	 * First try the order set by the bootdev-order property
@@ -213,12 +222,55 @@ static int bootdev_test_order(struct unit_test_state *uts)
 	bootflow_iter_uninit(&iter);
 
 	/* Use the environment variable to override it */
-	ut_assertok(env_set("boot_targets", "mmc1 mmc2"));
+	ut_assertok(env_set("boot_targets", "mmc1 mmc2 usb"));
 	ut_assertok(bootflow_scan_first(NULL, NULL, &iter, 0, &bflow));
 	ut_asserteq(-ENODEV, bootflow_scan_next(&iter, &bflow));
-	ut_asserteq(2, iter.num_devs);
+	ut_asserteq(5, iter.num_devs);
 	ut_asserteq_str("mmc1.bootdev", iter.dev_used[0]->name);
 	ut_asserteq_str("mmc2.bootdev", iter.dev_used[1]->name);
+	ut_asserteq_str("usb_mass_storage.lun0.bootdev",
+			iter.dev_used[2]->name);
+	bootflow_iter_uninit(&iter);
+
+	/* Try a single uclass */
+	ut_assertok(env_set("boot_targets", NULL));
+	ut_assertok(bootflow_scan_first(NULL, "mmc", &iter, 0, &bflow));
+	ut_asserteq(2, iter.num_devs);
+
+	/* Now scan past mmc1 and make sure that only mmc0 shows up */
+	ut_asserteq(-ENODEV, bootflow_scan_next(&iter, &bflow));
+	ut_asserteq(3, iter.num_devs);
+	ut_asserteq_str("mmc2.bootdev", iter.dev_used[0]->name);
+	ut_asserteq_str("mmc1.bootdev", iter.dev_used[1]->name);
+	ut_asserteq_str("mmc0.bootdev", iter.dev_used[2]->name);
+	bootflow_iter_uninit(&iter);
+
+	/* Try a single uclass with boot_targets */
+	ut_assertok(env_set("boot_targets", "mmc"));
+	ut_assertok(bootflow_scan_first(NULL, NULL, &iter, 0, &bflow));
+	ut_asserteq(2, iter.num_devs);
+
+	/* Now scan past mmc1 and make sure that only mmc0 shows up */
+	ut_asserteq(-ENODEV, bootflow_scan_next(&iter, &bflow));
+	ut_asserteq(3, iter.num_devs);
+	ut_asserteq_str("mmc2.bootdev", iter.dev_used[0]->name);
+	ut_asserteq_str("mmc1.bootdev", iter.dev_used[1]->name);
+	ut_asserteq_str("mmc0.bootdev", iter.dev_used[2]->name);
+	bootflow_iter_uninit(&iter);
+
+	/* Try a single uclass with boot_targets */
+	ut_assertok(env_set("boot_targets", "mmc usb"));
+	ut_assertok(bootflow_scan_first(NULL, NULL, &iter, 0, &bflow));
+	ut_asserteq(2, iter.num_devs);
+
+	/* Now scan past mmc1 and make sure that the 3 USB devices show up */
+	ut_asserteq(-ENODEV, bootflow_scan_next(&iter, &bflow));
+	ut_asserteq(6, iter.num_devs);
+	ut_asserteq_str("mmc2.bootdev", iter.dev_used[0]->name);
+	ut_asserteq_str("mmc1.bootdev", iter.dev_used[1]->name);
+	ut_asserteq_str("mmc0.bootdev", iter.dev_used[2]->name);
+	ut_asserteq_str("usb_mass_storage.lun0.bootdev",
+			iter.dev_used[3]->name);
 	bootflow_iter_uninit(&iter);
 
 	return 0;
@@ -289,7 +341,7 @@ static int bootdev_test_prio(struct unit_test_state *uts)
 
 	/* try again but enable hunting, which brings in SCSI */
 	bootflow_iter_uninit(&iter);
-	ut_assertok(bootflow_scan_first(NULL, NULL, &iter, BOOTFLOWF_HUNT,
+	ut_assertok(bootflow_scan_first(NULL, NULL, &iter, BOOTFLOWIF_HUNT,
 					&bflow));
 	ut_asserteq(-ENODEV, bootflow_scan_next(&iter, &bflow));
 	ut_asserteq(7, iter.num_devs);
@@ -306,6 +358,7 @@ static int bootdev_test_hunter(struct unit_test_state *uts)
 {
 	struct bootstd_priv *std;
 
+	usb_started = false;
 	test_set_skip_delays(true);
 
 	/* get access to the used hunters */
@@ -346,6 +399,7 @@ static int bootdev_test_cmd_hunt(struct unit_test_state *uts)
 	struct bootstd_priv *std;
 
 	test_set_skip_delays(true);
+	usb_started = false;
 
 	/* get access to the used hunters */
 	ut_assertok(bootstd_get_priv(&std));
@@ -376,7 +430,6 @@ static int bootdev_test_cmd_hunt(struct unit_test_state *uts)
 	ut_assert_nextline("Hunting with: simple_bus");
 	ut_assert_nextline("Found 2 extension board(s).");
 	ut_assert_nextline("Hunting with: ide");
-	ut_assert_nextline("Bus 0: not available  ");
 
 	/* mmc hunter has already been used so should not run again */
 
@@ -427,8 +480,8 @@ static int bootdev_test_hunt_scan(struct unit_test_state *uts)
 
 	ut_assertok(bootstd_test_drop_bootdev_order(uts));
 	ut_assertok(bootflow_scan_first(NULL, NULL, &iter,
-					BOOTFLOWF_SHOW | BOOTFLOWF_HUNT |
-					BOOTFLOWF_SKIP_GLOBAL, &bflow));
+					BOOTFLOWIF_SHOW | BOOTFLOWIF_HUNT |
+					BOOTFLOWIF_SKIP_GLOBAL, &bflow));
 	ut_asserteq(BIT(MMC_HUNTER) | BIT(1), std->hunters_used);
 
 	return 0;
@@ -475,6 +528,7 @@ BOOTSTD_TEST(bootdev_test_bootable, UT_TESTF_DM | UT_TESTF_SCAN_FDT);
 /* Check hunting for bootdev of a particular priority */
 static int bootdev_test_hunt_prio(struct unit_test_state *uts)
 {
+	usb_started = false;
 	test_set_skip_delays(true);
 
 	console_record_reset_enable();
@@ -487,7 +541,6 @@ static int bootdev_test_hunt_prio(struct unit_test_state *uts)
 	/* now try a different priority, verbosely */
 	ut_assertok(bootdev_hunt_prio(BOOTDEVP_5_SCAN_SLOW, true));
 	ut_assert_nextline("Hunting with: ide");
-	ut_assert_nextline("Bus 0: not available  ");
 	ut_assert_nextline("Hunting with: usb");
 	ut_assert_nextline(
 		"Bus usb@1: scanning bus usb@1 for devices... 5 USB Device(s) found");
@@ -504,6 +557,8 @@ static int bootdev_test_hunt_label(struct unit_test_state *uts)
 	struct bootstd_priv *std;
 	int mflags;
 
+	usb_started = false;
+
 	/* get access to the used hunters */
 	ut_assertok(bootstd_get_priv(&std));
 
@@ -512,9 +567,8 @@ static int bootdev_test_hunt_label(struct unit_test_state *uts)
 	old = (void *)&mflags;   /* arbitrary pointer to check against dev */
 	dev = old;
 	mflags = 123;
-	ut_asserteq(-EINVAL,
+	ut_asserteq(-EPFNOSUPPORT,
 		    bootdev_hunt_and_find_by_label("fred", &dev, &mflags));
-	ut_assert_nextline("Unknown uclass 'fred' in label");
 	ut_asserteq_ptr(old, dev);
 	ut_asserteq(123, mflags);
 	ut_assert_console_end();
@@ -525,7 +579,6 @@ static int bootdev_test_hunt_label(struct unit_test_state *uts)
 		    bootdev_hunt_and_find_by_label("mmc4", &dev, &mflags));
 	ut_asserteq_ptr(old, dev);
 	ut_asserteq(123, mflags);
-	ut_assert_nextline("Unknown seq 4 for label 'mmc4'");
 	ut_assert_console_end();
 
 	ut_assertok(bootstd_test_check_mmc_hunter(uts));
@@ -649,7 +702,7 @@ static int bootdev_test_next_prio(struct unit_test_state *uts)
 	iter.part = 0;
 	uclass_first_device(UCLASS_BOOTMETH, &bflow.method);
 	iter.cur_prio = 0;
-	iter.flags = BOOTFLOWF_SHOW;
+	iter.flags = BOOTFLOWIF_SHOW;
 
 	dev = NULL;
 	console_record_reset_enable();
@@ -662,7 +715,7 @@ static int bootdev_test_next_prio(struct unit_test_state *uts)
 	ut_assert_console_end();
 
 	/* now try again with hunting enabled */
-	iter.flags = BOOTFLOWF_SHOW | BOOTFLOWF_HUNT;
+	iter.flags = BOOTFLOWIF_SHOW | BOOTFLOWIF_HUNT;
 	iter.cur_prio = 0;
 	iter.part = 0;
 

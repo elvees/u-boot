@@ -105,15 +105,6 @@ config TARGET_OMAP3_LOGIC
 	select OMAP3_GPIO_6
 	imply CMD_DM
 
-config TARGET_NOKIA_RX51
-	bool "Nokia RX51"
-	select POSITION_INDEPENDENT
-	select SKIP_LOWLEVEL_INIT
-	select SUPPORT_PASSING_ATAGS
-	select CMDLINE_TAG
-	select INITRD_TAG
-	select REVISION_TAG
-
 config TARGET_TAO3530
 	bool "TAO3530"
 	select OMAP3_GPIO_2
@@ -153,6 +144,7 @@ endchoice
 
 config SPL_OMAP3_ID_NAND
 	bool "Support OMAP3-specific ID and MFR function"
+	depends on NAND_OMAP_GPMC
 	help
 	  Support for an OMAP3-specific set of functions to return the
 	  ID and MFR of the first attached NAND chip, if present.
@@ -161,12 +153,11 @@ config SYS_SOC
 	default "omap3"
 
 source "board/logicpd/am3517evm/Kconfig"
-source "board/ti/beagle/Kconfig"
+source "board/beagle/beagle/Kconfig"
 source "board/timll/devkit8000/Kconfig"
 source "board/ti/omap3evm/Kconfig"
 source "board/isee/igep00x0/Kconfig"
 source "board/logicpd/omap3som/Kconfig"
-source "board/nokia/rx51/Kconfig"
 source "board/lg/sniper/Kconfig"
 
 endif

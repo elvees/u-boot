@@ -2,7 +2,7 @@
 /*
  * Library to support early TI EVM EEPROM handling
  *
- * Copyright (C) 2015-2016 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2015-2016 Texas Instruments Incorporated - https://www.ti.com/
  *	Lokesh Vutla
  *	Steve Kipisz
  */
@@ -19,6 +19,7 @@
 #include <mmc.h>
 #include <errno.h>
 #include <malloc.h>
+#include <linux/printk.h>
 
 #include "board_detect.h"
 
@@ -128,7 +129,7 @@ static int __maybe_unused ti_i2c_eeprom_get(int bus_addr, int dev_addr,
 
 	rc = dm_i2c_read(dev, 0x1, &offset_test, sizeof(offset_test));
 
-	if (*((u32 *)ep) != (header & 0xFF))
+	if (offset_test != ((header >> 8) & 0xFF))
 		one_byte_addressing = false;
 
 	/* Corrupted data??? */
@@ -180,7 +181,7 @@ static int __maybe_unused ti_i2c_eeprom_get(int bus_addr, int dev_addr,
 
 	rc = i2c_read(dev_addr, 0x1, byte, &offset_test, sizeof(offset_test));
 
-	if (*((u32 *)ep) != (header & 0xFF))
+	if (offset_test != ((header >> 8) & 0xFF))
 		one_byte_addressing = false;
 
 	/* Corrupted data??? */

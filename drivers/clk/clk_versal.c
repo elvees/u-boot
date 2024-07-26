@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2019 Xilinx, Inc.
- * Siva Durga Prasad Paladugu <siva.durga.paladugu@xilinx.com>
+ * Siva Durga Prasad Paladugu <siva.durga.prasad.paladugu@amd.com>>
  */
 
 #include <common.h>
@@ -67,6 +67,13 @@
 #define CLOCK_NODE_TYPE_MUX	1
 #define CLOCK_NODE_TYPE_DIV	4
 #define CLOCK_NODE_TYPE_GATE	6
+
+#define PM_CLK_REF_CLK		(0x830c06aU)
+#define PM_CLK_PL_ALT_REF_CLK	(0x830c06bU)
+#define PM_CLK_MUXED_IRO	(0x830c06cU)
+#define PM_CLK_EMIO		(0x830c071U)
+
+#define TOPOLOGY_TYPE_FIXEDFACTOR	0x3
 
 enum clk_type {
 	CLK_TYPE_OUTPUT,
@@ -365,48 +372,37 @@ static u32 versal_clock_set_div(u32 clk_id, u32 div)
 	return div;
 }
 
-static u64 versal_clock_ref(u32 clk_id)
+static u64 versal_clock_get_ref_rate(u32 clk_id)
 {
-	u32 ret_payload[PAYLOAD_ARG_CNT];
-	int ref;
-
-	xilinx_pm_request(PM_CLOCK_GETPARENT, clk_id, 0, 0, 0, ret_payload);
-	ref = ret_payload[0];
-	if (!(ref & 1))
+	if (clk_id == PM_CLK_REF_CLK || clk_id == PM_CLK_MUXED_IRO || clk_id == PM_CLK_EMIO)
 		return ref_clk;
-	if (ref & 2)
+	else if (clk_id == PM_CLK_PL_ALT_REF_CLK)
 		return pl_alt_ref_clk;
-	return 0;
+	else
+		return 0;
 }
 
-static u64 versal_clock_get_pll_rate(u32 clk_id)
+static int versal_clock_get_fixed_factor_rate(u32 clock_id, u32 parent_id)
 {
+	struct versal_pm_query_data qdata = {0};
 	u32 ret_payload[PAYLOAD_ARG_CNT];
-	u32 fbdiv;
-	u32 res;
-	u32 frac;
-	u64 freq;
-	u32 parent_rate, parent_id;
-	u32 id = clk_id & 0xFFF;
+	u32 mult, div;
+	u32 parent_rate;
+	int ret;
 
-	xilinx_pm_request(PM_CLOCK_GETSTATE, clk_id, 0, 0, 0, ret_payload);
-	res = ret_payload[1];
-	if (!res) {
-		printf("0%x PLL not enabled\n", clk_id);
-		return 0;
-	}
+	qdata.qid = PM_QID_CLOCK_GET_FIXEDFACTOR_PARAMS;
+	qdata.arg1 = clock_id;
 
-	parent_id = clock[clock[id].parent[0].id].clk_id;
-	parent_rate = versal_clock_ref(parent_id);
+	ret = versal_pm_query(qdata, ret_payload);
+	if (ret)
+		return ret;
 
-	xilinx_pm_request(PM_CLOCK_GETDIVIDER, clk_id, 0, 0, 0, ret_payload);
-	fbdiv = ret_payload[1];
-	xilinx_pm_request(PM_CLOCK_PLL_GETPARAM, clk_id, 2, 0, 0, ret_payload);
-	frac = ret_payload[1];
+	mult = ret_payload[1];
+	div = ret_payload[2];
 
-	freq = (fbdiv * parent_rate) >> (1 << frac);
+	parent_rate = versal_clock_get_ref_rate(parent_id);
+	return parent_rate * mult / div;
 
-	return freq;
 }
 
 static u32 versal_clock_mux(u32 clk_id)
@@ -435,6 +431,37 @@ static u32 versal_clock_get_parentid(u32 clk_id)
 
 	debug("parent_id:0x%x\n", clock[clock[id].parent[parent_id].id].clk_id);
 	return clock[clock[id].parent[parent_id].id].clk_id;
+}
+
+static u64 versal_clock_get_pll_rate(u32 clk_id)
+{
+	u32 ret_payload[PAYLOAD_ARG_CNT];
+	u32 fbdiv;
+	u32 res;
+	u32 frac;
+	u64 freq;
+	u32 parent_rate, parent_id, parent_ref_clk_id;
+	u32 id = clk_id & 0xFFF;
+
+	xilinx_pm_request(PM_CLOCK_GETSTATE, clk_id, 0, 0, 0, ret_payload);
+	res = ret_payload[1];
+	if (!res) {
+		printf("0%x PLL not enabled\n", clk_id);
+		return 0;
+	}
+
+	parent_id = clock[clock[id].parent[0].id].clk_id;
+	parent_ref_clk_id = versal_clock_get_parentid(parent_id);
+	parent_rate = versal_clock_get_ref_rate(parent_ref_clk_id);
+
+	xilinx_pm_request(PM_CLOCK_GETDIVIDER, clk_id, 0, 0, 0, ret_payload);
+	fbdiv = ret_payload[1];
+	xilinx_pm_request(PM_CLOCK_PLL_GETPARAM, clk_id, 2, 0, 0, ret_payload);
+	frac = ret_payload[1];
+
+	freq = (fbdiv * parent_rate) >> (1 << frac);
+
+	return freq;
 }
 
 static u32 versal_clock_gate(u32 clk_id)
@@ -479,14 +506,19 @@ static u64 versal_clock_calc(u32 clk_id)
 	u32 parent_id;
 	u64 clk_rate;
 	u32 div;
+	struct clock_topology topology;
 
 	if (versal_clock_pll(clk_id, &clk_rate))
 		return clk_rate;
 
 	parent_id = versal_clock_get_parentid(clk_id);
 	if (((parent_id >> NODE_SUBCLASS_SHIFT) &
-	     NODE_CLASS_MASK) == NODE_SUBCLASS_CLOCK_REF)
-		return versal_clock_ref(clk_id);
+	     NODE_CLASS_MASK) == NODE_SUBCLASS_CLOCK_REF) {
+		topology = clock[clk_id & 0x3FF].node[0];
+		if (topology.type == TOPOLOGY_TYPE_FIXEDFACTOR)
+			return versal_clock_get_fixed_factor_rate(clk_id, parent_id);
+		return versal_clock_get_ref_rate(parent_id);
+	}
 
 	if (!parent_id)
 		return 0;
@@ -505,7 +537,7 @@ static int versal_clock_get_rate(u32 clk_id, u64 *clk_rate)
 {
 	if (((clk_id >>  NODE_SUBCLASS_SHIFT) &
 	     NODE_CLASS_MASK) == NODE_SUBCLASS_CLOCK_REF)
-		*clk_rate = versal_clock_ref(clk_id);
+		*clk_rate = versal_clock_get_ref_rate(clk_id);
 
 	if (versal_clock_pll(clk_id, clk_rate))
 		return 0;
@@ -523,7 +555,8 @@ static int versal_clock_get_rate(u32 clk_id, u64 *clk_rate)
 	return 0;
 }
 
-int soc_clk_dump(void)
+#if IS_ENABLED(CONFIG_CMD_CLK)
+static void versal_clk_dump(struct udevice __always_unused *dev)
 {
 	u64 clk_rate = 0;
 	u32 type, ret, i = 0;
@@ -543,9 +576,8 @@ int soc_clk_dump(void)
 			printf("clk: %s  freq:%lld\n",
 			       clock[i].clk_name, clk_rate);
 	}
-
-	return 0;
 }
+#endif
 
 static void versal_get_clock_info(void)
 {
@@ -737,11 +769,13 @@ static struct clk_ops versal_clk_ops = {
 	.set_rate = versal_clk_set_rate,
 	.get_rate = versal_clk_get_rate,
 	.enable = versal_clk_enable,
+#if IS_ENABLED(CONFIG_CMD_CLK)
+	.dump = versal_clk_dump,
+#endif
 };
 
 static const struct udevice_id versal_clk_ids[] = {
 	{ .compatible = "xlnx,versal-clk" },
-	{ .compatible = "xlnx,versal-net-clk" },
 	{ }
 };
 

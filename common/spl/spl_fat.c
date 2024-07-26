@@ -12,6 +12,7 @@
 #include <env.h>
 #include <log.h>
 #include <spl.h>
+#include <spl_load.h>
 #include <asm/u-boot.h>
 #include <fat.h>
 #include <errno.h>
@@ -19,6 +20,11 @@
 #include <linux/libfdt.h>
 
 static int fat_registered;
+
+void spl_fat_force_reregister(void)
+{
+	fat_registered = 0;
+}
 
 static int spl_register_fat_device(struct blk_desc *block_dev, int partition)
 {
@@ -45,7 +51,7 @@ static ulong spl_fit_read(struct spl_load_info *load, ulong file_offset,
 {
 	loff_t actread;
 	int ret;
-	char *filename = (char *)load->filename;
+	char *filename = load->priv;
 
 	ret = fat_read_file(filename, buf, file_offset, size, &actread);
 	if (ret)
@@ -60,57 +66,41 @@ int spl_load_image_fat(struct spl_image_info *spl_image,
 		       const char *filename)
 {
 	int err;
-	struct legacy_img_hdr *header;
+	loff_t size;
+	struct spl_load_info load;
 
 	err = spl_register_fat_device(block_dev, partition);
 	if (err)
 		goto end;
 
-	header = spl_get_load_buffer(-sizeof(*header), sizeof(*header));
-
-	err = file_fat_read(filename, header, sizeof(struct legacy_img_hdr));
-	if (err <= 0)
-		goto end;
-
-	if (IS_ENABLED(CONFIG_SPL_LOAD_FIT_FULL) &&
-	    image_get_magic(header) == FDT_MAGIC) {
-		err = file_fat_read(filename, (void *)CONFIG_SYS_LOAD_ADDR, 0);
-		if (err <= 0)
-			goto end;
-		err = spl_parse_image_header(spl_image, bootdev,
-				(struct legacy_img_hdr *)CONFIG_SYS_LOAD_ADDR);
-		if (err == -EAGAIN)
-			return err;
-		if (err == 0)
-			err = 1;
-	} else if (IS_ENABLED(CONFIG_SPL_LOAD_FIT) &&
-	    image_get_magic(header) == FDT_MAGIC) {
-		struct spl_load_info load;
-
-		debug("Found FIT\n");
-		load.read = spl_fit_read;
-		load.bl_len = 1;
-		load.filename = (void *)filename;
-		load.priv = NULL;
-
-		return spl_load_simple_fit(spl_image, &load, 0, header);
-	} else {
-		err = spl_parse_image_header(spl_image, bootdev, header);
+	/*
+	 * Avoid pulling in this function for other image types since we are
+	 * very short on space on some boards.
+	 */
+	if (IS_ENABLED(CONFIG_SPL_LOAD_FIT_FULL)) {
+		err = fat_size(filename, &size);
 		if (err)
 			goto end;
-
-		err = file_fat_read(filename,
-				    (u8 *)(uintptr_t)spl_image->load_addr, 0);
+	} else {
+		size = 0;
 	}
+
+	load.read = spl_fit_read;
+	if (IS_ENABLED(CONFIG_SPL_FS_FAT_DMA_ALIGN))
+		spl_set_bl_len(&load, ARCH_DMA_MINALIGN);
+	else
+		spl_set_bl_len(&load, 1);
+	load.priv = (void *)filename;
+	err = spl_load(spl_image, bootdev, &load, size, 0);
 
 end:
 #ifdef CONFIG_SPL_LIBCOMMON_SUPPORT
-	if (err <= 0)
+	if (err < 0)
 		printf("%s: error reading image %s, err - %d\n",
 		       __func__, filename, err);
 #endif
 
-	return (err <= 0);
+	return err;
 }
 
 #if CONFIG_IS_ENABLED(OS_BOOT)
@@ -128,7 +118,7 @@ int spl_load_image_fat_os(struct spl_image_info *spl_image,
 #if defined(CONFIG_SPL_ENV_SUPPORT) && defined(CONFIG_SPL_OS_BOOT)
 	file = env_get("falcon_args_file");
 	if (file) {
-		err = file_fat_read(file, (void *)CONFIG_SYS_SPL_ARGS_ADDR, 0);
+		err = file_fat_read(file, (void *)CONFIG_SPL_PAYLOAD_ARGS_ADDR, 0);
 		if (err <= 0) {
 			printf("spl: error reading image %s, err - %d, falling back to default\n",
 			       file, err);
@@ -153,7 +143,7 @@ defaults:
 #endif
 
 	err = file_fat_read(CONFIG_SPL_FS_LOAD_ARGS_NAME,
-			    (void *)CONFIG_SYS_SPL_ARGS_ADDR, 0);
+			    (void *)CONFIG_SPL_PAYLOAD_ARGS_ADDR, 0);
 	if (err <= 0) {
 #ifdef CONFIG_SPL_LIBCOMMON_SUPPORT
 		printf("%s: error reading image %s, err - %d\n",

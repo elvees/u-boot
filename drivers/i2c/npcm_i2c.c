@@ -517,11 +517,6 @@ static int npcm_i2c_init_clk(struct npcm_i2c_bus *bus, u32 bus_freq)
 	u32 sclfrq;
 	u8 hldt, val;
 
-	if (bus_freq > I2C_FREQ_100K) {
-		printf("Support standard mode only\n");
-		return -EINVAL;
-	}
-
 	/* SCLFRQ = T(SCL)/4/T(CLK) = FREQ(CLK)/4/FREQ(SCL) */
 	sclfrq = freq / (bus_freq * 4);
 	if (sclfrq < SCLFRQ_MIN || sclfrq > SCLFRQ_MAX)
@@ -575,7 +570,6 @@ static int npcm_i2c_probe(struct udevice *dev)
 		printf("%s: fail to get rate\n", __func__);
 		return -EINVAL;
 	}
-	clk_free(&clk);
 
 	bus->num = dev->seq_;
 	bus->reg = dev_read_addr_ptr(dev);

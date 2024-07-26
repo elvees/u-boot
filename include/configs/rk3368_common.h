@@ -8,7 +8,6 @@
 
 #include "rockchip-common.h"
 
-#include <asm/arch-rockchip/hardware.h>
 #include <linux/sizes.h>
 
 #define CFG_SYS_SDRAM_BASE		0
@@ -23,11 +22,9 @@
 	"kernel_addr_r=0x280000\0" \
 	"ramdisk_addr_r=0x5bf0000\0"
 
-#include <config_distro_bootcmd.h>
-
 #define CFG_EXTRA_ENV_SETTINGS \
 	"fdtfile=" CONFIG_DEFAULT_DEVICE_TREE ".dtb\0" \
-	ENV_MEM_LAYOUT_SETTINGS	\
-	BOOTENV
+	ENV_MEM_LAYOUT_SETTINGS \
+	"boot_targets=" BOOT_TARGETS "\0"
 
 #endif

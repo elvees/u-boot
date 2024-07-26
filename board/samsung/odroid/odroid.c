@@ -15,6 +15,7 @@
 #include <asm/arch/cpu.h>
 #include <dm.h>
 #include <env.h>
+#include <linux/printk.h>
 #include <power/pmic.h>
 #include <power/regulator.h>
 #include <power/max77686_pmic.h>
@@ -422,11 +423,9 @@ int exynos_early_init_f(void)
 	return 0;
 }
 
-int exynos_init(void)
+void exynos_init(void)
 {
 	board_gpio_init();
-
-	return 0;
 }
 
 int exynos_power_init(void)

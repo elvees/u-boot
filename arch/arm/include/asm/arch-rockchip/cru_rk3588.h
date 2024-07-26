@@ -11,12 +11,12 @@
 #define KHz		1000
 #define OSC_HZ		(24 * MHz)
 
-#define CPU_PVTPLL_HZ	(1008 * MHz)
 #define LPLL_HZ		(816 * MHz)
 #define GPLL_HZ		(1188 * MHz)
 #define CPLL_HZ		(1500 * MHz)
 #define NPLL_HZ         (850 * MHz)
 #define PPLL_HZ		(1100 * MHz)
+#define SPLL_HZ		(702 * MHz)
 
 /* RK3588 pll id */
 enum rk3588_pll_id {
@@ -29,6 +29,7 @@ enum rk3588_pll_id {
 	V0PLL,
 	AUPLL,
 	PPLL,
+	SPLL,
 	PLL_COUNT,
 };
 
@@ -62,6 +63,8 @@ struct rk3588_pll {
 	unsigned int con4;
 	unsigned int reserved0[3];
 };
+
+#define CRU_BASE	0xfd7c0000
 
 struct rk3588_cru {
 	struct rk3588_pll pll[18];
@@ -147,6 +150,9 @@ struct pll_rate_table {
 #define RK3588_DSU_CLKSEL_CON(x)	((x) * 0x4 + RK3588_DSU_CRU_BASE + 0x300)
 #define RK3588_DSU_CLKGATE_CON(x)	((x) * 0x4 + RK3588_DSU_CRU_BASE + 0x800)
 #define RK3588_DSU_SOFTRST_CON(x)	((x) * 0x4 + RK3588_DSU_CRU_BASE + 0xa00)
+
+#define RK3588_SBUSCRU_SPLL_CON(x)	((x) * 0x4 + 0x220)
+#define RK3588_SBUSCRU_MODE_CON0	0x280
 
 enum {
 	/* CRU_CLK_SEL8_CON */
@@ -447,5 +453,22 @@ enum {
 	CLK_I2C0_SEL_MASK			= 1 << CLK_I2C0_SEL_SHIFT,
 	CLK_I2C_SEL_200M			= 0,
 	CLK_I2C_SEL_100M,
+
+	/* SECURECRU_CLKSEL_CON01 */
+	SCMI_HCLK_SD_SEL_SHIFT			= 2,
+	SCMI_HCLK_SD_SEL_MASK			= 3 << SCMI_HCLK_SD_SEL_SHIFT,
+	SCMI_HCLK_SD_SEL_150M			= 0,
+	SCMI_HCLK_SD_SEL_100M,
+	SCMI_HCLK_SD_SEL_50M,
+	SCMI_HCLK_SD_SEL_24M,
+
+	/* SECURECRU_CLKSEL_CON03 */
+	SCMI_CCLK_SD_SEL_SHIFT			= 12,
+	SCMI_CCLK_SD_SEL_MASK			= 3 << SCMI_CCLK_SD_SEL_SHIFT,
+	SCMI_CCLK_SD_SEL_GPLL			= 0,
+	SCMI_CCLK_SD_SEL_SPLL,
+	SCMI_CCLK_SD_SEL_24M,
+	SCMI_CCLK_SD_DIV_SHIFT			= 6,
+	SCMI_CCLK_SD_DIV_MASK			= 0x3f << SCMI_CCLK_SD_DIV_SHIFT,
 };
 #endif

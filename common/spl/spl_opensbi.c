@@ -15,12 +15,14 @@
 #include <asm/smp.h>
 #include <opensbi.h>
 #include <linux/libfdt.h>
+#include <linux/printk.h>
+#include <mapmem.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
 struct fw_dynamic_info opensbi_info;
 
-static int spl_opensbi_find_uboot_node(void *blob, int *uboot_node)
+static int spl_opensbi_find_os_node(void *blob, int *uboot_node, int os_type)
 {
 	int fit_images_node, node;
 	const char *fit_os;
@@ -34,7 +36,7 @@ static int spl_opensbi_find_uboot_node(void *blob, int *uboot_node)
 		if (!fit_os)
 			continue;
 
-		if (genimg_get_os_id(fit_os) == IH_OS_U_BOOT) {
+		if (genimg_get_os_id(fit_os) == os_type) {
 			*uboot_node = node;
 			return 0;
 		}
@@ -43,38 +45,64 @@ static int spl_opensbi_find_uboot_node(void *blob, int *uboot_node)
 	return -ENODEV;
 }
 
-void spl_invoke_opensbi(struct spl_image_info *spl_image)
+void __noreturn spl_invoke_opensbi(struct spl_image_info *spl_image)
 {
-	int ret, uboot_node;
-	ulong uboot_entry;
-	void (*opensbi_entry)(ulong hartid, ulong dtb, ulong info);
+	int ret, os_node;
+	ulong os_entry;
+	int os_type;
+	typedef void __noreturn (*opensbi_entry_t)(ulong hartid, ulong dtb, ulong info);
+	opensbi_entry_t opensbi_entry;
 
 	if (!spl_image->fdt_addr) {
 		pr_err("No device tree specified in SPL image\n");
 		hang();
 	}
 
-	/* Find U-Boot image in /fit-images */
-	ret = spl_opensbi_find_uboot_node(spl_image->fdt_addr, &uboot_node);
+	/*
+	 * Originally, u-boot-spl will place DTB directly after the kernel,
+	 * but the size of the kernel did not include the BSS section, which
+	 * means u-boot-spl will place the DTB in the kernel BSS section
+	 * causing the DTB to be cleared by kernel BSS initializtion.
+	 * Moving DTB in front of the kernel can avoid the error.
+	 */
+#if CONFIG_IS_ENABLED(LOAD_FIT_OPENSBI_OS_BOOT) && \
+    CONFIG_VAL(PAYLOAD_ARGS_ADDR)
+	memcpy((void *)CONFIG_SPL_PAYLOAD_ARGS_ADDR, spl_image->fdt_addr,
+	       fdt_totalsize(spl_image->fdt_addr));
+	spl_image->fdt_addr = map_sysmem(CONFIG_SPL_PAYLOAD_ARGS_ADDR, 0);
+#endif
+
+	/*
+	 * Find next os image in /fit-images
+	 * The next os image default is u-boot proper, once enable
+	 * OpenSBI OS boot mode, the OS image should be linux.
+	 */
+	if (CONFIG_IS_ENABLED(LOAD_FIT_OPENSBI_OS_BOOT))
+		os_type = IH_OS_LINUX;
+	else
+		os_type = IH_OS_U_BOOT;
+
+	ret = spl_opensbi_find_os_node(spl_image->fdt_addr, &os_node, os_type);
 	if (ret) {
-		pr_err("Can't find U-Boot node, %d\n", ret);
+		pr_err("Can't find %s node for opensbi, %d\n",
+		       genimg_get_os_name(os_type), ret);
 		hang();
 	}
 
 	/* Get U-Boot entry point */
-	ret = fit_image_get_entry(spl_image->fdt_addr, uboot_node, &uboot_entry);
+	ret = fit_image_get_entry(spl_image->fdt_addr, os_node, &os_entry);
 	if (ret)
-		ret = fit_image_get_load(spl_image->fdt_addr, uboot_node, &uboot_entry);
+		ret = fit_image_get_load(spl_image->fdt_addr, os_node, &os_entry);
 
 	/* Prepare opensbi_info object */
 	opensbi_info.magic = FW_DYNAMIC_INFO_MAGIC_VALUE;
 	opensbi_info.version = FW_DYNAMIC_INFO_VERSION;
-	opensbi_info.next_addr = uboot_entry;
+	opensbi_info.next_addr = os_entry;
 	opensbi_info.next_mode = FW_DYNAMIC_INFO_NEXT_MODE_S;
 	opensbi_info.options = CONFIG_SPL_OPENSBI_SCRATCH_OPTIONS;
 	opensbi_info.boot_hart = gd->arch.boot_hart;
 
-	opensbi_entry = (void (*)(ulong, ulong, ulong))spl_image->entry_point;
+	opensbi_entry = (opensbi_entry_t)spl_image->entry_point;
 	invalidate_icache_all();
 
 #ifdef CONFIG_SPL_SMP

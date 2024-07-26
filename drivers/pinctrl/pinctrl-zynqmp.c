@@ -3,7 +3,7 @@
  * Xilinx pinctrl driver for ZynqMP
  *
  * Author(s):   Ashok Reddy Soma <ashok.reddy.soma@xilinx.com>
- *              Michal Simek <michal.simek@xilinx.com>
+ *              Michal Simek <michal.simek@amd.com>
  *
  * Copyright (C) 2021 Xilinx, Inc. All rights reserved.
  */
@@ -157,6 +157,12 @@ static int zynqmp_pm_pinctrl_get_config(const u32 pin, const u32 param, u32 *val
 static int zynqmp_pm_pinctrl_set_config(const u32 pin, const u32 param, u32 value)
 {
 	int ret;
+
+	if (param == PM_PINCTRL_CONFIG_TRI_STATE) {
+		ret = zynqmp_pm_feature(PM_PINCTRL_CONFIG_PARAM_SET);
+		if (ret < PM_PINCTRL_PARAM_SET_VERSION)
+			return -EOPNOTSUPP;
+	}
 
 	/* Request the pin first */
 	ret = xilinx_pm_request(PM_PINCTRL_REQUEST, pin, 0, 0, 0, NULL);
@@ -467,6 +473,10 @@ static int zynqmp_pinconf_set(struct udevice *dev, unsigned int pin,
 				 pin);
 		break;
 	case PIN_CONFIG_BIAS_HIGH_IMPEDANCE:
+		param = PM_PINCTRL_CONFIG_TRI_STATE;
+		arg = PM_PINCTRL_TRI_STATE_ENABLE;
+		ret = zynqmp_pm_pinctrl_set_config(pin, param, arg);
+		break;
 	case PIN_CONFIG_LOW_POWER_MODE:
 		/*
 		 * This cases are mentioned in dts but configurable
@@ -474,6 +484,11 @@ static int zynqmp_pinconf_set(struct udevice *dev, unsigned int pin,
 		 * boot time warnings as of now.
 		 */
 		ret = 0;
+		break;
+	case PIN_CONFIG_OUTPUT_ENABLE:
+		param = PM_PINCTRL_CONFIG_TRI_STATE;
+		arg = PM_PINCTRL_TRI_STATE_DISABLE;
+		ret = zynqmp_pm_pinctrl_set_config(pin, param, arg);
 		break;
 	default:
 		dev_warn(dev, "unsupported configuration parameter '%u'\n",
@@ -533,6 +548,8 @@ static int zynqmp_pinctrl_get_pin_muxing(struct udevice *dev,
 				     &pinmux.drive_strength);
 	zynqmp_pm_pinctrl_get_config(selector, PM_PINCTRL_CONFIG_VOLTAGE_STATUS,
 				     &pinmux.volt_sts);
+	zynqmp_pm_pinctrl_get_config(selector, PM_PINCTRL_CONFIG_TRI_STATE,
+				     &pinmux.tri_state);
 
 	switch (pinmux.drive_strength) {
 	case PM_PINCTRL_DRIVE_STRENGTH_2MA:
@@ -553,13 +570,15 @@ static int zynqmp_pinctrl_get_pin_muxing(struct udevice *dev,
 		return -EINVAL;
 	}
 
-	snprintf(buf, size, "slew:%s\tbias:%s\tpull:%s\tinput:%s\tdrive:%dmA\tvolt:%s",
+	snprintf(buf, size,
+		 "slew:%s\tbias:%s\tpull:%s\tinput:%s\tdrive:%dmA\tvolt:%s\ttri_state:%s",
 		 pinmux.slew ? "slow" : "fast",
 		 pinmux.bias ? "enabled" : "disabled",
 		 pinmux.pull_ctrl ? "up" : "down",
 		 pinmux.input_type ? "schmitt" : "cmos",
 		 pinmux.drive_strength,
-		 pinmux.volt_sts ? "1.8" : "3.3");
+		 pinmux.volt_sts ? "1.8" : "3.3",
+		 pinmux.tri_state ? "enabled" : "disabled");
 
 	return 0;
 }

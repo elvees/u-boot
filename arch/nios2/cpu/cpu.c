@@ -35,11 +35,17 @@ int checkboard(void)
 }
 #endif
 
-int do_reset(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
+void reset_cpu(void)
 {
 	disable_interrupts();
 	/* indirect call to go beyond 256MB limitation of toolchain */
 	nios2_callr(gd->arch.reset_addr);
+}
+
+int do_reset(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
+{
+	reset_cpu();
+
 	return 0;
 }
 
@@ -64,7 +70,7 @@ static void copy_exception_trampoline(void)
 }
 #endif
 
-static int nios_cpu_setup(void *ctx, struct event *event)
+static int nios_cpu_setup(void)
 {
 	struct udevice *dev;
 	int ret;
@@ -80,7 +86,7 @@ static int nios_cpu_setup(void *ctx, struct event *event)
 
 	return 0;
 }
-EVENT_SPY(EVT_DM_POST_INIT, nios_cpu_setup);
+EVENT_SPY_SIMPLE(EVT_DM_POST_INIT_F, nios_cpu_setup);
 
 static int altera_nios2_get_desc(const struct udevice *dev, char *buf,
 				 int size)

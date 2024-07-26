@@ -1,10 +1,13 @@
 .. SPDX-License-Identifier: GPL-2.0+:
 
+.. index::
+   single: font (command)
+
 font command
 ============
 
-Synopis
--------
+Synopsis
+--------
 
 ::
 

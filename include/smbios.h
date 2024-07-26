@@ -8,11 +8,11 @@
 #ifndef _SMBIOS_H_
 #define _SMBIOS_H_
 
-#include <dm/ofnode.h>
+#include <linux/types.h>
 
 /* SMBIOS spec version implemented */
 #define SMBIOS_MAJOR_VER	3
-#define SMBIOS_MINOR_VER	0
+#define SMBIOS_MINOR_VER	7
 
 enum {
 	SMBIOS_STR_MAX	= 64,	/* Maximum length allowed for a string */
@@ -54,6 +54,32 @@ struct __packed smbios_entry {
 	u8 bcd_rev;
 };
 
+/**
+ * struct smbios3_entry - SMBIOS 3.0 (64-bit) Entry Point structure
+ */
+struct __packed smbios3_entry {
+	/** @anchor: anchor string */
+	u8 anchor[5];
+	/** @checksum: checksum of the entry point structure */
+	u8 checksum;
+	/** @length: length of the entry point structure */
+	u8 length;
+	/** @major_ver: major version of the SMBIOS specification */
+	u8 major_ver;
+	/** @minor_ver: minor version of the SMBIOS specification */
+	u8 minor_ver;
+	/** @docrev: revision of the SMBIOS specification */
+	u8 doc_rev;
+	/** @entry_point_rev: revision of the entry point structure */
+	u8 entry_point_rev;
+	/** @reserved: reserved */
+	u8 reserved;
+	/** maximum size of SMBIOS table */
+	u32 table_maximum_size;
+	/** @struct_table_address: 64-bit physical starting address */
+	u64 struct_table_address;
+};
+
 /* BIOS characteristics */
 #define BIOS_CHARACTERISTICS_PCI_SUPPORTED	(1 << 7)
 #define BIOS_CHARACTERISTICS_UPGRADEABLE	(1 << 11)
@@ -80,6 +106,33 @@ struct __packed smbios_type0 {
 	u8 ec_major_release;
 	u8 ec_minor_release;
 	char eos[SMBIOS_STRUCT_EOS_BYTES];
+};
+
+/**
+ * enum smbios_wakeup_type - wake-up type
+ *
+ * These constants are used for the Wake-Up Type field in the SMBIOS
+ * System Information (Type 1) structure.
+ */
+enum smbios_wakeup_type {
+	/** @SMBIOS_WAKEUP_TYPE_RESERVED: Reserved */
+	SMBIOS_WAKEUP_TYPE_RESERVED,
+	/** @SMBIOS_WAKEUP_TYPE_OTHER: Other */
+	SMBIOS_WAKEUP_TYPE_OTHER,
+	/** @SMBIOS_WAKEUP_TYPE_UNKNOWN: Unknown */
+	SMBIOS_WAKEUP_TYPE_UNKNOWN,
+	/** @SMBIOS_WAKEUP_TYPE_APM_TIMER: APM Timer */
+	SMBIOS_WAKEUP_TYPE_APM_TIMER,
+	/** @SMBIOS_WAKEUP_TYPE_MODEM_RING: Modem Ring */
+	SMBIOS_WAKEUP_TYPE_MODEM_RING,
+	/** @SMBIOS_WAKEUP_TYPE_LAN_REMOTE: LAN Remote */
+	SMBIOS_WAKEUP_TYPE_LAN_REMOTE,
+	/** @SMBIOS_WAKEUP_TYPE_POWER_SWITCH: Power Switch */
+	SMBIOS_WAKEUP_TYPE_POWER_SWITCH,
+	/** @SMBIOS_WAKEUP_TYPE_PCI_PME: PCI PME# */
+	SMBIOS_WAKEUP_TYPE_PCI_PME,
+	/** @SMBIOS_WAKEUP_TYPE_AC_POWER_RESTORED: AC Power Restored */
+	SMBIOS_WAKEUP_TYPE_AC_POWER_RESTORED,
 };
 
 struct __packed smbios_type1 {
@@ -113,6 +166,7 @@ struct __packed smbios_type2 {
 	u8 chassis_location;
 	u16 chassis_handle;
 	u8 board_type;
+	u8 number_contained_objects;
 	char eos[SMBIOS_STRUCT_EOS_BYTES];
 };
 
@@ -228,12 +282,13 @@ static inline void fill_smbios_header(void *table, int type,
  *
  * This writes SMBIOS table at a given address.
  *
- * @addr:	start address to write SMBIOS table. If this is not
- *		16-byte-aligned then it will be aligned before the table is
- *		written.
+ * @addr:	start address to write SMBIOS table, 16-byte-alignment
+ * recommended. Note that while the SMBIOS tables themself have no alignment
+ * requirement, some systems may requires alignment. For example x86 systems
+ * which put tables at f0000 require 16-byte alignment
+ *
  * Return:	end address of SMBIOS table (and start address for next entry)
  *		or NULL in case of an error
- *
  */
 ulong write_smbios_table(ulong addr);
 
@@ -299,10 +354,10 @@ int smbios_update_version_full(void *smbios_tab, const char *version);
  * This function clear the device dependent parameters such as
  * serial number for the measurement.
  *
- * @entry: pointer to a struct smbios_entry
+ * @entry: pointer to a struct smbios3_entry
  * @header: pointer to a struct smbios_header
  */
-void smbios_prepare_measurement(const struct smbios_entry *entry,
+void smbios_prepare_measurement(const struct smbios3_entry *entry,
 				struct smbios_header *header);
 
 #endif /* _SMBIOS_H_ */

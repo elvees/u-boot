@@ -1,13 +1,3 @@
-if TI816X
-
-config TARGET_TI816X_EVM
-	bool "Support ti816x_evm"
-	help
-	  This option specifies support for the TI8168 EVM development platform
-	  with PG2.0 silicon and DDR3 DRAM.
-
-endif
-
 if AM33XX
 
 config AM33XX_CHILISOM
@@ -115,15 +105,6 @@ config TARGET_CHILIBOARD
 	select DM_SERIAL
 	imply CMD_DM
 
-config TARGET_DRACO
-	bool "Support draco"
-	select BOARD_LATE_INIT
-	select DM
-	select DM_GPIO
-	select DM_SERIAL
-	select FACTORYSET
-	imply CMD_DM
-
 config TARGET_ETAMIN
 	bool "Support etamin"
 	select BOARD_LATE_INIT
@@ -223,6 +204,7 @@ config TARGET_AM43XX_EVM
 	imply DM_I2C
 	imply DM_SPI
 	imply DM_SPI_FLASH
+	imply MTD
 	imply SPL_ENV_SUPPORT
 	imply SPL_FS_EXT4
 	imply SPL_FS_FAT

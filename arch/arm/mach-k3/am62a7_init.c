@@ -8,11 +8,15 @@
 #include <spl.h>
 #include <asm/io.h>
 #include <asm/arch/hardware.h>
-#include <asm/arch/sysfw-loader.h>
+#include "sysfw-loader.h"
 #include "common.h"
 #include <dm.h>
 #include <dm/uclass-internal.h>
 #include <dm/pinctrl.h>
+
+struct fwl_data cbass_main_fwls[] = {
+       { "FSS_DAT_REG3", 7, 8 },
+};
 
 /*
  * This uninitialized global variable would normal end up in the .bss section,
@@ -27,7 +31,7 @@ static void store_boot_info_from_rom(void)
 	bootindex = *(u32 *)(CONFIG_SYS_K3_BOOT_PARAM_TABLE_INDEX);
 
 	if (IS_ENABLED(CONFIG_CPU_V7R)) {
-		memcpy(&bootdata, (uintptr_t *)ROM_ENTENDED_BOOT_DATA_INFO,
+		memcpy(&bootdata, (uintptr_t *)ROM_EXTENDED_BOOT_DATA_INFO,
 		       sizeof(struct rom_extended_boot_data));
 	}
 }
@@ -124,6 +128,9 @@ void board_init_f(ulong dummy)
 		panic("ROM has not loaded TIFS firmware\n");
 
 	k3_sysfw_loader(true, NULL, NULL);
+
+	/* Disable ROM configured firewalls right after loading sysfw */
+	remove_fwl_configs(cbass_main_fwls, ARRAY_SIZE(cbass_main_fwls));
 #endif
 
 #if defined(CONFIG_CPU_V7R)
@@ -158,7 +165,9 @@ void board_init_f(ulong dummy)
 		panic("DRAM init failed: %d\n", ret);
 #endif
 
-	printf("am62a_init: %s done\n", __func__);
+	setup_qos();
+
+	debug("am62a_init: %s done\n", __func__);
 }
 
 static u32 __get_backup_bootmedia(u32 devstat)
@@ -256,7 +265,7 @@ u32 spl_boot_device(void)
 	else
 		bootmedia = __get_backup_bootmedia(devstat);
 
-	printf("am62a_init: %s: devstat = 0x%x bootmedia = 0x%x bootindex = %d\n",
+	debug("am62a_init: %s: devstat = 0x%x bootmedia = 0x%x bootindex = %d\n",
 	       __func__, devstat, bootmedia, bootindex);
 	return bootmedia;
 }

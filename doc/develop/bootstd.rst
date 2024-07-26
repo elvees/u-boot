@@ -132,6 +132,9 @@ above bootdev scanning.
 Controlling ordering
 --------------------
 
+By default, faster bootdevs (or those which are assumed to be faster) are used
+first, since they are more likely to be able to boot the device quickly.
+
 Several options are available to control the ordering of boot scanning:
 
 
@@ -151,10 +154,14 @@ bootdevs and their sequence numbers.
 bootmeths
 ~~~~~~~~~
 
+By default bootmeths are checked in name order. Use `bootmeth list` to see the
+ordering. Note that the `extlinux` and `script` bootmeth is first, to preserve the behaviour
+used by the old distro scripts.
+
 This environment variable can be used to control the list of bootmeths used and
 their ordering for example::
 
-   setenv bootmeths "syslinux efi"
+   setenv bootmeths "extlinux efi"
 
 Entries may be removed or re-ordered in this list to affect the order the
 bootmeths are tried on each bootdev. If the variable is empty, the default
@@ -163,7 +170,6 @@ controlled by aliases.
 
 The :ref:`usage/cmd/bootmeth:bootmeth command` (`bootmeth order`) operates in
 the same way as setting this variable.
-
 
 Bootdev uclass
 --------------
@@ -241,7 +247,7 @@ fdtfile
     Name of the flattened device tree (FDT) file to load, e.g.
     "rockchip/rk3399-rockpro64.dtb"
 
-fdtaddr_addr_r
+fdt_addr_r
     Address at which to load the FDT, e.g. 0x01f00000
 
 fdtoverlay_addr_r (needed if overlays are used)
@@ -306,7 +312,7 @@ media device::
 
 The bootdev device is typically created automatically in the media uclass'
 `post_bind()` method by calling `bootdev_setup_for_dev()` or
-`bootdev_setup_sibling_blk()`. The code typically something like this::
+`bootdev_setup_for_sibling_blk()`. The code typically something like this::
 
     /* dev is the Ethernet device */
     ret = bootdev_setup_for_dev(dev, "eth_bootdev");
@@ -316,7 +322,7 @@ The bootdev device is typically created automatically in the media uclass'
 or::
 
     /* blk is the block device (child of MMC device)
-    ret = bootdev_setup_sibling_blk(blk, "mmc_bootdev");
+    ret = bootdev_setup_for_sibling_blk(blk, "mmc_bootdev");
     if (ret)
         return log_msg_ret("bootdev", ret);
 
@@ -389,8 +395,8 @@ Configuration
 -------------
 
 Standard boot is enabled with `CONFIG_BOOTSTD`. Each bootmeth has its own CONFIG
-option also. For example, `CONFIG_BOOTMETH_DISTRO` enables support for distro
-boot from a disk.
+option also. For example, `CONFIG_BOOTMETH_EXTLINUX` enables support for
+booting from a disk using an `extlinux.conf` file.
 
 To enable all feature sof standard boot, use `CONFIG_BOOTSTD_FULL`. This
 includes the full set of commands, more error messages when things go wrong and
@@ -406,8 +412,8 @@ Available bootmeth drivers
 
 Bootmeth drivers are provided for:
 
-   - distro boot from a disk (syslinux)
-   - distro boot from a network (PXE)
+   - extlinux / syslinux boot from a disk
+   - extlinux boot from a network (PXE)
    - U-Boot scripts from disk, network or SPI flash
    - EFI boot using bootefi from disk
    - VBE
@@ -458,6 +464,28 @@ ready    File was loaded and is ready for use. In this state the bootflow is
 =======  =======================================================================
 
 
+Migrating from distro_boot
+--------------------------
+
+To migrate from distro_boot:
+
+#. Update your board header files to remove the BOOTENV and BOOT_TARGET_xxx
+   defines. Standard boot finds available boot devices automatically.
+
+#. Remove the "boot_targets" variable unless you need it. Standard boot uses a
+   default order from fastest to slowest, which generally matches the order used
+   by boards.
+
+#. Make sure that CONFIG_BOOTSTD_DEFAULTS is enabled by your board, so it can
+   boot common Linux distributions.
+
+An example patch is at migrate_patch_.
+
+If you are using custom boot scripts for your board, consider creating your
+own bootmeth to hold the logic. There are various examples at
+`boot/bootmeth_...`.
+
+
 Theory of operation
 -------------------
 
@@ -489,22 +517,26 @@ in a valid bootflow, whether to iterate through just a single bootdev, etc.
 Then the iterator is set up to according to the parameters given:
 
 - When `dev` is provided, then a single bootdev is scanned. In this case,
-  `BOOTFLOWF_SKIP_GLOBAL` and `BOOTFLOWF_SINGLE_DEV` are set. No hunters are
+  `BOOTFLOWIF_SKIP_GLOBAL` and `BOOTFLOWIF_SINGLE_DEV` are set. No hunters are
   used in this case
 
 - Otherwise, when `label` is provided, then a single label or named bootdev is
-  scanned. In this case `BOOTFLOWF_SKIP_GLOBAL` is set and there are three
+  scanned. In this case `BOOTFLOWIF_SKIP_GLOBAL` is set and there are three
   options (with an effect on the `iter_incr()` function described later):
 
   - If `label` indicates a numeric bootdev number (e.g. "2") then
     `BOOTFLOW_METHF_SINGLE_DEV` is set. In this case, moving to the next bootdev
     simple stops, since there is only one. No hunters are used.
   - If `label` indicates a particular media device (e.g. "mmc1") then
-    `BOOTFLOWF_SINGLE_MEDIA` is set. In this case, moving to the next bootdev
+    `BOOTFLOWIF_SINGLE_MEDIA` is set. In this case, moving to the next bootdev
     processes just the children of the media device. Hunters are used, in this
     example just the "mmc" hunter.
+  - If `label` indicates a particular partition in a particular media device
+    (e.g. "mmc1:3") then `BOOTFLOWIF_SINGLE_PARTITION` is set. In this case,
+    only a single partition within a bootdev is processed. Hunters are used, in
+    this example just the "mmc" hunter.
   - If `label` indicates a media uclass (e.g. "mmc") then
-    `BOOTFLOWF_SINGLE_UCLASS` is set. In this case, all bootdevs in that uclass
+    `BOOTFLOWIF_SINGLE_UCLASS` is set. In this case, all bootdevs in that uclass
     are used. Hunters are used, in this example just the "mmc" hunter
 
 - Otherwise, none of the above flags is set and iteration is set up to work
@@ -543,7 +575,7 @@ bootdev.
 With the iterator ready, `bootflow_scan_first()` checks whether the current
 settings produce a valid bootflow. This is handled by `bootflow_check()`, which
 either returns 0 (if it got something) or an error if not (more on that later).
-If the `BOOTFLOWF_ALL` iterator flag is set, even errors are returned as
+If the `BOOTFLOWIF_ALL` iterator flag is set, even errors are returned as
 incomplete bootflows, but normally an error results in moving onto the next
 iteration.
 
@@ -651,7 +683,7 @@ e.g. updating the state, depending on what it finds. For global bootmeths the
 Based on what the bootdev or bootmeth responds with, `bootflow_check()` either
 returns a valid bootflow, or a partial one with an error. A partial bootflow
 is one that has some fields set up, but did not reach the `BOOTFLOWST_READY`
-state. As noted before, if the `BOOTFLOWF_ALL` iterator flag is set, then all
+state. As noted before, if the `BOOTFLOWIF_ALL` iterator flag is set, then all
 bootflows are returned, even partial ones. This can help with debugging.
 
 So at this point you can see that total control over whether a bootflow can
@@ -677,14 +709,15 @@ Assuming the bootmeth is happy, or at least indicates that it is willing to try
 partition. If that works it tries to detect a file system. If that works then it
 calls the bootmeth device once more, this time to read the bootflow.
 
-Note: At present a filesystem is needed for the bootmeth to be called on block
-devices, simply because we don't have any examples where this is not the case.
-This feature can be added as needed. Note that sandbox is a special case, since
-in that case the host filesystem can be accessed even though the block device
-is NULL.
+Note: Normally a filesystem is needed for the bootmeth to be called on block
+devices, but bootmeths which don't need that can set the BOOTMETHF_ANY_PART
+flag to indicate that they can scan any partition. An example is the ChromiumOS
+bootmeth which can store a kernel in a raw partition. Note also that sandbox is
+a special case, since in that case the host filesystem can be accessed even
+though the block device is NULL.
 
-If we take the example of the `bootmeth_distro` driver, this call ends up at
-`distro_read_bootflow()`. It has the filesystem ready, so tries various
+If we take the example of the `bootmeth_extlinux` driver, this call ends up at
+`extlinux_read_bootflow()`. It has the filesystem ready, so tries various
 filenames to try to find the `extlinux.conf` file, reading it if possible. If
 all goes well the bootflow ends up in the `BOOTFLOWST_READY` state.
 
@@ -697,12 +730,12 @@ the  `BOOTFLOWST_READY` state.
 
 That is the basic operation of scanning for bootflows. The process of booting a
 bootflow is handled by the bootmeth driver for that bootflow. In the case of
-distro boot, this parses and processes the `extlinux.conf` file that was read.
-See `distro_boot()` for how that works. The processing may involve reading
+extlinux boot, this parses and processes the `extlinux.conf` file that was read.
+See `extlinux_boot()` for how that works. The processing may involve reading
 additional files, which is handled by the `read_file()` method, which is
-`distro_read_file()` in this case. All bootmethds should support reading files,
-since the bootflow is typically only the basic instructions and does not include
-the operating system itself, ramdisk, device tree, etc.
+`extlinux_read_file()` in this case. All bootmethds should support reading
+files, since the bootflow is typically only the basic instructions and does not
+include the operating system itself, ramdisk, device tree, etc.
 
 The vast majority of the bootstd code is concerned with iterating through
 partitions on bootdevs and using bootmethds to find bootflows.
@@ -752,9 +785,7 @@ To do
 
 Some things that need to be done to completely replace the distro-boot scripts:
 
-- add bootdev drivers for dhcp, sata, scsi, ide, virtio
-- PXE boot for EFI
-- support for loading U-Boot scripts
+- implement extensions (devicetree overlays with add-on boards)
 
 Other ideas:
 
@@ -768,3 +799,4 @@ Other ideas:
 .. _BootLoaderSpec: http://www.freedesktop.org/wiki/Specifications/BootLoaderSpec/
 .. _distro_boot: https://github.com/u-boot/u-boot/blob/master/boot/distro.c
 .. _bootflow_h: https://github.com/u-boot/u-boot/blob/master/include/bootflow.h
+.. _migrate_patch: https://patchwork.ozlabs.org/project/uboot/patch/20230727215433.578830-2-sjg@chromium.org/

@@ -106,6 +106,8 @@ static inline int bad_block(uchar *marker, int port_size)
 		return __raw_readw((u16 *)marker) != 0xffff;
 }
 
+static int saved_page_size;
+
 int nand_spl_load_image(uint32_t offs, unsigned int uboot_size, void *vdst)
 {
 	struct fsl_ifc_fcm *gregs = (void *)CFG_SYS_IFC_ADDR;
@@ -150,6 +152,7 @@ int nand_spl_load_image(uint32_t offs, unsigned int uboot_size, void *vdst)
 		if (port_size == 8)
 			bad_marker = 5;
 	}
+	saved_page_size = page_size;
 
 	ver = ifc_in32(&gregs->ifc_rev);
 	if (ver >= FSL_IFC_V2_0_0)
@@ -275,8 +278,8 @@ void nand_boot(void)
 
 #ifdef CONFIG_CHAIN_OF_TRUST
 	/*
-	 * U-Boot header is appended at end of U-boot image, so
-	 * calculate U-boot header address using U-boot header size.
+	 * U-Boot header is appended at end of U-Boot image, so
+	 * calculate U-Boot header address using U-Boot header size.
 	 */
 #define FSL_U_BOOT_HDR_ADDR \
 		((CFG_SYS_NAND_U_BOOT_START + \
@@ -300,6 +303,11 @@ void nand_boot(void)
 #ifndef CONFIG_TPL_NAND_INIT
 void nand_init(void)
 {
+}
+
+unsigned int nand_page_size(void)
+{
+	return saved_page_size;
 }
 
 void nand_deselect(void)

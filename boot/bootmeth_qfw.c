@@ -76,7 +76,7 @@ static int qfw_bootmeth_bind(struct udevice *dev)
 {
 	struct bootmeth_uc_plat *plat = dev_get_uclass_plat(dev);
 
-	plat->desc = "Sandbox boot for testing";
+	plat->desc = "QEMU boot using firmware interface";
 
 	return 0;
 }
@@ -89,7 +89,7 @@ static struct bootmeth_ops qfw_bootmeth_ops = {
 };
 
 static const struct udevice_id qfw_bootmeth_ids[] = {
-	{ .compatible = "u-boot,qfw-syslinux" },
+	{ .compatible = "u-boot,qfw-extlinux" },
 	{ }
 };
 

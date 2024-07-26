@@ -19,6 +19,7 @@ config DFU_WRITE_ALT
 
 config DFU_TFTP
 	bool "DFU via TFTP"
+	depends on NETDEVICES
 	select UPDATE_COMMON
 	select DFU_OVER_TFTP
 	help
@@ -35,13 +36,13 @@ config DFU_TIMEOUT
 
 config DFU_MMC
 	bool "MMC back end for DFU"
+	depends on MMC
 	help
 	  This option enables using DFU to read and write to MMC based storage.
 
 config DFU_MTD
 	bool "MTD back end for DFU"
 	depends on DM_MTD
-	depends on CMD_MTDPARTS
 	help
 	  This option enables using DFU to read and write to on any MTD device.
 
@@ -67,6 +68,7 @@ config DFU_RAM
 
 config DFU_SF
 	bool "SPI flash back end for DFU"
+	depends on SPI_FLASH || DM_SPI_FLASH
 	help
 	  This option enables using DFU to read and write to SPI flash based
 	  storage.
@@ -111,5 +113,14 @@ config SYS_DFU_MAX_FILE_SIZE
 	  the buffer once we've been given the whole file.  Define
 	  this to the maximum filesize (in bytes) for the buffer.
 	  If undefined it defaults to the CONFIG_SYS_DFU_DATA_BUF_SIZE.
+
+config DFU_NAME_MAX_SIZE
+	int "Size of the name to be added in dfu entity"
+	default 32
+	depends on DFU
+	help
+	  This value is used to maximum size. If name is longer than default size,
+	  we need to change the proper maximum size.
+
 endif
 endmenu

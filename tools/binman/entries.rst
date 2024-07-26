@@ -1,5 +1,5 @@
 Binman Entry Documentation
-===========================
+==========================
 
 This file describes the entry types supported by binman. These entry types can
 be placed in an image one by one to build up a final firmware image. It is
@@ -468,6 +468,200 @@ updating the EC on startup via software sync.
 
 
 
+.. _etype_efi_capsule:
+
+Entry: capsule: Entry for generating EFI Capsule files
+------------------------------------------------------
+
+The parameters needed for generation of the capsules can be provided
+as properties in the entry.
+
+Properties / Entry arguments:
+    - image-index: Unique number for identifying corresponding
+      payload image. Number between 1 and descriptor count, i.e.
+      the total number of firmware images that can be updated. Mandatory
+      property.
+    - image-guid: Image GUID which will be used for identifying the
+      updatable image on the board. Mandatory property.
+    - hardware-instance: Optional number for identifying unique
+      hardware instance of a device in the system. Default value of 0
+      for images where value is not to be used.
+    - fw-version: Value of image version that can be put on the capsule
+      through the Firmware Management Protocol(FMP) header.
+    - monotonic-count: Count used when signing an image.
+    - private-key: Path to PEM formatted .key private key file. Mandatory
+      property for generating signed capsules.
+    - public-key-cert: Path to PEM formatted .crt public key certificate
+      file. Mandatory property for generating signed capsules.
+    - oem-flags - OEM flags to be passed through capsule header.
+
+    Since this is a subclass of Entry_section, all properties of the parent
+    class also apply here. Except for the properties stated as mandatory, the
+    rest of the properties are optional.
+
+For more details on the description of the capsule format, and the capsule
+update functionality, refer Section 8.5 and Chapter 23 in the `UEFI
+specification`_.
+
+The capsule parameters like image index and image GUID are passed as
+properties in the entry. The payload to be used in the capsule is to be
+provided as a subnode of the capsule entry.
+
+A typical capsule entry node would then look something like this::
+
+    capsule {
+            type = "efi-capsule";
+            image-index = <0x1>;
+            /* Image GUID for testing capsule update */
+            image-guid = SANDBOX_UBOOT_IMAGE_GUID;
+            hardware-instance = <0x0>;
+            private-key = "path/to/the/private/key";
+            public-key-cert = "path/to/the/public-key-cert";
+            oem-flags = <0x8000>;
+
+            u-boot {
+            };
+    };
+
+In the above example, the capsule payload is the U-Boot image. The
+capsule entry would read the contents of the payload and put them
+into the capsule. Any external file can also be specified as the
+payload using the blob-ext subnode.
+
+.. _`UEFI specification`: https://uefi.org/sites/default/files/resources/UEFI_Spec_2_10_Aug29.pdf
+
+
+
+.. _etype_efi_empty_capsule:
+
+Entry: efi-empty-capsule: Entry for generating EFI Empty Capsule files
+----------------------------------------------------------------------
+
+The parameters needed for generation of the empty capsules can
+be provided as properties in the entry.
+
+Properties / Entry arguments:
+    - image-guid: Image GUID which will be used for identifying the
+      updatable image on the board. Mandatory for accept capsule.
+    - capsule-type - String to indicate type of capsule to generate. Valid
+      values are 'accept' and 'revert'.
+
+For more details on the description of the capsule format, and the capsule
+update functionality, refer Section 8.5 and Chapter 23 in the `UEFI
+specification`_. For more information on the empty capsule, refer the
+sections 2.3.2 and 2.3.3 in the `Dependable Boot specification`_.
+
+A typical accept empty capsule entry node would then look something
+like this::
+
+    empty-capsule {
+            type = "efi-empty-capsule";
+            /* GUID of the image being accepted */
+            image-type-id = SANDBOX_UBOOT_IMAGE_GUID;
+            capsule-type = "accept";
+    };
+
+A typical revert empty capsule entry node would then look something
+like this::
+
+    empty-capsule {
+            type = "efi-empty-capsule";
+            capsule-type = "revert";
+    };
+
+The empty capsules do not have any input payload image.
+
+.. _`UEFI specification`: https://uefi.org/sites/default/files/resources/UEFI_Spec_2_10_Aug29.pdf
+.. _`Dependable Boot specification`: https://git.codelinaro.org/linaro/dependable-boot/mbfw/uploads/6f7ddfe3be24e18d4319e108a758d02e/mbfw.pdf
+
+
+
+.. _etype_encrypted:
+
+Entry: encrypted: Externally built encrypted binary blob
+--------------------------------------------------------
+
+This entry provides the functionality to include information about how to
+decrypt an encrypted binary. This information is added to the
+resulting device tree by adding a new cipher node in the entry's parent
+node (i.e. the binary).
+
+The key that must be used to decrypt the binary is either directly embedded
+in the device tree or indirectly by specifying a key source. The key source
+can be used as an id of a key that is stored in an external device.
+
+Using an embedded key
+~~~~~~~~~~~~~~~~~~~~~
+
+This is an example using an embedded key::
+
+    blob-ext {
+        filename = "encrypted-blob.bin";
+    };
+
+    encrypted {
+        algo = "aes256-gcm";
+        iv-filename = "encrypted-blob.bin.iv";
+        key-filename = "encrypted-blob.bin.key";
+    };
+
+This entry generates the following device tree structure form the example
+above::
+
+    data = [...]
+    cipher {
+        algo = "aes256-gcm";
+        key = <0x...>;
+        iv = <0x...>;
+    };
+
+The data property is generated by the blob-ext etype, the cipher node and
+its content is generated by this etype.
+
+Using an external key
+~~~~~~~~~~~~~~~~~~~~~
+
+Instead of embedding the key itself into the device tree, it is also
+possible to address an externally stored key by specifying a 'key-source'
+instead of the 'key'::
+
+    blob-ext {
+        filename = "encrypted-blob.bin";
+    };
+
+    encrypted {
+        algo = "aes256-gcm";
+        iv-filename = "encrypted-blob.bin.iv";
+        key-source = "external-key-id";
+    };
+
+This entry generates the following device tree structure form the example
+above::
+
+    data = [...]
+    cipher {
+        algo = "aes256-gcm";
+        key-source = "external-key-id";
+        iv = <0x...>;
+    };
+
+Properties
+~~~~~~~~~~
+
+Properties / Entry arguments:
+    - algo: The encryption algorithm. Currently no algorithm is supported
+            out-of-the-box. Certain algorithms will be added in future
+            patches.
+    - iv-filename: The name of the file containing the initialization
+                   vector (in short iv). See
+                   https://en.wikipedia.org/wiki/Initialization_vector
+    - key-filename: The name of the file containing the key. Either
+                    key-filename or key-source must be provided.
+    - key-source: The key that should be used. Either key-filename or
+                  key-source must be provided.
+
+
+
 .. _etype_fdtmap:
 
 Entry: fdtmap: An entry which contains an FDT map
@@ -614,6 +808,12 @@ The top-level 'fit' node supports the following special properties:
         files for the gen-fdt-nodes operation (as below). This is often
         `of-list` meaning that `-a of-list="dtb1 dtb2..."` should be passed
         to binman.
+
+    fit,fdt-list-val
+        As an alternative to fit,fdt-list the list of device tree files
+        can be provided in this property as a string list, e.g.::
+
+            fit,fdt-list-val = "dtb1", "dtb2";
 
 Substitutions
 ~~~~~~~~~~~~~
@@ -886,6 +1086,11 @@ FMAP does not support this. Sections are represented as an area appearing
 before its contents, so that it is possible to reconstruct the hierarchy
 from the FMAP by using the offset information. This convention does not
 seem to be documented, but is used in Chromium OS.
+
+To mark an area as preserved, use the normal 'preserved' flag in the entry.
+This will result in the corresponding FMAP area having the
+FMAP_AREA_PRESERVE flag. This flag does not automatically propagate down to
+child entries.
 
 CBFS entries appear as a single entry, i.e. the sub-entries are ignored.
 
@@ -1653,6 +1858,134 @@ by setting the size of the entry to something larger than the text.
 
 
 
+.. _etype_ti_board_config:
+
+Entry: ti-board-config: An entry containing a TI schema validated board config binary
+-------------------------------------------------------------------------------------
+
+This etype supports generation of two kinds of board configuration
+binaries: singular board config binary as well as combined board config
+binary.
+
+Properties / Entry arguments:
+    - config-file: File containing board configuration data in YAML
+    - schema-file: File containing board configuration YAML schema against
+      which the config file is validated
+
+Output files:
+    - board config binary: File containing board configuration binary
+
+These above parameters are used only when the generated binary is
+intended to be a single board configuration binary. Example::
+
+    my-ti-board-config {
+        ti-board-config {
+            config = "board-config.yaml";
+            schema = "schema.yaml";
+        };
+    };
+
+To generate a combined board configuration binary, we pack the
+needed individual binaries into a ti-board-config binary. In this case,
+the available supported subnode names are board-cfg, pm-cfg, sec-cfg and
+rm-cfg. The final binary is prepended with a header containing details about
+the included board config binaries. Example::
+
+    my-combined-ti-board-config {
+        ti-board-config {
+            board-cfg {
+                config = "board-cfg.yaml";
+                schema = "schema.yaml";
+            };
+            sec-cfg {
+                config = "sec-cfg.yaml";
+                schema = "schema.yaml";
+            };
+        }
+    }
+
+
+
+.. _etype_ti_dm:
+
+Entry: ti-dm: TI Device Manager (DM) blob
+-----------------------------------------
+
+Properties / Entry arguments:
+    - ti-dm-path: Filename of file to read into the entry, typically ti-dm.bin
+
+This entry holds the device manager responsible for resource and power management
+in K3 devices. See https://software-dl.ti.com/tisci/esd/latest/ for more information
+about TI DM.
+
+
+
+.. _etype_ti_secure:
+
+Entry: ti-secure: Entry containing a TI x509 certificate binary
+---------------------------------------------------------------
+
+Properties / Entry arguments:
+    - content: List of phandles to entries to sign
+    - keyfile: Filename of file containing key to sign binary with
+    - sha: Hash function to be used for signing
+
+Output files:
+    - input.<unique_name> - input file passed to openssl
+    - config.<unique_name> - input file generated for openssl (which is
+      used as the config file)
+    - cert.<unique_name> - output file generated by openssl (which is
+      used as the entry contents)
+
+openssl signs the provided data, using the TI templated config file and
+writes the signature in this entry. This allows verification that the
+data is genuine.
+
+
+
+.. _etype_ti_secure_rom:
+
+Entry: ti-secure-rom: Entry containing a TI x509 certificate binary for images booted by ROM
+--------------------------------------------------------------------------------------------
+
+Properties / Entry arguments:
+    - keyfile: Filename of file containing key to sign binary with
+    - combined: boolean if device follows combined boot flow
+    - countersign: boolean if device contains countersigned system firmware
+    - load: load address of SPL
+    - sw-rev: software revision
+    - sha: Hash function to be used for signing
+    - core: core on which bootloader runs, valid cores are 'secure' and 'public'
+    - content: phandle of SPL in case of legacy bootflow or phandles of component binaries
+      in case of combined bootflow
+    - core-opts (optional): lockstep (0) or split (2) mode set to 0 by default
+
+The following properties are only for generating a combined bootflow binary:
+    - sysfw-inner-cert: boolean if binary contains sysfw inner certificate
+    - dm-data: boolean if binary contains dm-data binary
+    - content-sbl: phandle of SPL binary
+    - content-sysfw: phandle of sysfw binary
+    - content-sysfw-data: phandle of sysfw-data or tifs-data binary
+    - content-sysfw-inner-cert (optional): phandle of sysfw inner certificate binary
+    - content-dm-data (optional): phandle of dm-data binary
+    - load-sysfw: load address of sysfw binary
+    - load-sysfw-data: load address of sysfw-data or tifs-data binary
+    - load-sysfw-inner-cert (optional): load address of sysfw inner certificate binary
+    - load-dm-data (optional): load address of dm-data binary
+
+Output files:
+    - input.<unique_name> - input file passed to openssl
+    - config.<unique_name> - input file generated for openssl (which is
+      used as the config file)
+    - cert.<unique_name> - output file generated by openssl (which is
+      used as the entry contents)
+
+openssl signs the provided data, using the TI templated config file and
+writes the signature in this entry. This allows verification that the
+data is genuine.
+
+
+
 .. _etype_u_boot:
 
 Entry: u-boot: U-Boot flat binary
@@ -1904,6 +2237,45 @@ in the binman README for more information.
 
 The ELF file 'spl/u-boot-spl' must also be available for this to work, since
 binman uses that to look up symbols to write into the SPL binary.
+
+
+
+.. _etype_u_boot_spl_pubkey_dtb:
+
+Entry: u-boot-spl-pubkey-dtb: U-Boot SPL device tree including public key
+-------------------------------------------------------------------------
+
+Properties / Entry arguments:
+    - key-name-hint: Public key name without extension (.crt).
+                Default is determined by underlying
+                bintool (fdt_add_pubkey), usually 'key'.
+    - algo: (Optional) Algorithm used for signing. Default is determined by
+            underlying bintool (fdt_add_pubkey), usually 'sha1,rsa2048'
+    - required: (Optional) If present this indicates that the key must be
+                verified for the image / configuration to be
+                considered valid
+
+The following example shows an image containing an SPL which
+is packed together with the dtb. Binman will add a signature
+node to the dtb.
+
+Example node::
+
+    image {
+    ...
+        spl {
+            filename = "spl.bin"
+
+            u-boot-spl-nodtb {
+            };
+            u-boot-spl-pubkey-dtb {
+                algo = "sha384,rsa4096";
+                required = "conf";
+                key-name-hint = "dev";
+            };
+        };
+    ...
+    }
 
 
 
@@ -2285,6 +2657,24 @@ and kernel are genuine.
 
 
 
+.. _etype_x509_cert:
+
+Entry: x509-cert: An entry which contains an X509 certificate
+-------------------------------------------------------------
+
+Properties / Entry arguments:
+    - content: List of phandles to entries to sign
+
+Output files:
+    - input.<unique_name> - input file passed to openssl
+    - cert.<unique_name> - output file generated by openssl (which is
+        used as the entry contents)
+
+openssl signs the provided data, writing the signature in this entry. This
+allows verification that the data is genuine
+
+
+
 .. _etype_x86_reset16:
 
 Entry: x86-reset16: x86 16-bit reset code for U-Boot
@@ -2397,6 +2787,81 @@ U-Boot).
 
 If TPL is not being used, the 'x86-start16-spl or 'x86-start16' entry types
 may be used instead.
+
+
+
+.. _etype_xilinx_bootgen:
+
+Entry: xilinx-bootgen: Signed SPL boot image for Xilinx ZynqMP devices
+----------------------------------------------------------------------
+
+Properties / Entry arguments:
+    - auth-params: (Optional) Authentication parameters passed to bootgen
+    - fsbl-config: (Optional) FSBL parameters passed to bootgen
+    - keysrc-enc: (Optional) Key source when using decryption engine
+    - pmufw-filename: Filename of PMU firmware. Default: pmu-firmware.elf
+    - psk-key-name-hint: Name of primary secret key to use for signing the
+                         secondardy public key. Format: .pem file
+    - ssk-key-name-hint: Name of secondardy secret key to use for signing
+                         the boot image. Format: .pem file
+
+The etype is used to create a boot image for Xilinx ZynqMP
+devices.
+
+Information for signed images:
+
+In AMD/Xilinx SoCs, two pairs of public and secret keys are used
+- primary and secondary. The function of the primary public/secret key pair
+is to authenticate the secondary public/secret key pair.
+The function of the secondary key is to sign/verify the boot image. [1]
+
+AMD/Xilinx uses the following terms for private/public keys [1]:
+
+    PSK = Primary Secret Key (Used to sign Secondary Public Key)
+    PPK = Primary Public Key (Used to verify Secondary Public Key)
+    SSK = Secondary Secret Key (Used to sign the boot image/partitions)
+    SPK = Used to verify the actual boot image
+
+The following example builds a signed boot image. The fuses of
+the primary public key (ppk) should be fused together with the RSA_EN flag.
+
+Example node::
+
+    spl {
+        filename = "boot.signed.bin";
+
+        xilinx-bootgen {
+            psk-key-name-hint = "psk0";
+            ssk-key-name-hint = "ssk0";
+            auth-params = "ppk_select=0", "spk_id=0x00000000";
+
+            u-boot-spl-nodtb {
+            };
+            u-boot-spl-pubkey-dtb {
+                algo = "sha384,rsa4096";
+                required = "conf";
+                key-name-hint = "dev";
+            };
+        };
+    };
+
+For testing purposes, e.g. if no RSA_EN should be fused, one could add
+the "bh_auth_enable" flag in the fsbl-config field. This will skip the
+verification of the ppk fuses and boot the image, even if ppk hash is
+invalid.
+
+Example node::
+
+    xilinx-bootgen {
+        psk-key-name-hint = "psk0";
+        psk-key-name-hint = "ssk0";
+        ...
+        fsbl-config = "bh_auth_enable";
+        ...
+    };
+
+[1] https://docs.xilinx.com/r/en-US/ug1283-bootgen-user-guide/Using-Authentication
+
 
 
 

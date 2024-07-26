@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2014 - 2015 Xilinx, Inc.
- * Michal Simek <michal.simek@xilinx.com>
+ * Michal Simek <michal.simek@amd.com>
  */
 
 #include <common.h>
 #include <cpu_func.h>
 #include <log.h>
+#include <zynqmp_firmware.h>
 #include <asm/arch/hardware.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/io.h>
@@ -32,7 +33,8 @@
 #define ZYNQMP_CRLAPB_RST_LPD_R51_RST_MASK	0x02
 #define ZYNQMP_CRLAPB_CPU_R5_CTRL_CLKACT_MASK	0x1000000
 
-#define ZYNQMP_TCM_START_ADDRESS		0xFFE00000
+#define ZYNQMP_R5_0_TCM_START_ADDR		0xFFE00000
+#define ZYNQMP_R5_1_TCM_START_ADDR		0xFFE90000
 #define ZYNQMP_TCM_BOTH_SIZE			0x40000
 
 #define ZYNQMP_CORE_APU0	0
@@ -215,9 +217,14 @@ static void set_r5_start(u8 high)
 	writel(tmp, &rpu_base->rpu1_cfg);
 }
 
-static void write_tcm_boot_trampoline(u32 boot_addr)
+static void write_tcm_boot_trampoline(u32 nr, u32 boot_addr)
 {
 	if (boot_addr) {
+		u64 tcm_start_addr = ZYNQMP_R5_0_TCM_START_ADDR;
+
+		if (nr == ZYNQMP_CORE_RPU1)
+			tcm_start_addr = ZYNQMP_R5_1_TCM_START_ADDR;
+
 		/*
 		 * Boot trampoline is simple ASM code below.
 		 *
@@ -229,12 +236,12 @@ static void write_tcm_boot_trampoline(u32 boot_addr)
 		 *		bx	r1
 		 */
 		debug("Write boot trampoline for %x\n", boot_addr);
-		writel(0xea000000, ZYNQMP_TCM_START_ADDRESS);
-		writel(boot_addr, ZYNQMP_TCM_START_ADDRESS + 0x4);
-		writel(0xe59f0004, ZYNQMP_TCM_START_ADDRESS + 0x8);
-		writel(0xe5901000, ZYNQMP_TCM_START_ADDRESS + 0xc);
-		writel(0xe12fff11, ZYNQMP_TCM_START_ADDRESS + 0x10);
-		writel(0x00000004, ZYNQMP_TCM_START_ADDRESS + 0x14); // address for
+		writel(0xea000000, tcm_start_addr);
+		writel(boot_addr, tcm_start_addr + 0x4);
+		writel(0xe59f0004, tcm_start_addr + 0x8);
+		writel(0xe5901000, tcm_start_addr + 0xc);
+		writel(0xe12fff11, tcm_start_addr + 0x10);
+		writel(0x00000004, tcm_start_addr + 0x14);
 	}
 }
 
@@ -247,8 +254,10 @@ void initialize_tcm(bool mode)
 		release_r5_reset(ZYNQMP_CORE_RPU0, LOCK);
 	} else {
 		set_r5_tcm_mode(SPLIT);
+		set_r5_halt_mode(ZYNQMP_CORE_RPU0, HALT, SPLIT);
 		set_r5_halt_mode(ZYNQMP_CORE_RPU1, HALT, SPLIT);
 		enable_clock_r5();
+		release_r5_reset(ZYNQMP_CORE_RPU0, SPLIT);
 		release_r5_reset(ZYNQMP_CORE_RPU1, SPLIT);
 	}
 }
@@ -318,6 +327,10 @@ int cpu_release(u32 nr, int argc, char *const argv[])
 		flush_dcache_all();
 
 		if (!strncmp(argv[1], "lockstep", 8)) {
+			if (nr != ZYNQMP_CORE_RPU0) {
+				printf("Lockstep mode should run on ZYNQMP_CORE_RPU0\n");
+				return 1;
+			}
 			printf("R5 lockstep mode\n");
 			set_r5_reset(nr, LOCK);
 			set_r5_tcm_mode(LOCK);
@@ -326,7 +339,7 @@ int cpu_release(u32 nr, int argc, char *const argv[])
 			enable_clock_r5();
 			release_r5_reset(nr, LOCK);
 			dcache_disable();
-			write_tcm_boot_trampoline(boot_addr_uniq);
+			write_tcm_boot_trampoline(nr, boot_addr_uniq);
 			dcache_enable();
 			set_r5_halt_mode(nr, RELEASE, LOCK);
 			mark_r5_used(nr, LOCK);
@@ -339,7 +352,7 @@ int cpu_release(u32 nr, int argc, char *const argv[])
 			enable_clock_r5();
 			release_r5_reset(nr, SPLIT);
 			dcache_disable();
-			write_tcm_boot_trampoline(boot_addr_uniq);
+			write_tcm_boot_trampoline(nr, boot_addr_uniq);
 			dcache_enable();
 			set_r5_halt_mode(nr, RELEASE, SPLIT);
 			mark_r5_used(nr, SPLIT);

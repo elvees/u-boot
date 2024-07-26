@@ -11,8 +11,8 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/imx8-pins.h>
 #include <asm/arch/iomux.h>
-#include <asm/arch/sci/sci.h>
 #include <asm/arch/snvs_security_sc.h>
+#include <firmware/imx/sci/sci.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/gpio.h>
 #include <asm/io.h>
@@ -85,18 +85,18 @@ static void setup_iomux_uart(void)
 
 static uint32_t do_get_tdx_user_fuse(int a, int b)
 {
-	sc_err_t sciErr;
+	int sciErr;
 	u32 val_a = 0;
 	u32 val_b = 0;
 
 	sciErr = sc_misc_otp_fuse_read(-1, a, &val_a);
-	if (sciErr != SC_ERR_NONE) {
+	if (sciErr) {
 		printf("Error reading out user fuse %d\n", a);
 		return 0;
 	}
 
 	sciErr = sc_misc_otp_fuse_read(-1, b, &val_b);
-	if (sciErr != SC_ERR_NONE) {
+	if (sciErr) {
 		printf("Error reading out user fuse %d\n", b);
 		return 0;
 	}
@@ -131,9 +131,9 @@ void board_mem_get_layout(u64 *phys_sdram_1_start,
 {
 	u32 is_quadplus = 0, val = 0;
 	struct tdx_user_fuses tdxramfuses;
-	sc_err_t scierr = sc_misc_otp_fuse_read(-1, 6, &val);
+	int scierr = sc_misc_otp_fuse_read(-1, 6, &val);
 
-	if (scierr == SC_ERR_NONE) {
+	if (!scierr) {
 		/* QP has one A72 core disabled */
 		is_quadplus = ((val >> 4) & 0x3) != 0x0;
 	}
@@ -206,16 +206,6 @@ static inline void board_gpio_init(void) {}
 void board_preboot_os(void)
 {
 	gpio_direction_output(BKL1_GPIO, 0);
-}
-
-int checkboard(void)
-{
-	puts("Model: Toradex Apalis iMX8\n");
-
-	build_info();
-	print_bootinfo();
-
-	return 0;
 }
 
 static enum pcb_rev_t get_pcb_revision(void)
@@ -299,14 +289,6 @@ int board_init(void)
 	}
 
 	return 0;
-}
-
-/*
- * Board specific reset that is system reset.
- */
-void reset_cpu(void)
-{
-	/* TODO */
 }
 
 #if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)

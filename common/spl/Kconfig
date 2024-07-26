@@ -67,7 +67,7 @@ config SPL_SIZE_LIMIT_SUBTRACT_MALLOC
 config SPL_SIZE_LIMIT_PROVIDE_STACK
 	hex "SPL image size check: provide stack space before relocation"
 	depends on SPL_SIZE_LIMIT > 0
-	default 0
+	default 0x0
 	help
 	  If set, this size is reserved in SPL_SIZE_LIMIT check to ensure such
 	  an image does not overflow SRAM if SPL_SIZE_LIMIT describes the size
@@ -97,8 +97,7 @@ config SPL_PAD_TO
 	default 0x31000 if ARCH_MX6 && MX6_OCRAM_256KB
 	default 0x11000 if ARCH_MX7 || (ARCH_MX6 && !MX6_OCRAM_256KB)
 	default 0x10000 if ARCH_KEYSTONE
-	default 0x8000 if ARCH_SUNXI && !MACH_SUN50I_H616
-	default 0x0 if ARCH_MTMIPS
+	default 0x0 if ARCH_MTMIPS || ARCH_SUNXI
 	default TPL_MAX_SIZE if TPL_MAX_SIZE > SPL_MAX_SIZE
 	default SPL_MAX_SIZE
 	help
@@ -183,6 +182,7 @@ config SPL_SYS_REPORT_STACK_F_USAGE
 
 config SPL_SHOW_ERRORS
 	bool "Show more information when something goes wrong"
+	depends on SPL_LIBCOMMON_SUPPORT
 	help
 	  This enabled more verbose error messages and checking when something
 	  goes wrong in SPL. For example, it shows the error code when U-Boot
@@ -206,7 +206,7 @@ config SPL_BINMAN_SYMBOLS
 config SPL_BINMAN_UBOOT_SYMBOLS
 	bool "Declare binman symbols for U-Boot phases in SPL"
 	depends on SPL_BINMAN_SYMBOLS
-	default n if ARCH_IMX8M
+	default n if ARCH_IMX8M || ARCH_IMX9
 	default y
 	help
 	  This enables use of symbols in SPL which refer to U-Boot phases,
@@ -265,7 +265,7 @@ config SPL_TEXT_BASE
 	default 0x402F0400 if AM33XX
 	default 0x40301350 if OMAP54XX
 	default 0x10060 if MACH_SUN50I || MACH_SUN50I_H5 || MACH_SUN9I
-	default 0x20060 if SUN50I_GEN_H6
+	default 0x20060 if SUN50I_GEN_H6 || SUNXI_GEN_NCAT2
 	default 0x00060 if ARCH_SUNXI
 	default 0xfffc0000 if ARCH_ZYNQMP
 	default 0x0
@@ -279,8 +279,15 @@ config SPL_BOARD_INIT
 	  spl_board_init() from board_init_r(). This function should be
 	  provided by the board.
 
+config SPL_LOAD_BLOCK
+	bool
+	help
+	  Support loading images from block devices. This adds a bl_len member
+	  to struct spl_load_info.
+
 config SPL_BOOTROM_SUPPORT
 	bool "Support returning to the BOOTROM"
+	select SPL_LOAD_BLOCK if MACH_IMX
 	help
 	  Some platforms (e.g. the Rockchip RK3368) provide support in their
 	  ROM for loading the next boot-stage after performing basic setup
@@ -330,6 +337,20 @@ config SPL_LEGACY_IMAGE_CRC_CHECK
 	  If disabled, Legacy images are booted if the image magic and size
 	  are correct, without further integrity checks.
 
+config SPL_LOAD_IMX_CONTAINER
+	bool "Enable SPL loading and booting of i.MX8 Containers"
+	depends on SPL
+	help
+	  Support booting U-Boot from an i.MX8 container image. If you are not
+	  using i.MX8, say 'n'.
+
+config IMX_CONTAINER_CFG
+	string "i.MX8 Container config file"
+	depends on SPL && SPL_LOAD_IMX_CONTAINER
+	help
+	  Specify the cfg file for generating the container image which will be
+	  loaded by SPL.
+
 config SPL_SYS_MALLOC_SIMPLE
 	bool "Only use malloc_simple functions in the SPL"
 	help
@@ -350,13 +371,15 @@ config SPL_SHARES_INIT_SP_ADDR
 
 config SPL_STACK
 	hex "Initial stack pointer location"
-	depends on (ARM || ARCH_JZ47XX || MICROBLAZE || RISCV) && SPL_FRAMEWORK
+	depends on (ARM || ARCH_JZ47XX || MICROBLAZE || RISCV) && \
+		SPL_FRAMEWORK || ROCKCHIP_RK3036
 	depends on !SPL_SHARES_INIT_SP_ADDR
 	default 0x946bb8 if ARCH_MX7
 	default 0x93ffb8 if ARCH_MX6 && MX6_OCRAM_256KB
 	default 0x91ffb8 if ARCH_MX6 && !MX6_OCRAM_256KB
 	default 0x118000 if MACH_SUN50I_H6
-	default 0x58000 if MACH_SUN50I_H616
+	default 0x52a00 if MACH_SUN50I_H616
+	default 0x40000 if MACH_SUN8I_R528
 	default 0x54000 if MACH_SUN50I || MACH_SUN50I_H5
 	default 0x18000 if MACH_SUN9I
 	default 0x8000 if ARCH_SUNXI
@@ -402,21 +425,21 @@ config SPL_SEPARATE_BSS
 	  location is used. Normally we put the device tree at the end of BSS
 	  but with this option enabled, it goes at _image_binary_end.
 
-config SYS_SPL_MALLOC
+config SPL_SYS_MALLOC
 	bool "Enable malloc pool in SPL"
 	depends on SPL_FRAMEWORK
 
-config HAS_CUSTOM_SPL_MALLOC_START
+config SPL_HAS_CUSTOM_MALLOC_START
 	bool "For the SPL malloc pool, define a custom starting address"
-	depends on SYS_SPL_MALLOC
+	depends on SPL_SYS_MALLOC
 
-config CUSTOM_SYS_SPL_MALLOC_ADDR
+config SPL_CUSTOM_SYS_MALLOC_ADDR
 	hex "SPL malloc addr"
-	depends on HAS_CUSTOM_SPL_MALLOC_START
+	depends on SPL_HAS_CUSTOM_MALLOC_START
 
-config SYS_SPL_MALLOC_SIZE
+config SPL_SYS_MALLOC_SIZE
 	hex "Size of the SPL malloc pool"
-	depends on SYS_SPL_MALLOC
+	depends on SPL_SYS_MALLOC
 	default 0x100000
 
 config SPL_READ_ONLY
@@ -458,6 +481,11 @@ config SPL_DISPLAY_PRINT
 	  banner ("U-Boot SPL ..."). This function should be provided by
 	  the board.
 
+config SPL_SYS_MMCSD_RAW_MODE
+	bool
+	help
+	  Support booting from an MMC without a filesystem.
+
 config SYS_MMCSD_RAW_MODE_U_BOOT_USE_SECTOR
 	bool "MMC raw mode: by sector"
 	default y if ARCH_SUNXI || ARCH_DAVINCI || ARCH_UNIPHIER || \
@@ -466,6 +494,8 @@ config SYS_MMCSD_RAW_MODE_U_BOOT_USE_SECTOR
 		     ARCH_AT91 || ARCH_ZYNQ || ARCH_KEYSTONE || OMAP34XX || \
 		     OMAP44XX || OMAP54XX || AM33XX || AM43XX || \
 		     TARGET_SIFIVE_UNLEASHED || TARGET_SIFIVE_UNMATCHED
+	select SPL_LOAD_BLOCK if SPL_MMC
+	select SPL_SYS_MMCSD_RAW_MODE if SPL_MMC
 	help
 	  Use sector number for specifying U-Boot location on MMC/SD in
 	  raw mode.
@@ -502,6 +532,8 @@ config SYS_MMCSD_RAW_MODE_U_BOOT_DATA_PART_OFFSET
 
 config SYS_MMCSD_RAW_MODE_U_BOOT_USE_PARTITION
 	bool "MMC Raw mode: by partition"
+	select SPL_LOAD_BLOCK if SPL_MMC
+	select SPL_SYS_MMCSD_RAW_MODE if SPL_MMC
 	help
 	  Use a partition for loading U-Boot when using MMC/SD in raw mode.
 
@@ -550,34 +582,10 @@ config SYS_MMCSD_RAW_MODE_EMMC_BOOT_PARTITION
 	  the eMMC EXT_CSC_PART_CONFIG selection should be overridden in SPL
 	  by user defined partition number.
 
-config SPL_CRC32
-	bool "Support CRC32"
-	default y if SPL_LEGACY_IMAGE_FORMAT || SPL_EFI_PARTITION
-	default y if SPL_ENV_SUPPORT || TPL_BLOBLIST
-	help
-	  Enable this to support CRC32 in uImages or FIT images within SPL.
-	  This is a 32-bit checksum value that can be used to verify images.
-	  For FIT images, this is the least secure type of checksum, suitable
-	  for detected accidental image corruption. For secure applications you
-	  should consider SHA1 or SHA256.
-
-config SPL_MD5
-	bool "Support MD5"
-	depends on SPL_FIT
-	help
-	  Enable this to support MD5 in FIT images within SPL. An MD5
-	  checksum is a 128-bit hash value used to check that the image
-	  contents have not been corrupted. Note that MD5 is not considered
-	  secure as it is possible (with a brute-force attack) to adjust the
-	  image while still retaining the same MD5 hash value. For secure
-	  applications where images may be changed maliciously, you should
-	  consider SHA256 or SHA384.
-
 config SPL_FIT_IMAGE_TINY
 	bool "Remove functionality from SPL FIT loading to reduce size"
 	depends on SPL_FIT
-	default y if MACH_SUN50I || MACH_SUN50I_H5 || SUN50I_GEN_H6
-	default y if ARCH_IMX8M || ARCH_IMX9
+	default y if ARCH_IMX8M || ARCH_IMX9 || ARCH_SUNXI
 	help
 	  Enable this to reduce the size of the FIT image loading code
 	  in SPL, if space for the SPL binary is very tight.
@@ -666,6 +674,7 @@ config SPL_ETH
 
 config SPL_FS_EXT4
 	bool "Support EXT filesystems"
+	select SPL_CRC16 if EXT4_WRITE
 	help
 	  Enable support for EXT2/3/4 filesystems with SPL. This permits
 	  U-Boot (or Linux in Falcon mode) to be loaded from an EXT
@@ -689,6 +698,22 @@ config SPL_FS_FAT
 	  permits U-Boot (or Linux in Falcon mode) to be loaded from a FAT
 	  filesystem from within SPL. Support for the underlying block
 	  device (e.g. MMC or USB) must be enabled separately.
+
+config SPL_FS_FAT_DMA_ALIGN
+	bool "Use DMA-aligned buffers with FAT"
+	depends on SPL_FS_FAT
+	select SPL_LOAD_BLOCK
+	default y if SPL_LOAD_FIT
+	help
+	  The FAT filesystem driver tries to ensure that the reads it issues to
+	  the block subsystem use DMA-aligned buffers. If the supplied buffer is
+	  not DMA-aligned, the FAT driver will use a bounce-buffer and read
+	  block-by-block. This is separate from the bounce-buffer used by the
+	  block subsystem (CONFIG_BOUNCE_BUFFER).
+
+	  Enable this config to align buffers passed to the FAT filesystem
+	  driver. This will speed up reads, but will increase the size of U-Boot
+	  by around 60 bytes.
 
 config SPL_FS_LOAD_PAYLOAD_NAME
 	string "File to load for U-Boot from the filesystem"
@@ -816,8 +841,17 @@ config SPL_MMC
 	  this option to build the drivers in drivers/mmc as part of an SPL
 	  build.
 
+config SYS_MMCSD_FS_BOOT
+	bool "MMC FS Boot mode"
+	depends on SPL_MMC
+	default y if !ARCH_MVEBU
+	help
+	  Enable MMC FS Boot mode. Partition is selected by option
+	  SYS_MMCSD_FS_BOOT_PARTITION.
+
 config SYS_MMCSD_FS_BOOT_PARTITION
 	int "MMC Boot Partition"
+	depends on SYS_MMCSD_FS_BOOT
 	default 1
 	help
 	  Partition on the MMC to load U-Boot from when the MMC is being
@@ -855,7 +889,7 @@ config SPL_MPC8XXX_INIT_DDR
 	  allows DRAM to be set up before loading U-Boot into that DRAM,
 	  where it can run.
 
-config SPL_MTD_SUPPORT
+config SPL_MTD
 	bool "Support MTD drivers"
 	help
 	  Enable support for MTD (Memory Technology Device) within SPL. MTD
@@ -874,6 +908,7 @@ config SPL_MUSB_NEW
 
 config SPL_NAND_SUPPORT
 	bool "Support NAND flash"
+	select SPL_LOAD_BLOCK
 	help
 	  Enable support for NAND (Negative AND) flash in SPL. NAND flash
 	  can be used to allow SPL to load U-Boot from supported devices.
@@ -1077,9 +1112,9 @@ config SPL_OS_BOOT
 	  Enable booting directly to an OS from SPL.
 	  for more info read doc/README.falcon
 
-config SYS_SPL_ARGS_ADDR
+config SPL_PAYLOAD_ARGS_ADDR
 	hex "Address in memory to load 'args' file for Falcon Mode to"
-	depends on SPL_OS_BOOT
+	depends on SPL_OS_BOOT || SPL_LOAD_FIT_OPENSBI_OS_BOOT
 	default 0x88000000 if ARCH_OMAP2PLUS
 	help
 	  Address in memory where the 'args' file, typically a device tree
@@ -1099,6 +1134,8 @@ config SYS_OS_BASE
 config SPL_FALCON_BOOT_MMCSD
 	bool "Enable Falcon boot from MMC or SD media"
 	depends on SPL_OS_BOOT && SPL_MMC
+	select SPL_LOAD_BLOCK
+	select SPL_SYS_MMCSD_RAW_MODE
 	help
 	  Select this if the Falcon mode OS image mode is on MMC or SD media.
 
@@ -1254,6 +1291,32 @@ config SPL_SATA_RAW_U_BOOT_SECTOR
 	  Sector on the SATA disk to load U-Boot from, when the SATA disk is being
 	  used in raw mode. Units: SATA disk sectors (1 sector = 512 bytes).
 
+config SPL_NVME
+	bool "NVM Express device support"
+	depends on BLK
+	select FS_LOADER
+	select SPL_BLK_FS
+	help
+	  This option enables support for NVM Express devices.
+	  It supports basic functions of NVMe (read/write).
+
+config SPL_NVME_PCI
+	bool "NVM Express PCI device support for SPL"
+	depends on SPL_PCI && SPL_NVME
+	help
+	  This option enables support for NVM Express PCI devices.
+	  This allows use of NVMe devices for loading u-boot.
+
+config SPL_NVME_BOOT_DEVICE
+	hex "NVMe boot device number"
+	depends on SPL_NVME
+	default 0x0
+
+config SYS_NVME_BOOT_PARTITION
+	hex "NVMe boot partition number"
+	depends on SPL_NVME
+	default	0x1
+
 config SPL_SERIAL
 	bool "Support serial"
 	select SPL_PRINTF
@@ -1335,96 +1398,6 @@ config SPL_THERMAL
 	  temperature sensors to permit warnings, speed throttling or even
 	  automatic power-off when the temperature gets too high or low. Other
 	  devices may be discrete but connected on a suitable bus.
-
-config SPL_USB_HOST
-	bool "Support USB host drivers"
-	help
-	  Enable access to USB (Universal Serial Bus) host devices so that
-	  SPL can load U-Boot from a connected USB peripheral, such as a USB
-	  flash stick. While USB takes a little longer to start up than most
-	  buses, it is very flexible since many different types of storage
-	  device can be attached. This option enables the drivers in
-	  drivers/usb/host as part of an SPL build.
-
-config SPL_USB_STORAGE
-	bool "Support loading from USB"
-	depends on SPL_USB_HOST
-	help
-	  Enable support for USB devices in SPL. This allows use of USB
-	  devices such as hard drives and flash drivers for loading U-Boot.
-	  The actual drivers are enabled separately using the normal U-Boot
-	  config options. This enables loading from USB using a configured
-	  device.
-
-config SYS_USB_FAT_BOOT_PARTITION
-	int "Partition on USB to use to load U-Boot from"
-	depends on SPL_USB_STORAGE
-	default 1
-	help
-	  Partition on the USB storage device to load U-Boot from
-
-config SPL_USB_GADGET
-	bool "Suppport USB Gadget drivers"
-	help
-	  Enable USB Gadget API which allows to enable USB device functions
-	  in SPL.
-
-if SPL_USB_GADGET
-
-config SPL_USB_ETHER
-	bool "Support USB Ethernet drivers"
-	depends on SPL_NET
-	help
-	  Enable access to the USB network subsystem and associated
-	  drivers in SPL. This permits SPL to load U-Boot over a
-	  USB-connected Ethernet link (such as a USB Ethernet dongle) rather
-	  than from an onboard peripheral. Environment support is required
-	  since the network stack uses a number of environment variables.
-	  See also SPL_NET and SPL_ETH.
-
-config SPL_DFU
-	bool "Support DFU (Device Firmware Upgrade)"
-	select SPL_HASH
-	select SPL_DFU_NO_RESET
-	depends on SPL_RAM_SUPPORT
-	help
-	  This feature enables the DFU (Device Firmware Upgrade) in SPL with
-	  RAM memory device support. The ROM code will load and execute
-	  the SPL built with dfu. The user can load binaries (u-boot/kernel) to
-	  selected device partition from host-pc using dfu-utils.
-	  This feature is useful to flash the binaries to factory or bare-metal
-	  boards using USB interface.
-
-choice
-	bool "DFU device selection"
-	depends on SPL_DFU
-
-config SPL_DFU_RAM
-	bool "RAM device"
-	depends on SPL_DFU && SPL_RAM_SUPPORT
-	help
-	 select RAM/DDR memory device for loading binary images
-	 (u-boot/kernel) to the selected device partition using
-	 DFU and execute the u-boot/kernel from RAM.
-
-endchoice
-
-config SPL_USB_SDP_SUPPORT
-	bool "Support SDP (Serial Download Protocol)"
-	depends on SPL_SERIAL
-	help
-	  Enable Serial Download Protocol (SDP) device support in SPL. This
-	  allows to download images into memory and execute (jump to) them
-	  using the same protocol as implemented by the i.MX family's boot ROM.
-
-config SPL_SDP_USB_DEV
-	int "SDP USB controller index"
-	default 0
-	depends on SPL_USB_SDP_SUPPORT
-	help
-	  Some boards have USB controller other than 0. Define this option
-	  so it can be used in compiled environment.
-endif
 
 config SPL_WATCHDOG
 	bool "Support watchdog drivers"
@@ -1515,8 +1488,10 @@ config SPL_OPENSBI_SCRATCH_OPTIONS
 	default 0x1
 	depends on SPL_OPENSBI
 	help
-	  Options passed to fw_dynamic, for example SBI_SCRATCH_NO_BOOT_PRINTS or
-	  SBI_SCRATCH_DEBUG_PRINTS.
+	  This bitmap of options is passed from U-Boot SPL to OpenSBI.
+	  As of OpenSBI 1.3 the following bits are defined:
+	  - SBI_SCRATCH_NO_BOOT_PRINTS = 0x1 (Disable prints during boot)
+	  - SBI_SCRATCH_DEBUG_PRINTS   = 0x2 (Enable runtime debug prints)
 
 config SPL_TARGET
 	string "Addtional build targets for 'make'"

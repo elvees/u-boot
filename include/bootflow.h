@@ -37,6 +37,23 @@ enum bootflow_state_t {
 };
 
 /**
+ * enum bootflow_flags_t - flags for bootflows
+ *
+ * @BOOTFLOWF_USE_PRIOR_FDT: Indicates that an FDT was not found by the bootmeth
+ *	and it is using the prior-stage FDT, which is the U-Boot control FDT.
+ *	This is only possible with the EFI bootmeth (distro-efi) and only when
+ *	CONFIG_OF_HAS_PRIOR_STAGE is enabled
+ * @BOOTFLOWF_STATIC_BUF: Indicates that @bflow->buf is statically set, rather
+ *	than being allocated by malloc().
+ * @BOOTFLOWF_USE_BUILTIN_FDT : Indicates that current bootflow uses built-in FDT
+ */
+enum bootflow_flags_t {
+	BOOTFLOWF_USE_PRIOR_FDT	= 1 << 0,
+	BOOTFLOWF_STATIC_BUF	= 1 << 1,
+	BOOTFLOWF_USE_BUILTIN_FDT	= 1 << 2,
+};
+
+/**
  * struct bootflow - information about a bootflow
  *
  * This is connected into two separate linked lists:
@@ -46,7 +63,7 @@ enum bootflow_state_t {
  *
  * @bm_node: Points to siblings in the same bootdev
  * @glob_node: Points to siblings in the global list (all bootdev)
- * @dev: Bootdevice device which produced this bootflow
+ * @dev: Bootdev device which produced this bootflow
  * @blk: Block device which contains this bootflow, NULL if this is a network
  *	device or sandbox 'host' device
  * @part: Partition number (0 for whole device)
@@ -60,7 +77,7 @@ enum bootflow_state_t {
  * @fname: Filename of bootflow file (allocated)
  * @logo: Logo to display for this bootflow (BMP format)
  * @logo_size: Size of the logo in bytes
- * @buf: Bootflow file contents (allocated)
+ * @buf: Bootflow file contents (allocated unless @flags & BOOTFLOWF_STATIC_BUF)
  * @size: Size of bootflow file in bytes
  * @err: Error number received (0 if OK)
  * @os_name: Name of the OS / distro being booted, or NULL if not known
@@ -68,6 +85,10 @@ enum bootflow_state_t {
  * @fdt_fname: Filename of FDT file
  * @fdt_size: Size of FDT file
  * @fdt_addr: Address of loaded fdt
+ * @flags: Flags for the bootflow (see enum bootflow_flags_t)
+ * @cmdline: OS command line, or NULL if not known (allocated)
+ * @x86_setup: Pointer to x86 setup block inside @buf, NULL if not present
+ * @bootmeth_priv: Private data for the bootmeth
  */
 struct bootflow {
 	struct list_head bm_node;
@@ -90,39 +111,46 @@ struct bootflow {
 	char *fdt_fname;
 	int fdt_size;
 	ulong fdt_addr;
+	int flags;
+	char *cmdline;
+	void *x86_setup;
+	void *bootmeth_priv;
 };
 
 /**
- * enum bootflow_flags_t - flags for the bootflow iterator
+ * enum bootflow_iter_flags_t - flags for the bootflow iterator
  *
- * @BOOTFLOWF_FIXED: Only used fixed/internal media
- * @BOOTFLOWF_SHOW: Show each bootdev before scanning it; show each hunter
+ * @BOOTFLOWIF_FIXED: Only used fixed/internal media
+ * @BOOTFLOWIF_SHOW: Show each bootdev before scanning it; show each hunter
  * before using it
- * @BOOTFLOWF_ALL: Return bootflows with errors as well
- * @BOOTFLOWF_HUNT: Hunt for new bootdevs using the bootdrv hunters
+ * @BOOTFLOWIF_ALL: Return bootflows with errors as well
+ * @BOOTFLOWIF_HUNT: Hunt for new bootdevs using the bootdrv hunters
  *
  * Internal flags:
- * @BOOTFLOWF_SINGLE_DEV: (internal) Just scan one bootdev
- * @BOOTFLOWF_SKIP_GLOBAL: (internal) Don't scan global bootmeths
- * @BOOTFLOWF_SINGLE_UCLASS: (internal) Keep scanning through all devices in
+ * @BOOTFLOWIF_SINGLE_DEV: (internal) Just scan one bootdev
+ * @BOOTFLOWIF_SKIP_GLOBAL: (internal) Don't scan global bootmeths
+ * @BOOTFLOWIF_SINGLE_UCLASS: (internal) Keep scanning through all devices in
  * this uclass (used with things like "mmc")
- * @BOOTFLOWF_SINGLE_MEDIA: (internal) Scan one media device in the uclass (used
+ * @BOOTFLOWIF_SINGLE_MEDIA: (internal) Scan one media device in the uclass (used
  * with things like "mmc1")
+ * @BOOTFLOWIF_SINGLE_PARTITION: (internal) Scan one partition in media device
+ * (used with things like "mmc1:3")
  */
-enum bootflow_flags_t {
-	BOOTFLOWF_FIXED		= 1 << 0,
-	BOOTFLOWF_SHOW		= 1 << 1,
-	BOOTFLOWF_ALL		= 1 << 2,
-	BOOTFLOWF_HUNT		= 1 << 3,
+enum bootflow_iter_flags_t {
+	BOOTFLOWIF_FIXED		= 1 << 0,
+	BOOTFLOWIF_SHOW			= 1 << 1,
+	BOOTFLOWIF_ALL			= 1 << 2,
+	BOOTFLOWIF_HUNT			= 1 << 3,
 
 	/*
 	 * flags used internally by standard boot - do not set these when
 	 * calling bootflow_scan_bootdev() etc.
 	 */
-	BOOTFLOWF_SINGLE_DEV	= 1 << 16,
-	BOOTFLOWF_SKIP_GLOBAL	= 1 << 17,
-	BOOTFLOWF_SINGLE_UCLASS	= 1 << 18,
-	BOOTFLOWF_SINGLE_MEDIA	= 1 << 19,
+	BOOTFLOWIF_SINGLE_DEV		= 1 << 16,
+	BOOTFLOWIF_SKIP_GLOBAL		= 1 << 17,
+	BOOTFLOWIF_SINGLE_UCLASS	= 1 << 18,
+	BOOTFLOWIF_SINGLE_MEDIA		= 1 << 19,
+	BOOTFLOWIF_SINGLE_PARTITION	= 1 << 20,
 };
 
 /**
@@ -164,9 +192,9 @@ enum bootflow_meth_flags_t {
  * updated to a larger value, no less than the number of available partitions.
  * This ensures that iteration works through all partitions on the bootdev.
  *
- * @flags: Flags to use (see enum bootflow_flags_t). If BOOTFLOWF_GLOBAL_FIRST is
- *	enabled then the global bootmeths are being scanned, otherwise we have
- *	moved onto the bootdevs
+ * @flags: Flags to use (see enum bootflow_iter_flags_t). If
+ *	BOOTFLOWIF_GLOBAL_FIRST is enabled then the global bootmeths are being
+ *	scanned, otherwise we have moved onto the bootdevs
  * @dev: Current bootdev, NULL if none. This is only ever updated in
  * bootflow_iter_set_dev()
  * @part: Current partition number (0 for whole device)
@@ -233,7 +261,7 @@ void bootflow_init(struct bootflow *bflow, struct udevice *bootdev,
  * This sets everything to the starting point, ready for use.
  *
  * @iter: Place to store private info (inited by this call)
- * @flags: Flags to use (see enum bootflow_flags_t)
+ * @flags: Flags to use (see enum bootflow_iter_flags_t)
  */
 void bootflow_iter_init(struct bootflow_iter *iter, int flags);
 
@@ -259,15 +287,16 @@ int bootflow_iter_drop_bootmeth(struct bootflow_iter *iter,
 /**
  * bootflow_scan_first() - find the first bootflow for a device or label
  *
- * If @flags includes BOOTFLOWF_ALL then bootflows with errors are returned too
+ * If @flags includes BOOTFLOWIF_ALL then bootflows with errors are returned too
  *
  * @dev:	Boot device to scan, NULL to work through all of them until it
  *	finds one that can supply a bootflow
  * @label:	Label to control the scan, NULL to work through all devices
  *	until it finds one that can supply a bootflow
  * @iter:	Place to store private info (inited by this call)
- * @flags:	Flags for iterator (enum bootflow_flags_t). Note that if @dev
- * is NULL, then BOOTFLOWF_SKIP_GLOBAL is set automatically by this function
+ * @flags:	Flags for iterator (enum bootflow_iter_flags_t). Note that if
+ *	@dev is NULL, then BOOTFLOWIF_SKIP_GLOBAL is set automatically by this
+ *	function
  * @bflow:	Place to put the bootflow if found
  * Return: 0 if found,  -ENODEV if no device, other -ve on other error
  *	(iteration can continue)
@@ -330,6 +359,17 @@ void bootflow_free(struct bootflow *bflow);
  *	be tried again unless something changes
  */
 int bootflow_boot(struct bootflow *bflow);
+
+/**
+ * bootflow_read_all() - Read all bootflow files
+ *
+ * Some bootmeths delay reading of large files until booting is requested. This
+ * causes those files to be read.
+ *
+ * @bflow: Bootflow to read
+ * Return: result of trying to read
+ */
+int bootflow_read_all(struct bootflow *bflow);
 
 /**
  * bootflow_run_boot() - Try to boot a bootflow
@@ -424,5 +464,99 @@ int bootflow_menu_apply_theme(struct expo *exp, ofnode node);
  */
 int bootflow_menu_run(struct bootstd_priv *std, bool text_mode,
 		      struct bootflow **bflowp);
+
+#define BOOTFLOWCL_EMPTY	((void *)1)
+
+/**
+ * cmdline_set_arg() - Update or read an argument in a cmdline string
+ *
+ * Handles updating a single arg in a cmdline string, returning it in a supplied
+ * buffer; also reading an arg from a cmdline string
+ *
+ * When updating, consecutive spaces are squashed as are spaces at the start and
+ * end.
+ *
+ * @buf: Working buffer to use (initial contents are ignored). Use NULL when
+ * reading
+ * @maxlen: Length of working buffer. Use 0 when reading
+ * @cmdline: Command line to update, in the form:
+ *
+ *	fred mary= jane=123 john="has spaces"
+ *
+ * @set_arg: Argument to set or read (may or may not exist)
+ * @new_val: Value for the new argument. May not include quotes (") but may
+ * include embedded spaces, in which case it will be quoted when added to the
+ * command line. Use NULL to delete the argument from @cmdline, BOOTFLOWCL_EMPTY
+ * to set it to an empty value (no '=' sign after arg), "" to add an '=' sign
+ * but with an empty value. Use NULL when reading.
+ * @posp: Ignored when setting an argument; when getting an argument, returns
+ * the start position of its value in @cmdline, after the first quote, if any
+ *
+ * Return:
+ * For updating:
+ *	length of new buffer (including \0 terminator) on success, -ENOENT if
+ *	@new_val is NULL and @set_arg does not exist in @from, -EINVAL if a
+ *	quoted arg-value in @from is not terminated with a quote, -EBADF if
+ *	@new_val has spaces but does not start and end with quotes (or it has
+ *	quotes in the middle of the string), -E2BIG if @maxlen is too small
+ * For reading:
+ *	length of arg value (excluding quotes), -ENOENT if not found
+ */
+int cmdline_set_arg(char *buf, int maxlen, const char *cmdline,
+		    const char *set_arg, const char *new_val, int *posp);
+
+/**
+ * bootflow_cmdline_set_arg() - Set a single argument for a bootflow
+ *
+ * Update the allocated cmdline and set the bootargs variable
+ *
+ * @bflow: Bootflow to update
+ * @arg: Argument to update (e.g. "console")
+ * @val: Value to set (e.g. "ttyS2") or NULL to delete the argument if present,
+ * "" to set it to an empty value (e.g. "console=") and BOOTFLOWCL_EMPTY to add
+ * it without any value ("initrd")
+ * @set_env: true to set the "bootargs" environment variable too
+ *
+ * Return: 0 if OK, -ENOMEM if out of memory
+ */
+int bootflow_cmdline_set_arg(struct bootflow *bflow, const char *arg,
+			     const char *val, bool set_env);
+
+/**
+ * cmdline_get_arg() - Read an argument from a cmdline
+ *
+ * @cmdline: Command line to read, in the form:
+ *
+ *	fred mary= jane=123 john="has spaces"
+ * @arg: Argument to read (may or may not exist)
+ * @posp: Returns position of argument (after any leading quote) if present
+ * Return: Length of argument value excluding quotes if found, -ENOENT if not
+ * found
+ */
+int cmdline_get_arg(const char *cmdline, const char *arg, int *posp);
+
+/**
+ * bootflow_cmdline_get_arg() - Read an argument from a cmdline
+ *
+ * @bootflow: Bootflow to read from
+ * @arg: Argument to read (may or may not exist)
+ * @valp: Returns a pointer to the argument (after any leading quote) if present
+ * Return: Length of argument value excluding quotes if found, -ENOENT if not
+ * found
+ */
+int bootflow_cmdline_get_arg(struct bootflow *bflow, const char *arg,
+			     const char **val);
+
+/**
+ * bootflow_cmdline_auto() - Automatically set a value for a known argument
+ *
+ * This handles a small number of known arguments, for Linux in particular. It
+ * adds suitable kernel parameters automatically, e.g. to enable the console.
+ *
+ * @bflow: Bootflow to update
+ * @arg: Name of argument to set (e.g. "earlycon" or "console")
+ * Return: 0 if OK -ve on error
+ */
+int bootflow_cmdline_auto(struct bootflow *bflow, const char *arg);
 
 #endif

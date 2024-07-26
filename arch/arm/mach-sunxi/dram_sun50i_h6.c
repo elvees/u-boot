@@ -5,7 +5,6 @@
  * (C) Copyright 2017      Icenowy Zheng <icenowy@aosc.io>
  *
  */
-#include <common.h>
 #include <init.h>
 #include <log.h>
 #include <asm/io.h>
@@ -15,7 +14,6 @@
 #include <asm/arch/prcm.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
-#include <linux/kconfig.h>
 
 /*
  * The DRAM controller structure on H6 is similar to the ones on A23/A80:
@@ -93,7 +91,8 @@ enum {
 	MBUS_QOS_HIGH,
 	MBUS_QOS_HIGHEST
 };
-inline void mbus_configure_port(u8 port,
+
+static void mbus_configure_port(u8 port,
 				bool bwlimit,
 				bool priority,
 				u8 qos,

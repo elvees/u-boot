@@ -11,9 +11,10 @@
 #include <phy.h>
 #include <linux/bitfield.h>
 
+#define PHY_ID_YT8511				0x0000010a
 #define PHY_ID_YT8521				0x0000011a
 #define PHY_ID_YT8531				0x4f51e91b
-#define PHY_ID_YT8531SH			0x4f51e91a
+#define PHY_ID_YT8531SH				0x4f51e91a
 #define PHY_ID_MASK				GENMASK(31, 0)
 
 /* Extended Register's Address Offset Register */
@@ -24,20 +25,51 @@
 
 #define YTPHY_SYNCE_CFG_REG			0xA012
 
+#define YT8531_PAD_DRIVE_STRENGTH_CFG_REG		0xA010
+#define YT8531_RGMII_RXC_DS_MASK		GENMASK(15, 13)
+#define YT8531_RGMII_RXD_DS_HI_MASK		BIT(12)		/* Bit 2 of rxd_ds */
+#define YT8531_RGMII_RXD_DS_LOW_MASK		GENMASK(5, 4)	/* Bit 1/0 of rxd_ds */
+#define YT8531_RGMII_RX_DS_DEFAULT		0x3
+
 #define YTPHY_DTS_OUTPUT_CLK_DIS		0
 #define YTPHY_DTS_OUTPUT_CLK_25M		25000000
 #define YTPHY_DTS_OUTPUT_CLK_125M		125000000
 
-#define YT8521_SCR_SYNCE_ENABLE		BIT(5)
+#define YT8521_SCR_SYNCE_ENABLE			BIT(5)
 /* 1b0 output 25m clock
  * 1b1 output 125m clock  *default*
  */
 #define YT8521_SCR_CLK_FRE_SEL_125M		BIT(3)
-#define YT8521_SCR_CLK_SRC_MASK		GENMASK(2, 1)
+#define YT8521_SCR_CLK_SRC_MASK			GENMASK(2, 1)
 #define YT8521_SCR_CLK_SRC_PLL_125M		0
 #define YT8521_SCR_CLK_SRC_UTP_RX		1
 #define YT8521_SCR_CLK_SRC_SDS_RX		2
 #define YT8521_SCR_CLK_SRC_REF_25M		3
+
+#define YT8511_EXT_CLK_GATE	0x0c
+#define YT8511_EXT_DELAY_DRIVE	0x0d
+#define YT8511_EXT_SLEEP_CTRL	0x27
+
+/* 2b00 25m from pll
+ * 2b01 25m from xtl *default*
+ * 2b10 62.m from pll
+ * 2b11 125m from pll
+ */
+#define YT8511_CLK_125M		(BIT(2) | BIT(1))
+#define YT8511_PLLON_SLP	BIT(14)
+
+/* RX Delay enabled = 1.8ns 1000T, 8ns 10/100T */
+#define YT8511_DELAY_RX		BIT(0)
+
+/* TX Gig-E Delay is bits 7:4, default 0x5
+ * TX Fast-E Delay is bits 15:12, default 0xf
+ * Delay = 150ps * N - 250ps
+ * On = 2000ps, off = 50ps
+ */
+#define YT8511_DELAY_GE_TX_EN	(0xf << 4)
+#define YT8511_DELAY_GE_TX_DIS	(0x2 << 4)
+#define YT8511_DELAY_FE_TX_EN	(0xf << 12)
+#define YT8511_DELAY_FE_TX_DIS	(0x2 << 12)
 
 #define YT8531_SCR_SYNCE_ENABLE		BIT(6)
 /* 1b0 output 25m clock   *default*
@@ -100,6 +132,10 @@
  */
 #define YT8531_CCR_RXC_DLY_EN			BIT(8)
 #define YT8531_CCR_RXC_DLY_1_900_NS		1900
+
+#define YT8531_CCR_CFG_LDO_MASK		GENMASK(5, 4)
+#define YT8531_CCR_CFG_LDO_3V3			0x0
+#define YT8531_CCR_CFG_LDO_1V8			0x2
 
 /* bits in struct ytphy_plat_priv->flag */
 #define TX_CLK_ADJ_ENABLED			BIT(0)
@@ -209,6 +245,17 @@ static int ytphy_modify_ext(struct phy_device *phydev, u16 regnum, u16 mask,
 		return ret;
 
 	return phy_modify(phydev, MDIO_DEVAD_NONE, YTPHY_PAGE_DATA, mask, set);
+}
+
+static int ytphy_read_ext(struct phy_device *phydev, u16 regnum)
+{
+	int ret;
+
+	ret = phy_write(phydev, MDIO_DEVAD_NONE, YTPHY_PAGE_SELECT, regnum);
+	if (ret < 0)
+		return ret;
+
+	return phy_read(phydev, MDIO_DEVAD_NONE, YTPHY_PAGE_DATA);
 }
 
 static int ytphy_rgmii_clk_delay_config(struct phy_device *phydev)
@@ -330,22 +377,16 @@ static int yt8531_startup(struct phy_device *phydev)
 static void ytphy_dt_parse(struct phy_device *phydev)
 {
 	struct ytphy_plat_priv	*priv = phydev->priv;
-	int ret;
 
-	ret = ofnode_read_u32(phydev->node, "motorcomm,clk-out-frequency-hz",
-			      &priv->clk_out_frequency);
-	if (ret < 0)
-		priv->clk_out_frequency = YTPHY_DTS_OUTPUT_CLK_DIS;
-
-	ret = ofnode_read_u32(phydev->node, "rx-internal-delay-ps",
-			      &priv->rx_delay_ps);
-	if (ret < 0)
-		priv->rx_delay_ps = YT8531_RC1R_RGMII_1_950_NS;
-
-	ret = ofnode_read_u32(phydev->node, "tx-internal-delay-ps",
-			      &priv->tx_delay_ps);
-	if (ret < 0)
-		priv->tx_delay_ps = YT8531_RC1R_RGMII_1_950_NS;
+	priv->clk_out_frequency = ofnode_read_u32_default(phydev->node,
+							  "motorcomm,clk-out-frequency-hz",
+							  YTPHY_DTS_OUTPUT_CLK_DIS);
+	priv->rx_delay_ps = ofnode_read_u32_default(phydev->node,
+						    "rx-internal-delay-ps",
+						    YT8531_RC1R_RGMII_1_950_NS);
+	priv->tx_delay_ps = ofnode_read_u32_default(phydev->node,
+						    "tx-internal-delay-ps",
+						    YT8531_RC1R_RGMII_1_950_NS);
 
 	if (ofnode_read_bool(phydev->node, "motorcomm,auto-sleep-disabled"))
 		priv->flag |= AUTO_SLEEP_DISABLED;
@@ -364,6 +405,58 @@ static void ytphy_dt_parse(struct phy_device *phydev)
 
 	if (ofnode_read_bool(phydev->node, "motorcomm,tx-clk-1000-inverted"))
 		priv->flag |= TX_CLK_1000_INVERTED;
+}
+
+static int yt8511_config(struct phy_device *phydev)
+{
+	u32 ge, fe;
+	int ret;
+
+	ret = genphy_config_aneg(phydev);
+	if (ret < 0)
+		return ret;
+
+	switch (phydev->interface) {
+	case PHY_INTERFACE_MODE_RGMII:
+		ge = YT8511_DELAY_GE_TX_DIS;
+		fe = YT8511_DELAY_FE_TX_DIS;
+		break;
+	case PHY_INTERFACE_MODE_RGMII_RXID:
+		ge = YT8511_DELAY_RX | YT8511_DELAY_GE_TX_DIS;
+		fe = YT8511_DELAY_FE_TX_DIS;
+		break;
+	case PHY_INTERFACE_MODE_RGMII_TXID:
+		ge = YT8511_DELAY_GE_TX_EN;
+		fe = YT8511_DELAY_FE_TX_EN;
+		break;
+	case PHY_INTERFACE_MODE_RGMII_ID:
+		ge = YT8511_DELAY_RX | YT8511_DELAY_GE_TX_EN;
+		fe = YT8511_DELAY_FE_TX_EN;
+		break;
+	default: /* do not support other modes */
+		return -EOPNOTSUPP;
+	}
+
+	ret = ytphy_modify_ext(phydev, YT8511_EXT_CLK_GATE,
+			       (YT8511_DELAY_RX | YT8511_DELAY_GE_TX_EN), ge);
+	if (ret < 0)
+		return ret;
+	/* set clock mode to 125m */
+	ret = ytphy_modify_ext(phydev, YT8511_EXT_CLK_GATE,
+			       YT8511_CLK_125M, YT8511_CLK_125M);
+	if (ret < 0)
+		return ret;
+	ret = ytphy_modify_ext(phydev, YT8511_EXT_DELAY_DRIVE,
+			       YT8511_DELAY_FE_TX_EN, fe);
+	if (ret < 0)
+		return ret;
+	/* sleep control, disable PLL in sleep for now */
+	ret = ytphy_modify_ext(phydev, YT8511_EXT_SLEEP_CTRL, YT8511_PLLON_SLP,
+			       0);
+	if (ret < 0)
+		return ret;
+
+	return 0;
 }
 
 static int yt8521_config(struct phy_device *phydev)
@@ -431,6 +524,111 @@ static int yt8521_config(struct phy_device *phydev)
 	return 0;
 }
 
+/**
+ * struct ytphy_ldo_vol_map - map a current value to a register value
+ * @vol: ldo voltage
+ * @ds:  value in the register
+ * @cur: value in device configuration
+ */
+struct ytphy_ldo_vol_map {
+	u32 vol;
+	u32 ds;
+	u32 cur;
+};
+
+static const struct ytphy_ldo_vol_map yt8531_ldo_vol[] = {
+	{.vol = YT8531_CCR_CFG_LDO_1V8, .ds = 0, .cur = 1200},
+	{.vol = YT8531_CCR_CFG_LDO_1V8, .ds = 1, .cur = 2100},
+	{.vol = YT8531_CCR_CFG_LDO_1V8, .ds = 2, .cur = 2700},
+	{.vol = YT8531_CCR_CFG_LDO_1V8, .ds = 3, .cur = 2910},
+	{.vol = YT8531_CCR_CFG_LDO_1V8, .ds = 4, .cur = 3110},
+	{.vol = YT8531_CCR_CFG_LDO_1V8, .ds = 5, .cur = 3600},
+	{.vol = YT8531_CCR_CFG_LDO_1V8, .ds = 6, .cur = 3970},
+	{.vol = YT8531_CCR_CFG_LDO_1V8, .ds = 7, .cur = 4350},
+	{.vol = YT8531_CCR_CFG_LDO_3V3, .ds = 0, .cur = 3070},
+	{.vol = YT8531_CCR_CFG_LDO_3V3, .ds = 1, .cur = 4080},
+	{.vol = YT8531_CCR_CFG_LDO_3V3, .ds = 2, .cur = 4370},
+	{.vol = YT8531_CCR_CFG_LDO_3V3, .ds = 3, .cur = 4680},
+	{.vol = YT8531_CCR_CFG_LDO_3V3, .ds = 4, .cur = 5020},
+	{.vol = YT8531_CCR_CFG_LDO_3V3, .ds = 5, .cur = 5450},
+	{.vol = YT8531_CCR_CFG_LDO_3V3, .ds = 6, .cur = 5740},
+	{.vol = YT8531_CCR_CFG_LDO_3V3, .ds = 7, .cur = 6140},
+};
+
+static u32 yt8531_get_ldo_vol(struct phy_device *phydev)
+{
+	u32 val;
+
+	val = ytphy_read_ext(phydev, YT8531_CHIP_CONFIG_REG);
+	val = FIELD_GET(YT8531_CCR_CFG_LDO_MASK, val);
+
+	return val <= YT8531_CCR_CFG_LDO_1V8 ? val : YT8531_CCR_CFG_LDO_1V8;
+}
+
+static int yt8531_get_ds_map(struct phy_device *phydev, u32 cur)
+{
+	u32 vol;
+	int i;
+
+	vol = yt8531_get_ldo_vol(phydev);
+	for (i = 0; i < ARRAY_SIZE(yt8531_ldo_vol); i++) {
+		if (yt8531_ldo_vol[i].vol == vol && yt8531_ldo_vol[i].cur == cur)
+			return yt8531_ldo_vol[i].ds;
+	}
+
+	return -EINVAL;
+}
+
+static int yt8531_set_ds(struct phy_device *phydev)
+{
+	u32 ds_field_low, ds_field_hi, val;
+	int ret, ds;
+
+	/* set rgmii rx clk driver strength */
+	if (!ofnode_read_u32(phydev->node, "motorcomm,rx-clk-drv-microamp", &val)) {
+		ds = yt8531_get_ds_map(phydev, val);
+		if (ds < 0) {
+			pr_warn("No matching current value was found.");
+			return -EINVAL;
+		}
+	} else {
+		ds = YT8531_RGMII_RX_DS_DEFAULT;
+	}
+
+	ret = ytphy_modify_ext(phydev,
+			       YT8531_PAD_DRIVE_STRENGTH_CFG_REG,
+			       YT8531_RGMII_RXC_DS_MASK,
+			       FIELD_PREP(YT8531_RGMII_RXC_DS_MASK, ds));
+	if (ret < 0)
+		return ret;
+
+	/* set rgmii rx data driver strength */
+	if (!ofnode_read_u32(phydev->node, "motorcomm,rx-data-drv-microamp", &val)) {
+		ds = yt8531_get_ds_map(phydev, val);
+		if (ds < 0) {
+			pr_warn("No matching current value was found.");
+			return -EINVAL;
+		}
+	} else {
+		ds = YT8531_RGMII_RX_DS_DEFAULT;
+	}
+
+	ds_field_hi = FIELD_GET(BIT(2), ds);
+	ds_field_hi = FIELD_PREP(YT8531_RGMII_RXD_DS_HI_MASK, ds_field_hi);
+
+	ds_field_low = FIELD_GET(GENMASK(1, 0), ds);
+	ds_field_low = FIELD_PREP(YT8531_RGMII_RXD_DS_LOW_MASK, ds_field_low);
+
+	ret = ytphy_modify_ext(phydev,
+			       YT8531_PAD_DRIVE_STRENGTH_CFG_REG,
+			       YT8531_RGMII_RXD_DS_LOW_MASK | YT8531_RGMII_RXD_DS_HI_MASK,
+			       ds_field_low | ds_field_hi);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
 static int yt8531_config(struct phy_device *phydev)
 {
 	struct ytphy_plat_priv	*priv = phydev->priv;
@@ -493,6 +691,10 @@ static int yt8531_config(struct phy_device *phydev)
 			return ret;
 	}
 
+	ret = yt8531_set_ds(phydev);
+	if (ret < 0)
+		return ret;
+
 	return 0;
 }
 
@@ -509,29 +711,17 @@ static int yt8531_probe(struct phy_device *phydev)
 	return 0;
 }
 
-static struct phy_driver motorcomm8531sh_driver = {
-	.name          = "YT8531SH Gigabit Ethernet",
-	.uid           = PHY_ID_YT8531SH,
+U_BOOT_PHY_DRIVER(motorcomm8511) = {
+	.name          = "YT8511 Gigabit Ethernet",
+	.uid           = PHY_ID_YT8511,
 	.mask          = PHY_ID_MASK,
 	.features      = PHY_GBIT_FEATURES,
-	.probe	       = &yt8531_probe,
-	.config        = &yt8521_config,
-	.startup       = &yt8531_startup,
+	.config        = &yt8511_config,
+	.startup       = &genphy_startup,
 	.shutdown      = &genphy_shutdown,
 };
 
-static struct phy_driver motorcomm8531_driver = {
-	.name          = "YT8531 Gigabit Ethernet",
-	.uid           = PHY_ID_YT8531,
-	.mask          = PHY_ID_MASK,
-	.features      = PHY_GBIT_FEATURES,
-	.probe	       = &yt8531_probe,
-	.config        = &yt8531_config,
-	.startup       = &yt8531_startup,
-	.shutdown      = &genphy_shutdown,
-};
-
-static struct phy_driver motorcomm8521_driver = {
+U_BOOT_PHY_DRIVER(motorcomm8521) = {
 	.name          = "YT8521 Gigabit Ethernet",
 	.uid           = PHY_ID_YT8521,
 	.mask          = PHY_ID_MASK,
@@ -542,11 +732,24 @@ static struct phy_driver motorcomm8521_driver = {
 	.shutdown      = &genphy_shutdown,
 };
 
-int phy_motorcomm_init(void)
-{
-	phy_register(&motorcomm8531sh_driver);
-	phy_register(&motorcomm8531_driver);
-	phy_register(&motorcomm8521_driver);
+U_BOOT_PHY_DRIVER(motorcomm8531) = {
+	.name          = "YT8531 Gigabit Ethernet",
+	.uid           = PHY_ID_YT8531,
+	.mask          = PHY_ID_MASK,
+	.features      = PHY_GBIT_FEATURES,
+	.probe	       = &yt8531_probe,
+	.config        = &yt8531_config,
+	.startup       = &yt8531_startup,
+	.shutdown      = &genphy_shutdown,
+};
 
-	return 0;
-}
+U_BOOT_PHY_DRIVER(motorcomm8531sh) = {
+	.name          = "YT8531SH Gigabit Ethernet",
+	.uid           = PHY_ID_YT8531SH,
+	.mask          = PHY_ID_MASK,
+	.features      = PHY_GBIT_FEATURES,
+	.probe	       = &yt8531_probe,
+	.config        = &yt8521_config,
+	.startup       = &yt8531_startup,
+	.shutdown      = &genphy_shutdown,
+};

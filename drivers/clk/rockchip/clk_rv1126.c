@@ -16,7 +16,6 @@
 #include <asm/arch-rockchip/grf_rv1126.h>
 #include <asm/arch-rockchip/hardware.h>
 #include <dm/device-internal.h>
-#include <asm/io.h>
 #include <dm/lists.h>
 #include <dt-bindings/clock/rockchip,rv1126-cru.h>
 
@@ -505,7 +504,7 @@ static int rv1126_pmuclk_bind(struct udevice *dev)
 	ret = offsetof(struct rv1126_pmucru, pmu_softrst_con[0]);
 	ret = rockchip_reset_bind(dev, ret, 2);
 	if (ret)
-		debug("Warning: software reset driver bind faile\n");
+		debug("Warning: software reset driver bind failed\n");
 #endif
 	return 0;
 }
@@ -1867,7 +1866,7 @@ static int rv1126_clk_bind(struct udevice *dev)
 	ret = offsetof(struct rv1126_cru, softrst_con[0]);
 	ret = rockchip_reset_bind(dev, ret, 15);
 	if (ret)
-		debug("Warning: software reset driver bind faile\n");
+		debug("Warning: software reset driver bind failed\n");
 #endif
 	return 0;
 }

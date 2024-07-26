@@ -22,12 +22,12 @@
 #include <asm/gpio.h>
 #include <asm/arch/imx8-pins.h>
 #include <asm/arch/iomux.h>
-#include <asm/arch/sci/sci.h>
 #include <asm/arch/sys_proto.h>
 #ifndef CONFIG_SPL
 #include <asm/arch-imx8/clock.h>
 #endif
 #include <linux/delay.h>
+#include "../common/eeprom.h"
 #include "../common/factoryset.h"
 
 #define GPIO_PAD_CTRL \
@@ -147,7 +147,7 @@ static void enet_device_phy_reset(void)
 int setup_gpr_fec(void)
 {
 	sc_ipc_t ipc_handle = -1;
-	sc_err_t err = 0;
+	int err = 0;
 	unsigned int test;
 
 	/*
@@ -156,14 +156,14 @@ int setup_gpr_fec(void)
 	 *	0: internal clock
 	 *	1: external clock --->  your choice for RMII
 	 *
-	 * CLKDIV_SEL: it controls a div by 2 on the internal clock path à
-	 *	it should be don’t care when using external clock
+	 * CLKDIV_SEL: it controls a div by 2 on the internal clock path a
+	 *	it should be don't care when using external clock
 	 *	0: non-divided clock
 	 *	1: clock divided by 2
 	 * 50_DISABLE or 125_DISABLE:
-	 *	it’s used to disable the clock tree going outside the chip
+	 *	it's used to disable the clock tree going outside the chip
 	 *	when reference clock is generated internally.
-	 *	It should be don’t care when reference clock is provided
+	 *	It should be don't care when reference clock is provided
 	 *	externally.
 	 *	0: clock is enabled
 	 *	1: clock is disabled
@@ -175,35 +175,35 @@ int setup_gpr_fec(void)
 	 */
 
 	err = sc_misc_set_control(ipc_handle, SC_R_ENET_1, SC_C_TXCLK, 1);
-	if (err != SC_ERR_NONE)
+	if (err)
 		printf("Error in setting up SC_C %d\n\r", SC_C_TXCLK);
 
 	sc_misc_get_control(ipc_handle, SC_R_ENET_1, SC_C_TXCLK, &test);
 	debug("TEST SC_C %d-->%d\n\r", SC_C_TXCLK, test);
 
 	err = sc_misc_set_control(ipc_handle, SC_R_ENET_1, SC_C_CLKDIV, 0);
-	if (err != SC_ERR_NONE)
+	if (err)
 		printf("Error in setting up SC_C %d\n\r", SC_C_CLKDIV);
 
 	sc_misc_get_control(ipc_handle, SC_R_ENET_1, SC_C_CLKDIV, &test);
 	debug("TEST SC_C %d-->%d\n\r", SC_C_CLKDIV, test);
 
 	err = sc_misc_set_control(ipc_handle, SC_R_ENET_1, SC_C_DISABLE_50, 0);
-	if (err != SC_ERR_NONE)
+	if (err)
 		printf("Error in setting up SC_C %d\n\r", SC_C_DISABLE_50);
 
 	sc_misc_get_control(ipc_handle, SC_R_ENET_1, SC_C_TXCLK, &test);
 	debug("TEST SC_C %d-->%d\n\r", SC_C_DISABLE_50, test);
 
 	err = sc_misc_set_control(ipc_handle, SC_R_ENET_1, SC_C_DISABLE_125, 1);
-	if (err != SC_ERR_NONE)
+	if (err)
 		printf("Error in setting up SC_C %d\n\r", SC_C_DISABLE_125);
 
 	sc_misc_get_control(ipc_handle, SC_R_ENET_1, SC_C_TXCLK, &test);
 	debug("TEST SC_C %d-->%d\n\r", SC_C_DISABLE_125, test);
 
 	err = sc_misc_set_control(ipc_handle, SC_R_ENET_1, SC_C_SEL_125, 1);
-	if (err != SC_ERR_NONE)
+	if (err)
 		printf("Error in setting up SC_C %d\n\r", SC_C_SEL_125);
 
 	sc_misc_get_control(ipc_handle, SC_R_ENET_1, SC_C_SEL_125, &test);
@@ -337,13 +337,11 @@ void board_late_mmc_env_init(void)
 }
 
 #ifndef CONFIG_SPL_BUILD
-int factoryset_read_eeprom(int i2c_addr);
-
 static int load_parameters_from_factoryset(void)
 {
 	int ret;
 
-	ret = factoryset_read_eeprom(EEPROM_I2C_ADDR);
+	ret = factoryset_read_eeprom(SIEMENS_EE_I2C_ADDR);
 	if (ret)
 		return ret;
 

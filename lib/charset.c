@@ -5,7 +5,6 @@
  *  Copyright (c) 2017 Rob Clark
  */
 
-#include <common.h>
 #include <charset.h>
 #include <capitalization.h>
 #include <cp437.h>
@@ -16,7 +15,7 @@
 /**
  * codepage_437 - Unicode to codepage 437 translation table
  */
-const u16 codepage_437[128] = CP437;
+const u16 codepage_437[160] = CP437;
 
 static struct capitalization_table capitalization_table[] =
 #ifdef CONFIG_EFI_UNICODE_CAPITALIZATION
@@ -388,7 +387,7 @@ int u16_strcasecmp(const u16 *s1, const u16 *s2)
  *		> 0 if the first different u16 in s1 is greater than the
  *		corresponding u16 in s2
  */
-int u16_strncmp(const u16 *s1, const u16 *s2, size_t n)
+int __efi_runtime u16_strncmp(const u16 *s1, const u16 *s2, size_t n)
 {
 	int ret = 0;
 
@@ -444,14 +443,14 @@ u16 *u16_strdup(const void *src)
 
 size_t u16_strlcat(u16 *dest, const u16 *src, size_t count)
 {
-	size_t destlen = u16_strlen(dest);
+	size_t destlen = u16_strnlen(dest, count);
 	size_t srclen = u16_strlen(src);
-	size_t ret = destlen + srclen + 1;
+	size_t ret = destlen + srclen;
 
 	if (destlen >= count)
 		return ret;
-	if (ret > count)
-		srclen -= ret - count;
+	if (ret >= count)
+		srclen -= (ret - count + 1);
 	memcpy(&dest[destlen], src, 2 * srclen);
 	dest[destlen + srclen] = 0x0000;
 
@@ -517,9 +516,12 @@ int utf_to_cp(s32 *c, const u16 *codepage)
 		int j;
 
 		/* Look up codepage translation */
-		for (j = 0; j < 0x80; ++j) {
+		for (j = 0; j < 0xA0; ++j) {
 			if (*c == codepage[j]) {
-				*c = j + 0x80;
+				if (j < 0x20)
+					*c = j;
+				else
+					*c = j + 0x60;
 				return 0;
 			}
 		}
@@ -571,6 +573,10 @@ int utf8_to_utf32_stream(u8 c, char *buffer)
 		}
 		if (pos == end)
 			return 0;
+		/*
+		 * Appending the byte lead to an invalid UTF-8 byte sequence.
+		 * Consider it as the start of a new code sequence.
+		 */
 		*buffer = 0;
 	}
 }

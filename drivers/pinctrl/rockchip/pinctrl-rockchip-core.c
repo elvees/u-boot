@@ -12,13 +12,12 @@
 #include <fdtdec.h>
 #include <linux/bitops.h>
 #include <linux/libfdt.h>
-#include <asm/global_data.h>
 
 #include "pinctrl-rockchip.h"
+#include <dt-bindings/pinctrl/rockchip.h>
 
 #define MAX_ROCKCHIP_PINS_ENTRIES	30
 #define MAX_ROCKCHIP_GPIO_PER_BANK      32
-#define RK_FUNC_GPIO                    0
 
 static int rockchip_verify_config(struct udevice *dev, u32 bank, u32 pin)
 {
@@ -133,8 +132,12 @@ static int rockchip_get_mux(struct rockchip_pin_bank *bank, int pin)
 	if (bank->iomux[iomux_num].type & IOMUX_GPIO_ONLY)
 		return RK_FUNC_GPIO;
 
-	regmap = (bank->iomux[iomux_num].type & IOMUX_SOURCE_PMU)
-				? priv->regmap_pmu : priv->regmap_base;
+	if (bank->iomux[iomux_num].type & IOMUX_SOURCE_PMU)
+		regmap = priv->regmap_pmu;
+	else if (bank->iomux[iomux_num].type & IOMUX_L_SOURCE_PMU)
+		regmap = (pin % 8 < 4) ? priv->regmap_pmu : priv->regmap_base;
+	else
+		regmap = priv->regmap_base;
 
 	/* get basic quadrupel of mux registers and the correct reg inside */
 	mux_type = bank->iomux[iomux_num].type;
@@ -143,6 +146,28 @@ static int rockchip_get_mux(struct rockchip_pin_bank *bank, int pin)
 
 	if (bank->recalced_mask & BIT(pin))
 		rockchip_get_recalced_mux(bank, pin, &reg, &bit, &mask);
+
+	if (IS_ENABLED(CONFIG_ROCKCHIP_RK3588)) {
+		if (bank->bank_num == 0) {
+			if (pin >= RK_PB4 && pin <= RK_PD7) {
+				u32 reg0 = 0;
+
+				reg0 = reg + 0x4000 - 0xC; /* PMU2_IOC_BASE */
+				ret = regmap_read(regmap, reg0, &val);
+				if (ret)
+					return ret;
+
+				ret = ((val >> bit) & mask);
+				if (ret != 8)
+					return ret;
+
+				reg = reg + 0x8000; /* BUS_IOC_BASE */
+				regmap = priv->regmap_base;
+			}
+		} else if (bank->bank_num > 0) {
+			reg += 0x8000; /* BUS_IOC_BASE */
+		}
+	}
 
 	ret = regmap_read(regmap, reg, &val);
 	if (ret)
@@ -173,7 +198,7 @@ static int rockchip_verify_mux(struct rockchip_pin_bank *bank,
 	}
 
 	if (bank->iomux[iomux_num].type & IOMUX_GPIO_ONLY) {
-		if (mux != IOMUX_GPIO_ONLY) {
+		if (mux != RK_FUNC_GPIO) {
 			debug("pin %d only supports a gpio mux\n", pin);
 			return -ENOTSUPP;
 		}
@@ -433,13 +458,7 @@ static int rockchip_pinctrl_set_state(struct udevice *dev,
 	int prop_len, param;
 	const u32 *data;
 	ofnode node;
-#ifdef CONFIG_OF_LIVE
-	const struct device_node *np;
-	struct property *pp;
-#else
-	int property_offset, pcfg_node;
-	const void *blob = gd->fdt_blob;
-#endif
+	struct ofprop prop;
 	data = dev_read_prop(config, "rockchip,pins", &count);
 	if (count < 0) {
 		debug("%s: bad array size %d\n", __func__, count);
@@ -473,24 +492,15 @@ static int rockchip_pinctrl_set_state(struct udevice *dev,
 		node = ofnode_get_by_phandle(conf);
 		if (!ofnode_valid(node))
 			return -ENODEV;
-#ifdef CONFIG_OF_LIVE
-		np = ofnode_to_np(node);
-		for (pp = np->properties; pp; pp = pp->next) {
-			prop_name = pp->name;
-			prop_len = pp->length;
-			value = pp->value;
-#else
-		pcfg_node = ofnode_to_offset(node);
-		fdt_for_each_property_offset(property_offset, blob, pcfg_node) {
-			value = fdt_getprop_by_offset(blob, property_offset,
-						      &prop_name, &prop_len);
+		ofnode_for_each_prop(prop, node) {
+			value = ofprop_get_property(&prop, &prop_name, &prop_len);
 			if (!value)
-				return -ENOENT;
-#endif
+				continue;
+
 			param = rockchip_pinconf_prop_name_to_param(prop_name,
 								    &default_val);
 			if (param < 0)
-				break;
+				continue;
 
 			if (prop_len >= sizeof(fdt32_t))
 				arg = fdt32_to_cpu(*(fdt32_t *)value);
@@ -548,12 +558,14 @@ static struct rockchip_pin_ctrl *rockchip_pinctrl_get_soc_data(struct udevice *d
 
 			/* preset iomux offset value, set new start value */
 			if (iom->offset >= 0) {
-				if (iom->type & IOMUX_SOURCE_PMU)
+				if ((iom->type & IOMUX_SOURCE_PMU) ||
+				    (iom->type & IOMUX_L_SOURCE_PMU))
 					pmu_offs = iom->offset;
 				else
 					grf_offs = iom->offset;
 			} else { /* set current iomux offset */
-				iom->offset = (iom->type & IOMUX_SOURCE_PMU) ?
+				iom->offset = ((iom->type & IOMUX_SOURCE_PMU) ||
+					       (iom->type & IOMUX_L_SOURCE_PMU)) ?
 							pmu_offs : grf_offs;
 			}
 

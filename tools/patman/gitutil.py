@@ -5,9 +5,9 @@
 import os
 import sys
 
-from patman import command
 from patman import settings
-from patman import terminal
+from u_boot_pylib import command
+from u_boot_pylib import terminal
 
 # True to use --no-decorate - we check this in setup()
 use_no_decorate = True
@@ -147,8 +147,9 @@ def get_upstream(git_dir, branch):
     if remote == '.':
         return merge, None
     elif remote and merge:
-        leaf = merge.split('/')[-1]
-        return '%s/%s' % (remote, leaf), None
+        # Drop the initial refs/heads from merge
+        leaf = merge.split('/', maxsplit=2)[2:]
+        return '%s/%s' % (remote, '/'.join(leaf)), None
     else:
         raise ValueError("Cannot determine upstream branch for branch "
                          "'%s' remote='%s', merge='%s'"
@@ -651,7 +652,7 @@ def get_default_user_name():
     Returns:
         User name found in .gitconfig file, or None if none
     """
-    uname = command.output_one_line('git', 'config', '--global', 'user.name')
+    uname = command.output_one_line('git', 'config', '--global', '--includes', 'user.name')
     return uname
 
 
@@ -661,7 +662,7 @@ def get_default_user_email():
     Returns:
         User's email found in .gitconfig file, or None if none
     """
-    uemail = command.output_one_line('git', 'config', '--global', 'user.email')
+    uemail = command.output_one_line('git', 'config', '--global', '--includes', 'user.email')
     return uemail
 
 

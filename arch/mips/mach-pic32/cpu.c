@@ -4,7 +4,6 @@
  * Purna Chandra Mandal <purna.mandal@microchip.com>
  *
  */
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <event.h>
@@ -31,7 +30,6 @@ static ulong rate(int id)
 	int ret;
 	struct udevice *dev;
 	struct clk clk;
-	ulong rate;
 
 	ret = uclass_get_device(UCLASS_CLK, 0, &dev);
 	if (ret) {
@@ -44,11 +42,7 @@ static ulong rate(int id)
 	if (ret < 0)
 		return ret;
 
-	rate = clk_get_rate(&clk);
-
-	clk_free(&clk);
-
-	return rate;
+	return clk_get_rate(&clk);
 }
 
 static ulong clk_get_cpu_rate(void)
@@ -57,7 +51,7 @@ static ulong clk_get_cpu_rate(void)
 }
 
 /* initialize prefetch module related to cpu_clk */
-static void prefetch_init(void)
+static int prefetch_init(void)
 {
 	struct pic32_reg_atomic *regs;
 	const void __iomem *base;
@@ -93,16 +87,12 @@ static void prefetch_init(void)
 	/* Enable prefetch for all */
 	writel(0x30, &regs->set);
 	iounmap(regs);
-}
 
-/* arch specific CPU init after DM */
-static int pic32_flash_prefetch(void *ctx, struct event *event)
-{
-	/* flash prefetch */
-	prefetch_init();
 	return 0;
 }
-EVENT_SPY(EVT_DM_POST_INIT, pic32_flash_prefetch);
+
+/* arch-specific CPU init after DM: flash prefetch */
+EVENT_SPY_SIMPLE(EVT_DM_POST_INIT_F, prefetch_init);
 
 /* Un-gate DDR2 modules (gated by default) */
 static void ddr2_pmd_ungate(void)
@@ -146,28 +136,5 @@ const char *get_core_name(void)
 	}
 
 	return str;
-}
-#endif
-#ifdef CONFIG_CMD_CLK
-
-int soc_clk_dump(void)
-{
-	int i;
-
-	printf("PLL Speed: %lu MHz\n",
-	       CLK_MHZ(rate(PLLCLK)));
-
-	printf("CPU Speed: %lu MHz\n", CLK_MHZ(rate(PB7CLK)));
-
-	printf("MPLL Speed: %lu MHz\n", CLK_MHZ(rate(MPLL)));
-
-	for (i = PB1CLK; i <= PB7CLK; i++)
-		printf("PB%d Clock Speed: %lu MHz\n", i - PB1CLK + 1,
-		       CLK_MHZ(rate(i)));
-
-	for (i = REF1CLK; i <= REF5CLK; i++)
-		printf("REFO%d Clock Speed: %lu MHz\n", i - REF1CLK + 1,
-		       CLK_MHZ(rate(i)));
-	return 0;
 }
 #endif

@@ -1,5 +1,8 @@
 .. SPDX-License-Identifier: GPL-2.0+
 
+.. index::
+   single: qfw (command)
+
 qfw command
 ===========
 
@@ -15,7 +18,7 @@ Synopsis
 Description
 -----------
 
-The *qfw* command is used to retrieve information form the QEMU firmware.
+The *qfw* command is used to retrieve information from the QEMU firmware.
 
 The *qfw list* sub-command displays the QEMU firmware files.
 
@@ -41,18 +44,21 @@ QEMU firmware files are listed via the *qfw list* command:
 ::
 
     => qfw list
-    etc/boot-fail-wait
-    etc/smbios/smbios-tables
-    etc/smbios/smbios-anchor
-    etc/e820
-    genroms/kvmvapic.bin
-    genroms/linuxboot.bin
-    etc/system-states
-    etc/acpi/tables
-    etc/table-loader
-    etc/tpm/log
-    etc/acpi/rsdp
-    bootorder
+    00000000 bios-geometry
+    00000000 bootorder
+    000f0060 etc/acpi/rsdp
+    bed14040 etc/acpi/tables
+    00000000 etc/boot-fail-wait
+    00000000 etc/e820
+    00000000 etc/smbios/smbios-anchor
+    00000000 etc/smbios/smbios-tables
+    00000000 etc/system-states
+    00000000 etc/table-loader
+    00000000 etc/tpm/log
+    00000000 genroms/kvmvapic.bin
+
+Where an address is shown, it indicates where the data is available for
+inspection, e.g. using the :doc:`md`.
 
 The available CPUs can be shown via the *qfw cpus* command:
 

@@ -61,11 +61,20 @@
 #define RK3588_OTPC_INT_ST		0x0084
 #define RK3588_RD_DONE			BIT(1)
 
+#define RV1126_OTP_NVM_CEB		0x00
+#define RV1126_OTP_NVM_RSTB		0x04
+#define RV1126_OTP_NVM_ST		0x18
+#define RV1126_OTP_NVM_RADDR		0x1C
+#define RV1126_OTP_NVM_RSTART		0x20
+#define RV1126_OTP_NVM_RDATA		0x24
+#define RV1126_OTP_READ_ST		0x30
+
 struct rockchip_otp_plat {
 	void __iomem *base;
 };
 
 struct rockchip_otp_data {
+	int (*init)(struct udevice *dev);
 	int (*read)(struct udevice *dev, int offset, void *buf, int size);
 	int offset;
 	int size;
@@ -89,7 +98,7 @@ static int dump_otp(struct cmd_tbl *cmdtp, int flag,
 
 	for (i = 0; true; i += sizeof(data)) {
 		ret = misc_read(dev, i, &data, sizeof(data));
-		if (ret < 0)
+		if (ret <= 0)
 			return 0;
 
 		print_buffer(i, data, 1, sizeof(data), sizeof(data));
@@ -232,6 +241,48 @@ static int rockchip_rk3588_otp_read(struct udevice *dev, int offset,
 	return 0;
 }
 
+static int rockchip_rv1126_otp_init(struct udevice *dev)
+{
+	struct rockchip_otp_plat *otp = dev_get_plat(dev);
+	int ret;
+
+	writel(0x0, otp->base + RV1126_OTP_NVM_CEB);
+	ret = rockchip_otp_poll_timeout(otp, 0x1, RV1126_OTP_NVM_ST);
+
+	if (ret)
+		return ret;
+
+	writel(0x1, otp->base + RV1126_OTP_NVM_RSTB);
+	ret = rockchip_otp_poll_timeout(otp, 0x4, RV1126_OTP_NVM_ST);
+
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static int rockchip_rv1126_otp_read(struct udevice *dev, int offset, void *buf,
+				    int size)
+{
+	struct rockchip_otp_plat *otp = dev_get_plat(dev);
+	u32 status = 0;
+	u8 *buffer = buf;
+	int ret = 0;
+
+	while (size--) {
+		writel(offset++, otp->base + RV1126_OTP_NVM_RADDR);
+		writel(0x1, otp->base + RV1126_OTP_NVM_RSTART);
+		ret = readl_poll_timeout(otp->base + RV1126_OTP_READ_ST,
+					 status, !status, OTPC_TIMEOUT);
+		if (ret)
+			return ret;
+
+		*buffer++ = (u8)(readl(otp->base + RV1126_OTP_NVM_RDATA) & 0xFF);
+	}
+
+	return 0;
+}
+
 static int rockchip_otp_read(struct udevice *dev, int offset,
 			     void *buf, int size)
 {
@@ -249,8 +300,10 @@ static int rockchip_otp_read(struct udevice *dev, int offset,
 
 	offset += data->offset;
 
-	if (data->block_size <= 1)
-		return data->read(dev, offset, buf, size);
+	if (data->block_size <= 1) {
+		ret = data->read(dev, offset, buf, size);
+		goto done;
+	}
 
 	block_start = offset / data->block_size;
 	block_offset = offset % data->block_size;
@@ -266,7 +319,9 @@ static int rockchip_otp_read(struct udevice *dev, int offset,
 		memcpy(buf, buffer + block_offset, size);
 
 	free(buffer);
-	return ret;
+
+done:
+	return ret < 0 ? ret : size;
 }
 
 static const struct misc_ops rockchip_otp_ops = {
@@ -278,6 +333,20 @@ static int rockchip_otp_of_to_plat(struct udevice *dev)
 	struct rockchip_otp_plat *plat = dev_get_plat(dev);
 
 	plat->base = dev_read_addr_ptr(dev);
+
+	return 0;
+}
+
+static int rockchip_otp_probe(struct udevice *dev)
+{
+	struct rockchip_otp_data *data;
+
+	data = (struct rockchip_otp_data *)dev_get_driver_data(dev);
+	if (!data)
+		return -EINVAL;
+
+	if (data->init)
+		return data->init(dev);
 
 	return 0;
 }
@@ -300,6 +369,12 @@ static const struct rockchip_otp_data rk3588_data = {
 	.block_size = 4,
 };
 
+static const struct rockchip_otp_data rv1126_data = {
+	.init = rockchip_rv1126_otp_init,
+	.read = rockchip_rv1126_otp_read,
+	.size = 0x40,
+};
+
 static const struct udevice_id rockchip_otp_ids[] = {
 	{
 		.compatible = "rockchip,px30-otp",
@@ -317,6 +392,10 @@ static const struct udevice_id rockchip_otp_ids[] = {
 		.compatible = "rockchip,rk3588-otp",
 		.data = (ulong)&rk3588_data,
 	},
+	{
+		.compatible = "rockchip,rv1126-otp",
+		.data = (ulong)&rv1126_data,
+	},
 	{}
 };
 
@@ -327,4 +406,5 @@ U_BOOT_DRIVER(rockchip_otp) = {
 	.of_to_plat = rockchip_otp_of_to_plat,
 	.plat_auto = sizeof(struct rockchip_otp_plat),
 	.ops = &rockchip_otp_ops,
+	.probe = rockchip_otp_probe,
 };

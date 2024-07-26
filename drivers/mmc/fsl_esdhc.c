@@ -252,7 +252,7 @@ static void esdhc_setup_dma(struct fsl_esdhc_priv *priv, struct mmc_data *data)
 	    priv->adma_desc_table) {
 		debug("Using ADMA2\n");
 		/* prefer ADMA2 if it is available */
-		sdhci_prepare_adma_table(priv->adma_desc_table, data,
+		sdhci_prepare_adma_table(NULL, priv->adma_desc_table, data,
 					 priv->dma_addr);
 
 		adma_addr = virt_to_phys(priv->adma_desc_table);
@@ -1123,7 +1123,7 @@ static int fsl_esdhc_execute_tuning(struct udevice *dev, uint32_t opcode)
 	esdhc_write32(&regs->irqstaten, IRQSTATEN_BRR);
 
 	for (i = 0; i < MAX_TUNING_LOOP; i++) {
-		mmc_send_tuning(mmc, opcode, NULL);
+		mmc_send_tuning(mmc, opcode);
 		mdelay(1);
 
 		val = esdhc_read32(&regs->autoc12err);

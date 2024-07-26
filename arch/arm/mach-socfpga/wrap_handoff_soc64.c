@@ -10,6 +10,14 @@
 #include <errno.h>
 #include "log.h"
 
+#ifndef __ASSEMBLY__
+enum endianness {
+	LITTLE_ENDIAN = 0,
+	BIG_ENDIAN,
+	UNKNOWN_ENDIANNESS
+};
+#endif
+
 static enum endianness check_endianness(u32 handoff)
 {
 	switch (handoff) {

@@ -1,7 +1,10 @@
 .. SPDX-License-Identifier: GPL-2.0+:
 
+.. index::
+   single: wdt (command)
+
 wdt command
-============
+===========
 
 Synopsis
 --------

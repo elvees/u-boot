@@ -36,14 +36,19 @@ static int is_printable_string(const void *data, int len);
  */
 struct fdt_header *working_fdt;
 
-void set_working_fdt_addr(ulong addr)
+static void set_working_fdt_addr_quiet(ulong addr)
 {
 	void *buf;
 
-	printf("Working FDT set to %lx\n", addr);
 	buf = map_sysmem(addr, 0);
 	working_fdt = buf;
 	env_set_hex("fdtaddr", addr);
+}
+
+void set_working_fdt_addr(ulong addr)
+{
+	printf("Working FDT set to %lx\n", addr);
+	set_working_fdt_addr_quiet(addr);
 }
 
 /*
@@ -192,10 +197,14 @@ static int do_fdt(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		if ((quiet && fdt_check_header(blob)) ||
 		    (!quiet && !fdt_valid(&blob)))
 			return 1;
-		if (control)
+		if (control) {
 			gd->fdt_blob = blob;
-		else
-			set_working_fdt_addr(addr);
+		} else {
+			if (quiet)
+				set_working_fdt_addr_quiet(addr);
+			else
+				set_working_fdt_addr(addr);
+		}
 
 		if (argc >= 2) {
 			int  len;
@@ -475,18 +484,9 @@ static int do_fdt(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 					if (ret != 0)
 						return ret;
 				} else if (subcmd[0] == 'a') {
-					/* Get address */
-					char buf[19];
-
-					snprintf(buf, sizeof(buf), "0x%lx",
-						 (ulong)map_to_sysmem(nodep));
-					env_set(var, buf);
+					env_set_hex(var, (ulong)map_to_sysmem(nodep));
 				} else if (subcmd[0] == 's') {
-					/* Get size */
-					char buf[11];
-
-					sprintf(buf, "0x%08X", len);
-					env_set(var, buf);
+					env_set_hex(var, len);
 				} else
 					return CMD_RET_USAGE;
 				return 0;
@@ -733,7 +733,7 @@ static int do_fdt(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 
 		gd->fdt_blob = blob;
 		cfg_noffset = fit_conf_get_node(working_fdt, NULL);
-		if (!cfg_noffset) {
+		if (cfg_noffset < 0) {
 			printf("Could not find configuration node: %s\n",
 			       fdt_strerror(cfg_noffset));
 			return CMD_RET_FAILURE;
@@ -1113,8 +1113,7 @@ static int fdt_print(const char *pathp, char *prop, int depth)
 }
 
 /********************************************************************/
-#ifdef CONFIG_SYS_LONGHELP
-static char fdt_help_text[] =
+U_BOOT_LONGHELP(fdt,
 	"addr [-c] [-q] <addr> [<size>]  - Set the [control] fdt location to <addr>\n"
 #ifdef CONFIG_OF_LIBFDT_OVERLAY
 	"fdt apply <addr>                    - Apply overlay to the DT\n"
@@ -1153,8 +1152,7 @@ static char fdt_help_text[] =
 	"                                               default gd->fdt_blob\n"
 #endif
 	"NOTE: Dereference aliases by omitting the leading '/', "
-		"e.g. fdt print ethernet0.";
-#endif
+		"e.g. fdt print ethernet0.");
 
 U_BOOT_CMD(
 	fdt,	255,	0,	do_fdt,

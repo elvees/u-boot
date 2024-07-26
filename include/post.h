@@ -11,7 +11,6 @@
 #define _POST_H
 
 #ifndef	__ASSEMBLY__
-#include <common.h>
 #include <asm/io.h>
 
 #if defined(CONFIG_POST)
@@ -105,9 +104,6 @@ void post_bootmode_clear (void);
 int post_run (char *name, int flags);
 int post_info (char *name);
 int post_log (char *format, ...);
-#ifdef CONFIG_NEEDS_MANUAL_RELOC
-void post_reloc (void);
-#endif
 unsigned long post_time_ms (unsigned long base);
 
 /**

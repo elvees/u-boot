@@ -14,13 +14,15 @@
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/imx93_pins.h>
+#include <asm/arch/mu.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/mach-imx/boot_mode.h>
 #include <asm/mach-imx/mxc_i2c.h>
 #include <asm/arch-mx7ulp/gpio.h>
+#include <asm/mach-imx/ele_api.h>
 #include <asm/mach-imx/syscounter.h>
-#include <asm/mach-imx/s400_api.h>
+#include <asm/sections.h>
 #include <dm/uclass.h>
 #include <dm/device.h>
 #include <dm/uclass-internal.h>
@@ -42,6 +44,12 @@ int spl_board_boot_device(enum boot_device boot_dev_spl)
 
 void spl_board_init(void)
 {
+	int ret;
+
+	ret = ele_start_rng();
+	if (ret)
+		printf("Fail to start RNG: %d\n", ret);
+
 	puts("Normal Boot\n");
 }
 
@@ -67,10 +75,23 @@ int power_init_board(void)
 	/* BUCKxOUT_DVS0/1 control BUCK123 output */
 	pmic_reg_write(dev, PCA9450_BUCK123_DVS, 0x29);
 
-	/* 0.9v
-	 */
-	pmic_reg_write(dev, PCA9450_BUCK1OUT_DVS0, 0x18);
-	pmic_reg_write(dev, PCA9450_BUCK3OUT_DVS0, 0x18);
+	/* enable DVS control through PMIC_STBY_REQ */
+	pmic_reg_write(dev, PCA9450_BUCK1CTRL, 0x59);
+
+	if (IS_ENABLED(CONFIG_IMX9_LOW_DRIVE_MODE)) {
+		/* 0.75v for Low drive mode
+		 */
+		pmic_reg_write(dev, PCA9450_BUCK1OUT_DVS0, 0x0c);
+		pmic_reg_write(dev, PCA9450_BUCK3OUT_DVS0, 0x0c);
+	} else {
+		/* 0.9v for Over drive mode
+		 */
+		pmic_reg_write(dev, PCA9450_BUCK1OUT_DVS0, 0x18);
+		pmic_reg_write(dev, PCA9450_BUCK3OUT_DVS0, 0x18);
+	}
+
+	/* set standby voltage to 0.65v */
+	pmic_reg_write(dev, PCA9450_BUCK1OUT_DVS1, 0x4);
 
 	/* I2C_LT_EN*/
 	pmic_reg_write(dev, 0xa, 0x3);
@@ -78,7 +99,6 @@ int power_init_board(void)
 }
 #endif
 
-extern int imx9_probe_mu(void *ctx, struct event *event);
 void board_init_f(ulong dummy)
 {
 	int ret;
@@ -96,17 +116,18 @@ void board_init_f(ulong dummy)
 
 	preloader_console_init();
 
-	ret = imx9_probe_mu(NULL, NULL);
+	ret = imx9_probe_mu();
 	if (ret) {
 		printf("Fail to init Sentinel API\n");
 	} else {
-		printf("SOC: 0x%x\n", gd->arch.soc_rev);
-		printf("LC: 0x%x\n", gd->arch.lifecycle);
+		debug("SOC: 0x%x\n", gd->arch.soc_rev);
+		debug("LC: 0x%x\n", gd->arch.lifecycle);
 	}
+
 	power_init_board();
 
-	/* 1.7GHz */
-	set_arm_clk(1700000000);
+	if (!IS_ENABLED(CONFIG_IMX9_LOW_DRIVE_MODE))
+		set_arm_clk(get_cpu_speed_grade_hz());
 
 	/* Init power of mix */
 	soc_power_init();

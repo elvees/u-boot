@@ -18,6 +18,7 @@
 #include <reset.h>
 #include <wait_bit.h>
 #include <asm/io.h>
+#include <linux/printk.h>
 
 #define ETH_RX_DESC			PKTBUFSRX
 #define ETH_MAX_MTU_SIZE		1518
@@ -456,8 +457,6 @@ static int bcm6348_eth_probe(struct udevice *dev)
 			pr_err("%s: error enabling clock %d\n", __func__, i);
 			return ret;
 		}
-
-		clk_free(&clk);
 	}
 
 	/* try to perform resets */

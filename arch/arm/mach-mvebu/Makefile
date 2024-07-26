@@ -22,12 +22,13 @@ else # CONFIG_ARCH_KIRKWOOD
 obj-y	= cpu.o
 obj-y	+= dram.o
 obj-y	+= lowlevel.o
-obj-$(CONFIG_DM_RESET) += system-controller.o
 ifndef CONFIG_SPL_BUILD
 obj-$(CONFIG_ARMADA_375) += ../../../drivers/ddr/marvell/axp/xor.o
 obj-$(CONFIG_ARMADA_38X) += ../../../drivers/ddr/marvell/a38x/xor.o
 obj-$(CONFIG_ARMADA_XP) += ../../../drivers/ddr/marvell/axp/xor.o
 obj-$(CONFIG_ARMADA_MSYS) += ../../../drivers/ddr/marvell/axp/xor.o
+
+obj-$(CONFIG_ARMADA_32BIT_SYSCON) += system-controller.o
 
 ifdef CONFIG_ARMADA_38X
 obj-$(CONFIG_MVEBU_EFUSE) += efuse.o
@@ -50,14 +51,32 @@ KWB_REPLACE += BOOT_FROM
 ifneq ($(CONFIG_MVEBU_SPL_BOOT_DEVICE_SPI),)
 	KWB_CFG_BOOT_FROM=spi
 endif
+ifneq ($(CONFIG_MVEBU_SPL_BOOT_DEVICE_NAND),)
+	KWB_CFG_BOOT_FROM=nand
+endif
 ifneq ($(CONFIG_MVEBU_SPL_BOOT_DEVICE_MMC),)
 	KWB_CFG_BOOT_FROM=sdio
 endif
 ifneq ($(CONFIG_MVEBU_SPL_BOOT_DEVICE_SATA),)
 	KWB_CFG_BOOT_FROM=sata
 endif
+ifneq ($(CONFIG_MVEBU_SPL_BOOT_DEVICE_PEX),)
+	KWB_CFG_BOOT_FROM=pex
+endif
 ifneq ($(CONFIG_MVEBU_SPL_BOOT_DEVICE_UART),)
 	KWB_CFG_BOOT_FROM=uart
+endif
+
+ifneq ($(CONFIG_MVEBU_SPL_BOOT_DEVICE_NAND),)
+KWB_REPLACE += NAND_PAGE_SIZE NAND_BLKSZ NAND_BADBLK_LOCATION
+KWB_CFG_NAND_PAGE_SIZE = $(CONFIG_SYS_NAND_PAGE_SIZE)
+KWB_CFG_NAND_BLKSZ = $(CONFIG_SYS_NAND_BLOCK_SIZE)
+KWB_CFG_NAND_BADBLK_LOCATION = $(CONFIG_MVEBU_SPL_NAND_BADBLK_LOCATION)
+endif
+
+ifneq ($(CONFIG_MVEBU_SPL_BOOT_DEVICE_SATA),)
+KWB_REPLACE += SATA_BLKSZ
+KWB_CFG_SATA_BLKSZ = $(CONFIG_MVEBU_SPL_SATA_BLKSZ)
 endif
 
 ifneq ($(CONFIG_SECURED_MODE_IMAGE),)

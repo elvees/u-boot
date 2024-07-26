@@ -16,6 +16,7 @@
 #include <asm/cache.h>
 #include <asm/byteorder.h>	/* for nton* / ntoh* stuff */
 #include <env.h>
+#include <hexdump.h>
 #include <log.h>
 #include <time.h>
 #include <linux/if_ether.h>
@@ -29,6 +30,7 @@ struct udevice;
 #define DEBUG_DEV_PKT 0		/* Packets or info directed to the device */
 #define DEBUG_NET_PKT 0		/* Packets on info on the network at large */
 #define DEBUG_INT_STATE 0	/* Internal network state changes */
+#define DEBUG_NET_PKT_TRACE 0	/* Trace all packet data */
 
 /*
  *	The number of receive packet buffers, and the required packet buffer
@@ -167,6 +169,9 @@ enum eth_recv_flags {
  *		    to the network stack. This function should fill in the
  *		    eth_pdata::enetaddr field - optional
  * set_promisc: Enable or Disable promiscuous mode
+ * get_sset_count: Number of statistics counters
+ * get_string: Names of the statistic counters
+ * get_stats: The values of the statistic counters
  */
 struct eth_ops {
 	int (*start)(struct udevice *dev);
@@ -178,6 +183,9 @@ struct eth_ops {
 	int (*write_hwaddr)(struct udevice *dev);
 	int (*read_rom_hwaddr)(struct udevice *dev);
 	int (*set_promisc)(struct udevice *dev, bool enable);
+	int (*get_sset_count)(struct udevice *dev);
+	void (*get_strings)(struct udevice *dev, u8 *data);
+	void (*get_stats)(struct udevice *dev, u64 *data);
 };
 
 #define eth_get_ops(dev) ((struct eth_ops *)(dev)->driver->ops)
@@ -484,6 +492,8 @@ extern char	net_hostname[32];	/* Our hostname */
 #ifdef CONFIG_NET
 extern char	net_root_path[CONFIG_BOOTP_MAX_ROOT_PATH_LEN];	/* Our root path */
 #endif
+/* Indicates whether the pxe path prefix / config file was specified in dhcp option */
+extern char *pxelinux_configfile;
 /** END OF BOOTP EXTENTIONS **/
 extern u8		net_ethaddr[ARP_HLEN];		/* Our ethernet address */
 extern u8		net_server_ethaddr[ARP_HLEN];	/* Boot server enet address */
@@ -504,8 +514,9 @@ extern ushort		net_native_vlan;	/* Our Native VLAN */
 extern int		net_restart_wrap;	/* Tried all network devices */
 
 enum proto_t {
-	BOOTP, RARP, ARP, TFTPGET, DHCP, PING, PING6, DNS, NFS, CDP, NETCONS,
-	SNTP, TFTPSRV, TFTPPUT, LINKLOCAL, FASTBOOT, WOL, UDP, NCSI, WGET
+	BOOTP, RARP, ARP, TFTPGET, DHCP, DHCP6, PING, PING6, DNS, NFS, CDP,
+	NETCONS, SNTP, TFTPSRV, TFTPPUT, LINKLOCAL, FASTBOOT_UDP, FASTBOOT_TCP,
+	WOL, UDP, NCSI, WGET, RS
 };
 
 extern char	net_boot_file_name[1024];/* Boot File name */
@@ -631,6 +642,8 @@ uchar * net_get_async_tx_pkt_buf(void);
 /* Transmit a packet */
 static inline void net_send_packet(uchar *pkt, int len)
 {
+	if (DEBUG_NET_PKT_TRACE)
+		print_hex_dump_bytes("tx: ", DUMP_PREFIX_OFFSET, pkt, len);
 	/* Currently no way to return errors from eth_send() */
 	(void) eth_send(pkt, len);
 }
@@ -916,5 +929,22 @@ void eth_set_enable_bootdevs(bool enable);
 #else
 static inline void eth_set_enable_bootdevs(bool enable) {}
 #endif
+
+/**
+ * wget_with_dns() - runs dns host IP address resulution before wget
+ *
+ * @dst_addr:	destination address to download the file
+ * @uri:	uri string of target file of wget
+ * Return:	downloaded file size, negative if failed
+ */
+int wget_with_dns(ulong dst_addr, char *uri);
+
+/**
+ * wget_validate_uri() - varidate the uri
+ *
+ * @uri:	uri string of target file of wget
+ * Return:	true if uri is valid, false if uri is invalid
+ */
+bool wget_validate_uri(char *uri);
 
 #endif /* __NET_H__ */

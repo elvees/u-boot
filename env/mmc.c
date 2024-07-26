@@ -114,8 +114,13 @@ static inline s64 mmc_offset(struct mmc *mmc, int copy)
 	if (IS_ENABLED(CONFIG_SYS_MMC_ENV_PART))
 		hwpart = mmc_get_env_part(mmc);
 
+#if defined(CONFIG_ENV_MMC_PARTITION)
+	str = CONFIG_ENV_MMC_PARTITION;
+#else
 	/* look for the partition in mmc CONFIG_SYS_MMC_ENV_DEV */
 	str = ofnode_conf_read_str(dt_prop.partition);
+#endif
+
 	if (str) {
 		/* try to place the environment at end of the partition */
 		err = mmc_offset_try_partition(str, copy, &val);
@@ -431,6 +436,7 @@ static int env_mmc_load(void)
 
 	ret = env_import_redund((char *)tmp_env1, read1_fail, (char *)tmp_env2,
 				read2_fail, H_EXTERNAL);
+	printf("Reading from %sMMC(%d)... ", gd->env_valid == ENV_REDUND ? "redundant " : "", dev);
 
 fini:
 	fini_mmc_for_env(mmc);
@@ -470,6 +476,8 @@ static int env_mmc_load(void)
 		goto fini;
 	}
 
+	printf("Reading from MMC(%d)... ", dev);
+
 	ret = env_import(buf, 1, H_EXTERNAL);
 	if (!ret) {
 		ep = (env_t *)buf;
@@ -490,7 +498,7 @@ U_BOOT_ENV_LOCATION(mmc) = {
 	.location	= ENVL_MMC,
 	ENV_NAME("MMC")
 	.load		= env_mmc_load,
-#ifndef CONFIG_SPL_BUILD
+#if defined(CONFIG_CMD_SAVEENV) && !defined(CONFIG_SPL_BUILD)
 	.save		= env_save_ptr(env_mmc_save),
 	.erase		= ENV_ERASE_PTR(env_mmc_erase)
 #endif

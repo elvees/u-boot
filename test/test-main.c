@@ -46,13 +46,13 @@ enum fdtchk_t {
  */
 static enum fdtchk_t fdt_action(void)
 {
-	/* Do a copy for sandbox (but only the U-Boot build, not SPL) */
-	if (CONFIG_IS_ENABLED(SANDBOX))
-		return FDTCHK_COPY;
-
 	/* For sandbox SPL builds, do nothing */
-	if (IS_ENABLED(CONFIG_SANDBOX))
+	if (IS_ENABLED(CONFIG_SANDBOX) && IS_ENABLED(CONFIG_SPL_BUILD))
 		return FDTCHK_NONE;
+
+	/* Do a copy for sandbox (but only the U-Boot build, not SPL) */
+	if (IS_ENABLED(CONFIG_SANDBOX))
+		return FDTCHK_COPY;
 
 	/* For all other boards, do a checksum */
 	return FDTCHK_CHECKSUM;
@@ -272,7 +272,7 @@ static int dm_test_restore(struct device_node *of_root)
 		return ret;
 	dm_scan_plat(false);
 	if (!CONFIG_IS_ENABLED(OF_PLATDATA))
-		dm_scan_fdt(false);
+		dm_extended_scan(false);
 
 	return 0;
 }
@@ -303,7 +303,7 @@ static int test_pre_run(struct unit_test_state *uts, struct unit_test *test)
 	if (test->flags & UT_TESTF_PROBE_TEST)
 		ut_assertok(do_autoprobe(uts));
 
-	if (!CONFIG_IS_ENABLED(OF_PLATDATA) &&
+	if (CONFIG_IS_ENABLED(OF_REAL) &&
 	    (test->flags & UT_TESTF_SCAN_FDT)) {
 		/*
 		 * only set this if we know the ethernet uclass will be created
@@ -476,7 +476,9 @@ static int ut_run_test_live_flat(struct unit_test_state *uts,
 	 *   (for sandbox we handle this by copying the tree, but not for other
 	 *    boards)
 	 */
-	if (!(test->flags & UT_TESTF_LIVE_TREE) &&
+	if ((!CONFIG_IS_ENABLED(OF_LIVE) ||
+	     (test->flags & UT_TESTF_SCAN_FDT)) &&
+	    !(test->flags & UT_TESTF_LIVE_TREE) &&
 	    (CONFIG_IS_ENABLED(OFNODE_MULTI_TREE) ||
 	     !(test->flags & UT_TESTF_OTHER_FDT)) &&
 	    (!runs || ut_test_run_on_flattree(test)) &&

@@ -14,9 +14,10 @@
 #include <mapmem.h>
 #include <spl.h>
 #include <sysinfo.h>
-#include <asm/cache.h>
 #include <asm/global_data.h>
+#include <asm/io.h>
 #include <linux/libfdt.h>
+#include <linux/printk.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -26,10 +27,6 @@ struct spl_fit_info {
 	int images_node;	/* FDT offset to "/images" node */
 	int conf_node;		/* FDT offset to selected configuration node */
 };
-
-__weak void board_spl_fit_post_load(const void *fit)
-{
-}
 
 __weak ulong board_spl_fit_size_align(ulong size)
 {
@@ -47,7 +44,7 @@ static int find_node_from_desc(const void *fit, int node, const char *str)
 	for (child = fdt_first_subnode(fit, node); child >= 0;
 	     child = fdt_next_subnode(fit, child)) {
 		int len;
-		const char *desc = fdt_getprop(fit, child, "description", &len);
+		const char *desc = fdt_getprop(fit, child, FIT_DESC_PROP, &len);
 
 		if (!desc)
 			continue;
@@ -174,29 +171,12 @@ static int spl_fit_get_image_node(const struct spl_fit_info *ctx,
 
 static int get_aligned_image_offset(struct spl_load_info *info, int offset)
 {
-	/*
-	 * If it is a FS read, get the first address before offset which is
-	 * aligned to ARCH_DMA_MINALIGN. If it is raw read return the
-	 * block number to which offset belongs.
-	 */
-	if (info->filename)
-		return offset & ~(ARCH_DMA_MINALIGN - 1);
-
-	return offset / info->bl_len;
+	return ALIGN_DOWN(offset, spl_get_bl_len(info));
 }
 
 static int get_aligned_image_overhead(struct spl_load_info *info, int offset)
 {
-	/*
-	 * If it is a FS read, get the difference between the offset and
-	 * the first address before offset which is aligned to
-	 * ARCH_DMA_MINALIGN. If it is raw read return the offset within the
-	 * block.
-	 */
-	if (info->filename)
-		return offset & (ARCH_DMA_MINALIGN - 1);
-
-	return offset % info->bl_len;
+	return offset & (spl_get_bl_len(info) - 1);
 }
 
 static int get_aligned_image_size(struct spl_load_info *info, int data_size,
@@ -204,14 +184,11 @@ static int get_aligned_image_size(struct spl_load_info *info, int data_size,
 {
 	data_size = data_size + get_aligned_image_overhead(info, offset);
 
-	if (info->filename)
-		return data_size;
-
-	return (data_size + info->bl_len - 1) / info->bl_len;
+	return ALIGN(data_size, spl_get_bl_len(info));
 }
 
 /**
- * spl_load_fit_image(): load the image described in a certain FIT node
+ * load_simple_fit(): load the image described in a certain FIT node
  * @info:	points to information about the device to load data from
  * @sector:	the start sector of the FIT image on the device
  * @ctx:	points to the FIT context structure
@@ -224,9 +201,9 @@ static int get_aligned_image_size(struct spl_load_info *info, int data_size,
  *
  * Return:	0 on success or a negative error number.
  */
-static int spl_load_fit_image(struct spl_load_info *info, ulong sector,
-			      const struct spl_fit_info *ctx, int node,
-			      struct spl_image_info *image_info)
+static int load_simple_fit(struct spl_load_info *info, ulong fit_offset,
+			   const struct spl_fit_info *ctx, int node,
+			   struct spl_image_info *image_info)
 {
 	int offset;
 	size_t length;
@@ -236,21 +213,20 @@ static int spl_load_fit_image(struct spl_load_info *info, ulong sector,
 	void *load_ptr;
 	void *src;
 	ulong overhead;
-	int nr_sectors;
 	uint8_t image_comp = -1, type = -1;
 	const void *data;
 	const void *fit = ctx->fit;
 	bool external_data = false;
 
 	if (IS_ENABLED(CONFIG_SPL_FPGA) ||
-	    (IS_ENABLED(CONFIG_SPL_OS_BOOT) && IS_ENABLED(CONFIG_SPL_GZIP))) {
+	    (IS_ENABLED(CONFIG_SPL_OS_BOOT) && spl_decompression_enabled())) {
 		if (fit_image_get_type(fit, node, &type))
 			puts("Cannot get image type.\n");
 		else
 			debug("%s ", genimg_get_type_name(type));
 	}
 
-	if (IS_ENABLED(CONFIG_SPL_GZIP)) {
+	if (spl_decompression_enabled()) {
 		fit_image_get_comp(fit, node, &image_comp);
 		debug("%s ", genimg_get_comp_name(image_comp));
 	}
@@ -285,15 +261,20 @@ static int spl_load_fit_image(struct spl_load_info *info, ulong sector,
 			return 0;
 		}
 
-		src_ptr = map_sysmem(ALIGN(load_addr, ARCH_DMA_MINALIGN), len);
+		if (spl_decompression_enabled() &&
+		    (image_comp == IH_COMP_GZIP || image_comp == IH_COMP_LZMA))
+			src_ptr = map_sysmem(ALIGN(CONFIG_SYS_LOAD_ADDR, ARCH_DMA_MINALIGN), len);
+		else
+			src_ptr = map_sysmem(ALIGN(load_addr, ARCH_DMA_MINALIGN), len);
 		length = len;
 
 		overhead = get_aligned_image_overhead(info, offset);
-		nr_sectors = get_aligned_image_size(info, length, offset);
+		size = get_aligned_image_size(info, length, offset);
 
 		if (info->read(info,
-			       sector + get_aligned_image_offset(info, offset),
-			       nr_sectors, src_ptr) != nr_sectors)
+			       fit_offset +
+			       get_aligned_image_offset(info, offset), size,
+			       src_ptr) < length)
 			return -EIO;
 
 		debug("External data: dst=%p, offset=%x, size=%lx\n",
@@ -330,6 +311,16 @@ static int spl_load_fit_image(struct spl_load_info *info, ulong sector,
 			return -EIO;
 		}
 		length = size;
+	} else if (IS_ENABLED(CONFIG_SPL_LZMA) && image_comp == IH_COMP_LZMA) {
+		size = CONFIG_SYS_BOOTM_LEN;
+		ulong loadEnd;
+
+		if (image_decomp(IH_COMP_LZMA, CONFIG_SYS_LOAD_ADDR, 0, 0,
+				 load_ptr, src, length, size, &loadEnd)) {
+			puts("Uncompressing error\n");
+			return -EIO;
+		}
+		length = loadEnd - CONFIG_SYS_LOAD_ADDR;
 	} else {
 		memcpy(load_ptr, src, length);
 	}
@@ -355,14 +346,20 @@ static bool os_takes_devicetree(uint8_t os)
 	case IH_OS_U_BOOT:
 		return true;
 	case IH_OS_LINUX:
-		return IS_ENABLED(CONFIG_SPL_OS_BOOT);
+		return IS_ENABLED(CONFIG_SPL_OS_BOOT) ||
+		       IS_ENABLED(CONFIG_SPL_OPENSBI);
 	default:
 		return false;
 	}
 }
 
+__weak int board_spl_fit_append_fdt_skip(const char *name)
+{
+	return 0;	/* Do not skip */
+}
+
 static int spl_fit_append_fdt(struct spl_image_info *spl_image,
-			      struct spl_load_info *info, ulong sector,
+			      struct spl_load_info *info, ulong offset,
 			      const struct spl_fit_info *ctx)
 {
 	struct spl_image_info image_info;
@@ -377,26 +374,32 @@ static int spl_fit_append_fdt(struct spl_image_info *spl_image,
 	/* Figure out which device tree the board wants to use */
 	node = spl_fit_get_image_node(ctx, FIT_FDT_PROP, index++);
 	if (node < 0) {
+		size_t size;
+
 		debug("%s: cannot find FDT node\n", __func__);
 
 		/*
 		 * U-Boot did not find a device tree inside the FIT image. Use
 		 * the U-Boot device tree instead.
 		 */
-		if (gd->fdt_blob)
-			memcpy((void *)image_info.load_addr, gd->fdt_blob,
-			       fdt_totalsize(gd->fdt_blob));
-		else
+		if (!gd->fdt_blob)
 			return node;
+
+		/*
+		 * Make the load-address of the FDT available for the SPL
+		 * framework
+		 */
+		size = fdt_totalsize(gd->fdt_blob);
+		spl_image->fdt_addr = map_sysmem(image_info.load_addr, size);
+		memcpy(spl_image->fdt_addr, gd->fdt_blob, size);
 	} else {
-		ret = spl_load_fit_image(info, sector, ctx, node,
-					 &image_info);
+		ret = load_simple_fit(info, offset, ctx, node, &image_info);
 		if (ret < 0)
 			return ret;
+
+		spl_image->fdt_addr = phys_to_virt(image_info.load_addr);
 	}
 
-	/* Make the load-address of the FDT available for the SPL framework */
-	spl_image->fdt_addr = map_sysmem(image_info.load_addr, 0);
 	if (CONFIG_IS_ENABLED(FIT_IMAGE_TINY))
 		return 0;
 
@@ -404,11 +407,23 @@ static int spl_fit_append_fdt(struct spl_image_info *spl_image,
 		void *tmpbuffer = NULL;
 
 		for (; ; index++) {
-			node = spl_fit_get_image_node(ctx, FIT_FDT_PROP, index);
-			if (node == -E2BIG) {
+			const char *str;
+
+			ret = spl_fit_get_image_name(ctx, FIT_FDT_PROP, index, &str);
+			if (ret == -E2BIG) {
 				debug("%s: No additional FDT node\n", __func__);
+				ret = 0;
 				break;
-			} else if (node < 0) {
+			} else if (ret < 0) {
+				continue;
+			}
+
+			ret = board_spl_fit_append_fdt_skip(str);
+			if (ret)
+				continue;
+
+			node = fdt_subnode_offset(ctx->fit, ctx->images_node, str);
+			if (node < 0) {
 				debug("%s: unable to find FDT node %d\n",
 				      __func__, index);
 				continue;
@@ -429,8 +444,8 @@ static int spl_fit_append_fdt(struct spl_image_info *spl_image,
 					      __func__);
 			}
 			image_info.load_addr = (ulong)tmpbuffer;
-			ret = spl_load_fit_image(info, sector, ctx,
-						 node, &image_info);
+			ret = load_simple_fit(info, offset, ctx, node,
+					      &image_info);
 			if (ret < 0)
 				break;
 
@@ -480,10 +495,11 @@ static int spl_fit_record_loadable(const struct spl_fit_info *ctx, int index,
 	node = spl_fit_get_image_node(ctx, "loadables", index);
 
 	ret = fdt_record_loadable(blob, index, name, image->load_addr,
-				  image->size, image->entry_point,
-				  fdt_getprop(ctx->fit, node, "type", NULL),
-				  fdt_getprop(ctx->fit, node, "os", NULL),
-				  fdt_getprop(ctx->fit, node, "arch", NULL));
+			image->size, image->entry_point,
+			fdt_getprop(ctx->fit, node, FIT_TYPE_PROP, NULL),
+			fdt_getprop(ctx->fit, node, FIT_OS_PROP, NULL),
+			fdt_getprop(ctx->fit, node, FIT_ARCH_PROP, NULL));
+
 	return ret;
 }
 
@@ -534,7 +550,12 @@ static void *spl_get_fit_load_buffer(size_t size)
 	buf = malloc_cache_aligned(size);
 	if (!buf) {
 		pr_err("Could not get FIT buffer of %lu bytes\n", (ulong)size);
-		pr_err("\tcheck CONFIG_SYS_SPL_MALLOC_SIZE\n");
+
+		if (IS_ENABLED(CONFIG_SPL_SYS_MALLOC))
+			pr_err("\tcheck CONFIG_SPL_SYS_MALLOC_SIZE\n");
+		else
+			pr_err("\tcheck CONFIG_SPL_SYS_MALLOC_F_LEN\n");
+
 		buf = spl_get_load_buffer(0, size);
 	}
 	return buf;
@@ -605,7 +626,7 @@ static int spl_fit_upload_fpga(struct spl_fit_info *ctx, int node,
 }
 
 static int spl_fit_load_fpga(struct spl_fit_info *ctx,
-			     struct spl_load_info *info, ulong sector)
+			     struct spl_load_info *info, ulong offset)
 {
 	int node, ret;
 
@@ -620,7 +641,7 @@ static int spl_fit_load_fpga(struct spl_fit_info *ctx,
 	warn_deprecated("'fpga' property in config node. Use 'loadables'");
 
 	/* Load the image and set up the fpga_image structure */
-	ret = spl_load_fit_image(info, sector, ctx, node, &fpga_image);
+	ret = load_simple_fit(info, offset, ctx, node, &fpga_image);
 	if (ret) {
 		printf("%s: Cannot load the FPGA: %i\n", __func__, ret);
 		return ret;
@@ -630,11 +651,10 @@ static int spl_fit_load_fpga(struct spl_fit_info *ctx,
 }
 
 static int spl_simple_fit_read(struct spl_fit_info *ctx,
-			       struct spl_load_info *info, ulong sector,
+			       struct spl_load_info *info, ulong offset,
 			       const void *fit_header)
 {
 	unsigned long count, size;
-	int sectors;
 	void *buf;
 
 	/*
@@ -653,13 +673,13 @@ static int spl_simple_fit_read(struct spl_fit_info *ctx,
 	 * For FIT with data embedded, data is loaded as part of FIT image.
 	 * For FIT with external data, data is not loaded in this step.
 	 */
-	sectors = get_aligned_image_size(info, size, 0);
-	buf = board_spl_fit_buffer_addr(size, sectors, info->bl_len);
+	size = get_aligned_image_size(info, size, 0);
+	buf = board_spl_fit_buffer_addr(size, size, 1);
 
-	count = info->read(info, sector, sectors, buf);
+	count = info->read(info, offset, size, buf);
 	ctx->fit = buf;
-	debug("fit read sector %lx, sectors=%d, dst=%p, count=%lu, size=0x%lx\n",
-	      sector, sectors, buf, count, size);
+	debug("fit read offset %lx, size=%lu, dst=%p, count=%lu\n",
+	      offset, size, buf, count);
 
 	return (count == 0) ? -EIO : 0;
 }
@@ -691,7 +711,7 @@ static int spl_simple_fit_parse(struct spl_fit_info *ctx)
 }
 
 int spl_load_simple_fit(struct spl_image_info *spl_image,
-			struct spl_load_info *info, ulong sector, void *fit)
+			struct spl_load_info *info, ulong offset, void *fit)
 {
 	struct spl_image_info image_info;
 	struct spl_fit_info ctx;
@@ -700,7 +720,7 @@ int spl_load_simple_fit(struct spl_image_info *spl_image,
 	int index = 0;
 	int firmware_node;
 
-	ret = spl_simple_fit_read(&ctx, info, sector, fit);
+	ret = spl_simple_fit_read(&ctx, info, offset, fit);
 	if (ret < 0)
 		return ret;
 
@@ -715,7 +735,7 @@ int spl_load_simple_fit(struct spl_image_info *spl_image,
 		return ret;
 
 	if (IS_ENABLED(CONFIG_SPL_FPGA))
-		spl_fit_load_fpga(&ctx, info, sector);
+		spl_fit_load_fpga(&ctx, info, offset);
 
 	/*
 	 * Find the U-Boot image using the following search order:
@@ -745,7 +765,7 @@ int spl_load_simple_fit(struct spl_image_info *spl_image,
 	}
 
 	/* Load the image and set up the spl_image structure */
-	ret = spl_load_fit_image(info, sector, &ctx, node, spl_image);
+	ret = load_simple_fit(info, offset, &ctx, node, spl_image);
 	if (ret)
 		return ret;
 
@@ -763,7 +783,7 @@ int spl_load_simple_fit(struct spl_image_info *spl_image,
 	 * We allow this to fail, as the U-Boot image might embed its FDT.
 	 */
 	if (os_takes_devicetree(spl_image->os)) {
-		ret = spl_fit_append_fdt(spl_image, info, sector, &ctx);
+		ret = spl_fit_append_fdt(spl_image, info, offset, &ctx);
 		if (ret < 0 && spl_image->os != IH_OS_U_BOOT)
 			return ret;
 	}
@@ -786,7 +806,7 @@ int spl_load_simple_fit(struct spl_image_info *spl_image,
 			continue;
 
 		image_info.load_addr = 0;
-		ret = spl_load_fit_image(info, sector, &ctx, node, &image_info);
+		ret = load_simple_fit(info, offset, &ctx, node, &image_info);
 		if (ret < 0) {
 			printf("%s: can't load image loadables index %d (ret = %d)\n",
 			       __func__, index, ret);
@@ -800,7 +820,7 @@ int spl_load_simple_fit(struct spl_image_info *spl_image,
 			debug("Loadable is %s\n", genimg_get_os_name(os_type));
 
 		if (os_takes_devicetree(os_type)) {
-			spl_fit_append_fdt(&image_info, info, sector, &ctx);
+			spl_fit_append_fdt(&image_info, info, offset, &ctx);
 			spl_image->fdt_addr = image_info.fdt_addr;
 		}
 
@@ -820,7 +840,7 @@ int spl_load_simple_fit(struct spl_image_info *spl_image,
 	}
 
 	/*
-	 * If a platform does not provide CFG_SYS_UBOOT_START, U-Boot's
+	 * If a platform does not provide CONFIG_SYS_UBOOT_START, U-Boot's
 	 * Makefile will set it to 0 and it will end up as the entry point
 	 * here. What it actually means is: use the load address.
 	 */
@@ -829,8 +849,99 @@ int spl_load_simple_fit(struct spl_image_info *spl_image,
 
 	spl_image->flags |= SPL_FIT_FOUND;
 
-	if (IS_ENABLED(CONFIG_IMX_HAB))
-		board_spl_fit_post_load(ctx.fit);
+	return 0;
+}
+
+/* Parse and load full fitImage in SPL */
+int spl_load_fit_image(struct spl_image_info *spl_image,
+		       const struct legacy_img_hdr *header)
+{
+	struct bootm_headers images;
+	const char *fit_uname_config = NULL;
+	uintptr_t fdt_hack;
+	const char *uname;
+	ulong fw_data = 0, dt_data = 0, img_data = 0;
+	ulong fw_len = 0, dt_len = 0, img_len = 0;
+	int idx, conf_noffset;
+	int ret;
+
+#ifdef CONFIG_SPL_FIT_SIGNATURE
+	images.verify = 1;
+#endif
+	ret = fit_image_load(&images, virt_to_phys((void *)header),
+			     NULL, &fit_uname_config,
+			     IH_ARCH_DEFAULT, IH_TYPE_STANDALONE, -1,
+			     FIT_LOAD_OPTIONAL, &fw_data, &fw_len);
+	if (ret >= 0) {
+		printf("DEPRECATED: 'standalone = ' property.");
+		printf("Please use either 'firmware =' or 'kernel ='\n");
+	} else {
+		ret = fit_image_load(&images, virt_to_phys((void *)header),
+				     NULL, &fit_uname_config, IH_ARCH_DEFAULT,
+				     IH_TYPE_FIRMWARE, -1, FIT_LOAD_OPTIONAL,
+				     &fw_data, &fw_len);
+	}
+
+	if (ret < 0) {
+		ret = fit_image_load(&images, virt_to_phys((void *)header),
+				     NULL, &fit_uname_config, IH_ARCH_DEFAULT,
+				     IH_TYPE_KERNEL, -1, FIT_LOAD_OPTIONAL,
+				     &fw_data, &fw_len);
+	}
+
+	if (ret < 0)
+		return ret;
+
+	spl_image->size = fw_len;
+	spl_image->load_addr = fw_data;
+	if (fit_image_get_entry(header, ret, &spl_image->entry_point))
+		spl_image->entry_point = fw_data;
+	if (fit_image_get_os(header, ret, &spl_image->os))
+		spl_image->os = IH_OS_INVALID;
+	spl_image->name = genimg_get_os_name(spl_image->os);
+
+	debug(SPL_TPL_PROMPT "payload image: %32s load addr: 0x%lx size: %d\n",
+	      spl_image->name, spl_image->load_addr, spl_image->size);
+
+#ifdef CONFIG_SPL_FIT_SIGNATURE
+	images.verify = 1;
+#endif
+	ret = fit_image_load(&images, virt_to_phys((void *)header), NULL,
+			     &fit_uname_config, IH_ARCH_DEFAULT, IH_TYPE_FLATDT,
+			     -1, FIT_LOAD_OPTIONAL, &dt_data, &dt_len);
+	if (ret >= 0) {
+		spl_image->fdt_addr = (void *)dt_data;
+
+		if (spl_image->os == IH_OS_U_BOOT) {
+			/* HACK: U-Boot expects FDT at a specific address */
+			fdt_hack = spl_image->load_addr + spl_image->size;
+			fdt_hack = (fdt_hack + 3) & ~3;
+			debug("Relocating FDT to %p\n", spl_image->fdt_addr);
+			memcpy((void *)fdt_hack, spl_image->fdt_addr, dt_len);
+		}
+	}
+
+	conf_noffset = fit_conf_get_node((const void *)header,
+					 fit_uname_config);
+	if (conf_noffset < 0)
+		return 0;
+
+	for (idx = 0;
+	     uname = fdt_stringlist_get((const void *)header, conf_noffset,
+					FIT_LOADABLE_PROP, idx,
+				NULL), uname;
+	     idx++) {
+#ifdef CONFIG_SPL_FIT_SIGNATURE
+		images.verify = 1;
+#endif
+		ret = fit_image_load(&images, (ulong)header,
+				     &uname, &fit_uname_config,
+				     IH_ARCH_DEFAULT, IH_TYPE_LOADABLE, -1,
+				     FIT_LOAD_OPTIONAL_NON_ZERO,
+				     &img_data, &img_len);
+		if (ret < 0)
+			return ret;
+	}
 
 	return 0;
 }

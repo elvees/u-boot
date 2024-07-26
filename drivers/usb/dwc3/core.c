@@ -2,7 +2,7 @@
 /**
  * core.c - DesignWare USB3 DRD Controller Core file
  *
- * Copyright (C) 2015 Texas Instruments Incorporated - http://www.ti.com
+ * Copyright (C) 2015 Texas Instruments Incorporated - https://www.ti.com
  *
  * Authors: Felipe Balbi <balbi@ti.com>,
  *	    Sebastian Andrzej Siewior <bigeasy@linutronix.de>
@@ -31,14 +31,13 @@
 #include <linux/usb/gadget.h>
 #include <linux/bitfield.h>
 #include <linux/math64.h>
+#include <linux/time.h>
 
 #include "core.h"
 #include "gadget.h"
 #include "io.h"
 
 #include "linux-compat.h"
-
-#define NSEC_PER_SEC	1000000000L
 
 static LIST_HEAD(dwc3_list);
 /* -------------------------------------------------------------------------- */
@@ -984,31 +983,43 @@ void dwc3_uboot_exit(int index)
 	}
 }
 
+MODULE_ALIAS("platform:dwc3");
+MODULE_AUTHOR("Felipe Balbi <balbi@ti.com>");
+MODULE_LICENSE("GPL v2");
+MODULE_DESCRIPTION("DesignWare USB3 DRD Controller Driver");
+
+#if !CONFIG_IS_ENABLED(DM_USB_GADGET)
+__weak int dwc3_uboot_interrupt_status(struct udevice *dev)
+{
+	return 1;
+}
+
 /**
- * dwc3_uboot_handle_interrupt - handle dwc3 core interrupt
- * @index: index of this controller
+ * dm_usb_gadget_handle_interrupts - handle dwc3 core interrupt
+ * @dev: device of this controller
  *
  * Invokes dwc3 gadget interrupts.
  *
  * Generally called from board file.
  */
-void dwc3_uboot_handle_interrupt(int index)
+int dm_usb_gadget_handle_interrupts(struct udevice *dev)
 {
 	struct dwc3 *dwc = NULL;
 
+	if (!dwc3_uboot_interrupt_status(dev))
+		return 0;
+
 	list_for_each_entry(dwc, &dwc3_list, list) {
-		if (dwc->index != index)
+		if (dwc->dev != dev)
 			continue;
 
 		dwc3_gadget_uboot_handle_interrupt(dwc);
 		break;
 	}
-}
 
-MODULE_ALIAS("platform:dwc3");
-MODULE_AUTHOR("Felipe Balbi <balbi@ti.com>");
-MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("DesignWare USB3 DRD Controller Driver");
+	return 0;
+}
+#endif
 
 #if CONFIG_IS_ENABLED(PHY) && CONFIG_IS_ENABLED(DM_USB)
 int dwc3_setup_phy(struct udevice *dev, struct phy_bulk *phys)

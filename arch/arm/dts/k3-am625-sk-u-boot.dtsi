@@ -4,145 +4,43 @@
  * Copyright (C) 2021-2022 Texas Instruments Incorporated - https://www.ti.com/
  */
 
+#include "k3-am625-sk-binman.dtsi"
+
 / {
 	chosen {
-		stdout-path = "serial2:115200n8";
-		tick-timer = &timer1;
-	};
-
-	aliases {
-		mmc1 = &sdhci1;
-	};
-
-	memory@80000000 {
-		u-boot,dm-spl;
+		tick-timer = &main_timer0;
 	};
 };
 
-&cbass_main{
-	u-boot,dm-spl;
-
-	timer1: timer@2400000 {
-		compatible = "ti,omap5430-timer";
-		reg = <0x00 0x2400000 0x00 0x80>;
-		ti,timer-alwon;
-		clock-frequency = <25000000>;
-		u-boot,dm-spl;
-	};
+&main_timer0 {
+	clock-frequency = <25000000>;
 };
 
-&dmss {
-	u-boot,dm-spl;
+&main_bcdma {
+	reg = <0x00 0x485c0100 0x00 0x100>,
+	      <0x00 0x4c000000 0x00 0x20000>,
+	      <0x00 0x4a820000 0x00 0x20000>,
+	      <0x00 0x4aa40000 0x00 0x20000>,
+	      <0x00 0x4bc00000 0x00 0x100000>,
+	      <0x00 0x48600000 0x00 0x8000>,
+	      <0x00 0x484a4000 0x00 0x2000>,
+	      <0x00 0x484c2000 0x00 0x2000>;
+	reg-names = "gcfg", "bchanrt", "rchanrt", "tchanrt",
+		    "ringrt" , "cfg", "tchan", "rchan";
 };
 
-&secure_proxy_main {
-	u-boot,dm-spl;
-};
-
-&dmsc {
-	u-boot,dm-spl;
-};
-
-&k3_pds {
-	u-boot,dm-spl;
-};
-
-&k3_clks {
-	u-boot,dm-spl;
-};
-
-&k3_reset {
-	u-boot,dm-spl;
-};
-
-&wkup_conf {
-	u-boot,dm-spl;
-};
-
-&chipid {
-	u-boot,dm-spl;
-};
-
-&main_pmx0 {
-	u-boot,dm-spl;
-};
-
-&main_uart0 {
-	u-boot,dm-spl;
-};
-
-&main_uart0_pins_default {
-	u-boot,dm-spl;
-};
-
-&main_uart1 {
-	u-boot,dm-spl;
-};
-
-&cbass_mcu {
-	u-boot,dm-spl;
-};
-
-&cbass_wakeup {
-	u-boot,dm-spl;
-};
-
-&mcu_pmx0 {
-	u-boot,dm-spl;
-};
-
-&wkup_uart0 {
-	u-boot,dm-spl;
-};
-
-&sdhci1 {
-	u-boot,dm-spl;
-};
-
-&main_mmc1_pins_default {
-	u-boot,dm-spl;
-};
-
-&fss {
-	u-boot,dm-spl;
-};
-
-&ospi0_pins_default {
-	u-boot,dm-spl;
-};
-
-&ospi0 {
-	u-boot,dm-spl;
-
-	flash@0 {
-		u-boot,dm-spl;
-
-		partitions {
-			u-boot,dm-spl;
-
-			partition@3fc0000 {
-				u-boot,dm-spl;
-			};
-		};
-	};
-};
-
-&cpsw3g {
-	reg = <0x0 0x8000000 0x0 0x200000>,
-	      <0x0 0x43000200 0x0 0x8>;
-	reg-names = "cpsw_nuss", "mac_efuse";
-	/delete-property/ ranges;
-	u-boot,dm-spl;
-
-	cpsw-phy-sel@04044 {
-		compatible = "ti,am64-phy-gmii-sel";
-		reg = <0x0 0x00104044 0x0 0x8>;
-		u-boot,dm-spl;
-	};
-};
-
-&cpsw_port1 {
-	u-boot,dm-spl;
+&main_pktdma {
+	reg = <0x00 0x485c0000 0x00 0x100>,
+	      <0x00 0x4a800000 0x00 0x20000>,
+	      <0x00 0x4aa00000 0x00 0x20000>,
+	      <0x00 0x4b800000 0x00 0x200000>,
+	      <0x00 0x485e0000 0x00 0x10000>,
+	      <0x00 0x484a0000 0x00 0x2000>,
+	      <0x00 0x484c0000 0x00 0x2000>,
+	      <0x00 0x48430000 0x00 0x1000>;
+	reg-names = "gcfg", "rchanrt", "tchanrt", "ringrt",
+		    "cfg", "tchan", "rchan", "rflow";
+	bootph-all;
 };
 
 &cpsw_port2 {

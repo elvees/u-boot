@@ -3,10 +3,18 @@
  * Copyright 2020-2022 Toradex
  */
 
-&{/aliases} {
-	/* SDHCI instance order: eMMC, SD/MMC */
-	mmc0 = &usdhc3;
-	mmc1 = &usdhc1;
+#include "imx7s-u-boot.dtsi"
+
+/ {
+	aliases {
+		/* SDHCI instance order: eMMC, SD/MMC */
+		mmc0 = &usdhc3;
+		mmc1 = &usdhc1;
+	};
+
+	sysinfo {
+		compatible = "toradex,sysinfo";
+	};
 };
 
 &lcdif {
@@ -15,7 +23,7 @@
 	pinctrl-0 = <&pinctrl_lcdif_dat
 		     &pinctrl_lcdif_ctrl>;
 	display = <&display0>;
-	u-boot,dm-pre-reloc;
+	bootph-all;
 
 	display0: display0 {
 		bits-per-pixel = <18>;
@@ -42,4 +50,8 @@
 			};
 		};
 	};
+};
+
+&wdog1 {
+	bootph-pre-ram;
 };

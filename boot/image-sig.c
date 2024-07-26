@@ -17,6 +17,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define IMAGE_MAX_HASHED_NODES		100
 
 struct checksum_algo checksum_algos[] = {
+#if CONFIG_IS_ENABLED(SHA1)
 	{
 		.name = "sha1",
 		.checksum_len = SHA1_SUM_LEN,
@@ -24,6 +25,8 @@ struct checksum_algo checksum_algos[] = {
 		.der_prefix = sha1_der_prefix,
 		.calculate = hash_calculate,
 	},
+#endif
+#if CONFIG_IS_ENABLED(SHA256)
 	{
 		.name = "sha256",
 		.checksum_len = SHA256_SUM_LEN,
@@ -31,7 +34,8 @@ struct checksum_algo checksum_algos[] = {
 		.der_prefix = sha256_der_prefix,
 		.calculate = hash_calculate,
 	},
-#ifdef CONFIG_SHA384
+#endif
+#if CONFIG_IS_ENABLED(SHA384)
 	{
 		.name = "sha384",
 		.checksum_len = SHA384_SUM_LEN,
@@ -40,7 +44,7 @@ struct checksum_algo checksum_algos[] = {
 		.calculate = hash_calculate,
 	},
 #endif
-#ifdef CONFIG_SHA512
+#if CONFIG_IS_ENABLED(SHA512)
 	{
 		.name = "sha512",
 		.checksum_len = SHA512_SUM_LEN,
@@ -57,20 +61,6 @@ struct checksum_algo *image_get_checksum_algo(const char *full_name)
 	int i;
 	const char *name;
 
-	if (IS_ENABLED(CONFIG_NEEDS_MANUAL_RELOC)) {
-		static bool done;
-
-		if (!done) {
-			done = true;
-			for (i = 0; i < ARRAY_SIZE(checksum_algos); i++) {
-				struct checksum_algo *algo = &checksum_algos[i];
-
-				MANUAL_RELOC(algo->name);
-				MANUAL_RELOC(algo->calculate);
-			}
-		}
-	}
-
 	for (i = 0; i < ARRAY_SIZE(checksum_algos); i++) {
 		name = checksum_algos[i].name;
 		/* Make sure names match and next char is a comma */
@@ -86,20 +76,6 @@ struct crypto_algo *image_get_crypto_algo(const char *full_name)
 {
 	struct crypto_algo *crypto, *end;
 	const char *name;
-
-	if (IS_ENABLED(CONFIG_NEEDS_MANUAL_RELOC)) {
-		static bool done;
-
-		if (!done) {
-			done = true;
-			crypto = ll_entry_start(struct crypto_algo, cryptos);
-			end = ll_entry_end(struct crypto_algo, cryptos);
-			for (; crypto < end; crypto++) {
-				MANUAL_RELOC(crypto->name);
-				MANUAL_RELOC(crypto->verify);
-			}
-		}
-	}
 
 	/* Move name to after the comma */
 	name = strchr(full_name, ',');

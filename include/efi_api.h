@@ -192,7 +192,7 @@ struct efi_boot_services {
 					struct efi_event *event,
 					void *context),
 				void *notify_context,
-				efi_guid_t *event_group,
+				const efi_guid_t *event_group,
 				struct efi_event **event);
 };
 
@@ -404,6 +404,9 @@ struct efi_runtime_services {
 #define EFI_EVENT_GROUP_RESET_SYSTEM \
 	EFI_GUID(0x62da6a56, 0x13fb, 0x485a, 0xa8, 0xda, \
 		 0xa3, 0xdd, 0x79, 0x12, 0xcb, 0x6b)
+#define EFI_EVENT_GROUP_RETURN_TO_EFIBOOTMGR \
+	EFI_GUID(0xb4a40fe6, 0x9149, 0x4f29, 0x94, 0x47, \
+		 0x49, 0x38, 0x7a, 0x7f, 0xab, 0x87)
 
 /* EFI Configuration Table and GUID definitions */
 #define NULL_GUID \
@@ -429,6 +432,10 @@ struct efi_runtime_services {
 #define SMBIOS_TABLE_GUID \
 	EFI_GUID(0xeb9d2d31, 0x2d88, 0x11d3,  \
 		 0x9a, 0x16, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d)
+
+#define SMBIOS3_TABLE_GUID \
+	EFI_GUID(0xf2fd1544, 0x9794, 0x4a2c, \
+		 0x99, 0x2e, 0xe5, 0xbb, 0xcf, 0x20, 0xe3, 0x94)
 
 #define EFI_LOAD_FILE_PROTOCOL_GUID \
 	EFI_GUID(0x56ec3091, 0x954c, 0x11d2, \
@@ -557,12 +564,6 @@ struct efi_loaded_image {
 #  define DEVICE_PATH_SUB_TYPE_INSTANCE_END	0x01
 #  define DEVICE_PATH_SUB_TYPE_END		0xff
 
-struct efi_device_path {
-	u8 type;
-	u8 sub_type;
-	u16 length;
-} __packed;
-
 struct efi_mac_addr {
 	u8 addr[32];
 } __packed;
@@ -583,6 +584,13 @@ struct efi_device_path_vendor {
 	struct efi_device_path dp;
 	efi_guid_t guid;
 	u8 vendor_data[];
+} __packed;
+
+struct efi_device_path_udevice {
+	struct efi_device_path dp;
+	efi_guid_t guid;
+	int uclass_id;
+	int dev_number;
 } __packed;
 
 struct efi_device_path_controller {
@@ -1176,10 +1184,36 @@ struct efi_key_descriptor {
 
 struct efi_hii_keyboard_layout {
 	u16 layout_length;
-	efi_guid_t guid;
+	/*
+	 * The EFI spec defines this as efi_guid_t.
+	 * clang and gcc both report alignment problems here.
+	 * clang with -Wunaligned-access
+	 * warning: field guid within 'struct efi_hii_keyboard_layout' is less
+	 * aligned than 'efi_guid_t' and is usually due to
+	 * 'struct efi_hii_keyboard_layout' being packed, which can lead to
+	 * unaligned accesses
+	 *
+	 * GCC with -Wpacked-not-aligned -Waddress-of-packed-member
+	 * 'efi_guid_t' offset 2 in 'struct efi_hii_keyboard_layout'
+	 * isn't aligned to 4
+	 *
+	 * Removing the alignment from efi_guid_t is not an option, since
+	 * it is also used in non-packed structs and that would break
+	 * calculations with offsetof
+	 *
+	 * This is the only place we get a report for. That happens because
+	 * all other declarations of efi_guid_t within a packed struct happens
+	 * to be 4-byte aligned.  i.e a u32, a u64 a 2 * u16 or any combination
+	 * that ends up landing efi_guid_t on a 4byte boundary precedes.
+	 *
+	 * Replace this with a 1-byte aligned counterpart of b[16].  This is a
+	 * packed struct so the memory  placement of efi_guid_t should not change
+	 *
+	 */
+	u8 guid[16];
 	u32 layout_descriptor_string_offset;
 	u8 descriptor_count;
-	struct efi_key_descriptor descriptors[];
+	/* struct efi_key_descriptor descriptors[]; follows here */
 } __packed;
 
 struct efi_hii_keyboard_package {
@@ -1915,6 +1949,25 @@ struct efi_system_resource_table {
 #define EFI_CERT_TYPE_PKCS7_GUID \
 	EFI_GUID(0x4aafd29d, 0x68df, 0x49ee, 0x8a, 0xa9, \
 		 0x34, 0x7d, 0x37, 0x56, 0x65, 0xa7)
+
+#define EFI_LZMA_COMPRESSED \
+	EFI_GUID(0xee4e5898, 0x3914, 0x4259, 0x9d, 0x6e, \
+		 0xdc, 0x7b, 0xd7, 0x94, 0x03, 0xcf)
+#define EFI_DXE_SERVICES \
+	EFI_GUID(0x05ad34ba, 0x6f02, 0x4214, 0x95, 0x2e, \
+		 0x4d, 0xa0, 0x39, 0x8e, 0x2b, 0xb9)
+#define EFI_HOB_LIST \
+	EFI_GUID(0x7739f24c, 0x93d7, 0x11d4, 0x9a, 0x3a,  \
+		 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d)
+#define EFI_MEMORY_TYPE \
+	EFI_GUID(0x4c19049f, 0x4137, 0x4dd3, 0x9c, 0x10, \
+		 0x8b, 0x97, 0xa8, 0x3f, 0xfd, 0xfa)
+#define EFI_MEM_STATUS_CODE_REC \
+	EFI_GUID(0x060cc026, 0x4c0d, 0x4dda, 0x8f, 0x41, \
+		 0x59, 0x5f, 0xef, 0x00, 0xa5, 0x02)
+#define EFI_GUID_EFI_ACPI1 \
+	EFI_GUID(0xeb9d2d30, 0x2d88, 0x11d3,  0x9a, 0x16, \
+		 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d)
 
 /**
  * struct win_certificate_uefi_guid - A certificate that encapsulates

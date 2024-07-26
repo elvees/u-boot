@@ -765,11 +765,6 @@ int ext4fs_get_parent_inode_num(const char *dirname, char *dname, int flags)
 	struct ext2_inode *first_inode = NULL;
 	struct ext2_inode temp_inode;
 
-	if (*dirname != '/') {
-		printf("Please supply Absolute path\n");
-		return -1;
-	}
-
 	/* TODO: input validation make equivalent to linux */
 	depth_dirname = zalloc(strlen(dirname) + 1);
 	if (!depth_dirname)
@@ -2214,9 +2209,8 @@ static char *ext4fs_read_symlink(struct ext2fs_node *node)
 	return symlink;
 }
 
-static int ext4fs_find_file1(const char *currpath,
-			     struct ext2fs_node *currroot,
-			     struct ext2fs_node **currfound, int *foundtype)
+int ext4fs_find_file1(const char *currpath, struct ext2fs_node *currroot,
+		      struct ext2fs_node **currfound, int *foundtype)
 {
 	char fpath[strlen(currpath) + 1];
 	char *name = fpath;
@@ -2368,15 +2362,11 @@ fail:
 	return -1;
 }
 
-int ext4fs_mount(unsigned part_length)
+int ext4fs_mount(void)
 {
 	struct ext2_data *data;
 	int status;
 	struct ext_filesystem *fs = get_fs();
-
-	if (part_length < SUPERBLOCK_SIZE)
-		return 0;
-
 	data = zalloc(SUPERBLOCK_SIZE);
 	if (!data)
 		return 0;

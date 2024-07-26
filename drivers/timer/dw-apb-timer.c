@@ -13,7 +13,6 @@
 #include <reset.h>
 #include <timer.h>
 #include <dm/device_compat.h>
-#include <linux/kconfig.h>
 
 #include <asm/io.h>
 #include <asm/arch/timer.h>
@@ -23,7 +22,7 @@
 #define DW_APB_CTRL		0x8
 
 struct dw_apb_timer_priv {
-	fdt_addr_t regs;
+	uintptr_t regs;
 	struct reset_ctl_bulk resets;
 };
 
@@ -75,8 +74,6 @@ static int dw_apb_timer_probe(struct udevice *dev)
 			return ret;
 
 		uc_priv->clock_rate = clk_get_rate(&clk);
-
-		clk_free(&clk);
 	}
 
 	/* init timer */

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * (C) Copyright 2015 - 2016, Xilinx, Inc,
- * Michal Simek <michal.simek@xilinx.com>
- * Siva Durga Prasad <siva.durga.paladugu@xilinx.com>
+ * Michal Simek <michal.simek@amd.com>
+ * Siva Durga Prasad Paladugu <siva.durga.prasad.paladugu@amd.com>
  */
 
 #include <console.h>
@@ -332,10 +332,16 @@ static int zynqmp_loads(xilinx_desc *desc, const void *buf, size_t bsize,
 	buf_lo = lower_32_bits((ulong)buf);
 	buf_hi = upper_32_bits((ulong)buf);
 
-	ret = xilinx_pm_request(PM_FPGA_LOAD, buf_lo,
+	if ((u32)(uintptr_t)fpga_sec_info->userkey_addr)
+		ret = xilinx_pm_request(PM_FPGA_LOAD, buf_lo,
 				buf_hi,
-			 (u32)(uintptr_t)fpga_sec_info->userkey_addr,
-			 flag, ret_payload);
+				(u32)(uintptr_t)fpga_sec_info->userkey_addr,
+				flag, ret_payload);
+	else
+		ret = xilinx_pm_request(PM_FPGA_LOAD, buf_lo,
+					buf_hi, (u32)bsize,
+					flag, ret_payload);
+
 	if (ret)
 		puts("PL FPGA LOAD fail\n");
 	else

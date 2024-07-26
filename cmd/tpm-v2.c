@@ -99,11 +99,19 @@ static int do_tpm2_pcr_extend(struct cmd_tbl *cmdtp, int flag, int argc,
 	struct tpm_chip_priv *priv;
 	u32 index = simple_strtoul(argv[1], NULL, 0);
 	void *digest = map_sysmem(simple_strtoul(argv[2], NULL, 0), 0);
+	int algo = TPM2_ALG_SHA256;
+	int algo_len;
 	int ret;
 	u32 rc;
 
-	if (argc != 3)
+	if (argc < 3 || argc > 4)
 		return CMD_RET_USAGE;
+	if (argc == 4) {
+		algo = tpm2_name_to_algorithm(argv[3]);
+		if (algo < 0)
+			return CMD_RET_FAILURE;
+	}
+	algo_len = tpm2_algorithm_to_len(algo);
 
 	ret = get_tpm(&dev);
 	if (ret)
@@ -116,8 +124,12 @@ static int do_tpm2_pcr_extend(struct cmd_tbl *cmdtp, int flag, int argc,
 	if (index >= priv->pcr_count)
 		return -EINVAL;
 
-	rc = tpm2_pcr_extend(dev, index, TPM2_ALG_SHA256, digest,
-			     TPM2_DIGEST_LEN);
+	rc = tpm2_pcr_extend(dev, index, algo, digest, algo_len);
+	if (!rc) {
+		printf("PCR #%u extended with %d byte %s digest\n", index,
+		       algo_len, tpm2_algorithm_name(algo));
+		print_byte_string(digest, algo_len);
+	}
 
 	unmap_sysmem(digest);
 
@@ -127,15 +139,23 @@ static int do_tpm2_pcr_extend(struct cmd_tbl *cmdtp, int flag, int argc,
 static int do_tpm_pcr_read(struct cmd_tbl *cmdtp, int flag, int argc,
 			   char *const argv[])
 {
+	enum tpm2_algorithms algo = TPM2_ALG_SHA256;
 	struct udevice *dev;
 	struct tpm_chip_priv *priv;
 	u32 index, rc;
+	int algo_len;
 	unsigned int updates;
 	void *data;
 	int ret;
 
-	if (argc != 3)
+	if (argc < 3 || argc > 4)
 		return CMD_RET_USAGE;
+	if (argc == 4) {
+		algo = tpm2_name_to_algorithm(argv[3]);
+		if (algo < 0)
+			return CMD_RET_FAILURE;
+	}
+	algo_len = tpm2_algorithm_to_len(algo);
 
 	ret = get_tpm(&dev);
 	if (ret)
@@ -151,11 +171,12 @@ static int do_tpm_pcr_read(struct cmd_tbl *cmdtp, int flag, int argc,
 
 	data = map_sysmem(simple_strtoul(argv[2], NULL, 0), 0);
 
-	rc = tpm2_pcr_read(dev, index, priv->pcr_select_min, TPM2_ALG_SHA256,
-			   data, TPM2_DIGEST_LEN, &updates);
+	rc = tpm2_pcr_read(dev, index, priv->pcr_select_min, algo,
+			   data, algo_len, &updates);
 	if (!rc) {
-		printf("PCR #%u content (%u known updates):\n", index, updates);
-		print_byte_string(data, TPM2_DIGEST_LEN);
+		printf("PCR #%u %s %d byte content (%u known updates):\n", index,
+		       tpm2_algorithm_name(algo), algo_len, updates);
+		print_byte_string(data, algo_len);
 	}
 
 	unmap_sysmem(data);
@@ -370,6 +391,7 @@ static struct cmd_tbl tpm2_commands[] = {
 	U_BOOT_CMD_MKENT(dam_reset, 0, 1, do_tpm_dam_reset, "", ""),
 	U_BOOT_CMD_MKENT(dam_parameters, 0, 1, do_tpm_dam_parameters, "", ""),
 	U_BOOT_CMD_MKENT(change_auth, 0, 1, do_tpm_change_auth, "", ""),
+	U_BOOT_CMD_MKENT(autostart, 0, 1, do_tpm_autostart, "", ""),
 	U_BOOT_CMD_MKENT(pcr_setauthpolicy, 0, 1,
 			 do_tpm_pcr_setauthpolicy, "", ""),
 	U_BOOT_CMD_MKENT(pcr_setauthvalue, 0, 1,
@@ -392,8 +414,13 @@ U_BOOT_CMD(tpm2, CONFIG_SYS_MAXARGS, 1, do_tpm, "Issue a TPMv2.x command",
 "    Show information about the TPM.\n"
 "state\n"
 "    Show internal state from the TPM (if available)\n"
+"autostart\n"
+"    Initalize the tpm, perform a Startup(clear) and run a full selftest\n"
+"    sequence\n"
 "init\n"
 "    Initialize the software stack. Always the first command to issue.\n"
+"    'tpm startup' is the only acceptable command after a 'tpm init' has been\n"
+"    issued\n"
 "startup <mode>\n"
 "    Issue a TPM2_Startup command.\n"
 "    <mode> is one of:\n"
@@ -409,14 +436,14 @@ U_BOOT_CMD(tpm2, CONFIG_SYS_MAXARGS, 1, do_tpm, "Issue a TPMv2.x command",
 "    <hierarchy> is one of:\n"
 "        * TPM2_RH_LOCKOUT\n"
 "        * TPM2_RH_PLATFORM\n"
-"pcr_extend <pcr> <digest_addr>\n"
-"    Extend PCR #<pcr> with digest at <digest_addr>.\n"
+"pcr_extend <pcr> <digest_addr> [<digest_algo>]\n"
+"    Extend PCR #<pcr> with digest at <digest_addr> with digest_algo.\n"
 "    <pcr>: index of the PCR\n"
-"    <digest_addr>: address of a 32-byte SHA256 digest\n"
-"pcr_read <pcr> <digest_addr>\n"
-"    Read PCR #<pcr> to memory address <digest_addr>.\n"
+"    <digest_addr>: address of digest of digest_algo type (defaults to SHA256)\n"
+"pcr_read <pcr> <digest_addr> [<digest_algo>]\n"
+"    Read PCR #<pcr> to memory address <digest_addr> with <digest_algo>.\n"
 "    <pcr>: index of the PCR\n"
-"    <digest_addr>: address to store the a 32-byte SHA256 digest\n"
+"    <digest_addr>: address of digest of digest_algo type (defaults to SHA256)\n"
 "get_capability <capability> <property> <addr> <count>\n"
 "    Read and display <count> entries indexed by <capability>/<property>.\n"
 "    Values are 4 bytes long and are written at <addr>.\n"

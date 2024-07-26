@@ -10,9 +10,7 @@
 #include <env_callback.h>
 #include <linux/stringify.h>
 
-#ifndef USE_HOSTCC
 #include <generated/environment.h>
-#endif
 
 #ifdef DEFAULT_ENV_INSTANCE_EMBEDDED
 env_t embedded_environment __UBOOT_ENV_SECTION__(environment) = {
@@ -23,7 +21,7 @@ env_t embedded_environment __UBOOT_ENV_SECTION__(environment) = {
 	{
 #elif defined(DEFAULT_ENV_INSTANCE_STATIC)
 static char default_environment[] = {
-#elif defined(DEFAULT_ENV_IS_RW)
+#elif defined(CONFIG_DEFAULT_ENV_IS_RW)
 char default_environment[] = {
 #else
 const char default_environment[] = {
@@ -44,7 +42,7 @@ const char default_environment[] = {
 #if defined(CONFIG_BOOTDELAY)
 	"bootdelay="	__stringify(CONFIG_BOOTDELAY)	"\0"
 #endif
-#if defined(CONFIG_BAUDRATE) && (CONFIG_BAUDRATE >= 0)
+#if !defined(CONFIG_OF_SERIAL_BAUD) && defined(CONFIG_BAUDRATE) && (CONFIG_BAUDRATE >= 0)
 	"baudrate="	__stringify(CONFIG_BAUDRATE)	"\0"
 #endif
 #ifdef	CONFIG_LOADS_ECHO
@@ -101,6 +99,17 @@ const char default_environment[] = {
 #ifdef CONFIG_SYS_SOC
 	"soc="		CONFIG_SYS_SOC			"\0"
 #endif
+#ifdef CONFIG_USB_HOST
+	"usb_ignorelist="
+#ifdef CONFIG_USB_KEYBOARD
+	/* Ignore Yubico devices. Currently only a single USB keyboard device is
+	 * supported and the emulated HID keyboard Yubikeys present is useless
+	 * as keyboard.
+	 */
+	"0x1050:*,"
+#endif
+	"\0"
+#endif
 #ifdef CONFIG_ENV_IMPORT_FDT
 	"env_fdt_path="	CONFIG_ENV_FDT_PATH		"\0"
 #endif
@@ -120,6 +129,10 @@ const char default_environment[] = {
 #endif
 #ifdef	CFG_EXTRA_ENV_SETTINGS
 	CFG_EXTRA_ENV_SETTINGS
+#endif
+#ifdef CONFIG_OF_SERIAL_BAUD
+	/* Padding for baudrate at the end when environment is writable */
+	"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 #endif
 	"\0"
 #else /* CONFIG_USE_DEFAULT_ENV_FILE */

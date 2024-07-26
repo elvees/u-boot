@@ -17,11 +17,11 @@
 #include <ram.h>
 #include <regmap.h>
 #include <syscon.h>
-#include <asm/io.h>
 #include <asm/arch-rockchip/clock.h>
 #include <asm/arch-rockchip/cru_rk3188.h>
 #include <asm/arch-rockchip/ddr_rk3188.h>
 #include <asm/arch-rockchip/grf_rk3188.h>
+#include <asm/arch-rockchip/hardware.h>
 #include <asm/arch-rockchip/pmu_rk3188.h>
 #include <asm/arch-rockchip/sdram.h>
 #include <asm/arch-rockchip/sdram_rk3288.h>
@@ -867,7 +867,7 @@ static int conv_of_plat(struct udevice *dev)
 	memcpy(&plat->base, of_plat->rockchip_sdram_params, sizeof(plat->base));
 	/* rk3188 supports dual-channel, set default channel num to 2 */
 	plat->num_channels = 1;
-	ret = regmap_init_mem_plat(dev, of_plat->reg,
+	ret = regmap_init_mem_plat(dev, of_plat->reg, sizeof(of_plat->reg[0]),
 				   ARRAY_SIZE(of_plat->reg) / 2, &plat->map);
 	if (ret)
 		return ret;

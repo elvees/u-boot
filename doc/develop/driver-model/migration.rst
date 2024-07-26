@@ -13,7 +13,7 @@ CONFIG_DM
 * Status: In progress
 * Deadline: 2020.01
 
-Starting with the 2010.01 release CONFIG_DM will be enabled for all boards.
+Starting with the 2020.01 release CONFIG_DM will be enabled for all boards.
 This does not concern CONFIG_DM_SPL and CONFIG_DM_TPL. The conversion date for
 these configuration items still needs to be defined.
 
@@ -100,7 +100,7 @@ Maintainers should submit patches switching over to using CONFIG_DM_I2C and
 other base driver model options in time for inclusion in the 2021.10 release.
 
 CFG_SYS_TIMER_RATE and CFG_SYS_TIMER_COUNTER
---------------------------------------------------
+--------------------------------------------
 Deadline: 2023.01
 
 These are legacy options which have been replaced by driver model.

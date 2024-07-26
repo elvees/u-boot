@@ -25,6 +25,11 @@ config TOOLS_LIBCRYPTO
 	  This selection does not affect target features, such as runtime FIT
 	  signature verification.
 
+config TOOLS_KWBIMAGE
+	bool "Enable kwbimage support in host tools"
+	default y
+	select TOOLS_LIBCRYPTO
+
 config TOOLS_FIT
 	def_bool y
 	help
@@ -46,6 +51,7 @@ config TOOLS_FIT_RSASSA_PSS
 	  Support the rsassa-pss signature scheme in the tools builds
 
 config TOOLS_FIT_SIGNATURE
+	depends on TOOLS_LIBCRYPTO
 	def_bool y
 	help
 	  Enable signature verification of FIT uImages in the tools builds
@@ -142,6 +148,27 @@ config SERIAL_CLK_FREQUENCY
 	  Chip specific frequency: other value 30MHz
 	  1-30MHz  2-50MHz 3-60MHz 4-75MHz 5-80MHz 6-100MHz 7-133MHz 8-166MHz
 
+config FSPI_COL_ADDR_W
+	hex "Column Address With"
+	default 0x00
+	depends on FSPI_CONF_HEADER
+	help
+	  Default 0. For HyperBus protocol, it is fixed to 3
+
+config FSPI_CONTROLLER_MISC
+	hex "FSPI miscellaneous control"
+	default 0x00000000
+	depends on FSPI_CONF_HEADER
+	help
+	  Default 0. [0x40] Controller Misc Options
+
+config FSPI_FLASH_A1_SIZE
+	hex "Size in bytes of Flash A1"
+	default 0x10000000
+	depends on FSPI_CONF_HEADER
+	help
+	  Size of Flash connected to A1 in bytes
+
 config LUT_CUSTOM_SEQUENCE
 	hex "Enable Custom Look Up Table(LUT) Sequence"
 	default 0x00
@@ -156,5 +183,14 @@ config LUT_SEQUENCE
 	depends on FSPI_CONF_HEADER
 	help
 	  Look Up Table Sequence
+
+config TOOLS_MKFWUMDATA
+	bool "Build mkfwumdata command"
+	default y if FWU_MULTI_BANK_UPDATE
+	help
+	  This command allows users to create a raw image of the FWU
+	  metadata for initial installation of the FWU multi bank
+	  update on the board. The installation method depends on
+	  the platform.
 
 endmenu

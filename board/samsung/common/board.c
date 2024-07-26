@@ -43,6 +43,10 @@ __weak int exynos_early_init_f(void)
 	return 0;
 }
 
+__weak void exynos_init(void)
+{
+}
+
 __weak int exynos_power_init(void)
 {
 	return 0;
@@ -113,7 +117,9 @@ int board_init(void)
 	gd->ram_size -= size;
 	gd->bd->bi_dram[CONFIG_NR_DRAM_BANKS - 1].size -= size;
 #endif
-	return exynos_init();
+	exynos_init();
+
+	return 0;
 }
 
 int dram_init(void)
@@ -223,7 +229,7 @@ int board_late_init(void)
 	char mmcbootdev_str[16];
 
 	ret = uclass_first_device_err(UCLASS_CROS_EC, &dev);
-	if (ret && ret != -ENODEV) {
+	if (ret && ret != -ENODEV && ret != -EPFNOSUPPORT) {
 		/* Force console on */
 		gd->flags &= ~GD_FLG_SILENT;
 

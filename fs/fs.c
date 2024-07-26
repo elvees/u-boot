@@ -13,6 +13,7 @@
 #include <env.h>
 #include <lmb.h>
 #include <log.h>
+#include <malloc.h>
 #include <mapmem.h>
 #include <part.h>
 #include <ext4fs.h>
@@ -26,6 +27,7 @@
 #include <asm/io.h>
 #include <div64.h>
 #include <linux/math64.h>
+#include <linux/sizes.h>
 #include <efi_loader.h>
 #include <squashfs.h>
 #include <erofs.h>
@@ -235,7 +237,7 @@ static struct fstype_info fstypes[] = {
 		.mkdir = fs_mkdir_unsupported,
 	},
 #endif
-#ifdef CONFIG_SANDBOX
+#if IS_ENABLED(CONFIG_SANDBOX) && !IS_ENABLED(CONFIG_SPL_BUILD)
 	{
 		.fstype = FS_TYPE_SANDBOX,
 		.name = "sandbox",
@@ -254,7 +256,7 @@ static struct fstype_info fstypes[] = {
 		.ln = fs_ln_unsupported,
 	},
 #endif
-#ifdef CONFIG_SEMIHOSTING
+#if CONFIG_IS_ENABLED(SEMIHOSTING)
 	{
 		.fstype = FS_TYPE_SEMIHOSTING,
 		.name = "semihosting",
@@ -420,22 +422,6 @@ int fs_set_blk_dev(const char *ifname, const char *dev_part_str, int fstype)
 {
 	struct fstype_info *info;
 	int part, i;
-#ifdef CONFIG_NEEDS_MANUAL_RELOC
-	static int relocated;
-
-	if (!relocated) {
-		for (i = 0, info = fstypes; i < ARRAY_SIZE(fstypes);
-				i++, info++) {
-			info->name += gd->reloc_off;
-			info->probe += gd->reloc_off;
-			info->close += gd->reloc_off;
-			info->ls += gd->reloc_off;
-			info->read += gd->reloc_off;
-			info->write += gd->reloc_off;
-		}
-		relocated = 1;
-	}
-#endif
 
 	part = part_get_info_by_dev_and_name_or_num(ifname, dev_part_str, &fs_dev_desc,
 						    &fs_partition, 1);
@@ -763,7 +749,7 @@ int do_load(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[],
 	if (argc > 7)
 		return CMD_RET_USAGE;
 
-	if (fs_set_blk_dev(argv[1], (argc >= 3) ? argv[2] : NULL, fstype)) {
+	if (fs_set_blk_dev(argv[1], cmd_arg2(argc, argv), fstype)) {
 		log_err("Can't set block device\n");
 		return 1;
 	}
@@ -805,10 +791,9 @@ int do_load(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[],
 		return 1;
 	}
 
-	if (IS_ENABLED(CONFIG_CMD_BOOTEFI))
-		efi_set_bootdev(argv[1], (argc > 2) ? argv[2] : "",
-				(argc > 4) ? argv[4] : "", map_sysmem(addr, 0),
-				len_read);
+	efi_set_bootdev(argv[1], (argc > 2) ? argv[2] : "",
+			(argc > 4) ? argv[4] : "", map_sysmem(addr, 0),
+			len_read);
 
 	printf("%llu bytes read in %lu ms", len_read, time);
 	if (time > 0) {
@@ -832,7 +817,7 @@ int do_ls(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[],
 	if (argc > 4)
 		return CMD_RET_USAGE;
 
-	if (fs_set_blk_dev(argv[1], (argc >= 3) ? argv[2] : NULL, fstype))
+	if (fs_set_blk_dev(argv[1], cmd_arg2(argc, argv), fstype))
 		return 1;
 
 	if (fs_ls(argc >= 4 ? argv[3] : "/"))
@@ -1007,4 +992,60 @@ int do_fs_types(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 		puts(": <none>");
 	puts("\n");
 	return CMD_RET_SUCCESS;
+}
+
+int fs_read_alloc(const char *fname, ulong size, uint align, void **bufp)
+{
+	loff_t bytes_read;
+	ulong addr;
+	char *buf;
+	int ret;
+
+	buf = memalign(align, size + 1);
+	if (!buf)
+		return log_msg_ret("buf", -ENOMEM);
+	addr = map_to_sysmem(buf);
+
+	ret = fs_read(fname, addr, 0, size, &bytes_read);
+	if (ret) {
+		free(buf);
+		return log_msg_ret("read", ret);
+	}
+	if (size != bytes_read)
+		return log_msg_ret("bread", -EIO);
+	buf[size] = '\0';
+
+	*bufp = buf;
+
+	return 0;
+}
+
+int fs_load_alloc(const char *ifname, const char *dev_part_str,
+		  const char *fname, ulong max_size, ulong align, void **bufp,
+		  ulong *sizep)
+{
+	loff_t size;
+	void *buf;
+	int ret;
+
+	if (fs_set_blk_dev(ifname, dev_part_str, FS_TYPE_ANY))
+		return log_msg_ret("set", -ENOMEDIUM);
+
+	ret = fs_size(fname, &size);
+	if (ret)
+		return log_msg_ret("sz", -ENOENT);
+
+	if (size >= (max_size ?: SZ_1G))
+		return log_msg_ret("sz", -E2BIG);
+
+	if (fs_set_blk_dev(ifname, dev_part_str, FS_TYPE_ANY))
+		return log_msg_ret("set", -ENOMEDIUM);
+
+	ret = fs_read_alloc(fname, size, align, &buf);
+	if (ret)
+		return log_msg_ret("al", ret);
+	*sizep = size;
+	*bufp = buf;
+
+	return 0;
 }

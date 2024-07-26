@@ -12,7 +12,7 @@
 #include <asm/io.h>
 #include <asm/gpio.h>
 #include <asm/arch/clock.h>
-#include <asm/arch/sci/sci.h>
+#include <firmware/imx/sci/sci.h>
 #include <asm/arch/imx8-pins.h>
 #include <usb.h>
 #include <asm/arch/iomux.h>
@@ -79,7 +79,7 @@ static void setup_iomux_uart(void)
 int board_early_init_f(void)
 {
 	/* sc_ipc_t ipcHndl = 0; */
-	sc_err_t scierr = 0;
+	int scierr;
 
 	/* When start u-boot in XEN VM, directly return */
 	/* if (IS_ENABLED(CONFIG_XEN)) */
@@ -89,19 +89,19 @@ int board_early_init_f(void)
 
 	/* Power up UART0, this is very early while power domain is not working */
 	scierr = sc_pm_set_resource_power_mode(-1, SC_R_UART_0, SC_PM_PW_MODE_ON);
-	if (scierr != SC_ERR_NONE)
+	if (scierr)
 		return 0;
 
 	/* Set UART0 clock root to 80 MHz */
 	sc_pm_clock_rate_t rate = 80000000;
 
 	scierr = sc_pm_set_clock_rate(-1, SC_R_UART_0, 2, &rate);
-	if (scierr != SC_ERR_NONE)
+	if (scierr)
 		return 0;
 
 	/* Enable UART0 clock root */
 	scierr = sc_pm_clock_enable(-1, SC_R_UART_0, 2, true, false);
-	if (scierr != SC_ERR_NONE)
+	if (scierr)
 		return 0;
 
 	setup_iomux_uart();
@@ -171,7 +171,7 @@ int board_mmc_init(struct bd_info *bis)
 	 * (U-Boot device node)    (Physical Port)
 	 * mmc0 (onboard eMMC)     USDHC1
 	 * mmc1 (external SD card) USDHC2
-	 * mmc2 (onboard µSD)      USDHC3
+	 * mmc2 (onboard uSD)      USDHC3
 	 */
 	for (i = 0; i < CFG_SYS_FSL_USDHC_NUM; i++) {
 		switch (i) {
@@ -196,7 +196,7 @@ int board_mmc_init(struct bd_info *bis)
 			gpio_direction_input(USDHC1_CD_GPIO);
 			break;
 		case 2:
-		  /* onboard µSD */
+		  /* onboard uSD */
 			if (!imx8_power_domain_lookup_name("conn_sdhc2", &pd))
 				power_domain_on(&pd);
 
@@ -371,13 +371,6 @@ void detail_board_ddr_info(void)
 	puts("\nDDR    ");
 }
 
-/*
- * Board specific reset that is system reset.
- */
-void reset_cpu(void)
-{
-	/* TODO */
-}
 
 #ifdef CONFIG_OF_BOARD_SETUP
 int ft_board_setup(void *blob, struct bd_info *bd)

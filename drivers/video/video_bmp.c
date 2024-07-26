@@ -43,6 +43,18 @@ static u32 get_bmp_col_x2r10g10b10(struct bmp_color_table_entry *cte)
 }
 
 /**
+ * get_bmp_col_rgba8888() - Convert a colour-table entry into a rgba8888 pixel value
+ *
+ * Return: value to write to the rgba8888 frame buffer for this palette entry
+ */
+static u32 get_bmp_col_rgba8888(struct bmp_color_table_entry *cte)
+{
+	return ((cte->red) |
+		(cte->green << 8U) |
+		(cte->blue << 16U) | 0xff << 24U);
+}
+
+/**
  * write_pix8() - Write a pixel from a BMP image into the framebuffer
  *
  * This handles frame buffers with 8, 16, 24 or 32 bits per pixel
@@ -71,6 +83,8 @@ static void write_pix8(u8 *fb, uint bpix, enum video_format eformat,
 			*fb++ = cte->blue;
 		} else if (eformat == VIDEO_X2R10G10B10) {
 			*(u32 *)fb = get_bmp_col_x2r10g10b10(cte);
+		} else if (eformat == VIDEO_RGBA8888) {
+			*(u32 *)fb = get_bmp_col_rgba8888(cte);
 		} else {
 			*fb++ = cte->blue;
 			*fb++ = cte->green;
@@ -320,7 +334,7 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
 	switch (bmp_bpix) {
 	case 1:
 	case 8:
-		if (IS_ENABLED(CONFIG_VIDEO_BMP_RLE8)) {
+		if (CONFIG_IS_ENABLED(VIDEO_BMP_RLE8)) {
 			u32 compression = get_unaligned_le32(
 				&bmp->header.compression);
 			debug("compressed %d %d\n", compression, BMP_BI_RLE8);
@@ -348,7 +362,7 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
 		}
 		break;
 	case 16:
-		if (IS_ENABLED(CONFIG_BMP_16BPP)) {
+		if (CONFIG_IS_ENABLED(BMP_16BPP)) {
 			for (i = 0; i < height; ++i) {
 				schedule();
 				for (j = 0; j < width; j++) {
@@ -361,7 +375,7 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
 		}
 		break;
 	case 24:
-		if (IS_ENABLED(CONFIG_BMP_24BPP)) {
+		if (CONFIG_IS_ENABLED(BMP_24BPP)) {
 			for (i = 0; i < height; ++i) {
 				for (j = 0; j < width; j++) {
 					if (bpix == 16) {
@@ -382,6 +396,17 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
 						*fb++ = (pix >> 8) & 0xff;
 						*fb++ = (pix >> 16) & 0xff;
 						*fb++ = pix >> 24;
+					} else if (eformat == VIDEO_RGBA8888) {
+						u32 pix;
+
+						pix = *bmap++ << 8U; /* blue */
+						pix |= *bmap++ << 16U; /* green */
+						pix |= *bmap++ << 24U; /* red */
+
+						*fb++ = (pix >> 24) & 0xff;
+						*fb++ = (pix >> 16) & 0xff;
+						*fb++ = (pix >> 8) & 0xff;
+						*fb++ = 0xff;
 					} else {
 						*fb++ = *bmap++;
 						*fb++ = *bmap++;
@@ -395,7 +420,7 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
 		}
 		break;
 	case 32:
-		if (IS_ENABLED(CONFIG_BMP_32BPP)) {
+		if (CONFIG_IS_ENABLED(BMP_32BPP)) {
 			for (i = 0; i < height; ++i) {
 				for (j = 0; j < width; j++) {
 					if (eformat == VIDEO_X2R10G10B10) {
@@ -409,6 +434,17 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
 						*fb++ = (pix >> 8) & 0xff;
 						*fb++ = (pix >> 16) & 0xff;
 						*fb++ = pix >> 24;
+					} else if (eformat == VIDEO_RGBA8888) {
+						u32 pix;
+
+						pix = *bmap++ << 8U; /* blue */
+						pix |= *bmap++ << 16U; /* green */
+						pix |= *bmap++ << 24U; /* red */
+						bmap++;
+						*fb++ = (pix >> 24) & 0xff;
+						*fb++ = (pix >> 16) & 0xff;
+						*fb++ = (pix >> 8) & 0xff;
+						*fb++ = 0xff; /* opacity */
 					} else {
 						*fb++ = *bmap++;
 						*fb++ = *bmap++;

@@ -9,14 +9,14 @@
  * Copyright(c) 2007-2018 Jianjun Jiang <8192542@qq.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <asm/io.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/dram.h>
-#include <asm/arch/gpio.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <hang.h>
+#include <sunxi_gpio.h>
 
 #define SDR_T_CAS			(0x2)
 #define SDR_T_RAS			(0x8)

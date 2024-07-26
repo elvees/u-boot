@@ -34,6 +34,7 @@
 #include <phy.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
+#include <linux/printk.h>
 #include <power/regulator.h>
 #include <remoteproc.h>
 #include <reset.h>
@@ -47,12 +48,10 @@
 
 /* SYSCFG registers */
 #define SYSCFG_BOOTR		0x00
-#define SYSCFG_PMCSETR		0x04
 #define SYSCFG_IOCTRLSETR	0x18
 #define SYSCFG_ICNR		0x1C
 #define SYSCFG_CMPCR		0x20
 #define SYSCFG_CMPENSETR	0x24
-#define SYSCFG_PMCCLRR		0x44
 
 #define SYSCFG_BOOTR_BOOT_MASK		GENMASK(2, 0)
 #define SYSCFG_BOOTR_BOOTPD_SHIFT	4
@@ -68,16 +67,6 @@
 
 #define SYSCFG_CMPENSETR_MPU_EN		BIT(0)
 
-#define SYSCFG_PMCSETR_ETH_CLK_SEL	BIT(16)
-#define SYSCFG_PMCSETR_ETH_REF_CLK_SEL	BIT(17)
-
-#define SYSCFG_PMCSETR_ETH_SELMII	BIT(20)
-
-#define SYSCFG_PMCSETR_ETH_SEL_MASK	GENMASK(23, 21)
-#define SYSCFG_PMCSETR_ETH_SEL_GMII_MII	0
-#define SYSCFG_PMCSETR_ETH_SEL_RGMII	BIT(21)
-#define SYSCFG_PMCSETR_ETH_SEL_RMII	BIT(23)
-
 #define KS_CCR		0x08
 #define KS_CCR_EEPROM	BIT(9)
 #define KS_BE0		BIT(12)
@@ -87,14 +76,25 @@
 
 static bool dh_stm32_mac_is_in_ks8851(void)
 {
-	ofnode node;
+	struct udevice *udev;
 	u32 reg, cider, ccr;
+	char path[256];
+	ofnode node;
+	int ret;
 
 	node = ofnode_path("ethernet1");
 	if (!ofnode_valid(node))
 		return false;
 
-	if (ofnode_device_is_compatible(node, "micrel,ks8851-mll"))
+	ret = ofnode_get_path(node, path, sizeof(path));
+	if (ret)
+		return false;
+
+	ret = uclass_get_device_by_of_path(UCLASS_ETH, path, &udev);
+	if (ret)
+		return false;
+
+	if (!ofnode_device_is_compatible(node, "micrel,ks8851-mll"))
 		return false;
 
 	/*
@@ -127,6 +127,9 @@ static int dh_stm32_setup_ethaddr(void)
 	if (dh_mac_is_in_env("ethaddr"))
 		return 0;
 
+	if (dh_get_mac_is_enabled("ethernet0"))
+		return 0;
+
 	if (!dh_get_mac_from_eeprom(enetaddr, "eeprom0"))
 		return eth_env_set_enetaddr("ethaddr", enetaddr);
 
@@ -138,6 +141,9 @@ static int dh_stm32_setup_eth1addr(void)
 	unsigned char enetaddr[6];
 
 	if (dh_mac_is_in_env("eth1addr"))
+		return 0;
+
+	if (dh_get_mac_is_enabled("ethernet1"))
 		return 0;
 
 	if (dh_stm32_mac_is_in_ks8851())
@@ -184,9 +190,9 @@ int checkboard(void)
 }
 
 #ifdef CONFIG_BOARD_EARLY_INIT_F
-static u8 brdcode __section("data");
-static u8 ddr3code __section("data");
-static u8 somcode __section("data");
+static u8 brdcode __section(".data");
+static u8 ddr3code __section(".data");
+static u8 somcode __section(".data");
 static u32 opp_voltage_mv __section(".data");
 
 static void board_get_coding_straps(void)
@@ -229,8 +235,9 @@ static void board_get_coding_straps(void)
 
 	gpio_free_list_nodev(gpio, ret);
 
-	printf("Code:  SoM:rev=%d,ddr3=%d Board:rev=%d\n",
-		somcode, ddr3code, brdcode);
+	if (CONFIG_IS_ENABLED(DISPLAY_PRINT))
+		printf("Code:  SoM:rev=%d,ddr3=%d Board:rev=%d\n",
+		       somcode, ddr3code, brdcode);
 }
 
 int board_stm32mp1_ddr_config_name_match(struct udevice *dev,
@@ -675,76 +682,6 @@ void board_quiesce_devices(void)
 #ifdef CONFIG_LED
 	setup_led(LEDST_OFF);
 #endif
-}
-
-/* eth init function : weak called in eqos driver */
-int board_interface_eth_init(struct udevice *dev,
-			     phy_interface_t interface_type)
-{
-	u8 *syscfg;
-	u32 value;
-	bool eth_clk_sel_reg = false;
-	bool eth_ref_clk_sel_reg = false;
-
-	/* Gigabit Ethernet 125MHz clock selection. */
-	eth_clk_sel_reg = dev_read_bool(dev, "st,eth-clk-sel");
-
-	/* Ethernet 50Mhz RMII clock selection */
-	eth_ref_clk_sel_reg =
-		dev_read_bool(dev, "st,eth-ref-clk-sel");
-
-	syscfg = (u8 *)syscon_get_first_range(STM32MP_SYSCON_SYSCFG);
-
-	if (!syscfg)
-		return -ENODEV;
-
-	switch (interface_type) {
-	case PHY_INTERFACE_MODE_MII:
-		value = SYSCFG_PMCSETR_ETH_SEL_GMII_MII |
-			SYSCFG_PMCSETR_ETH_REF_CLK_SEL;
-		debug("%s: PHY_INTERFACE_MODE_MII\n", __func__);
-		break;
-	case PHY_INTERFACE_MODE_GMII:
-		if (eth_clk_sel_reg)
-			value = SYSCFG_PMCSETR_ETH_SEL_GMII_MII |
-				SYSCFG_PMCSETR_ETH_CLK_SEL;
-		else
-			value = SYSCFG_PMCSETR_ETH_SEL_GMII_MII;
-		debug("%s: PHY_INTERFACE_MODE_GMII\n", __func__);
-		break;
-	case PHY_INTERFACE_MODE_RMII:
-		if (eth_ref_clk_sel_reg)
-			value = SYSCFG_PMCSETR_ETH_SEL_RMII |
-				SYSCFG_PMCSETR_ETH_REF_CLK_SEL;
-		else
-			value = SYSCFG_PMCSETR_ETH_SEL_RMII;
-		debug("%s: PHY_INTERFACE_MODE_RMII\n", __func__);
-		break;
-	case PHY_INTERFACE_MODE_RGMII:
-	case PHY_INTERFACE_MODE_RGMII_ID:
-	case PHY_INTERFACE_MODE_RGMII_RXID:
-	case PHY_INTERFACE_MODE_RGMII_TXID:
-		if (eth_clk_sel_reg)
-			value = SYSCFG_PMCSETR_ETH_SEL_RGMII |
-				SYSCFG_PMCSETR_ETH_CLK_SEL;
-		else
-			value = SYSCFG_PMCSETR_ETH_SEL_RGMII;
-		debug("%s: PHY_INTERFACE_MODE_RGMII\n", __func__);
-		break;
-	default:
-		debug("%s: Do not manage %d interface\n",
-		      __func__, interface_type);
-		/* Do not manage others interfaces */
-		return -EINVAL;
-	}
-
-	/* clear and set ETH configuration bits */
-	writel(SYSCFG_PMCSETR_ETH_SEL_MASK | SYSCFG_PMCSETR_ETH_SELMII |
-	       SYSCFG_PMCSETR_ETH_REF_CLK_SEL | SYSCFG_PMCSETR_ETH_CLK_SEL,
-	       syscfg + SYSCFG_PMCCLRR);
-	writel(value, syscfg + SYSCFG_PMCSETR);
-
-	return 0;
 }
 
 #if defined(CONFIG_OF_BOARD_SETUP)

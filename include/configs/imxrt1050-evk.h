@@ -26,9 +26,9 @@
 #endif
 
 /*
- * Configuration of the external SDRAM memory
+ * Address of U-Boot for SPI NOR boot
  */
 
-#define CFG_SYS_UBOOT_START		0x800023FD
+#define CFG_SYS_UBOOT_BASE			0x60010000
 
 #endif /* __IMXRT1050_EVK_H */

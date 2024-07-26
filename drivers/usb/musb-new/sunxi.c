@@ -30,6 +30,7 @@
 #include <dm/root.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
+#include <linux/printk.h>
 #include <linux/usb/musb.h>
 #include "linux-compat.h"
 #include "musb_core.h"
@@ -80,8 +81,6 @@
 /******************************************************************************
  * From usbc/usbc.c
  ******************************************************************************/
-
-#define OFF_SUN6I_AHB_RESET0	0x2c0
 
 struct sunxi_musb_config {
 	struct musb_hdrc_config *config;
@@ -486,7 +485,7 @@ static int musb_usb_probe(struct udevice *dev)
 #else
 	pdata.mode = MUSB_PERIPHERAL;
 	host->host = musb_register(&pdata, &glue->dev, base);
-	if (!host->host)
+	if (IS_ERR_OR_NULL(host->host))
 		return -EIO;
 
 	printf("Allwinner mUSB OTG (Peripheral)\n");
@@ -507,6 +506,16 @@ static int musb_usb_remove(struct udevice *dev)
 	return 0;
 }
 
+/*
+ * The Linux driver has a config struct, its fields mapping to this driver
+ * like this:
+ *	.hdrc_config:
+ *		sunxi_musb_hdrc_config_5eps => musb_config
+ *		sunxi_musb_hdrc_config_4eps => musb_config_h3
+ *	.has_sram: always enabled, ideally no-op on SoCs not using it
+ *	.has_reset: automatically detected from DT
+ *	.no_configdata: handled via Kconfig's CONFIG_USB_MUSB_FIXED_CONFIGDATA
+ */
 static const struct sunxi_musb_config sun4i_a10_cfg = {
 	.config = &musb_config,
 };
@@ -519,6 +528,10 @@ static const struct sunxi_musb_config sun8i_h3_cfg = {
 	.config = &musb_config_h3,
 };
 
+static const struct sunxi_musb_config suniv_f1c100s_cfg = {
+	.config = &musb_config,
+};
+
 static const struct udevice_id sunxi_musb_ids[] = {
 	{ .compatible = "allwinner,sun4i-a10-musb",
 			.data = (ulong)&sun4i_a10_cfg },
@@ -528,6 +541,8 @@ static const struct udevice_id sunxi_musb_ids[] = {
 			.data = (ulong)&sun6i_a31_cfg },
 	{ .compatible = "allwinner,sun8i-h3-musb",
 			.data = (ulong)&sun8i_h3_cfg },
+	{ .compatible = "allwinner,suniv-f1c100s-musb",
+			.data = (ulong)&suniv_f1c100s_cfg },
 	{ }
 };
 

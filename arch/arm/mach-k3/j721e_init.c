@@ -2,19 +2,17 @@
 /*
  * J721E: SoC specific initialization
  *
- * Copyright (C) 2018-2019 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2018-2019 Texas Instruments Incorporated - https://www.ti.com/
  *	Lokesh Vutla <lokeshvutla@ti.com>
  */
 
-#include <common.h>
 #include <init.h>
 #include <spl.h>
 #include <asm/io.h>
 #include <asm/armv7_mpu.h>
 #include <asm/arch/hardware.h>
-#include <asm/arch/sysfw-loader.h>
+#include "sysfw-loader.h"
 #include "common.h"
-#include <asm/arch/sys_proto.h>
 #include <linux/soc/ti/ti_sci_protocol.h>
 #include <dm.h>
 #include <dm/uclass-internal.h>
@@ -26,6 +24,7 @@
 
 #ifdef CONFIG_K3_LOAD_SYSFW
 struct fwl_data cbass_hc_cfg0_fwls[] = {
+#if defined(CONFIG_TARGET_J721E_R5_EVM)
 	{ "PCIE0_CFG", 2560, 8 },
 	{ "PCIE1_CFG", 2561, 8 },
 	{ "USB3SS0_CORE", 2568, 4 },
@@ -34,11 +33,16 @@ struct fwl_data cbass_hc_cfg0_fwls[] = {
 	{ "UFS_HCI0_CFG", 2580, 4 },
 	{ "SERDES0", 2584, 1 },
 	{ "SERDES1", 2585, 1 },
+#elif defined(CONFIG_TARGET_J7200_R5_EVM)
+	{ "PCIE1_CFG", 2561, 7 },
+#endif
 }, cbass_hc0_fwls[] = {
+#if defined(CONFIG_TARGET_J721E_R5_EVM)
 	{ "PCIE0_HP", 2528, 24 },
 	{ "PCIE0_LP", 2529, 24 },
 	{ "PCIE1_HP", 2530, 24 },
 	{ "PCIE1_LP", 2531, 24 },
+#endif
 }, cbass_rc_cfg0_fwls[] = {
 	{ "EMMCSD4SS0_CFG", 2380, 4 },
 }, cbass_rc0_fwls[] = {
@@ -140,8 +144,8 @@ void do_dt_magic(void)
 	int ret, rescan, mmc_dev = -1;
 	static struct mmc *mmc;
 
-	if (IS_ENABLED(CONFIG_TI_I2C_BOARD_DETECT))
-		do_board_detect();
+	/* Perform board detection */
+	do_board_detect();
 
 	/*
 	 * Board detection has been done.
@@ -224,6 +228,18 @@ void board_init_f(ulong dummy)
 		pinctrl_select_state(dev, "default");
 
 	/*
+	 * Force probe of clk_k3 driver here to ensure basic default clock
+	 * configuration is always done.
+	 */
+	if (IS_ENABLED(CONFIG_SPL_CLK_K3)) {
+		ret = uclass_get_device_by_driver(UCLASS_CLK,
+						  DM_DRIVER_GET(ti_clk),
+						  &dev);
+		if (ret)
+			panic("Failed to initialize clk-k3!\n");
+	}
+
+	/*
 	 * Load, start up, and configure system controller firmware. Provide
 	 * the U-Boot console init function to the SYSFW post-PM configuration
 	 * callback hook, effectively switching on (or over) the console
@@ -235,18 +251,6 @@ void board_init_f(ulong dummy)
 #ifdef CONFIG_SPL_OF_LIST
 	do_dt_magic();
 #endif
-
-	/*
-	 * Force probe of clk_k3 driver here to ensure basic default clock
-	 * configuration is always done.
-	 */
-	if (IS_ENABLED(CONFIG_SPL_CLK_K3)) {
-		ret = uclass_get_device_by_driver(UCLASS_CLK,
-						  DM_DRIVER_GET(ti_clk),
-						  &dev);
-		if (ret)
-			panic("Failed to initialize clk-k3!\n");
-	}
 
 	/* Prepare console output */
 	preloader_console_init();
@@ -267,9 +271,8 @@ void board_init_f(ulong dummy)
 	/* Output System Firmware version info */
 	k3_sysfw_print_ver();
 
-	/* Perform EEPROM-based board detection */
-	if (IS_ENABLED(CONFIG_TI_I2C_BOARD_DETECT))
-		do_board_detect();
+	/* Perform board detection */
+	do_board_detect();
 
 #if defined(CONFIG_CPU_V7R) && defined(CONFIG_K3_AVS0)
 	ret = uclass_get_device_by_driver(UCLASS_MISC, DM_DRIVER_GET(k3_avs),
@@ -283,13 +286,20 @@ void board_init_f(ulong dummy)
 	if (ret)
 		panic("DRAM init failed: %d\n", ret);
 #endif
-	spl_enable_dcache();
+	spl_enable_cache();
 }
 
 u32 spl_mmc_boot_mode(struct mmc *mmc, const u32 boot_device)
 {
 	switch (boot_device) {
 	case BOOT_DEVICE_MMC1:
+		if (IS_ENABLED(CONFIG_SUPPORT_EMMC_BOOT)) {
+			if (spl_mmc_emmc_boot_partition(mmc))
+				return MMCSD_MODE_EMMCBOOT;
+			return MMCSD_MODE_FS;
+		}
+		if (IS_ENABLED(CONFIG_SPL_FS_FAT) || IS_ENABLED(CONFIG_SPL_FS_EXT4))
+			return MMCSD_MODE_FS;
 		return MMCSD_MODE_EMMCBOOT;
 	case BOOT_DEVICE_MMC2:
 		return MMCSD_MODE_FS;
@@ -336,7 +346,8 @@ static u32 __get_primary_bootmedia(u32 main_devstat, u32 wkup_devstat)
 	bootmode |= (main_devstat & MAIN_DEVSTAT_BOOT_MODE_B_MASK) <<
 			BOOT_MODE_B_SHIFT;
 
-	if (bootmode == BOOT_DEVICE_OSPI || bootmode ==	BOOT_DEVICE_QSPI)
+	if (bootmode == BOOT_DEVICE_OSPI || bootmode == BOOT_DEVICE_QSPI ||
+	    bootmode == BOOT_DEVICE_XSPI)
 		bootmode = BOOT_DEVICE_SPI;
 
 	if (bootmode == BOOT_DEVICE_MMC2) {
@@ -379,58 +390,3 @@ u32 spl_boot_device(void)
 	else
 		return __get_backup_bootmedia(main_devstat);
 }
-
-#ifdef CONFIG_SYS_K3_SPL_ATF
-
-#define J721E_DEV_MCU_RTI0			262
-#define J721E_DEV_MCU_RTI1			263
-#define J721E_DEV_MCU_ARMSS0_CPU0		250
-#define J721E_DEV_MCU_ARMSS0_CPU1		251
-
-void release_resources_for_core_shutdown(void)
-{
-	struct ti_sci_handle *ti_sci;
-	struct ti_sci_dev_ops *dev_ops;
-	struct ti_sci_proc_ops *proc_ops;
-	int ret;
-	u32 i;
-
-	const u32 put_device_ids[] = {
-		J721E_DEV_MCU_RTI0,
-		J721E_DEV_MCU_RTI1,
-	};
-
-	ti_sci = get_ti_sci_handle();
-	dev_ops = &ti_sci->ops.dev_ops;
-	proc_ops = &ti_sci->ops.proc_ops;
-
-	/* Iterate through list of devices to put (shutdown) */
-	for (i = 0; i < ARRAY_SIZE(put_device_ids); i++) {
-		u32 id = put_device_ids[i];
-
-		ret = dev_ops->put_device(ti_sci, id);
-		if (ret)
-			panic("Failed to put device %u (%d)\n", id, ret);
-	}
-
-	const u32 put_core_ids[] = {
-		J721E_DEV_MCU_ARMSS0_CPU1,
-		J721E_DEV_MCU_ARMSS0_CPU0,	/* Handle CPU0 after CPU1 */
-	};
-
-	/* Iterate through list of cores to put (shutdown) */
-	for (i = 0; i < ARRAY_SIZE(put_core_ids); i++) {
-		u32 id = put_core_ids[i];
-
-		/*
-		 * Queue up the core shutdown request. Note that this call
-		 * needs to be followed up by an actual invocation of an WFE
-		 * or WFI CPU instruction.
-		 */
-		ret = proc_ops->proc_shutdown_no_wait(ti_sci, id);
-		if (ret)
-			panic("Failed sending core %u shutdown message (%d)\n",
-			      id, ret);
-	}
-}
-#endif

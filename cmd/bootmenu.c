@@ -119,7 +119,7 @@ static char *bootmenu_choice_entry(void *data)
 				iter = iter->next;
 			return iter->key;
 		case BKEY_QUIT:
-			/* Quit by choosing the last entry - U-Boot console */
+			/* Quit by choosing the last entry */
 			iter = menu->first;
 			while (iter->next)
 				iter = iter->next;
@@ -351,8 +351,8 @@ static struct bootmenu_data *bootmenu_create(int delay)
 		 * UEFI specification requires booting from removal media using
 		 * a architecture-specific default image name such as BOOTAA64.EFI.
 		 */
-		efi_ret = eficonfig_generate_media_device_boot_option();
-		if (efi_ret != EFI_SUCCESS && efi_ret != EFI_NOT_FOUND)
+		efi_ret = efi_bootmgr_update_media_device_boot_option();
+		if (efi_ret != EFI_SUCCESS)
 			goto cleanup;
 
 		ret = prepare_uefi_bootorder_entry(menu, &iter, &i);
@@ -361,15 +361,15 @@ static struct bootmenu_data *bootmenu_create(int delay)
 	}
 #endif
 
-	/* Add U-Boot console entry at the end */
+	/* Add Exit entry at the end */
 	if (i <= MAX_COUNT - 1) {
 		entry = malloc(sizeof(struct bootmenu_entry));
 		if (!entry)
 			goto cleanup;
 
-		/* Add Quit entry if entering U-Boot console is disabled */
+		/* Add Quit entry if exiting bootmenu is disabled */
 		if (!IS_ENABLED(CONFIG_BOOTMENU_DISABLE_UBOOT_CONSOLE))
-			entry->title = strdup("U-Boot console");
+			entry->title = strdup("Exit");
 		else
 			entry->title = strdup("Quit");
 
@@ -532,7 +532,7 @@ static enum bootmenu_ret bootmenu_show(int delay)
 		title = strdup(iter->title);
 		command = strdup(iter->command);
 
-		/* last entry is U-Boot console or Quit */
+		/* last entry exits bootmenu */
 		if (iter->num == iter->menu->count - 1) {
 			ret = BOOTMENU_RET_QUIT;
 			goto cleanup;

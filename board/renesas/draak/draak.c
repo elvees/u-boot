@@ -6,7 +6,6 @@
  * Copyright (C) 2017 Marek Vasut <marek.vasut+renesas@gmail.com>
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <hang.h>
 #include <init.h>
@@ -23,9 +22,8 @@
 #include <asm/arch/sys_proto.h>
 #include <asm/gpio.h>
 #include <asm/arch/gpio.h>
-#include <asm/arch/rmobile.h>
+#include <asm/arch/renesas.h>
 #include <asm/arch/rcar-mstp.h>
-#include <asm/arch/sh_sdhi.h>
 #include <i2c.h>
 #include <mmc.h>
 
@@ -66,13 +64,4 @@ int board_init(void)
 	setbits_le16(HSUSB_REG_LPSTS, HSUSB_REG_LPSTS_SUSPM_NORMAL);
 
 	return 0;
-}
-
-#define RST_BASE	0xE6160000
-#define RST_CA53RESCNT	(RST_BASE + 0x44)
-#define RST_CA53_CODE	0x5A5A000F
-
-void reset_cpu(void)
-{
-	writel(RST_CA53_CODE, RST_CA53RESCNT);
 }

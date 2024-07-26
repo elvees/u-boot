@@ -26,7 +26,7 @@ static int qemu_fwcfg_cmd_list_firmware(void)
 	for (file = qfw_file_iter_init(qfw_dev, &iter);
 	     !qfw_file_iter_end(&iter);
 	     file = qfw_file_iter_next(&iter)) {
-		printf("%-56s\n", file->cfg.name);
+		printf("%08lx %-56s\n", file->addr, file->cfg.name);
 	}
 
 	return 0;
@@ -121,4 +121,4 @@ U_BOOT_CMD(
 	"    - list                             : print firmware(s) currently loaded\n"
 	"    - cpus                             : print online cpu number\n"
 	"    - load <kernel addr> <initrd addr> : load kernel and initrd (if any), and setup for zboot\n"
-)
+);

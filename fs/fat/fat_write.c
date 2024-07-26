@@ -18,6 +18,7 @@
 #include <rand.h>
 #include <asm/byteorder.h>
 #include <asm/cache.h>
+#include <dm/uclass.h>
 #include <linux/ctype.h>
 #include <linux/math64.h>
 #include "fat.c"
@@ -132,15 +133,17 @@ static int set_name(fat_itr *itr, const char *filename, char *shortname)
 		return period_location;
 	if (*dirent.name == ' ')
 		*dirent.name = '_';
-	/* 0xe5 signals a deleted directory entry. Replace it by 0x05. */
-	if (*dirent.name == 0xe5)
-		*dirent.name = 0x05;
+	/* Substitute character 0xe5 signaling deletetion by character 0x05 */
+	if (*dirent.name == DELETED_FLAG)
+		*dirent.name = aRING;
 
 	/* If filename and short name are the same, quit. */
 	sprintf(buf, "%.*s.%.3s", period_location, dirent.name, dirent.ext);
 	if (!strcmp(buf, filename)) {
 		ret = 1;
 		goto out;
+	} else if (!strcasecmp(buf, filename)) {
+		goto out_ret;
 	}
 
 	/* Construct an indexed short name */
@@ -177,12 +180,13 @@ static int set_name(fat_itr *itr, const char *filename, char *shortname)
 		if (find_directory_entry(itr, buf))
 			continue;
 
-		debug("chosen short name: %s\n", buf);
-		/* Each long name directory entry takes 13 characters. */
-		ret = (strlen(filename) + 25) / 13;
-		goto out;
+		goto out_ret;
 	}
 	return -EIO;
+out_ret:
+	debug("chosen short name: %s\n", buf);
+	/* Each long name directory entry takes 13 characters. */
+	ret = (strlen(filename) + 25) / 13;
 out:
 	memcpy(shortname, &dirent, SHORT_NAME_SIZE);
 	return ret;
@@ -687,8 +691,8 @@ get_set_cluster(fsdata *mydata, __u32 clustnum, loff_t pos, __u8 *buffer,
 	static u8 *tmpbuf_cluster;
 	unsigned int bytesperclust = mydata->clust_size * mydata->sect_size;
 	__u32 startsect;
-	loff_t wsize;
-	int clustcount, i, ret;
+	loff_t clustcount, wsize;
+	int i, ret;
 
 	*gotsize = 0;
 	if (!size)
@@ -1149,6 +1153,41 @@ getit:
 }
 
 /**
+ * dentry_set_time() - set change time
+ *
+ * @dentptr:	directory entry
+ */
+static void dentry_set_time(dir_entry *dentptr)
+{
+	if (CONFIG_IS_ENABLED(DM_RTC)) {
+		struct udevice *dev;
+		struct rtc_time tm;
+		u16 date;
+		u16 time;
+
+		uclass_first_device(UCLASS_RTC, &dev);
+		if (!dev)
+			goto err;
+		if (dm_rtc_get(dev, &tm))
+			goto err;
+		if (tm.tm_year < 1980 || tm.tm_year > 2107)
+			goto err;
+		date = (tm.tm_mday & 0x1f) |
+		       ((tm.tm_mon & 0xf) << 5) |
+		       ((tm.tm_year - 1980) << 9);
+		time = (tm.tm_sec > 1) |
+		       ((tm.tm_min & 0x3f) << 5) |
+		(tm.tm_hour << 11);
+		dentptr->date = date;
+		dentptr->time = time;
+		return;
+	}
+err:
+	dentptr->date = 0x2821; /* 2000-01-01 */
+	dentptr->time = 0;
+}
+
+/**
  * fill_dentry() - fill directory entry with shortname
  *
  * @mydata:		private filesystem parameters
@@ -1167,6 +1206,12 @@ static void fill_dentry(fsdata *mydata, dir_entry *dentptr,
 	dentptr->size = cpu_to_le32(size);
 
 	dentptr->attr = attr;
+
+	/* Set change date */
+	dentry_set_time(dentptr);
+	/* Set creation date */
+	dentptr->cdate = dentptr->date;
+	dentptr->ctime = dentptr->time;
 
 	memcpy(&dentptr->nameext, shortname, SHORT_NAME_SIZE);
 }
@@ -1373,6 +1418,8 @@ int file_fat_write_at(const char *filename, loff_t pos, void *buffer,
 
 		/* Update file size in a directory entry */
 		retdent->size = cpu_to_le32(pos + size);
+		/* Update change date */
+		dentry_set_time(retdent);
 	} else {
 		/* Create a new file */
 		char shortname[SHORT_NAME_SIZE];
@@ -1568,8 +1615,9 @@ int fat_unlink(const char *filename)
 	char *filename_copy, *dirname, *basename;
 
 	filename_copy = strdup(filename);
-	if (!filename_copy) {
-		printf("Error: allocating memory\n");
+	itr = malloc_cache_aligned(sizeof(fat_itr));
+	if (!itr || !filename_copy) {
+		printf("Error: out of memory\n");
 		ret = -ENOMEM;
 		goto exit;
 	}
@@ -1578,13 +1626,6 @@ int fat_unlink(const char *filename)
 	if (!strcmp(dirname, "/") && !strcmp(basename, "")) {
 		printf("Error: cannot remove root\n");
 		ret = -EINVAL;
-		goto exit;
-	}
-
-	itr = malloc_cache_aligned(sizeof(fat_itr));
-	if (!itr) {
-		printf("Error: allocating memory\n");
-		ret = -ENOMEM;
 		goto exit;
 	}
 
@@ -1602,7 +1643,7 @@ int fat_unlink(const char *filename)
 	}
 
 	if (!find_directory_entry(itr, basename)) {
-		printf("%s: doesn't exist\n", basename);
+		log_err("%s: doesn't exist (%d)\n", basename, -ENOENT);
 		ret = -ENOENT;
 		goto exit;
 	}

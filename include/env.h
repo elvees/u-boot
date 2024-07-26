@@ -73,6 +73,14 @@ enum env_redund_flags {
 int env_get_id(void);
 
 /**
+ * env_inc_id() - Increase the sequence number for the environment
+ *
+ * Increment the value that is used by env_get_id() to inform callers
+ * if the environment has changed since they last checked.
+ */
+void env_inc_id(void);
+
+/**
  * env_init() - Set up the pre-relocation environment
  *
  * This locates the environment or uses the default if nothing is available.
@@ -240,11 +248,6 @@ int eth_env_get_enetaddr(const char *name, uint8_t *enetaddr);
 int eth_env_set_enetaddr(const char *name, const uint8_t *enetaddr);
 
 /**
- * env_fix_drivers() - Updates envdriver as per relocation
- */
-void env_fix_drivers(void);
-
-/**
  * env_set_default_vars() - reset variables to their default value
  *
  * This resets individual variables to their value in the default environment
@@ -361,16 +364,18 @@ int env_import_redund(const char *buf1, int buf1_read_fail,
  */
 char *env_get_default(const char *name);
 
+/**
+ * env_get_default_into() - Look up a variable from the default environment and
+ * copy its value in buf.
+ *
+ * @name: Variable to look up
+ * Return: actual length of the variable value excluding the terminating
+ *	NULL-byte, or -1 if the variable is not found
+ */
+int env_get_default_into(const char *name, char *buf, unsigned int len);
+
 /* [re]set to the default environment */
 void env_set_default(const char *s, int flags);
-
-/**
- * env_reloc() - Relocate the 'env' sub-commands
- *
- * This is used for those unfortunate archs with crappy toolchains
- */
-void env_reloc(void);
-
 
 /**
  * env_import_fdt() - Import environment values from device tree blob

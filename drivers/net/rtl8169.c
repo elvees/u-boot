@@ -51,6 +51,7 @@
 #include <asm/io.h>
 #include <pci.h>
 #include <linux/delay.h>
+#include <linux/printk.h>
 
 #undef DEBUG_RTL8169
 #undef DEBUG_RTL8169_TX
@@ -96,12 +97,12 @@ static int media[MAX_UNITS] = { -1, -1, -1, -1, -1, -1, -1, -1 };
 #define TX_TIMEOUT  (6*HZ)
 
 /* write/read MMIO register. Notice: {read,write}[wl] do the necessary swapping */
-#define RTL_W8(reg, val8)	writeb((val8), ioaddr + (reg))
-#define RTL_W16(reg, val16)	writew((val16), ioaddr + (reg))
-#define RTL_W32(reg, val32)	writel((val32), ioaddr + (reg))
-#define RTL_R8(reg)		readb(ioaddr + (reg))
-#define RTL_R16(reg)		readw(ioaddr + (reg))
-#define RTL_R32(reg)		readl(ioaddr + (reg))
+#define RTL_W8(reg, val8)	writeb((val8), (void *)(ioaddr + (reg)))
+#define RTL_W16(reg, val16)	writew((val16), (void *)(ioaddr + (reg)))
+#define RTL_W32(reg, val32)	writel((val32), (void *)(ioaddr + (reg)))
+#define RTL_R8(reg)		readb((void *)(ioaddr + (reg)))
+#define RTL_R16(reg)		readw((void *)(ioaddr + (reg)))
+#define RTL_R32(reg)		readl((void *)(ioaddr + (reg)))
 
 #define bus_to_phys(a)	pci_mem_to_phys((pci_dev_t)(unsigned long)dev->priv, \
 	(pci_addr_t)(unsigned long)a)
@@ -118,9 +119,9 @@ enum RTL8169_registers {
 	FLASH = 0x30,
 	ERSR = 0x36,
 	ChipCmd = 0x37,
-	TxPoll = 0x38,
-	IntrMask = 0x3C,
-	IntrStatus = 0x3E,
+	TxPoll_8169 = 0x38,
+	IntrMask_8169 = 0x3C,
+	IntrStatus_8169 = 0x3E,
 	TxConfig = 0x40,
 	RxConfig = 0x44,
 	RxMissed = 0x4C,
@@ -146,6 +147,12 @@ enum RTL8169_registers {
 	FuncEventMask = 0xF4,
 	FuncPresetState = 0xF8,
 	FuncForceEvent = 0xFC,
+};
+
+enum RTL8125_registers {
+	IntrMask_8125 = 0x38,
+	IntrStatus_8125 = 0x3C,
+	TxPoll_8125 = 0x90,
 };
 
 enum RTL8169_register_content {
@@ -263,6 +270,7 @@ static struct {
 	{"RTL-8101e",		0x34, 0xff7e1880,},
 	{"RTL-8100e",		0x32, 0xff7e1880,},
 	{"RTL-8168h/8111h",	0x54, 0xff7e1880,},
+	{"RTL-8125B",		0x64, 0xff7e1880,},
 };
 
 enum _DescStatusBit {
@@ -304,10 +312,12 @@ static unsigned char rxdata[RX_BUF_LEN];
  *
  * This can be fixed by defining CONFIG_SYS_NONCACHED_MEMORY which will cause
  * the driver to allocate descriptors from a pool of non-cached memory.
+ *
+ * Hardware maintain D-cache coherency in RISC-V architecture.
  */
 #if RTL8169_DESC_SIZE < ARCH_DMA_MINALIGN
 #if !defined(CONFIG_SYS_NONCACHED_MEMORY) && \
-	!CONFIG_IS_ENABLED(SYS_DCACHE_OFF) && !defined(CONFIG_X86)
+	!CONFIG_IS_ENABLED(SYS_DCACHE_OFF) && !defined(CONFIG_X86) && !defined(CONFIG_RISCV)
 #warning cache-line size is larger than descriptor size
 #endif
 #endif
@@ -344,6 +354,8 @@ static const unsigned int rtl8169_rx_config =
     (RX_FIFO_THRESH << RxCfgFIFOShift) | (RX_DMA_BURST << RxCfgDMAShift);
 
 static struct pci_device_id supported[] = {
+	{ PCI_DEVICE(PCI_VENDOR_ID_REALTEK, 0x8125) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_REALTEK, 0x8161) },
 	{ PCI_DEVICE(PCI_VENDOR_ID_REALTEK, 0x8167) },
 	{ PCI_DEVICE(PCI_VENDOR_ID_REALTEK, 0x8168) },
 	{ PCI_DEVICE(PCI_VENDOR_ID_REALTEK, 0x8169) },
@@ -517,6 +529,7 @@ static int rtl_recv_common(struct udevice *dev, unsigned long dev_iobase,
 	/* return true if there's an ethernet packet ready to read */
 	/* nic->packet should contain data on return */
 	/* nic->packetlen should contain length of data */
+	struct pci_child_plat *pplat = dev_get_parent_plat(dev);
 	int cur_rx;
 	int length = 0;
 
@@ -558,6 +571,10 @@ static int rtl_recv_common(struct udevice *dev, unsigned long dev_iobase,
 		return length;
 
 	} else {
+		u32 IntrStatus = IntrStatus_8169;
+
+		if (pplat->device == 0x8125)
+			IntrStatus = IntrStatus_8125;
 		ushort sts = RTL_R8(IntrStatus);
 		RTL_W8(IntrStatus, sts & ~(TxErr | RxErr | SYSErr));
 		udelay(100);	/* wait */
@@ -582,6 +599,7 @@ static int rtl_send_common(struct udevice *dev, unsigned long dev_iobase,
 {
 	/* send the packet to destination */
 
+	struct pci_child_plat *pplat = dev_get_parent_plat(dev);
 	u32 to;
 	u8 *ptxb;
 	int entry = tpc->cur_tx % NUM_TX_DESC;
@@ -618,7 +636,10 @@ static int rtl_send_common(struct udevice *dev, unsigned long dev_iobase,
 				    ((len > ETH_ZLEN) ? len : ETH_ZLEN));
 	}
 	rtl_flush_tx_desc(&tpc->TxDescArray[entry]);
-	RTL_W8(TxPoll, 0x40);	/* set polling bit */
+	if (pplat->device == 0x8125)
+		RTL_W8(TxPoll_8125, 0x1);	/* set polling bit */
+	else
+		RTL_W8(TxPoll_8169, 0x40);	/* set polling bit */
 
 	tpc->cur_tx++;
 	to = currticks() + TX_TIMEOUT;
@@ -824,21 +845,26 @@ static int rtl8169_eth_start(struct udevice *dev)
 	return 0;
 }
 
-static void rtl_halt_common(unsigned long dev_iobase)
+static void rtl_halt_common(struct udevice *dev)
 {
+	struct rtl8169_private *priv = dev_get_priv(dev);
+	struct pci_child_plat *pplat = dev_get_parent_plat(dev);
 	int i;
 
 #ifdef DEBUG_RTL8169
 	printf ("%s\n", __FUNCTION__);
 #endif
 
-	ioaddr = dev_iobase;
+	ioaddr = priv->iobase;
 
 	/* Stop the chip's Tx and Rx DMA processes. */
 	RTL_W8(ChipCmd, 0x00);
 
 	/* Disable interrupts by clearing the interrupt mask. */
-	RTL_W16(IntrMask, 0x0000);
+	if (pplat->device == 0x8125)
+		RTL_W16(IntrMask_8125, 0x0000);
+	else
+		RTL_W16(IntrMask_8169, 0x0000);
 
 	RTL_W32(RxMissed, 0);
 
@@ -849,9 +875,7 @@ static void rtl_halt_common(unsigned long dev_iobase)
 
 void rtl8169_eth_stop(struct udevice *dev)
 {
-	struct rtl8169_private *priv = dev_get_priv(dev);
-
-	rtl_halt_common(priv->iobase);
+	rtl_halt_common(dev);
 }
 
 static int rtl8169_write_hwaddr(struct udevice *dev)
@@ -1025,12 +1049,12 @@ static int rtl8169_eth_probe(struct udevice *dev)
 	struct pci_child_plat *pplat = dev_get_parent_plat(dev);
 	struct rtl8169_private *priv = dev_get_priv(dev);
 	struct eth_pdata *plat = dev_get_plat(dev);
-	u32 iobase;
 	int region;
 	int ret;
 
-	debug("rtl8169: REALTEK RTL8169 @0x%x\n", iobase);
 	switch (pplat->device) {
+	case 0x8125:
+	case 0x8161:
 	case 0x8168:
 		region = 2;
 		break;
@@ -1038,10 +1062,13 @@ static int rtl8169_eth_probe(struct udevice *dev)
 		region = 1;
 		break;
 	}
-	dm_pci_read_config32(dev, PCI_BASE_ADDRESS_0 + region * 4, &iobase);
-	iobase &= ~0xf;
-	priv->iobase = (int)dm_pci_mem_to_phys(dev, iobase);
 
+	priv->iobase = (ulong)dm_pci_map_bar(dev,
+					     PCI_BASE_ADDRESS_0 + region * 4,
+					     0, 0,
+					     PCI_REGION_TYPE, PCI_REGION_MEM);
+
+	debug("rtl8169: REALTEK RTL8169 @0x%lx\n", priv->iobase);
 	ret = rtl_init(priv->iobase, dev->name, plat->enetaddr);
 	if (ret < 0) {
 		printf(pr_fmt("failed to initialize card: %d\n"), ret);

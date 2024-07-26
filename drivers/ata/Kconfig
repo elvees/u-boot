@@ -36,7 +36,8 @@ menu "SATA/SCSI device support"
 config AHCI_PCI
 	bool "Support for PCI-based AHCI controller"
 	depends on PCI
-	depends on DM_SCSI
+	depends on SCSI
+	depends on SCSI_AHCI
 	help
 	  Enables support for the PCI-based AHCI controller.
 
@@ -46,13 +47,13 @@ config SPL_AHCI_PCI
 	bool "Support for PCI-based AHCI controller for SPL"
 	depends on SPL
 	depends on SPL_PCI
-	depends on SPL_SATA && DM_SCSI
+	depends on SPL_SATA && SCSI
 
 config DWC_AHCI
 	bool "Enable Synopsys DWC AHCI driver support"
 	select SCSI_AHCI
 	select PHY
-	depends on DM_SCSI
+	depends on SCSI
 	help
 	  Enable this driver to support Sata devices through
 	  Synopsys DWC AHCI module.
@@ -82,7 +83,7 @@ config AHCI_MVEBU
 	bool "Marvell EBU AHCI SATA support"
 	depends on ARCH_MVEBU || ARCH_OCTEON
 	select SCSI_AHCI
-	select DM_SCSI
+	select SCSI
 	help
 	  This option enables support for the Marvell EBU SoC's
 	  onboard AHCI SATA.
@@ -103,7 +104,7 @@ if SATA
 config SATA_CEVA
 	bool "Ceva Sata controller"
 	depends on AHCI
-	depends on DM_SCSI
+	depends on SCSI
 	help
 	  This option enables Ceva Sata controller hard IP available on Xilinx
 	  ZynqMP. Support up to 2 external devices. Compliant with SATA 3.1 and

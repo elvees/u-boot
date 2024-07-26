@@ -11,6 +11,13 @@
 	#size-cells = <1>;
 	compatible = "xlnx,zynq-7000";
 
+	options {
+		u-boot {
+			compatible = "u-boot,config";
+			bootscr-address = /bits/ 64 <0x3000000>;
+		};
+	};
+
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -37,7 +44,7 @@
 		};
 	};
 
-	fpga_full: fpga-full {
+	fpga_full: fpga-region {
 		compatible = "fpga-region";
 		fpga-mgr = <&devcfg>;
 		#address-cells = <1>;
@@ -96,7 +103,7 @@
 	};
 
 	amba: axi {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 		compatible = "simple-bus";
 		#address-cells = <1>;
 		#size-cells = <1>;
@@ -153,6 +160,7 @@
 			clocks = <&clkc 38>;
 			interrupt-parent = <&intc>;
 			interrupts = <0 25 4>;
+			clock-frequency = <400000>;
 			reg = <0xe0004000 0x1000>;
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -164,6 +172,7 @@
 			clocks = <&clkc 39>;
 			interrupt-parent = <&intc>;
 			interrupts = <0 48 4>;
+			clock-frequency = <400000>;
 			reg = <0xe0005000 0x1000>;
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -258,7 +267,7 @@
 		};
 
 		gem0: ethernet@e000b000 {
-			compatible = "xlnx,zynq-gem", "cdns,zynq-gem", "cdns,gem";
+			compatible = "xlnx,zynq-gem", "cdns,gem";
 			reg = <0xe000b000 0x1000>;
 			status = "disabled";
 			interrupts = <0 22 4>;
@@ -269,7 +278,7 @@
 		};
 
 		gem1: ethernet@e000c000 {
-			compatible = "xlnx,zynq-gem", "cdns,zynq-gem", "cdns,gem";
+			compatible = "xlnx,zynq-gem", "cdns,gem";
 			reg = <0xe000c000 0x1000>;
 			status = "disabled";
 			interrupts = <0 45 4>;
@@ -297,15 +306,11 @@
 				compatible = "arm,pl353-nand-r2p1";
 				reg = <0 0 0x1000000>;
 				status = "disabled";
-				#address-cells = <1>;
-				#size-cells = <0>;
 			};
 			nor0: flash@1,0 {
 				status = "disabled";
 				compatible = "cfi-flash";
 				reg = <1 0 0x2000000>;
-				#address-cells = <1>;
-				#size-cells = <1>;
 			};
 		};
 
@@ -330,14 +335,14 @@
 		};
 
 		slcr: slcr@f8000000 {
-			u-boot,dm-pre-reloc;
+			bootph-all;
 			#address-cells = <1>;
 			#size-cells = <1>;
 			compatible = "xlnx,zynq-slcr", "syscon", "simple-mfd";
 			reg = <0xF8000000 0x1000>;
 			ranges;
 			clkc: clkc@100 {
-				u-boot,dm-pre-reloc;
+				bootph-all;
 				#clock-cells = <1>;
 				compatible = "xlnx,ps7-clkc";
 				fclk-enable = <0xf>;
@@ -369,20 +374,20 @@
 			};
 		};
 
-		dmac_s: dmac@f8003000 {
+		dmac_s: dma-controller@f8003000 {
 			compatible = "arm,pl330", "arm,primecell";
 			reg = <0xf8003000 0x1000>;
 			interrupt-parent = <&intc>;
-			interrupt-names = "abort", "dma0", "dma1", "dma2", "dma3",
-				"dma4", "dma5", "dma6", "dma7";
+			/*
+			 * interrupt-names = "abort", "dma0", "dma1", "dma2", "dma3",
+			 * "dma4", "dma5", "dma6", "dma7";
+			 */
 			interrupts = <0 13 4>,
 			             <0 14 4>, <0 15 4>,
 			             <0 16 4>, <0 17 4>,
 			             <0 40 4>, <0 41 4>,
 			             <0 42 4>, <0 43 4>;
 			#dma-cells = <1>;
-			#dma-channels = <8>;
-			#dma-requests = <4>;
 			clocks = <&clkc 27>;
 			clock-names = "apb_pclk";
 		};
@@ -427,7 +432,7 @@
 		};
 
 		scutimer: timer@f8f00600 {
-			u-boot,dm-pre-reloc;
+			bootph-all;
 			interrupt-parent = <&intc>;
 			interrupts = <1 13 0x301>;
 			compatible = "arm,cortex-a9-twd-timer";

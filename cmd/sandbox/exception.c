@@ -5,7 +5,6 @@
  * Copyright (c) 2020, Heinrich Schuchardt <xypron.glpk@gmx.de>
  */
 
-#include <common.h>
 #include <command.h>
 
 static int do_sigsegv(struct cmd_tbl *cmdtp, int flag, int argc,
@@ -31,11 +30,10 @@ static struct cmd_tbl cmd_sub[] = {
 			 "", ""),
 };
 
-static char exception_help_text[] =
+U_BOOT_LONGHELP(exception,
 	"<ex>\n"
 	"  The following exceptions are available:\n"
 	"  undefined  - undefined instruction\n"
-	"  sigsegv    - illegal memory access\n"
-	;
+	"  sigsegv    - illegal memory access\n");
 
 #include <exception.h>

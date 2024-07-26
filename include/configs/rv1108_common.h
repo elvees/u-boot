@@ -5,7 +5,6 @@
 #ifndef __CONFIG_RV1108_COMMON_H
 #define __CONFIG_RV1108_COMMON_H
 
-#include <asm/arch-rockchip/hardware.h>
 #include "rockchip-common.h"
 
 #define CFG_IRAM_BASE		0x10080000
@@ -28,6 +27,6 @@
 	ENV_MEM_LAYOUT_SETTINGS \
 	"fdtfile=" CONFIG_DEFAULT_FDT_FILE "\0" \
 	"partitions=" PARTS_DEFAULT \
-	BOOTENV
+	"boot_targets=" BOOT_TARGETS "\0"
 
 #endif

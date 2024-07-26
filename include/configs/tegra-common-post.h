@@ -7,21 +7,7 @@
 #ifndef __TEGRA_COMMON_POST_H
 #define __TEGRA_COMMON_POST_H
 
-#if IS_ENABLED(CONFIG_CMD_USB)
-# define BOOT_TARGET_USB(func) func(USB, usb, 0)
-#else
-# define BOOT_TARGET_USB(func)
-#endif
-
-#ifndef BOOT_TARGET_DEVICES
-#define BOOT_TARGET_DEVICES(func) \
-	func(MMC, mmc, 1) \
-	func(MMC, mmc, 0) \
-	BOOT_TARGET_USB(func) \
-	func(PXE, pxe, na) \
-	func(DHCP, dhcp, na)
-#endif
-#include <config_distro_bootcmd.h>
+#define BOOT_TARGETS	"mmc1 mmc0 usb pxe dhcp"
 
 #ifdef CONFIG_TEGRA_KEYBOARD
 #define STDIN_KBD_KBC ",tegra-kbc"
@@ -33,6 +19,12 @@
 #define STDIN_KBD_USB ",usbkbd"
 #else
 #define STDIN_KBD_USB ""
+#endif
+
+#ifdef CONFIG_BUTTON_KEYBOARD
+#define STDIN_BTN_KBD ",button-kbd"
+#else
+#define STDIN_BTN_KBD ""
 #endif
 
 #ifdef CONFIG_VIDEO
@@ -48,7 +40,7 @@
 #endif
 
 #define TEGRA_DEVICE_SETTINGS \
-	"stdin=serial" STDIN_KBD_KBC STDIN_KBD_USB STDOUT_CROS_EC "\0" \
+	"stdin=serial" STDIN_KBD_KBC STDIN_KBD_USB STDOUT_CROS_EC STDIN_BTN_KBD "\0" \
 	"stdout=serial" STDOUT_VIDEO "\0" \
 	"stderr=serial" STDOUT_VIDEO "\0" \
 	""
@@ -70,7 +62,7 @@
 	MEM_LAYOUT_ENV_SETTINGS \
 	"fdt_high=" FDT_HIGH "\0" \
 	"initrd_high=" INITRD_HIGH "\0" \
-	BOOTENV \
+	"boot_targets=" BOOT_TARGETS "\0" \
 	BOARD_EXTRA_ENV_SETTINGS
 
 #endif /* __TEGRA_COMMON_POST_H */

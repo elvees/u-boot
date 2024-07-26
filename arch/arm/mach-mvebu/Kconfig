@@ -5,7 +5,6 @@ config HAVE_MVEBU_EFUSE
 
 config ARMADA_32BIT
 	bool
-	select ARCH_MISC_INIT
 	select BOARD_EARLY_INIT_F
 	select CPU_V7A
 	select SPL_DM if SPL
@@ -16,8 +15,11 @@ config ARMADA_32BIT
 	select SUPPORT_SPL
 	select SYS_L2_PL310 if !SYS_L2CACHE_OFF
 	select TRANSLATION_OFFSET
+	select TOOLS_KWBIMAGE if SPL
 	select SPL_SYS_NO_VECTOR_TABLE if SPL
 	select ARCH_VERY_EARLY_INIT
+	select ARMADA_32BIT_SYSCON_RESET if DM_RESET && PCI_MVEBU
+	select ARMADA_32BIT_SYSCON_SYSRESET if SYSRESET
 
 # ARMv7 SoCs...
 config ARMADA_375
@@ -108,6 +110,7 @@ config TARGET_CLEARFOG
 	bool "Support ClearFog"
 	select 88F6820
 	select BOARD_LATE_INIT
+	select OF_BOARD_SETUP
 
 config TARGET_HELIOS4
 	bool "Support Helios4"
@@ -144,8 +147,12 @@ config TARGET_TURRIS_OMNIA
 	select ATSHA204A
 
 config TARGET_TURRIS_MOX
-	bool "Support Turris Mox"
+	bool "Support CZ.NIC's Turris Mox / RIPE Atlas Probe"
 	select ARMADA_3700
+	select BOARD_TYPES
+	select ENV_IS_IN_MMC
+	select ENV_IS_IN_SPI_FLASH
+	select MULTI_DTB_FIT
 
 config TARGET_MVEBU_ARMADA_8K
 	bool "Support Armada 7k/8k platforms"
@@ -201,6 +208,10 @@ config TARGET_CONTROLCENTERDC
 config TARGET_X530
 	bool "Support Allied Telesis x530"
 	select 88F6820
+
+config TARGET_X240
+	bool "Support Allied Telesis x240"
+	select ALLEYCAT_5
 
 config TARGET_DB_XC3_24G4XG
 	bool "Support DB-XC3-24G4XG"
@@ -274,6 +285,7 @@ config SYS_BOARD
 	default "theadorable" if TARGET_THEADORABLE
 	default "a38x" if TARGET_CONTROLCENTERDC
 	default "x530" if TARGET_X530
+	default "x240" if TARGET_X240
 	default "db-xc3-24g4xg" if TARGET_DB_XC3_24G4XG
 	default "crs3xx-98dx3236" if TARGET_CRS3XX_98DX3236
 	default "mvebu_alleycat-5" if TARGET_MVEBU_ALLEYCAT5
@@ -297,6 +309,7 @@ config SYS_CONFIG_NAME
 	default "turris_mox" if TARGET_TURRIS_MOX
 	default "controlcenterdc" if TARGET_CONTROLCENTERDC
 	default "x530" if TARGET_X530
+	default "x240" if TARGET_X240
 	default "db-xc3-24g4xg" if TARGET_DB_XC3_24G4XG
 	default "crs3xx-98dx3236" if TARGET_CRS3XX_98DX3236
 	default "mvebu_alleycat-5" if TARGET_MVEBU_ALLEYCAT5
@@ -320,6 +333,7 @@ config SYS_VENDOR
 	default "CZ.NIC" if TARGET_TURRIS_MOX
 	default "gdsys" if TARGET_CONTROLCENTERDC
 	default "alliedtelesis" if TARGET_X530
+	default "alliedtelesis" if TARGET_X240
 	default "mikrotik" if TARGET_CRS3XX_98DX3236
 	default "Marvell" if TARGET_MVEBU_ALLEYCAT5
 
@@ -331,7 +345,7 @@ choice
 	depends on SPL
 
 config MVEBU_SPL_BOOT_DEVICE_SPI
-	bool "SPI NOR flash"
+	bool "NOR flash (SPI or parallel)"
 	imply ENV_IS_IN_SPI_FLASH
 	imply SPL_DM_SPI
 	imply SPL_SPI_FLASH_SUPPORT
@@ -339,8 +353,13 @@ config MVEBU_SPL_BOOT_DEVICE_SPI
 	imply SPL_SPI
 	select SPL_BOOTROM_SUPPORT
 
+config MVEBU_SPL_BOOT_DEVICE_NAND
+	bool "NAND flash (SPI or parallel)"
+	select MTD_RAW_NAND
+	select SPL_BOOTROM_SUPPORT
+
 config MVEBU_SPL_BOOT_DEVICE_MMC
-	bool "SDIO/MMC card"
+	bool "eMMC or SD card"
 	imply ENV_IS_IN_MMC
 	# GPIO needed for eMMC/SD card presence detection
 	imply SPL_DM_GPIO
@@ -348,6 +367,8 @@ config MVEBU_SPL_BOOT_DEVICE_MMC
 	imply SPL_GPIO
 	imply SPL_LIBDISK_SUPPORT
 	imply SPL_MMC
+	select SUPPORT_EMMC_BOOT if SPL_MMC
+	select SYS_MMCSD_RAW_MODE_U_BOOT_USE_SECTOR if SPL_MMC
 	select SPL_BOOTROM_SUPPORT
 
 config MVEBU_SPL_BOOT_DEVICE_SATA
@@ -356,11 +377,33 @@ config MVEBU_SPL_BOOT_DEVICE_SATA
 	imply SPL_LIBDISK_SUPPORT
 	select SPL_BOOTROM_SUPPORT
 
+config MVEBU_SPL_BOOT_DEVICE_PEX
+	bool "PCI Express"
+	select SPL_BOOTROM_SUPPORT
+
 config MVEBU_SPL_BOOT_DEVICE_UART
 	bool "UART"
 	select SPL_BOOTROM_SUPPORT
 
 endchoice
+
+config MVEBU_SPL_NAND_BADBLK_LOCATION
+	hex "NAND Bad block indicator location"
+	depends on MVEBU_SPL_BOOT_DEVICE_NAND
+	range 0x0 0x1
+	help
+	  Value 0x0 = SLC flash = BBI at page 0 or page 1
+	  Value 0x1 = MLC flash = BBI at last page in the block
+
+config MVEBU_SPL_SATA_BLKSZ
+	int "SATA block size"
+	depends on MVEBU_SPL_BOOT_DEVICE_SATA
+	range 512 32768
+	default 512
+	help
+	  Block size of the SATA disk in bytes.
+	  Typically 512 bytes for majority of disks
+	  and 4096 bytes for 4K Native disks.
 
 config MVEBU_EFUSE
 	bool "Enable eFuse support"
@@ -404,6 +447,39 @@ config SECURED_MODE_CSK_INDEX
 	int "Index of active CSK"
 	default 0
 	depends on SECURED_MODE_IMAGE
+
+config SF_DEFAULT_SPEED
+	int "Default speed for SPI flash in Hz"
+	default 10000000
+	depends on MVEBU_SPL_BOOT_DEVICE_SPI
+
+config SF_DEFAULT_MODE
+	hex "Default mode for SPI flash"
+	default 0x0
+	depends on MVEBU_SPL_BOOT_DEVICE_SPI
+
+config ARMADA_32BIT_SYSCON
+	bool
+	depends on ARMADA_32BIT
+	select REGMAP
+	select SYSCON
+
+config ARMADA_32BIT_SYSCON_RESET
+	bool "Support Armada XP/375/38x/39x reset controller"
+	depends on ARMADA_32BIT
+	depends on DM_RESET
+	select ARMADA_32BIT_SYSCON
+	help
+	  Build support for Armada XP/375/38x/39x reset controller. This is
+	  needed for PCIe support.
+
+config ARMADA_32BIT_SYSCON_SYSRESET
+	bool "Support Armada XP/375/38x/39x sysreset via driver model"
+	depends on ARMADA_32BIT
+	depends on SYSRESET
+	select ARMADA_32BIT_SYSCON
+	help
+	  Build support for Armada XP/375/38x/39x system reset via driver model.
 
 source "board/solidrun/clearfog/Kconfig"
 source "board/kobol/helios4/Kconfig"

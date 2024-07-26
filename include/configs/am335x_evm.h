@@ -1,7 +1,7 @@
 /*
  * am335x_evm.h
  *
- * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2011 Texas Instruments Incorporated - https://www.ti.com/
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -76,7 +76,7 @@
 #include <config_distro_bootcmd.h>
 
 #ifndef CONFIG_SPL_BUILD
-#include <environment/ti/dfu.h>
+#include <env/ti/dfu.h>
 
 #define CFG_EXTRA_ENV_SETTINGS \
 	DEFAULT_LINUX_BOOT_ENV \

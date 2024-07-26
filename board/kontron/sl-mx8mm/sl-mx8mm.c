@@ -29,15 +29,15 @@ struct efi_fw_image fw_images[] = {
 
 struct efi_capsule_update_info update_info = {
 	.dfu_string = "sf 0:0=flash-bin raw 0x400 0x1f0000",
+	.num_images = ARRAY_SIZE(fw_images),
 	.images = fw_images,
 };
 
-u8 num_image_type_guids = ARRAY_SIZE(fw_images);
 #endif /* EFI_HAVE_CAPSULE_SUPPORT */
 
 int board_phys_sdram_size(phys_size_t *size)
 {
-	u32 ddr_size = readl(M4_BOOTROM_BASE_ADDR);
+	u32 ddr_size = readl(MCU_BOOTROM_BASE_ADDR);
 
 	if (ddr_size == 4) {
 		*size = 0x100000000;

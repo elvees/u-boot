@@ -3,10 +3,10 @@
  * Copyright (c) 2012 The Chromium OS Authors.
  */
 
-#include <common.h>
 #include <mapmem.h>
 #include <time.h>
 #include <trace.h>
+#include <linux/errno.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/sections.h>
@@ -51,7 +51,7 @@ static inline uintptr_t __attribute__((no_instrument_function))
 	uintptr_t offset = (uintptr_t)func_ptr;
 
 #ifdef CONFIG_SANDBOX
-	offset -= (uintptr_t)&_init;
+	offset -= (uintptr_t)_init;
 #else
 	if (gd->flags & GD_FLG_RELOC)
 		offset -= gd->relocaddr;

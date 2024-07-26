@@ -89,7 +89,7 @@ int meson_ft_board_setup(void *blob, struct bd_info *bd)
 
 	/*
 	 * If in PCIe mode, alter DT
-	 * 0：Enable USB3.0，Disable PCIE, 1：Disable USB3.0, Enable PCIE
+	 * 0: Enable USB3.0, Disable PCIE, 1: Disable USB3.0, Enable PCIE
 	 */
 	if (ret > 0) {
 		static char data[32] __aligned(4);
@@ -104,8 +104,8 @@ int meson_ft_board_setup(void *blob, struct bd_info *bd)
 		}
 
 		/* Update PHY names (mandatory to disable USB3.0) */
-		len = strlcpy(data, "usb2-phy0", 32);
-		len += strlcpy(&data[len], "usb2-phy1", 32 - len);
+		len = strlcpy(data, "usb2-phy0", 32) + 1;
+		len += strlcpy(&data[len], "usb2-phy1", 32 - len) + 1;
 		ret = fdt_setprop(blob, node, "phy-names", data, len);
 		if (ret < 0) {
 			printf("vim3: failed to update usb phy names property (%d)\n", ret);
@@ -132,7 +132,7 @@ int meson_ft_board_setup(void *blob, struct bd_info *bd)
 		}
 
 		/* Enable PCIe */
-		len = strlcpy(data, "okay", 32);
+		len = strlcpy(data, "okay", 32) + 1;
 		ret = fdt_setprop(blob, node, "status", data, len);
 		if (ret < 0) {
 			printf("vim3: failed to enable pcie node (%d)\n", ret);
@@ -151,7 +151,7 @@ int meson_ft_board_setup(void *blob, struct bd_info *bd)
 
 int misc_init_r(void)
 {
-	u8 mac_addr[MAC_ADDR_LEN];
+	u8 mac_addr[MAC_ADDR_LEN + 1];
 	char efuse_mac_addr[EFUSE_MAC_SIZE], tmp[3];
 	char serial_string[EFUSE_MAC_SIZE + 1];
 	ssize_t len;
@@ -169,6 +169,7 @@ int misc_init_r(void)
 			tmp[2] = '\0';
 			mac_addr[i] = hextoul(tmp, NULL);
 		}
+		mac_addr[MAC_ADDR_LEN] = '\0';
 
 		if (is_valid_ethaddr(mac_addr))
 			eth_env_set_enetaddr("ethaddr", mac_addr);

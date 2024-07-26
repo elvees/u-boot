@@ -99,7 +99,7 @@ static int do_bootdev_info(struct cmd_tbl *cmdtp, int flag, int argc,
 
 	printf("Name:      %s\n", dev->name);
 	printf("Sequence:  %d\n", dev_seq(dev));
-	printf("Status:    %s\n", ret ? simple_itoa(ret) : device_active(dev) ?
+	printf("Status:    %s\n", ret ? simple_itoa(-ret) : device_active(dev) ?
 		"Probed" : "OK");
 	printf("Uclass:    %s\n", dev_get_uclass_name(dev_get_parent(dev)));
 	printf("Bootflows: %d (%d valid)\n", i, num_valid);
@@ -139,13 +139,11 @@ static int do_bootdev_hunt(struct cmd_tbl *cmdtp, int flag, int argc,
 	return 0;
 }
 
-#ifdef CONFIG_SYS_LONGHELP
-static char bootdev_help_text[] =
+U_BOOT_LONGHELP(bootdev,
 	"list [-p]         - list all available bootdevs (-p to probe)\n"
 	"bootdev hunt [-l|<spec>]  - use hunt drivers to find bootdevs\n"
 	"bootdev select <bd>       - select a bootdev by name | label | seq\n"
-	"bootdev info [-p]         - show information about a bootdev (-p to probe)";
-#endif
+	"bootdev info [-p]         - show information about a bootdev (-p to probe)");
 
 U_BOOT_CMD_WITH_SUBCMDS(bootdev, "Boot devices", bootdev_help_text,
 	U_BOOT_SUBCMD_MKENT(list, 2, 1, do_bootdev_list),

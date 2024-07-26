@@ -174,8 +174,12 @@ static void usb_hub_power_on(struct usb_hub_device *hub)
 
 	debug("enabling power on all ports\n");
 	for (i = 0; i < dev->maxchild; i++) {
+		if (usb_hub_is_superspeed(dev)) {
+			usb_set_port_feature(dev, i + 1, USB_PORT_FEAT_RESET);
+			debug("Reset : port %d returns %lX\n", i + 1, dev->status);
+		}
 		usb_set_port_feature(dev, i + 1, USB_PORT_FEAT_POWER);
-		debug("port %d returns %lX\n", i + 1, dev->status);
+		debug("PowerOn : port %d returns %lX\n", i + 1, dev->status);
 	}
 
 #ifdef CONFIG_SANDBOX
@@ -394,6 +398,13 @@ int usb_hub_port_connect_change(struct usb_device *dev, int port)
 		speed = USB_SPEED_FULL;
 		break;
 	}
+
+	/*
+	 * USB 2.0 7.1.7.5: devices must be able to accept a SetAddress()
+	 * request (refer to Section 11.24.2 and Section 9.4 respectively)
+	 * after the reset recovery time 10 ms
+	 */
+	mdelay(10);
 
 #if CONFIG_IS_ENABLED(DM_USB)
 	struct udevice *child;

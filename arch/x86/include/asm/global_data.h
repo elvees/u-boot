@@ -9,6 +9,7 @@
 
 #ifndef __ASSEMBLY__
 
+#include <linux/types.h>
 #include <asm/processor.h>
 #include <asm/mrccache.h>
 
@@ -123,6 +124,11 @@ struct arch_global_data {
 #endif
 	void *itss_priv;		/* Private ITSS data pointer */
 	ulong coreboot_table;		/* Address of coreboot table */
+	ulong table_start;		/* Start address of x86 tables */
+	ulong table_end;		/* End address of x86 tables */
+	ulong table_start_high;		/* Start address of high x86 tables */
+	ulong table_end_high;		/* End address of high x86 tables */
+	ulong smbios_start;		/* Start address of SMBIOS table */
 };
 
 #endif

@@ -3,22 +3,21 @@
 #include "imx8mq-u-boot.dtsi"
 
 &pinctrl_uart1 {
-	u-boot,dm-spl;
+	bootph-pre-ram;
 };
 
 &uart1 { /* console */
-	u-boot,dm-spl;
+	bootph-pre-ram;
 };
 
 &binman {
-	/delete-node/ signed-hdmi;
-
-	signed-hdmi {
-		filename = "signed_hdmi.bin";
-
-		signed-dp-imx8m {
-			filename = "signed_dp_imx8m.bin";
-			type = "blob-ext";
+	section {
+		nxp-imx8mimage {
+			section {
+				signed-hdmi-imx8m {
+					filename = "signed_dp_imx8m.bin";
+				};
+			};
 		};
 	};
 };

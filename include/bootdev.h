@@ -7,6 +7,7 @@
 #ifndef __bootdev_h
 #define __bootdev_h
 
+#include <dm/uclass-id.h>
 #include <linux/list.h>
 
 struct bootflow;
@@ -65,7 +66,7 @@ struct bootdev_hunter;
  *
  * @info: Info structure describing this hunter
  * @show: true to show information from the hunter
- * Returns: 0 if OK, -ve on error
+ * Returns: 0 if OK, -ENOENT on device not found, otherwise -ve on error
  */
 typedef int (*bootdev_hunter_func)(struct bootdev_hunter *info, bool show);
 
@@ -200,7 +201,7 @@ void bootdev_clear_bootflows(struct udevice *dev);
  * All fields in @bflow must be set up. Note that @bflow->dev is used to add the
  * bootflow to that device.
  *
- * @dev: Bootdevice device to add to
+ * @dev: Bootdev device to add to
  * @bflow: Bootflow to add. Note that fields within bflow must be allocated
  *	since this function takes over ownership of these. This functions makes
  *	a copy of @bflow itself (without allocating its fields again), so the
@@ -258,7 +259,7 @@ int bootdev_find_by_label(const char *label, struct udevice **devp,
  * @devp: returns the device found, on success
  * @method_flagsp: If non-NULL, returns any flags implied by the label
  * (enum bootflow_meth_flags_t), 0 if none. Unset if function fails
- * Return: 0 if OK, -EINVAL if the uclass is not supported by this board,
+ * Return: 0 if OK, -EPFNOSUPPORT if the uclass is not supported by this board,
  * -ENOENT if there is no device with that number
  */
 int bootdev_find_by_any(const char *name, struct udevice **devp,
@@ -321,6 +322,15 @@ int bootdev_hunt(const char *spec, bool show);
 int bootdev_hunt_prio(enum bootdev_prio_t prio, bool show);
 
 /**
+ * bootdev_unhunt() - Mark a device as needing to be hunted again
+ *
+ * @id: uclass ID to update
+ * Return: 0 if done, -EALREADY if already in this state, -ENOENT if no hunter
+ * found for that uclass
+ */
+int bootdev_unhunt(enum uclass_id id);
+
+/**
  * bootdev_hunt_and_find_by_label() - Hunt for bootdevs by label
  *
  * Runs the hunter for the label, then tries to find the bootdev, possible
@@ -371,7 +381,7 @@ int bootdev_next_prio(struct bootflow_iter *iter, struct udevice **devp);
 /**
  * bootdev_setup_for_dev() - Bind a new bootdev device (deprecated)
  *
- * Please use bootdev_setup_sibling_blk() instead since it supports multiple
+ * Please use bootdev_setup_for_sibling_blk() instead since it supports multiple
  * (child) block devices for each media device.
  *
  * Creates a bootdev device as a child of @parent. This should be called from
@@ -386,7 +396,7 @@ int bootdev_next_prio(struct bootflow_iter *iter, struct udevice **devp);
 int bootdev_setup_for_dev(struct udevice *parent, const char *drv_name);
 
 /**
- * bootdev_setup_for_blk() - Bind a new bootdev device for a blk device
+ * bootdev_setup_for_sibling_blk() - Bind a new bootdev device for a blk device
  *
  * Creates a bootdev device as a sibling of @blk. This should be called from
  * the driver's bind() method or its uclass' post_bind() method, at the same
@@ -398,7 +408,7 @@ int bootdev_setup_for_dev(struct udevice *parent, const char *drv_name);
  * @drv_name: Name of bootdev driver to bind
  * Return: 0 if OK, -ve on error
  */
-int bootdev_setup_sibling_blk(struct udevice *blk, const char *drv_name);
+int bootdev_setup_for_sibling_blk(struct udevice *blk, const char *drv_name);
 
 /**
  * bootdev_get_sibling_blk() - Locate the block device for a bootdev
@@ -428,8 +438,8 @@ static inline int bootdev_setup_for_dev(struct udevice *parent,
 	return 0;
 }
 
-static inline int bootdev_setup_sibling_blk(struct udevice *blk,
-					    const char *drv_name)
+static inline int bootdev_setup_for_sibling_blk(struct udevice *blk,
+						const char *drv_name)
 {
 	return 0;
 }

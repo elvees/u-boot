@@ -2,11 +2,10 @@
 /*
  * Texas Instruments GPMC Driver
  *
- * Copyright (C) 2021 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2021 Texas Instruments Incorporated - https://www.ti.com/
  */
 
 #include <asm/io.h>
-#include <asm/arch/sys_proto.h>
 #include <clk.h>
 #include <common.h>
 #include <dm.h>
@@ -17,6 +16,7 @@
 #include <linux/mtd/omap_gpmc.h>
 #include <linux/ioport.h>
 #include <linux/io.h>
+#include <linux/sizes.h>
 #include "ti-gpmc.h"
 
 enum gpmc_clk_domain {
@@ -1195,6 +1195,12 @@ static int gpmc_probe(struct udevice *dev)
 
 	gpmc_cfg = (struct gpmc *)priv->base;
 	gpmc_base = priv->base;
+
+	/*
+	 * Disable all IRQs as some bootroms might leave them enabled
+	 * and that will cause a lock-up later
+	 */
+	gpmc_write_reg(GPMC_IRQENABLE, 0);
 
 	priv->l3_clk = devm_clk_get(dev, "fck");
 	if (IS_ERR(priv->l3_clk))

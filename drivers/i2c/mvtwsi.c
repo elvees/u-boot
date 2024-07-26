@@ -124,7 +124,8 @@ enum mvtwsi_ctrl_register_fields {
  * on other platforms, it is a normal r/w bit, which is cleared by writing 0.
  */
 
-#if defined(CONFIG_SUNXI_GEN_SUN6I) || defined(CONFIG_SUN50I_GEN_H6)
+#if defined(CONFIG_SUNXI_GEN_SUN6I) || defined(CONFIG_SUN50I_GEN_H6) || \
+    defined(CONFIG_SUNXI_GEN_NCAT2)
 #define	MVTWSI_CONTROL_CLEAR_IFLG	0x00000008
 #else
 #define	MVTWSI_CONTROL_CLEAR_IFLG	0x00000000
@@ -142,6 +143,8 @@ enum mvtwsi_ctrl_register_fields {
  * code.
  */
 enum mvstwsi_status_values {
+	/* Protocol violation on bus; this is a terminal state */
+	MVTWSI_BUS_ERROR		= 0x00,
 	/* START condition transmitted */
 	MVTWSI_STATUS_START		= 0x08,
 	/* Repeated START condition transmitted */
@@ -526,6 +529,36 @@ static void __twsi_i2c_init(struct mvtwsi_registers *twsi, int speed,
 }
 
 /*
+ * __twsi_i2c_reinit() - Reset and reinitialize the I2C controller.
+ *
+ * This function should be called to get the MVTWSI controller out of the
+ * "bus error" state. It saves and restores the baud and address registers.
+ *
+ * @twsi:	The MVTWSI register structure to use.
+ * @tick:	The duration of a clock cycle at the current I2C speed.
+ */
+static void __twsi_i2c_reinit(struct mvtwsi_registers *twsi, uint tick)
+{
+	uint baud;
+	uint slaveadd;
+
+	/* Save baud, address registers */
+	baud = readl(&twsi->baudrate);
+	slaveadd = readl(&twsi->slave_address);
+
+	/* Reset controller */
+	twsi_reset(twsi);
+
+	/* Restore baud, address registers */
+	writel(baud, &twsi->baudrate);
+	writel(slaveadd, &twsi->slave_address);
+	writel(0, &twsi->xtnd_slave_addr);
+
+	/* Assert STOP, but don't care for the result */
+	(void) twsi_stop(twsi, tick);
+}
+
+/*
  * i2c_begin() - Start a I2C transaction.
  *
  * Begin a I2C transaction with a given expected start status and chip address.
@@ -621,6 +654,11 @@ static int __twsi_i2c_read(struct mvtwsi_registers *twsi, uchar chip,
 	int stop_status;
 	int expected_start = MVTWSI_STATUS_START;
 
+	/* Check for (and clear) a bus error from a previous failed transaction
+	 * or another master on the same bus */
+	if (readl(&twsi->status) == MVTWSI_BUS_ERROR)
+		__twsi_i2c_reinit(twsi, tick);
+
 	if (alen > 0) {
 		/* Begin i2c write to send the address bytes */
 		status = i2c_begin(twsi, expected_start, (chip << 1), tick);
@@ -667,6 +705,11 @@ static int __twsi_i2c_write(struct mvtwsi_registers *twsi, uchar chip,
 			    uint tick)
 {
 	int status, stop_status;
+
+	/* Check for (and clear) a bus error from a previous failed transaction
+	 * or another master on the same bus */
+	if (readl(&twsi->status) == MVTWSI_BUS_ERROR)
+		__twsi_i2c_reinit(twsi, tick);
 
 	/* Begin i2c write to send first the address bytes, then the
 	 * data bytes */

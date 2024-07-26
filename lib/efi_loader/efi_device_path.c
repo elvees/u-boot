@@ -7,9 +7,9 @@
 
 #define LOG_CATEGORY LOGC_EFI
 
-#include <common.h>
 #include <blk.h>
 #include <dm.h>
+#include <dm/root.h>
 #include <log.h>
 #include <net.h>
 #include <usb.h>
@@ -21,28 +21,11 @@
 #include <asm-generic/unaligned.h>
 #include <linux/compat.h> /* U16_MAX */
 
-#ifdef CONFIG_SANDBOX
-const efi_guid_t efi_guid_host_dev = U_BOOT_HOST_DEV_GUID;
-#endif
-#ifdef CONFIG_VIRTIO_BLK
-const efi_guid_t efi_guid_virtio_dev = U_BOOT_VIRTIO_DEV_GUID;
-#endif
-
 /* template END node: */
 const struct efi_device_path END = {
 	.type     = DEVICE_PATH_TYPE_END,
 	.sub_type = DEVICE_PATH_SUB_TYPE_END,
 	.length   = sizeof(END),
-};
-
-/* template ROOT node: */
-static const struct efi_device_path_vendor ROOT = {
-	.dp = {
-		.type     = DEVICE_PATH_TYPE_HARDWARE_DEVICE,
-		.sub_type = DEVICE_PATH_SUB_TYPE_VENDOR,
-		.length   = sizeof(ROOT),
-	},
-	.guid = U_BOOT_GUID,
 };
 
 #if defined(CONFIG_MMC)
@@ -62,20 +45,6 @@ static bool is_sd(struct blk_desc *desc)
 	return IS_SD(mmc) != 0U;
 }
 #endif
-
-static void *dp_alloc(size_t sz)
-{
-	void *buf;
-
-	if (efi_allocate_pool(EFI_BOOT_SERVICES_DATA, sz, &buf) !=
-	    EFI_SUCCESS) {
-		debug("EFI: ERROR: out of memory in %s\n", __func__);
-		return NULL;
-	}
-
-	memset(buf, 0, sz);
-	return buf;
-}
 
 /*
  * Iterate to next block in device-path, terminating (returning NULL)
@@ -133,7 +102,7 @@ int efi_dp_match(const struct efi_device_path *a,
  * See UEFI spec, section 3.1.2 for "short-form device path".
  *
  * @dp:		original device-path
- * @Return:	shortened device-path or NULL
+ * Return:	shortened device-path or NULL
  */
 struct efi_device_path *efi_dp_shorten(struct efi_device_path *dp)
 {
@@ -293,7 +262,7 @@ struct efi_device_path *efi_dp_dup(const struct efi_device_path *dp)
 	if (!dp)
 		return NULL;
 
-	ndp = dp_alloc(sz);
+	ndp = efi_alloc(sz);
 	if (!ndp)
 		return NULL;
 	memcpy(ndp, dp, sz);
@@ -302,30 +271,27 @@ struct efi_device_path *efi_dp_dup(const struct efi_device_path *dp)
 }
 
 /**
- * efi_dp_append_or_concatenate() - Append or concatenate two device paths.
- *				    Concatenated device path will be separated
- *				    by a sub-type 0xff end node
+ * efi_dp_concat() - Concatenate two device paths and add and terminate them
+ *                   with an end node.
  *
- * @dp1:	First device path
- * @dp2:	Second device path
- * @concat:	If true the two device paths will be concatenated and separated
- *		by an end of entrire device path sub-type 0xff end node.
- *		If true the second device path will be appended to the first and
- *		terminated by an end node
+ * @dp1:	    First device path
+ * @dp2:	    Second device path
+ * @split_end_node: If true the two device paths will be concatenated and
+ *                  separated by an end node (DEVICE_PATH_SUB_TYPE_END).
+ *		    If false the second device path will be concatenated to the
+ *		    first one as-is.
  *
  * Return:
  * concatenated device path or NULL. Caller must free the returned value
  */
-static struct
-efi_device_path *efi_dp_append_or_concatenate(const struct efi_device_path *dp1,
-					      const struct efi_device_path *dp2,
-					      bool concat)
+struct
+efi_device_path *efi_dp_concat(const struct efi_device_path *dp1,
+			       const struct efi_device_path *dp2,
+			       bool split_end_node)
 {
 	struct efi_device_path *ret;
-	size_t end_size = sizeof(END);
+	size_t end_size;
 
-	if (concat)
-		end_size = 2 * sizeof(END);
 	if (!dp1 && !dp2) {
 		/* return an end node */
 		ret = efi_dp_dup(&END);
@@ -337,14 +303,20 @@ efi_device_path *efi_dp_append_or_concatenate(const struct efi_device_path *dp1,
 		/* both dp1 and dp2 are non-null */
 		unsigned sz1 = efi_dp_size(dp1);
 		unsigned sz2 = efi_dp_size(dp2);
-		void *p = dp_alloc(sz1 + sz2 + end_size);
+		void *p;
+
+		if (split_end_node)
+			end_size = 2 * sizeof(END);
+		else
+			end_size = sizeof(END);
+		p = efi_alloc(sz1 + sz2 + end_size);
 		if (!p)
 			return NULL;
 		ret = p;
 		memcpy(p, dp1, sz1);
 		p += sz1;
 
-		if (concat) {
+		if (split_end_node) {
 			memcpy(p, &END, sizeof(END));
 			p += sizeof(END);
 		}
@@ -358,37 +330,6 @@ efi_device_path *efi_dp_append_or_concatenate(const struct efi_device_path *dp1,
 	return ret;
 }
 
-/**
- * efi_dp_append() - Append a device to an existing device path.
- *
- * @dp1:	First device path
- * @dp2:	Second device path
- *
- * Return:
- * concatenated device path or NULL. Caller must free the returned value
- */
-struct efi_device_path *efi_dp_append(const struct efi_device_path *dp1,
-				      const struct efi_device_path *dp2)
-{
-	return efi_dp_append_or_concatenate(dp1, dp2, false);
-}
-
-/**
- * efi_dp_concat() - Concatenate 2 device paths. The final device path will
- *                   contain two device paths separated by and end node (0xff).
- *
- * @dp1:	First device path
- * @dp2:	Second device path
- *
- * Return:
- * concatenated device path or NULL. Caller must free the returned value
- */
-struct efi_device_path *efi_dp_concat(const struct efi_device_path *dp1,
-				      const struct efi_device_path *dp2)
-{
-	return efi_dp_append_or_concatenate(dp1, dp2, true);
-}
-
 struct efi_device_path *efi_dp_append_node(const struct efi_device_path *dp,
 					   const struct efi_device_path *node)
 {
@@ -400,7 +341,7 @@ struct efi_device_path *efi_dp_append_node(const struct efi_device_path *dp,
 		ret = efi_dp_dup(dp);
 	} else if (!dp) {
 		size_t sz = node->length;
-		void *p = dp_alloc(sz + sizeof(END));
+		void *p = efi_alloc(sz + sizeof(END));
 		if (!p)
 			return NULL;
 		memcpy(p, node, sz);
@@ -409,7 +350,7 @@ struct efi_device_path *efi_dp_append_node(const struct efi_device_path *dp,
 	} else {
 		/* both dp and node are non-null */
 		size_t sz = efi_dp_size(dp);
-		void *p = dp_alloc(sz + node->length + sizeof(END));
+		void *p = efi_alloc(sz + node->length + sizeof(END));
 		if (!p)
 			return NULL;
 		memcpy(p, dp, sz);
@@ -430,7 +371,7 @@ struct efi_device_path *efi_dp_create_device_node(const u8 type,
 	if (length < sizeof(struct efi_device_path))
 		return NULL;
 
-	ret = dp_alloc(length);
+	ret = efi_alloc(length);
 	if (!ret)
 		return ret;
 	ret->type = type;
@@ -452,7 +393,7 @@ struct efi_device_path *efi_dp_append_instance(
 		return efi_dp_dup(dpi);
 	sz = efi_dp_size(dp);
 	szi = efi_dp_instance_size(dpi);
-	p = dp_alloc(sz + szi + 2 * sizeof(END));
+	p = efi_alloc(sz + szi + 2 * sizeof(END));
 	if (!p)
 		return NULL;
 	ret = p;
@@ -477,7 +418,7 @@ struct efi_device_path *efi_dp_get_next_instance(struct efi_device_path **dp,
 	if (!dp || !*dp)
 		return NULL;
 	sz = efi_dp_instance_size(*dp);
-	p = dp_alloc(sz + sizeof(END));
+	p = efi_alloc(sz + sizeof(END));
 	if (!p)
 		return NULL;
 	memcpy(p, *dp, sz + sizeof(END));
@@ -508,13 +449,12 @@ bool efi_dp_is_multi_instance(const struct efi_device_path *dp)
 __maybe_unused static unsigned int dp_size(struct udevice *dev)
 {
 	if (!dev || !dev->driver)
-		return sizeof(ROOT);
+		return sizeof(struct efi_device_path_udevice);
 
 	switch (device_get_uclass_id(dev)) {
 	case UCLASS_ROOT:
-	case UCLASS_SIMPLE_BUS:
 		/* stop traversing parents at this point: */
-		return sizeof(ROOT);
+		return sizeof(struct efi_device_path_udevice);
 	case UCLASS_ETH:
 		return dp_size(dev->parent) +
 			sizeof(struct efi_device_path_mac_addr);
@@ -545,33 +485,15 @@ __maybe_unused static unsigned int dp_size(struct udevice *dev)
 			return dp_size(dev->parent) +
 				sizeof(struct efi_device_path_nvme);
 #endif
-#ifdef CONFIG_SANDBOX
-		case UCLASS_HOST:
-			 /*
-			  * Sandbox's host device will be represented
-			  * as vendor device with extra one byte for
-			  * device number
-			  */
-			return dp_size(dev->parent)
-				+ sizeof(struct efi_device_path_vendor) + 1;
-#endif
 #ifdef CONFIG_USB
 		case UCLASS_MASS_STORAGE:
 			return dp_size(dev->parent)
 				+ sizeof(struct efi_device_path_controller);
 #endif
-#ifdef CONFIG_VIRTIO_BLK
-		case UCLASS_VIRTIO:
-			 /*
-			  * Virtio devices will be represented as a vendor
-			  * device node with an extra byte for the device
-			  * number.
-			  */
-			return dp_size(dev->parent)
-				+ sizeof(struct efi_device_path_vendor) + 1;
-#endif
 		default:
-			return dp_size(dev->parent);
+			/* UCLASS_BLKMAP, UCLASS_HOST, UCLASS_VIRTIO */
+			return dp_size(dev->parent) +
+				sizeof(struct efi_device_path_udevice);
 		}
 #if defined(CONFIG_MMC)
 	case UCLASS_MMC:
@@ -583,8 +505,8 @@ __maybe_unused static unsigned int dp_size(struct udevice *dev)
 		return dp_size(dev->parent) +
 			sizeof(struct efi_device_path_usb);
 	default:
-		/* just skip over unknown classes: */
-		return dp_size(dev->parent);
+		return dp_size(dev->parent) +
+			sizeof(struct efi_device_path_udevice);
 	}
 }
 
@@ -597,21 +519,19 @@ __maybe_unused static unsigned int dp_size(struct udevice *dev)
  */
 __maybe_unused static void *dp_fill(void *buf, struct udevice *dev)
 {
+	enum uclass_id uclass_id;
+
 	if (!dev || !dev->driver)
 		return buf;
 
-	switch (device_get_uclass_id(dev)) {
-	case UCLASS_ROOT:
-	case UCLASS_SIMPLE_BUS: {
-		/* stop traversing parents at this point: */
-		struct efi_device_path_vendor *vdp = buf;
-		*vdp = ROOT;
-		return &vdp[1];
-	}
+	uclass_id = device_get_uclass_id(dev);
+	if (uclass_id != UCLASS_ROOT)
+		buf = dp_fill(buf, dev->parent);
+
+	switch (uclass_id) {
 #ifdef CONFIG_NETDEVICES
 	case UCLASS_ETH: {
-		struct efi_device_path_mac_addr *dp =
-			dp_fill(buf, dev->parent);
+		struct efi_device_path_mac_addr *dp = buf;
 		struct eth_pdata *pdata = dev_get_plat(dev);
 
 		dp->dp.type = DEVICE_PATH_TYPE_MESSAGING_DEVICE;
@@ -626,46 +546,10 @@ __maybe_unused static void *dp_fill(void *buf, struct udevice *dev)
 	}
 #endif
 	case UCLASS_BLK:
-		switch (dev->parent->uclass->uc_drv->id) {
-#ifdef CONFIG_SANDBOX
-		case UCLASS_HOST: {
-			/* stop traversing parents at this point: */
-			struct efi_device_path_vendor *dp;
-			struct blk_desc *desc = dev_get_uclass_plat(dev);
-
-			dp_fill(buf, dev->parent);
-			dp = buf;
-			++dp;
-			dp->dp.type = DEVICE_PATH_TYPE_HARDWARE_DEVICE;
-			dp->dp.sub_type = DEVICE_PATH_SUB_TYPE_VENDOR;
-			dp->dp.length = sizeof(*dp) + 1;
-			memcpy(&dp->guid, &efi_guid_host_dev,
-			       sizeof(efi_guid_t));
-			dp->vendor_data[0] = desc->devnum;
-			return &dp->vendor_data[1];
-			}
-#endif
-#ifdef CONFIG_VIRTIO_BLK
-		case UCLASS_VIRTIO: {
-			struct efi_device_path_vendor *dp;
-			struct blk_desc *desc = dev_get_uclass_plat(dev);
-
-			dp_fill(buf, dev->parent);
-			dp = buf;
-			++dp;
-			dp->dp.type = DEVICE_PATH_TYPE_HARDWARE_DEVICE;
-			dp->dp.sub_type = DEVICE_PATH_SUB_TYPE_VENDOR;
-			dp->dp.length = sizeof(*dp) + 1;
-			memcpy(&dp->guid, &efi_guid_virtio_dev,
-			       sizeof(efi_guid_t));
-			dp->vendor_data[0] = desc->devnum;
-			return &dp->vendor_data[1];
-			}
-#endif
+		switch (device_get_uclass_id(dev->parent)) {
 #ifdef CONFIG_IDE
 		case UCLASS_IDE: {
-			struct efi_device_path_atapi *dp =
-			dp_fill(buf, dev->parent);
+			struct efi_device_path_atapi *dp = buf;
 			struct blk_desc *desc = dev_get_uclass_plat(dev);
 
 			dp->dp.type = DEVICE_PATH_TYPE_MESSAGING_DEVICE;
@@ -681,8 +565,7 @@ __maybe_unused static void *dp_fill(void *buf, struct udevice *dev)
 #endif
 #if defined(CONFIG_SCSI)
 		case UCLASS_SCSI: {
-			struct efi_device_path_scsi *dp =
-				dp_fill(buf, dev->parent);
+			struct efi_device_path_scsi *dp = buf;
 			struct blk_desc *desc = dev_get_uclass_plat(dev);
 
 			dp->dp.type = DEVICE_PATH_TYPE_MESSAGING_DEVICE;
@@ -695,8 +578,7 @@ __maybe_unused static void *dp_fill(void *buf, struct udevice *dev)
 #endif
 #if defined(CONFIG_MMC)
 		case UCLASS_MMC: {
-			struct efi_device_path_sd_mmc_path *sddp =
-				dp_fill(buf, dev->parent);
+			struct efi_device_path_sd_mmc_path *sddp = buf;
 			struct blk_desc *desc = dev_get_uclass_plat(dev);
 
 			sddp->dp.type     = DEVICE_PATH_TYPE_MESSAGING_DEVICE;
@@ -710,8 +592,7 @@ __maybe_unused static void *dp_fill(void *buf, struct udevice *dev)
 #endif
 #if defined(CONFIG_AHCI) || defined(CONFIG_SATA)
 		case UCLASS_AHCI: {
-			struct efi_device_path_sata *dp =
-				dp_fill(buf, dev->parent);
+			struct efi_device_path_sata *dp = buf;
 			struct blk_desc *desc = dev_get_uclass_plat(dev);
 
 			dp->dp.type     = DEVICE_PATH_TYPE_MESSAGING_DEVICE;
@@ -726,8 +607,7 @@ __maybe_unused static void *dp_fill(void *buf, struct udevice *dev)
 #endif
 #if defined(CONFIG_NVME)
 		case UCLASS_NVME: {
-			struct efi_device_path_nvme *dp =
-				dp_fill(buf, dev->parent);
+			struct efi_device_path_nvme *dp = buf;
 			u32 ns_id;
 
 			dp->dp.type     = DEVICE_PATH_TYPE_MESSAGING_DEVICE;
@@ -741,8 +621,7 @@ __maybe_unused static void *dp_fill(void *buf, struct udevice *dev)
 #if defined(CONFIG_USB)
 		case UCLASS_MASS_STORAGE: {
 			struct blk_desc *desc = dev_get_uclass_plat(dev);
-			struct efi_device_path_controller *dp =
-				dp_fill(buf, dev->parent);
+			struct efi_device_path_controller *dp = buf;
 
 			dp->dp.type	= DEVICE_PATH_TYPE_HARDWARE_DEVICE;
 			dp->dp.sub_type = DEVICE_PATH_SUB_TYPE_CONTROLLER;
@@ -751,16 +630,26 @@ __maybe_unused static void *dp_fill(void *buf, struct udevice *dev)
 			return &dp[1];
 		}
 #endif
-		default:
-			debug("%s(%u) %s: unhandled parent class: %s (%u)\n",
-			      __FILE__, __LINE__, __func__,
-			      dev->name, dev->parent->uclass->uc_drv->id);
-			return dp_fill(buf, dev->parent);
+		default: {
+			/* UCLASS_BLKMAP, UCLASS_HOST, UCLASS_VIRTIO */
+			struct efi_device_path_udevice *dp = buf;
+			struct blk_desc *desc = dev_get_uclass_plat(dev);
+
+			dp->dp.type = DEVICE_PATH_TYPE_HARDWARE_DEVICE;
+			dp->dp.sub_type = DEVICE_PATH_SUB_TYPE_VENDOR;
+			dp->dp.length = sizeof(*dp);
+			memcpy(&dp->guid, &efi_u_boot_guid,
+			       sizeof(efi_guid_t));
+			dp->uclass_id = (UCLASS_BLK & 0xffff) |
+					(desc->uclass_id << 16);
+			dp->dev_number = desc->devnum;
+
+			return &dp[1];
 		}
+	}
 #if defined(CONFIG_MMC)
 	case UCLASS_MMC: {
-		struct efi_device_path_sd_mmc_path *sddp =
-			dp_fill(buf, dev->parent);
+		struct efi_device_path_sd_mmc_path *sddp = buf;
 		struct mmc *mmc = mmc_get_mmc_dev(dev);
 		struct blk_desc *desc = mmc_get_blk_desc(mmc);
 
@@ -776,7 +665,7 @@ __maybe_unused static void *dp_fill(void *buf, struct udevice *dev)
 #endif
 	case UCLASS_MASS_STORAGE:
 	case UCLASS_USB_HUB: {
-		struct efi_device_path_usb *udp = dp_fill(buf, dev->parent);
+		struct efi_device_path_usb *udp = buf;
 
 		switch (device_get_uclass_id(dev->parent)) {
 		case UCLASS_USB_HUB: {
@@ -795,11 +684,18 @@ __maybe_unused static void *dp_fill(void *buf, struct udevice *dev)
 
 		return &udp[1];
 	}
-	default:
-		/* If the uclass driver is missing, this will show NULL */
-		log_debug("unhandled device class: %s (%s)\n", dev->name,
-			  dev_get_uclass_name(dev));
-		return dp_fill(buf, dev->parent);
+	default: {
+		struct efi_device_path_udevice *vdp = buf;
+
+		vdp->dp.type = DEVICE_PATH_TYPE_HARDWARE_DEVICE;
+		vdp->dp.sub_type = DEVICE_PATH_SUB_TYPE_VENDOR;
+		vdp->dp.length = sizeof(*vdp);
+		memcpy(&vdp->guid, &efi_u_boot_guid, sizeof(efi_guid_t));
+		vdp->uclass_id = uclass_id;
+		vdp->dev_number = dev->seq_;
+
+		return &vdp[1];
+	    }
 	}
 }
 
@@ -827,12 +723,17 @@ static unsigned dp_part_size(struct blk_desc *desc, int part)
  * @buf		buffer to which the device path is written
  * @desc	block device descriptor
  * @part	partition number, 0 identifies a block device
+ *
+ * Return:	pointer to position after the node
  */
 static void *dp_part_node(void *buf, struct blk_desc *desc, int part)
 {
 	struct disk_partition info;
+	int ret;
 
-	part_get_info(desc, part, &info);
+	ret = part_get_info(desc, part, &info);
+	if (ret < 0)
+		return buf;
 
 	if (desc->part_type == PART_TYPE_ISO) {
 		struct efi_device_path_cdrom_path *cddp = buf;
@@ -918,7 +819,7 @@ struct efi_device_path *efi_dp_from_part(struct blk_desc *desc, int part)
 {
 	void *buf, *start;
 
-	start = buf = dp_alloc(dp_part_size(desc, part) + sizeof(END));
+	start = buf = efi_alloc(dp_part_size(desc, part) + sizeof(END));
 	if (!buf)
 		return NULL;
 
@@ -945,7 +846,7 @@ struct efi_device_path *efi_dp_part_node(struct blk_desc *desc, int part)
 		dpsize = sizeof(struct efi_device_path_cdrom_path);
 	else
 		dpsize = sizeof(struct efi_device_path_hard_drive_path);
-	buf = dp_alloc(dpsize);
+	buf = efi_alloc(dpsize);
 
 	if (buf)
 		dp_part_node(buf, desc, part);
@@ -986,73 +887,57 @@ static void path_to_uefi(void *uefi, const char *src)
 }
 
 /**
- * efi_dp_from_file() - create device path for file
+ * efi_dp_from_file() - append file path node to device path.
  *
- * The function creates a device path from the block descriptor @desc and the
- * partition number @part and appends a device path node created describing the
- * file path @path.
- *
- * If @desc is NULL, the device path will not contain nodes describing the
- * partition.
- * If @path is an empty string "", the device path will not contain a node
- * for the file path.
- *
- * @desc:	block device descriptor or NULL
- * @part:	partition number
- * @path:	file path on partition or ""
+ * @dp:		device path or NULL
+ * @path:	file path or NULL
  * Return:	device path or NULL in case of an error
  */
-struct efi_device_path *efi_dp_from_file(struct blk_desc *desc, int part,
-		const char *path)
+struct efi_device_path *efi_dp_from_file(const struct efi_device_path *dp,
+					 const char *path)
 {
 	struct efi_device_path_file_path *fp;
-	void *buf, *start;
-	size_t dpsize = 0, fpsize;
+	void *buf, *pos;
+	size_t dpsize, fpsize;
 
-	if (desc)
-		dpsize = dp_part_size(desc, part);
-
+	dpsize = efi_dp_size(dp);
 	fpsize = sizeof(struct efi_device_path) +
 		 2 * (utf8_utf16_strlen(path) + 1);
 	if (fpsize > U16_MAX)
 		return NULL;
 
-	dpsize += fpsize;
-
-	start = buf = dp_alloc(dpsize + sizeof(END));
+	buf = efi_alloc(dpsize + fpsize + sizeof(END));
 	if (!buf)
 		return NULL;
 
-	if (desc)
-		buf = dp_part_fill(buf, desc, part);
+	memcpy(buf, dp, dpsize);
+	pos = buf + dpsize;
 
 	/* add file-path: */
 	if (*path) {
-		fp = buf;
+		fp = pos;
 		fp->dp.type = DEVICE_PATH_TYPE_MEDIA_DEVICE;
 		fp->dp.sub_type = DEVICE_PATH_SUB_TYPE_FILE_PATH;
 		fp->dp.length = (u16)fpsize;
 		path_to_uefi(fp->str, path);
-		buf += fpsize;
+		pos += fpsize;
 	}
 
-	*((struct efi_device_path *)buf) = END;
+	memcpy(pos, &END, sizeof(END));
 
-	return start;
+	return buf;
 }
 
 struct efi_device_path *efi_dp_from_uart(void)
 {
 	void *buf, *pos;
 	struct efi_device_path_uart *uart;
-	size_t dpsize = sizeof(ROOT) + sizeof(*uart) + sizeof(END);
+	size_t dpsize = dp_size(dm_root()) + sizeof(*uart) + sizeof(END);
 
-	buf = dp_alloc(dpsize);
+	buf = efi_alloc(dpsize);
 	if (!buf)
 		return NULL;
-	pos = buf;
-	memcpy(pos, &ROOT, sizeof(ROOT));
-	pos += sizeof(ROOT);
+	pos = dp_fill(buf, dm_root());
 	uart = pos;
 	uart->dp.type = DEVICE_PATH_TYPE_MESSAGING_DEVICE;
 	uart->dp.sub_type = DEVICE_PATH_SUB_TYPE_MSG_UART;
@@ -1063,8 +948,7 @@ struct efi_device_path *efi_dp_from_uart(void)
 	return buf;
 }
 
-#ifdef CONFIG_NETDEVICES
-struct efi_device_path *efi_dp_from_eth(void)
+struct efi_device_path __maybe_unused *efi_dp_from_eth(void)
 {
 	void *buf, *start;
 	unsigned dpsize = 0;
@@ -1073,7 +957,7 @@ struct efi_device_path *efi_dp_from_eth(void)
 
 	dpsize += dp_size(eth_get_dev());
 
-	start = buf = dp_alloc(dpsize + sizeof(END));
+	start = buf = efi_alloc(dpsize + sizeof(END));
 	if (!buf)
 		return NULL;
 
@@ -1083,7 +967,6 @@ struct efi_device_path *efi_dp_from_eth(void)
 
 	return start;
 }
-#endif
 
 /* Construct a device-path for memory-mapped image */
 struct efi_device_path *efi_dp_from_mem(uint32_t memory_type,
@@ -1093,7 +976,7 @@ struct efi_device_path *efi_dp_from_mem(uint32_t memory_type,
 	struct efi_device_path_memory *mdp;
 	void *buf, *start;
 
-	start = buf = dp_alloc(sizeof(*mdp) + sizeof(END));
+	start = buf = efi_alloc(sizeof(*mdp) + sizeof(END));
 	if (!buf)
 		return NULL;
 
@@ -1169,58 +1052,43 @@ efi_status_t efi_dp_from_name(const char *dev, const char *devnr,
 			      struct efi_device_path **file)
 {
 	struct blk_desc *desc = NULL;
+	struct efi_device_path *dp;
 	struct disk_partition fs_partition;
 	size_t image_size;
 	void *image_addr;
 	int part = 0;
-	char *filename;
-	char *s;
 
 	if (path && !file)
 		return EFI_INVALID_PARAMETER;
 
-	if (!strcmp(dev, "Net")) {
-#ifdef CONFIG_NETDEVICES
-		if (device)
-			*device = efi_dp_from_eth();
-#endif
-	} else if (!strcmp(dev, "Uart")) {
-		if (device)
-			*device = efi_dp_from_uart();
-	} else if (!strcmp(dev, "Mem")) {
+	if (IS_ENABLED(CONFIG_EFI_BINARY_EXEC) &&
+	    (!strcmp(dev, "Mem") || !strcmp(dev, "hostfs")))  {
+		/* loadm command and semihosting */
 		efi_get_image_parameters(&image_addr, &image_size);
 
-		if (device)
-			*device = efi_dp_from_mem(EFI_RESERVED_MEMORY_TYPE,
-						  (uintptr_t)image_addr,
-						  image_size);
+		dp = efi_dp_from_mem(EFI_RESERVED_MEMORY_TYPE,
+				     (uintptr_t)image_addr, image_size);
+	} else if (IS_ENABLED(CONFIG_NETDEVICES) && !strcmp(dev, "Net")) {
+		dp = efi_dp_from_eth();
+	} else if (!strcmp(dev, "Uart")) {
+		dp = efi_dp_from_uart();
 	} else {
 		part = blk_get_device_part_str(dev, devnr, &desc, &fs_partition,
 					       1);
 		if (part < 0 || !desc)
 			return EFI_INVALID_PARAMETER;
 
-		if (device)
-			*device = efi_dp_from_part(desc, part);
+		dp = efi_dp_from_part(desc, part);
 	}
+	if (device)
+		*device = dp;
 
 	if (!path)
 		return EFI_SUCCESS;
 
-	filename = calloc(1, strlen(path) + 1);
-	if (!filename)
-		return EFI_OUT_OF_RESOURCES;
-
-	sprintf(filename, "%s", path);
-	/* DOS style file path: */
-	s = filename;
-	while ((s = strchr(s, '/')))
-		*s++ = '\\';
-	*file = efi_dp_from_file(desc, part, filename);
-	free(filename);
-
+	*file = efi_dp_from_file(dp, path);
 	if (!*file)
-		return EFI_INVALID_PARAMETER;
+		return EFI_OUT_OF_RESOURCES;
 
 	return EFI_SUCCESS;
 }

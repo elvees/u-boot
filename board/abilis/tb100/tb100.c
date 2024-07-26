@@ -3,7 +3,6 @@
  * (C) Copyright 2014 Pierrick Hascoet, Abilis Systems
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <net.h>
 #include <netdev.h>
@@ -15,6 +14,10 @@ void reset_cpu(void)
 	writel(0x1, (void *)CRM_SWRESET);
 }
 
+/*
+ * Ethernet configuration
+ */
+#define ETH0_BASE_ADDRESS		0xFE100000
 int board_eth_init(struct bd_info *bis)
 {
 	if (designware_initialize(ETH0_BASE_ADDRESS, 0) >= 0)

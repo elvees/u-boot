@@ -53,15 +53,21 @@ List of mainline supported Rockchip boards:
      - Google Speedy (chromebook_speedy)
      - Amarula Vyasa-RK3288 (vyasa-rk3288)
 * rk3308
+     - Radxa ROCK Pi S (rock-pi-s-rk3308)
      - Rockchip Evb-RK3308 (evb-rk3308)
      - Roc-cc-RK3308 (roc-cc-rk3308)
 * rk3326
      - ODROID-GO Advance (odroid-go2)
 * rk3328
      - Rockchip Evb-RK3328 (evb-rk3328)
+     - Firefly ROC-RK3328-CC (roc-cc-rk3328)
+     - FriendlyElec NanoPi R2C (nanopi-r2c-rk3328)
+     - FriendlyElec NanoPi R2C Plus (nanopi-r2c-plus-rk3328)
+     - FriendlyElec NanoPi R2S (nanopi-r2s-rk3328)
      - Pine64 Rock64 (rock64-rk3328)
-     - Firefly-RK3328 (roc-cc-rk3328)
-     - Radxa Rockpi E (rock-pi-e-rk3328)
+     - Radxa ROCK Pi E (rock-pi-e-rk3328)
+     - Xunlong Orange Pi R1 Plus (orangepi-r1-plus-rk3328)
+     - Xunlong Orange Pi R1 Plus LTS (orangepi-r1-plus-lts-rk3328)
 * rk3368
      - GeekBox (geekbox)
      - PX5 EVB (evb-px5)
@@ -83,16 +89,52 @@ List of mainline supported Rockchip boards:
      - Khadas Edge-V (hadas-edge-v-rk3399)
      - Orange Pi RK3399 (orangepi-rk3399)
      - Pine64 RockPro64 (rockpro64-rk3399)
-     - Radxa ROCK Pi 4 (rock-pi-4-rk3399)
+     - Radxa ROCK 4C+ (rock-4c-plus-rk3399)
+     - Radxa ROCK 4SE (rock-4se-rk3399)
+     - Radxa ROCK Pi 4A/B/A+/B+ (rock-pi-4-rk3399)
+     - Radxa ROCK Pi 4C (rock-pi-4c-rk3399)
      - Rockchip Evb-RK3399 (evb_rk3399)
      - Theobroma Systems RK3399-Q7 SoM - Puma (puma_rk3399)
 
+* rk3566
+     - Anbernic RGxx3 (anbernic-rgxx3-rk3566)
+     - Pine64 PineTab2 (pinetab2-rk3566)
+     - Pine64 Quartz64-A Board (quartz64-a-rk3566)
+     - Pine64 Quartz64-B Board (quartz64-b-rk3566)
+     - Pine64 SOQuartz on Blade (soquartz-blade-rk3566)
+     - Pine64 SOQuartz on CM4-IO (soquartz-cm4-rk3566)
+     - Pine64 SOQuartz on Model A (soquartz-model-a-rk3566)
+     - Powkiddy X55 (powkiddy-x55-rk3566)
+     - Radxa CM3 IO Board (radxa-cm3-io-rk3566)
+
 * rk3568
      - Rockchip Evb-RK3568 (evb-rk3568)
+     - Banana Pi BPI-R2 Pro (bpi-r2-pro-rk3568)
+     - EmbedFire LubanCat 2 (lubancat-2-rk3568)
+     - FriendlyElec NanoPi R5C (nanopi-r5c-rk3568)
+     - FriendlyElec NanoPi R5S (nanopi-r5s-rk3568)
+     - Generic RK3566/RK3568 (generic-rk3568)
+     - Hardkernel ODROID-M1 (odroid-m1-rk3568)
+     - Radxa E25 Carrier Board (radxa-e25-rk3568)
+     - Radxa ROCK 3 Model A (rock-3a-rk3568)
 
 * rk3588
-     - Edgeble Neural Compute Module 6 SoM - Neu6a (neu6a-io-rk3588)
+     - Rockchip EVB (evb-rk3588)
+     - Edgeble Neural Compute Module 6A SoM - Neu6a (neu6a-io-rk3588)
+     - Edgeble Neural Compute Module 6B SoM - Neu6b (neu6b-io-rk3588)
+     - FriendlyElec NanoPC-T6 (nanopc-t6-rk3588)
+     - Generic RK3588S/RK3588 (generic-rk3588)
+     - Indiedroid Nova (nova-rk3588s)
+     - Pine64 QuartzPro64 (quartzpro64-rk3588)
+     - Radxa ROCK 5A (rock5a-rk3588s)
      - Radxa ROCK 5B (rock5b-rk3588)
+     - Rockchip Toybrick TB-RK3588X (toybrick-rk3588)
+     - Theobroma Systems RK3588-SBC Jaguar (jaguar-rk3588)
+     - Turing Machines RK1 (turing-rk1-rk3588)
+     - Xunlong Orange Pi 5 (orangepi-5-rk3588s)
+     - Xunlong Orange Pi 5 Plus (orangepi-5-plus-rk3588)
+     - Yanyi Tech CoolPi 4 Model B (coolpi-4b-rk3588s)
+     - Yanyi Tech CoolPi CM5 EVB (coolpi-cm5-evb-rk3588)
 
 * rv1108
      - Rockchip Evb-rv1108 (evb-rv1108)
@@ -100,6 +142,7 @@ List of mainline supported Rockchip boards:
 
 * rv1126
      - Edgeble Neural Compute Module 2 SoM - Neu2/Neu2k (neu2-io-r1126)
+     - Itead Sonoff iHost (sonoff-ihost-rv1126)
 
 Building
 --------
@@ -120,6 +163,19 @@ To build TF-A:
         cd ..
 
 Specify the PLAT= with desired Rockchip platform to build TF-A for.
+
+For SoCs whose TF-A code is not available as open source, use BL31 binary provided by Rockchip:
+
+.. code-block:: bash
+
+        git clone --depth 1 https://github.com/rockchip-linux/rkbin
+
+TPL
+^^^
+
+For some SoCs U-Boot sources lack of support to inizialize DRAM.
+In these cases, to get a fully functional image following :ref:`PackageWithTPLandSPL`, use DDR binary provided by Rockchip rkbin repository as ROCKCHIP_TPL when building U-Boot.
+Otherwise, follow :ref:`PackageWithRockchipMiniloader`. 
 
 U-Boot
 ^^^^^^
@@ -150,6 +206,15 @@ To build rk3288 boards:
 
         make evb-rk3288_defconfig
         make CROSS_COMPILE=arm-linux-gnueabihf-
+
+To build rk3308 boards:
+
+.. code-block:: bash
+
+        export BL31=../rkbin/bin/rk33/rk3308_bl31_v2.26.elf
+        export ROCKCHIP_TPL=../rkbin/bin/rk33/rk3308_ddr_589MHz_uartX_mY_v2.07.bin
+        make evb-rk3308_defconfig
+        make CROSS_COMPILE=aarch64-linux-gnu-
 
 To build rk3328 boards:
 
@@ -185,17 +250,28 @@ To build rk3568 boards:
         make evb-rk3568_defconfig
         make CROSS_COMPILE=aarch64-linux-gnu-
 
+To build rk3588 boards:
+
+.. code-block:: bash
+
+        export BL31=../rkbin/bin/rk35/rk3588_bl31_v1.33.elf
+        export ROCKCHIP_TPL=../rkbin/bin/rk35/rk3588_ddr_lp4_2112MHz_lp5_2736MHz_v1.09.bin
+        make evb-rk3588_defconfig
+        make CROSS_COMPILE=aarch64-linux-gnu-
+
 Flashing
 --------
 
+.. _`PackageWithTPLandSPL`:
+
 1. Package the image with U-Boot TPL/SPL
------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 SD Card
-^^^^^^^
+"""""""
 
 All Rockchip platforms (except rk3128 which doesn't use SPL) are now
-supporting a single boot image using binman and pad_cat.
+supporting a single boot image using binman.
 
 To write an image that boots from a SD card (assumed to be /dev/sda):
 
@@ -205,7 +281,7 @@ To write an image that boots from a SD card (assumed to be /dev/sda):
         sync
 
 eMMC
-^^^^
+""""
 
 eMMC flash would probe on mmc0 in most of the Rockchip platforms.
 
@@ -244,36 +320,22 @@ For Rockchip 32-bit platforms the U-Boot proper image
 is u-boot-dtb.img
 
 SPI
-^^^
+"""
 
-The SPI boot method requires the generation of idbloader.img with help of the mkimage tool.
+Write u-boot-rockchip-spi.bin to offset 0 of SPI flash.
 
-SPL-alone SPI boot image:
-
-.. code-block:: bash
-
-        ./tools/mkimage -n rk3399 -T rkspi -d spl/u-boot-spl.bin idbloader.img
-
-TPL+SPL SPI boot image:
-
-.. code-block:: bash
-
-        ./tools/mkimage -n rk3399 -T rkspi -d tpl/u-boot-tpl.bin:spl/u-boot-spl.bin idbloader.img
-
-Copy SPI boot images into SD card and boot from SD:
+Copy u-boot-rockchip-spi.bin into SD card and boot from SD:
 
 .. code-block:: bash
 
         sf probe
-        load mmc 1:1 $kernel_addr_r idbloader.img
-        sf erase 0 +$filesize
-        sf write $kernel_addr_r 0 ${filesize}
-        load mmc 1:1 ${kernel_addr_r} u-boot.itb
-        sf erase 0x60000 +$filesize
-        sf write $kernel_addr_r 0x60000 ${filesize}
+        load mmc 1:1 $kernel_addr_r u-boot-rockchip-spi.bin
+        sf update $fileaddr 0 $filesize
+
+.. _`PackageWithRockchipMiniloader`:
 
 2. Package the image with Rockchip miniloader
----------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Image package with Rockchip miniloader requires rkbin [1].
 
@@ -313,16 +375,16 @@ Note:
 2. 0x200000 is a load address and is an option for some platforms.
 
 3. Package the RK3066 image with U-Boot TPL/SPL on NAND
--------------------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Unlike later SoC models the rk3066 BootROM doesn't have SDMMC support.
 If all other boot options fail then it enters into a BootROM mode on the USB OTG port.
-This method loads TPL/SPL on NAND with U-boot and kernel on SD card.
+This method loads TPL/SPL on NAND with U-Boot and kernel on SD card.
 
 SD Card
-^^^^^^^
+"""""""
 
-U-boot expects a GPT partition map and a boot directory structure with files on the SD card.
+U-Boot expects a GPT partition map and a boot directory structure with files on the SD card.
 
 .. code-block:: none
 
@@ -347,7 +409,7 @@ Boot partition:
         zImage
         rk3066a-mk808.dtb
 
-To write a U-boot image to the SD card (assumed to be /dev/sda):
+To write a U-Boot image to the SD card (assumed to be /dev/sda):
 
 .. code-block:: bash
 
@@ -355,7 +417,7 @@ To write a U-boot image to the SD card (assumed to be /dev/sda):
         sync
 
 NAND
-^^^^
+""""
 
 Bring device in BootROM mode:
 
@@ -380,9 +442,8 @@ Program with commands in a bash script ./flash.sh:
 
         #!/bin/sh
 
-        printf "RK30" > tplspl.bin
-        dd if=u-boot-tpl.bin >> tplspl.bin
-        truncate -s %2048 tplspl.bin
+        printf "RK30" | dd conv=notrunc bs=4 count=1 of=u-boot-tpl.bin
+        truncate -s %2048 u-boot-tpl.bin
         truncate -s %2048 u-boot-spl.bin
         ../tools/boot_merger --verbose config-flash.ini
         ../tools/upgrade_tool ul ./RK30xxLoader_uboot.bin
@@ -406,7 +467,7 @@ config-flash.ini:
         NUM=2
         LOADER1=FlashData
         LOADER2=FlashBoot
-        FlashData=tplspl.bin
+        FlashData=u-boot-tpl.bin
         FlashBoot=u-boot-spl.bin
         [OUTPUT]
         PATH=RK30xxLoader_uboot.bin

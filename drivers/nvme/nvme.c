@@ -578,17 +578,22 @@ static int nvme_set_queue_count(struct nvme_dev *dev, int count)
 	return min(result & 0xffff, result >> 16) + 1;
 }
 
-static void nvme_create_io_queues(struct nvme_dev *dev)
+static int nvme_create_io_queues(struct nvme_dev *dev)
 {
 	unsigned int i;
+	int ret;
 
 	for (i = dev->queue_count; i <= dev->max_qid; i++)
 		if (!nvme_alloc_queue(dev, i, dev->q_depth))
-			break;
+			return log_msg_ret("all", -ENOMEM);
 
-	for (i = dev->online_queues; i <= dev->queue_count - 1; i++)
-		if (nvme_create_queue(dev->queues[i], i))
-			break;
+	for (i = dev->online_queues; i <= dev->queue_count - 1; i++) {
+		ret = nvme_create_queue(dev->queues[i], i);
+		if (ret)
+			return log_msg_ret("cre", ret);
+	}
+
+	return 0;
 }
 
 static int nvme_setup_io_queues(struct nvme_dev *dev)
@@ -598,14 +603,18 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 
 	nr_io_queues = 1;
 	result = nvme_set_queue_count(dev, nr_io_queues);
-	if (result <= 0)
+	if (result <= 0) {
+		log_debug("Cannot set queue count (err=%dE)\n", result);
 		return result;
+	}
 
 	dev->max_qid = nr_io_queues;
 
 	/* Free previously allocated queues */
 	nvme_free_queues(dev, nr_io_queues + 1);
-	nvme_create_io_queues(dev);
+	result = nvme_create_io_queues(dev);
+	if (result)
+		return result;
 
 	return 0;
 }
@@ -683,8 +692,13 @@ int nvme_scan_namespace(void)
 
 	uclass_foreach_dev(dev, uc) {
 		ret = device_probe(dev);
-		if (ret)
-			return ret;
+		if (ret) {
+			log_err("Failed to probe '%s': err=%dE\n", dev->name,
+				ret);
+			/* Bail if we ran out of memory, else keep trying */
+			if (ret != -EBUSY)
+				return ret;
+		}
 	}
 
 	return 0;
@@ -823,8 +837,8 @@ int nvme_init(struct udevice *udev)
 	ndev->udev = udev;
 	INIT_LIST_HEAD(&ndev->namespaces);
 	if (readl(&ndev->bar->csts) == -1) {
-		ret = -ENODEV;
-		printf("Error: %s: Out of memory!\n", udev->name);
+		ret = -EBUSY;
+		printf("Error: %s: Controller not ready!\n", udev->name);
 		goto free_nvme;
 	}
 
@@ -842,8 +856,10 @@ int nvme_init(struct udevice *udev)
 	ndev->dbs = ((void __iomem *)ndev->bar) + 4096;
 
 	ret = nvme_configure_admin_queue(ndev);
-	if (ret)
+	if (ret) {
+		log_debug("Unable to configure admin queue (err=%dE)\n", ret);
 		goto free_queue;
+	}
 
 	/* Allocate after the page size is known */
 	ndev->prp_pool = memalign(ndev->page_size, MAX_PRP_POOL);
@@ -855,8 +871,10 @@ int nvme_init(struct udevice *udev)
 	ndev->prp_entry_num = MAX_PRP_POOL >> 3;
 
 	ret = nvme_setup_io_queues(ndev);
-	if (ret)
+	if (ret) {
+		log_debug("Unable to setup I/O queues(err=%dE)\n", ret);
 		goto free_queue;
+	}
 
 	nvme_get_info_from_identify(ndev);
 
@@ -890,11 +908,11 @@ int nvme_init(struct udevice *udev)
 
 		/* The real blksz and size will be set by nvme_blk_probe() */
 		ret = blk_create_devicef(udev, "nvme-blk", name, UCLASS_NVME,
-					 -1, 512, 0, &ns_udev);
+					 -1, DEFAULT_BLKSZ, 0, &ns_udev);
 		if (ret)
 			goto free_id;
 
-		ret = bootdev_setup_sibling_blk(ns_udev, "nvme_bootdev");
+		ret = bootdev_setup_for_sibling_blk(ns_udev, "nvme_bootdev");
 		if (ret)
 			return log_msg_ret("bootdev", ret);
 

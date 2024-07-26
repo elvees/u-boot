@@ -45,7 +45,7 @@ int cmd_ut_category(const char *name, const char *prefix,
 	}
 
 	ret = ut_run_list(name, prefix, tests, n_ents,
-			  argc > 1 ? argv[1] : NULL, runs_per_text, force_run,
+			  cmd_arg1(argc, argv), runs_per_text, force_run,
 			  test_insert);
 
 	return ret ? CMD_RET_FAILURE : 0;
@@ -54,9 +54,15 @@ int cmd_ut_category(const char *name, const char *prefix,
 static struct cmd_tbl cmd_ut_sub[] = {
 	U_BOOT_CMD_MKENT(all, CONFIG_SYS_MAXARGS, 1, do_ut_all, "", ""),
 	U_BOOT_CMD_MKENT(info, 1, 1, do_ut_info, "", ""),
-#ifdef CONFIG_BOOTSTD
+#ifdef CONFIG_CMD_BDI
+	U_BOOT_CMD_MKENT(bdinfo, CONFIG_SYS_MAXARGS, 1, do_ut_bdinfo, "", ""),
+#endif
+#ifdef CONFIG_UT_BOOTSTD
 	U_BOOT_CMD_MKENT(bootstd, CONFIG_SYS_MAXARGS, 1, do_ut_bootstd,
 			 "", ""),
+#endif
+#ifdef CONFIG_CMDLINE
+	U_BOOT_CMD_MKENT(cmd, CONFIG_SYS_MAXARGS, 1, do_ut_cmd, "", ""),
 #endif
 	U_BOOT_CMD_MKENT(common, CONFIG_SYS_MAXARGS, 1, do_ut_common, "", ""),
 #if defined(CONFIG_UT_DM)
@@ -84,6 +90,10 @@ static struct cmd_tbl cmd_ut_sub[] = {
 #ifdef CONFIG_UT_LOG
 	U_BOOT_CMD_MKENT(log, CONFIG_SYS_MAXARGS, 1, do_ut_log, "", ""),
 #endif
+#if defined(CONFIG_SANDBOX) && defined(CONFIG_CMD_MBR) && defined(CONFIG_CMD_MMC) \
+        && defined(CONFIG_MMC_SANDBOX) && defined(CONFIG_MMC_WRITE)
+	U_BOOT_CMD_MKENT(mbr, CONFIG_SYS_MAXARGS, 1, do_ut_mbr, "", ""),
+#endif
 	U_BOOT_CMD_MKENT(mem, CONFIG_SYS_MAXARGS, 1, do_ut_mem, "", ""),
 #if defined(CONFIG_SANDBOX) && defined(CONFIG_CMD_SETEXPR)
 	U_BOOT_CMD_MKENT(setexpr, CONFIG_SYS_MAXARGS, 1, do_ut_setexpr, "",
@@ -96,6 +106,10 @@ static struct cmd_tbl cmd_ut_sub[] = {
 #if CONFIG_IS_ENABLED(UT_UNICODE) && !defined(API_BUILD)
 	U_BOOT_CMD_MKENT(unicode, CONFIG_SYS_MAXARGS, 1, do_ut_unicode, "", ""),
 #endif
+#ifdef CONFIG_MEASURED_BOOT
+	U_BOOT_CMD_MKENT(measurement, CONFIG_SYS_MAXARGS, 1, do_ut_measurement,
+			 "", ""),
+#endif
 #ifdef CONFIG_SANDBOX
 	U_BOOT_CMD_MKENT(compression, CONFIG_SYS_MAXARGS, 1, do_ut_compression,
 			 "", ""),
@@ -107,8 +121,14 @@ static struct cmd_tbl cmd_ut_sub[] = {
 #ifdef CONFIG_CMD_ADDRMAP
 	U_BOOT_CMD_MKENT(addrmap, CONFIG_SYS_MAXARGS, 1, do_ut_addrmap, "", ""),
 #endif
+#if CONFIG_IS_ENABLED(HUSH_PARSER)
+	U_BOOT_CMD_MKENT(hush, CONFIG_SYS_MAXARGS, 1, do_ut_hush, "", ""),
+#endif
 #ifdef CONFIG_CMD_LOADM
 	U_BOOT_CMD_MKENT(loadm, CONFIG_SYS_MAXARGS, 1, do_ut_loadm, "", ""),
+#endif
+#ifdef CONFIG_CMD_PCI_MPS
+	U_BOOT_CMD_MKENT(pci_mps, CONFIG_SYS_MAXARGS, 1, do_ut_pci_mps, "", ""),
 #endif
 #ifdef CONFIG_CMD_SEAMA
 	U_BOOT_CMD_MKENT(seama, CONFIG_SYS_MAXARGS, 1, do_ut_seama, "", ""),
@@ -160,8 +180,7 @@ static int do_ut(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	return CMD_RET_USAGE;
 }
 
-#ifdef CONFIG_SYS_LONGHELP
-static char ut_help_text[] =
+U_BOOT_LONGHELP(ut,
 	"[-r] [-f] [<suite>] - run unit tests\n"
 	"   -r<runs>   Number of times to run each test\n"
 	"   -f         Force 'manual' tests to run as well\n"
@@ -173,11 +192,17 @@ static char ut_help_text[] =
 #ifdef CONFIG_CMD_ADDRMAP
 	"\naddrmap - very basic test of addrmap command"
 #endif
+#ifdef CONFIG_CMD_BDI
+	"\nbdinfo - bdinfo command"
+#endif
 #ifdef CONFIG_SANDBOX
 	"\nbloblist - bloblist implementation"
 #endif
 #ifdef CONFIG_BOOTSTD
 	"\nbootstd - standard boot implementation"
+#endif
+#ifdef CONFIG_CMDLINE
+	"\ncmd - test various commands"
 #endif
 #ifdef CONFIG_SANDBOX
 	"\ncompression - compressors and bootm decompression"
@@ -192,7 +217,10 @@ static char ut_help_text[] =
 	"\nfdt - fdt command"
 #endif
 #ifdef CONFIG_CONSOLE_TRUETYPE
-	"\nut font - font command"
+	"\nfont - font command"
+#endif
+#if CONFIG_IS_ENABLED(HUSH_PARSER)
+	"\nhush - Test hush behavior"
 #endif
 #ifdef CONFIG_CMD_LOADM
 	"\nloadm - loadm command parameters and loading memory blob"
@@ -210,6 +238,9 @@ static char ut_help_text[] =
 #ifdef CONFIG_UT_OVERLAY
 	"\noverlay - device tree overlays"
 #endif
+#ifdef CONFIG_CMD_PCI_MPS
+	"\npci_mps - PCI Express Maximum Payload Size"
+#endif
 	"\nprint  - printing things to the console"
 	"\nsetexpr - setexpr command"
 #ifdef CONFIG_SANDBOX
@@ -225,8 +256,7 @@ static char ut_help_text[] =
 	!defined(CONFIG_SPL_BUILD) && !defined(API_BUILD)
 	"\nunicode - Unicode functions"
 #endif
-	;
-#endif /* CONFIG_SYS_LONGHELP */
+	);
 
 U_BOOT_CMD(
 	ut, CONFIG_SYS_MAXARGS, 1, do_ut,

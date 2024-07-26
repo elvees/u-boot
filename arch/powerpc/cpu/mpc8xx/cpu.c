@@ -16,7 +16,6 @@
  * Wolfgang Denk <wd@denx.de>
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <display_options.h>
 #include <net.h>
@@ -127,7 +126,7 @@ static int check_CPU(long clock, uint pvr, uint immr)
 		return -1;
 
 	k = (immr << 16) |
-	    in_be16(&immap->im_cpm.cp_dparam16[PROFF_REVNUM / sizeof(u16)]);
+	    in_be16((u16 __iomem *)&immap->im_cpm.cp_dpmem[PROFF_REVNUM]);
 
 	/*
 	 * Some boards use sockets so different CPUs can be used.

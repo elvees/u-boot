@@ -538,7 +538,7 @@ static int ehci_usb_phy_mode(struct udevice *dev)
 			plat->init_type = USB_INIT_DEVICE;
 		else
 			plat->init_type = USB_INIT_HOST;
-	} else if (is_mx7() || is_imx8mm() || is_imx8mn()) {
+	} else if (is_mx7() || is_imx8mm() || is_imx8mn() || is_imx93()) {
 		phy_status = (void __iomem *)(addr +
 					      USBNC_PHY_STATUS_OFFSET);
 		val = readl(phy_status);
@@ -703,18 +703,10 @@ static int ehci_usb_probe(struct udevice *dev)
 	usb_internal_phy_clock_gate(priv->phy_addr, 1);
 	usb_phy_enable(ehci, priv->phy_addr);
 #endif
-#endif
-
-#if CONFIG_IS_ENABLED(DM_REGULATOR)
-	if (priv->vbus_supply) {
-		ret = regulator_set_enable(priv->vbus_supply,
-					   (type == USB_INIT_DEVICE) ?
-					   false : true);
-		if (ret && ret != -ENOSYS) {
-			printf("Error enabling VBUS supply (ret=%i)\n", ret);
-			goto err_clk;
-		}
-	}
+#else
+	ret = generic_setup_phy(dev, &priv->phy, 0);
+	if (ret)
+		goto err_regulator;
 #endif
 
 	if (priv->init_type == USB_INIT_HOST) {
@@ -724,12 +716,6 @@ static int ehci_usb_probe(struct udevice *dev)
 	}
 
 	mdelay(10);
-
-#if defined(CONFIG_PHY)
-	ret = generic_setup_phy(dev, &priv->phy, 0);
-	if (ret)
-		goto err_regulator;
-#endif
 
 	hccr = (struct ehci_hccr *)((uintptr_t)&ehci->caplength);
 	hcor = (struct ehci_hcor *)((uintptr_t)hccr +
@@ -745,10 +731,6 @@ err_phy:
 #if defined(CONFIG_PHY)
 	generic_shutdown_phy(&priv->phy);
 err_regulator:
-#endif
-#if CONFIG_IS_ENABLED(DM_REGULATOR)
-	if (priv->vbus_supply)
-		regulator_set_enable(priv->vbus_supply, false);
 #endif
 err_clk:
 #if CONFIG_IS_ENABLED(CLK)

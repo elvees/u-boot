@@ -19,6 +19,7 @@
 #include <part.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
+#include <linux/printk.h>
 #include <power/regulator.h>
 #include <malloc.h>
 #include <memalign.h>
@@ -359,7 +360,7 @@ static const u8 tuning_blk_pattern_8bit[] = {
 	0xff, 0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee,
 };
 
-int mmc_send_tuning(struct mmc *mmc, u32 opcode, int *cmd_error)
+int mmc_send_tuning(struct mmc *mmc, u32 opcode)
 {
 	struct mmc_cmd cmd;
 	struct mmc_data data;
@@ -398,6 +399,26 @@ int mmc_send_tuning(struct mmc *mmc, u32 opcode, int *cmd_error)
 }
 #endif
 
+int mmc_send_stop_transmission(struct mmc *mmc, bool write)
+{
+	struct mmc_cmd cmd;
+
+	cmd.cmdidx = MMC_CMD_STOP_TRANSMISSION;
+	cmd.cmdarg = 0;
+	/*
+	 * JEDEC Standard No. 84-B51 Page 126
+	 * CMD12 STOP_TRANSMISSION R1/R1b[3]
+	 * NOTE 3 R1 for read cases and R1b for write cases.
+	 *
+	 * Physical Layer Simplified Specification Version 9.00
+	 * 7.3.1.3 Detailed Command Description
+	 * CMD12 R1b
+	 */
+	cmd.resp_type = (IS_SD(mmc) || write) ? MMC_RSP_R1b : MMC_RSP_R1;
+
+	return mmc_send_cmd(mmc, &cmd, NULL);
+}
+
 static int mmc_read_blocks(struct mmc *mmc, void *dst, lbaint_t start,
 			   lbaint_t blkcnt)
 {
@@ -425,10 +446,7 @@ static int mmc_read_blocks(struct mmc *mmc, void *dst, lbaint_t start,
 		return 0;
 
 	if (blkcnt > 1) {
-		cmd.cmdidx = MMC_CMD_STOP_TRANSMISSION;
-		cmd.cmdarg = 0;
-		cmd.resp_type = MMC_RSP_R1b;
-		if (mmc_send_cmd(mmc, &cmd, NULL)) {
+		if (mmc_send_stop_transmission(mmc, false)) {
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 			pr_err("mmc fail to send stop cmd\n");
 #endif
@@ -1552,13 +1570,20 @@ static int sd_read_ssr(struct mmc *mmc)
 	return 0;
 }
 #endif
-/* frequency bases */
-/* divided by 10 to be nice to platforms without floating point */
+/*
+ * TRAN_SPEED bits 0:2 encode the frequency unit:
+ * 0 = 100KHz, 1 = 1MHz, 2 = 10MHz, 3 = 100MHz, values 4 - 7 are reserved.
+ * The values in fbase[] are divided by 10 to avoid floats in multiplier[].
+ */
 static const int fbase[] = {
 	10000,
 	100000,
 	1000000,
 	10000000,
+	0,	/* reserved */
+	0,	/* reserved */
+	0,	/* reserved */
+	0,	/* reserved */
 };
 
 /* Multiplier values for TRAN_SPEED.  Multiplied by 10 to be nice
@@ -2009,9 +2034,9 @@ static int mmc_select_hs400(struct mmc *mmc)
 	mmc_set_clock(mmc, mmc->tran_speed, false);
 
 	/* execute tuning if needed */
-	mmc->hs400_tuning = 1;
+	mmc->hs400_tuning = true;
 	err = mmc_execute_tuning(mmc, MMC_CMD_SEND_TUNING_BLOCK_HS200);
-	mmc->hs400_tuning = 0;
+	mmc->hs400_tuning = false;
 	if (err) {
 		debug("tuning failed\n");
 		return err;
@@ -2223,6 +2248,7 @@ error:
 			mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,
 				   EXT_CSD_BUS_WIDTH, EXT_CSD_BUS_WIDTH_1);
 			mmc_select_mode(mmc, MMC_LEGACY);
+			mmc_set_clock(mmc, mmc->legacy_speed, MMC_CLK_ENABLE);
 			mmc_set_bus_width(mmc, 1);
 		}
 	}
@@ -2231,6 +2257,16 @@ error:
 
 	return -ENOTSUPP;
 }
+#else
+static int sd_select_mode_and_width(struct mmc *mmc, uint card_caps)
+{
+	return 0;
+};
+
+static int mmc_select_mode_and_width(struct mmc *mmc, uint card_caps)
+{
+	return 0;
+};
 #endif
 
 #if CONFIG_IS_ENABLED(MMC_TINY)
@@ -2262,7 +2298,7 @@ static int mmc_startup_v4(struct mmc *mmc)
 		return 0;
 
 	if (!mmc->ext_csd)
-		memset(ext_csd_bkup, 0, sizeof(ext_csd_bkup));
+		memset(ext_csd_bkup, 0, MMC_MAX_BLOCK_LEN);
 
 	err = mmc_send_ext_csd(mmc, ext_csd);
 	if (err)
@@ -2432,6 +2468,9 @@ static int mmc_startup_v4(struct mmc *mmc)
 
 	mmc->wr_rel_set = ext_csd[EXT_CSD_WR_REL_SET];
 
+	mmc->can_trim =
+		!!(ext_csd[EXT_CSD_SEC_FEATURE] & EXT_CSD_SEC_FEATURE_TRIM_EN);
+
 	return 0;
 error:
 	if (mmc->ext_csd) {
@@ -2538,6 +2577,8 @@ static int mmc_startup(struct mmc *mmc)
 	mult = multipliers[((cmd.response[0] >> 3) & 0xf)];
 
 	mmc->legacy_speed = freq * mult;
+	if (!mmc->legacy_speed)
+		log_debug("TRAN_SPEED: reserved value");
 	mmc_select_mode(mmc, MMC_LEGACY);
 
 	mmc->dsr_imp = ((cmd.response[1] >> 12) & 0x1);
@@ -2754,9 +2795,10 @@ static int mmc_power_on(struct mmc *mmc)
 {
 #if CONFIG_IS_ENABLED(DM_MMC) && CONFIG_IS_ENABLED(DM_REGULATOR)
 	if (mmc->vmmc_supply) {
-		int ret = regulator_set_enable(mmc->vmmc_supply, true);
+		int ret = regulator_set_enable_if_allowed(mmc->vmmc_supply,
+							  true);
 
-		if (ret && ret != -EACCES) {
+		if (ret && ret != -ENOSYS) {
 			printf("Error enabling VMMC supply : %d\n", ret);
 			return ret;
 		}
@@ -2770,9 +2812,10 @@ static int mmc_power_off(struct mmc *mmc)
 	mmc_set_clock(mmc, 0, MMC_CLK_DISABLE);
 #if CONFIG_IS_ENABLED(DM_MMC) && CONFIG_IS_ENABLED(DM_REGULATOR)
 	if (mmc->vmmc_supply) {
-		int ret = regulator_set_enable(mmc->vmmc_supply, false);
+		int ret = regulator_set_enable_if_allowed(mmc->vmmc_supply,
+							  false);
 
-		if (ret && ret != -EACCES) {
+		if (ret && ret != -ENOSYS) {
 			pr_debug("Error disabling VMMC supply : %d\n", ret);
 			return ret;
 		}
@@ -2986,12 +3029,14 @@ int mmc_init(struct mmc *mmc)
 	return err;
 }
 
-#if CONFIG_IS_ENABLED(MMC_UHS_SUPPORT) || \
-    CONFIG_IS_ENABLED(MMC_HS200_SUPPORT) || \
-    CONFIG_IS_ENABLED(MMC_HS400_SUPPORT)
 int mmc_deinit(struct mmc *mmc)
 {
 	u32 caps_filtered;
+
+	if (!CONFIG_IS_ENABLED(MMC_UHS_SUPPORT) &&
+	    !CONFIG_IS_ENABLED(MMC_HS200_SUPPORT) &&
+	    !CONFIG_IS_ENABLED(MMC_HS400_SUPPORT))
+		return 0;
 
 	if (!mmc->has_init)
 		return 0;
@@ -3010,7 +3055,6 @@ int mmc_deinit(struct mmc *mmc)
 		return mmc_select_mode_and_width(mmc, caps_filtered);
 	}
 }
-#endif
 
 int mmc_set_dsr(struct mmc *mmc, u16 val)
 {

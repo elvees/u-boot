@@ -31,7 +31,8 @@ config IMX_RDC
 
 config IMX_BOOTAUX
 	bool "Support boot auxiliary core"
-	depends on ARCH_MX7 || ARCH_MX6 || ARCH_VF610 || ARCH_IMX8M
+	depends on ARCH_MX7 || ARCH_MX6 || ARCH_VF610 || ARCH_IMX8 || ARCH_IMX8M
+	select LIB_ELF
 	help
 	  bootaux [addr] to boot auxiliary core.
 
@@ -53,6 +54,7 @@ config IMX_HAB
 	bool "Support i.MX HAB features"
 	depends on ARCH_MX7 || ARCH_MX6 || ARCH_MX5 || ARCH_IMX8M || ARCH_MX7ULP
 	select FSL_CAAM if HAS_CAAM
+	select SPL_DRIVERS_MISC if SPL
 	imply CMD_DEKBLOB if HAS_CAAM
 	help
 	  This option enables the support for secure boot (HAB).
@@ -70,7 +72,7 @@ config CSF_SIZE
 config CMD_BMODE
 	bool "Support the 'bmode' command"
 	default y
-	depends on ARCH_MX7 || ARCH_MX6 || ARCH_MX5
+	depends on ARCH_IMX8M || ARCH_MX7 || ARCH_MX6 || ARCH_MX5
 	help
 	  This enables the 'bmode' (bootmode) command for forcing
 	  a boot from specific media.
@@ -86,6 +88,7 @@ config CMD_DEKBLOB
 	select IMX_CAAM_DEK_ENCAP if ARCH_MX6 || ARCH_MX7 || ARCH_MX7ULP
 	select IMX_OPTEE_DEK_ENCAP if ARCH_IMX8M
 	select IMX_SECO_DEK_ENCAP if ARCH_IMX8
+	select IMX_ELE_DEK_ENCAP if ARCH_IMX8ULP || ARCH_IMX9
 	help
 	  This enables the 'dek_blob' command which is used with the
 	  Freescale secure boot mechanism. This command encapsulates and
@@ -112,6 +115,12 @@ config IMX_SECO_DEK_ENCAP
 	help
 	  This enabled the DEK blob encapsulation with the SECO API. This option
 	  is only available on imx8.
+
+config IMX_ELE_DEK_ENCAP
+	bool "Support the DEK blob encapsulation with ELE"
+	help
+	  This enabled the DEK blob encapsulation with the ELE API. This option
+	  is only available on imx8ulp and imx9.
 
 config CMD_PRIBLOB
 	bool "Support the set_priblob_bitfield command"
@@ -174,7 +183,7 @@ config IMX8_ROMAPI
 config SPL_IMX_ROMAPI_LOADADDR
 	hex "Default load address to load image through ROM API"
 	depends on IMX8_ROMAPI || SPL_BOOTROM_SUPPORT
-	default 0
+	default 0x0
 
 config IMX_DCD_ADDR
 	hex "DCD Blocks location on the image"
@@ -185,19 +194,6 @@ config IMX_DCD_ADDR
 	  the ROM code to configure the device at early boot stage, is located.
 	  This information is shared with the user via mkimage -l just so the
 	  image can be signed.
-
-config SPL_LOAD_IMX_CONTAINER
-	bool "Enable SPL loading U-Boot as a i.MX Container image"
-	depends on SPL
-	help
-	  This is to let SPL could load i.MX Container image
-
-config IMX_CONTAINER_CFG
-	string "i.MX Container config file"
-	depends on SPL
-	help
-	  This is to specific the cfg file for generating container
-	  image which will be loaded by SPL.
 
 config IOMUX_LPSR
 	bool

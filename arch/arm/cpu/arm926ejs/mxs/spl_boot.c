@@ -17,6 +17,7 @@
 #include <asm/arch/sys_proto.h>
 #include <asm/gpio.h>
 #include <asm/sections.h>
+#include <asm/system.h>
 #include <linux/compiler.h>
 
 #include "mxs_init.h"
@@ -93,7 +94,9 @@ static uint8_t mxs_get_bootmode_index(void)
 	return i;
 }
 
-static void mxs_spl_fixup_vectors(void)
+static noinline
+__attribute__((target("arm")))
+void mxs_spl_fixup_vectors(void)
 {
 	/*
 	 * Copy our vector table to 0x0, since due to HAB, we cannot
@@ -103,7 +106,10 @@ static void mxs_spl_fixup_vectors(void)
 	 */
 
 	/* cppcheck-suppress nullPointer */
-	memcpy(0x0, &_start, 0x60);
+	memcpy(0x0, _start, 0x60);
+
+	/* Make sure ARM core points to low vectors */
+	set_cr(get_cr() & ~CR_V);
 }
 
 static void mxs_spl_console_init(void)
@@ -128,8 +134,10 @@ void mxs_common_spl_init(const uint32_t arg, const uint32_t *resptr,
 
 	mxs_iomux_setup_multiple_pads(iomux_setup, iomux_size);
 
-	mxs_spl_console_init();
-	debug("SPL: Serial Console Initialised\n");
+	if (!CONFIG_IS_ENABLED(DM_SERIAL)) {
+		mxs_spl_console_init();
+		debug("SPL: Serial Console Initialised\n");
+	}
 
 	mxs_power_init();
 

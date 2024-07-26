@@ -8,7 +8,6 @@
 
 #define LOG_CATEGORY LOGC_EFI
 
-#include <common.h>
 #include <efi_loader.h>
 #include <efi_variable.h>
 #include <env.h>
@@ -368,9 +367,8 @@ efi_status_t efi_capsule_authenticate(const void *capsule, efi_uintn_t capsule_s
 					     auth_hdr->auth_info.hdr.dwLength
 					     - sizeof(auth_hdr->auth_info),
 					     &buf);
-	if (IS_ERR(capsule_sig)) {
+	if (!capsule_sig) {
 		debug("Parsing variable's pkcs7 header failed\n");
-		capsule_sig = NULL;
 		goto out;
 	}
 
@@ -403,12 +401,6 @@ out:
 	free(regs);
 
 	return status;
-}
-#else
-efi_status_t efi_capsule_authenticate(const void *capsule, efi_uintn_t capsule_size,
-				      void **image, efi_uintn_t *image_size)
-{
-	return EFI_UNSUPPORTED;
 }
 #endif /* CONFIG_EFI_CAPSULE_AUTHENTICATE */
 
@@ -587,6 +579,13 @@ static efi_status_t efi_capsule_update_firmware(
 		fw_accept_os = capsule_data->flags & FW_ACCEPT_OS ? 0x1 : 0x0;
 	}
 
+	if (guidcmp(&capsule_data->capsule_guid,
+		    &efi_guid_firmware_management_capsule_id)) {
+		log_err("Unsupported capsule type: %pUs\n",
+			&capsule_data->capsule_guid);
+		return EFI_UNSUPPORTED;
+	}
+
 	/* sanity check */
 	if (capsule_data->header_size < sizeof(*capsule) ||
 	    capsule_data->header_size >= capsule_data->capsule_image_size)
@@ -757,15 +756,7 @@ efi_status_t EFIAPI efi_update_capsule(
 
 		log_debug("Capsule[%d] (guid:%pUs)\n",
 			  i, &capsule->capsule_guid);
-		if (!guidcmp(&capsule->capsule_guid,
-			     &efi_guid_firmware_management_capsule_id)) {
-			ret  = efi_capsule_update_firmware(capsule);
-		} else {
-			log_err("Unsupported capsule type: %pUs\n",
-				&capsule->capsule_guid);
-			ret = EFI_UNSUPPORTED;
-		}
-
+		ret  = efi_capsule_update_firmware(capsule);
 		if (ret != EFI_SUCCESS)
 			goto out;
 	}

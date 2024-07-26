@@ -35,6 +35,7 @@
 #include <asm-generic/atomic-long.h>
 #include <ubi_uboot.h>
 #include <ubifs_uboot.h>
+#include <linux/printk.h>
 
 #include <linux/ctype.h>
 #include <linux/time.h>
@@ -67,7 +68,6 @@ struct page {
 void iput(struct inode *inode);
 
 /* linux/include/time.h */
-#define NSEC_PER_SEC	1000000000L
 #define get_seconds()	0
 #define CURRENT_TIME_SEC	((struct timespec) { get_seconds(), 0 })
 

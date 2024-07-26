@@ -6,8 +6,8 @@
 #include <linux/slab.h>
 #else
 #include <linux/compat.h>
-#include <common.h>
 #include <malloc.h>
+#include <linux/printk.h>
 #endif
 #include <linux/list.h>
 #include <linux/list_sort.h>

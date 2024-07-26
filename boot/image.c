@@ -42,6 +42,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #else /* USE_HOSTCC */
 #include "mkimage.h"
+#include <linux/kconfig.h>
 #include <u-boot/md5.h>
 #include <time.h>
 
@@ -62,7 +63,6 @@ DECLARE_GLOBAL_DATA_PTR;
 #include <relocate.h>
 #include <linux/lzo.h>
 #include <linux/zstd.h>
-#include <linux/kconfig.h>
 #include <lzma/LzmaTypes.h>
 #include <lzma/LzmaDec.h>
 #include <lzma/LzmaTools.h>
@@ -181,6 +181,8 @@ static const table_entry_t uimage_type[] = {
 	{	IH_TYPE_SUNXI_EGON, "sunxi_egon",  "Allwinner eGON Boot Image" },
 	{	IH_TYPE_SUNXI_TOC0, "sunxi_toc0",  "Allwinner TOC0 Boot Image" },
 	{	IH_TYPE_FDT_LEGACY, "fdt_legacy", "legacy Image with Flat Device Tree ", },
+	{	IH_TYPE_RENESAS_SPKG, "spkgimage", "Renesas SPKG Image" },
+	{	IH_TYPE_STARFIVE_SPL, "sfspl", "StarFive SPL Image" },
 	{	-1,		    "",		  "",			},
 };
 
@@ -413,15 +415,20 @@ void image_print_contents(const void *ptr)
  * @type:	OS type (IH_OS_...)
  * @comp_type:	Compression type being used (IH_COMP_...)
  * @is_xip:	true if the load address matches the image start
+ * @load:	Load address for printing
  */
-static void print_decomp_msg(int comp_type, int type, bool is_xip)
+static void print_decomp_msg(int comp_type, int type, bool is_xip,
+			     ulong load)
 {
 	const char *name = genimg_get_type_name(type);
 
+	/* Shows "Loading Kernel Image" for example */
 	if (comp_type == IH_COMP_NONE)
-		printf("   %s %s\n", is_xip ? "XIP" : "Loading", name);
+		printf("   %s %s", is_xip ? "XIP" : "Loading", name);
 	else
-		printf("   Uncompressing %s\n", name);
+		printf("   Uncompressing %s", name);
+
+	printf(" to %lx\n", load);
 }
 
 int image_decomp_type(const unsigned char *buf, ulong len)
@@ -446,7 +453,7 @@ int image_decomp(int comp, ulong load, ulong image_start, int type,
 	int ret = -ENOSYS;
 
 	*load_end = load;
-	print_decomp_msg(comp, type, load == image_start);
+	print_decomp_msg(comp, type, load == image_start, load);
 
 	/*
 	 * Load the image to the right place, decompressing if needed. After
@@ -570,7 +577,7 @@ const char *genimg_get_cat_name(enum ih_category category, uint id)
 	entry = get_table_entry(table_info[category].table, id);
 	if (!entry)
 		return unknown_msg(category);
-	return manual_reloc(entry->lname);
+	return entry->lname;
 }
 
 /**
@@ -590,7 +597,7 @@ const char *genimg_get_cat_short_name(enum ih_category category, uint id)
 	entry = get_table_entry(table_info[category].table, id);
 	if (!entry)
 		return unknown_msg(category);
-	return manual_reloc(entry->sname);
+	return entry->sname;
 }
 
 int genimg_get_cat_count(enum ih_category category)
@@ -640,7 +647,7 @@ char *get_table_entry_name(const table_entry_t *table, char *msg, int id)
 	table = get_table_entry(table, id);
 	if (!table)
 		return msg;
-	return manual_reloc(table->lname);
+	return table->lname;
 }
 
 const char *genimg_get_os_name(uint8_t os)
@@ -675,7 +682,7 @@ static const char *genimg_get_short_name(const table_entry_t *table, int val)
 	table = get_table_entry(table, val);
 	if (!table)
 		return "unknown";
-	return manual_reloc(table->sname);
+	return table->sname;
 }
 
 const char *genimg_get_type_short_name(uint8_t type)
@@ -718,7 +725,7 @@ int get_table_entry_id(const table_entry_t *table,
 	const table_entry_t *t;
 
 	for (t = table; t->id >= 0; ++t) {
-		if (t->sname && !strcasecmp(manual_reloc(t->sname), name))
+		if (t->sname && !strcasecmp(t->sname, name))
 			return t->id;
 	}
 	debug("Invalid %s Type: %s\n", table_name, name);

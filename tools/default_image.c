@@ -15,7 +15,6 @@
 
 #include "imagetool.h"
 #include "mkimage.h"
-#include <u-boot/crc.h>
 
 #include <image.h>
 #include <tee/optee.h>
@@ -39,6 +38,11 @@ static int image_check_params(struct image_tool_params *params)
 	return	((params->dflag && (params->fflag || params->lflag)) ||
 		(params->fflag && (params->dflag || params->lflag)) ||
 		(params->lflag && (params->dflag || params->fflag)));
+}
+
+static void image_print_header(const void *ptr, struct image_tool_params *params)
+{
+	image_print_contents(ptr);
 }
 
 static int image_verify_header(unsigned char *ptr, int image_size,
@@ -201,7 +205,7 @@ U_BOOT_IMAGE_TYPE(
 	(void *)&header,
 	image_check_params,
 	image_verify_header,
-	image_print_contents,
+	image_print_header,
 	image_set_header,
 	image_extract_subimage,
 	image_check_image_types,

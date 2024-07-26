@@ -20,6 +20,7 @@
 
 #include <asm/cache.h>
 #include <asm/mmu.h>
+#include <asm/fsl_lbc.h>
 #include <asm/u-boot.h>
 
 #include "hrcw/hrcw.h"
@@ -215,6 +216,7 @@ in_flash:
 	 * gt-regs BAT can be reused after board_init_f calls
 	 * board_early_init_f (EVB only).
 	 */
+#ifdef CONFIG_SYS_INIT_RAM_LOCK
 	/* enable address translation */
 	bl	enable_addr_trans
 	sync
@@ -222,7 +224,6 @@ in_flash:
 	/* enable the data cache */
 	bl	dcache_enable
 	sync
-#ifdef CONFIG_SYS_INIT_RAM_LOCK
 	bl	lock_ram_in_cache
 	sync
 #endif
@@ -244,7 +245,7 @@ in_flash:
 	cmplw	r3, r4
 	bne	1b
 
-#if CONFIG_VAL(SYS_MALLOC_F_LEN)
+#if CONFIG_IS_ENABLED(SYS_MALLOC_F)
 
 #if CONFIG_VAL(SYS_MALLOC_F_LEN) + GENERATED_GBL_DATA_SIZE > CFG_SYS_INIT_RAM_SIZE
 #error "SYS_MALLOC_F_LEN too large to fit into initial RAM."
@@ -483,6 +484,7 @@ init_e300_core: /* time t 10 */
 
 
 	lis	r3, CONFIG_SYS_IMMR@h
+#ifndef CONFIG_WDT_MPC8xxx
 #if defined(CONFIG_WATCHDOG)
 	/* Initialise the Watchdog values and reset it (if req) */
 	/*------------------------------------------------------*/
@@ -508,6 +510,7 @@ init_e300_core: /* time t 10 */
 	stw r4, SWCRR(r3)
 1:
 #endif /* CONFIG_WATCHDOG */
+#endif
 
 #if defined(CONFIG_MASK_AER_AO)
 	/* Write the Arbiter Event Enable to mask Address Only traps. */

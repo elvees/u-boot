@@ -3,7 +3,6 @@
  * Copyright 2019 Google LLC
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <tpm_api.h>
@@ -33,6 +32,27 @@ u32 tpm_startup(struct udevice *dev, enum tpm_startup_type mode)
 	} else {
 		return -ENOSYS;
 	}
+}
+
+u32 tpm_auto_start(struct udevice *dev)
+{
+	u32 rc;
+
+	/*
+	 * the tpm_init() will return -EBUSY if the init has already happened
+	 * The selftest and startup code can run multiple times with no side
+	 * effects
+	 */
+	rc = tpm_init(dev);
+	if (rc && rc != -EBUSY)
+		return rc;
+
+	if (tpm_is_v1(dev))
+		return tpm1_auto_start(dev);
+	else if (tpm_is_v2(dev))
+		return tpm2_auto_start(dev);
+	else
+		return -ENOSYS;
 }
 
 u32 tpm_resume(struct udevice *dev)

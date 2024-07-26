@@ -57,17 +57,41 @@ struct __packed acpi_table_header {
 	char oem_id[6];		/* OEM identification */
 	char oem_table_id[8];	/* OEM table identification */
 	u32 oem_revision;	/* OEM revision number */
-	char aslc_id[4];	/* ASL compiler vendor ID */
-	u32 aslc_revision;	/* ASL compiler revision number */
+	char creator_id[4];	/* ASL compiler vendor ID */
+	u32 creator_revision;	/* ASL compiler revision number */
 };
 
+/**
+ * struct acpi_gen_regaddr - generic address structure (GAS)
+ */
 struct acpi_gen_regaddr {
-	u8 space_id;	/* Address space ID */
-	u8 bit_width;	/* Register size in bits */
-	u8 bit_offset;	/* Register bit offset */
-	u8 access_size;	/* Access size */
-	u32 addrl;	/* Register address, low 32 bits */
-	u32 addrh;	/* Register address, high 32 bits */
+	/**
+	 * @space_id: address space ID
+	 *
+	 * See table "Operation Region Address Space Identifiers" in the ACPI
+	 * specification.
+	 */
+	u8 space_id;
+	/** @bit_width: size in bits of the register */
+	u8 bit_width;
+	/** @bit_offset: bit offset of the register */
+	u8 bit_offset;
+	/**
+	 * @access_size: access size
+	 *
+	 * * 0 - undefined
+	 * * 1 - byte access
+	 * * 2 - word (2 bytes) access
+	 * * 3 - Dword (4 bytes) access
+	 * * 4 - Qword (8 bytes) access
+	 *
+	 * See ACPI_ACCESS_SIZE_*_ACCESS macros.
+	 */
+	u8 access_size;
+	/** @addrl: register address, low 32 bits */
+	u32 addrl;
+	/** @addrh: register address, high 32 bits */
+	u32 addrh;
 };
 
 /* A maximum number of 32 ACPI tables ought to be enough for now */
@@ -80,20 +104,31 @@ struct acpi_rsdt {
 };
 
 /* XSDT (Extended System Description Table) */
-struct acpi_xsdt {
+struct __packed acpi_xsdt {
 	struct acpi_table_header header;
 	u64 entry[MAX_ACPI_TABLES];
 };
 
-/* HPET timers */
-struct __packed acpi_hpet {
+/**
+ * struct acpi_hpet: High Precision Event Timers (HETP)
+ *
+ * The structure is defined in the
+ * "IA-PC HPET (High Precision Event Timers) Specification", rev 1.0a, Oct 2004
+ */
+struct acpi_hpet {
+	/** @header: table header */
 	struct acpi_table_header header;
+	/** @id hardware ID of Event Timer Block */
 	u32 id;
+	/** @addr: address of Event Timer Block */
 	struct acpi_gen_regaddr addr;
+	/** @number: HPET sequence number */
 	u8 number;
+	/** @min_tick: minimum clock ticks without lost interrupts */
 	u16 min_tick;
+	/** @attributes: page protection and OEM atttribute */
 	u8 attributes;
-};
+} __packed;
 
 struct __packed acpi_tpm2 {
 	struct acpi_table_header header;
@@ -228,10 +263,8 @@ struct __packed acpi_fadt {
 	u8 reset_value;
 	u16 arm_boot_arch;
 	u8 minor_revision;
-	u32 x_firmware_ctl_l;
-	u32 x_firmware_ctl_h;
-	u32 x_dsdt_l;
-	u32 x_dsdt_h;
+	u64 x_firmware_ctrl;
+	u64 x_dsdt;
 	struct acpi_gen_regaddr x_pm1a_evt_blk;
 	struct acpi_gen_regaddr x_pm1b_evt_blk;
 	struct acpi_gen_regaddr x_pm1a_cnt_blk;
@@ -366,7 +399,7 @@ enum {
  * This holds information about the Generic Interrupt Controller (GIC) CPU
  * interface. See ACPI Spec v6.3 section 5.2.12.14
  */
-struct __packed acpi_madr_gicc {
+struct acpi_madr_gicc {
 	u8 type;
 	u8 length;
 	u16 reserved;
@@ -385,7 +418,7 @@ struct __packed acpi_madr_gicc {
 	u8 efficiency;
 	u8 reserved2;
 	u16 spi_overflow_irq;
-};
+} __packed;
 
 /**
  * struct __packed acpi_madr_gicc - GIC distributor (type 0xc)
@@ -393,7 +426,7 @@ struct __packed acpi_madr_gicc {
  * This holds information about the Generic Interrupt Controller (GIC)
  * Distributor interface. See ACPI Spec v6.3 section 5.2.12.15
  */
-struct __packed acpi_madr_gicd {
+struct acpi_madr_gicd {
 	u8 type;
 	u8 length;
 	u16 reserved;
@@ -402,7 +435,7 @@ struct __packed acpi_madr_gicd {
 	u32 reserved2;
 	u8 gic_version;
 	u8 reserved3[3];
-};
+} __packed;
 
 /* MCFG (PCI Express MMIO config space BAR description table) */
 struct acpi_mcfg {
@@ -655,7 +688,7 @@ struct __packed acpi_spcr {
  *
  * See ACPI Spec v6.3 section 5.2.24 for details
  */
-struct __packed acpi_gtdt {
+struct acpi_gtdt {
 	struct acpi_table_header header;
 	u64 cnt_ctrl_base;
 	u32 reserved0;
@@ -672,7 +705,7 @@ struct __packed acpi_gtdt {
 	u32 plat_timer_offset;
 	u32 virt_el2_gsiv;
 	u32 virt_el2_flags;
-};
+} __packed;
 
 /**
  * struct acpi_bgrt -  Boot Graphics Resource Table (BGRT)
@@ -682,7 +715,7 @@ struct __packed acpi_gtdt {
  *
  * See ACPI Spec v6.3 section 5.2.22 for details
  */
-struct __packed acpi_bgrt {
+struct acpi_bgrt {
 	struct acpi_table_header header;
 	u16 version;
 	u8 status;
@@ -690,7 +723,7 @@ struct __packed acpi_bgrt {
 	u64 addr;
 	u32 offset_x;
 	u32 offset_y;
-};
+} __packed;
 
 /* Types for PPTT */
 #define ACPI_PPTT_TYPE_PROC		0
@@ -711,22 +744,22 @@ struct __packed acpi_bgrt {
  *
  * See ACPI Spec v6.3 section 5.2.29 for details
  */
-struct __packed acpi_pptt_header {
+struct acpi_pptt_header {
 	u8 type;	/* ACPI_PPTT_TYPE_... */
 	u8 length;
 	u16 reserved;
-};
+} __packed;
 
 /**
  * struct acpi_pptt_proc - a processor as described by PPTT
  */
-struct __packed acpi_pptt_proc {
+struct acpi_pptt_proc {
 	struct acpi_pptt_header hdr;
 	u32 flags;
 	u32 parent;
 	u32 proc_id;
 	u32 num_resources;
-};
+} __packed;
 
 /* Cache flags for acpi_pptt_cache */
 #define ACPI_PPTT_SIZE_VALID		BIT(0)
@@ -753,7 +786,7 @@ struct __packed acpi_pptt_proc {
 /**
  * struct acpi_pptt_cache - a cache as described by PPTT
  */
-struct __packed acpi_pptt_cache {
+struct acpi_pptt_cache {
 	struct acpi_pptt_header hdr;
 	u32 flags;
 	u32 next_cache_level;
@@ -762,7 +795,7 @@ struct __packed acpi_pptt_cache {
 	u8 assoc;
 	u8 attributes;
 	u16 line_size;
-};
+} __packed;
 
 /* Tables defined/reserved by ACPI and generated by U-Boot */
 enum acpi_tables {
@@ -831,16 +864,6 @@ void acpi_create_dbg2(struct acpi_dbg2_header *dbg2,
 		      const char *device_path);
 
 /**
- * acpi_fill_header() - Set up a new table header
- *
- * This sets all fields except length, revision, checksum and aslc_revision
- *
- * @header: ACPI header to update
- * @signature: Table signature to use (4 characters)
- */
-void acpi_fill_header(struct acpi_table_header *header, char *signature);
-
-/**
  * acpi_align() - Align the ACPI output pointer to a 16-byte boundary
  *
  * @ctx: ACPI context
@@ -883,6 +906,13 @@ void acpi_inc_align(struct acpi_ctx *ctx, uint amount);
  */
 int acpi_add_table(struct acpi_ctx *ctx, void *table);
 
+static inline int acpi_add_fadt(struct acpi_ctx *ctx, struct acpi_fadt *fadt)
+{
+	acpi_add_table(ctx, fadt);
+	acpi_inc(ctx, sizeof(struct acpi_fadt));
+	return 0;
+}
+
 /**
  * acpi_write_rsdp() - Write out an RSDP indicating where the ACPI tables are
  *
@@ -914,6 +944,15 @@ void acpi_fill_header(struct acpi_table_header *header, char *signature);
 int acpi_fill_csrt(struct acpi_ctx *ctx);
 
 /**
+ * acpi_get_rsdp_addr() - get ACPI RSDP table address
+ *
+ * This routine returns the ACPI RSDP table address in the system memory.
+ *
+ * @return:	ACPI RSDP table address
+ */
+ulong acpi_get_rsdp_addr(void);
+
+/**
  * write_acpi_tables() - Write out the ACPI tables
  *
  * This writes all ACPI tables to the given address
@@ -922,6 +961,14 @@ int acpi_fill_csrt(struct acpi_ctx *ctx);
  * @return address of end of tables, where the next tables can be written
  */
 ulong write_acpi_tables(ulong start);
+
+/**
+ * acpi_find_table() - Look up an ACPI table
+ *
+ * @sig: Signature of table (4 characters, upper case)
+ * Return: pointer to table header, or NULL if not found
+ */
+struct acpi_table_header *acpi_find_table(const char *sig);
 
 #endif /* !__ACPI__*/
 

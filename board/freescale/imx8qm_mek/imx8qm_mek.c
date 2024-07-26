@@ -14,7 +14,7 @@
 #include <asm/io.h>
 #include <asm/gpio.h>
 #include <asm/arch/clock.h>
-#include <asm/arch/sci/sci.h>
+#include <firmware/imx/sci/sci.h>
 #include <asm/arch/imx8-pins.h>
 #include <asm/arch/iomux.h>
 #include <asm/arch/sys_proto.h>
@@ -100,14 +100,6 @@ int board_init(void)
 	board_gpio_init();
 
 	return 0;
-}
-
-/*
- * Board specific reset that is system reset.
- */
-void reset_cpu(void)
-{
-	/* TODO */
 }
 
 #ifdef CONFIG_OF_BOARD_SETUP

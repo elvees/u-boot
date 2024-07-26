@@ -4,7 +4,7 @@
  *
  * Common bootmode functions for omap based boards
  *
- * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
+ * Copyright (C) 2011, Texas Instruments, Incorporated - https://www.ti.com/
  */
 
 #include <common.h>
@@ -74,23 +74,6 @@ void save_omap_boot_params(void)
 	 */
 	if (boot_device == BOOT_DEVICE_QSPI_4)
 		boot_device = BOOT_DEVICE_SPI;
-#endif
-#ifdef CONFIG_TI816X
-	/*
-	 * On PG2.0 and later TI816x the values we get when booting are not the
-	 * same as on PG1.0, which is what the defines are based on.  Update
-	 * them as needed.
-	 */
-	if (get_cpu_rev() != 1) {
-		if (boot_device == 0x05) {
-			omap_boot_params->boot_device = BOOT_DEVICE_NAND;
-			boot_device = BOOT_DEVICE_NAND;
-		}
-		if (boot_device == 0x08) {
-			omap_boot_params->boot_device = BOOT_DEVICE_MMC1;
-			boot_device = BOOT_DEVICE_MMC1;
-		}
-	}
 #endif
 	/*
 	 * When booting from peripheral booting, the boot device is not usable
@@ -183,8 +166,7 @@ void save_omap_boot_params(void)
 
 	gd->arch.omap_boot_mode = boot_mode;
 
-#if !defined(CONFIG_TI816X) && \
-    !defined(CONFIG_AM33XX) && !defined(CONFIG_AM43XX)
+#if !defined(CONFIG_AM33XX) && !defined(CONFIG_AM43XX)
 
 	/* CH flags */
 
@@ -208,7 +190,7 @@ int load_firmware(char *name_fw, u32 *loadaddr)
 	struct udevice *fsdev;
 	int size = 0;
 
-	if (!IS_ENABLED(CONFIG_FS_LOADER))
+	if (!CONFIG_IS_ENABLED(FS_LOADER))
 		return 0;
 
 	if (!*loadaddr)
@@ -324,13 +306,6 @@ void __noreturn jump_to_image_no_args(struct spl_image_info *spl_image)
 	debug("image entry point: 0x%lX\n", spl_image->entry_point);
 	/* Pass the saved boot_params from rom code */
 	image_entry((u32 *)boot_params);
-}
-#endif
-
-#ifdef CONFIG_SCSI_AHCI_PLAT
-void arch_preboot_os(void)
-{
-	ahci_reset((void __iomem *)DWC_AHSATA_BASE);
 }
 #endif
 

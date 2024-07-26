@@ -7,7 +7,6 @@
  * Copyright (C) 2015 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <image.h>
 #include <init.h>
@@ -24,9 +23,8 @@
 #include <asm/arch/sys_proto.h>
 #include <asm/gpio.h>
 #include <asm/arch/gpio.h>
-#include <asm/arch/rmobile.h>
+#include <asm/arch/renesas.h>
 #include <asm/arch/rcar-mstp.h>
-#include <asm/arch/sh_sdhi.h>
 #include <i2c.h>
 #include <mmc.h>
 
@@ -67,38 +65,29 @@ int board_init(void)
 	return 0;
 }
 
-#define RST_BASE	0xE6160000
-#define RST_CA57RESCNT	(RST_BASE + 0x40)
-#define RST_CA53RESCNT	(RST_BASE + 0x44)
-#define RST_RSTOUTCR	(RST_BASE + 0x58)
-#define RST_CODE	0xA5A5000F
-
+#if CONFIG_IS_ENABLED(SYS_I2C_LEGACY) && defined(CONFIG_SYS_I2C_SH)
 void reset_cpu(void)
 {
-#if CONFIG_IS_ENABLED(SYS_I2C_LEGACY) && defined(CONFIG_SYS_I2C_SH)
 	i2c_reg_write(CONFIG_SYS_I2C_POWERIC_ADDR, 0x20, 0x80);
-#else
-	/* only CA57 ? */
-	writel(RST_CODE, RST_CA57RESCNT);
-#endif
 }
+#endif
 
 #ifdef CONFIG_MULTI_DTB_FIT
 int board_fit_config_name_match(const char *name)
 {
 	/* PRR driver is not available yet */
-	u32 cpu_type = rmobile_get_cpu_type();
+	u32 cpu_type = renesas_get_cpu_type();
 
-	if ((cpu_type == RMOBILE_CPU_TYPE_R8A7795) &&
-	    !strcmp(name, "r8a77950-salvator-x-u-boot"))
+	if ((cpu_type == RENESAS_CPU_TYPE_R8A7795) &&
+	    !strcmp(name, "r8a77951-salvator-x"))
 		return 0;
 
-	if ((cpu_type == RMOBILE_CPU_TYPE_R8A7796) &&
-	    !strcmp(name, "r8a77960-salvator-x-u-boot"))
+	if ((cpu_type == RENESAS_CPU_TYPE_R8A7796) &&
+	    !strcmp(name, "r8a77960-salvator-x"))
 		return 0;
 
-	if ((cpu_type == RMOBILE_CPU_TYPE_R8A77965) &&
-	    !strcmp(name, "r8a77965-salvator-x-u-boot"))
+	if ((cpu_type == RENESAS_CPU_TYPE_R8A77965) &&
+	    !strcmp(name, "r8a77965-salvator-x"))
 		return 0;
 
 	return -1;

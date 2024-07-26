@@ -7,10 +7,8 @@
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
 
 obj-y	+= board.o
-obj-y	+= clock.o
 obj-y	+= cpu_info.o
 obj-y	+= dram_helpers.o
-obj-y	+= pinmux.o
 obj-$(CONFIG_SUN6I_PRCM)	+= prcm.o
 obj-$(CONFIG_AXP_PMIC_BUS)	+= pmic_bus.o
 obj-$(CONFIG_MACH_SUNIV)	+= clock_sun6i.o
@@ -26,11 +24,13 @@ obj-$(CONFIG_MACH_SUN8I)	+= clock_sun6i.o
 endif
 obj-$(CONFIG_MACH_SUN9I)	+= clock_sun9i.o gtbus_sun9i.o
 obj-$(CONFIG_SUN50I_GEN_H6)	+= clock_sun50i_h6.o
+obj-$(CONFIG_SUNXI_GEN_NCAT2)	+= clock_sun50i_h6.o
 ifndef CONFIG_ARM64
 obj-y	+= timer.o
 endif
 
 ifdef CONFIG_SPL_BUILD
+obj-y				+= clock.o
 obj-$(CONFIG_MACH_SUNIV)	+= dram_suniv.o
 obj-$(CONFIG_DRAM_SUN4I)	+= dram_sun4i.o
 obj-$(CONFIG_DRAM_SUN6I)	+= dram_sun6i.o

@@ -29,25 +29,13 @@
 #include <fdt_support.h>
 #include "igep00x0.h"
 
-static const struct ns16550_plat igep_serial = {
-	.base = OMAP34XX_UART3,
-	.reg_shift = 2,
-	.clock = V_NS16550_CLK,
-	.fcr = UART_FCR_DEFVAL,
-};
-
-U_BOOT_DRVINFO(igep_uart) = {
-	"ns16550_serial",
-	&igep_serial
-};
-
 /*
  * Routine: get_board_revision
  * Description: GPIO_28 and GPIO_129 are used to read board and revision from
  * IGEP00x0 boards. First of all, it is necessary to reset USB transceiver from
  * IGEP0030 in order to read GPIO_IGEP00X0_BOARD_DETECTION correctly, because
  * this functionality is shared by USB HOST.
- * Once USB reset is applied, U-boot configures these pins as input pullup to
+ * Once USB reset is applied, U-Boot configures these pins as input pullup to
  * detect board and revision:
  * IGEP0020-RF = 0b00
  * IGEP0020-RC = 0b01

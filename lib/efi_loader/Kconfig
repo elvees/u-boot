@@ -32,14 +32,22 @@ config EFI_LOADER
 
 if EFI_LOADER
 
-config CMD_BOOTEFI_BOOTMGR
+config EFI_BINARY_EXEC
+	bool "Execute UEFI binary"
+	default y
+	help
+	  Select this option if you want to execute the UEFI binary after
+	  loading it with U-Boot load commands or other methods.
+	  You may enable CMD_BOOTEFI_BINARY so that you can use bootefi
+	  command to do that.
+
+config EFI_BOOTMGR
 	bool "UEFI Boot Manager"
 	default y
-	select BOOTMETH_GLOBAL if BOOTSTD
 	help
 	  Select this option if you want to select the UEFI binary to be booted
-	  via UEFI variables Boot####, BootOrder, and BootNext. This enables the
-	  'bootefi bootmgr' command.
+	  via UEFI variables Boot####, BootOrder, and BootNext. You should also
+	  normally enable CMD_BOOTEFI_BOOTMGR so that the command is available.
 
 choice
 	prompt "Store for non-volatile UEFI variables"
@@ -54,13 +62,66 @@ config EFI_VARIABLE_FILE_STORE
 	  Select this option if you want non-volatile UEFI variables to be
 	  stored as file /ubootefi.var on the EFI system partition.
 
+config EFI_RT_VOLATILE_STORE
+	bool "Allow variable runtime services in volatile storage (e.g RAM)"
+	depends on EFI_VARIABLE_FILE_STORE
+	help
+	  When EFI variables are stored on file we don't allow SetVariableRT,
+	  since the OS doesn't know how to write that file. At he same time
+	  we copy runtime variables in DRAM and support GetVariableRT
+
+	  Enable this option to allow SetVariableRT on the RAM backend of
+	  the EFI variable storage. The OS will be responsible for syncing
+	  the RAM contents to the file, otherwise any changes made during
+	  runtime won't persist reboots.
+	  Authenticated variables are not supported. Note that this will
+	  violate the EFI spec since writing auth variables will return
+	  EFI_INVALID_PARAMETER
+
 config EFI_MM_COMM_TEE
-	bool "UEFI variables storage service via OP-TEE"
+	bool "UEFI variables storage service via the trusted world"
 	depends on OPTEE
 	help
+	  Allowing access to the MM SP services (SPs such as  StandAlonneMM, smm-gateway).
+	  When using the u-boot OP-TEE driver, StandAlonneMM is supported.
+	  When using the u-boot FF-A  driver any MM SP is supported.
+
 	  If OP-TEE is present and running StandAloneMM, dispatch all UEFI
 	  variable related operations to that. The application will verify,
 	  authenticate and store the variables on an RPMB.
+
+	  When ARM_FFA_TRANSPORT is used, dispatch all UEFI variable related
+	  operations to the MM SP running in the secure world.
+	  A door bell mechanism is used to notify the SP when there is data in the shared
+	  MM buffer. The data is copied by u-boot to the shared buffer before issuing
+	  the door bell event.
+
+config FFA_SHARED_MM_BUF_SIZE
+	int "Memory size of the shared MM communication buffer"
+	depends on EFI_MM_COMM_TEE && ARM_FFA_TRANSPORT
+	help
+	  This defines the size in bytes of the memory area reserved for the shared
+	  buffer used for communication between the MM feature in U-Boot and
+	  the MM SP in secure world.
+	  The size of the memory region must be a multiple of the size of the maximum
+	  translation granule size that is specified in the ID_AA64MMFR0_EL1 System register.
+	  It is assumed that the MM SP knows the size of the shared MM communication buffer.
+
+config FFA_SHARED_MM_BUF_OFFSET
+	int "Data offset in the shared MM communication buffer"
+	depends on EFI_MM_COMM_TEE && ARM_FFA_TRANSPORT
+	help
+	  This defines the offset in bytes of the data read or written to in the shared
+	  buffer by the MM SP.
+
+config FFA_SHARED_MM_BUF_ADDR
+	hex "Define the address of the shared MM communication buffer"
+	depends on EFI_MM_COMM_TEE && ARM_FFA_TRANSPORT
+	help
+	  This defines the address of the shared MM communication buffer
+	  used for communication between the MM feature in U-Boot and
+	  the MM SP in secure world.
+	  It is assumed that the MM SP knows the address of the shared MM communication buffer.
 
 config EFI_VARIABLE_NO_STORE
 	bool "Don't persist non-volatile UEFI variables"
@@ -84,7 +145,7 @@ if EFI_VARIABLES_PRESEED
 
 config EFI_VAR_SEED_FILE
 	string "File with initial values of non-volatile UEFI variables"
-	default ubootefi.var
+	default "ubootefi.var"
 	help
 	  File with initial values of non-volatile UEFI variables. The file must
 	  be in the same format as the storage in the EFI system partition. The
@@ -96,17 +157,20 @@ endif
 
 config EFI_VAR_BUF_SIZE
 	int "Memory size of the UEFI variable store"
-	default 16384
+	default 131072
 	range 4096 2147483647
 	help
 	  This defines the size in bytes of the memory area reserved for keeping
 	  UEFI variables.
 
-	  When using StandAloneMM (CONFIG_EFI_MM_COMM_TEE=y) this value should
-	  match the value of PcdFlashNvStorageVariableSize used to compile the
-	  StandAloneMM module.
+	  When using StandAloneMM (CONFIG_EFI_MM_COMM_TEE=y) is used the
+	  available size for storing variables is defined in
+	  PcdFlashNvStorageVariableSize.
+	  That value is probed at runtime from U-Boot. In that case,
+	  EFI_VAR_BUF_SIZE represents the memory U-Boot reserves to present
+	  runtime variables to the OS.
 
-	  Minimum 4096, default 16384.
+	  Minimum 4096, default 131072
 
 config EFI_GET_TIME
 	bool "GetTime() runtime service"
@@ -234,6 +298,14 @@ config EFI_CAPSULE_MAX
 	  Select the max capsule index value used for capsule report
 	  variables. This value is used to create CapsuleMax variable.
 
+config EFI_CAPSULE_ESL_FILE
+	string "Path to the EFI Signature List File"
+	depends on EFI_CAPSULE_AUTHENTICATE
+	help
+	  Provides the path to the EFI Signature List file which will
+	  be embedded in the platform's device tree and used for
+	  capsule authentication at the time of capsule update.
+
 config EFI_DEVICE_PATH_TO_TEXT
 	bool "Device path to text protocol"
 	default y
@@ -309,7 +381,7 @@ config EFI_HAVE_RUNTIME_RESET
 	bool
 	default y
 	depends on ARCH_BCM283X || FSL_LAYERSCAPE || PSCI_RESET || \
-		   SANDBOX || SYSRESET_X86
+		   SANDBOX || SYSRESET_SBI || SYSRESET_X86
 
 config EFI_GRUB_ARM32_WORKAROUND
 	bool "Workaround for GRUB on 32bit ARM"
@@ -333,8 +405,6 @@ config EFI_TCG2_PROTOCOL
 	bool "EFI_TCG2_PROTOCOL support"
 	default y
 	depends on TPM_V2
-	# Sandbox TPM currently fails on GetCapabilities needed for TCG2
-	depends on !SANDBOX
 	select SHA1
 	select SHA256
 	select SHA384
@@ -432,5 +502,14 @@ config EFI_RISCV_BOOT_PROTOCOL
 	  to the next boot stage. It should be enabled as it is meant to
 	  replace the transfer via the device-tree. The latter is not
 	  possible on systems using ACPI.
+
+config EFI_HTTP_BOOT
+	bool "EFI HTTP Boot support"
+	select CMD_DNS
+	select CMD_WGET
+	select BLKMAP
+	help
+	  Enabling this option adds EFI HTTP Boot support. It allows to
+	  directly boot from network.
 
 endif

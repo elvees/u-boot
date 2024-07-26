@@ -12,6 +12,7 @@
 #include <asm/system.h>
 #include <linux/linkage.h>
 
+#ifndef CONFIG_CMO_BY_VA_ONLY
 /*
  * void __asm_dcache_level(level)
  *
@@ -19,6 +20,7 @@
  *
  * x0: cache level
  * x1: 0 clean & invalidate, 1 invalidate only
+ * x16: FEAT_CCIDX
  * x2~x9: clobbered
  */
 .pushsection .text.__asm_dcache_level, "ax"
@@ -28,8 +30,14 @@ ENTRY(__asm_dcache_level)
 	isb				/* sync change of cssidr_el1 */
 	mrs	x6, ccsidr_el1		/* read the new cssidr_el1 */
 	ubfx	x2, x6,  #0,  #3	/* x2 <- log2(cache line size)-4 */
+	cbz	x16, 3f			/* check for FEAT_CCIDX */
+	ubfx	x3, x6,  #3, #21	/* x3 <- number of cache ways - 1 */
+	ubfx	x4, x6, #32, #24	/* x4 <- number of cache sets - 1 */
+	b	4f
+3:
 	ubfx	x3, x6,  #3, #10	/* x3 <- number of cache ways - 1 */
 	ubfx	x4, x6, #13, #15	/* x4 <- number of cache sets - 1 */
+4:
 	add	x2, x2, #4		/* x2 <- log2(cache line size) */
 	clz	w5, w3			/* bit position of #ways */
 	/* x12 <- cache level << 1 */
@@ -73,6 +81,8 @@ ENTRY(__asm_dcache_all)
 	ubfx	x11, x10, #24, #3	/* x11 <- loc */
 	cbz	x11, finished		/* if loc is 0, exit */
 	mov	x15, lr
+	mrs	x16, s3_0_c0_c7_2	/* read value of id_aa64mmfr2_el1*/
+	ubfx	x16, x16, #20, #4	/* save FEAT_CCIDX identifier in x16 */
 	mov	x0, #0			/* start flush at cache level 0 */
 	/* x0  <- cache level */
 	/* x10 <- clidr_el1 */
@@ -115,6 +125,41 @@ ENTRY(__asm_invalidate_dcache_all)
 	b	__asm_dcache_all
 ENDPROC(__asm_invalidate_dcache_all)
 .popsection
+
+.pushsection .text.__asm_flush_l3_dcache, "ax"
+WEAK(__asm_flush_l3_dcache)
+	mov	x0, #0			/* return status as success */
+	ret
+ENDPROC(__asm_flush_l3_dcache)
+.popsection
+
+.pushsection .text.__asm_invalidate_l3_icache, "ax"
+WEAK(__asm_invalidate_l3_icache)
+	mov	x0, #0			/* return status as success */
+	ret
+ENDPROC(__asm_invalidate_l3_icache)
+.popsection
+
+#else	/* CONFIG_CMO_BY_VA */
+
+/*
+ * Define these so that they actively clash with in implementation
+ * accidentally selecting CONFIG_CMO_BY_VA
+ */
+
+.pushsection .text.__asm_invalidate_l3_icache, "ax"
+ENTRY(__asm_invalidate_l3_icache)
+	mov	x0, xzr
+	ret
+ENDPROC(__asm_invalidate_l3_icache)
+.popsection
+.pushsection .text.__asm_flush_l3_dcache, "ax"
+ENTRY(__asm_flush_l3_dcache)
+	mov	x0, xzr
+	ret
+ENDPROC(__asm_flush_l3_dcache)
+.popsection
+#endif	/* CONFIG_CMO_BY_VA */
 
 /*
  * void __asm_flush_dcache_range(start, end)
@@ -187,20 +232,6 @@ WEAK(__asm_invalidate_l3_dcache)
 	mov	x0, #0			/* return status as success */
 	ret
 ENDPROC(__asm_invalidate_l3_dcache)
-.popsection
-
-.pushsection .text.__asm_flush_l3_dcache, "ax"
-WEAK(__asm_flush_l3_dcache)
-	mov	x0, #0			/* return status as success */
-	ret
-ENDPROC(__asm_flush_l3_dcache)
-.popsection
-
-.pushsection .text.__asm_invalidate_l3_icache, "ax"
-WEAK(__asm_invalidate_l3_icache)
-	mov	x0, #0			/* return status as success */
-	ret
-ENDPROC(__asm_invalidate_l3_icache)
 .popsection
 
 /*

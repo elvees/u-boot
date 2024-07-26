@@ -98,6 +98,23 @@ int ut_check_skipline(struct unit_test_state *uts);
 int ut_check_skip_to_line(struct unit_test_state *uts, const char *fmt, ...);
 
 /**
+ * ut_check_skip_to_linen() - skip output until a partial line is found
+ *
+ * This creates a string and then checks it against the following lines of
+ * console output obtained with console_record_readline() until it is found.
+ * Only the characters up to the length of the string are checked, so the line
+ * may extend further
+ *
+ * After the function returns, uts->expect_str holds the expected string and
+ * uts->actual_str holds the actual string read from the console.
+ *
+ * @uts: Test state
+ * @fmt: printf() format string to look for, followed by args
+ * Return: 0 if OK, -ENOENT if not found, other value on error
+ */
+int ut_check_skip_to_linen(struct unit_test_state *uts, const char *fmt, ...);
+
+/**
  * ut_check_console_end() - Check there is no more console output
  *
  * After the function returns, uts->actual_str holds the actual string read
@@ -125,23 +142,32 @@ int ut_check_console_dump(struct unit_test_state *uts, int total_bytes);
 		 fmt, ##args)
 
 /* Assert that a condition is non-zero */
-#define ut_assert(cond)							\
+#define ut_assert(cond) ({						\
+	int __ret = 0;							\
+									\
 	if (!(cond)) {							\
 		ut_fail(uts, __FILE__, __LINE__, __func__, #cond);	\
 		return CMD_RET_FAILURE;					\
-	}
+	}								\
+	__ret;								\
+})
 
 /* Assert that a condition is non-zero, with printf() string */
-#define ut_assertf(cond, fmt, args...)					\
+#define ut_assertf(cond, fmt, args...) ({				\
+	int __ret = 0;							\
+									\
 	if (!(cond)) {							\
 		ut_failf(uts, __FILE__, __LINE__, __func__, #cond,	\
 			 fmt, ##args);					\
 		return CMD_RET_FAILURE;					\
-	}
+	}								\
+	__ret;								\
+})
 
 /* Assert that two int expressions are equal */
-#define ut_asserteq(expr1, expr2) {					\
+#define ut_asserteq(expr1, expr2) ({					\
 	unsigned int _val1 = (expr1), _val2 = (expr2);			\
+	int __ret = 0;							\
 									\
 	if (_val1 != _val2) {						\
 		ut_failf(uts, __FILE__, __LINE__, __func__,		\
@@ -150,11 +176,13 @@ int ut_check_console_dump(struct unit_test_state *uts, int total_bytes);
 			 _val1, _val1, _val2, _val2);			\
 		return CMD_RET_FAILURE;					\
 	}								\
-}
+	__ret;								\
+})
 
 /* Assert that two 64 int expressions are equal */
-#define ut_asserteq_64(expr1, expr2) {					\
+#define ut_asserteq_64(expr1, expr2) ({					\
 	u64 _val1 = (expr1), _val2 = (expr2);				\
+	int __ret = 0;							\
 									\
 	if (_val1 != _val2) {						\
 		ut_failf(uts, __FILE__, __LINE__, __func__,		\
@@ -166,11 +194,13 @@ int ut_check_console_dump(struct unit_test_state *uts, int total_bytes);
 			 (unsigned long long)_val2);			\
 		return CMD_RET_FAILURE;					\
 	}								\
-}
+	__ret;								\
+})
 
 /* Assert that two string expressions are equal */
-#define ut_asserteq_str(expr1, expr2) {					\
+#define ut_asserteq_str(expr1, expr2) ({				\
 	const char *_val1 = (expr1), *_val2 = (expr2);			\
+	int __ret = 0;							\
 									\
 	if (strcmp(_val1, _val2)) {					\
 		ut_failf(uts, __FILE__, __LINE__, __func__,		\
@@ -178,15 +208,17 @@ int ut_check_console_dump(struct unit_test_state *uts, int total_bytes);
 			 "Expected \"%s\", got \"%s\"", _val1, _val2);	\
 		return CMD_RET_FAILURE;					\
 	}								\
-}
+	__ret;								\
+})
 
 /*
  * Assert that two string expressions are equal, up to length of the
  * first
  */
-#define ut_asserteq_strn(expr1, expr2) {				\
+#define ut_asserteq_strn(expr1, expr2) ({				\
 	const char *_val1 = (expr1), *_val2 = (expr2);			\
 	int _len = strlen(_val1);					\
+	int __ret = 0;							\
 									\
 	if (memcmp(_val1, _val2, _len)) {				\
 		ut_failf(uts, __FILE__, __LINE__, __func__,		\
@@ -195,12 +227,14 @@ int ut_check_console_dump(struct unit_test_state *uts, int total_bytes);
 			 _len, _val1, _len, _val2);			\
 		return CMD_RET_FAILURE;					\
 	}								\
-}
+	__ret;								\
+})
 
 /* Assert that two memory areas are equal */
-#define ut_asserteq_mem(expr1, expr2, len) {				\
+#define ut_asserteq_mem(expr1, expr2, len) ({				\
 	const u8 *_val1 = (u8 *)(expr1), *_val2 = (u8 *)(expr2);	\
 	const uint __len = len;						\
+	int __ret = 0;							\
 									\
 	if (memcmp(_val1, _val2, __len)) {				\
 		char __buf1[64 + 1] = "\0";				\
@@ -213,11 +247,13 @@ int ut_check_console_dump(struct unit_test_state *uts, int total_bytes);
 			 __buf1, __buf2);				\
 		return CMD_RET_FAILURE;					\
 	}								\
-}
+	__ret;								\
+})
 
 /* Assert that two pointers are equal */
-#define ut_asserteq_ptr(expr1, expr2) {					\
+#define ut_asserteq_ptr(expr1, expr2) ({				\
 	const void *_val1 = (expr1), *_val2 = (expr2);			\
+	int __ret = 0;							\
 									\
 	if (_val1 != _val2) {						\
 		ut_failf(uts, __FILE__, __LINE__, __func__,		\
@@ -225,12 +261,14 @@ int ut_check_console_dump(struct unit_test_state *uts, int total_bytes);
 			 "Expected %p, got %p", _val1, _val2);		\
 		return CMD_RET_FAILURE;					\
 	}								\
-}
+	__ret;								\
+})
 
 /* Assert that two addresses (converted from pointers) are equal */
-#define ut_asserteq_addr(expr1, expr2) {				\
+#define ut_asserteq_addr(expr1, expr2) ({				\
 	ulong _val1 = map_to_sysmem(expr1);				\
 	ulong _val2 = map_to_sysmem(expr2);				\
+	int __ret = 0;							\
 									\
 	if (_val1 != _val2) {						\
 		ut_failf(uts, __FILE__, __LINE__, __func__,		\
@@ -238,35 +276,41 @@ int ut_check_console_dump(struct unit_test_state *uts, int total_bytes);
 			 "Expected %lx, got %lx", _val1, _val2);	\
 		return CMD_RET_FAILURE;					\
 	}								\
-}
+	__ret;								\
+})
 
 /* Assert that a pointer is NULL */
-#define ut_assertnull(expr) {					\
+#define ut_assertnull(expr) ({						\
 	const void *_val = (expr);					\
+	int __ret = 0;							\
 									\
-	if (_val) {						\
+	if (_val) {							\
 		ut_failf(uts, __FILE__, __LINE__, __func__,		\
 			 #expr " != NULL",				\
 			 "Expected NULL, got %p", _val);		\
 		return CMD_RET_FAILURE;					\
 	}								\
-}
+	__ret;								\
+})
 
 /* Assert that a pointer is not NULL */
-#define ut_assertnonnull(expr) {					\
+#define ut_assertnonnull(expr) ({					\
 	const void *_val = (expr);					\
+	int __ret = 0;							\
 									\
-	if (!_val) {						\
+	if (!_val) {							\
 		ut_failf(uts, __FILE__, __LINE__, __func__,		\
 			 #expr " = NULL",				\
 			 "Expected non-null, got NULL");		\
 		return CMD_RET_FAILURE;					\
 	}								\
-}
+	__ret;								\
+})
 
 /* Assert that a pointer is not an error pointer */
-#define ut_assertok_ptr(expr) {						\
+#define ut_assertok_ptr(expr) ({					\
 	const void *_val = (expr);					\
+	int __ret = 0;							\
 									\
 	if (IS_ERR(_val)) {						\
 		ut_failf(uts, __FILE__, __LINE__, __func__,		\
@@ -275,57 +319,93 @@ int ut_check_console_dump(struct unit_test_state *uts, int total_bytes);
 			 PTR_ERR(_val));				\
 		return CMD_RET_FAILURE;					\
 	}								\
-}
+	__ret;								\
+})
 
 /* Assert that an operation succeeds (returns 0) */
 #define ut_assertok(cond)	ut_asserteq(0, cond)
 
 /* Assert that the next console output line matches */
-#define ut_assert_nextline(fmt, args...)				\
+#define ut_assert_nextline(fmt, args...) ({				\
+	int __ret = 0;							\
+									\
 	if (ut_check_console_line(uts, fmt, ##args)) {			\
 		ut_failf(uts, __FILE__, __LINE__, __func__,		\
 			 "console", "\nExpected '%s',\n     got '%s'",	\
 			 uts->expect_str, uts->actual_str);		\
 		return CMD_RET_FAILURE;					\
 	}								\
+	__ret;								\
+})
 
 /* Assert that the next console output line matches up to the length */
-#define ut_assert_nextlinen(fmt, args...)				\
+#define ut_assert_nextlinen(fmt, args...) ({				\
+	int __ret = 0;							\
+									\
 	if (ut_check_console_linen(uts, fmt, ##args)) {			\
 		ut_failf(uts, __FILE__, __LINE__, __func__,		\
 			 "console", "\nExpected '%s',\n     got '%s'",	\
 			 uts->expect_str, uts->actual_str);		\
 		return CMD_RET_FAILURE;					\
 	}								\
+	__ret;								\
+})
 
 /* Assert that there is a 'next' console output line, and skip it */
-#define ut_assert_skipline()						\
+#define ut_assert_skipline() ({						\
+	int __ret = 0;							\
+									\
 	if (ut_check_skipline(uts)) {					\
 		ut_failf(uts, __FILE__, __LINE__, __func__,		\
 			 "console", "\nExpected a line, got end");	\
 		return CMD_RET_FAILURE;					\
 	}								\
+	__ret;								\
+})
 
 /* Assert that a following console output line matches */
-#define ut_assert_skip_to_line(fmt, args...)				\
+#define ut_assert_skip_to_line(fmt, args...) ({				\
+	int __ret = 0;							\
+									\
 	if (ut_check_skip_to_line(uts, fmt, ##args)) {			\
 		ut_failf(uts, __FILE__, __LINE__, __func__,		\
 			 "console", "\nExpected '%s',\n     got to '%s'", \
 			 uts->expect_str, uts->actual_str);		\
 		return CMD_RET_FAILURE;					\
 	}								\
+	__ret;								\
+})
+
+/* Assert that a following console output line matches */
+#define ut_assert_skip_to_linen(fmt, args...) ({				\
+	int __ret = 0;							\
+									\
+	if (ut_check_skip_to_linen(uts, fmt, ##args)) {			\
+		ut_failf(uts, __FILE__, __LINE__, __func__,		\
+			 "console", "\nExpected '%s',\n     got to '%s'", \
+			 uts->expect_str, uts->actual_str);		\
+		return CMD_RET_FAILURE;					\
+	}								\
+	__ret;								\
+})
 
 /* Assert that there is no more console output */
-#define ut_assert_console_end()						\
+#define ut_assert_console_end() ({					\
+	int __ret = 0;							\
+									\
 	if (ut_check_console_end(uts)) {				\
 		ut_failf(uts, __FILE__, __LINE__, __func__,		\
 			 "console", "Expected no more output, got '%s'",\
 			 uts->actual_str);				\
 		return CMD_RET_FAILURE;					\
 	}								\
+	__ret;								\
+})
 
 /* Assert that the next lines are print_buffer() dump at an address */
-#define ut_assert_nextlines_are_dump(total_bytes)			\
+#define ut_assert_nextlines_are_dump(total_bytes) ({			\
+	int __ret = 0;							\
+									\
 	if (ut_check_console_dump(uts, total_bytes)) {			\
 		ut_failf(uts, __FILE__, __LINE__, __func__,		\
 			 "console",					\
@@ -333,6 +413,8 @@ int ut_check_console_dump(struct unit_test_state *uts, int total_bytes);
 			 total_bytes, uts->actual_str);			\
 		return CMD_RET_FAILURE;					\
 	}								\
+	__ret;								\
+})
 
 /* Assert that the next console output line is empty */
 #define ut_assert_nextline_empty()					\

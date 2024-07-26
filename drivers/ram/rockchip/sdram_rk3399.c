@@ -14,7 +14,6 @@
 #include <ram.h>
 #include <regmap.h>
 #include <syscon.h>
-#include <asm/io.h>
 #include <asm/arch-rockchip/clock.h>
 #include <asm/arch-rockchip/cru.h>
 #include <asm/arch-rockchip/grf_rk3399.h>
@@ -2749,6 +2748,8 @@ static u64 dram_detect_cap(struct dram_info *dram,
 	/* detect cs1 row */
 	sdram_detect_cs1_row(cap_info, params->base.dramtype);
 
+	sdram_detect_high_row(cap_info);
+
 	/* detect die bw */
 	sdram_detect_dbw(cap_info, params->base.dramtype);
 
@@ -3048,7 +3049,7 @@ static int conv_of_plat(struct udevice *dev)
 	struct dtd_rockchip_rk3399_dmc *dtplat = &plat->dtplat;
 	int ret;
 
-	ret = regmap_init_mem_plat(dev, dtplat->reg,
+	ret = regmap_init_mem_plat(dev, dtplat->reg, sizeof(dtplat->reg[0]),
 				   ARRAY_SIZE(dtplat->reg) / 2, &plat->map);
 	if (ret)
 		return ret;

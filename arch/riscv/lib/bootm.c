@@ -6,8 +6,8 @@
  * Rick Chen, Andes Technology Corporation <rick@andestech.com>
  */
 
-#include <common.h>
 #include <bootstage.h>
+#include <bootm.h>
 #include <command.h>
 #include <dm.h>
 #include <fdt_support.h>
@@ -42,7 +42,7 @@ static void announce_and_cleanup(int fake)
 #ifdef CONFIG_BOOTSTAGE_FDT
 	bootstage_fdt_add_report();
 #endif
-#ifdef CONFIG_BOOTSTAGE_REPORT
+#if CONFIG_IS_ENABLED(BOOTSTAGE_REPORT)
 	bootstage_report();
 #endif
 
@@ -106,9 +106,10 @@ static void boot_jump_linux(struct bootm_headers *images, int flag)
 	}
 }
 
-int do_bootm_linux(int flag, int argc, char *const argv[],
-		   struct bootm_headers *images)
+int do_bootm_linux(int flag, struct bootm_info *bmi)
 {
+	struct bootm_headers *images = bmi->images;
+
 	/* No need for those on RISC-V */
 	if (flag & BOOTM_STATE_OS_BD_T || flag & BOOTM_STATE_OS_CMDLINE)
 		return -1;
@@ -128,10 +129,9 @@ int do_bootm_linux(int flag, int argc, char *const argv[],
 	return 0;
 }
 
-int do_bootm_vxworks(int flag, int argc, char *const argv[],
-		     struct bootm_headers *images)
+int do_bootm_vxworks(int flag, struct bootm_info *bmi)
 {
-	return do_bootm_linux(flag, argc, argv, images);
+	return do_bootm_linux(flag, bmi);
 }
 
 static ulong get_sp(void)

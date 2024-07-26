@@ -10,7 +10,7 @@
  * TI OMAP5 AND DRA7XX common configuration settings
  *
  * For more details, please see the technical documents listed at
- * http://www.ti.com/product/omap5432
+ * https://www.ti.com/product/omap5432
  */
 
 #ifndef __CONFIG_TI_OMAP5_COMMON_H
@@ -39,8 +39,8 @@
 #define DFUARGS
 #endif
 
-#include <environment/ti/mmc.h>
-#include <environment/ti/nand.h>
+#include <env/ti/mmc.h>
+#include <env/ti/nand.h>
 
 #ifndef CONSOLEDEV
 #define CONSOLEDEV "ttyS2"

@@ -121,7 +121,7 @@ General Patch Submission Rules
    * For new features: a description of the feature and your implementation.
 
 * Additional comments which you don't want included in U-Boot's history can be
-  included below the first "---" in the message body.
+  included below the first "``---``" in the message body.
 
 * If your description gets too long, that's a strong indication that you should
   split up your patch.
@@ -253,7 +253,7 @@ to observe the following rules.
 
 * Please make sure to keep a "change log", i.e. a description of what you have
   changed compared to previous versions of this patch. This change log should
-  be added below the "---" line in the patch, which starts the "comment
+  be added below the "``---``" line in the patch, which starts the "comment
   section", i.e. which contains text that does not get included into the
   actual commit message.
   Note: it is *not* sufficient to provide a change log in some cover letter
@@ -363,7 +363,7 @@ A Custodian has additional privileges and can:
 
    * Awaiting Upstream
 
-   * Superseeded
+   * Superseded
 
    * Deferred
 
@@ -399,7 +399,7 @@ today. Not all states are used by all custodians.
   and has not merged yet to master, or has queued the patch up to be submitted
   to be merged, but has not yet.
 
-* Superseeded: Patches are marked as 'superseeded' when the poster submits a
+* Superseded: Patches are marked as 'superseded' when the poster submits a
   new version of these patches.
 
 * Deferred: Deferred usually means the patch depends on something else that

@@ -33,15 +33,30 @@
 
 	pci {
 		compatible = "pci-x86";
-		u-boot,dm-pre-reloc;
+		bootph-all;
 	};
 
 	serial: serial {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 		compatible = "coreboot-serial";
 	};
 
 	coreboot-fb {
+		bootph-some-ram;
 		compatible = "coreboot-fb";
+	};
+
+	bootstd {
+		compatible = "u-boot,boot-std";
+
+		theme {
+			font-size = <30>;
+			menu-inset = <3>;
+			menuitem-gap-y = <1>;
+		};
+	};
+
+	sysinfo {
+		compatible = "coreboot,sysinfo";
 	};
 };

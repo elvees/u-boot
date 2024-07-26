@@ -64,7 +64,7 @@ off_t os_lseek(int fd, off_t offset, int whence);
  * @fd:		File descriptor as returned by os_open()
  * Return:	file size or negative error code
  */
-int os_filesize(int fd);
+off_t os_filesize(int fd);
 
 /**
  * Access to the OS open() system call
@@ -97,6 +97,29 @@ int os_close(int fd);
  * Return:	0 for success, other for error
  */
 int os_unlink(const char *pathname);
+
+/** os_persistent_fname() - Find the path to a test file
+ *
+ * @buf: Buffer to hold path
+ * @maxsize: Maximum size of buffer
+ * @fname: Leaf filename to find
+ * Returns: 0 on success, -ENOENT if file is not found, -ENOSPC if the buffer is
+ * too small
+ */
+int os_persistent_file(char *buf, int maxsize, const char *fname);
+
+/**
+ * os_mktemp() - Create a temporary file
+ * @fname: The template to use for the file name. This must end with 6 Xs. It
+ *         will be modified to the opened filename on success.
+ * @size: The size of the file
+ *
+ * Create a temporary file using @fname as a template, unlink it, and truncate
+ * it to @size.
+ *
+ * Return: A file descriptor, or negative errno on error
+ */
+int os_mktemp(char *fname, off_t size);
 
 /**
  * os_exit() - access to the OS exit() system call

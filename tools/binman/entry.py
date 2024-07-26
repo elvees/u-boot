@@ -14,9 +14,9 @@ import time
 from binman import bintool
 from binman import elf
 from dtoc import fdt_util
-from patman import tools
-from patman.tools import to_hex, to_hex_size
-from patman import tout
+from u_boot_pylib import tools
+from u_boot_pylib.tools import to_hex, to_hex_size
+from u_boot_pylib import tout
 
 modules = {}
 
@@ -100,6 +100,14 @@ class Entry(object):
             appear in the map
         optional (bool): True if this entry contains an optional external blob
         overlap (bool): True if this entry overlaps with others
+        preserve (bool): True if this entry should be preserved when updating
+            firmware. This means that it will not be changed by the update.
+            This is just a signal: enforcement of this is up to the updater.
+            This flag does not automatically propagate down to child entries.
+        build_done (bool): Indicates that the entry data has been built and does
+            not need to be done again. This is only used with 'binman replace',
+            to stop sections from being rebuilt if their entries have not been
+            replaced
     """
     fake_dir = None
 
@@ -148,6 +156,9 @@ class Entry(object):
         self.overlap = False
         self.elf_base_sym = None
         self.offset_from_elf = None
+        self.preserve = False
+        self.build_done = False
+        self.no_write_symbols = False
 
     @staticmethod
     def FindEntryClass(etype, expanded):
@@ -310,6 +321,9 @@ class Entry(object):
         self.offset_from_elf = fdt_util.GetPhandleNameOffset(self._node,
                                                              'offset-from-elf')
 
+        self.preserve = fdt_util.GetBool(self._node, 'preserve')
+        self.no_write_symbols = fdt_util.GetBool(self._node, 'no-write-symbols')
+
     def GetDefaultFilename(self):
         return None
 
@@ -459,6 +473,9 @@ class Entry(object):
 
     def ObtainContents(self, skip_entry=None, fake_size=0):
         """Figure out the contents of an entry.
+
+        For missing blobs (where allow-missing is enabled), the contents are set
+        to b'' and self.missing is set to True.
 
         Args:
             skip_entry (Entry): Entry to skip when obtaining section contents
@@ -683,7 +700,7 @@ class Entry(object):
         Args:
           section: Section containing the entry
         """
-        if self.auto_write_symbols:
+        if self.auto_write_symbols and not self.no_write_symbols:
             # Check if we are writing symbols into an ELF file
             is_elf = self.GetDefaultFilename() == self.elf_fname
             elf.LookupAndWriteSymbols(self.elf_fname, self, section.GetImage(),
@@ -1006,6 +1023,7 @@ features to produce new behaviours.
         else:
             self.contents_size = self.pre_reset_size
         ok = self.ProcessContentsUpdate(data)
+        self.build_done = False
         self.Detail('WriteData: size=%x, ok=%s' % (len(data), ok))
         section_ok = self.section.WriteChildData(self)
         return ok and section_ok
@@ -1027,6 +1045,14 @@ features to produce new behaviours.
             True if the section could be updated successfully, False if the
                 data is such that the section could not update
         """
+        self.build_done = False
+        entry = self.section
+
+        # Now we must rebuild all sections above this one
+        while entry and entry != entry.section:
+            self.build_done = False
+            entry = entry.section
+
         return True
 
     def GetSiblingOrder(self):
@@ -1104,7 +1130,7 @@ features to produce new behaviours.
         If there are faked blobs, the entries are added to the list
 
         Args:
-            fake_blobs_list: List of Entry objects to be added to
+            faked_blobs_list: List of Entry objects to be added to
         """
         # This is meaningless for anything other than blobs
         pass
@@ -1288,10 +1314,6 @@ features to produce new behaviours.
         """
         data = b''
         for entry in entries:
-            # First get the input data and put it in a file. If not available,
-            # try later.
-            if not entry.ObtainContents(fake_size=fake_size):
-                return None, None, None
             data += entry.GetData()
         uniq = self.GetUniqueName()
         fname = tools.get_output_filename(f'{prefix}.{uniq}')
@@ -1349,3 +1371,14 @@ features to produce new behaviours.
         val = elf.GetSymbolOffset(entry.elf_fname, sym_name,
                                   entry.elf_base_sym)
         return val + offset
+
+    def mark_build_done(self):
+        """Mark an entry as already built"""
+        self.build_done = True
+        entries = self.GetEntries()
+        if entries:
+            for entry in entries.values():
+                entry.mark_build_done()
+
+    def UpdateSignatures(self, privatekey_fname, algo, input_fname):
+        self.Raise('Updating signatures is not supported with this entry type')

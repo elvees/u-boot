@@ -324,7 +324,7 @@ typedef struct {
 /* I can almost use ordinary FILE *.  Is open_memstream() universally
  * available?  Where is it documented? */
 struct in_str {
-	const char *p;
+	const unsigned char *p;
 #ifndef __U_BOOT__
 	char peek_buf[2];
 #endif
@@ -2171,11 +2171,17 @@ int set_local_var(const char *s, int flg_export)
 	 * NAME=VALUE format.  So the first order of business is to
 	 * split 's' on the '=' into 'name' and 'value' */
 	value = strchr(name, '=');
-	if (value == NULL || *(value + 1) == 0) {
+	if (!value) {
 		free(name);
 		return -1;
 	}
 	*value++ = 0;
+
+	if (!*value) {
+		unset_local_var(name);
+		free(name);
+		return 0;
+	}
 
 	for(cur = top_vars; cur; cur = cur->next) {
 		if(strcmp(cur->name, name)==0)
@@ -3299,19 +3305,6 @@ int parse_file_outer(void)
 }
 
 #ifdef __U_BOOT__
-#ifdef CONFIG_NEEDS_MANUAL_RELOC
-static void u_boot_hush_reloc(void)
-{
-	unsigned long addr;
-	struct reserved_combo *r;
-
-	for (r=reserved_list; r<reserved_list+NRES; r++) {
-		addr = (ulong) (r->literal) + gd->reloc_off;
-		r->literal = (char *)addr;
-	}
-}
-#endif
-
 int u_boot_hush_start(void)
 {
 	if (top_vars == NULL) {
@@ -3321,9 +3314,6 @@ int u_boot_hush_start(void)
 		top_vars->next = NULL;
 		top_vars->flg_export = 0;
 		top_vars->flg_read_only = 1;
-#ifdef CONFIG_NEEDS_MANUAL_RELOC
-		u_boot_hush_reloc();
-#endif
 	}
 	return 0;
 }

@@ -12,6 +12,7 @@
 #include <linux/bitops.h>
 #include <clk-uclass.h>
 #include <clk.h>
+#include <zynqmp_firmware.h>
 #include <asm/arch/sys_proto.h>
 #include <dm.h>
 #include <linux/err.h>
@@ -269,17 +270,22 @@ static u32 zynqmp_clk_get_register(enum zynqmp_clk id)
 	case usb3_dual_ref:
 		return CRL_APB_USB3_DUAL_REF_CTRL;
 	case gem_tsu_ref:
+	case gem_tsu:
 		return CRL_APB_GEM_TSU_REF_CTRL;
 	case gem0_tx:
+	case gem0_rx:
 	case gem0_ref:
 		return CRL_APB_GEM0_REF_CTRL;
 	case gem1_tx:
+	case gem1_rx:
 	case gem1_ref:
 		return CRL_APB_GEM1_REF_CTRL;
 	case gem2_tx:
+	case gem2_rx:
 	case gem2_ref:
 		return CRL_APB_GEM2_REF_CTRL;
 	case gem3_tx:
+	case gem3_rx:
 	case gem3_ref:
 		return CRL_APB_GEM3_REF_CTRL;
 	case usb0_bus_ref:
@@ -691,6 +697,7 @@ static ulong zynqmp_clk_get_rate(struct clk *clk)
 	case topsw_lsbus:
 	case sata_ref ... gpu_pp1_ref:
 		two_divs = true;
+		fallthrough;
 	case cpu_r5:
 	case dbg_fpd:
 	case ams_ref:
@@ -717,6 +724,8 @@ static ulong zynqmp_clk_set_rate(struct clk *clk, ulong rate)
 	switch (id) {
 	case gem0_ref ... gem3_ref:
 	case gem0_tx ... gem3_tx:
+	case gem0_rx ... gem3_rx:
+	case gem_tsu:
 	case qspi_ref ... can1_ref:
 	case usb0_bus_ref ... usb3_dual_ref:
 		return zynqmp_clk_set_peripheral_rate(priv, id,
@@ -726,15 +735,10 @@ static ulong zynqmp_clk_set_rate(struct clk *clk, ulong rate)
 	}
 }
 
-int soc_clk_dump(void)
+#if IS_ENABLED(CONFIG_CMD_CLK)
+static void zynqmp_clk_dump(struct udevice *dev)
 {
-	struct udevice *dev;
 	int i, ret;
-
-	ret = uclass_get_device_by_driver(UCLASS_CLK,
-		DM_DRIVER_GET(zynqmp_clk), &dev);
-	if (ret)
-		return ret;
 
 	printf("clk\t\tfrequency\n");
 	for (i = 0; i < clk_max; i++) {
@@ -745,12 +749,13 @@ int soc_clk_dump(void)
 
 			clk.id = i;
 			ret = clk_request(dev, &clk);
-			if (ret < 0)
-				return ret;
+			if (ret < 0) {
+				printf("%s clk_request() failed: %d\n",
+				       __func__, ret);
+				break;
+			}
 
 			rate = clk_get_rate(&clk);
-
-			clk_free(&clk);
 
 			if ((rate == (unsigned long)-ENOSYS) ||
 			    (rate == (unsigned long)-ENXIO) ||
@@ -760,9 +765,8 @@ int soc_clk_dump(void)
 				printf("%10s%20lu\n", name, rate);
 		}
 	}
-
-	return 0;
 }
+#endif
 
 static int zynqmp_get_freq_by_name(char *name, struct udevice *dev, ulong *freq)
 {
@@ -835,6 +839,7 @@ static int zynqmp_clk_enable(struct clk *clk)
 		break;
 	case qspi_ref ... can1_ref:
 	case lpd_lsbus:
+	case topsw_lsbus:
 		clkact_shift = 24;
 		mask = 0x1;
 		break;
@@ -862,6 +867,9 @@ static struct clk_ops zynqmp_clk_ops = {
 	.set_rate = zynqmp_clk_set_rate,
 	.get_rate = zynqmp_clk_get_rate,
 	.enable = zynqmp_clk_enable,
+#if IS_ENABLED(CONFIG_CMD_CLK)
+	.dump = zynqmp_clk_dump,
+#endif
 };
 
 static const struct udevice_id zynqmp_clk_ids[] = {

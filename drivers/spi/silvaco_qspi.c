@@ -239,10 +239,8 @@ assert_reset:
 	}
 disable_clk_ext:
 	clk_disable(&priv->clk_ext);
-	clk_free(&priv->clk_ext);
 disable_clk_axi:
 	clk_disable(&priv->clk_axi);
-	clk_free(&priv->clk_axi);
 
 	return ret;
 }
@@ -255,10 +253,8 @@ static int silvaco_qspi_remove(struct udevice *dev)
 	reset_free(&priv->rst_ctl);
 
 	clk_disable(&priv->clk_ext);
-	clk_free(&priv->clk_ext);
 
 	clk_disable(&priv->clk_axi);
-	clk_free(&priv->clk_axi);
 
 	return 0;
 }

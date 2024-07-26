@@ -13,9 +13,9 @@ import shutil
 import struct
 import tempfile
 
-from patman import command
-from patman import tools
-from patman import tout
+from u_boot_pylib import command
+from u_boot_pylib import tools
+from u_boot_pylib import tout
 
 ELF_TOOLS = True
 try:
@@ -248,6 +248,9 @@ def LookupAndWriteSymbols(elf_fname, entry, section, is_elf=False,
         entry: Entry to process
         section: Section which can be used to lookup symbol values
         base_sym: Base symbol marking the start of the image
+
+    Returns:
+        int: Number of symbols written
     """
     if not base_sym:
         base_sym = '__image_copy_start'
@@ -269,12 +272,13 @@ def LookupAndWriteSymbols(elf_fname, entry, section, is_elf=False,
 
     if not syms:
         tout.debug('LookupAndWriteSymbols: no syms')
-        return
+        return 0
     base = syms.get(base_sym)
     if not base and not is_elf:
         tout.debug('LookupAndWriteSymbols: no base')
-        return
+        return 0
     base_addr = 0 if is_elf else base.address
+    count = 0
     for name, sym in syms.items():
         if name.startswith('_binman'):
             msg = ("Section '%s': Symbol '%s'\n   in entry '%s'" %
@@ -307,6 +311,11 @@ def LookupAndWriteSymbols(elf_fname, entry, section, is_elf=False,
                        (msg, name, offset, value, len(value_bytes)))
             entry.data = (entry.data[:offset] + value_bytes +
                         entry.data[offset + sym.size:])
+            count += 1
+    if count:
+        tout.detail(
+            f"Section '{section.GetPath()}': entry '{entry.GetPath()}' : {count} symbols")
+    return count
 
 def GetSymbolValue(sym, data, msg):
     """Get the value of a symbol
@@ -438,13 +447,15 @@ def DecodeElf(data, location):
     Returns:
         ElfInfo object containing information about the decoded ELF file
     """
+    if not ELF_TOOLS:
+        raise ValueError("Python: No module named 'elftools'")
     file_size = len(data)
     with io.BytesIO(data) as fd:
         elf = ELFFile(fd)
-        data_start = 0xffffffff;
-        data_end = 0;
-        mem_end = 0;
-        virt_to_phys = 0;
+        data_start = 0xffffffff
+        data_end = 0
+        mem_end = 0
+        virt_to_phys = 0
 
         for i in range(elf.num_segments()):
             segment = elf.get_segment(i)

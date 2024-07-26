@@ -9,6 +9,7 @@
 #define LOG_CATEGORY UCLASS_USB
 
 #include <common.h>
+#include <bootdev.h>
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
@@ -18,7 +19,6 @@
 #include <dm/lists.h>
 #include <dm/uclass-internal.h>
 
-extern bool usb_started; /* flag for the started/stopped USB status */
 static bool asynch_allowed;
 
 struct usb_uclass_priv {
@@ -209,6 +209,13 @@ int usb_stop(void)
 #ifdef CONFIG_USB_STORAGE
 	usb_stor_reset();
 #endif
+	if (CONFIG_IS_ENABLED(BOOTSTD)) {
+		int ret;
+
+		ret = bootdev_unhunt(UCLASS_USB);
+		if (IS_ENABLED(CONFIG_BOOTSTD_FULL) && ret && ret != -EALREADY)
+			printf("failed to unhunt USB (err=%dE)\n", ret);
+	}
 	uc_priv->companion_device_count = 0;
 	usb_started = 0;
 
@@ -248,6 +255,37 @@ static void remove_inactive_children(struct uclass *uc, struct udevice *bus)
 				device_unbind(dev);
 		}
 	}
+}
+
+static int usb_probe_companion(struct udevice *bus)
+{
+	struct udevice *companion_dev;
+	int ret;
+
+	/*
+	 * Enforce optional companion controller is marked as such in order to
+	 * 1st scan the primary controller, before the companion controller
+	 * (ownership is given to companion when low or full speed devices
+	 * have been detected).
+	 */
+	ret = uclass_get_device_by_phandle(UCLASS_USB, bus, "companion", &companion_dev);
+	if (!ret) {
+		struct usb_bus_priv *companion_bus_priv;
+
+		debug("%s is the companion of %s\n", companion_dev->name, bus->name);
+		companion_bus_priv = dev_get_uclass_priv(companion_dev);
+		companion_bus_priv->companion = true;
+	} else if (ret && ret != -ENOENT && ret != -ENODEV) {
+		/*
+		 * Treat everything else than no companion or disabled
+		 * companion as an error. (It may not be enabled on boards
+		 * that have a High-Speed HUB to handle FS and LS traffic).
+		 */
+		printf("Failed to get companion (ret=%d)\n", ret);
+		return ret;
+	}
+
+	return 0;
 }
 
 int usb_init(void)
@@ -300,6 +338,11 @@ int usb_init(void)
 			printf("probe failed, error %d\n", ret);
 			continue;
 		}
+
+		ret = usb_probe_companion(bus);
+		if (ret)
+			continue;
+
 		controllers_initialized++;
 		usb_started = true;
 	}
@@ -345,9 +388,9 @@ int usb_init(void)
 
 	/* if we were not able to find at least one working bus, bail out */
 	if (controllers_initialized == 0)
-		printf("No working controllers found\n");
+		printf("No USB controllers found\n");
 
-	return usb_started ? 0 : -1;
+	return usb_started ? 0 : -ENOENT;
 }
 
 int usb_setup_ehci_gadget(struct ehci_ctrl **ctlrp)

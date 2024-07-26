@@ -187,13 +187,16 @@ int board_late_init(void)
 	add_board_boot_modes(board_boot_modes);
 #endif
 
-#ifdef CONFIG_CMD_USB_SDP
-	if (is_boot_from_usb()) {
-		printf("Serial Downloader recovery mode, using sdp command\n");
+	if (IS_ENABLED(CONFIG_USB) && is_boot_from_usb()) {
 		env_set("bootdelay", "0");
-		env_set("bootcmd", "sdp 0");
+		if (IS_ENABLED(CONFIG_CMD_USB_SDP)) {
+			printf("Serial Downloader recovery mode, using sdp command\n");
+			env_set("bootcmd", "sdp 0");
+		} else if (IS_ENABLED(CONFIG_CMD_FASTBOOT)) {
+			printf("Fastboot recovery mode, using fastboot command\n");
+			env_set("bootcmd", "fastboot usb 0");
+		}
 	}
-#endif /* CONFIG_CMD_USB_SDP */
 
 #if defined(CONFIG_VIDEO)
 	setup_lcd();
@@ -202,27 +205,9 @@ int board_late_init(void)
 	return 0;
 }
 
-int checkboard(void)
-{
-	printf("Model: Toradex Colibri iMX6ULL\n");
-
-	return 0;
-}
-
 #if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)
 int ft_board_setup(void *blob, struct bd_info *bd)
 {
-#if defined(CONFIG_FDT_FIXUP_PARTITIONS)
-	static struct node_info nodes[] = {
-		{ "fsl,imx6ull-gpmi-nand", MTD_DEV_TYPE_NAND, },
-		{ "fsl,imx6q-gpmi-nand", MTD_DEV_TYPE_NAND, },
-	};
-
-	/* Update partition nodes using info from mtdparts env var */
-	puts("   Updating MTD partitions...\n");
-	fdt_fixup_mtdparts(blob, nodes, ARRAY_SIZE(nodes));
-#endif
-
 	return ft_common_board_setup(blob, bd);
 }
 #endif

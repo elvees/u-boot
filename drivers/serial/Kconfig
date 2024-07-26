@@ -24,6 +24,21 @@ config BAUDRATE
 	  in the SPL stage (most drivers) or for choosing a default baudrate
 	  in the absence of an environment setting (serial_mxc.c).
 
+config OF_SERIAL_BAUD
+	bool "Fetch serial baudrate from device tree"
+	depends on DM_SERIAL && SPL_ENV_SUPPORT
+	select DEFAULT_ENV_IS_RW
+	help
+	  Select this to enable fetching and setting of the baudrate
+	  configured in the DT. Replace the default baudrate with the DT
+	  baudrate and also set it to the environment.
+
+config DEFAULT_ENV_IS_RW
+	bool "Make default environment as writable"
+	help
+	  Select this to enable to make default environment writable. This
+	  allows modifying the default environment.
+
 config REQUIRE_SERIAL_CONSOLE
 	bool "Require a serial port for console"
 	# Running without a serial console is not supported by the
@@ -160,7 +175,6 @@ config SERIAL_PROBE_ALL
 config SPL_DM_SERIAL
 	bool "Enable Driver Model for serial drivers in SPL"
 	depends on DM_SERIAL && SPL_DM
-	select SYS_SPL_MALLOC_F
 	default y
 	help
 	  Enable driver model for serial in SPL. This replaces
@@ -171,7 +185,6 @@ config SPL_DM_SERIAL
 config TPL_DM_SERIAL
 	bool "Enable Driver Model for serial drivers in TPL"
 	depends on DM_SERIAL && TPL_DM
-	select SYS_TPL_MALLOC_F
 	default y if TPL && DM_SERIAL
 	help
 	  Enable driver model for serial in TPL. This replaces
@@ -218,6 +231,7 @@ config DEBUG_UART
 choice
 	prompt "Select which UART will provide the debug UART"
 	depends on DEBUG_UART
+	default DEBUG_SBI_CONSOLE if RISCV_SMODE
 	default DEBUG_UART_NS16550
 
 config DEBUG_UART_ALTERA_JTAGUART
@@ -289,17 +303,27 @@ config DEBUG_EFI_CONSOLE
 
 config DEBUG_SBI_CONSOLE
 	bool "SBI"
-	depends on SBI_V01
+	depends on RISCV_SMODE
 	help
 	  Select this to enable a debug console which calls back to SBI to
 	  output to the console. This can be useful for early debugging of
 	  U-Boot when running on top of SBI (Supervisor Binary Interface).
+	  This implementation of the debug UART is not available while in
+	  M-mode (e.g. during SPL).
 
 config DEBUG_UART_S5P
 	bool "Samsung S5P"
 	depends on ARCH_APPLE || ARCH_EXYNOS || ARCH_S5PC1XX
 	help
 	  Select this to enable a debug UART using the serial_s5p driver. You
+	  will need to provide parameters to make this work. The driver will
+	  be available until the real driver-model serial is running.
+
+config DEBUG_UART_MSM
+	bool "Qualcomm QUP UART debug"
+	depends on ARCH_SNAPDRAGON || ARCH_IPQ40XX
+	help
+	  Select this to enable a debug UART using the serial_msm driver. You
 	  will need to provide parameters to make this work. The driver will
 	  be available until the real driver-model serial is running.
 
@@ -415,6 +439,14 @@ config DEBUG_UART_SEMIHOSTING
 	  start up driver model. The driver will be available until the real
 	  driver model serial is running.
 
+config DEBUG_UART_SCIF
+	bool "Renesas SCIF UART"
+	depends on SH || ARCH_RENESAS
+	help
+	  Select this to enable a debug UART using the serial_sh driver. You
+	  will need to provide parameters to make this work. The driver will
+	  be available until the real driver-model serial is running.
+
 config DEBUG_UART_SIFIVE
 	bool "SiFive UART"
 	depends on SIFIVE_SERIAL
@@ -474,8 +506,8 @@ endchoice
 config DEBUG_UART_BASE
 	hex "Base address of UART"
 	depends on DEBUG_UART
-	default 0 if DEBUG_SBI_CONSOLE
-	default 0 if DEBUG_UART_SANDBOX
+	default 0x0 if DEBUG_SBI_CONSOLE
+	default 0x0 if DEBUG_UART_SANDBOX
 	default 0xff000000 if DEBUG_UART_ZYNQ && ARCH_ZYNQMP
 	default 0xe0000000 if DEBUG_UART_ZYNQ && ARCH_ZYNQ
 	help
@@ -660,6 +692,16 @@ config COREBOOT_SERIAL
 	  comes from the coreboot 'sysinfo' tables. This allows U-Boot to have
 	  a serial console on any platform without needing to change the
 	  device tree, etc.
+
+config COREBOOT_SERIAL_FROM_DBG2
+	bool "Obtain UART from ACPI tables"
+	depends on COREBOOT_SERIAL
+	default y
+	help
+	  Select this to try to find a DBG2 record in the ACPI tables, in the
+	  event that coreboot does not provide information about the UART in the
+	  normal sysinfo tables. This provides a useful fallback when serial
+	  is not enabled in coreboot.
 
 config CORTINA_UART
 	bool "Cortina UART support"
@@ -859,7 +901,7 @@ config SANDBOX_SERIAL
 
 config SCIF_CONSOLE
 	bool "Renesas SCIF UART support"
-	depends on SH || ARCH_RMOBILE
+	depends on SH || ARCH_RENESAS
 	help
 	  Select this to enable Renesas SCIF UART. To operate serial ports
 	  on systems with RCar or SH SoCs, say Y to this option. If unsure,
@@ -945,6 +987,14 @@ config MSM_GENI_SERIAL
 	  i.e. newer ones, starting from SDM845.
 	  Driver works in FIFO mode.
 	  Multiple baudrates supported.
+
+config MXS_AUART_SERIAL
+	bool "MXS AUART"
+	depends on DM_SERIAL
+	help
+	  Support for Freescale i.MX23 / i.MX28 AUART or Application UART IP.
+	  This IP is present in the aforementioned SoCs, however this is not
+	  the IP used to drive the Debug UART port, for that see PL01X_SERIAL .
 
 config OCTEON_SERIAL_BOOTCMD
 	bool "MIPS Octeon PCI remote bootcmd input"
@@ -1111,6 +1161,6 @@ config SYS_SDSR
 config SYS_SDMR
 	hex "SDMR Value"
 	depends on MPC8XX_CONS
-	default 0
+	default 0x0
 
 endif

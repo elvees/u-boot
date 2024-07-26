@@ -30,18 +30,6 @@
 	aliases {
 		spi5 = &spi5;
 	};
-
-	vdd_log: vdd-log {
-		compatible = "pwm-regulator";
-		pwms = <&pwm2 0 25000 1>;
-		regulator-name = "vdd_log";
-		regulator-always-on;
-		regulator-boot-on;
-		regulator-min-microvolt = <800000>;
-		regulator-max-microvolt = <1400000>;
-		regulator-init-microvolt = <950000>;
-		vin-supply = <&vcc5v0_sys>;
-	};
 };
 
 &binman {
@@ -62,11 +50,11 @@
 };
 
 &gpio1 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpio3 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 
 	/*
 	 * The Qseven BIOS_DISABLE signal on the RK3399-Q7 keeps the on-module
@@ -75,7 +63,7 @@
 	 * eMMC and SPI after the SPL has been booted from SD Card.
 	 */
 	bios_disable_override {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 		gpios = <RK_PD5 GPIO_ACTIVE_LOW>;
 		output-high;
 		line-name = "bios_disable_override";
@@ -84,29 +72,34 @@
 };
 
 &gpio4 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &norflash {
-	u-boot,dm-pre-reloc;
+	bootph-pre-ram;
+	bootph-some-ram;
 };
 
-&pcfg_pull_none {
-	u-boot,dm-pre-reloc;
+&uart0 {
+	bootph-all;
+	clock-frequency = <24000000>;
 };
 
-&pcfg_pull_up {
-	u-boot,dm-pre-reloc;
+&uart0_cts {
+	bootph-pre-sram;
+	bootph-pre-ram;
 };
 
-&sdmmc_bus4 {
-	u-boot,dm-pre-reloc;
+&uart0_rts {
+	bootph-pre-sram;
+	bootph-pre-ram;
 };
 
-&sdmmc_clk {
-	u-boot,dm-pre-reloc;
+&uart0_xfer {
+	bootph-pre-sram;
+	bootph-pre-ram;
 };
 
-&sdmmc_cmd {
-	u-boot,dm-pre-reloc;
+&vdd_log {
+	regulator-init-microvolt = <950000>;
 };

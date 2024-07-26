@@ -5,11 +5,8 @@
 
 #include "rk3328-u-boot.dtsi"
 #include "rk3328-sdram-lpddr3-1600.dtsi"
-/ {
-	chosen {
-		u-boot,spl-boot-order = "same-as-spl", &sdmmc, &emmc;
-	};
 
+/ {
 	smbios {
 		compatible = "u-boot,sysinfo-smbios";
 
@@ -32,44 +29,37 @@
 	};
 };
 
-&gpio0 {
-	u-boot,dm-spl;
-};
-
-&pinctrl {
-	u-boot,dm-spl;
-};
-
-&sdmmc0m1_pin {
-	u-boot,dm-spl;
-};
-
-&pcfg_pull_up_4ma {
-	u-boot,dm-spl;
-};
-
-&usb_host0_xhci {
-	vbus-supply = <&vcc_host_5v>;
-	status = "okay";
-};
-
-/*
- * This makes XHCI responsible for toggling VBUS. This is needed to work
- * around an issue where either XHCI only works with USB 2.0 or OTG doesn't
- * work, depending on how VBUS is configured. Having USB 3.0 seems better.
- */
-&vcc_host_5v {
-	/delete-property/ regulator-always-on;
-	/delete-property/ regulator-boot-on;
-};
-
-/* Need this and all the pinctrl/gpio stuff above to set pinmux */
-&vcc_sd {
-	u-boot,dm-spl;
-};
-
 &spi0 {
-	spi_flash: spiflash@0 {
-		u-boot,dm-pre-reloc;
+	flash@0 {
+		bootph-pre-ram;
+		bootph-some-ram;
 	};
+};
+
+&spi0m2_clk {
+	bootph-pre-ram;
+	bootph-some-ram;
+};
+
+&spi0m2_cs0 {
+	bootph-pre-ram;
+	bootph-some-ram;
+};
+
+&spi0m2_rx {
+	bootph-pre-ram;
+	bootph-some-ram;
+};
+
+&spi0m2_tx {
+	bootph-pre-ram;
+	bootph-some-ram;
+};
+
+&usb20_otg {
+	hnp-srp-disable;
+};
+
+&vcc_sd {
+	bootph-pre-ram;
 };

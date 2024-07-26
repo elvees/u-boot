@@ -9,7 +9,7 @@
 #include <dm.h>
 #include <log.h>
 #include <malloc.h>
-#include <asm/arch/sci/sci.h>
+#include <firmware/imx/sci/sci.h>
 #include <asm/arch/clock.h>
 #include <dt-bindings/clock/imx8qxp-clock.h>
 #include <dt-bindings/soc/imx_rsrc.h>
@@ -43,17 +43,11 @@ static int imx8_clk_enable(struct clk *clk)
 }
 
 #if IS_ENABLED(CONFIG_CMD_CLK)
-int soc_clk_dump(void)
+static void imx8_clk_dump(struct udevice *dev)
 {
-	struct udevice *dev;
 	struct clk clk;
 	unsigned long rate;
 	int i, ret;
-
-	ret = uclass_get_device_by_driver(UCLASS_CLK,
-					  DM_DRIVER_GET(imx8_clk), &dev);
-	if (ret)
-		return ret;
 
 	printf("Clk\t\tHz\n");
 
@@ -67,8 +61,6 @@ int soc_clk_dump(void)
 
 		ret = clk_get_rate(&clk);
 		rate = ret;
-
-		clk_free(&clk);
 
 		if (ret == -EINVAL) {
 			printf("clk ID %lu not supported yet\n",
@@ -84,8 +76,6 @@ int soc_clk_dump(void)
 		printf("%s(%3lu):\t%lu\n",
 		       imx8_clk_names[i].name, imx8_clk_names[i].id, rate);
 	}
-
-	return 0;
 }
 #endif
 
@@ -94,6 +84,9 @@ static struct clk_ops imx8_clk_ops = {
 	.get_rate = imx8_clk_get_rate,
 	.enable = imx8_clk_enable,
 	.disable = imx8_clk_disable,
+#if IS_ENABLED(CONFIG_CMD_CLK)
+	.dump = imx8_clk_dump,
+#endif
 };
 
 static int imx8_clk_probe(struct udevice *dev)

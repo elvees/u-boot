@@ -13,6 +13,8 @@
 #include <env.h>
 #include <linker_lists.h>
 
+#include <linux/compiler_attributes.h>
+
 #ifndef NULL
 #define NULL	0
 #endif
@@ -23,6 +25,10 @@
 #endif
 
 #ifndef	__ASSEMBLY__
+
+/* For ARRAY_SIZE() */
+#include <linux/kernel.h>
+
 /*
  * Monitor Command Table
  */
@@ -53,6 +59,39 @@ struct cmd_tbl {
 				    char last_char, int maxv, char *cmdv[]);
 #endif
 };
+
+/**
+ * cmd_arg_get() - Get a particular argument
+ *
+ * @argc: Number of arguments
+ * @argv: Argument vector of length @argc
+ * @argnum: Argument to get (0=first)
+ * Return: Pointer to argument @argnum if it exists, else NULL
+ */
+static inline const char *cmd_arg_get(int argc, char *const argv[], int argnum)
+{
+	return argc > argnum ? argv[argnum] : NULL;
+}
+
+static inline const char *cmd_arg0(int argc, char *const argv[])
+{
+	return cmd_arg_get(argc, argv, 0);
+}
+
+static inline const char *cmd_arg1(int argc, char *const argv[])
+{
+	return cmd_arg_get(argc, argv, 1);
+}
+
+static inline const char *cmd_arg2(int argc, char *const argv[])
+{
+	return cmd_arg_get(argc, argv, 2);
+}
+
+static inline const char *cmd_arg3(int argc, char *const argv[])
+{
+	return cmd_arg_get(argc, argv, 3);
+}
 
 #if defined(CONFIG_CMD_RUN)
 int do_run(struct cmd_tbl *cmdtp, int flag, int argc,
@@ -89,6 +128,12 @@ int var_complete(int argc, char *const argv[], char last_char, int maxv,
 		 char *cmdv[]);
 int cmd_auto_complete(const char *const prompt, char *buf, int *np,
 		      int *colp);
+#else
+static inline int cmd_auto_complete(const char *const prompt, char *buf,
+				    int *np, int *colp)
+{
+	return 0;
+}
 #endif
 
 /**
@@ -141,7 +186,7 @@ int cmd_process_error(struct cmd_tbl *cmdtp, int err);
  * Return: data size in bytes (1, 2, 4, 8) or CMD_DATA_SIZE_ERR for an invalid
  *	character, or CMD_DATA_SIZE_STR for a string
  */
-int cmd_get_data_size(char *arg, int default_size);
+int cmd_get_data_size(const char *arg, int default_size);
 #endif
 
 #ifdef CONFIG_CMD_BOOTD
@@ -260,12 +305,17 @@ int run_command_repeatable(const char *cmd, int flag);
 /**
  * run_commandf() - Run a command created by a format string
  *
- * The command cannot be larger than 127 characters
- *
  * @fmt: printf() format string
  * @...: Arguments to use (flag is always 0)
+ *
+ * The command cannot be larger than (CONFIG_SYS_CBSIZE - 1) characters.
+ *
+ * Return:
+ * Returns 0 on success, -EIO if internal output error occurred, -ENOSPC in
+ *	case of 'fmt' string truncation, or != 0 on error, specific for
+ *	run_command().
  */
-int run_commandf(const char *fmt, ...);
+int run_commandf(const char *fmt, ...) __printf(1, 2);
 
 /**
  * Run a list of commands separated by ; or even \0
@@ -311,23 +361,8 @@ int cmd_source_script(ulong addr, const char *fit_uname, const char *confname);
 # define _CMD_HELP(x)
 #endif
 
-#ifdef CONFIG_NEEDS_MANUAL_RELOC
-#define U_BOOT_SUBCMDS_RELOC(_cmdname)					\
-	static void _cmdname##_subcmds_reloc(void)			\
-	{								\
-		static int relocated;					\
-									\
-		if (relocated)						\
-			return;						\
-									\
-		fixup_cmdtable(_cmdname##_subcmds,			\
-			       ARRAY_SIZE(_cmdname##_subcmds));		\
-		relocated = 1;						\
-	}
-#else
-#define U_BOOT_SUBCMDS_RELOC(_cmdname)					\
-	static void _cmdname##_subcmds_reloc(void) { }
-#endif
+#define U_BOOT_LONGHELP(_cmdname, text)					\
+	static __maybe_unused const char _cmdname##_help_text[] = text
 
 #define U_BOOT_SUBCMDS_DO_CMD(_cmdname)					\
 	static int do_##_cmdname(struct cmd_tbl *cmdtp, int flag,	\
@@ -335,8 +370,6 @@ int cmd_source_script(ulong addr, const char *fit_uname, const char *confname);
 				 int *repeatable)			\
 	{								\
 		struct cmd_tbl *subcmd;					\
-									\
-		_cmdname##_subcmds_reloc();				\
 									\
 		/* We need at least the cmd and subcmd names. */	\
 		if (argc < 2 || argc > CONFIG_SYS_MAXARGS)		\
@@ -372,11 +405,10 @@ int cmd_source_script(ulong addr, const char *fit_uname, const char *confname);
 
 #define U_BOOT_SUBCMDS(_cmdname, ...)					\
 	static struct cmd_tbl _cmdname##_subcmds[] = { __VA_ARGS__ };	\
-	U_BOOT_SUBCMDS_RELOC(_cmdname)					\
 	U_BOOT_SUBCMDS_DO_CMD(_cmdname)					\
 	U_BOOT_SUBCMDS_COMPLETE(_cmdname)
 
-#ifdef CONFIG_CMDLINE
+#if CONFIG_IS_ENABLED(CMDLINE)
 #define U_BOOT_CMDREP_MKENT_COMPLETE(_name, _maxargs, _cmd_rep,		\
 				     _usage, _help, _comp)		\
 		{ #_name, _maxargs, _cmd_rep, cmd_discard_repeatable,	\
@@ -391,7 +423,7 @@ int cmd_source_script(ulong addr, const char *fit_uname, const char *confname);
 #define U_BOOT_CMD_COMPLETE(_name, _maxargs, _rep, _cmd, _usage, _help, _comp) \
 	ll_entry_declare(struct cmd_tbl, _name, cmd) =			\
 		U_BOOT_CMD_MKENT_COMPLETE(_name, _maxargs, _rep, _cmd,	\
-						_usage, _help, _comp);
+						_usage, _help, _comp)
 
 #define U_BOOT_CMDREP_COMPLETE(_name, _maxargs, _cmd_rep, _usage,	\
 			       _help, _comp)				\

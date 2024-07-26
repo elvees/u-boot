@@ -12,10 +12,10 @@ import tempfile
 import unittest
 
 from binman import elf
-from patman import command
-from patman import test_util
-from patman import tools
-from patman import tout
+from u_boot_pylib import command
+from u_boot_pylib import test_util
+from u_boot_pylib import tools
+from u_boot_pylib import tout
 
 binman_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
 
@@ -141,7 +141,8 @@ class TestElf(unittest.TestCase):
         entry = FakeEntry(10)
         section = FakeSection()
         elf_fname = self.ElfTestFile('u_boot_binman_syms_bad')
-        elf.LookupAndWriteSymbols(elf_fname, entry, section)
+        count = elf.LookupAndWriteSymbols(elf_fname, entry, section)
+        self.assertEqual(0, count)
 
     def testBadSymbolSize(self):
         """Test that an attempt to use an 8-bit symbol are detected
@@ -162,7 +163,7 @@ class TestElf(unittest.TestCase):
     def testNoValue(self):
         """Test the case where we have no value for the symbol
 
-        This should produce -1 values for all thress symbols, taking up the
+        This should produce -1 values for all three symbols, taking up the
         first 16 bytes of the image.
         """
         if not elf.ELF_TOOLS:
@@ -170,7 +171,8 @@ class TestElf(unittest.TestCase):
         entry = FakeEntry(28)
         section = FakeSection(sym_value=None)
         elf_fname = self.ElfTestFile('u_boot_binman_syms')
-        elf.LookupAndWriteSymbols(elf_fname, entry, section)
+        count = elf.LookupAndWriteSymbols(elf_fname, entry, section)
+        self.assertEqual(5, count)
         expected = (struct.pack('<L', elf.BINMAN_SYM_MAGIC_VALUE) +
                     tools.get_bytes(255, 20) +
                     tools.get_bytes(ord('a'), 4))
@@ -247,14 +249,26 @@ class TestElf(unittest.TestCase):
 
     def testEmbedFail(self):
         """Test calling GetSymbolFileOffset() without elftools"""
+        old_val = elf.ELF_TOOLS
         try:
-            old_val = elf.ELF_TOOLS
             elf.ELF_TOOLS = False
             fname = self.ElfTestFile('embed_data')
             with self.assertRaises(ValueError) as e:
                 elf.GetSymbolFileOffset(fname, ['embed_start', 'embed_end'])
-            self.assertIn("Python: No module named 'elftools'",
-                      str(e.exception))
+            with self.assertRaises(ValueError) as e:
+                elf.DecodeElf(tools.read_file(fname), 0xdeadbeef)
+            with self.assertRaises(ValueError) as e:
+                elf.GetFileOffset(fname, 0xdeadbeef)
+            with self.assertRaises(ValueError) as e:
+                elf.GetSymbolFromAddress(fname, 0xdeadbeef)
+            with self.assertRaises(ValueError) as e:
+                entry = FakeEntry(10)
+                section = FakeSection()
+                elf.LookupAndWriteSymbols(fname, entry, section, True)
+
+            self.assertIn(
+                "Section 'section_path': entry 'entry_path': Cannot write symbols to an ELF file without Python elftools",
+                str(e.exception))
         finally:
             elf.ELF_TOOLS = old_val
 
@@ -276,8 +290,8 @@ class TestElf(unittest.TestCase):
 
     def test_read_segments_fail(self):
         """Test for read_loadable_segments() without elftools"""
+        old_val = elf.ELF_TOOLS
         try:
-            old_val = elf.ELF_TOOLS
             elf.ELF_TOOLS = False
             fname = self.ElfTestFile('embed_data')
             with self.assertRaises(ValueError) as e:
@@ -313,8 +327,8 @@ class TestElf(unittest.TestCase):
 
     def test_get_file_offset_fail(self):
         """Test calling GetFileOffset() without elftools"""
+        old_val = elf.ELF_TOOLS
         try:
-            old_val = elf.ELF_TOOLS
             elf.ELF_TOOLS = False
             fname = self.ElfTestFile('embed_data')
             with self.assertRaises(ValueError) as e:
@@ -337,8 +351,8 @@ class TestElf(unittest.TestCase):
 
     def test_get_symbol_from_address_fail(self):
         """Test calling GetSymbolFromAddress() without elftools"""
+        old_val = elf.ELF_TOOLS
         try:
-            old_val = elf.ELF_TOOLS
             elf.ELF_TOOLS = False
             fname = self.ElfTestFile('embed_data')
             with self.assertRaises(ValueError) as e:
@@ -368,6 +382,11 @@ class TestElf(unittest.TestCase):
         with self.assertRaises(KeyError) as e:
             elf.GetSymbolOffset(fname, 'embed')
         self.assertIn('__image_copy_start', str(e.exception))
+
+    def test_get_symbol_address(self):
+        fname = self.ElfTestFile('embed_data')
+        addr = elf.GetSymbolAddress(fname, 'region_size')
+        self.assertEqual(0, addr)
 
 
 if __name__ == '__main__':

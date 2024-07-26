@@ -7,6 +7,8 @@
 #ifndef _INCLUDE_REGULATOR_H_
 #define _INCLUDE_REGULATOR_H_
 
+#include <linux/errno.h>
+
 struct udevice;
 
 /**
@@ -134,6 +136,7 @@ struct dm_regulator_mode {
 enum regulator_flag {
 	REGULATOR_FLAG_AUTOSET_UV	= 1 << 0,
 	REGULATOR_FLAG_AUTOSET_UA	= 1 << 1,
+	REGULATOR_FLAG_AUTOSET_DONE	= 1 << 2,
 };
 
 /**

@@ -1,7 +1,10 @@
 .. SPDX-License-Identifier: GPL-2.0+:
 
+.. index::
+   single: cat (command)
+
 cat command
-===============
+===========
 
 Synopsis
 --------

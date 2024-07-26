@@ -7,7 +7,6 @@
  * Copyright (C) 2015-2017 Cogent Embedded, Inc. <source@cogentembedded.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <dm/pinctrl.h>
@@ -43,30 +42,30 @@
 	PORT_GP_1(5, 25, fn, sfx),					\
 	PORT_GP_1(5, 26, fn, sfx),					\
 	PORT_GP_1(5, 27, fn, sfx),					\
-	PORT_GP_CFG_1(6, 0, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE),	\
-	PORT_GP_CFG_1(6, 1, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 2, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 3, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 4, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 5, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 6, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 7, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 8, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE),	\
-	PORT_GP_CFG_1(6, 9, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 10, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 11, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 12, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 13, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 14, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 15, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 16, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE),	\
-	PORT_GP_CFG_1(6, 17, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 18, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 19, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 20, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 21, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 22, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
-	PORT_GP_CFG_1(6, 23, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 0, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33),	\
+	PORT_GP_CFG_1(6, 1, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 2, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 3, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 4, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 5, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 6, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 7, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 8, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33),	\
+	PORT_GP_CFG_1(6, 9, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 10, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 11, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 12, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 13, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 14, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 15, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 16, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33),	\
+	PORT_GP_CFG_1(6, 17, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 18, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 19, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 20, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 21, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 22, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
+	PORT_GP_CFG_1(6, 23, fn, sfx, SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 | SH_PFC_PIN_CFG_PULL_UP),	\
 	PORT_GP_CFG_1(6, 24, fn, sfx, SH_PFC_PIN_CFG_PULL_UP),		\
 	PORT_GP_CFG_1(6, 25, fn, sfx, SH_PFC_PIN_CFG_PULL_UP)
 
@@ -5513,7 +5512,7 @@ static const struct pinmux_cfg_reg pinmux_config_regs[] = {
 		FN_SEL_SSI9_0, FN_SEL_SSI9_1,
 		/* RESERVED [12] */ ))
 	},
-	{ },
+	{ /* sentinel */ }
 };
 
 static int r8a7794_pin_to_pocctrl(unsigned int pin, u32 *pocctrl)
@@ -5819,8 +5818,8 @@ static const struct pinmux_bias_reg pinmux_bias_regs[] = {
 static int r8a7794_pinmux_soc_init(struct sh_pfc *pfc)
 {
 	/* Initialize TDSEL on old revisions */
-	if ((rmobile_get_cpu_rev_integer() == 1) &&
-	    (rmobile_get_cpu_rev_fraction() == 0))
+	if ((renesas_get_cpu_rev_integer() == 1) &&
+	    (renesas_get_cpu_rev_fraction() == 0))
 		sh_pfc_write(pfc, 0xe6060068, 0x55555500);
 
 	return 0;

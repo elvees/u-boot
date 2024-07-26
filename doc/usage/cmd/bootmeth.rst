@@ -1,10 +1,13 @@
 .. SPDX-License-Identifier: GPL-2.0+:
 
+.. index::
+   single: bootmeth (command)
+
 bootmeth command
 ================
 
-Synopis
--------
+Synopsis
+--------
 
 ::
 
@@ -45,7 +48,7 @@ The format looks like this:
 =====  ===  ==================  =================================
 Order  Seq  Name                Description
 =====  ===  ==================  =================================
-    0    0  distro              Syslinux boot from a block device
+    0    0  extlinux            Extlinux boot from a block device
     1    1  efi                 EFI boot from an .efi file
     2    2  pxe                 PXE boot from a network device
     3    3  sandbox             Sandbox boot for testing
@@ -77,7 +80,7 @@ This shows listing bootmeths. All are present and in the normal order::
     => bootmeth list
     Order  Seq  Name                Description
     -----  ---  ------------------  ------------------
-        0    0  distro              Syslinux boot from a block device
+        0    0  distro              Extlinux boot from a block device
         1    1  efi                 EFI boot from an .efi file
         2    2  pxe                 PXE boot from a network device
         3    3  sandbox             Sandbox boot for testing
@@ -92,7 +95,7 @@ Now the order is changed, to include only two of them::
     Order  Seq  Name                Description
     -----  ---  ------------------  ------------------
         0    3  sandbox             Sandbox boot for testing
-        1    0  distro              Syslinux boot from a block device
+        1    0  distro              Extlinux boot from a block device
     -----  ---  ------------------  ------------------
     (2 bootmeths)
 
@@ -102,7 +105,7 @@ which are not::
     => bootmeth list -a
     Order  Seq  Name                Description
     -----  ---  ------------------  ------------------
-        1    0  distro              Syslinux boot from a block device
+        1    0  distro              Extlinux boot from a block device
         -    1  efi                 EFI boot from an .efi file
         -    2  pxe                 PXE boot from a network device
         0    3  sandbox             Sandbox boot for testing

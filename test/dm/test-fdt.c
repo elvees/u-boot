@@ -135,8 +135,8 @@ int dm_check_devices(struct unit_test_state *uts, int num_devices)
 		 * want to test the code that sets that up
 		 * (testfdt_drv_probe()).
 		 */
-		base = fdtdec_get_addr(gd->fdt_blob, dev_of_offset(dev),
-				       "ping-expect");
+		base = fdtdec_get_int(gd->fdt_blob, dev_of_offset(dev),
+				      "ping-expect", -1);
 		debug("dev=%d, base=%d: %s\n", i, base,
 		      fdt_get_name(gd->fdt_blob, dev_of_offset(dev), NULL));
 
@@ -215,7 +215,7 @@ static int dm_test_fdt_pre_reloc(struct unit_test_state *uts)
 
 	/*
 	 * These are 2 pre-reloc devices:
-	 * one with "u-boot,dm-pre-reloc" property (a-test node), and the other
+	 * one with "bootph-all" property (a-test node), and the other
 	 * one whose driver marked with DM_FLAG_PRE_RELOC flag (h-test node).
 	 */
 	ut_asserteq(2, list_count_items(&uc->dev_head));
@@ -617,6 +617,7 @@ static int dm_test_fdt_get_addr_ptr_flat(struct unit_test_state *uts)
 {
 	struct udevice *gpio, *dev;
 	void *ptr;
+	void *paddr;
 
 	/* Test for missing reg property */
 	ut_assertok(uclass_first_device_err(UCLASS_GPIO, &gpio));
@@ -624,7 +625,9 @@ static int dm_test_fdt_get_addr_ptr_flat(struct unit_test_state *uts)
 
 	ut_assertok(uclass_find_device_by_seq(UCLASS_TEST_DUMMY, 0, &dev));
 	ptr = devfdt_get_addr_ptr(dev);
-	ut_asserteq_ptr((void *)0x8000, ptr);
+
+	paddr = map_sysmem(0x8000, 0);
+	ut_asserteq_ptr(paddr, ptr);
 
 	return 0;
 }

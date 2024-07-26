@@ -10,13 +10,13 @@
 #include <log.h>
 #include <syscon.h>
 #include <asm/global_data.h>
-#include <asm/io.h>
 #include <asm/arch-rockchip/bootrom.h>
 #include <asm/arch-rockchip/clock.h>
 #include <asm/arch-rockchip/grf_rk3188.h>
 #include <asm/arch-rockchip/hardware.h>
 #include <dm/ofnode.h>
 #include <linux/err.h>
+#include <linux/printk.h>
 
 #define GRF_BASE	0x20008000
 

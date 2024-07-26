@@ -51,19 +51,6 @@ unsigned long notrace timer_get_rate(struct udevice *dev)
 
 static int timer_pre_probe(struct udevice *dev)
 {
-	if (IS_ENABLED(CONFIG_NEEDS_MANUAL_RELOC) &&
-	    (gd->flags & GD_FLG_RELOC)) {
-		struct timer_ops *ops = timer_get_ops(dev);
-		static int reloc_done;
-
-		if (!reloc_done) {
-			if (ops->get_count)
-				MANUAL_RELOC(ops->get_count);
-
-			reloc_done++;
-		}
-	}
-
 	if (CONFIG_IS_ENABLED(OF_REAL)) {
 		struct timer_dev_priv *uc_priv = dev_get_uclass_priv(dev);
 		struct clk timer_clk;
@@ -79,13 +66,13 @@ static int timer_pre_probe(struct udevice *dev)
 		err = clk_get_by_index(dev, 0, &timer_clk);
 		if (!err) {
 			ret = clk_get_rate(&timer_clk);
-			if (IS_ERR_VALUE(ret))
-				return ret;
-			uc_priv->clock_rate = ret;
-		} else {
-			uc_priv->clock_rate =
-				dev_read_u32_default(dev, "clock-frequency", 0);
+			if (!IS_ERR_VALUE(ret)) {
+				uc_priv->clock_rate = ret;
+				return 0;
+			}
 		}
+
+		uc_priv->clock_rate = dev_read_u32_default(dev, "clock-frequency", 0);
 	}
 
 	return 0;

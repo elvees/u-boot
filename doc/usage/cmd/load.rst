@@ -1,5 +1,8 @@
 .. SPDX-License-Identifier: GPL-2.0+:
 
+.. index::
+   single: load (command)
+
 load command
 ============
 
@@ -40,7 +43,7 @@ bytes
 pos
     number of bytes to skip
 
-addr, bytes, pos are hexadecimal numbers.
+part, addr, bytes, pos are hexadecimal numbers.
 
 Example
 -------

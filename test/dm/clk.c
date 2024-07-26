@@ -36,6 +36,15 @@ static int dm_test_clk_base(struct unit_test_state *uts)
 	ut_asserteq(clk_is_match(&clk_method1, &clk_method2), true);
 	ut_asserteq(clk_method1.id, clk_method2.id);
 
+	ut_assertok(uclass_get_device_by_name(UCLASS_MISC, "clk-test2", &dev));
+	ut_assertok(clk_set_defaults(dev, CLK_DEFAULTS_PRE));
+
+	ut_assertok(uclass_get_device_by_name(UCLASS_MISC, "clk-test3", &dev));
+	ut_assertok(clk_set_defaults(dev, CLK_DEFAULTS_PRE));
+
+	ut_assertok(uclass_get_device_by_name(UCLASS_MISC, "clk-test4", &dev));
+	ut_assertok(clk_set_defaults(dev, CLK_DEFAULTS_PRE));
+
 	return 0;
 }
 
@@ -173,19 +182,10 @@ static int dm_test_clk(struct unit_test_state *uts)
 						   SANDBOX_CLK_ID_I2C));
 	ut_asserteq(1, sandbox_clk_query_requested(dev_clk,
 						   SANDBOX_CLK_ID_UART2));
-	ut_assertok(sandbox_clk_test_free(dev_test));
-	ut_asserteq(0, sandbox_clk_query_requested(dev_clk,
-						   SANDBOX_CLK_ID_SPI));
-	ut_asserteq(0, sandbox_clk_query_requested(dev_clk,
-						   SANDBOX_CLK_ID_I2C));
-	ut_asserteq(0, sandbox_clk_query_requested(dev_clk,
-						   SANDBOX_CLK_ID_UART2));
 
 	ut_asserteq(1, sandbox_clk_query_requested(dev_clk,
 						   SANDBOX_CLK_ID_UART1));
 	ut_assertok(device_remove(dev_test, DM_REMOVE_NORMAL));
-	ut_asserteq(0, sandbox_clk_query_requested(dev_clk,
-						   SANDBOX_CLK_ID_UART1));
 	return 0;
 }
 DM_TEST(dm_test_clk, UT_TESTF_SCAN_FDT);

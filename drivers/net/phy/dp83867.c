@@ -10,6 +10,7 @@
 #include <linux/bitops.h>
 #include <linux/compat.h>
 #include <malloc.h>
+#include <linux/printk.h>
 
 #include <dm.h>
 #include <dt-bindings/net/ti-dp83867.h>
@@ -330,7 +331,7 @@ static int dp83867_config(struct phy_device *phydev)
 			      DP83867_RGMIIDCTL, delay);
 	}
 
-	if (phy_interface_is_sgmii(phydev)) {
+	if (phydev->interface == PHY_INTERFACE_MODE_SGMII) {
 		if (dp83867->sgmii_ref_clk_en)
 			phy_write_mmd(phydev, DP83867_DEVADDR, DP83867_SGMIICTL,
 				      DP83867_SGMII_TYPE);
@@ -409,7 +410,7 @@ static int dp83867_probe(struct phy_device *phydev)
 	return 0;
 }
 
-static struct phy_driver DP83867_driver = {
+U_BOOT_PHY_DRIVER(dp83867) = {
 	.name = "TI DP83867",
 	.uid = 0x2000a231,
 	.mask = 0xfffffff0,
@@ -419,9 +420,3 @@ static struct phy_driver DP83867_driver = {
 	.startup = &genphy_startup,
 	.shutdown = &genphy_shutdown,
 };
-
-int phy_dp83867_init(void)
-{
-	phy_register(&DP83867_driver);
-	return 0;
-}

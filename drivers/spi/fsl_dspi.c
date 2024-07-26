@@ -14,7 +14,6 @@
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
-#include <common.h>
 #include <log.h>
 #include <spi.h>
 #include <malloc.h>
@@ -26,9 +25,8 @@
 #include <fsl_dspi.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
-
-/* linux/include/time.h */
-#define NSEC_PER_SEC	1000000000L
+#include <linux/printk.h>
+#include <linux/time.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 

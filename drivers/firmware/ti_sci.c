@@ -3,7 +3,7 @@
  * Texas Instruments System Control Interface Protocol Driver
  * Based on drivers/firmware/ti_sci.c from Linux.
  *
- * Copyright (C) 2018 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2018 Texas Instruments Incorporated - https://www.ti.com/
  *	Lokesh Vutla <lokeshvutla@ti.com>
  */
 
@@ -16,6 +16,7 @@
 #include <dm/device.h>
 #include <dm/device_compat.h>
 #include <dm/devres.h>
+#include <dm/lists.h>
 #include <linux/bitops.h>
 #include <linux/compat.h>
 #include <linux/err.h>
@@ -236,21 +237,27 @@ static int ti_sci_do_xfer(struct ti_sci_info *info,
 {
 	struct k3_sec_proxy_msg *msg = &xfer->tx_message;
 	u8 secure_buf[info->desc->max_msg_size];
-	struct ti_sci_secure_msg_hdr secure_hdr;
+	struct ti_sci_secure_msg_hdr *secure_hdr = (struct ti_sci_secure_msg_hdr *)secure_buf;
 	int ret;
 
+	/*
+	 * The reason why we need the is_secure code is because of boot R5.
+	 * boot R5 starts off in "secure mode" when it hands off from Boot
+	 * ROM over to the Secondary bootloader. The initial set of calls
+	 * we have to make need to be on a secure pipe.
+	 */
 	if (info->is_secure) {
 		/* ToDo: get checksum of the entire message */
-		secure_hdr.checksum = 0;
-		secure_hdr.reserved = 0;
-		memcpy(&secure_buf[sizeof(secure_hdr)], xfer->tx_message.buf,
+		secure_hdr->checksum = 0;
+		secure_hdr->reserved = 0;
+		memcpy(&secure_buf[sizeof(*secure_hdr)], xfer->tx_message.buf,
 		       xfer->tx_message.len);
 
 		xfer->tx_message.buf = (u32 *)secure_buf;
-		xfer->tx_message.len += sizeof(secure_hdr);
+		xfer->tx_message.len += sizeof(*secure_hdr);
 
 		if (xfer->rx_len)
-			xfer->rx_len += sizeof(secure_hdr);
+			xfer->rx_len += sizeof(*secure_hdr);
 	}
 
 	/* Send the message */
@@ -265,7 +272,7 @@ static int ti_sci_do_xfer(struct ti_sci_info *info,
 	if (xfer->rx_len) {
 		ret = ti_sci_get_response(info, xfer, &info->chan_rx);
 		if (!ti_sci_is_response_ack(xfer->tx_message.buf)) {
-			dev_err(info->dev, "Message not acknowledged");
+			dev_err(info->dev, "Message not acknowledged\n");
 			ret = -ENODEV;
 		}
 	}
@@ -2690,6 +2697,8 @@ static void ti_sci_setup_ops(struct ti_sci_info *info)
 const
 struct ti_sci_handle *ti_sci_get_handle_from_sysfw(struct udevice *sci_dev)
 {
+	int ret;
+
 	if (!sci_dev)
 		return ERR_PTR(-EINVAL);
 
@@ -2701,6 +2710,11 @@ struct ti_sci_handle *ti_sci_get_handle_from_sysfw(struct udevice *sci_dev)
 	struct ti_sci_handle *handle = &info->handle;
 
 	if (!handle)
+		return ERR_PTR(-EINVAL);
+
+	ret = ti_sci_cmd_get_revision(handle);
+
+	if (ret)
 		return ERR_PTR(-EINVAL);
 
 	return handle;
@@ -2825,11 +2839,15 @@ static int ti_sci_probe(struct udevice *dev)
 	list_add_tail(&info->list, &ti_sci_list);
 	ti_sci_setup_ops(info);
 
-	ret = ti_sci_cmd_get_revision(&info->handle);
-
 	INIT_LIST_HEAD(&info->dev_list);
 
-	return ret;
+	if (IS_ENABLED(CONFIG_SYSRESET_TI_SCI)) {
+		ret = device_bind_driver(dev, "ti-sci-sysreset", "sysreset", NULL);
+		if (ret)
+			dev_warn(dev, "cannot bind SYSRESET (ret = %d)\n", ret);
+	}
+
+	return 0;
 }
 
 /**

@@ -15,6 +15,7 @@ static const char * const sandbox_clk_test_names[] = {
 	[SANDBOX_CLK_TEST_ID_FIXED] = "fixed",
 	[SANDBOX_CLK_TEST_ID_SPI] = "spi",
 	[SANDBOX_CLK_TEST_ID_I2C] = "i2c",
+	[SANDBOX_CLK_TEST_ID_I2C_ROOT] = "i2c_root",
 };
 
 int sandbox_clk_test_get(struct udevice *dev)
@@ -132,18 +133,6 @@ int sandbox_clk_test_disable_bulk(struct udevice *dev)
 	struct sandbox_clk_test *sbct = dev_get_priv(dev);
 
 	return clk_disable_bulk(&sbct->bulk);
-}
-
-int sandbox_clk_test_free(struct udevice *dev)
-{
-	struct sandbox_clk_test *sbct = dev_get_priv(dev);
-	int i;
-
-	devm_clk_put(dev, sbct->clkps[SANDBOX_CLK_TEST_ID_DEVM1]);
-	for (i = 0; i < SANDBOX_CLK_TEST_NON_DEVM_COUNT; i++)
-		clk_free(&sbct->clks[i]);
-
-	return 0;
 }
 
 int sandbox_clk_test_release_bulk(struct udevice *dev)

@@ -5,7 +5,6 @@
  * Copyright (c) 2018 Heinrich Schuchardt <xypron.glpk@gmx.de>
  */
 
-#include <common.h>
 #include <charset.h>
 #include <cp1250.h>
 #include <cp437.h>
@@ -257,7 +256,7 @@ static void EFIAPI efi_fat_to_str(struct efi_unicode_collation_protocol *this,
 	for (i = 0; i < fat_size; ++i) {
 		c = (unsigned char)fat[i];
 		if (c > 0x80)
-			c = codepage[c - 0x80];
+			c = codepage[c - 0x60];
 		string[i] = c;
 		if (!c)
 			break;

@@ -7,7 +7,6 @@
 #include <common.h>
 #include <clk.h>
 #include <log.h>
-#include <asm-generic/io.h>
 #include <dm.h>
 #include <fdtdec.h>
 #include <malloc.h>
@@ -17,12 +16,12 @@
 #include <dm/device_compat.h>
 #include <linux/err.h>
 #include <linux/errno.h>
+#include <linux/io.h>
 #include <linux/sizes.h>
+#include <linux/time.h>
 #include <zynqmp_firmware.h>
 #include "cadence_qspi.h"
 #include <dt-bindings/power/xlnx-versal-power.h>
-
-#define NSEC_PER_SEC			1000000000L
 
 #define CQSPI_STIG_READ			0
 #define CQSPI_STIG_WRITE		1
@@ -38,6 +37,11 @@ __weak int cadence_qspi_apb_dma_read(struct cadence_spi_priv *priv,
 __weak int cadence_qspi_versal_flash_reset(struct udevice *dev)
 {
 	return 0;
+}
+
+__weak ofnode cadence_qspi_get_subnode(struct udevice *dev)
+{
+	return dev_read_first_subnode(dev);
 }
 
 static int cadence_spi_write_speed(struct udevice *bus, uint hz)
@@ -232,7 +236,6 @@ static int cadence_spi_probe(struct udevice *bus)
 #endif
 		} else {
 			priv->ref_clk_hz = clk_get_rate(&clk);
-			clk_free(&clk);
 			if (IS_ERR_VALUE(priv->ref_clk_hz))
 				return priv->ref_clk_hz;
 		}
@@ -249,17 +252,14 @@ static int cadence_spi_probe(struct udevice *bus)
 
 	priv->wr_delay = 50 * DIV_ROUND_UP(NSEC_PER_SEC, priv->ref_clk_hz);
 
-	if (IS_ENABLED(CONFIG_ARCH_VERSAL)) {
-		/* Versal platform uses spi calibration to set read delay */
+	/* Versal and Versal-NET use spi calibration to set read delay */
+	if (CONFIG_IS_ENABLED(ARCH_VERSAL) ||
+	    CONFIG_IS_ENABLED(ARCH_VERSAL_NET))
 		if (priv->read_delay >= 0)
 			priv->read_delay = -1;
-		/* Reset ospi flash device */
-		ret = cadence_qspi_versal_flash_reset(bus);
-		if (ret)
-			return ret;
-	}
 
-	return 0;
+	/* Reset ospi flash device */
+	return cadence_qspi_versal_flash_reset(bus);
 }
 
 static int cadence_spi_remove(struct udevice *dev)
@@ -312,13 +312,12 @@ static int cadence_spi_mem_exec_op(struct spi_slave *spi,
 		 * which is unsupported on some flash devices during register
 		 * reads, prefer STIG mode for such small reads.
 		 */
-		if (!op->addr.nbytes ||
-		    op->data.nbytes <= CQSPI_STIG_DATA_LEN_MAX)
+		if (op->data.nbytes <= CQSPI_STIG_DATA_LEN_MAX)
 			mode = CQSPI_STIG_READ;
 		else
 			mode = CQSPI_READ;
 	} else {
-		if (!op->addr.nbytes || !op->data.buf.out)
+		if (op->data.nbytes <= CQSPI_STIG_DATA_LEN_MAX)
 			mode = CQSPI_STIG_WRITE;
 		else
 			mode = CQSPI_WRITE;
@@ -362,8 +361,15 @@ static bool cadence_spi_mem_supports_op(struct spi_slave *slave,
 {
 	bool all_true, all_false;
 
-	all_true = op->cmd.dtr && op->addr.dtr && op->dummy.dtr &&
-		   op->data.dtr;
+	/*
+	 * op->dummy.dtr is required for converting nbytes into ncycles.
+	 * Also, don't check the dtr field of the op phase having zero nbytes.
+	 */
+	all_true = op->cmd.dtr &&
+		   (!op->addr.nbytes || op->addr.dtr) &&
+		   (!op->dummy.nbytes || op->dummy.dtr) &&
+		   (!op->data.nbytes || op->data.dtr);
+
 	all_false = !op->cmd.dtr && !op->addr.dtr && !op->dummy.dtr &&
 		    !op->data.dtr;
 
@@ -383,9 +389,8 @@ static int cadence_spi_of_to_plat(struct udevice *bus)
 	struct cadence_spi_priv *priv = dev_get_priv(bus);
 	ofnode subnode;
 
-	plat->regbase = (void *)devfdt_get_addr_index(bus, 0);
-	plat->ahbbase = (void *)devfdt_get_addr_size_index(bus, 1,
-			&plat->ahbsize);
+	plat->regbase = devfdt_get_addr_index_ptr(bus, 0);
+	plat->ahbbase = devfdt_get_addr_size_index_ptr(bus, 1, &plat->ahbsize);
 	plat->is_decoded_cs = dev_read_bool(bus, "cdns,is-decoded-cs");
 	plat->fifo_depth = dev_read_u32_default(bus, "cdns,fifo-depth", 128);
 	plat->fifo_width = dev_read_u32_default(bus, "cdns,fifo-width", 4);
@@ -399,7 +404,7 @@ static int cadence_spi_of_to_plat(struct udevice *bus)
 	plat->is_dma = dev_read_bool(bus, "cdns,is-dma");
 
 	/* All other parameters are embedded in the child node */
-	subnode = dev_read_first_subnode(bus);
+	subnode = cadence_qspi_get_subnode(bus);
 	if (!ofnode_valid(subnode)) {
 		printf("Error: subnode with SPI flash config missing!\n");
 		return -ENODEV;

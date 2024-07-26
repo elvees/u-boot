@@ -36,6 +36,7 @@
 #include <linux/bitops.h>
 #include <linux/clk-provider.h>
 #include <linux/err.h>
+#include <linux/printk.h>
 
 #include "clk.h"
 
@@ -184,7 +185,7 @@ struct clk *clk_hw_register_mux_table(struct device *dev, const char *name,
 	if (!mux)
 		return ERR_PTR(-ENOMEM);
 
-	/* U-boot specific assignments */
+	/* U-Boot specific assignments */
 	mux->parent_names = parent_names;
 	mux->num_parents = num_parents;
 

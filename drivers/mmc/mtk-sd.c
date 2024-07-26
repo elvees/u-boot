@@ -20,6 +20,7 @@
 #include <linux/bitops.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>
+#include <linux/printk.h>
 
 /* MSDC_CFG */
 #define MSDC_CFG_HS400_CK_MODE_EXT	BIT(22)
@@ -1130,7 +1131,7 @@ static int hs400_tune_response(struct udevice *dev, u32 opcode)
 				i << PAD_CMD_TUNE_RX_DLY3_S);
 
 		for (j = 0; j < 3; j++) {
-			mmc_send_tuning(mmc, opcode, &cmd_err);
+			cmd_err = mmc_send_tuning(mmc, opcode);
 			if (!cmd_err) {
 				cmd_delay |= (1 << i);
 			} else {
@@ -1180,7 +1181,7 @@ static int msdc_tune_response(struct udevice *dev, u32 opcode)
 				i << MSDC_PAD_TUNE_CMDRDLY_S);
 
 		for (j = 0; j < 3; j++) {
-			mmc_send_tuning(mmc, opcode, &cmd_err);
+			cmd_err = mmc_send_tuning(mmc, opcode);
 			if (!cmd_err) {
 				rise_delay |= (1 << i);
 			} else {
@@ -1202,7 +1203,7 @@ static int msdc_tune_response(struct udevice *dev, u32 opcode)
 				i << MSDC_PAD_TUNE_CMDRDLY_S);
 
 		for (j = 0; j < 3; j++) {
-			mmc_send_tuning(mmc, opcode, &cmd_err);
+			cmd_err = mmc_send_tuning(mmc, opcode);
 			if (!cmd_err) {
 				fall_delay |= (1 << i);
 			} else {
@@ -1237,7 +1238,7 @@ skip_fall:
 		clrsetbits_le32(tune_reg, MSDC_PAD_TUNE_CMDRRDLY_M,
 				i << MSDC_PAD_TUNE_CMDRRDLY_S);
 
-		mmc_send_tuning(mmc, opcode, &cmd_err);
+		cmd_err = mmc_send_tuning(mmc, opcode);
 		if (!cmd_err)
 			internal_delay |= (1 << i);
 	}
@@ -1263,7 +1264,6 @@ static int msdc_tune_data(struct udevice *dev, u32 opcode)
 	struct msdc_delay_phase final_rise_delay, final_fall_delay = { 0, };
 	u8 final_delay, final_maxlen;
 	void __iomem *tune_reg = &host->base->pad_tune;
-	int cmd_err;
 	int i, ret;
 
 	if (host->dev_comp->pad_tune0)
@@ -1276,10 +1276,10 @@ static int msdc_tune_data(struct udevice *dev, u32 opcode)
 		clrsetbits_le32(tune_reg, MSDC_PAD_TUNE_DATRRDLY_M,
 				i << MSDC_PAD_TUNE_DATRRDLY_S);
 
-		ret = mmc_send_tuning(mmc, opcode, &cmd_err);
+		ret = mmc_send_tuning(mmc, opcode);
 		if (!ret) {
 			rise_delay |= (1 << i);
-		} else if (cmd_err) {
+		} else {
 			/* in this case, retune response is needed */
 			ret = msdc_tune_response(dev, opcode);
 			if (ret)
@@ -1299,10 +1299,10 @@ static int msdc_tune_data(struct udevice *dev, u32 opcode)
 		clrsetbits_le32(tune_reg, MSDC_PAD_TUNE_DATRRDLY_M,
 				i << MSDC_PAD_TUNE_DATRRDLY_S);
 
-		ret = mmc_send_tuning(mmc, opcode, &cmd_err);
+		ret = mmc_send_tuning(mmc, opcode);
 		if (!ret) {
 			fall_delay |= (1 << i);
-		} else if (cmd_err) {
+		} else {
 			/* in this case, retune response is needed */
 			ret = msdc_tune_response(dev, opcode);
 			if (ret)
@@ -1361,7 +1361,7 @@ static int msdc_tune_together(struct udevice *dev, u32 opcode)
 	for (i = 0; i < PAD_DELAY_MAX; i++) {
 		msdc_set_cmd_delay(host, i);
 		msdc_set_data_delay(host, i);
-		ret = mmc_send_tuning(mmc, opcode, NULL);
+		ret = mmc_send_tuning(mmc, opcode);
 		if (!ret)
 			rise_delay |= (1 << i);
 	}
@@ -1377,7 +1377,7 @@ static int msdc_tune_together(struct udevice *dev, u32 opcode)
 	for (i = 0; i < PAD_DELAY_MAX; i++) {
 		msdc_set_cmd_delay(host, i);
 		msdc_set_data_delay(host, i);
-		ret = mmc_send_tuning(mmc, opcode, NULL);
+		ret = mmc_send_tuning(mmc, opcode);
 		if (!ret)
 			fall_delay |= (1 << i);
 	}
@@ -1664,7 +1664,7 @@ static int msdc_drv_probe(struct udevice *dev)
 	if (cfg->f_max < cfg->f_min || cfg->f_max > host->src_clk_freq)
 		cfg->f_max = host->src_clk_freq;
 
-	cfg->b_max = 1024;
+	cfg->b_max = CONFIG_SYS_MMC_MAX_BLK_COUNT;
 	cfg->voltages = MMC_VDD_32_33 | MMC_VDD_33_34;
 
 	host->mmc = &plat->mmc;

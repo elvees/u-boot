@@ -180,7 +180,7 @@ static inline u64 readq(const volatile void __iomem *addr)
  *  IO port access primitives
  *  -------------------------
  *
- * The NDS32 doesn't have special IO access instructions just like ARM;
+ * The RISC-V doesn't have special IO access instructions just like ARM;
  * all IO is memory mapped.
  * Note that these are defined to perform little endian accesses
  * only.  Their primary purpose is to access PCI and ISA peripherals.
@@ -218,7 +218,8 @@ static inline u64 readq(const volatile void __iomem *addr)
 #define insw(p, d, l)			readsw(__io(p), d, l)
 #define insl(p, d, l)			readsl(__io(p), d, l)
 
-static inline void readsb(unsigned int *addr, void *data, int bytelen)
+static inline void readsb(const volatile void __iomem *addr, void *data,
+			  unsigned int bytelen)
 {
 	unsigned char *ptr;
 	unsigned char *ptr2;
@@ -233,7 +234,8 @@ static inline void readsb(unsigned int *addr, void *data, int bytelen)
 	}
 }
 
-static inline void readsw(unsigned int *addr, void *data, int wordlen)
+static inline void readsw(const volatile void __iomem *addr, void *data,
+			  unsigned int wordlen)
 {
 	unsigned short *ptr;
 	unsigned short *ptr2;
@@ -248,7 +250,8 @@ static inline void readsw(unsigned int *addr, void *data, int wordlen)
 	}
 }
 
-static inline void readsl(unsigned int *addr, void *data, int longlen)
+static inline void readsl(const volatile void __iomem *addr, void *data,
+			  unsigned int longlen)
 {
 	unsigned int *ptr;
 	unsigned int *ptr2;
@@ -263,7 +266,8 @@ static inline void readsl(unsigned int *addr, void *data, int longlen)
 	}
 }
 
-static inline void writesb(unsigned int *addr, const void *data, int bytelen)
+static inline void writesb(volatile void __iomem *addr, const void *data,
+			   unsigned int bytelen)
 {
 	unsigned char *ptr;
 	unsigned char *ptr2;
@@ -278,7 +282,8 @@ static inline void writesb(unsigned int *addr, const void *data, int bytelen)
 	}
 }
 
-static inline void writesw(unsigned int *addr, const void *data, int wordlen)
+static inline void writesw(volatile void __iomem *addr, const void *data,
+			   unsigned int wordlen)
 {
 	unsigned short *ptr;
 	unsigned short *ptr2;
@@ -293,7 +298,8 @@ static inline void writesw(unsigned int *addr, const void *data, int wordlen)
 	}
 }
 
-static inline void writesl(unsigned int *addr, const void *data, int longlen)
+static inline void writesl(volatile void __iomem *addr, const void *data,
+			   unsigned int longlen)
 {
 	unsigned int *ptr;
 	unsigned int *ptr2;
@@ -307,6 +313,14 @@ static inline void writesl(unsigned int *addr, const void *data, int longlen)
 		longlen--;
 	}
 }
+
+#define readsb readsb
+#define readsw readsw
+#define readsl readsl
+#define writesb writesb
+#define writesw writesw
+#define writesl writesl
+
 #endif
 
 #define outb_p(val, port)		outb((val), (port))
@@ -322,6 +336,51 @@ static inline void writesl(unsigned int *addr, const void *data, int longlen)
 #define insb_p(port, to, len)		insb(port, to, len)
 #define insw_p(port, to, len)		insw(port, to, len)
 #define insl_p(port, to, len)		insl(port, to, len)
+
+/*
+ * Unordered I/O memory access primitives.  These are even more relaxed than
+ * the relaxed versions, as they don't even order accesses between successive
+ * operations to the I/O regions.
+ */
+#define readb_cpu(c)		({ u8  __r = __raw_readb(c); __r; })
+#define readw_cpu(c)		({ u16 __r = le16_to_cpu((__force __le16)__raw_readw(c)); __r; })
+#define readl_cpu(c)		({ u32 __r = le32_to_cpu((__force __le32)__raw_readl(c)); __r; })
+
+#define writeb_cpu(v, c)	((void)__raw_writeb((v), (c)))
+#define writew_cpu(v, c)	((void)__raw_writew((__force u16)cpu_to_le16(v), (c)))
+#define writel_cpu(v, c)	((void)__raw_writel((__force u32)cpu_to_le32(v), (c)))
+
+#ifdef CONFIG_64BIT
+#define readq_cpu(c)		({ u64 __r = le64_to_cpu((__force __le64)__raw_readq(c)); __r; })
+#define writeq_cpu(v, c)	((void)__raw_writeq((__force u64)cpu_to_le64(v), (c)))
+#endif
+
+/*
+ * Relaxed I/O memory access primitives. These follow the Device memory
+ * ordering rules but do not guarantee any ordering relative to Normal memory
+ * accesses.  These are defined to order the indicated access (either a read or
+ * write) with all other I/O memory accesses to the same peripheral. Since the
+ * platform specification defines that all I/O regions are strongly ordered on
+ * channel 0, no explicit fences are required to enforce this ordering.
+ */
+/* FIXME: These are now the same as asm-generic */
+#define __io_rbr()		do {} while (0)
+#define __io_rar()		do {} while (0)
+#define __io_rbw()		do {} while (0)
+#define __io_raw()		do {} while (0)
+
+#define readb_relaxed(c)	({ u8  __v; __io_rbr(); __v = readb_cpu(c); __io_rar(); __v; })
+#define readw_relaxed(c)	({ u16 __v; __io_rbr(); __v = readw_cpu(c); __io_rar(); __v; })
+#define readl_relaxed(c)	({ u32 __v; __io_rbr(); __v = readl_cpu(c); __io_rar(); __v; })
+
+#define writeb_relaxed(v, c)	({ __io_rbw(); writeb_cpu((v), (c)); __io_raw(); })
+#define writew_relaxed(v, c)	({ __io_rbw(); writew_cpu((v), (c)); __io_raw(); })
+#define writel_relaxed(v, c)	({ __io_rbw(); writel_cpu((v), (c)); __io_raw(); })
+
+#ifdef CONFIG_64BIT
+#define readq_relaxed(c)	({ u64 __v; __io_rbr(); __v = readq_cpu(c); __io_rar(); __v; })
+#define writeq_relaxed(v, c)	({ __io_rbw(); writeq_cpu((v), (c)); __io_raw(); })
+#endif
 
 #include <asm-generic/io.h>
 

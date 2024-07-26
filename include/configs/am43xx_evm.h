@@ -2,7 +2,7 @@
 /*
  * am43xx_evm.h
  *
- * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2013 Texas Instruments Incorporated - https://www.ti.com/
  */
 
 #ifndef __CONFIG_AM43XX_EVM_H
@@ -64,7 +64,7 @@
 #include <config_distro_bootcmd.h>
 
 #ifndef CONFIG_SPL_BUILD
-#include <environment/ti/dfu.h>
+#include <env/ti/dfu.h>
 
 #define CFG_EXTRA_ENV_SETTINGS \
 	DEFAULT_LINUX_BOOT_ENV \

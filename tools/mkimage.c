@@ -115,7 +115,7 @@ static void usage(const char *msg)
 		"          -B => align size in hex for FIT structure and header\n"
 		"          -b => append the device tree binary to the FIT\n"
 		"          -t => update the timestamp in the FIT\n");
-#ifdef CONFIG_FIT_SIGNATURE
+#if CONFIG_IS_ENABLED(FIT_SIGNATURE)
 	fprintf(stderr,
 		"Signing / verified boot options: [-k keydir] [-K dtb] [ -c <comment>] [-p addr] [-r] [-N engine]\n"
 		"          -k => set directory containing private keys\n"
@@ -130,8 +130,9 @@ static void usage(const char *msg)
 		"          -o => algorithm to use for signing\n");
 #else
 	fprintf(stderr,
-		"Signing / verified boot not supported (CONFIG_FIT_SIGNATURE undefined)\n");
+		"Signing / verified boot not supported (CONFIG_TOOLS_FIT_SIGNATURE undefined)\n");
 #endif
+
 	fprintf(stderr, "       %s -V ==> print version information and exit\n",
 		params.cmdname);
 	fprintf(stderr, "Use '-T list' to see a list of available image types\n");
@@ -599,7 +600,12 @@ int main(int argc, char **argv)
 		exit (retval);
 	}
 
-	if ((params.type != IH_TYPE_MULTI) && (params.type != IH_TYPE_SCRIPT)) {
+	if (!params.skipcpy && params.type != IH_TYPE_MULTI && params.type != IH_TYPE_SCRIPT) {
+		if (!params.datafile) {
+			fprintf(stderr, "%s: Option -d with image data file was not specified\n",
+				params.cmdname);
+			exit(EXIT_FAILURE);
+		}
 		dfd = open(params.datafile, O_RDONLY | O_BINARY);
 		if (dfd < 0) {
 			fprintf(stderr, "%s: Can't open %s: %s\n",
@@ -785,7 +791,7 @@ int main(int argc, char **argv)
 
 	/* Print the image information by processing image header */
 	if (tparams->print_header)
-		tparams->print_header (ptr);
+		tparams->print_header (ptr, &params);
 	else {
 		fprintf (stderr, "%s: Can't print header for %s\n",
 			params.cmdname, tparams->name);
@@ -860,7 +866,9 @@ copy_file (int ifd, const char *datafile, int pad)
 		exit (EXIT_FAILURE);
 	}
 
-	if (params.xflag) {
+	if (params.xflag &&
+	    (((params.type > IH_TYPE_INVALID) && (params.type < IH_TYPE_FLATDT)) ||
+	     (params.type == IH_TYPE_KERNEL_NOLOAD) || (params.type == IH_TYPE_FIRMWARE_IVT))) {
 		unsigned char *p = NULL;
 		/*
 		 * XIP: do not append the struct legacy_img_hdr at the

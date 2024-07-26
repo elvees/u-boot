@@ -2,30 +2,21 @@
 /*
  * Board specific initialization for J721E EVM
  *
- * Copyright (C) 2018-2019 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2018-2019 Texas Instruments Incorporated - https://www.ti.com/
  *	Lokesh Vutla <lokeshvutla@ti.com>
  *
  */
 
-#include <common.h>
-#include <env.h>
-#include <fdt_support.h>
 #include <generic-phy.h>
 #include <image.h>
-#include <init.h>
-#include <log.h>
 #include <net.h>
-#include <asm/arch/sys_proto.h>
 #include <asm/arch/hardware.h>
-#include <asm/global_data.h>
 #include <asm/gpio.h>
-#include <asm/io.h>
 #include <spl.h>
-#include <asm/arch/sys_proto.h>
 #include <dm.h>
-#include <dm/uclass-internal.h>
 
 #include "../common/board_detect.h"
+#include "../common/fdt_ops.h"
 
 #define board_is_j721e_som()	(board_ti_k3_is("J721EX-PM1-SOM") || \
 				 board_ti_k3_is("J721EX-PM2-SOM"))
@@ -57,7 +48,7 @@ int dram_init(void)
 	return 0;
 }
 
-phys_size_t board_get_usable_ram_top(phys_size_t total_size)
+phys_addr_t board_get_usable_ram_top(phys_size_t total_size)
 {
 #ifdef CONFIG_PHYS_64BIT
 	/* Limit RAM used by U-Boot to the DDR low region */
@@ -71,13 +62,13 @@ phys_size_t board_get_usable_ram_top(phys_size_t total_size)
 int dram_init_banksize(void)
 {
 	/* Bank 0 declares the memory available in the DDR low region */
-	gd->bd->bi_dram[0].start = CFG_SYS_SDRAM_BASE;
+	gd->bd->bi_dram[0].start = 0x80000000;
 	gd->bd->bi_dram[0].size = 0x80000000;
 	gd->ram_size = 0x80000000;
 
 #ifdef CONFIG_PHYS_64BIT
 	/* Bank 1 declares the memory available in the DDR high region */
-	gd->bd->bi_dram[1].start = CFG_SYS_SDRAM_BASE1;
+	gd->bd->bi_dram[1].start = 0x880000000;
 	gd->bd->bi_dram[1].size = 0x80000000;
 	gd->ram_size = 0x100000000;
 #endif
@@ -144,18 +135,9 @@ void spl_perform_fixups(struct spl_image_info *spl_image)
 #if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)
 int ft_board_setup(void *blob, struct bd_info *bd)
 {
-	int ret;
-
-	ret = fdt_fixup_msmc_ram(blob, "/bus@100000", "sram@70000000");
-	if (ret < 0)
-		ret = fdt_fixup_msmc_ram(blob, "/interconnect@100000",
-					 "sram@70000000");
-	if (ret)
-		printf("%s: fixing up msmc ram failed %d\n", __func__, ret);
-
 	detect_enable_hyperflash(blob);
 
-	return ret;
+	return 0;
 }
 #endif
 
@@ -318,130 +300,66 @@ static int probe_daughtercards(void)
 		printf("Detected: %s rev %s\n", ep.name, ep.version);
 		daughter_card_detect_flags[i] = true;
 
-#ifndef CONFIG_SPL_BUILD
-		int j;
-		/*
-		 * Populate any MAC addresses from daughtercard into the U-Boot
-		 * environment, starting with a card-specific offset so we can
-		 * have multiple ext_cards contribute to the MAC pool in a well-
-		 * defined manner.
-		 */
-		for (j = 0; j < mac_addr_cnt; j++) {
-			if (!is_valid_ethaddr((u8 *)mac_addr[j]))
+		if (!IS_ENABLED(CONFIG_SPL_BUILD)) {
+			int j;
+			/*
+			 * Populate any MAC addresses from daughtercard into the U-Boot
+			 * environment, starting with a card-specific offset so we can
+			 * have multiple ext_cards contribute to the MAC pool in a well-
+			 * defined manner.
+			 */
+			for (j = 0; j < mac_addr_cnt; j++) {
+				if (!is_valid_ethaddr((u8 *)mac_addr[j]))
+					continue;
+
+				eth_env_set_enetaddr_by_index("eth",
+							      ext_cards[i].eth_offset + j,
+							      (uchar *)mac_addr[j]);
+			}
+		}
+	}
+
+	if (!IS_ENABLED(CONFIG_SPL_BUILD)) {
+		char name_overlays[1024] = { 0 };
+
+		for (i = 0; i < ARRAY_SIZE(ext_cards); i++) {
+			if (!daughter_card_detect_flags[i])
 				continue;
 
-			eth_env_set_enetaddr_by_index("eth",
-						      ext_cards[i].eth_offset + j,
-						      (uchar *)mac_addr[j]);
+			/* Skip if no overlays are to be added */
+			if (!strlen(ext_cards[i].dtbo_name))
+				continue;
+
+			/*
+			 * Make sure we are not running out of buffer space by checking
+			 * if we can fit the new overlay, a trailing space to be used
+			 * as a separator, plus the terminating zero.
+			 */
+			if (strlen(name_overlays) + strlen(ext_cards[i].dtbo_name) + 2 >
+			    sizeof(name_overlays))
+				return -ENOMEM;
+
+			/* Append to our list of overlays */
+			strcat(name_overlays, ext_cards[i].dtbo_name);
+			strcat(name_overlays, " ");
 		}
-#endif
+
+		/* Apply device tree overlay(s) to the U-Boot environment, if any */
+		if (strlen(name_overlays))
+			return env_set("name_overlays", name_overlays);
 	}
-#ifndef CONFIG_SPL_BUILD
-	char name_overlays[1024] = { 0 };
-
-	for (i = 0; i < ARRAY_SIZE(ext_cards); i++) {
-		if (!daughter_card_detect_flags[i])
-			continue;
-
-		/* Skip if no overlays are to be added */
-		if (!strlen(ext_cards[i].dtbo_name))
-			continue;
-
-		/*
-		 * Make sure we are not running out of buffer space by checking
-		 * if we can fit the new overlay, a trailing space to be used
-		 * as a separator, plus the terminating zero.
-		 */
-		if (strlen(name_overlays) + strlen(ext_cards[i].dtbo_name) + 2 >
-		    sizeof(name_overlays))
-			return -ENOMEM;
-
-		/* Append to our list of overlays */
-		strcat(name_overlays, ext_cards[i].dtbo_name);
-		strcat(name_overlays, " ");
-	}
-
-	/* Apply device tree overlay(s) to the U-Boot environment, if any */
-	if (strlen(name_overlays))
-		return env_set("name_overlays", name_overlays);
-#endif
 
 	return 0;
 }
 #endif
 
-void configure_serdes_torrent(void)
-{
-	struct udevice *dev;
-	struct phy serdes;
-	int ret;
-
-	if (!IS_ENABLED(CONFIG_PHY_CADENCE_TORRENT))
-		return;
-
-	ret = uclass_get_device_by_driver(UCLASS_PHY,
-					  DM_DRIVER_GET(torrent_phy_provider),
-					  &dev);
-	if (ret) {
-		printf("Torrent init failed:%d\n", ret);
-		return;
-	}
-
-	serdes.dev = dev;
-	serdes.id = 0;
-
-	ret = generic_phy_init(&serdes);
-	if (ret) {
-		printf("phy_init failed!!: %d\n", ret);
-		return;
-	}
-
-	ret = generic_phy_power_on(&serdes);
-	if (ret) {
-		printf("phy_power_on failed!!: %d\n", ret);
-		return;
-	}
-}
-
-void configure_serdes_sierra(void)
-{
-	struct udevice *dev, *link_dev;
-	struct phy link;
-	int ret, count, i;
-	int link_count = 0;
-
-	if (!IS_ENABLED(CONFIG_PHY_CADENCE_SIERRA))
-		return;
-
-	ret = uclass_get_device_by_driver(UCLASS_MISC,
-					  DM_DRIVER_GET(sierra_phy_provider),
-					  &dev);
-	if (ret) {
-		printf("Sierra init failed:%d\n", ret);
-		return;
-	}
-
-	count = device_get_child_count(dev);
-	for (i = 0; i < count; i++) {
-		ret = device_get_child(dev, i, &link_dev);
-		if (ret) {
-			printf("probe of sierra child node %d failed: %d\n", i, ret);
-			return;
-		}
-		if (link_dev->driver->id == UCLASS_PHY) {
-			link.dev = link_dev;
-			link.id = link_count++;
-
-			ret = generic_phy_power_on(&link);
-			if (ret) {
-				printf("phy_power_on failed!!: %d\n", ret);
-				return;
-			}
-		}
-	}
-}
-
 #ifdef CONFIG_BOARD_LATE_INIT
+static struct ti_fdt_map ti_j721e_evm_fdt_map[] = {
+	{"j721e", "k3-j721e-common-proc-board.dtb"},
+	{"j721e-sk", "k3-j721e-sk.dtb"},
+	{"j7200", "k3-j7200-common-proc-board.dtb"},
+	{ /* Sentinel. */ }
+};
 static void setup_board_eeprom_env(void)
 {
 	char *name = "j721e";
@@ -461,6 +379,7 @@ static void setup_board_eeprom_env(void)
 
 invalid_eeprom:
 	set_board_info_env_am6(name);
+	ti_set_fdt_env(name, ti_j721e_evm_fdt_map);
 }
 
 static void setup_serial(void)
@@ -493,12 +412,6 @@ int board_late_init(void)
 		if (board_is_j721e_som() || board_is_j7200_som())
 			probe_daughtercards();
 	}
-
-	if (board_is_j7200_som())
-		configure_serdes_torrent();
-
-	if (board_is_j721e_som())
-		configure_serdes_sierra();
 
 	return 0;
 }
@@ -541,10 +454,8 @@ err_free_gpio:
 
 void spl_board_init(void)
 {
-#if defined(CONFIG_ESM_K3) || defined(CONFIG_ESM_PMIC)
 	struct udevice *dev;
 	int ret;
-#endif
 
 	if ((IS_ENABLED(CONFIG_TARGET_J721E_A72_EVM) ||
 	     IS_ENABLED(CONFIG_TARGET_J7200_A72_EVM)) &&
@@ -553,24 +464,23 @@ void spl_board_init(void)
 			probe_daughtercards();
 	}
 
-#ifdef CONFIG_ESM_K3
-	if (board_ti_k3_is("J721EX-PM2-SOM")) {
-		ret = uclass_get_device_by_driver(UCLASS_MISC,
-						  DM_DRIVER_GET(k3_esm), &dev);
+	if (IS_ENABLED(CONFIG_ESM_K3)) {
+		ret = uclass_get_device_by_name(UCLASS_MISC, "esm@700000", &dev);
 		if (ret)
-			printf("ESM init failed: %d\n", ret);
-	}
-#endif
+			printf("MISC init for esm@700000 failed: %d\n", ret);
 
-#ifdef CONFIG_ESM_PMIC
-	if (board_ti_k3_is("J721EX-PM2-SOM")) {
+		ret = uclass_get_device_by_name(UCLASS_MISC, "esm@40800000", &dev);
+		if (ret)
+			printf("MISC init for esm@40800000 failed: %d\n", ret);
+	}
+
+	if (IS_ENABLED(CONFIG_ESM_PMIC)) {
 		ret = uclass_get_device_by_driver(UCLASS_MISC,
 						  DM_DRIVER_GET(pmic_esm),
 						  &dev);
 		if (ret)
 			printf("ESM PMIC init failed: %d\n", ret);
 	}
-#endif
 	if ((IS_ENABLED(CONFIG_TARGET_J7200_A72_EVM) || IS_ENABLED(CONFIG_TARGET_J721E_A72_EVM)) &&
 	    IS_ENABLED(CONFIG_HBMC_AM654)) {
 		struct udevice *dev;

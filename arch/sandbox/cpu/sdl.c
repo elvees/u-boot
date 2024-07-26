@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <sysreset.h>
 #include <linux/input.h>
 #include <SDL2/SDL.h>
 #include <asm/state.h>
@@ -71,7 +72,7 @@ static struct sdl_info {
 static void sandbox_sdl_poll_events(void)
 {
 	/*
-	 * We don't want to include common.h in this file since it uses
+	 * We don't want to include cpu_func.h in this file since it uses
 	 * system headers. So add a declation here.
 	 */
 	extern void reset_cpu(void);
@@ -81,7 +82,7 @@ static void sandbox_sdl_poll_events(void)
 		switch (event.type) {
 		case SDL_QUIT:
 			puts("LCD window closed - quitting\n");
-			reset_cpu();
+			sysreset_walk(SYSRESET_POWER_OFF);
 			break;
 		}
 	}

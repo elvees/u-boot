@@ -24,6 +24,7 @@ enum rcar_gen3_clk_types {
 	CLK_TYPE_GEN3_R,
 	CLK_TYPE_GEN3_MDSEL,	/* Select parent/divider using mode pin */
 	CLK_TYPE_GEN3_Z,
+	CLK_TYPE_GEN3_ZG,
 	CLK_TYPE_GEN3_OSC,	/* OSC EXTAL predivider and fixed divider */
 	CLK_TYPE_GEN3_RCKSEL,	/* Select parent/divider using RCKCR.CKSEL */
 	CLK_TYPE_GEN3_RPCSRC,
@@ -34,8 +35,14 @@ enum rcar_gen3_clk_types {
 
 	CLK_TYPE_GEN4_MAIN,
 	CLK_TYPE_GEN4_PLL1,
-	CLK_TYPE_GEN4_PLL2X_3X,	/* PLL[23][01] */
+	CLK_TYPE_GEN4_PLL2,
+	CLK_TYPE_GEN4_PLL2X_3X,	/* R8A779A0 only */
+	CLK_TYPE_GEN4_PLL3,
 	CLK_TYPE_GEN4_PLL5,
+	CLK_TYPE_GEN4_PLL4,
+	CLK_TYPE_GEN4_PLL6,
+	CLK_TYPE_GEN4_PLL7,
+	CLK_TYPE_GEN4_SDSRC,
 	CLK_TYPE_GEN4_SDH,
 	CLK_TYPE_GEN4_SD,
 	CLK_TYPE_GEN4_MDSEL,	/* Select parent/divider using mode pin */
@@ -107,11 +114,29 @@ struct rcar_gen3_cpg_pll_config {
 	u8 pll3_mult;
 	u8 pll3_div;
 	u8 osc_prediv;
+};
+
+struct rcar_gen4_cpg_pll_config {
+	u8 extal_div;
+	u8 pll1_mult;
+	u8 pll1_div;
+	u8 pll2_mult;
+	u8 pll2_div;
+	u8 pll3_mult;
+	u8 pll3_div;
+	u8 pll4_mult;
+	u8 pll4_div;
 	u8 pll5_mult;
 	u8 pll5_div;
+	u8 pll6_mult;
+	u8 pll6_div;
+	u8 osc_prediv;
+	u8 pll7_mult;
+	u8 pll7_div;
 };
 
 #define CPG_RST_MODEMR	0x060
+#define CPG_RST_MODEMR0	0x000
 
 #define CPG_SDCKCR_STPnHCK		BIT(9)
 #define CPG_SDCKCR_STPnCK		BIT(8)
@@ -132,8 +157,11 @@ struct gen3_clk_priv {
 	struct cpg_mssr_info	*info;
 	struct clk		clk_extal;
 	struct clk		clk_extalr;
-	bool			sscg;
-	const struct rcar_gen3_cpg_pll_config *cpg_pll_config;
+	u32			cpg_mode;
+	union {
+		const struct rcar_gen3_cpg_pll_config *gen3_cpg_pll_config;
+		const struct rcar_gen4_cpg_pll_config *gen4_cpg_pll_config;
+	};
 };
 
 int gen3_cpg_bind(struct udevice *parent);

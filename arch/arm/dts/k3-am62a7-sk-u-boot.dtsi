@@ -4,137 +4,182 @@
  * Copyright (C) 2022 Texas Instruments Incorporated - https://www.ti.com/
  */
 
+#include "k3-am62a-sk-binman.dtsi"
+
 / {
 	chosen {
 		stdout-path = "serial2:115200n8";
-		tick-timer = &timer1;
+		tick-timer = &main_timer0;
 	};
 
 	memory@80000000 {
-		u-boot,dm-spl;
+		bootph-all;
 	};
 };
 
-&cbass_main{
-	u-boot,dm-spl;
+&main_timer0 {
+	bootph-all;
+};
 
-	timer1: timer@2400000 {
-		compatible = "ti,omap5430-timer";
-		reg = <0x00 0x2400000 0x00 0x80>;
-		ti,timer-alwon;
-		clock-frequency = <25000000>;
-		u-boot,dm-spl;
-	};
+&cbass_main {
+	bootph-all;
 };
 
 &dmss {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &secure_proxy_main {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &dmsc {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &k3_pds {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &k3_clks {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &k3_reset {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &wkup_conf {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &chipid {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &main_pmx0 {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &main_uart0 {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &main_uart0_pins_default {
-	u-boot,dm-spl;
-};
-
-&main_uart1 {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &cbass_mcu {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &cbass_wakeup {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &mcu_pmx0 {
-	u-boot,dm-spl;
-};
-
-&wkup_uart0 {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &main_gpio0 {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &main_i2c0 {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &main_i2c0_pins_default {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &main_i2c1 {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &main_i2c1_pins_default {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &exp1 {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &sdhci1 {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &main_mmc1_pins_default {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &k3_reset {
-	u-boot,dm-spl;
+	bootph-all;
 };
 
 &dmsc {
-	u-boot,dm-spl;
-	k3_sysreset: sysreset-controller {
-		compatible = "ti,sci-sysreset";
-		u-boot,dm-spl;
-	};
+	bootph-all;
 };
 
 &vdd_mmc1 {
-	u-boot,dm-spl;
+	bootph-all;
+};
+
+&main_bcdma {
+	reg = <0x00 0x485c0100 0x00 0x100>,
+	      <0x00 0x4c000000 0x00 0x20000>,
+	      <0x00 0x4a820000 0x00 0x20000>,
+	      <0x00 0x4aa40000 0x00 0x20000>,
+	      <0x00 0x4bc00000 0x00 0x100000>,
+	      <0x00 0x48600000 0x00 0x8000>,
+	      <0x00 0x484a4000 0x00 0x2000>,
+	      <0x00 0x484c2000 0x00 0x2000>;
+	reg-names = "gcfg", "bchanrt", "rchanrt", "tchanrt",
+		    "ringrt" , "cfg", "tchan", "rchan";
+	bootph-all;
+};
+
+&main_pktdma {
+	reg = <0x00 0x485c0000 0x00 0x100>,
+	      <0x00 0x4a800000 0x00 0x20000>,
+	      <0x00 0x4aa00000 0x00 0x20000>,
+	      <0x00 0x4b800000 0x00 0x200000>,
+	      <0x00 0x485e0000 0x00 0x10000>,
+	      <0x00 0x484a0000 0x00 0x2000>,
+	      <0x00 0x484c0000 0x00 0x2000>,
+	      <0x00 0x48430000 0x00 0x1000>;
+	reg-names = "gcfg", "rchanrt", "tchanrt", "ringrt",
+		    "cfg", "tchan", "rchan", "rflow";
+	bootph-all;
+};
+
+&main_mdio1_pins_default {
+	bootph-all;
+};
+
+&cpsw3g_mdio {
+	bootph-all;
+};
+
+&cpsw3g_phy0 {
+	bootph-all;
+};
+
+&main_rgmii1_pins_default {
+	bootph-all;
+};
+
+&phy_gmii_sel {
+	bootph-all;
+};
+
+&cpsw3g {
+	bootph-all;
+	ethernet-ports {
+		bootph-all;
+	};
+};
+
+&cpsw_port1 {
+	bootph-all;
 };

@@ -16,6 +16,7 @@
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <linux/delay.h>
+#include <linux/printk.h>
 #include "pcie_fsl.h"
 #include <dm/device_compat.h>
 
@@ -58,6 +59,14 @@ static int fsl_pcie_read_config(const struct udevice *bus, pci_dev_t bdf,
 		return 0;
 	}
 
+	/* Skip Freescale PCIe controller's PEXCSRBAR register */
+	if (PCI_BUS(bdf) - dev_seq(bus) == 0 &&
+	    PCI_DEV(bdf) == 0 && PCI_FUNC(bdf) == 0 &&
+	    (offset & ~3) == PCI_BASE_ADDRESS_0) {
+		*valuep = 0;
+		return 0;
+	}
+
 	val = PCI_CONF1_EXT_ADDRESS(PCI_BUS(bdf) - dev_seq(bus),
 				    PCI_DEV(bdf), PCI_FUNC(bdf),
 				    offset);
@@ -93,6 +102,12 @@ static int fsl_pcie_write_config(struct udevice *bus, pci_dev_t bdf,
 	u32 val_32;
 
 	if (fsl_pcie_addr_valid(pcie, bdf))
+		return 0;
+
+	/* Skip Freescale PCIe controller's PEXCSRBAR register */
+	if (PCI_BUS(bdf) - dev_seq(bus) == 0 &&
+	    PCI_DEV(bdf) == 0 && PCI_FUNC(bdf) == 0 &&
+	    (offset & ~3) == PCI_BASE_ADDRESS_0)
 		return 0;
 
 	val = PCI_CONF1_EXT_ADDRESS(PCI_BUS(bdf) - dev_seq(bus),

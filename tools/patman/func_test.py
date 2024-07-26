@@ -23,9 +23,9 @@ from patman import patchstream
 from patman.patchstream import PatchStream
 from patman.series import Series
 from patman import settings
-from patman import terminal
-from patman import tools
-from patman.test_util import capture_sys_output
+from u_boot_pylib import terminal
+from u_boot_pylib import tools
+from u_boot_pylib.test_util import capture_sys_output
 
 import pygit2
 from patman import status
@@ -240,6 +240,8 @@ class TestFunctional(unittest.TestCase):
         self.assertEqual('Change log missing for v3', next(lines))
         self.assertEqual('Change log for unknown version v4', next(lines))
         self.assertEqual("Alias 'pci' not found", next(lines))
+        while next(lines) != 'Cc processing complete':
+            pass
         self.assertIn('Dry run', next(lines))
         self.assertEqual('', next(lines))
         self.assertIn('Send a total of %d patches' % count, next(lines))
@@ -487,8 +489,8 @@ complicated as possible''')
         # pylint: disable=E1101
         self.repo.checkout(target, strategy=pygit2.GIT_CHECKOUT_FORCE)
         control.setup()
+        orig_dir = os.getcwd()
         try:
-            orig_dir = os.getcwd()
             os.chdir(self.gitdir)
 
             # Check that it can detect the current branch
@@ -677,8 +679,8 @@ diff --git a/lib/efi_loader/efi_memory.c b/lib/efi_loader/efi_memory.c
         self.repo.checkout(target, strategy=pygit2.GIT_CHECKOUT_FORCE)
 
         # Check that it can detect the current branch
+        orig_dir = os.getcwd()
         try:
-            orig_dir = os.getcwd()
             os.chdir(self.gitdir)
             with self.assertRaises(ValueError) as exc:
                 gitutil.count_commits_to_branch(None)
