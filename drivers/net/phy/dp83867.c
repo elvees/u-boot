@@ -7,6 +7,7 @@
 #include <log.h>
 #include <phy.h>
 #include <dm/devres.h>
+#include <linux/bitfield.h>
 #include <linux/bitops.h>
 #include <linux/compat.h>
 #include <malloc.h>
@@ -21,6 +22,7 @@
 #define DP83867_DEVADDR		0x1f
 
 #define MII_DP83867_PHYCTRL	0x10
+#define MII_DP83867_PHYSTS	0x11
 #define MII_DP83867_MICR	0x12
 #define MII_DP83867_CFG2	0x14
 #define MII_DP83867_BISCR	0x16
@@ -76,6 +78,10 @@
 #define DP83867_PHYCTRL_SGMIIEN			0x0800
 #define DP83867_PHYCTRL_RXFIFO_SHIFT	12
 #define DP83867_PHYCTRL_TXFIFO_SHIFT	14
+
+/* PHYSTS bits */
+#define DP83867_PHYSTS_SPEED_SELECTION		GENMASK(15, 14)
+#define DP83867_PHYSTS_DUPLEX_MODE		BIT(13)
 
 /* RGMIIDCTL bits */
 #define DP83867_RGMII_TX_CLK_DELAY_MAX		0xf
@@ -398,6 +404,56 @@ err_out:
 	return ret;
 }
 
+/* After link downshift DP83867 can leave set bits 10, 11 (support for
+ * 1000BASE-T) in STS1 register. And standard genphy_parse_link() function will
+ * read incorrect speed from these bits.
+ * dp83867_parse_link() function uses PHYSTS register where stores correct
+ * speed even after link downshift.
+ */
+static int dp83867_parse_link(struct phy_device *phydev)
+{
+	if (phydev->autoneg == AUTONEG_ENABLE) {
+		int physts = phy_read(phydev, MDIO_DEVAD_NONE,
+				      MII_DP83867_PHYSTS);
+
+		if (physts < 0)
+			return physts;
+
+		switch (FIELD_GET(DP83867_PHYSTS_SPEED_SELECTION, physts)) {
+		case 0:
+			phydev->speed = SPEED_10;
+			break;
+		case 1:
+			phydev->speed = SPEED_100;
+			break;
+		case 2:
+			phydev->speed = SPEED_1000;
+			break;
+		default:
+			pr_err("Unknown PHY speed\n");
+			return -EINVAL;
+		}
+
+		phydev->duplex = (physts & DP83867_PHYSTS_DUPLEX_MODE) ?
+				 DUPLEX_FULL : DUPLEX_HALF;
+
+		return 0;
+	} else {
+		return genphy_parse_link(phydev);
+	}
+}
+
+static int dp83867_startup(struct phy_device *phydev)
+{
+	int ret;
+
+	ret = genphy_update_link(phydev);
+	if (ret)
+		return ret;
+
+	return dp83867_parse_link(phydev);
+}
+
 static int dp83867_probe(struct phy_device *phydev)
 {
 	struct dp83867_private *dp83867;
@@ -417,6 +473,6 @@ U_BOOT_PHY_DRIVER(dp83867) = {
 	.features = PHY_GBIT_FEATURES,
 	.probe = dp83867_probe,
 	.config = &dp83867_config,
-	.startup = &genphy_startup,
+	.startup = &dp83867_startup,
 	.shutdown = &genphy_shutdown,
 };
