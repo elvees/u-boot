@@ -5,13 +5,13 @@
 
 /dts-v1/;
 
-#include "mcom03-elvmc03smarc-r1.0.dtsi"
+#include "mcom03-elvmc03smarc-r2.2.0.dtsi"
 
-/ {	model = "ELV-MC03-SMARC r1.0, ELV-SMARC-CB r2.10";
-	compatible = "elvees,elvmc03smarc-r1.0-elvsmarccb-r2.10",
-		     "elvees,elvsmarccb-r2.10",
+/ {	model = "ELV-MC03-SMARC r2.2.0, ELV-SMARC-CB r2.9.1";
+	compatible = "elvees,elvmc03smarc-r2.2.0-elvsmarccb-r2.9.1",
+		     "elvees,elvsmarccb-r2.9.1",
 		     "elvees,elvsmarccb",
-		     "elvees,elvmc03smarc-r1.0",
+		     "elvees,elvmc03smarc-r2.2.0",
 		     "elvees,elvmc03smarc",
 		     "elvees,mcom03";
 
@@ -36,12 +36,10 @@
 	sdhci-caps-mask = <0x7 0x4000000>;
 	sdhci-caps = <0x0 0x0>;
 
-	/* SDIO_WP is not connected on ELV-SMARC-CB r2.10.3 */
-	disable-wp;
-
 	/* The default clock pad drive strength of 6 mA is insufficient
-	* for some ELV-SMARC-CBs resulting in unstable SDMMC performance.
-	*/
+	 * for ELV-SMARC-CB resulting in unstable SDMMC performance
+	 * (possibly due to a PCB bug).
+	 */
 	elvees,drive-strength-clk = <8>;
 };
 
@@ -57,7 +55,6 @@
 	status = "okay";
 };
 
-/* Connected to USB 2.0 hub */
 &usb1 {
 	status = "okay";
 };

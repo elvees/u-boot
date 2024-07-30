@@ -3,16 +3,16 @@
 
 /dts-v1/;
 
-#include "mcom03-elvmc03smarc-r2.2.dtsi"
+#include "mcom03-elvmc03smarc-r2.2.0.dtsi"
 #include "mcom03-smarccommoncb-r1.0.dtsi"
 
 / {
-	model = "ELV-MC03-SMARC r2.2, SMARC-COMMON-CB r1.0";
-	compatible = "elvees,elvmc03smarc-r2.2-smarccommoncb-r1.0",
+	model = "ELV-MC03-SMARC r2.2.0, SMARC-COMMON-CB r1.0";
+	compatible = "elvees,elvmc03smarc-r2.2.0-smarccommoncb-r1.0",
 		     "elvees,elvmc03smarc-smarccommoncb",
 		     "elvees,smarccommoncb-r1.0",
 		     "elvees,smarccommoncb",
-		     "elvees,elvmc03smarc-r2.2",
+		     "elvees,elvmc03smarc-r2.2.0",
 		     "elvees,elvmc03smarc",
 		     "elvees,mcom03";
 

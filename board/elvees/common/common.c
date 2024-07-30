@@ -360,7 +360,7 @@ int power_init_board(void)
 {
 	if (of_machine_is_compatible("elvees,elvmc03smarc-r1.0"))
 		power_init_elvmc03smarc_r10();
-	else if (of_machine_is_compatible("elvees,elvmc03smarc-r2.2") ||
+	else if (of_machine_is_compatible("elvees,elvmc03smarc-r2.2.0") ||
 		 of_machine_is_compatible("elvees,elvmc03smarc-r2.6.1") ||
 		 of_machine_is_compatible("elvees,elvmc03smarc-r2.7.1") ||
 		 of_machine_is_compatible("elvees,elvmc03smarc-r2.9.1"))
