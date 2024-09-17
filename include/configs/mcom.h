@@ -164,13 +164,6 @@
 #ifndef CONFIG_SPL_BUILD
 
 /* Default environment */
-#if defined(CONFIG_TARGET_ECAM02DM) || defined(CONFIG_TARGET_ECAM02DM3) || \
-	defined(CONFIG_TARGET_ECAM02DM31)
-#define CONFIG_BOOTFILE			"/boot/zImage"
-#else
-#define CONFIG_BOOTFILE			"zImage"
-#endif  /* CONFIG_TARGET_ECAM02DM || CONFIG_TARGET_ECAM02DM3 */
-
 #define CONFIG_LOADADDR			0x40000000
 
 #define CONFIG_PREBOOT \
@@ -205,13 +198,9 @@
 #else
 #define BOOT_TARGET_DEVICES(func) \
 	func(MMC, mmc, 0) \
-	func(LEGACY_MMC, legacy_mmc, 0) \
 	func(MMC, mmc, 1) \
-	func(LEGACY_MMC, legacy_mmc, 1) \
 	func(USB, usb, 0) \
-	func(LEGACY_USB, legacy_usb, 0) \
-	func(UBIFS, ubifs, 0) \
-	func(LEGACY_UBIFS, legacy_ubifs, 0)
+	func(UBIFS, ubifs, 0)
 #endif  /* CONFIG_TARGET_ECAM02DM || CONFIG_TARGET_ECAM02DM3 */
 
 #include <config_distro_bootcmd.h>
@@ -258,48 +247,15 @@ defined(CONFIG_TARGET_ECAM02DM3) || defined(CONFIG_TARGET_ECAM02DM31)
 	"run legacy_bootcmd\0"
 
 #define EXTRA_CMDLINE " ubi.fm_autoconvert=1 vinc.cacheable=1 panic=1"
-#else
-#define ROOTFS_OPTIONS "rw"
 
-#define BOOTUBIVOL
-
-#define EXTRA_BOOTENV
-
-#define EXTRA_CMDLINE
-#endif  /* CONFIG_TARGET_ECAM02DM || CONFIG_TARGET_ECAM02DM3 */
-
-#ifndef FDTFILE
-#define FDTFILE CONFIG_DEFAULT_DEVICE_TREE
-#endif
-
-#define FDTFILE_ENV "fdtfile=" __stringify(FDTFILE) ".dtb\0"
-
-#define CONFIG_EXTRA_ENV_SETTINGS \
-	"bootm_size=0x8000000\0" \
-	"stdin=serial\0" \
-	"bootelf_spioffset=0x100000\0" \
-	"bootelf_spibus=0\0" \
-	"bootelf_addr=0x50000000\0" \
-	"bootelf_elfsize=0x200000\0" \
-	"bootfile=" CONFIG_BOOTFILE "\0" \
-	"stdout=serial\0" \
-	"stderr=serial\0" \
-	DDRCTL_CMD \
-	"ddrctl_cid=1\0" \
+#define LEGACY_BOOTENV \
+	"bootfile=/boot/zImage\0" \
 	"bootenvcmd=\0" \
-	"console=ttyS0,115200\0" \
-	"rootfs_options=" ROOTFS_OPTIONS "\0" \
-	"cmdline=" EXTRA_CMDLINE "\0" \
 	"bootpartnum=1\0" \
 	"rootpartnum=2\0" \
-	"usb_pgood_delay=5000\0" \
-	"bootubipart=allnand\0" \
-	BOOTUBIVOL \
 	"loadbootfile=load ${loaddev} ${loadpart} ${loadaddr} ${bootfile}\0" \
-	"set_bootargs=setenv bootargs console=${console} " \
-		"root=${rootfsdev} rootfstype=${rootfstype} rootwait " \
-		"${rootfs_options} ${cmdline}\0" \
-	"mcomboot=run set_bootargs;bootz ${loadaddr} - ${fdtcontroladdr}\0" \
+	"rootfs_options=" ROOTFS_OPTIONS "\0" \
+	"cmdline=" EXTRA_CMDLINE "\0" \
 	"legacy_bootcmd=" \
 		"if test -n ${bootenvcmd}; then " \
 			"run bootenvcmd;" \
@@ -332,13 +288,49 @@ defined(CONFIG_TARGET_ECAM02DM3) || defined(CONFIG_TARGET_ECAM02DM31)
 		"ubi part ${bootubipart};" \
 		"ubifsmount ubi:boot;" \
 		"run legacy_bootcmd\0" \
+	"mcomboot=run set_bootargs;bootz ${loadaddr} - ${fdtcontroladdr}\0" \
+	"set_bootargs=setenv bootargs console=${console} " \
+		"root=${rootfsdev} rootfstype=${rootfstype} rootwait " \
+		"${rootfs_options} ${cmdline}\0"
+#else
+#define LEGACY_BOOTENV
+
+#define BOOTUBIVOL
+
+#define EXTRA_BOOTENV
+
+#define EXTRA_CMDLINE
+#endif  /* CONFIG_TARGET_ECAM02DM || CONFIG_TARGET_ECAM02DM3 */
+
+#ifndef FDTFILE
+#define FDTFILE CONFIG_DEFAULT_DEVICE_TREE
+#endif
+
+#define FDTFILE_ENV "fdtfile=" __stringify(FDTFILE) ".dtb\0"
+
+#define CONFIG_EXTRA_ENV_SETTINGS \
+	"bootm_size=0x8000000\0" \
+	"stdin=serial\0" \
+	"bootelf_spioffset=0x100000\0" \
+	"bootelf_spibus=0\0" \
+	"bootelf_addr=0x50000000\0" \
+	"bootelf_elfsize=0x200000\0" \
+	"findfdt=" \
+		"setenv fdt_addr ${fdtcontroladdr};\0" \
+	"stdout=serial\0" \
+	"stderr=serial\0" \
+	DDRCTL_CMD \
+	"ddrctl_cid=1\0" \
+	"console=ttyS0,115200\0" \
+	"usb_pgood_delay=5000\0" \
+	"bootubipart=allnand\0" \
+	BOOTUBIVOL \
+	LEGACY_BOOTENV \
 	"fdt_addr_r=0x46000000\0" \
 	"pxefile_addr_r=0x47000000\0" \
 	"scriptaddr=0x47000000\0" \
 	KERNEL_ADDR_R \
 	"ramdisk_addr_r=0x50000000\0" \
-	"findfdt=" \
-		"setenv fdt_addr ${fdtcontroladdr};\0" \
 	FDTFILE_ENV \
 	BOOTENV \
 	EXTRA_BOOTENV
