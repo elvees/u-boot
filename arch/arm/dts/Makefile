@@ -1301,7 +1301,7 @@ dtb-$(CONFIG_ARCH_MCOM03) += \
 	mcom03-elvmc03smarc-r2.7.1-elvsmarccb-r3.2.1.dtb \
 	mcom03-elvmc03smarc-r2.7.1-thincb4-r1.0.0.dtb \
 	mcom03-elvmc03smarc-r2.9.1-elvsmarccb-r3.3.0.dtb \
-	mcom03-bub-r1.3.0.dtb \
+	mcom03-mcom03bub-r1.3.0.dtb \
 	mcom03-haps-cpu.dtb \
 	mcom03-haps-sdr.dtb \
 	mcom03-haps-media.dtb \

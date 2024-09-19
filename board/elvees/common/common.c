@@ -209,7 +209,7 @@ static void pad_set_ctl(unsigned long reg, u32 value)
 
 static void board_pads_cfg(void)
 {
-	if (of_machine_is_compatible("elvees,mcom03-bub")) {
+	if (of_machine_is_compatible("elvees,mcom03bub")) {
 		nand_pad_cfg();
 
 		/* Set EMAC pads drive strength to 12 mA for data and 8 mA for clock.
