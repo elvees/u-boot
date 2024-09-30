@@ -223,18 +223,6 @@ defined(CONFIG_TARGET_ECAM02DM3) || defined(CONFIG_TARGET_ECAM02DM31)
 #define DDRCTL_CMD "ddrctl_cmd=disable\0"
 #endif
 
-#if defined(CONFIG_TARGET_SALUTE_D1) || defined(CONFIG_TARGET_SALUTE_D2)
-#define BLACKLIST "modprobe.blacklist=vpoutfb"
-#else
-#define BLACKLIST
-#endif
-
-#ifdef CONFIG_TARGET_SALUTE_PM
-#define VIDEO_MODE "video=HDMI:1920x1080"
-#else
-#define VIDEO_MODE
-#endif
-
 #ifdef CONFIG_FIT
 #define KERNEL_ADDR_R "kernel_addr_r=0xC0000000\0"
 #else
@@ -301,7 +289,7 @@ defined(CONFIG_TARGET_ECAM02DM3) || defined(CONFIG_TARGET_ECAM02DM31)
 	"bootenvcmd=\0" \
 	"console=ttyS0,115200\0" \
 	"rootfs_options=" ROOTFS_OPTIONS "\0" \
-	"cmdline=" BLACKLIST VIDEO_MODE EXTRA_CMDLINE "\0" \
+	"cmdline=" EXTRA_CMDLINE "\0" \
 	"bootpartnum=1\0" \
 	"rootpartnum=2\0" \
 	"usb_pgood_delay=5000\0" \
