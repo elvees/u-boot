@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright 2024 RnD Center "ELVEES", JSC
+
+/dts-v1/;
+
+#include "mcom03-elvmc03ce-r2.5.0-elvcecb-r1.0.0.dts"
+
+/ {
+	model = "ELV-MC03-CE r2.8.1, ELV-CE-CB r3.3.0";
+	compatible = "elvees,elvmc03ce-r2.8.1-elvcecb-r3.3.0",
+		     "elvees,elvmc03ce-elvcecb",
+		     "elvees,elvcecb-r3.3.0",
+		     "elvees,elvcecb",
+		     "elvees,elvmc03ce-r2.8.1",
+		     "elvees,elvmc03ce",
+		     "elvees,mcom03";
+};
+
+&qspi0 {
+	/delete-node/ w25q16@0;
+
+	flash0: w25q128@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor", "spi-flash";
+		reg = <0x0>;
+		/* This is the highest frequency at which all commands are
+		 * supported by the flash device.
+		 */
+		spi-max-frequency = <50000000>;
+
+		spi-tx-bus-width = <4>;
+		spi-rx-bus-width = <4>;
+	};
+};
