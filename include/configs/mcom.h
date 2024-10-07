@@ -197,8 +197,8 @@
 #define BOOT_TARGET_DEVICES(func)	func(ECAM02DM, ecam02dm, 0)
 #else
 #define BOOT_TARGET_DEVICES(func) \
-	func(MMC, mmc, 0) \
 	func(MMC, mmc, 1) \
+	func(MMC, mmc, 0) \
 	func(USB, usb, 0) \
 	func(UBIFS, ubifs, 0)
 #endif  /* CONFIG_TARGET_ECAM02DM || CONFIG_TARGET_ECAM02DM3 */
