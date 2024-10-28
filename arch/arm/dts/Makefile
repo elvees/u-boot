@@ -1290,6 +1290,7 @@ dtb-$(CONFIG_ARCH_MCOM03) += \
 	mcom03-elvmc03smarc-r2.6.1-smarccommoncb-r1.0.dtb \
 	mcom03-elvmc03smarc-r2.7.1-smarccommoncb-r1.0.dtb \
 	mcom03-elvmc03smarc-r2.9.1-smarccommoncb-r1.0.dtb \
+	mcom03-elvmc03smarc-r2.11.0-smarccommoncb-r1.0.dtb \
 	mcom03-elvmc03smarc-r1.0-ngfwcb-r1.0.dtb \
 	mcom03-elvmc03smarc-r1.0-elvsmarccb-r1.0.dtb \
 	mcom03-elvmc03smarc-r1.0-elvsmarccb-r2.10.3.dtb \
@@ -1303,6 +1304,7 @@ dtb-$(CONFIG_ARCH_MCOM03) += \
 	mcom03-elvmc03smarc-r2.7.1-elvsmarccb-r3.2.1.dtb \
 	mcom03-elvmc03smarc-r2.7.1-thincb4-r1.0.0.dtb \
 	mcom03-elvmc03smarc-r2.9.1-elvsmarccb-r3.3.0.dtb \
+	mcom03-elvmc03smarc-r2.11.0-elvsmarccb-r3.3.0.dtb \
 	mcom03-mcom03bub-r1.3.0.dtb \
 	mcom03-haps-cpu.dtb \
 	mcom03-haps-sdr.dtb \
