@@ -267,6 +267,32 @@ static void board_pads_cfg(void)
 		val = readl(LSP1_GPIO_SWPORTD_DR);
 		val |= BIT(2);
 		writel(val, LSP1_GPIO_SWPORTD_DR);
+	} else if (of_machine_is_compatible("elvees,pm03cam-r2.0")) {
+		/* Set lens motors GPIO pins to logical one output mode in order to prevent
+		 * motors overheating caused by bug #IPCAM-740.
+		 */
+		/* Setup GPIO_IRIS pins */
+		val = readl(LSP0_GPIO_SWPORTC_DDR);
+		val |= BIT(4) | BIT(2) | BIT(1) | BIT(0);
+		writel(val, LSP0_GPIO_SWPORTC_DDR);
+		val = readl(LSP0_GPIO_SWPORTC_DR);
+		val |= BIT(4) | BIT(2) | BIT(1) | BIT(0);
+		writel(val, LSP0_GPIO_SWPORTC_DR);
+
+		/* Setup GPIO_IR_CUT pins */
+		val = readl(LSP0_GPIO_SWPORTD_DDR);
+		val |= BIT(1) | BIT(0);
+		writel(val, LSP0_GPIO_SWPORTD_DDR);
+		val = readl(LSP0_GPIO_SWPORTD_DR);
+		val |= BIT(1) | BIT(0);
+		writel(val, LSP0_GPIO_SWPORTD_DR);
+
+		/* U-Boot doesn't have pinctrl driver, so switch pad voltage manually */
+		lsperiph1_v18_pad_cfg();
+
+		/* Setup GPIO_ZOOM, GPIO_FOCUS pins */
+		writel(0xFF, LSP1_GPIO_SWPORTC_DDR);
+		writel(0xFF, LSP1_GPIO_SWPORTC_DR);
 	} else if (of_machine_is_compatible("elvees,elvmc03smarc-r2.6.1") ||
 		   of_machine_is_compatible("elvees,elvmc03smarc-r2.7.1") ||
 		   of_machine_is_compatible("elvees,elvmc03smarc-r2.9.1")) {
