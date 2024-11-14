@@ -3086,6 +3086,12 @@ sub process {
 			}
 		}
 
+# Extend list of checkpatch tests to ignore
+		if ($in_commit_log && $line =~ /^\s*Checkpatch-Ignore:\s*(.*)/) {
+			my @array = split(/[\s,]+/, $1);
+			hash_save_array_words(\%ignore_type, \@array);
+		}
+
 # Check for patch separator
 		if ($line =~ /^---$/) {
 			$has_patch_separator = 1;

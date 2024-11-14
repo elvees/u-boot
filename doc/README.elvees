@@ -1,0 +1,18 @@
+# Copyright 2024 RnD Center "ELVEES", JSC
+
+To ignore the specific check based on the git trailers of commit message
+provide a list of checkpatch tests to ignore delimited by comma.
+
+Example of usage:
+  Checkpatch-Ignore: <tests to ignore 0>, <tests to ignore 1>, ...
+
+For example to ignore the checkpatch issue such as:
+
+  WARNING:PREFER_IF: Use 'if (IS_ENABLED(CONFIG...))' instead of '#if or #ifdef' where possible
+
+use the following git trailers:
+
+  Checkpatch-Ignore: PREFER_IF
+
+By default checkpath doesn't provide a message type. To show a message type in output
+messages the '--show-types' command line argument has to be provided in checkpatch call.
