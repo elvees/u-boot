@@ -210,6 +210,12 @@
 #define BOOT_TARGET_DEVICES_UBIFS(func)
 #endif
 
+#if IS_ENABLED(CONFIG_CMD_DHCP) && IS_ENABLED(CONFIG_CMD_PXE)
+#define BOOT_TARGET_DEVICES_PXE(func) func(PXE, pxe, na)
+#else
+#define BOOT_TARGET_DEVICES_PXE(func)
+#endif
+
 #if defined(CONFIG_TARGET_ECAM02DM) || defined(CONFIG_TARGET_ECAM02DM3) || \
 	defined(CONFIG_TARGET_ECAM02DM31)
 #define BOOTENV_DEV_ECAM02DM		BOOTENV_DEV_BLKDEV
@@ -219,7 +225,8 @@
 #define BOOT_TARGET_DEVICES(func) \
 	BOOT_TARGET_DEVICES_MMC(func) \
 	BOOT_TARGET_DEVICES_USB(func) \
-	BOOT_TARGET_DEVICES_UBIFS(func)
+	BOOT_TARGET_DEVICES_UBIFS(func) \
+	BOOT_TARGET_DEVICES_PXE(func)
 #endif  /* CONFIG_TARGET_ECAM02DM || CONFIG_TARGET_ECAM02DM3 */
 
 #include <config_distro_bootcmd.h>
@@ -348,6 +355,7 @@ defined(CONFIG_TARGET_ECAM02DM3) || defined(CONFIG_TARGET_ECAM02DM31)
 	"fdt_addr_r=0x46000000\0" \
 	"pxefile_addr_r=0x47000000\0" \
 	"scriptaddr=0x47000000\0" \
+	"serverip=127.0.0.0\0" \
 	KERNEL_ADDR_R \
 	"ramdisk_addr_r=0x50000000\0" \
 	FDTFILE_ENV \
