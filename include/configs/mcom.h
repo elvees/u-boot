@@ -190,6 +190,26 @@
 #define BOOTENV_DEV_NAME_LEGACY_USB	BOOTENV_DEV_NAME_BLKDEV
 #define BOOTENV_DEV_NAME_LEGACY_UBIFS	BOOTENV_DEV_NAME_BLKDEV
 
+#if IS_ENABLED(CONFIG_CMD_MMC)
+#define BOOT_TARGET_DEVICES_MMC(func) \
+	func(MMC, mmc, 1) \
+	func(MMC, mmc, 0)
+#else
+#define BOOT_TARGET_DEVICES_MMC(func)
+#endif
+
+#if IS_ENABLED(CONFIG_CMD_USB)
+#define BOOT_TARGET_DEVICES_USB(func) func(USB, usb, 0)
+#else
+#define BOOT_TARGET_DEVICES_USB(func)
+#endif
+
+#if IS_ENABLED(CONFIG_CMD_UBIFS)
+#define BOOT_TARGET_DEVICES_UBIFS(func) func(UBIFS, ubifs, 0)
+#else
+#define BOOT_TARGET_DEVICES_UBIFS(func)
+#endif
+
 #if defined(CONFIG_TARGET_ECAM02DM) || defined(CONFIG_TARGET_ECAM02DM3) || \
 	defined(CONFIG_TARGET_ECAM02DM31)
 #define BOOTENV_DEV_ECAM02DM		BOOTENV_DEV_BLKDEV
@@ -197,10 +217,9 @@
 #define BOOT_TARGET_DEVICES(func)	func(ECAM02DM, ecam02dm, 0)
 #else
 #define BOOT_TARGET_DEVICES(func) \
-	func(MMC, mmc, 1) \
-	func(MMC, mmc, 0) \
-	func(USB, usb, 0) \
-	func(UBIFS, ubifs, 0)
+	BOOT_TARGET_DEVICES_MMC(func) \
+	BOOT_TARGET_DEVICES_USB(func) \
+	BOOT_TARGET_DEVICES_UBIFS(func)
 #endif  /* CONFIG_TARGET_ECAM02DM || CONFIG_TARGET_ECAM02DM3 */
 
 #include <config_distro_bootcmd.h>
