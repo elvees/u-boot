@@ -100,6 +100,9 @@
 #define CONFIG_POWER_PFUZE100_I2C_ADDR	0x08
 #endif
 
+/* Ethernet */
+#define CONFIG_TFTP_PORT
+
 /* Serial & console */
 #define CONFIG_SYS_NS16550
 #define CONFIG_SYS_NS16550_SERIAL
