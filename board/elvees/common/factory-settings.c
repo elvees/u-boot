@@ -54,10 +54,41 @@ static int get_mmc_device_num(void)
 
 static int enable_mmc_wp(int dev_num, int bootpart)
 {
+	u8 wp;
+	int ret;
+	struct mmc *mmc;
+
 	if (IS_ENABLED(CONFIG_MCOM03_EMMC_BOOT_WP_DISABLED))
 		return 0;
 
-	return mmc_boot_wp_single_partition(find_mmc_device(dev_num), bootpart);
+	mmc = find_mmc_device(dev_num);
+
+	ALLOC_CACHE_ALIGN_BUFFER(u8, ext_csd, MMC_MAX_BLOCK_LEN);
+	ret = mmc_send_ext_csd(mmc, ext_csd);
+	if (ret)
+		return ret;
+
+	if (bootpart != MMC_BOOT_0 && bootpart != MMC_BOOT_1)
+		return -EPERM;
+
+	wp = ext_csd[EXT_CSD_BOOT_WP_STATUS];
+	wp >>= (bootpart << 1);
+
+	switch (wp & 3) {
+	case 0:
+		return mmc_boot_wp_single_partition(mmc, bootpart);
+	case 1:
+		log_debug("Boot area %d is already power on protected\n", bootpart);
+		break;
+	case 2:
+		log_debug("Boot area %d is already permanently protected\n", bootpart);
+		break;
+	default:
+		log_err("Boot area %d is in reserved protection state\n", bootpart);
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 static int get_factory_settings(int dev_num, int hwpart, int part, const char *filename,
