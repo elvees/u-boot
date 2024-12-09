@@ -348,7 +348,7 @@ int do_factory_settings(const char *board_name)
 	int ret = 0;
 
 	if (!board_name) {
-		printf("\n   %s called with the NULL 'board_name' pointer\n", __func__);
+		printf("%s called with the NULL 'board_name' pointer\n", __func__);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -357,14 +357,14 @@ int do_factory_settings(const char *board_name)
 	if (factory.wp) {
 		ret = enable_mmc_wp(factory.dev_num, MMC_BOOT_0);
 		if (ret) {
-			printf("\n   Unable to write protect mmc %d boot %d\n",
+			printf("Unable to write protect mmc %d boot %d\n",
 			       factory.dev_num, MMC_BOOT_0);
 			goto exit;
 		}
 	}
 
 	if (env_set("board", board_name)) {
-		printf("\n   Unable to set board using value %s\n", board_name);
+		printf("Unable to set board using value %s\n", board_name);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -375,7 +375,7 @@ int do_factory_settings(const char *board_name)
 	if (!env_get("ethaddr")) {
 		if (factory.eth0_mac) {
 			if (env_set("ethaddr", factory.eth0_mac)) {
-				printf("\n   Unable to set ethaddr using factory value %s\n",
+				printf("Unable to set ethaddr using factory value %s\n",
 				       factory.eth0_mac);
 				ret = -EINVAL;
 				goto exit;
@@ -389,7 +389,7 @@ int do_factory_settings(const char *board_name)
 	if (!env_get("eth1addr")) {
 		if (factory.eth1_mac) {
 			if (env_set("eth1addr", factory.eth1_mac)) {
-				printf("\n   Unable to set eth1addr using factory value %s\n",
+				printf("Unable to set eth1addr using factory value %s\n",
 				       factory.eth1_mac);
 				ret = -EINVAL;
 				goto exit;
@@ -401,7 +401,7 @@ int do_factory_settings(const char *board_name)
 	if (!env_get("serial#")) {
 		if (factory.serial) {
 			if (env_set("serial#", factory.serial)) {
-				printf("\n   Unable to set serial# using factory value %s\n",
+				printf("Unable to set serial# using factory value %s\n",
 				       factory.serial);
 				ret = -EINVAL;
 				goto exit;
@@ -412,7 +412,7 @@ int do_factory_settings(const char *board_name)
 	/* Set boot_targets with factory value if necessary */
 	if (factory.boot_targets) {
 		if (env_set("boot_targets", factory.boot_targets)) {
-			printf("\n   Unable to set boot_targets using factory value %s\n",
+			printf("Unable to set boot_targets using factory value %s\n",
 			       factory.boot_targets);
 			ret = -EINVAL;
 			goto exit;
