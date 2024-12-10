@@ -49,7 +49,7 @@ static int get_mmc_device_num(void)
 			return i;
 	}
 
-	printf("eMMC is not found\n");
+	log_err("eMMC is not found\n");
 
 	return -ENODEV;
 }
@@ -80,12 +80,12 @@ static int get_factory_settings(int dev_num, int hwpart, int part, const char *f
 	// Check that file exists
 	ret = fs_set_blk_dev("mmc", part_str, FS_TYPE_ANY);
 	if (ret) {
-		printf("\n   Failed to find any filesystem on device\n");
+		log_debug("\n   There is no filesystem on device\n");
 		return 0;
 	}
 
 	if (!fs_exists(filename)) {
-		printf("\n   File %s doesn't exist\n", filename);
+		log_debug("\n   The %s file doesn't exist\n", filename);
 		return 0;
 	}
 
@@ -94,7 +94,7 @@ static int get_factory_settings(int dev_num, int hwpart, int part, const char *f
 	if (!ret)
 		ret = fs_size(filename, &size);
 	if (ret) {
-		printf("\n   Failed to get size of %s: (%d)\n", filename, ret);
+		log_err("\n   Failed to get size of %s: (%d)\n", filename, ret);
 		return ret;
 	}
 
@@ -102,7 +102,7 @@ static int get_factory_settings(int dev_num, int hwpart, int part, const char *f
 		// Alloc memory to load entire file
 		*data = memalign(ARCH_DMA_MINALIGN, size + 1);
 		if (!(*data)) {
-			printf("\n   Failed to alloc memory to load factory settings\n");
+			log_err("\n   Failed to alloc memory to load %s file\n", filename);
 			return -ENOMEM;
 		}
 		memset((void *)(*data), 0, size + 1);
@@ -112,8 +112,8 @@ static int get_factory_settings(int dev_num, int hwpart, int part, const char *f
 		if (!ret)
 			ret = fs_read(filename, (ulong)(*data), 0, 0, &size);
 		if (ret) {
-			printf("\n   Failed to load factory settings from %s: (%d)\n",
-			       filename, ret);
+			log_err("\n   Failed to load factory settings from %s: (%d)\n",
+				filename, ret);
 			free(*data);
 			*data = NULL;
 			return ret;
@@ -122,7 +122,7 @@ static int get_factory_settings(int dev_num, int hwpart, int part, const char *f
 		// Make sure that all is OK to return real size
 		*data_size = size;
 	} else {
-		printf("\n   Factory settings are empty\n");
+		log_debug("\n   The %s file is empty\n", filename);
 	}
 
 	return ret;
@@ -233,27 +233,27 @@ int detect_board_name(char board_name[])
 
 	if (board_override) {
 		strlcpy(board_name, board_override, BOARD_NAME_MAX_SIZE);
-		printf("Board name set from board_override: %s\n", board_name);
+		log_info("Board name set from board_override: %s\n", board_name);
 		return 0;
 	} else if (factory.board) {
 		strlcpy(board_name, factory.board, BOARD_NAME_MAX_SIZE);
-		printf("Board name set from factory settings: %s\n", board_name);
+		log_info("Board name set from factory settings: %s\n", board_name);
 		return 0;
 	} else if (!get_board_name_from_eeprom(board_name)) {
-		printf("Board name set from ID EEPROM: %s\n", board_name);
+		log_info("Board name set from ID EEPROM: %s\n", board_name);
 		return 0;
 	} else if (of_machine_is_compatible("elvees,elvmc03smarc-smarccommoncb")) {
 		/* ROCK Pi N10 is the only carrier which lacks EEPROM, so if we can't detect SMARC
 		   board name from factory settings we assume it's ROCK Pi N10 */
 		strcpy(board_name, "elvmc03smarc-r1.0-rockpi-n10");
-		printf("Board name set to: %s\n", board_name);
+		log_info("Board name set to: %s\n", board_name);
 		return 0;
 	} else if (!get_board_from_dtb(board_name)) {
-		printf("Board name set from DTB: %s\n", board_name);
+		log_info("Board name set from DTB: %s\n", board_name);
 		return 0;
 	}
 
-	printf("ERROR: unable to detect board name, this should never happen\n");
+	log_err("Unable to detect board name, this should never happen\n");
 	return -EINVAL;
 }
 
@@ -276,8 +276,8 @@ int load_factory_settings(void)
 	if (factory.dev_num < 0)
 		return 0;
 
-	printf("Loading factory settings from mmc %d.%d:%d ... ",
-	       factory.dev_num, MMC_BOOT_0_HW_PART_NUM, MMC_BOOT_0_DEFAULT_PART);
+	log_info("Loading factory settings from mmc %d.%d:%d ... ",
+		 factory.dev_num, MMC_BOOT_0_HW_PART_NUM, MMC_BOOT_0_DEFAULT_PART);
 
 	ret = get_factory_settings(factory.dev_num, MMC_BOOT_0_HW_PART_NUM,
 				   MMC_BOOT_0_DEFAULT_PART, "uboot-factory.env",
@@ -285,15 +285,17 @@ int load_factory_settings(void)
 	if (ret)
 		return ret;
 
-	if (!data)
+	if (!data) {
+		log_info("not found\n");
 		return 0;
+	}
 
 	/* Export existing environment to preserve it from being "contaminated"
 	 * by temporary factory variables
 	 */
 	saved_size = hexport_r(&env_htab, '\n', 0, &saved_env, 0, 0, NULL);
 	if (saved_size < 0) {
-		printf("\n   Unable to save current env: (%d)\n", errno);
+		log_err("\n   Unable to save current env: (%d)\n", errno);
 		ret = -errno;
 		goto exit;
 	}
@@ -301,7 +303,7 @@ int load_factory_settings(void)
 	/* Import factory variables */
 	if (!himport_r(&env_htab, data, data_size, '\n', H_NOCLEAR,
 		       0, 0, NULL)) {
-		printf("\n   Unable to import factory settings: (%d)\n", errno);
+		log_err("\n   Unable to import factory settings: (%d)\n", errno);
 		ret = -errno;
 		goto exit;
 	}
@@ -326,12 +328,12 @@ int load_factory_settings(void)
 
 	/* Restore saved environment */
 	if (!himport_r(&env_htab, saved_env, saved_size, '\n', 0, 0, 0, NULL)) {
-		printf("\n   Unable to restore env: (%d)\n", errno);
+		log_err("\n   Unable to restore env: (%d)\n", errno);
 		ret = -errno;
 		goto exit;
 	}
 
-	printf("OK\n");
+	log_info("OK\n");
 
 exit:
 	/* Free allocated resources if necessary */
@@ -348,7 +350,7 @@ int do_factory_settings(const char *board_name)
 	int ret = 0;
 
 	if (!board_name) {
-		printf("%s called with the NULL 'board_name' pointer\n", __func__);
+		log_err("%s called with the NULL 'board_name' pointer\n", __func__);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -357,14 +359,14 @@ int do_factory_settings(const char *board_name)
 	if (factory.wp) {
 		ret = enable_mmc_wp(factory.dev_num, MMC_BOOT_0);
 		if (ret) {
-			printf("Unable to write protect mmc %d boot %d\n",
-			       factory.dev_num, MMC_BOOT_0);
+			log_err("Unable to write protect mmc %d boot %d\n",
+				factory.dev_num, MMC_BOOT_0);
 			goto exit;
 		}
 	}
 
 	if (env_set("board", board_name)) {
-		printf("Unable to set board using value %s\n", board_name);
+		log_err("Unable to set board using value %s\n", board_name);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -375,8 +377,8 @@ int do_factory_settings(const char *board_name)
 	if (!env_get("ethaddr")) {
 		if (factory.eth0_mac) {
 			if (env_set("ethaddr", factory.eth0_mac)) {
-				printf("Unable to set ethaddr using factory value %s\n",
-				       factory.eth0_mac);
+				log_err("Unable to set ethaddr using factory value %s\n",
+					factory.eth0_mac);
 				ret = -EINVAL;
 				goto exit;
 			}
@@ -389,8 +391,8 @@ int do_factory_settings(const char *board_name)
 	if (!env_get("eth1addr")) {
 		if (factory.eth1_mac) {
 			if (env_set("eth1addr", factory.eth1_mac)) {
-				printf("Unable to set eth1addr using factory value %s\n",
-				       factory.eth1_mac);
+				log_err("Unable to set eth1addr using factory value %s\n",
+					factory.eth1_mac);
 				ret = -EINVAL;
 				goto exit;
 			}
@@ -401,8 +403,8 @@ int do_factory_settings(const char *board_name)
 	if (!env_get("serial#")) {
 		if (factory.serial) {
 			if (env_set("serial#", factory.serial)) {
-				printf("Unable to set serial# using factory value %s\n",
-				       factory.serial);
+				log_err("Unable to set serial# using factory value %s\n",
+					factory.serial);
 				ret = -EINVAL;
 				goto exit;
 			}
@@ -412,8 +414,8 @@ int do_factory_settings(const char *board_name)
 	/* Set boot_targets with factory value if necessary */
 	if (factory.boot_targets) {
 		if (env_set("boot_targets", factory.boot_targets)) {
-			printf("Unable to set boot_targets using factory value %s\n",
-			       factory.boot_targets);
+			log_err("Unable to set boot_targets using factory value %s\n",
+				factory.boot_targets);
 			ret = -EINVAL;
 			goto exit;
 		}
