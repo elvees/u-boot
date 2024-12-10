@@ -533,6 +533,7 @@ int board_init(void)
 
 int misc_init_r(void)
 {
+	int ret;
 	char board_name[BOARD_NAME_MAX_SIZE] = { };
 
 	if (!IS_ENABLED(CONFIG_ENV_IS_NOWHERE) &&
@@ -544,8 +545,13 @@ int misc_init_r(void)
 		}
 	}
 
-	load_factory_settings();
-	detect_board_name(board_name);
+	ret = load_factory_settings();
+	if (ret)
+		return ret;
+
+	ret = detect_board_name(board_name);
+	if (ret)
+		return ret;
 
 	// Setup RESET_OUT# signal on ELV-MC03-SMARC (except Rock Pi)
 	if (of_machine_is_compatible("elvees,elvmc03smarc-r1.0") &&

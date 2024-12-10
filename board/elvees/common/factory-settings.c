@@ -267,8 +267,10 @@ int load_factory_settings(void)
 	size_t data_size = 0;
 	size_t saved_size = 0;
 
+	memset((void *)&factory, 0, sizeof(factory));
+
 	if (IS_ENABLED(CONFIG_MCOM03_DISABLE_FACTORY))
-		return -EPERM;
+		return 0;
 
 	factory.dev_num = get_mmc_device_num();
 	if (factory.dev_num < 0)
