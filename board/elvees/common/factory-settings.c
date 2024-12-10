@@ -49,8 +49,6 @@ static int get_mmc_device_num(void)
 			return i;
 	}
 
-	log_err("eMMC is not found\n");
-
 	return -ENODEV;
 }
 
