@@ -39,11 +39,23 @@ Example:
 EOF
 }
 
+# The device to store factory settings
+FACTORY_DEV=mmcblk0boot0
+
 # The path to the factory dir
 FACTORY_DIR=/media/mmc/factory
 
+# The factory filesystem
+FACTORY_FS_TYPE=ext2
+
 # The path to the file with factory variables, used by U-Boot
 FACTORY_SETTINGS=$FACTORY_DIR/uboot-factory.env
+
+# The readonly mount flags of factory dir
+RO_MOUNT_FLAGS="ro,nosuid,nodev,noexec,relatime,sync,nofail"
+
+# The read-write mount flags of factory dir
+RW_MOUNT_FLAGS="rw,nosuid,nodev,noexec,sync"
 
 # The command to be done on the U-Boot factory settings
 CMD=
@@ -64,8 +76,8 @@ function fatal {
 }
 
 function is_filesystem_exists {
-    FS_TYPE=$(blkid -s TYPE -o value /dev/mmcblk0boot0)
-    [[ "$FS_TYPE" == "ext4" ]]
+    FS_TYPE=$(blkid -s TYPE -o value "/dev/$FACTORY_DEV")
+    [[ "$FS_TYPE" == "$FACTORY_FS_TYPE" ]]
 }
 
 function mount_protected {
@@ -74,10 +86,10 @@ function mount_protected {
         umount "$FACTORY_DIR"
     fi
 
-    echo 1 > /sys/block/mmcblk0boot0/force_ro
+    echo 1 > "/sys/block/$FACTORY_DEV/force_ro"
 
     if is_filesystem_exists; then
-        mount -t ext4 -o ro,noexec,nodev,nosuid,sync /dev/mmcblk0boot0 "$FACTORY_DIR"
+        mount -t "$FACTORY_FS_TYPE" -o "$RO_MOUNT_FLAGS" "/dev/$FACTORY_DEV" "$FACTORY_DIR"
     fi
 }
 
@@ -87,10 +99,10 @@ function mount_unprotected {
         umount "$FACTORY_DIR"
     fi
 
-    echo 0 > /sys/block/mmcblk0boot0/force_ro
+    echo 0 > "/sys/block/$FACTORY_DEV/force_ro"
 
     if is_filesystem_exists; then
-        mount -t ext4 -o rw,noexec,nodev,nosuid,sync /dev/mmcblk0boot0 "$FACTORY_DIR"
+        mount -t "$FACTORY_FS_TYPE" -o "$RW_MOUNT_FLAGS" "/dev/$FACTORY_DEV" "$FACTORY_DIR"
     fi
 }
 
@@ -100,15 +112,15 @@ function init_factory {
         umount "$FACTORY_DIR"
     fi
 
-    echo 0 > /sys/block/mmcblk0boot0/force_ro
+    echo 0 > "/sys/block/$FACTORY_DEV/force_ro"
 
     if is_filesystem_exists; then
         echo "INFO: Filesystem have been already initialized earlier"
     else
-        mkfs.ext4 -F /dev/mmcblk0boot0
+        mkfs -t "$FACTORY_FS_TYPE" -F "/dev/$FACTORY_DEV"
     fi
 
-    mount -t ext4 -o rw,noexec,nodev,nosuid,sync /dev/mmcblk0boot0 "$FACTORY_DIR"
+    mount -t "$FACTORY_FS_TYPE" -o "$RW_MOUNT_FLAGS" "/dev/$FACTORY_DEV" "$FACTORY_DIR"
     touch "$FACTORY_SETTINGS"
 }
 
