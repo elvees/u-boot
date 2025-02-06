@@ -4,10 +4,13 @@
  */
 
 #include <common.h>
+#include <display_options.h>
 #include <dm.h>
 #include <dm/of_access.h>
 #include <env.h>
+#include <fdt_support.h>
 #include <i2c.h>
+#include <image.h>
 #include <init.h>
 #include <mmc.h>
 #include <asm/armv8/mmu.h>
@@ -578,3 +581,39 @@ int board_late_init(void)
 
 	return 0;
 }
+
+#if CONFIG_IS_ENABLED(OF_LIBFDT)
+void board_prep_linux(struct bootm_headers *images)
+{
+	int offset;
+	int ret;
+	int len;
+	int pos;
+	char buf[DISPLAY_OPTIONS_BANNER_LENGTH] = {0};
+
+	display_options_get_banner(false, buf, sizeof(buf));
+	len = strlen(buf);
+	if (len) {
+		pos = strcspn(buf, "\n");
+		buf[pos] = '\0';
+
+		ret = fdt_check_header(images->ft_addr);
+		if (ret < 0) {
+			log_err("%s: %s\n", __func__, fdt_strerror(ret));
+			return;
+		}
+
+		/* find or create "/chosen" node. */
+		offset = fdt_find_or_add_subnode(images->ft_addr, 0, "chosen");
+		if (offset < 0)
+			return;
+
+		/* override u-boot version */
+		ret = fdt_setprop(images->ft_addr, offset, "u-boot,version", buf, pos);
+		if (ret < 0) {
+			log_err("Could not set u-boot,version %s\n", fdt_strerror(ret));
+			return;
+		}
+	}
+}
+#endif
