@@ -1,0 +1,8 @@
+- project:
+    check:
+      jobs:
+        - uboot-build
+        - uboot-lint
+    periodic:
+      jobs:
+        - uboot-build
