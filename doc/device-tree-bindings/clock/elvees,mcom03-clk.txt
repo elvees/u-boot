@@ -63,12 +63,18 @@ Example:
 		#clock-cells = <1>;
 		compatible = "elvees,mcom03-clk";
 		clocks = <&xti_clk>, <&clk125>;
-		assigned-clocks = <&clock CLK_MEDIA_PLL3>,
+		assigned-clocks = <&clock CLK_HSP_REFMUX2>,
+				  <&clock CLK_HSP_REFMUX3>,
+				  <&clock CLK_MEDIA_PLL3>,
 				  <&clock CLK_LSP0_UCG0_SYS>,
 				  <&clock CLK_MEDIA_UCG3_MIPI_TXCLKESC>;
-		assigned-clock-rates = <2376000000
+		assigned-clock-rates = <0
+					0
+					2376000000
 					94500000
 					19800000>;
+		assigned-clock-parents = <&clock CLK_HSP_PLL0>,
+					 <&clock CLK_HSP_PLL0>;
 		elvees,pll-max-nr = <CLK_HSP_PLL0 3>;
 		elvees,ucg-fixed-freq-mask = <CLK_CPU_UCG0 0x7>,
 					     <CLK_SERVICE_UCG0 0xfff>;
@@ -83,18 +89,14 @@ Example:
 		clock-frequency = <27000000>;
 	};
 
-	hsperiph@0 {
-		compatible = "simple-bus";
-		#address-cells = <2>;
-		#size-cells = <2>;
-		ranges;
-		assigned-clocks = <&clock CLK_HSP_REFMUX0>,
-				  <&clock CLK_HSP_REFMUX1>,
-				  <&clock CLK_HSP_REFMUX2>,
-				  <&clock CLK_HSP_REFMUX3>;
-		assigned-clock-parents = <&clock CLK_HSP_PLL0>,
-					 <&clock CLK_HSP_PLL0>,
-					 <&clock CLK_CLK125>,
-					 <&clock CLK_HSP_PLL0>;
-		..........
-	};
+Example to use CLK125 for Ethernet:
+
+	&emac0 {
+		assigned-clocks = <&clock CLK_HSP_REFMUX0>;
+		assigned-clock-parents = <&clock CLK_CLK125>;
+	}
+
+	&emac1 {
+		assigned-clocks = <&clock CLK_HSP_REFMUX0>;
+		assigned-clock-parents = <&clock CLK_CLK125>;
+	}
