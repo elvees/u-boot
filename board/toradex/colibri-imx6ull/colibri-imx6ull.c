@@ -3,6 +3,7 @@
  * Copyright (C) 2018-2019 Toradex AG
  */
 #include <common.h>
+#include <init.h>
 
 #include <asm/arch/clock.h>
 #include <asm/arch/crm_regs.h>
@@ -17,6 +18,7 @@
 #include <asm/io.h>
 #include <dm.h>
 #include <dm/platform_data/serial_mxc.h>
+#include <env.h>
 #include <fdt_support.h>
 #include <imx_thermal.h>
 #include <jffs2/load_kernel.h>

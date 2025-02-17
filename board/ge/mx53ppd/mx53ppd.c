@@ -9,6 +9,7 @@
  */
 
 #include <common.h>
+#include <init.h>
 #include <asm/io.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/sys_proto.h>
@@ -16,15 +17,15 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/iomux-mx53.h>
 #include <asm/arch/clock.h>
+#include <env.h>
 #include <linux/errno.h>
 #include <linux/libfdt.h>
 #include <asm/mach-imx/mxc_i2c.h>
 #include <asm/mach-imx/mx5_video.h>
-#include <environment.h>
 #include <netdev.h>
 #include <i2c.h>
 #include <mmc.h>
-#include <fsl_esdhc.h>
+#include <fsl_esdhc_imx.h>
 #include <asm/gpio.h>
 #include <power/pmic.h>
 #include <dialog_pmic.h>

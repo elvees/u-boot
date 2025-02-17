@@ -10,8 +10,11 @@
  * Steve Sakoman  <steve@sakoman.com>
  */
 #include <common.h>
+#include <env.h>
+#include <init.h>
 #include <palmas.h>
 #include <sata.h>
+#include <serial.h>
 #include <linux/string.h>
 #include <asm/gpio.h>
 #include <usb.h>
@@ -24,7 +27,6 @@
 #include <asm/arch/sys_proto.h>
 #include <asm/arch/mmc_host_def.h>
 #include <asm/arch/sata.h>
-#include <environment.h>
 #include <dwc3-uboot.h>
 #include <dwc3-omap-uboot.h>
 #include <i2c.h>
@@ -782,7 +784,7 @@ void set_muxconf_regs(void)
 		     early_padconf, ARRAY_SIZE(early_padconf));
 }
 
-#if defined(CONFIG_NAND)
+#if defined(CONFIG_MTD_RAW_NAND)
 static int nand_sw_detect(void)
 {
 	int rc;

@@ -5,6 +5,7 @@
  */
 
 #include <common.h>
+#include <init.h>
 #include <asm/io.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/sys_proto.h>
@@ -13,6 +14,7 @@
 #include <asm/arch/iomux-mx53.h>
 #include <asm/arch/clock.h>
 #include <asm/gpio.h>
+#include <env.h>
 #include <power/pmic.h>
 #include <fsl_pmic.h>
 #include "kp_id_rev.h"

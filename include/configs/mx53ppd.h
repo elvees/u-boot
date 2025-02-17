@@ -22,8 +22,6 @@
 /* Size of malloc() pool */
 #define CONFIG_SYS_MALLOC_LEN		(10 * 1024 * 1024)
 
-#define CONFIG_WATCHDOG_TIMEOUT_MSECS 8000
-
 #define CONFIG_BOARD_LATE_INIT
 #define CONFIG_REVISION_TAG
 
@@ -185,8 +183,6 @@
 	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
 
 /* FLASH and environment organization */
-#define CONFIG_ENV_OFFSET      (12 * 64 * 1024)
-#define CONFIG_ENV_SIZE        (10 * 1024)
 #define CONFIG_SYS_MMC_ENV_DEV 0
 
 #define CONFIG_CMD_FUSE
@@ -211,7 +207,6 @@
 #define CONFIG_BCH
 
 /* Backlight Control */
-#define CONFIG_PWM_IMX
 #define CONFIG_IMX6_PWM_PER_CLK 66666000
 
 #endif				/* __CONFIG_H */

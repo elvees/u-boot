@@ -98,7 +98,6 @@
 
 #define CONFIG_SYS_NAND_BLOCK_SIZE		0x20000
 #define CONFIG_SYS_NAND_PAGE_SIZE		NAND_LARGE_BLOCK_PAGE_SIZE
-#define CONFIG_SYS_NAND_USE_FLASH_BBT
 
 /*
  * USB
@@ -119,8 +118,6 @@
 /*
  * Environment
  */
-#define CONFIG_ENV_SIZE			SZ_128K
-#define CONFIG_ENV_OFFSET		0x000A0000
 
 #define CONFIG_BOOTCOMMAND			\
 	"dhcp; "				\

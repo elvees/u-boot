@@ -24,8 +24,6 @@
 #define CONFIG_SYS_MAX_FLASH_SECT	8
 #define CONFIG_SYS_MAX_FLASH_BANKS	1
 
-#define CONFIG_ENV_SIZE			(8 << 10)
-
 #define CONFIG_STM32_FLASH
 
 #define CONFIG_DW_GMAC_DEFAULT_DMA_PBL	(8)
@@ -55,7 +53,7 @@
 			"pxefile_addr_r=0xC0008000\0" \
 			"fdt_high=0xffffffffffffffff\0"		\
 			"initrd_high=0xffffffffffffffff\0"	\
-			"ramdisk_addr_r=0xD0900000\0"		\
+			"ramdisk_addr_r=0xC0600000\0"		\
 			BOOTENV
 
 /*

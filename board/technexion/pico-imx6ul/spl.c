@@ -10,7 +10,7 @@
 #include <asm/gpio.h>
 #include <asm/mach-imx/iomux-v3.h>
 #include <asm/mach-imx/boot_mode.h>
-#include <fsl_esdhc.h>
+#include <fsl_esdhc_imx.h>
 #include <linux/libfdt.h>
 #include <spl.h>
 
@@ -19,6 +19,10 @@
 #ifdef CONFIG_SPL_OS_BOOT
 int spl_start_uboot(void)
 {
+	/* Break into full U-Boot on 'c' */
+	if (serial_tstc() && serial_getc() == 'c')
+		return 1;
+
 	return 0;
 }
 #endif

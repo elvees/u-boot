@@ -42,7 +42,9 @@
 #define CONFIG_SYS_MALLOC_LEN		(CONFIG_ENV_SIZE + 2048 * 1024)
 
 /* I2C */
+#ifndef CONFIG_DM_I2C
 #define CONFIG_SYS_I2C
+#endif
 
 /* Serial Port */
 #define CONFIG_CONS_INDEX       1
@@ -67,6 +69,7 @@
 
 #define BOOT_TARGET_DEVICES(func) \
 	func(MMC, mmc, 0) \
+	func(MMC, mmc, 1) \
 	func(USB, usb, 0)
 #include <config_distro_bootcmd.h>
 
@@ -127,25 +130,46 @@
 			"${scripthdraddr} ${prefix}${boot_script_hdr} " \
 			"&& esbc_validate ${scripthdraddr};"    \
 		"source ${scriptaddr}\0"	  \
-	"sd_bootcmd=echo Trying load from SD ..;"	\
+	"xspi_bootcmd=echo Trying load from FlexSPI flash ...;" \
+		"sf probe 0:0 && sf read $load_addr " \
+		"$kernel_start $kernel_size ; env exists secureboot &&" \
+		"sf read $kernelheader_addr_r $kernelheader_start " \
+		"$kernelheader_size && esbc_validate ${kernelheader_addr_r}; "\
+		" bootm $load_addr#$board\0" \
+	"xspi_hdploadcmd=echo Trying load HDP firmware from FlexSPI...;" \
+		"sf probe 0:0 && sf read $load_addr 0x940000 0x30000 " \
+		"&& hdp load $load_addr 0x2000\0"			\
+	"sd_bootcmd=echo Trying load from SD ...;" \
 		"mmcinfo; mmc read $load_addr "		\
 		"$kernel_addr_sd $kernel_size_sd && "	\
 		"env exists secureboot && mmc read $kernelheader_addr_r " \
 		"$kernelhdr_addr_sd $kernelhdr_size_sd "		\
 		" && esbc_validate ${kernelheader_addr_r};"	\
 		"bootm $load_addr#$board\0"		\
+	"sd_hdploadcmd=echo Trying load HDP firmware from SD..;"        \
+		"mmcinfo;mmc read $load_addr 0x4a00 0x200 "             \
+		"&& hdp load $load_addr 0x2000\0"	\
 	"emmc_bootcmd=echo Trying load from EMMC ..;"	\
 		"mmcinfo; mmc dev 1; mmc read $load_addr "		\
 		"$kernel_addr_sd $kernel_size_sd && "	\
 		"env exists secureboot && mmc read $kernelheader_addr_r " \
 		"$kernelhdr_addr_sd $kernelhdr_size_sd "		\
 		" && esbc_validate ${kernelheader_addr_r};"	\
-		"bootm $load_addr#$board\0"
+		"bootm $load_addr#$board\0"			\
+	"emmc_hdploadcmd=echo Trying load HDP firmware from EMMC..;"      \
+		"mmc dev 1;mmcinfo;mmc read $load_addr 0x4a00 0x200 "	\
+		"&& hdp load $load_addr 0x2000\0"
 
 #undef CONFIG_BOOTCOMMAND
 
+#define XSPI_NOR_BOOTCOMMAND	\
+	"run xspi_hdploadcmd; run distro_bootcmd; run xspi_bootcmd; " \
+	"env exists secureboot && esbc_halt;;"
 #define SD_BOOTCOMMAND	\
-	"run distro_bootcmd;run sd_bootcmd; " \
+	"run sd_hdploadcmd; run distro_bootcmd;run sd_bootcmd; " \
+	"env exists secureboot && esbc_halt;"
+#define SD2_BOOTCOMMAND	\
+	"run emmc_hdploadcmd; run distro_bootcmd;run emmc_bootcmd; " \
 	"env exists secureboot && esbc_halt;"
 
 /* Monitor Command Prompt */
@@ -164,25 +188,14 @@
 
 /*  MMC  */
 #ifdef CONFIG_MMC
-#define CONFIG_FSL_ESDHC
 #define CONFIG_SYS_FSL_MMC_HAS_CAPBLT_VS33
 #endif
 
 #define CONFIG_SYS_MMC_ENV_DEV         0
 #define OCRAM_NONSECURE_SIZE		0x00010000
-#define CONFIG_ENV_OFFSET              0x500000        /* 5MB */
 #define CONFIG_SYS_FSL_QSPI_BASE	0x20000000
-#define CONFIG_ENV_ADDR	CONFIG_SYS_FSL_QSPI_BASE + CONFIG_ENV_OFFSET
-#define CONFIG_ENV_SIZE			0x2000          /* 8KB */
-#define CONFIG_ENV_SECT_SIZE           0x40000
 
 #define CONFIG_SYS_MONITOR_BASE CONFIG_SYS_TEXT_BASE
-
-/*  MMC  */
-#ifdef CONFIG_MMC
-#define CONFIG_FSL_ESDHC
-#define CONFIG_SYS_FSL_MMC_HAS_CAPBLT_VS33
-#endif
 
 /* I2C bus multiplexer */
 #define I2C_MUX_PCA_ADDR_PRI            0x77 /* Primary Mux*/
@@ -197,8 +210,12 @@
 #define CONFIG_SYS_EEPROM_PAGE_WRITE_BITS	3
 #define CONFIG_SYS_EEPROM_PAGE_WRITE_DELAY_MS	5
 
-#ifdef CONFIG_SECURE_BOOT
+#ifdef CONFIG_NXP_ESBC
 #include <asm/fsl_secure_boot.h>
 #endif
+
+/* Ethernet */
+/* smallest ENETC BD ring has 8 entries */
+#define CONFIG_SYS_RX_ETH_BUFFER		8
 
 #endif /* __L1028A_COMMON_H */

@@ -4,10 +4,10 @@
  */
 
 #include <common.h>
+#include <init.h>
 #include <asm/io.h>
 #include <asm/addrspace.h>
 #include <asm/types.h>
-#include <environment.h>
 #include <spi.h>
 #include <led.h>
 #include <wait_bit.h>

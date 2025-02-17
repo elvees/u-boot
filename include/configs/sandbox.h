@@ -37,8 +37,6 @@
 
 /* turn on command-line edit/c/auto */
 
-#define CONFIG_ENV_SIZE		8192
-
 /* SPI - enable all SPI flash types for testing purposes */
 
 #define CONFIG_I2C_EDID
@@ -63,7 +61,11 @@
 	func(HOST, host, 1) \
 	func(HOST, host, 0)
 
+#ifdef __ASSEMBLY__
+#define BOOTENV
+#else
 #include <config_distro_bootcmd.h>
+#endif
 
 #define CONFIG_KEEP_SERVERADDR
 #define CONFIG_UDP_CHECKSUM

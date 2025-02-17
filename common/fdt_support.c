@@ -7,6 +7,7 @@
  */
 
 #include <common.h>
+#include <env.h>
 #include <mapmem.h>
 #include <stdio_dev.h>
 #include <linux/ctype.h>
@@ -466,6 +467,41 @@ int fdt_fixup_memory_banks(void *blob, u64 start[], u64 size[], int banks)
 	}
 	return 0;
 }
+
+int fdt_set_usable_memory(void *blob, u64 start[], u64 size[], int areas)
+{
+	int err, nodeoffset;
+	int len;
+	u8 tmp[8 * 16]; /* Up to 64-bit address + 64-bit size */
+
+	if (areas > 8) {
+		printf("%s: num areas %d exceeds hardcoded limit %d\n",
+		       __func__, areas, 8);
+		return -1;
+	}
+
+	err = fdt_check_header(blob);
+	if (err < 0) {
+		printf("%s: %s\n", __func__, fdt_strerror(err));
+		return err;
+	}
+
+	/* find or create "/memory" node. */
+	nodeoffset = fdt_find_or_add_subnode(blob, 0, "memory");
+	if (nodeoffset < 0)
+		return nodeoffset;
+
+	len = fdt_pack_reg(blob, tmp, start, size, areas);
+
+	err = fdt_setprop(blob, nodeoffset, "linux,usable-memory", tmp, len);
+	if (err < 0) {
+		printf("WARNING: could not set %s %s.\n",
+		       "reg", fdt_strerror(err));
+		return err;
+	}
+
+	return 0;
+}
 #endif
 
 int fdt_fixup_memory(void *blob, u64 start, u64 size)
@@ -671,30 +707,33 @@ int fdt_pci_dma_ranges(void *blob, int phb_off, struct pci_controller *hose) {
 
 		dma_range[0] = 0;
 		if (size >= 0x100000000ull)
-			dma_range[0] |= FDT_PCI_MEM64;
+			dma_range[0] |= cpu_to_fdt32(FDT_PCI_MEM64);
 		else
-			dma_range[0] |= FDT_PCI_MEM32;
+			dma_range[0] |= cpu_to_fdt32(FDT_PCI_MEM32);
 		if (hose->regions[r].flags & PCI_REGION_PREFETCH)
-			dma_range[0] |= FDT_PCI_PREFETCH;
+			dma_range[0] |= cpu_to_fdt32(FDT_PCI_PREFETCH);
 #ifdef CONFIG_SYS_PCI_64BIT
-		dma_range[1] = bus_start >> 32;
+		dma_range[1] = cpu_to_fdt32(bus_start >> 32);
 #else
 		dma_range[1] = 0;
 #endif
-		dma_range[2] = bus_start & 0xffffffff;
+		dma_range[2] = cpu_to_fdt32(bus_start & 0xffffffff);
 
 		if (addrcell == 2) {
-			dma_range[3] = phys_start >> 32;
-			dma_range[4] = phys_start & 0xffffffff;
+			dma_range[3] = cpu_to_fdt32(phys_start >> 32);
+			dma_range[4] = cpu_to_fdt32(phys_start & 0xffffffff);
 		} else {
-			dma_range[3] = phys_start & 0xffffffff;
+			dma_range[3] = cpu_to_fdt32(phys_start & 0xffffffff);
 		}
 
 		if (sizecell == 2) {
-			dma_range[3 + addrcell + 0] = size >> 32;
-			dma_range[3 + addrcell + 1] = size & 0xffffffff;
+			dma_range[3 + addrcell + 0] =
+				cpu_to_fdt32(size >> 32);
+			dma_range[3 + addrcell + 1] =
+				cpu_to_fdt32(size & 0xffffffff);
 		} else {
-			dma_range[3 + addrcell + 0] = size & 0xffffffff;
+			dma_range[3 + addrcell + 0] =
+				cpu_to_fdt32(size & 0xffffffff);
 		}
 
 		dma_range += (3 + addrcell + sizecell);
@@ -1292,6 +1331,12 @@ u64 fdt_translate_address(const void *blob, int node_offset,
 	return __of_translate_address(blob, node_offset, in_addr, "ranges");
 }
 
+u64 fdt_translate_dma_address(const void *blob, int node_offset,
+			      const fdt32_t *in_addr)
+{
+	return __of_translate_address(blob, node_offset, in_addr, "dma-ranges");
+}
+
 /**
  * fdt_node_offset_by_compat_reg: Find a node that matches compatiable and
  * who's reg property matches a physical cpu address
@@ -1546,7 +1591,7 @@ u64 fdt_get_base_address(const void *fdt, int node)
 
 	prop = fdt_getprop(fdt, node, "reg", &size);
 
-	return prop ? fdt_translate_address(fdt, node, prop) : 0;
+	return prop ? fdt_translate_address(fdt, node, prop) : OF_BAD_ADDR;
 }
 
 /*
@@ -1556,7 +1601,7 @@ static int fdt_read_prop(const fdt32_t *prop, int prop_len, int cell_off,
 			 uint64_t *val, int cells)
 {
 	const fdt32_t *prop32 = &prop[cell_off];
-	const fdt64_t *prop64 = (const fdt64_t *)&prop[cell_off];
+	const unaligned_fdt64_t *prop64 = (const fdt64_t *)&prop[cell_off];
 
 	if ((cell_off + cells) > prop_len)
 		return -FDT_ERR_NOSPACE;

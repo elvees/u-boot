@@ -12,7 +12,7 @@
 #include <asm/arch/sys_proto.h>
 #include <asm/mach-imx/iomux-v3.h>
 #include <asm/mach-imx/mxc_i2c.h>
-#include <fsl_esdhc.h>
+#include <fsl_esdhc_imx.h>
 #include <linux/bitops.h>
 #include <miiphy.h>
 #include <netdev.h>
@@ -178,7 +178,9 @@ int board_phy_config(struct phy_device *phydev)
 int board_early_init_f(void)
 {
 	setup_iomux_uart();
+#ifdef CONFIG_FEC_MXC
 	setup_iomux_fec();
+#endif
 
 	return 0;
 }

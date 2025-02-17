@@ -9,12 +9,15 @@
 #include <linux/sizes.h>
 #include <asm/arch/timer.h>
 
+#ifndef __ASSEMBLY__
+#include <asm/arch/base.h>
+#endif
+
 #if defined(CONFIG_TARGET_RPI_2) || defined(CONFIG_TARGET_RPI_3_32B)
 #define CONFIG_SKIP_LOWLEVEL_INIT
 #endif
 
 /* Architecture, CPU, etc.*/
-#define CONFIG_ARCH_CPU_INIT
 
 /* Use SoC timer for AArch32, but architected timer for AArch64 */
 #ifndef CONFIG_ARM64
@@ -56,6 +59,10 @@
 #define CONFIG_SYS_MEMTEST_END		0x00200000
 #define CONFIG_LOADADDR			0x00200000
 
+#ifdef CONFIG_ARM64
+#define CONFIG_SYS_BOOTM_LEN		SZ_64M
+#endif
+
 /* Devices */
 /* GPIO */
 #define CONFIG_BCM2835_GPIO
@@ -71,9 +78,7 @@
 #define CONFIG_SYS_CBSIZE		1024
 
 /* Environment */
-#define CONFIG_ENV_SIZE			SZ_16K
 #define CONFIG_SYS_LOAD_ADDR		0x1000000
-#define CONFIG_PREBOOT			"usb start"
 
 /* Shell */
 

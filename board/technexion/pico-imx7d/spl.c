@@ -13,7 +13,7 @@
 #include <asm/arch-mx7/mx7-ddr.h>
 #include <asm/mach-imx/iomux-v3.h>
 #include <asm/gpio.h>
-#include <fsl_esdhc.h>
+#include <fsl_esdhc_imx.h>
 #include <spl.h>
 
 #if defined(CONFIG_SPL_BUILD)
@@ -21,6 +21,10 @@
 #ifdef CONFIG_SPL_OS_BOOT
 int spl_start_uboot(void)
 {
+	/* Break into full U-Boot on 'c' */
+	if (serial_tstc() && serial_getc() == 'c')
+		return 1;
+
 	return 0;
 }
 #endif

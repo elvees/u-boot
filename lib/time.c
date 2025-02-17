@@ -7,6 +7,7 @@
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
+#include <time.h>
 #include <timer.h>
 #include <watchdog.h>
 #include <div64.h>
@@ -132,6 +133,20 @@ int __weak timer_init(void)
 ulong __weak get_timer(ulong base)
 {
 	return tick_to_time(get_ticks()) - base;
+}
+
+static uint64_t notrace tick_to_time_us(uint64_t tick)
+{
+	ulong div = get_tbclk() / 1000;
+
+	tick *= CONFIG_SYS_HZ;
+	do_div(tick, div);
+	return tick;
+}
+
+uint64_t __weak get_timer_us(uint64_t base)
+{
+	return tick_to_time_us(get_ticks()) - base;
 }
 
 unsigned long __weak notrace timer_get_us(void)

@@ -15,14 +15,12 @@
 #define CONFIG_SYS_RTC_BUS_NUM         0
 
 /* Store environment at top of flash */
-#define CONFIG_ENV_SIZE			0x2000
 
 #define CONFIG_DIMM_SLOTS_PER_CTLR          1
 
 #define CONFIG_SYS_MONITOR_BASE CONFIG_SYS_TEXT_BASE
 
 #define CONFIG_QIXIS_I2C_ACCESS
-#define CONFIG_SYS_I2C_EARLY_INIT
 
 /*
  * QIXIS Definitions

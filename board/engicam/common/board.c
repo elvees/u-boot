@@ -6,6 +6,9 @@
  */
 
 #include <common.h>
+#include <command.h>
+#include <env.h>
+#include <init.h>
 #include <mmc.h>
 #include <asm/arch/sys_proto.h>
 #include <watchdog.h>
@@ -53,8 +56,6 @@ static void setenv_fdt_file(void)
 			env_set("fdt_file", "imx6dl-icore-rqs.dtb");
 	} else if (!strcmp(cmp_dtb, "imx6ul-geam"))
 		env_set("fdt_file", "imx6ul-geam.dtb");
-	else if (!strcmp(cmp_dtb, "imx6ul-isiot-mmc"))
-		env_set("fdt_file", "imx6ul-isiot-emmc.dtb");
 	else if (!strcmp(cmp_dtb, "imx6ul-isiot-emmc"))
 		env_set("fdt_file", "imx6ul-isiot-emmc.dtb");
 	else if (!strcmp(cmp_dtb, "imx6ul-isiot-nand"))

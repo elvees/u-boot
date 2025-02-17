@@ -4,6 +4,7 @@
  * Author: Fabio Estevam <fabio.estevam@nxp.com>
  */
 
+#include <init.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/mx7-pins.h>
@@ -13,6 +14,7 @@
 #include <asm/mach-imx/iomux-v3.h>
 #include <asm/io.h>
 #include <common.h>
+#include <env.h>
 #include <asm/arch/crm_regs.h>
 #include <netdev.h>
 #include <power/pmic.h>
@@ -145,7 +147,7 @@ int board_late_init(void)
 	 */
 	clrsetbits_le16(&wdog->wcr, 0, 0x10);
 
-#ifdef CONFIG_SECURE_BOOT
+#ifdef CONFIG_IMX_HAB
 	/* Determine HAB state */
 	env_set_ulong(HAB_ENABLED_ENVNAME, imx_hab_is_enabled());
 #else

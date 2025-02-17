@@ -1,11 +1,16 @@
 config EFI_LOADER
 	bool "Support running UEFI applications"
-	depends on (ARM || X86 || RISCV || SANDBOX) && OF_LIBFDT
+	depends on OF_LIBFDT && ( \
+		ARM && (SYS_CPU = arm1136 || \
+			SYS_CPU = arm1176 || \
+			SYS_CPU = armv7   || \
+			SYS_CPU = armv8)  || \
+		X86 || RISCV || SANDBOX)
 	# We need EFI_STUB_64BIT to be set on x86_64 with EFI_STUB
 	depends on !EFI_STUB || !X86_64 || EFI_STUB_64BIT
 	# We need EFI_STUB_32BIT to be set on x86_32 with EFI_STUB
 	depends on !EFI_STUB || !X86 || X86_64 || EFI_STUB_32BIT
-	default y
+	default y if !ARM || SYS_CPU = armv7 || SYS_CPU = armv8
 	select LIB_UUID
 	select HAVE_BLOCK_DEVICE
 	select REGEX
@@ -101,4 +106,18 @@ config EFI_PLATFORM_LANG_CODES
 	  RFC 4646 format, e.g. "en-US;de-DE". The first language code is used
 	  to initialize the PlatformLang variable.
 
+config EFI_HAVE_RUNTIME_RESET
+	# bool "Reset runtime service is available"
+	bool
+	default y
+	depends on ARCH_BCM283X || FSL_LAYERSCAPE || PSCI_RESET || SYSRESET_X86
+
+config EFI_GRUB_ARM32_WORKAROUND
+	bool "Workaround for GRUB on 32bit ARM"
+	default y
+	depends on ARM && !ARM64
+	help
+	  GRUB prior to version 2.04 requires U-Boot to disable caches. This
+	  workaround currently is also needed on systems with caches that
+	  cannot be managed via CP15.
 endif

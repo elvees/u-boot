@@ -33,7 +33,6 @@
 #define CONFIG_SYS_AT91_MAIN_CLOCK	18432000	/* main clock xtal */
 
 /* Misc CPU related */
-#define CONFIG_ARCH_CPU_INIT
 #define CONFIG_CMDLINE_TAG		/* enable passing of ATAGs */
 #define CONFIG_SETUP_MEMORY_TAGS
 #define CONFIG_INITRD_TAG
@@ -103,16 +102,12 @@
 
 #if defined(CONFIG_SPL_BUILD)
 /* SPL related */
-#define CONFIG_SYS_SPI_U_BOOT_OFFS	0x20000
 #endif
 
 /* load address */
 #define CONFIG_SYS_LOAD_ADDR			0x22000000
 
 /* bootstrap in spi flash , u-boot + env + linux in nandflash */
-#define CONFIG_ENV_OFFSET		0x100000
-#define CONFIG_ENV_OFFSET_REDUND	0x180000
-#define CONFIG_ENV_SIZE		(SZ_128K)	/* 1 sector = 128 kB */
 
 #ifndef CONFIG_SPL_BUILD
 #if defined(CONFIG_BOARD_AXM)

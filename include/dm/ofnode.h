@@ -254,7 +254,7 @@ int ofnode_read_u64(ofnode node, const char *propname, u64 *outp);
  * @def:	default value to return if the property has no value
  * @return property value, or @def if not found
  */
-int ofnode_read_u64_default(ofnode node, const char *propname, u64 def);
+u64 ofnode_read_u64_default(ofnode node, const char *propname, u64 def);
 
 /**
  * ofnode_read_string() - Read a string from a property
@@ -676,12 +676,14 @@ int ofnode_read_simple_size_cells(ofnode node);
  * After relocation and jumping into the real U-Boot binary it is possible to
  * determine if a node was bound in one of SPL/TPL stages.
  *
- * There are 3 settings currently in use
- * -
+ * There are 4 settings currently in use
+ * - u-boot,dm-pre-proper: U-Boot proper pre-relocation only
  * - u-boot,dm-pre-reloc: legacy and indicates any of TPL or SPL
  *   Existing platforms only use it to indicate nodes needed in
  *   SPL. Should probably be replaced by u-boot,dm-spl for
  *   new platforms.
+ * - u-boot,dm-spl: SPL and U-Boot pre-relocation
+ * - u-boot,dm-tpl: TPL and U-Boot pre-relocation
  *
  * @node: node to check
  * @return true if node is needed in SPL/TL, false otherwise
@@ -765,7 +767,7 @@ ofnode ofnode_by_prop_value(ofnode from, const char *propname,
 	     node = ofnode_next_subnode(node))
 
 /**
- * ofnode_translate_address() - Tranlate a device-tree address
+ * ofnode_translate_address() - Translate a device-tree address
  *
  * Translate an address from the device-tree into a CPU physical address. This
  * function walks up the tree and applies the various bus mappings along the
@@ -777,6 +779,20 @@ ofnode ofnode_by_prop_value(ofnode from, const char *propname,
  * @return the translated address; OF_BAD_ADDR on error
  */
 u64 ofnode_translate_address(ofnode node, const fdt32_t *in_addr);
+
+/**
+ * ofnode_translate_dma_address() - Translate a device-tree DMA address
+ *
+ * Translate a DMA address from the device-tree into a CPU physical address.
+ * This function walks up the tree and applies the various bus mappings along
+ * the way.
+ *
+ * @ofnode: Device tree node giving the context in which to translate the
+ *          DMA address
+ * @in_addr: pointer to the DMA address to translate
+ * @return the translated DMA address; OF_BAD_ADDR on error
+ */
+u64 ofnode_translate_dma_address(ofnode node, const fdt32_t *in_addr);
 
 /**
  * ofnode_device_is_compatible() - check if the node is compatible with compat

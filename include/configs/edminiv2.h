@@ -171,9 +171,6 @@
 /*
  *  Environment variables configurations
  */
-#define CONFIG_ENV_SECT_SIZE		0x2000	/* 16K */
-#define CONFIG_ENV_SIZE			0x2000
-#define CONFIG_ENV_OFFSET		0x4000	/* env starts here */
 
 /*
  * Size of malloc() pool
@@ -183,7 +180,6 @@
 /*
  * Other required minimal configurations
  */
-#define CONFIG_ARCH_CPU_INIT		/* call arch_cpu_init() */
 
 #define CONFIG_SYS_LOAD_ADDR		0x00800000
 #define CONFIG_SYS_MEMTEST_START	0x00400000

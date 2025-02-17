@@ -11,6 +11,7 @@
 #include <common.h>
 #include <command.h>
 #include <console.h>
+#include <env.h>
 #include <linux/ctype.h>
 
 /*
@@ -356,8 +357,13 @@ int cmd_auto_complete(const char *const prompt, char *buf, int *np, int *colp)
 	int i, j, k, len, seplen, argc;
 	int cnt;
 	char last_char;
+#ifdef CONFIG_CMDLINE_PS_SUPPORT
+	const char *ps_prompt = env_get("PS1");
+#else
+	const char *ps_prompt = CONFIG_SYS_PROMPT;
+#endif
 
-	if (strcmp(prompt, CONFIG_SYS_PROMPT) != 0)
+	if (strcmp(prompt, ps_prompt) != 0)
 		return 0;	/* not in normal console */
 
 	cnt = strlen(buf);
@@ -489,6 +495,11 @@ void fixup_cmdtable(cmd_tbl_t *cmdtp, int size)
 
 	for (i = 0; i < size; i++) {
 		ulong addr;
+
+		addr = (ulong)(cmdtp->cmd_rep) + gd->reloc_off;
+		cmdtp->cmd_rep =
+			(int (*)(struct cmd_tbl_s *, int, int,
+				 char * const [], int *))addr;
 
 		addr = (ulong)(cmdtp->cmd) + gd->reloc_off;
 #ifdef DEBUG_COMMANDS

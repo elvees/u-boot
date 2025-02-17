@@ -17,6 +17,8 @@ obj-$(CONFIG_OF_LIVE) += of_live.o
 obj-$(CONFIG_CMD_DHRYSTONE) += dhry/
 obj-$(CONFIG_ARCH_AT91) += at91/
 obj-$(CONFIG_OPTEE) += optee/
+obj-$(CONFIG_ASN1_DECODER) += asn1_decoder.o
+obj-y += crypto/
 
 obj-$(CONFIG_AES) += aes.o
 
@@ -106,15 +108,33 @@ obj-y += panic.o
 
 ifeq ($(CONFIG_$(SPL_TPL_)BUILD),y)
 # SPL U-Boot may use full-printf, tiny-printf or none at all
-ifdef CONFIG_USE_TINY_PRINTF
+ifdef CONFIG_$(SPL_TPL_)USE_TINY_PRINTF
 obj-$(CONFIG_$(SPL_TPL_)SPRINTF) += tiny-printf.o
 else
-obj-$(CONFIG_$(SPL_TPL_)SPRINTF) += vsprintf.o strmhz.o
+obj-$(CONFIG_$(SPL_TPL_)SPRINTF) += vsprintf.o
 endif
 obj-$(CONFIG_$(SPL_TPL_)STRTO) += strto.o
 else
 # Main U-Boot always uses the full printf support
-obj-y += vsprintf.o strto.o strmhz.o
+obj-y += vsprintf.o strto.o
 endif
+
+obj-y += date.o
+
+#
+# Build a fast OID lookup registry from include/linux/oid_registry.h
+#
+obj-$(CONFIG_OID_REGISTRY) += oid_registry.o
+
+$(obj)/oid_registry.o: $(obj)/oid_registry_data.c
+
+$(obj)/oid_registry_data.c: $(srctree)/include/linux/oid_registry.h \
+			    $(srctree)/scripts/build_OID_registry
+	$(call cmd,build_OID_registry)
+
+quiet_cmd_build_OID_registry = GEN     $@
+      cmd_build_OID_registry = perl $(srctree)/scripts/build_OID_registry $< $@
+
+clean-files     += oid_registry_data.c
 
 subdir-ccflags-$(CONFIG_CC_OPTIMIZE_LIBS_FOR_SPEED) += -O2

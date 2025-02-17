@@ -412,11 +412,7 @@ config TARGET_CONTROLCENTERD
 
 config TARGET_KMP204X
 	bool "Support kmp204x"
-	select ARCH_P2041
-	select PHYS_64BIT
-	select FSL_DDR_INTERACTIVE
-	imply CMD_CRAMFS
-	imply FS_CRAMFS
+	select VENDOR_KM
 
 config TARGET_XPEDITE520X
 	bool "Support xpedite520x"
@@ -1212,8 +1208,8 @@ config FSL_LAW
 	help
 		Use Freescale common code for Local Access Window
 
-config SECURE_BOOT
-	bool	"Secure Boot"
+config NXP_ESBC
+	bool	"NXP_ESBC"
 	help
 		Enable Freescale Secure Boot feature. Normally selected
 		by defconfig. If unsure, do not change.
@@ -1620,7 +1616,7 @@ source "board/freescale/t208xrdb/Kconfig"
 source "board/freescale/t4qds/Kconfig"
 source "board/freescale/t4rdb/Kconfig"
 source "board/gdsys/p1022/Kconfig"
-source "board/keymile/kmp204x/Kconfig"
+source "board/keymile/Kconfig"
 source "board/sbc8548/Kconfig"
 source "board/socrates/Kconfig"
 source "board/varisys/cyrus/Kconfig"

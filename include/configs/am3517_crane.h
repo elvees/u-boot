@@ -31,7 +31,6 @@
 /*
  * Size of malloc() pool
  */
-#define CONFIG_ENV_SIZE			(128 << 10)	/* 128 KiB sector */
 #define CONFIG_SYS_MALLOC_LEN		(CONFIG_ENV_SIZE + (128 << 10))
 						/* initial data */
 /*
@@ -69,15 +68,6 @@
  */
 
 #ifdef CONFIG_USB_AM35X
-
-#ifdef CONFIG_USB_MUSB_HCD
-
-#ifdef CONFIG_USB_KEYBOARD
-#define CONFIG_PREBOOT "usb start"
-#endif /* CONFIG_USB_KEYBOARD */
-
-#endif /* CONFIG_USB_MUSB_HCD */
-
 #ifdef CONFIG_USB_MUSB_UDC
 /* USB device configuration */
 #define CONFIG_USB_DEVICE		1
@@ -192,8 +182,6 @@
 #define CONFIG_SYS_MONITOR_BASE		CONFIG_SYS_FLASH_BASE
 
 #define CONFIG_SYS_ENV_SECT_SIZE	(128 << 10)	/* 128 KiB sector */
-#define CONFIG_ENV_OFFSET		0x260000
-#define CONFIG_ENV_ADDR			0x260000
 
 /*-----------------------------------------------------------------------
  * CFI FLASH driver setup

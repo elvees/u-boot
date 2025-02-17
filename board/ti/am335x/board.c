@@ -9,7 +9,9 @@
 
 #include <common.h>
 #include <dm.h>
+#include <env.h>
 #include <errno.h>
+#include <init.h>
 #include <spl.h>
 #include <serial.h>
 #include <asm/arch/cpu.h>
@@ -33,9 +35,8 @@
 #include <cpsw.h>
 #include <power/tps65217.h>
 #include <power/tps65910.h>
-#include <environment.h>
+#include <env_internal.h>
 #include <watchdog.h>
-#include <environment.h>
 #include "../common/board_detect.h"
 #include "board.h"
 
@@ -709,7 +710,7 @@ int board_init(void)
 #endif
 
 	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
-#if defined(CONFIG_NOR) || defined(CONFIG_NAND)
+#if defined(CONFIG_NOR) || defined(CONFIG_MTD_RAW_NAND)
 	gpmc_init();
 #endif
 
@@ -791,6 +792,7 @@ int board_init(void)
 #ifdef CONFIG_BOARD_LATE_INIT
 int board_late_init(void)
 {
+	struct udevice *dev;
 #if !defined(CONFIG_SPL_BUILD)
 	uint8_t mac_addr[6];
 	uint32_t mac_hi, mac_lo;
@@ -870,6 +872,9 @@ int board_late_init(void)
 		else
 			env_set("serial#", board_serial);
 	}
+
+	/* Just probe the potentially supported cdce913 device */
+	uclass_get_device(UCLASS_CLK, 0, &dev);
 
 	return 0;
 }

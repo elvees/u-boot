@@ -55,12 +55,6 @@
 /*
  * Environment
  */
-#define CONFIG_ENV_ADDR		(CONFIG_SYS_MONITOR_BASE + \
-				 CONFIG_SYS_MONITOR_LEN)
-#define CONFIG_ENV_SECT_SIZE	0x10000 /* 64K(one sector) for env */
-#define CONFIG_ENV_SIZE		0x2000
-#define CONFIG_ENV_ADDR_REDUND	(CONFIG_ENV_ADDR + CONFIG_ENV_SECT_SIZE)
-#define CONFIG_ENV_SIZE_REDUND	CONFIG_ENV_SIZE
 
 #define CONFIG_LOADS_ECHO		/* echo on for serial download */
 #define CONFIG_SYS_LOADS_BAUD_CHANGE	/* allow baudrate change */
@@ -99,8 +93,6 @@
 #define CONFIG_HOSTNAME		"gazerbeam"
 #define CONFIG_ROOTPATH		"/opt/nfsroot"
 #define CONFIG_BOOTFILE		"uImage"
-
-#define CONFIG_PREBOOT		/* enable preboot variable */
 
 #define CONFIG_EXTRA_ENV_SETTINGS					\
 	"netdev=eth0\0"							\

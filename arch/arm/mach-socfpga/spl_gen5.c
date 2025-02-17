@@ -79,8 +79,6 @@ void board_init_f(ulong dummy)
 		writel(SYSMGR_ECC_OCRAM_DERR  | SYSMGR_ECC_OCRAM_EN,
 		       &sysmgr_regs->eccgrp_ocram);
 
-	memset(__bss_start, 0, __bss_end - __bss_start);
-
 	socfpga_sdram_remap_zero();
 	socfpga_pl310_clear();
 
@@ -139,6 +137,13 @@ void board_init_f(ulong dummy)
 	ret = uclass_get_device(UCLASS_RESET, 0, &dev);
 	if (ret)
 		debug("Reset init failed: %d\n", ret);
+
+#ifdef CONFIG_SPL_NAND_DENALI
+	struct socfpga_reset_manager *reset_manager_base =
+		(struct socfpga_reset_manager *)SOCFPGA_RSTMGR_ADDRESS;
+
+	clrbits_le32(&reset_manager_base->per_mod_reset, BIT(4));
+#endif
 
 	/* enable console uart printing */
 	preloader_console_init();

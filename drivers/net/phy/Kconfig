@@ -46,7 +46,7 @@ config B53_PHY_PORTS
 endif # B53_SWITCH
 
 config MV88E61XX_SWITCH
-	bool "Marvel MV88E61xx Ethernet switch PHY support."
+	bool "Marvell MV88E61xx Ethernet switch PHY support."
 
 if MV88E61XX_SWITCH
 
@@ -99,6 +99,28 @@ config PHY_BROADCOM
 
 config PHY_CORTINA
 	bool "Cortina Ethernet PHYs support"
+
+choice
+	prompt "Location of the Cortina firmware"
+	default SYS_CORTINA_FW_IN_NOR
+	depends on PHY_CORTINA
+
+config SYS_CORTINA_FW_IN_MMC
+	bool "Cortina firmware in MMC"
+
+config SYS_CORTINA_FW_IN_NAND
+	bool "Cortina firmware in NAND flash"
+
+config SYS_CORTINA_FW_IN_NOR
+	bool "Cortina firmware in NOR flash"
+
+config SYS_CORTINA_FW_IN_REMOTE
+	bool "Cortina firmware in remote device"
+
+config SYS_CORTINA_FW_IN_SPIFLASH
+	bool "Cortina firmware in SPI flash"
+
+endchoice
 
 config PHY_DAVICOM
 	bool "Davicom Ethernet PHYs support"
@@ -227,6 +249,13 @@ config PHY_VITESSE
 
 config PHY_XILINX
 	bool "Xilinx Ethernet PHYs support"
+
+config PHY_XILINX_GMII2RGMII
+	bool "Xilinx GMII to RGMII Ethernet PHYs support"
+	help
+	  This adds support for Xilinx GMII to RGMII IP core. This IP acts
+	  as bridge between MAC connected over GMII and external phy that
+	  is connected over RGMII interface.
 
 config PHY_FIXED
 	bool "Fixed-Link PHY"

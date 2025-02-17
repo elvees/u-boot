@@ -23,10 +23,6 @@
 #define CONFIG_SETUP_MEMORY_TAGS
 #define CONFIG_INITRD_TAG
 
-#undef	CONFIG_SHOW_BOOT_PROGRESS
-
-#define CONFIG_ARCH_CPU_INIT
-
 /* Generic Interrupt Controller Definitions */
 #define CONFIG_GICV2
 #define GICD_BASE	0xF1010000
@@ -56,9 +52,6 @@
 
 /* ENV setting */
 #define CONFIG_ENV_OVERWRITE
-#define CONFIG_ENV_SECT_SIZE	(128 * 1024)
-#define CONFIG_ENV_SIZE		(CONFIG_ENV_SECT_SIZE)
-#define CONFIG_ENV_SIZE_REDUND	(CONFIG_ENV_SIZE)
 
 #define CONFIG_EXTRA_ENV_SETTINGS	\
 	"bootm_size=0x10000000\0"

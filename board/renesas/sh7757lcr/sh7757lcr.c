@@ -4,7 +4,8 @@
  */
 
 #include <common.h>
-#include <environment.h>
+#include <env.h>
+#include <init.h>
 #include <malloc.h>
 #include <asm/processor.h>
 #include <asm/io.h>
@@ -140,7 +141,7 @@ static void set_mac_to_sh_eth_register(int channel, char *mac_string)
 	unsigned char mac[6];
 	unsigned long val;
 
-	eth_parse_enetaddr(mac_string, mac);
+	string_to_enetaddr(mac_string, mac);
 
 	if (!channel)
 		ether = ETHER0_MAC_BASE;
@@ -159,7 +160,7 @@ static void set_mac_to_sh_giga_eth_register(int channel, char *mac_string)
 	unsigned char mac[6];
 	unsigned long val;
 
-	eth_parse_enetaddr(mac_string, mac);
+	string_to_enetaddr(mac_string, mac);
 
 	if (!channel)
 		ether = GETHER0_MAC_BASE;

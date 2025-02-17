@@ -11,11 +11,13 @@
 #include <common.h>
 #include <fdt_support.h>
 #include <fdtdec.h>
+#include <env.h>
 #include <errno.h>
 #include <image.h>
 #include <linux/libfdt.h>
 #include <mapmem.h>
 #include <asm/io.h>
+#include <tee/optee.h>
 
 #ifndef CONFIG_SYS_FDT_PAD
 #define CONFIG_SYS_FDT_PAD 0x3000
@@ -33,7 +35,7 @@ static void fdt_error(const char *msg)
 	puts(" - must RESET the board to recover.\n");
 }
 
-#if defined(CONFIG_IMAGE_FORMAT_LEGACY)
+#if CONFIG_IS_ENABLED(LEGACY_IMAGE_FORMAT)
 static const image_header_t *image_get_fdt(ulong fdt_addr)
 {
 	const image_header_t *fdt_hdr = map_sysmem(fdt_addr, 0);
@@ -263,7 +265,7 @@ error:
 int boot_get_fdt(int flag, int argc, char * const argv[], uint8_t arch,
 		bootm_headers_t *images, char **of_flat_tree, ulong *of_size)
 {
-#if defined(CONFIG_IMAGE_FORMAT_LEGACY)
+#if CONFIG_IS_ENABLED(LEGACY_IMAGE_FORMAT)
 	const image_header_t *fdt_hdr;
 	ulong		load, load_end;
 	ulong		image_start, image_data, image_end;
@@ -344,7 +346,7 @@ int boot_get_fdt(int flag, int argc, char * const argv[], uint8_t arch,
 		 */
 		buf = map_sysmem(fdt_addr, 0);
 		switch (genimg_get_format(buf)) {
-#if defined(CONFIG_IMAGE_FORMAT_LEGACY)
+#if CONFIG_IS_ENABLED(LEGACY_IMAGE_FORMAT)
 		case IMAGE_FORMAT_LEGACY:
 			/* verify fdt_addr points to a valid image header */
 			printf("## Flattened Device Tree from Legacy Image at %08lx\n",
@@ -558,6 +560,13 @@ int image_setup_libfdt(bootm_headers_t *images, void *blob,
 			       fdt_strerror(fdt_ret));
 			goto err;
 		}
+	}
+
+	fdt_ret = optee_copy_fdt_nodes(gd->fdt_blob, blob);
+	if (fdt_ret) {
+		printf("ERROR: transfer of optee nodes to new fdt failed: %s\n",
+		       fdt_strerror(fdt_ret));
+		goto err;
 	}
 
 	/* Delete the old LMB reservation */

@@ -15,18 +15,6 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-int pinctrl_decode_pin_config(const void *blob, int node)
-{
-	int flags = 0;
-
-	if (fdtdec_get_bool(blob, node, "bias-pull-up"))
-		flags |= 1 << PIN_CONFIG_BIAS_PULL_UP;
-	else if (fdtdec_get_bool(blob, node, "bias-pull-down"))
-		flags |= 1 << PIN_CONFIG_BIAS_PULL_DOWN;
-
-	return flags;
-}
-
 #if CONFIG_IS_ENABLED(PINCTRL_FULL)
 /**
  * pinctrl_config_one() - apply pinctrl settings for a single node
@@ -91,12 +79,18 @@ static int pinctrl_select_state_full(struct udevice *dev, const char *statename)
 		phandle = fdt32_to_cpu(*list++);
 		ret = uclass_get_device_by_phandle_id(UCLASS_PINCONFIG, phandle,
 						      &config);
-		if (ret)
-			return ret;
+		if (ret) {
+			dev_warn(dev, "%s: uclass_get_device_by_phandle_id: err=%d\n",
+				__func__, ret);
+			continue;
+		}
 
 		ret = pinctrl_config_one(config);
-		if (ret)
-			return ret;
+		if (ret) {
+			dev_warn(dev, "%s: pinctrl_config_one: err=%d\n",
+				__func__, ret);
+			continue;
+		}
 	}
 
 	return 0;
@@ -151,7 +145,9 @@ static int pinconfig_post_bind(struct udevice *dev)
 
 UCLASS_DRIVER(pinconfig) = {
 	.id = UCLASS_PINCONFIG,
+#if CONFIG_IS_ENABLED(PINCONF_RECURSIVE)
 	.post_bind = pinconfig_post_bind,
+#endif
 	.name = "pinconfig",
 };
 
@@ -395,7 +391,7 @@ int pinctrl_get_pin_muxing(struct udevice *dev, int selector, char *buf,
  * @dev: pinctrl device
  * @return: 0 on success, or negative error code on failure
  */
-static int pinctrl_post_bind(struct udevice *dev)
+static int __maybe_unused pinctrl_post_bind(struct udevice *dev)
 {
 	const struct pinctrl_ops *ops = pinctrl_get_ops(dev);
 

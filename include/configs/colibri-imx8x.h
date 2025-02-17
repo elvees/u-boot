@@ -13,10 +13,6 @@
 
 #define CONFIG_DISPLAY_BOARDINFO_LATE
 
-#undef CONFIG_BOOTM_NETBSD
-
-#define CONFIG_FSL_ESDHC
-#define CONFIG_FSL_USDHC
 #define CONFIG_SYS_FSL_ESDHC_ADDR	0
 #define USDHC1_BASE_ADDR		0x5b010000
 #define USDHC2_BASE_ADDR		0x5b020000
@@ -83,6 +79,7 @@
 	CONFIG_MFG_ENV_SETTINGS \
 	M4_BOOT_ENV \
 	MEM_LAYOUT_ENV_SETTINGS \
+	"boot_file=Image\0" \
 	"console=ttyLP3 earlycon\0" \
 	"fdt_addr=0x83000000\0"	\
 	"fdt_file=fsl-imx8qxp-colibri-dsihdmi-eval-v3.dtb\0" \
@@ -121,9 +118,6 @@
 #define CONFIG_SYS_MEMTEST_END		0x89000000
 
 /* Environment in eMMC, before config block at the end of 1st "boot sector" */
-#define CONFIG_ENV_SIZE			SZ_8K
-#define CONFIG_ENV_OFFSET		(-CONFIG_ENV_SIZE + \
-					 CONFIG_TDX_CFG_BLOCK_OFFSET)
 #define CONFIG_SYS_MMC_ENV_DEV		0	/* USDHC1 eMMC */
 #define CONFIG_SYS_MMC_ENV_PART		1
 

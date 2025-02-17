@@ -16,7 +16,9 @@ unsigned long get_board_ddr_clk(void);
 
 #ifdef CONFIG_FSL_QSPI
 #define CONFIG_QIXIS_I2C_ACCESS
+#ifndef CONFIG_DM_I2C
 #define CONFIG_SYS_I2C_EARLY_INIT
+#endif
 #define CONFIG_SYS_I2C_IFDR_DIV		0x7e
 #endif
 
@@ -56,11 +58,6 @@ unsigned long get_board_ddr_clk(void);
 
 #ifdef CONFIG_TFABOOT
 #define CONFIG_SYS_MMC_ENV_DEV		0
-#define CONFIG_ENV_SIZE			0x20000
-#define CONFIG_ENV_OFFSET		0x500000
-#define CONFIG_ENV_ADDR			(CONFIG_SYS_FLASH_BASE + \
-					 CONFIG_ENV_OFFSET)
-#define CONFIG_ENV_SECT_SIZE		0x20000
 #endif
 
 #define CONFIG_SYS_NOR0_CSPR_EXT	(0x0)
@@ -227,16 +224,11 @@ unsigned long get_board_ddr_clk(void);
 #define CONFIG_SYS_CS0_FTIM2		CONFIG_SYS_NAND_FTIM2
 #define CONFIG_SYS_CS0_FTIM3		CONFIG_SYS_NAND_FTIM3
 
-#define CONFIG_ENV_OFFSET		(896 * 1024)
-#define CONFIG_ENV_SECT_SIZE		0x20000
-#define CONFIG_ENV_SIZE			0x2000
 #define CONFIG_SPL_PAD_TO		0x20000
 #define CONFIG_SYS_NAND_U_BOOT_OFFS	(256 * 1024)
 #define CONFIG_SYS_NAND_U_BOOT_SIZE	(640 * 1024)
 #elif defined(CONFIG_SD_BOOT)
-#define CONFIG_ENV_OFFSET		0x300000
 #define CONFIG_SYS_MMC_ENV_DEV		0
-#define CONFIG_ENV_SIZE			0x20000
 #endif
 #else
 #define CONFIG_SYS_CSPR0_EXT		CONFIG_SYS_NOR0_CSPR_EXT
@@ -266,12 +258,6 @@ unsigned long get_board_ddr_clk(void);
 #define CONFIG_SYS_CS2_FTIM1		CONFIG_SYS_NAND_FTIM1
 #define CONFIG_SYS_CS2_FTIM2		CONFIG_SYS_NAND_FTIM2
 #define CONFIG_SYS_CS2_FTIM3		CONFIG_SYS_NAND_FTIM3
-
-#if !defined(CONFIG_QSPI_BOOT) && !defined(CONFIG_TFABOOT)
-#define CONFIG_ENV_ADDR			(CONFIG_SYS_FLASH_BASE + 0x300000)
-#define CONFIG_ENV_SECT_SIZE		0x20000
-#define CONFIG_ENV_SIZE			0x2000
-#endif
 #endif
 
 /* Debug Server firmware */
@@ -324,7 +310,9 @@ unsigned long get_board_ddr_clk(void);
  */
 #define RTC
 #define CONFIG_RTC_DS3231               1
+#define CONFIG_RTC_ENABLE_32KHZ_OUTPUT
 #define CONFIG_SYS_I2C_RTC_ADDR         0x68
+#define CONFIG_RTC_ENABLE_32KHZ_OUTPUT
 
 /* EEPROM */
 #define CONFIG_ID_EEPROM
@@ -348,7 +336,7 @@ unsigned long get_board_ddr_clk(void);
 
 /* Initial environment variables */
 #undef CONFIG_EXTRA_ENV_SETTINGS
-#ifdef CONFIG_SECURE_BOOT
+#ifdef CONFIG_NXP_ESBC
 #define CONFIG_EXTRA_ENV_SETTINGS		\
 	"hwconfig=fsl_ddr:bank_intlv=auto\0"	\
 	"loadaddr=0x80100000\0"			\
@@ -438,7 +426,7 @@ unsigned long get_board_ddr_clk(void);
 	"mcinitcmd=fsl_mc start mc 0x580a00000" \
 	" 0x580e00000 \0"
 #endif /* CONFIG_TFABOOT */
-#endif /* CONFIG_SECURE_BOOT */
+#endif /* CONFIG_NXP_ESBC */
 
 #ifdef CONFIG_TFABOOT
 #define SD_BOOTCOMMAND						\

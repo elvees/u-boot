@@ -34,8 +34,6 @@
 
 #undef CONFIG_BOOTCOMMAND
 #ifdef CONFIG_SD_BOOT
-/* u-boot env in sd/mmc card */
-#define CONFIG_ENV_SIZE		0x4000
 /* bootstrap + u-boot + env in sd card */
 #define CONFIG_BOOTCOMMAND	"fatload mmc " CONFIG_ENV_FAT_DEVICE_AND_PART " 0x21000000 at91-sama5d27_som1_ek.dtb; " \
 				"fatload mmc " CONFIG_ENV_FAT_DEVICE_AND_PART " 0x22000000 zImage; " \
@@ -43,13 +41,6 @@
 #endif
 
 #ifdef CONFIG_QSPI_BOOT
-#define CONFIG_ENV_OFFSET		0xb0000
-#define CONFIG_ENV_SIZE			0x10000
-#define CONFIG_ENV_SECT_SIZE		0x10000
-#define CONFIG_BOOTCOMMAND		"sf probe 0; "				\
-					"sf read 0x21000000 0xc0000 0x20000; "	\
-					"sf read 0x22000000 0xe0000 0x400000; "	\
-					"bootz 0x22000000 - 0x21000000"
 #undef CONFIG_BOOTARGS
 #define CONFIG_BOOTARGS \
 	"console=ttyS0,115200 earlyprintk root=/dev/mmcblk0p2 rw rootwait"
@@ -67,10 +58,6 @@
 #ifdef CONFIG_SD_BOOT
 #define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION	1
 #define CONFIG_SPL_FS_LOAD_PAYLOAD_NAME		"u-boot.img"
-#endif
-
-#ifdef CONFIG_QSPI_BOOT
-#define CONFIG_SYS_SPI_U_BOOT_OFFS	0x10000
 #endif
 
 #endif

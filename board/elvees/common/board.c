@@ -21,7 +21,7 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/regs.h>
 #include <asm/io.h>
-#include <environment.h>
+#include <env_internal.h>
 #include <linux/kernel.h>
 #include <spi.h>
 #include <spi_flash.h>

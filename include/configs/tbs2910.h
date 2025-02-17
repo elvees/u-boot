@@ -40,15 +40,6 @@
 #define CONFIG_MXC_UART
 #define CONFIG_MXC_UART_BASE		UART1_BASE /* select UART1/UART2 */
 
-/* Ethernet */
-#define CONFIG_FEC_MXC
-#define CONFIG_FEC_MXC
-#define IMX_FEC_BASE			ENET_BASE_ADDR
-#define CONFIG_FEC_XCV_TYPE		RGMII
-#define CONFIG_ETHPRIME			"FEC"
-#define CONFIG_FEC_MXC_PHYADDR		4
-#define CONFIG_PHY_ATHEROS
-
 /* Framebuffer */
 #ifdef CONFIG_VIDEO
 #define CONFIG_VIDEO_BMP_RLE8
@@ -79,22 +70,11 @@
 #ifdef CONFIG_CMD_USB_MASS_STORAGE
 #define CONFIG_USBD_HS
 #endif /* CONFIG_CMD_USB_MASS_STORAGE */
-#ifdef CONFIG_USB_KEYBOARD
-#define CONFIG_PREBOOT \
-	"usb start; " \
-	"if hdmidet; then " \
-		"run set_con_hdmi; " \
-	"else " \
-		"run set_con_serial; " \
-	"fi"
-#endif /* CONFIG_USB_KEYBOARD */
 #endif /* CONFIG_CMD_USB      */
 
 /* Environment organization */
 #define CONFIG_SYS_MMC_ENV_DEV		2 /* overwritten on SD boot */
 #define CONFIG_SYS_MMC_ENV_PART		1 /* overwritten on SD boot */
-#define CONFIG_ENV_SIZE			(8 * 1024)
-#define CONFIG_ENV_OFFSET		(384 * 1024)
 #define CONFIG_ENV_OVERWRITE
 
 #define CONFIG_BOARD_SIZE_LIMIT		392192 /* (CONFIG_ENV_OFFSET - 1024) */

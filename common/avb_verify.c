@@ -6,6 +6,7 @@
 
 #include <avb_verify.h>
 #include <blk.h>
+#include <cpu_func.h>
 #include <fastboot.h>
 #include <image.h>
 #include <malloc.h>
@@ -851,6 +852,7 @@ static AvbIOResult get_size_of_partition(AvbOps *ops,
 	return AVB_IO_RESULT_OK;
 }
 
+#ifdef CONFIG_OPTEE_TA_AVB
 static AvbIOResult read_persistent_value(AvbOps *ops,
 					 const char *name,
 					 size_t buffer_size,
@@ -968,6 +970,8 @@ free_name:
 
 	return rc;
 }
+#endif
+
 /**
  * ============================================================================
  * AVB2.0 AvbOps alloc/initialisation/free

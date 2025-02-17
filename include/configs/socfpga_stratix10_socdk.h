@@ -48,9 +48,7 @@
 /*
  * U-Boot environment configurations
  */
-#define CONFIG_ENV_SIZE			0x1000
 #define CONFIG_SYS_MMC_ENV_DEV		0	/* device 0 */
-#define CONFIG_ENV_OFFSET		512	/* just after the MBR */
 
 /*
  * QSPI support
@@ -62,16 +60,8 @@
 /* Flash device info */
 
 /*#define CONFIG_ENV_IS_IN_SPI_FLASH*/
-#ifdef CONFIG_ENV_IS_IN_SPI_FLASH
-#undef CONFIG_ENV_OFFSET
-#undef CONFIG_ENV_SIZE
-#define CONFIG_ENV_OFFSET		0x710000
-#define CONFIG_ENV_SIZE			(4 * 1024)
-#define CONFIG_ENV_SECT_SIZE		(4 * 1024)
-#endif /* CONFIG_ENV_IS_IN_SPI_FLASH */
 
 #ifndef CONFIG_SPL_BUILD
-#define CONFIG_MTD_DEVICE
 #define CONFIG_MTD_PARTITIONS
 #define MTDIDS_DEFAULT			"nor0=ff705000.spi.0"
 #endif /* CONFIG_SPL_BUILD */
@@ -113,7 +103,8 @@ unsigned int cm_get_qspi_controller_clk_hz(void);
 	"scriptaddr=0x02100000\0" \
 	"scriptfile=u-boot.scr\0" \
 	"fatscript=if fatload mmc 0:1 ${scriptaddr} ${scriptfile};" \
-		   "then source ${scriptaddr}; fi\0"
+		   "then source ${scriptaddr}; fi\0" \
+	"socfpga_legacy_reset_compat=1\0"
 
 /*
  * Generic Interrupt Controller Definitions
@@ -167,7 +158,6 @@ unsigned int cm_get_qspi_controller_clk_hz(void);
 unsigned int cm_get_l4_sys_free_clk_hz(void);
 #define CONFIG_DW_WDT_CLOCK_KHZ		(cm_get_l4_sys_free_clk_hz() / 1000)
 #endif
-#define CONFIG_WATCHDOG_TIMEOUT_MSECS	3000
 #endif
 
 /*
@@ -200,7 +190,6 @@ unsigned int cm_get_l4_sys_free_clk_hz(void);
 #define CONFIG_SYS_SPL_MALLOC_SIZE	(CONFIG_SYS_MALLOC_LEN)
 #define CONFIG_SYS_SPL_MALLOC_START	(CONFIG_SPL_BSS_START_ADDR \
 					- CONFIG_SYS_SPL_MALLOC_SIZE)
-#define CONFIG_SYS_SPI_U_BOOT_OFFS      0x3C00000
 
 /* SPL SDMMC boot support */
 #define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION	1

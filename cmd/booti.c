@@ -8,6 +8,7 @@
 #include <bootm.h>
 #include <command.h>
 #include <image.h>
+#include <irq_func.h>
 #include <lmb.h>
 #include <mapmem.h>
 #include <linux/kernel.h>
@@ -48,6 +49,9 @@ static int booti_start(cmd_tbl_t *cmdtp, int flag, int argc,
 	}
 
 	images->ep = relocated_addr;
+	images->os.start = relocated_addr;
+	images->os.end = relocated_addr + image_size;
+
 	lmb_reserve(&images->lmb, images->ep, le32_to_cpu(image_size));
 
 	/*

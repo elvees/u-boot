@@ -8,6 +8,8 @@
 
 #include <common.h>
 #include <dm.h>
+#include <env.h>
+#include <init.h>
 
 #include <asm/arch/clock.h>
 #include <asm/arch/crm_regs.h>
@@ -24,10 +26,8 @@
 #include <asm/mach-imx/video.h>
 #include <cpu.h>
 #include <dm/platform_data/serial_mxc.h>
-#include <environment.h>
-#include <fsl_esdhc.h>
+#include <fsl_esdhc_imx.h>
 #include <imx_thermal.h>
-#include <micrel.h>
 #include <miiphy.h>
 #include <netdev.h>
 #include <cpu.h>
@@ -83,7 +83,7 @@ iomux_v3_cfg_t const uart1_pads[] = {
 	MX6_PAD_CSI0_DAT11__UART1_TX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL),
 };
 
-#if defined(CONFIG_FSL_ESDHC) && defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_FSL_ESDHC_IMX) && defined(CONFIG_SPL_BUILD)
 /* Colibri MMC */
 iomux_v3_cfg_t const usdhc1_pads[] = {
 	MX6_PAD_SD1_CLK__SD1_CLK    | MUX_PAD_CTRL(USDHC_PAD_CTRL),
@@ -110,7 +110,7 @@ iomux_v3_cfg_t const usdhc3_pads[] = {
 	MX6_PAD_SD3_DAT7__SD3_DATA7 | MUX_PAD_CTRL(USDHC_EMMC_PAD_CTRL),
 	MX6_PAD_SD3_RST__SD3_RESET  | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 };
-#endif /* CONFIG_FSL_ESDHC & CONFIG_SPL_BUILD */
+#endif /* CONFIG_FSL_ESDHC_IMX & CONFIG_SPL_BUILD */
 
 iomux_v3_cfg_t const enet_pads[] = {
 	MX6_PAD_ENET_MDC__ENET_MDC		| MUX_PAD_CTRL(ENET_PAD_CTRL),
@@ -304,7 +304,7 @@ int board_ehci_hcd_init(int port)
 }
 #endif
 
-#if defined(CONFIG_FSL_ESDHC) && defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_FSL_ESDHC_IMX) && defined(CONFIG_SPL_BUILD)
 /* use the following sequence: eMMC, MMC */
 struct fsl_esdhc_cfg usdhc_cfg[CONFIG_SYS_FSL_USDHC_NUM] = {
 	{USDHC3_BASE_ADDR},
@@ -361,7 +361,7 @@ int board_mmc_init(bd_t *bis)
 
 	return fsl_esdhc_initialize(bis, &usdhc_cfg[0]);
 }
-#endif /* CONFIG_FSL_ESDHC & CONFIG_SPL_BUILD */
+#endif /* CONFIG_FSL_ESDHC_IMX & CONFIG_SPL_BUILD */
 
 int board_phy_config(struct phy_device *phydev)
 {

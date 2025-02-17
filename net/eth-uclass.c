@@ -7,10 +7,11 @@
 
 #include <common.h>
 #include <dm.h>
-#include <environment.h>
+#include <env.h>
 #include <net.h>
 #include <dm/device-internal.h>
 #include <dm/uclass-internal.h>
+#include <net/pcap.h>
 #include "eth_internal.h"
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -226,7 +227,7 @@ static int on_ethaddr(const char *name, const char *value, enum env_op op,
 		switch (op) {
 		case env_op_create:
 		case env_op_overwrite:
-			eth_parse_enetaddr(value, pdata->enetaddr);
+			string_to_enetaddr(value, pdata->enetaddr);
 			eth_write_hwaddr(dev);
 			break;
 		case env_op_delete:
@@ -344,6 +345,10 @@ int eth_send(void *packet, int length)
 		/* We cannot completely return the error at present */
 		debug("%s: send() returned error %d\n", __func__, ret);
 	}
+#if defined(CONFIG_CMD_PCAP)
+	if (ret >= 0)
+		pcap_post(packet, length, true);
+#endif
 	return ret;
 }
 
@@ -415,20 +420,25 @@ int eth_initialize(void)
 
 		bootstage_mark(BOOTSTAGE_ID_NET_ETH_INIT);
 		do {
-			if (num_devices)
-				printf(", ");
+			if (dev->seq != -1) {
+				if (num_devices)
+					printf(", ");
 
-			printf("eth%d: %s", dev->seq, dev->name);
+				printf("eth%d: %s", dev->seq, dev->name);
 
-			if (ethprime && dev == prime_dev)
-				printf(" [PRIME]");
+				if (ethprime && dev == prime_dev)
+					printf(" [PRIME]");
+			}
 
 			eth_write_hwaddr(dev);
 
+			if (dev->seq != -1)
+				num_devices++;
 			uclass_next_device_check(&dev);
-			num_devices++;
 		} while (dev);
 
+		if (!num_devices)
+			printf("No ethernet found.\n");
 		putc('\n');
 	}
 

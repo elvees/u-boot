@@ -5,6 +5,7 @@
  */
 
 #include <common.h>
+#include <cpu_func.h>
 #include <errno.h>
 #include <asm/armv7m.h>
 #include <asm/io.h>
@@ -331,6 +332,11 @@ void icache_disable(void)
 	isb();	/* subsequent instructions fetch see cache disable effect */
 }
 #else
+void invalidate_icache_all(void)
+{
+	return;
+}
+
 void icache_enable(void)
 {
 	return;

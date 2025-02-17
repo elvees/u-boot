@@ -9,6 +9,7 @@
  */
 
 #include <common.h>
+#include <cpu_func.h>
 #include <watchdog.h>
 #include <asm/immap.h>
 #include <asm/processor.h>
@@ -200,7 +201,7 @@ void cpu_init_f(void)
 	/* Lowest slew rate for UART0,1,2 */
 	out_8(&gpio->srcr_uart, 0x00);
 
-#ifdef CONFIG_FSL_ESDHC
+#ifdef CONFIG_FSL_ESDHC_IMX
 	/* eSDHC pin as faster speed */
 	out_8(&gpio->srcr_sdhc, 0x03);
 

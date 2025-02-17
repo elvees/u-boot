@@ -223,11 +223,6 @@
 /*
  * Environment Configuration
  */
-#define CONFIG_ENV_ADDR		(CONFIG_SYS_MONITOR_BASE \
-				+ CONFIG_SYS_MONITOR_LEN)
-#define CONFIG_ENV_SIZE		0x20000
-#define CONFIG_ENV_ADDR_REDUND	(CONFIG_ENV_ADDR + CONFIG_ENV_SIZE)
-#define CONFIG_ENV_SIZE_REDUND	(CONFIG_ENV_SIZE)
 
 #define CONFIG_NETDEV			eth1
 #define CONFIG_HOSTNAME		"ids8313"
@@ -253,9 +248,6 @@
 #define CONFIG_SYS_LOAD_ADDR		0x100000
 #define CONFIG_LOADS_ECHO
 #define CONFIG_TIMESTAMP
-#define CONFIG_PREBOOT			"echo;" \
-					"echo Type \\\"run nfsboot\\\" " \
-					"to mount root filesystem over NFS;echo"
 #define CONFIG_BOOTCOMMAND		"run boot_cramfs"
 #undef	CONFIG_SYS_LOADS_BAUD_CHANGE
 

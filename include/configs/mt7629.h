@@ -27,7 +27,6 @@
 #define CONFIG_SYS_NONCACHED_MEMORY	SZ_1M
 
 /* Environment */
-#define CONFIG_ENV_SIZE			SZ_4K
 /* Allow to overwrite serial and ethaddr */
 #define CONFIG_ENV_OVERWRITE
 
@@ -38,7 +37,6 @@
 #define CONFIG_SPL_PAD_TO		0x10000
 
 #define CONFIG_SPI_ADDR			0x30000000
-#define CONFIG_SYS_SPI_U_BOOT_OFFS	CONFIG_SPL_PAD_TO
 #define CONFIG_SYS_UBOOT_BASE		(CONFIG_SPI_ADDR + CONFIG_SPL_PAD_TO)
 
 /* SPL -> Uboot */

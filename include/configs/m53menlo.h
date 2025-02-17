@@ -62,7 +62,6 @@
 /*
  * NAND
  */
-#define CONFIG_ENV_SIZE			(16 * 1024)
 #ifdef CONFIG_CMD_NAND
 #define CONFIG_SYS_MAX_NAND_DEVICE	1
 #define CONFIG_SYS_NAND_BASE		NFC_BASE_ADDR_AXI
@@ -70,15 +69,9 @@
 #define CONFIG_MXC_NAND_IP_REGS_BASE	NFC_BASE_ADDR
 #define CONFIG_SYS_NAND_LARGEPAGE
 #define CONFIG_MXC_NAND_HWECC
-#define CONFIG_SYS_NAND_USE_FLASH_BBT
 
 /* Environment is in NAND */
-#define CONFIG_ENV_SIZE_REDUND		CONFIG_ENV_SIZE
-#define CONFIG_ENV_SECT_SIZE		(128 * 1024)
-#define CONFIG_ENV_RANGE		(4 * CONFIG_ENV_SECT_SIZE)
-#define CONFIG_ENV_OFFSET		(8 * CONFIG_ENV_SECT_SIZE) /* 1 MiB */
-#define CONFIG_ENV_OFFSET_REDUND	\
-		(CONFIG_ENV_OFFSET + CONFIG_ENV_RANGE)
+#define CONFIG_ENV_RANGE		(0x00080000) /* 512 KiB */
 #endif
 
 /*
@@ -154,7 +147,6 @@
 #define CONFIG_FSL_IIM
 
 /* Watchdog */
-#define CONFIG_WATCHDOG_TIMEOUT_MSECS 8000
 
 /*
  * Boot Linux
@@ -185,7 +177,6 @@
 /*
  * Extra Environments
  */
-#define CONFIG_PREBOOT		"run try_bootscript"
 #define CONFIG_HOSTNAME		"m53menlo"
 
 #define CONFIG_EXTRA_ENV_SETTINGS					\
@@ -241,5 +232,10 @@
 			"source ${kernel_addr_r} ; "			\
 		"fi ; "							\
 		"fi\0"
+
+#if defined(CONFIG_SPL_BUILD)
+#undef CONFIG_WATCHDOG
+#define CONFIG_HW_WATCHDOG
+#endif
 
 #endif	/* __M53MENLO_CONFIG_H__ */

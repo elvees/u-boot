@@ -23,7 +23,6 @@
 
 /* SPL */
 #include "imx6_spl.h"			/* common IMX6 SPL configuration */
-#define CONFIG_SYS_SPI_U_BOOT_OFFS	0x11400
 #define CONFIG_SPL_TARGET		"u-boot-with-spl.imx"
 
 /* Miscellaneous configurable options */
@@ -48,16 +47,7 @@
 #define CONFIG_FEC_MXC_PHYADDR		0
 #define CONFIG_ARP_TIMEOUT		200UL
 
-/* I2C Configs */
-#define CONFIG_SYS_I2C
-#define CONFIG_SYS_I2C_MXC
-#define CONFIG_SYS_I2C_MXC_I2C1		/* enable I2C bus 1 */
-#define CONFIG_SYS_I2C_MXC_I2C2		/* enable I2C bus 2 */
-#define CONFIG_SYS_I2C_MXC_I2C3		/* enable I2C bus 3 */
-#define CONFIG_SYS_I2C_SPEED		100000
-
 /* MMC Configs */
-#define CONFIG_FSL_USDHC
 #define CONFIG_SYS_FSL_ESDHC_ADDR	0
 #define CONFIG_SYS_FSL_USDHC_NUM	3
 #define CONFIG_SYS_MMC_ENV_DEV		2 /* 1 = SDHC3, 2 = SDHC4 (eMMC) */
@@ -69,7 +59,6 @@
 #if defined(CONFIG_SPL_BUILD)
 #undef CONFIG_DM_SPI
 #undef CONFIG_DM_SPI_FLASH
-#undef CONFIG_SPI_FLASH_MTD
 #endif
 
 /* UART */
@@ -98,7 +87,6 @@
 #endif
 
 /* Watchdog */
-#define CONFIG_WATCHDOG_TIMEOUT_MSECS	60000
 
 /* allow to overwrite serial and ethaddr */
 #define CONFIG_ENV_OVERWRITE
@@ -149,15 +137,5 @@
 #define CONFIG_SYS_MEMTEST_SCRATCH	0x10800000
 
 /* Environment */
-#define CONFIG_ENV_SIZE			(16 * 1024)
-#define CONFIG_SYS_REDUNDAND_ENVIRONMENT
-
-#if defined(CONFIG_ENV_IS_IN_SPI_FLASH)
-#define CONFIG_ENV_OFFSET		(1024 * 1024)
-#define CONFIG_ENV_SECT_SIZE		(64 * 1024)
-#define CONFIG_ENV_OFFSET_REDUND	\
-	(CONFIG_ENV_OFFSET + CONFIG_ENV_SECT_SIZE)
-#define CONFIG_ENV_SIZE_REDUND		CONFIG_ENV_SIZE
-#endif
 
 #endif	/* __DH_IMX6_CONFIG_H */

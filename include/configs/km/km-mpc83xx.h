@@ -3,8 +3,6 @@
  */
 #define BOOTFLASH_START	0xF0000000
 
-#define CONFIG_KM_CONSOLE_TTY	"ttyS0"
-
 /*
  * DDR Setup
  */
@@ -89,8 +87,6 @@
 		{0, {{I2C_MUX_PCA9547, 0x70, 1} } }, \
 		{1, {I2C_NULL_HOP} } }
 
-#define CONFIG_KM_IVM_BUS		2	/* I2C2 (Mux-Port 1)*/
-
 #if defined(CONFIG_CMD_NAND)
 #define CONFIG_NAND_KMETER1
 #define CONFIG_SYS_MAX_NAND_DEVICE	1
@@ -109,23 +105,7 @@
  */
 
 #ifndef CONFIG_SYS_RAMBOOT
-#ifndef CONFIG_ENV_ADDR
-#define CONFIG_ENV_ADDR		(CONFIG_SYS_MONITOR_BASE + \
-					CONFIG_SYS_MONITOR_LEN)
-#endif
-#define CONFIG_ENV_SECT_SIZE	0x20000 /* 128K(one sector) for env */
-#ifndef CONFIG_ENV_OFFSET
-#define CONFIG_ENV_OFFSET	(CONFIG_SYS_MONITOR_LEN)
-#endif
-
 /* Address and size of Redundant Environment Sector	*/
-#define CONFIG_ENV_OFFSET_REDUND	(CONFIG_ENV_OFFSET + \
-						CONFIG_ENV_SECT_SIZE)
-#define CONFIG_ENV_SIZE_REDUND	(CONFIG_ENV_SIZE)
-
-#else /* CFG_SYS_RAMBOOT */
-#define CONFIG_ENV_ADDR		(CONFIG_SYS_MONITOR_BASE - 0x1000)
-#define CONFIG_ENV_SIZE		0x2000
 #endif /* CFG_SYS_RAMBOOT */
 
 /*

@@ -358,20 +358,19 @@ static int stm32mp_bsec_read(struct udevice *dev, int offset,
 	bool shadow = true;
 	int nb_otp = size / sizeof(u32);
 	int otp;
+	unsigned int offs = offset;
 
-	if (offset >= STM32_BSEC_OTP_OFFSET) {
-		offset -= STM32_BSEC_OTP_OFFSET;
+	if (offs >= STM32_BSEC_OTP_OFFSET) {
+		offs -= STM32_BSEC_OTP_OFFSET;
 		shadow = false;
 	}
-	otp = offset / sizeof(u32);
 
-	if (otp < 0 || (otp + nb_otp - 1) > BSEC_OTP_MAX_VALUE) {
-		dev_err(dev, "wrong value for otp, max value : %i\n",
-			BSEC_OTP_MAX_VALUE);
+	if (offs < 0 || (offs % 4) || (size % 4))
 		return -EINVAL;
-	}
 
-	for (i = otp; i < (otp + nb_otp); i++) {
+	otp = offs / sizeof(u32);
+
+	for (i = otp; i < (otp + nb_otp) && i <= BSEC_OTP_MAX_VALUE; i++) {
 		u32 *addr = &((u32 *)buf)[i - otp];
 
 		if (shadow)
@@ -382,7 +381,10 @@ static int stm32mp_bsec_read(struct udevice *dev, int offset,
 		if (ret)
 			break;
 	}
-	return ret;
+	if (ret)
+		return ret;
+	else
+		return (i - otp) * 4;
 }
 
 static int stm32mp_bsec_write(struct udevice *dev, int offset,
@@ -393,20 +395,19 @@ static int stm32mp_bsec_write(struct udevice *dev, int offset,
 	bool shadow = true;
 	int nb_otp = size / sizeof(u32);
 	int otp;
+	unsigned int offs = offset;
 
-	if (offset >= STM32_BSEC_OTP_OFFSET) {
-		offset -= STM32_BSEC_OTP_OFFSET;
+	if (offs >= STM32_BSEC_OTP_OFFSET) {
+		offs -= STM32_BSEC_OTP_OFFSET;
 		shadow = false;
 	}
-	otp = offset / sizeof(u32);
 
-	if (otp < 0 || (otp + nb_otp - 1) > BSEC_OTP_MAX_VALUE) {
-		dev_err(dev, "wrong value for otp, max value : %d\n",
-			BSEC_OTP_MAX_VALUE);
+	if (offs < 0 || (offs % 4) || (size % 4))
 		return -EINVAL;
-	}
 
-	for (i = otp; i < otp + nb_otp; i++) {
+	otp = offs / sizeof(u32);
+
+	for (i = otp; i < otp + nb_otp && i <= BSEC_OTP_MAX_VALUE; i++) {
 		u32 *val = &((u32 *)buf)[i - otp];
 
 		if (shadow)
@@ -416,7 +417,10 @@ static int stm32mp_bsec_write(struct udevice *dev, int offset,
 		if (ret)
 			break;
 	}
-	return ret;
+	if (ret)
+		return ret;
+	else
+		return (i - otp) * 4;
 }
 
 static const struct misc_ops stm32mp_bsec_ops = {

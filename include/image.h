@@ -156,6 +156,7 @@ enum {
 	IH_OS_OPENRTOS,		/* OpenRTOS	*/
 	IH_OS_ARM_TRUSTED_FIRMWARE,     /* ARM Trusted Firmware */
 	IH_OS_TEE,			/* Trusted Execution Environment */
+	IH_OS_OPENSBI,			/* RISC-V OpenSBI */
 
 	IH_OS_COUNT,
 };
@@ -283,6 +284,7 @@ enum {
 	IH_TYPE_MTKIMAGE,		/* MediaTek BootROM loadable Image */
 	IH_TYPE_IMX8MIMAGE,		/* Freescale IMX8MBoot Image	*/
 	IH_TYPE_IMX8IMAGE,		/* Freescale IMX8Boot Image	*/
+	IH_TYPE_COPRO,			/* Coprocessor Image for remoteproc*/
 
 	IH_TYPE_COUNT,			/* Number of image types */
 };
@@ -317,13 +319,13 @@ enum {
  * all data in network byte order (aka natural aka bigendian).
  */
 typedef struct image_header {
-	__be32		ih_magic;	/* Image Header Magic Number	*/
-	__be32		ih_hcrc;	/* Image Header CRC Checksum	*/
-	__be32		ih_time;	/* Image Creation Timestamp	*/
-	__be32		ih_size;	/* Image Data Size		*/
-	__be32		ih_load;	/* Data	 Load  Address		*/
-	__be32		ih_ep;		/* Entry Point Address		*/
-	__be32		ih_dcrc;	/* Image Data CRC Checksum	*/
+	uint32_t	ih_magic;	/* Image Header Magic Number	*/
+	uint32_t	ih_hcrc;	/* Image Header CRC Checksum	*/
+	uint32_t	ih_time;	/* Image Creation Timestamp	*/
+	uint32_t	ih_size;	/* Image Data Size		*/
+	uint32_t	ih_load;	/* Data	 Load  Address		*/
+	uint32_t	ih_ep;		/* Entry Point Address		*/
+	uint32_t	ih_dcrc;	/* Image Data CRC Checksum	*/
 	uint8_t		ih_os;		/* Operating System		*/
 	uint8_t		ih_arch;	/* CPU architecture		*/
 	uint8_t		ih_type;	/* Image Type			*/
@@ -561,7 +563,7 @@ int boot_get_setup(bootm_headers_t *images, uint8_t arch, ulong *setup_start,
 #ifndef USE_HOSTCC
 /* Image format types, returned by _get_format() routine */
 #define IMAGE_FORMAT_INVALID	0x00
-#if defined(CONFIG_IMAGE_FORMAT_LEGACY)
+#if defined(CONFIG_LEGACY_IMAGE_FORMAT)
 #define IMAGE_FORMAT_LEGACY	0x01	/* legacy image_header based format */
 #endif
 #define IMAGE_FORMAT_FIT	0x02	/* new, libfdt based format */
@@ -848,6 +850,23 @@ static inline int image_check_target_arch(const image_header_t *hdr)
 	return image_check_arch(hdr, IH_ARCH_DEFAULT);
 }
 #endif /* USE_HOSTCC */
+
+/**
+ * image_decomp() - decompress an image
+ *
+ * @comp:	Compression algorithm that is used (IH_COMP_...)
+ * @load:	Destination load address in U-Boot memory
+ * @image_start Image start address (where we are decompressing from)
+ * @type:	OS type (IH_OS_...)
+ * @load_bug:	Place to decompress to
+ * @image_buf:	Address to decompress from
+ * @image_len:	Number of bytes in @image_buf to decompress
+ * @unc_len:	Available space for decompression
+ * @return 0 if OK, -ve on error (BOOTM_ERR_...)
+ */
+int image_decomp(int comp, ulong load, ulong image_start, int type,
+		 void *load_buf, void *image_buf, ulong image_len,
+		 uint unc_len, ulong *load_end);
 
 /**
  * Set up properties in the FDT

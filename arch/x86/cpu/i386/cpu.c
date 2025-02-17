@@ -19,6 +19,7 @@
  */
 
 #include <common.h>
+#include <cpu_func.h>
 #include <malloc.h>
 #include <asm/control_regs.h>
 #include <asm/cpu.h>
@@ -383,6 +384,14 @@ static void setup_mtrr(void)
 		/* Enable the fixed range MTRRs */
 		msr_setbits_64(MTRR_DEF_TYPE_MSR, MTRR_DEF_TYPE_FIX_EN);
 	}
+}
+
+int x86_cpu_init_tpl(void)
+{
+	setup_cpu_features();
+	setup_identity();
+
+	return 0;
 }
 
 int x86_cpu_init_f(void)

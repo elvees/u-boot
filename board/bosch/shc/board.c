@@ -12,7 +12,10 @@
  */
 
 #include <common.h>
+#include <env.h>
 #include <errno.h>
+#include <init.h>
+#include <irq_func.h>
 #include <spl.h>
 #include <asm/arch/cpu.h>
 #include <asm/arch/hardware.h>
@@ -30,9 +33,8 @@
 #include <miiphy.h>
 #include <cpsw.h>
 #include <power/tps65217.h>
-#include <environment.h>
+#include <env_internal.h>
 #include <watchdog.h>
-#include <environment.h>
 #include "mmc.h"
 #include "board.h"
 
@@ -442,7 +444,7 @@ int board_init(void)
 		puts("EEPROM Content Invalid.\n");
 
 	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
-#if defined(CONFIG_NOR) || defined(CONFIG_NAND)
+#if defined(CONFIG_NOR) || defined(CONFIG_MTD_RAW_NAND)
 	gpmc_init();
 #endif
 	shc_request_gpio();
