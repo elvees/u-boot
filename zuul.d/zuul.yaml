@@ -3,6 +3,10 @@
       jobs:
         - uboot-build
         - uboot-lint
+        - mcom02-uboot-tests:
+            dependencies: uboot-build
+            vars:
+              pytest_extra_args: --random-order-bucket=global --count=5
     periodic:
       jobs:
         - uboot-build
