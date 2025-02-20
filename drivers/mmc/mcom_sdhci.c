@@ -163,15 +163,14 @@ static int arasan_sdhci_probe(struct udevice *dev)
 	host->quirks = SDHCI_QUIRK_WAIT_SEND_CMD | SDHCI_QUIRK_NO_HISPD_BIT;
 	host->max_clk = SPLL_FREQ;
 	host->ops = &arasan_sdhci_ops;
-
-	ret = sdhci_setup_cfg(&plat->cfg, host, 0, 400000);
-	if (ret)
-		return ret;
-
 	host->mmc = &plat->mmc;
 	host->mmc->dev = dev;
 	host->mmc->priv = host;
 	upriv->mmc = host->mmc;
+
+	ret = sdhci_setup_cfg(&plat->cfg, host, 0, 400000);
+	if (ret)
+		return ret;
 
 	return sdhci_probe(dev);
 }
