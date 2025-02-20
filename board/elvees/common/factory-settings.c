@@ -257,9 +257,7 @@ int detect_board_name(char board_name[])
 {
 	const char *board_override = NULL;
 
-	if (!env_load())
-		board_override = env_get("board_override");
-
+	board_override = env_get("board_override");
 	if (board_override) {
 		strlcpy(board_name, board_override, BOARD_NAME_MAX_SIZE);
 		log_info("Board name set from board_override: %s\n", board_name);
