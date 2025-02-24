@@ -297,11 +297,8 @@ static void board_pads_cfg(void)
 		/* Setup GPIO_ZOOM, GPIO_FOCUS pins */
 		writel(0xFF, LSP1_GPIO_SWPORTC_DDR);
 		writel(0xFF, LSP1_GPIO_SWPORTC_DR);
-	} else if (of_machine_is_compatible("elvees,elvmc03smarc-r2.6.1") ||
-		   of_machine_is_compatible("elvees,elvmc03smarc-r2.7.1") ||
-		   of_machine_is_compatible("elvees,elvmc03smarc-r2.9.1")) {
-		lsperiph1_v18_pad_cfg();
-	} else {
+	} else if (!of_machine_is_compatible("elvees,elvmc03q7") &&
+		   !of_machine_is_compatible("elvees,elvmc03ce")) {
 		/* U-Boot doesn't have pinctrl driver, so switch pad voltage manually */
 		lsperiph1_v18_pad_cfg();
 	}
