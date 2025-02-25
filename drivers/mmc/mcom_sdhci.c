@@ -158,6 +158,10 @@ static int arasan_sdhci_probe(struct udevice *dev)
 	struct sdhci_host *host = dev_get_priv(dev);
 	int ret;
 
+	ret = mmc_of_parse(dev, &plat->cfg);
+	if (ret)
+		return ret;
+
 	host->name = dev->name;
 	host->ioaddr = (void *)devfdt_get_addr(dev);
 	host->quirks = SDHCI_QUIRK_WAIT_SEND_CMD | SDHCI_QUIRK_NO_HISPD_BIT;
