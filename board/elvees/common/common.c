@@ -298,7 +298,8 @@ static void board_pads_cfg(void)
 		writel(0xFF, LSP1_GPIO_SWPORTC_DDR);
 		writel(0xFF, LSP1_GPIO_SWPORTC_DR);
 	} else if (!of_machine_is_compatible("elvees,elvmc03q7") &&
-		   !of_machine_is_compatible("elvees,elvmc03ce")) {
+		   !of_machine_is_compatible("elvees,elvmc03ce") &&
+		   !of_machine_is_compatible("elvees,skifmp")) {
 		/* U-Boot doesn't have pinctrl driver, so switch pad voltage manually */
 		lsperiph1_v18_pad_cfg();
 	}
