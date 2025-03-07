@@ -30,11 +30,6 @@
 			size = <0x4000000>; // 64 MiB
 		};
 
-		vpu_reserved: vpu-pool {
-			compatible = "shared-dma-pool";
-			reusable;
-			size = <0x4000000>; // 64 MiB
-		};
 	};
 
 	aliases {
@@ -1109,16 +1104,6 @@
 		interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&mcc_clk>;
 		status = "disabled";
-	};
-
-	vpu: codec@37100000 {
-		memory-region = <&vpu_reserved>;
-		compatible = "elvees,avico";
-		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-		clocks = <&vpu_pclk>, <&vpu_aclk>, <&vpu_sclk>, <&dsp_aclk>;
-		clock-names = "pclk", "aclk", "sclk", "dsp_aclk";
-		reg = <0x37100000 0x00010000>, <0x3b000000 0x01000000>;
-		power-domains = <&pd_vpu>;
 	};
 
 	sdma: dma@37220000 {

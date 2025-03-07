@@ -84,7 +84,3 @@
 &vinc_reserved {
 	size = <0xC00000>;
 };
-
-&vpu_reserved {
-	status = "disabled";
-};
