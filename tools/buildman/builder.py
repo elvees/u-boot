@@ -577,7 +577,8 @@ class Builder:
         sym = {}
         for line in fd.readlines():
             try:
-                size, type, name = line[:-1].split()
+                if line.strip():
+                    size, type, name = line[:-1].split()
             except:
                 Print("Invalid line in file '%s': '%s'" % (fname, line[:-1]))
                 continue
@@ -978,7 +979,7 @@ class Builder:
 
         The summary takes the form of one line per architecture. The
         line contains deltas for each of the sections (+ means the section
-        got bigger, - means smaller). The nunmbers are the average number
+        got bigger, - means smaller). The numbers are the average number
         of bytes that a board in this section increased by.
 
         For example:

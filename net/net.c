@@ -93,6 +93,7 @@
 #include <env.h>
 #include <env_internal.h>
 #include <errno.h>
+#include <image.h>
 #include <net.h>
 #include <net/fastboot.h>
 #include <net/tftp.h>
@@ -636,7 +637,7 @@ restart:
 				printf("Bytes transferred = %d (%x hex)\n",
 				       net_boot_file_size, net_boot_file_size);
 				env_set_hex("filesize", net_boot_file_size);
-				env_set_hex("fileaddr", load_addr);
+				env_set_hex("fileaddr", image_load_addr);
 			}
 			if (protocol != NETCONS)
 				eth_halt();
@@ -882,9 +883,6 @@ int net_send_ip_packet(uchar *ether, struct in_addr dest, int dport, int sport,
  * to the algorithm in RFC815. It returns NULL or the pointer to
  * a complete packet, in static storage
  */
-#ifndef CONFIG_NET_MAXDEFRAG
-#define CONFIG_NET_MAXDEFRAG 16384
-#endif
 #define IP_PKTSIZE (CONFIG_NET_MAXDEFRAG)
 
 #define IP_MAXUDP (IP_PKTSIZE - IP_HDR_SIZE)

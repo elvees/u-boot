@@ -5,6 +5,7 @@
  */
 
 #include <common.h>
+#include <clock_legacy.h>
 #include <env.h>
 #include <fsl_immap.h>
 #include <fsl_ifc.h>
@@ -147,7 +148,7 @@ static void erratum_a008997(void)
 	out_be16((phy) + SCFG_USB_PHY_RX_OVRD_IN_HI, USB_PHY_RX_EQ_VAL_4)
 
 #elif defined(CONFIG_ARCH_LS2080A) || defined(CONFIG_ARCH_LS1088A) || \
-	defined(CONFIG_ARCH_LS1028A)
+	defined(CONFIG_ARCH_LS1028A) || defined(CONFIG_ARCH_LX2160A)
 
 #define PROGRAM_USB_PHY_RX_OVRD_IN_HI(phy)	\
 	out_le16((phy) + DCSR_USB_PHY_RX_OVRD_IN_HI, USB_PHY_RX_EQ_VAL_1); \
@@ -181,6 +182,15 @@ static void erratum_a009007(void)
 }
 
 #if defined(CONFIG_FSL_LSCH3)
+static void erratum_a050106(void)
+{
+#if defined(CONFIG_ARCH_LX2160A)
+	void __iomem *dcsr = (void __iomem *)DCSR_BASE;
+
+	PROGRAM_USB_PHY_RX_OVRD_IN_HI(dcsr + DCSR_USB_PHY1);
+	PROGRAM_USB_PHY_RX_OVRD_IN_HI(dcsr + DCSR_USB_PHY2);
+#endif
+}
 /*
  * This erratum requires setting a value to eddrtqcr1 to
  * optimal the DDR performance.
@@ -332,6 +342,7 @@ void fsl_lsch3_early_init_f(void)
 	erratum_a009798();
 	erratum_a008997();
 	erratum_a009007();
+	erratum_a050106();
 #ifdef CONFIG_CHAIN_OF_TRUST
 	/* In case of Secure Boot, the IBR configures the SMMU
 	* to allow only Secure transactions.
@@ -636,6 +647,11 @@ void fsl_lsch2_early_init_f(void)
 			SCFG_SNPCNFGCR_USB2WRSNP | SCFG_SNPCNFGCR_USB3RDSNP |
 			SCFG_SNPCNFGCR_USB3WRSNP | SCFG_SNPCNFGCR_SATARDSNP |
 			SCFG_SNPCNFGCR_SATAWRSNP);
+#elif defined(CONFIG_ARCH_LS1012A)
+	setbits_be32(&scfg->snpcnfgcr, SCFG_SNPCNFGCR_SECRDSNP |
+			SCFG_SNPCNFGCR_SECWRSNP | SCFG_SNPCNFGCR_USB1RDSNP |
+			SCFG_SNPCNFGCR_USB1WRSNP | SCFG_SNPCNFGCR_SATARDSNP |
+			SCFG_SNPCNFGCR_SATAWRSNP);
 #else
 	setbits_be32(&scfg->snpcnfgcr, SCFG_SNPCNFGCR_SECRDSNP |
 		     SCFG_SNPCNFGCR_SECWRSNP |
@@ -673,6 +689,47 @@ void fsl_lsch2_early_init_f(void)
 #if defined(CONFIG_ARCH_LS1043A) || defined(CONFIG_ARCH_LS1046A)
 	set_icids();
 #endif
+}
+#endif
+
+#ifdef CONFIG_FSPI_AHB_EN_4BYTE
+int fspi_ahb_init(void)
+{
+	/* Enable 4bytes address support and fast read */
+	u32 *fspi_lut, lut_key, *fspi_key;
+
+	fspi_key = (void *)SYS_NXP_FSPI_ADDR + SYS_NXP_FSPI_LUTKEY_BASE_ADDR;
+	fspi_lut = (void *)SYS_NXP_FSPI_ADDR + SYS_NXP_FSPI_LUT_BASE_ADDR;
+
+	lut_key = in_be32(fspi_key);
+
+	if (lut_key == SYS_NXP_FSPI_LUTKEY) {
+		/* That means the register is BE */
+		out_be32(fspi_key, SYS_NXP_FSPI_LUTKEY);
+		/* Unlock the lut table */
+		out_be32(fspi_key + 1, SYS_NXP_FSPI_LUTCR_UNLOCK);
+		/* Create READ LUT */
+		out_be32(fspi_lut, 0x0820040c);
+		out_be32(fspi_lut + 1, 0x24003008);
+		out_be32(fspi_lut + 2, 0x00000000);
+		/* Lock the lut table */
+		out_be32(fspi_key, SYS_NXP_FSPI_LUTKEY);
+		out_be32(fspi_key + 1, SYS_NXP_FSPI_LUTCR_LOCK);
+	} else {
+		/* That means the register is LE */
+		out_le32(fspi_key, SYS_NXP_FSPI_LUTKEY);
+		/* Unlock the lut table */
+		out_le32(fspi_key + 1, SYS_NXP_FSPI_LUTCR_UNLOCK);
+		/* Create READ LUT */
+		out_le32(fspi_lut, 0x0820040c);
+		out_le32(fspi_lut + 1, 0x24003008);
+		out_le32(fspi_lut + 2, 0x00000000);
+		/* Lock the lut table */
+		out_le32(fspi_key, SYS_NXP_FSPI_LUTKEY);
+		out_le32(fspi_key + 1, SYS_NXP_FSPI_LUTCR_LOCK);
+	}
+
+	return 0;
 }
 #endif
 
@@ -867,6 +924,9 @@ int board_late_init(void)
 #endif
 #ifdef CONFIG_QSPI_AHB_INIT
 	qspi_ahb_init();
+#endif
+#ifdef CONFIG_FSPI_AHB_EN_4BYTE
+	fspi_ahb_init();
 #endif
 
 	return fsl_board_late_init();

@@ -7,14 +7,17 @@
 #include <bootm.h>
 #include <clk.h>
 #include <config.h>
+#include <dfu.h>
 #include <dm.h>
 #include <env.h>
 #include <env_internal.h>
 #include <g_dnl.h>
 #include <generic-phy.h>
+#include <hang.h>
 #include <i2c.h>
 #include <init.h>
 #include <led.h>
+#include <malloc.h>
 #include <memalign.h>
 #include <misc.h>
 #include <mtd.h>
@@ -31,6 +34,7 @@
 #include <asm/arch/stm32.h>
 #include <asm/arch/sys_proto.h>
 #include <jffs2/load_kernel.h>
+#include <linux/err.h>
 #include <power/regulator.h>
 #include <usb/dwc2_udc.h>
 
@@ -607,7 +611,7 @@ error:
 
 static bool board_is_dk2(void)
 {
-	if (CONFIG_IS_ENABLED(TARGET_STM32MP157C_DK2) &&
+	if (CONFIG_IS_ENABLED(TARGET_ST_STM32MP15x) &&
 	    of_machine_is_compatible("st,stm32mp157c-dk2"))
 		return true;
 
@@ -1008,7 +1012,7 @@ void set_dfu_alt_info(char *interface, char *devstr)
 #include <dfu.h>
 #include <power/stpmic1.h>
 
-int dfu_otp_read(u64 offset, u8 *buffer, long *size)
+static int dfu_otp_read(u64 offset, u8 *buffer, long *size)
 {
 	struct udevice *dev;
 	int ret;
@@ -1028,7 +1032,7 @@ int dfu_otp_read(u64 offset, u8 *buffer, long *size)
 	return 0;
 }
 
-int dfu_pmic_read(u64 offset, u8 *buffer, long *size)
+static int dfu_pmic_read(u64 offset, u8 *buffer, long *size)
 {
 	int ret;
 #ifdef CONFIG_PMIC_STPMIC1
@@ -1096,10 +1100,8 @@ static void board_copro_image_process(ulong fw_image, size_t fw_size)
 	printf("Load Remote Processor %d with data@addr=0x%08lx %u bytes:%s\n",
 	       id, fw_image, fw_size, ret ? " Failed!" : " Success!");
 
-	if (!ret) {
+	if (!ret)
 		rproc_start(id);
-		env_set("copro_state", "booted");
-	}
 }
 
 U_BOOT_FIT_LOADABLE_HANDLER(IH_TYPE_COPRO, board_copro_image_process);

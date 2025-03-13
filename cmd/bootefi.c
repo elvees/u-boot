@@ -13,6 +13,7 @@
 #include <efi_selftest.h>
 #include <env.h>
 #include <errno.h>
+#include <malloc.h>
 #include <linux/libfdt.h>
 #include <linux/libfdt_env.h>
 #include <mapmem.h>
@@ -28,11 +29,13 @@ static struct efi_device_path *bootefi_device_path;
 /**
  * Set the load options of an image from an environment variable.
  *
- * @handle:	the image handle
- * @env_var:	name of the environment variable
- * Return:	status code
+ * @handle:		the image handle
+ * @env_var:		name of the environment variable
+ * @load_options:	pointer to load options (output)
+ * Return:		status code
  */
-static efi_status_t set_load_options(efi_handle_t handle, const char *env_var)
+static efi_status_t set_load_options(efi_handle_t handle, const char *env_var,
+				     u16 **load_options)
 {
 	struct efi_loaded_image *loaded_image_info;
 	size_t size;
@@ -40,6 +43,7 @@ static efi_status_t set_load_options(efi_handle_t handle, const char *env_var)
 	u16 *pos;
 	efi_status_t ret;
 
+	*load_options = NULL;
 	ret = EFI_CALL(systab.boottime->open_protocol(
 					handle,
 					&efi_guid_loaded_image,
@@ -64,6 +68,7 @@ static efi_status_t set_load_options(efi_handle_t handle, const char *env_var)
 		return EFI_OUT_OF_RESOURCES;
 	}
 	pos = loaded_image_info->load_options;
+	*load_options = pos;
 	utf8_utf16_strcpy(&pos, env);
 	loaded_image_info->load_options_size = size * 2;
 
@@ -144,6 +149,20 @@ done:
 	return ret;
 }
 
+static void efi_reserve_memory(u64 addr, u64 size)
+{
+	u64 pages;
+
+	/* Convert from sandbox address space. */
+	addr = (uintptr_t)map_sysmem(addr, 0);
+	pages = efi_size_in_pages(size + (addr & EFI_PAGE_MASK));
+	addr &= ~EFI_PAGE_MASK;
+	if (efi_add_memory_map(addr, pages, EFI_RESERVED_MEMORY_TYPE,
+			       false) != EFI_SUCCESS)
+		printf("Reserved memory mapping failed addr %llx size %llx\n",
+		       addr, size);
+}
+
 /**
  * efi_carve_out_dt_rsv() - Carve out DT reserved memory ranges
  *
@@ -156,7 +175,8 @@ done:
 static void efi_carve_out_dt_rsv(void *fdt)
 {
 	int nr_rsv, i;
-	uint64_t addr, size, pages;
+	u64 addr, size;
+	int nodeoffset, subnode;
 
 	nr_rsv = fdt_num_mem_rsv(fdt);
 
@@ -164,15 +184,26 @@ static void efi_carve_out_dt_rsv(void *fdt)
 	for (i = 0; i < nr_rsv; i++) {
 		if (fdt_get_mem_rsv(fdt, i, &addr, &size) != 0)
 			continue;
+		efi_reserve_memory(addr, size);
+	}
 
-		/* Convert from sandbox address space. */
-		addr = (uintptr_t)map_sysmem(addr, 0);
-
-		pages = efi_size_in_pages(size + (addr & EFI_PAGE_MASK));
-		addr &= ~EFI_PAGE_MASK;
-		if (efi_add_memory_map(addr, pages, EFI_RESERVED_MEMORY_TYPE,
-				       false) != EFI_SUCCESS)
-			printf("FDT memrsv map %d: Failed to add to map\n", i);
+	/* process reserved-memory */
+	nodeoffset = fdt_subnode_offset(fdt, 0, "reserved-memory");
+	if (nodeoffset >= 0) {
+		subnode = fdt_first_subnode(fdt, nodeoffset);
+		while (subnode >= 0) {
+			/* check if this subnode has a reg property */
+			addr = fdtdec_get_addr_size(fdt, subnode, "reg",
+						    (fdt_size_t *)&size);
+			/*
+			 * The /reserved-memory node may have children with
+			 * a size instead of a reg property.
+			 */
+			if (addr != FDT_ADDR_T_NONE &&
+			    fdtdec_get_is_enabled(fdt, subnode))
+				efi_reserve_memory(addr, size);
+			subnode = fdt_next_subnode(fdt, subnode);
+		}
 	}
 }
 
@@ -196,65 +227,67 @@ static void *get_config_table(const efi_guid_t *guid)
 #endif /* !CONFIG_IS_ENABLED(GENERATE_ACPI_TABLE) */
 
 /**
- * efi_install_fdt() - install fdt passed by a command argument
+ * efi_install_fdt() - install device tree
  *
- * If fdt_opt is available, the device tree located at that memory address will
- * will be installed as configuration table, otherwise the device tree located
- * at the address indicated by environment variable fdtcontroladdr will be used.
+ * If fdt is not EFI_FDT_USE_INTERNAL, the device tree located at that memory
+ * address will will be installed as configuration table, otherwise the device
+ * tree located at the address indicated by environment variable fdt_addr or as
+ * fallback fdtcontroladdr will be used.
  *
- * On architectures (x86) using ACPI tables device trees shall not be installed
- * as configuration table.
+ * On architectures using ACPI tables device trees shall not be installed as
+ * configuration table.
  *
- * @fdt_opt:	pointer to argument
+ * @fdt:	address of device tree or EFI_FDT_USE_INTERNAL to use the
+ *		the hardware device tree as indicated by environment variable
+ *		fdt_addr or as fallback the internal device tree as indicated by
+ *		the environment variable fdtcontroladdr
  * Return:	status code
  */
-static efi_status_t efi_install_fdt(const char *fdt_opt)
+efi_status_t efi_install_fdt(void *fdt)
 {
 	/*
 	 * The EBBR spec requires that we have either an FDT or an ACPI table
 	 * but not both.
 	 */
 #if CONFIG_IS_ENABLED(GENERATE_ACPI_TABLE)
-	if (fdt_opt) {
+	if (fdt) {
 		printf("ERROR: can't have ACPI table and device tree.\n");
 		return EFI_LOAD_ERROR;
 	}
 #else
-	unsigned long fdt_addr;
-	void *fdt;
 	bootm_headers_t img = { 0 };
 	efi_status_t ret;
 
-	if (fdt_opt) {
-		fdt_addr = simple_strtoul(fdt_opt, NULL, 16);
-		if (!fdt_addr)
-			return EFI_INVALID_PARAMETER;
-	} else {
+	if (fdt == EFI_FDT_USE_INTERNAL) {
+		const char *fdt_opt;
+		uintptr_t fdt_addr;
+
 		/* Look for device tree that is already installed */
 		if (get_config_table(&efi_guid_fdt))
 			return EFI_SUCCESS;
-		/* Use our own device tree as default */
-		fdt_opt = env_get("fdtcontroladdr");
+		/* Check if there is a hardware device tree */
+		fdt_opt = env_get("fdt_addr");
+		/* Use our own device tree as fallback */
 		if (!fdt_opt) {
-			printf("ERROR: need device tree\n");
-			return EFI_NOT_FOUND;
+			fdt_opt = env_get("fdtcontroladdr");
+			if (!fdt_opt) {
+				printf("ERROR: need device tree\n");
+				return EFI_NOT_FOUND;
+			}
 		}
 		fdt_addr = simple_strtoul(fdt_opt, NULL, 16);
 		if (!fdt_addr) {
-			printf("ERROR: invalid $fdtcontroladdr\n");
+			printf("ERROR: invalid $fdt_addr or $fdtcontroladdr\n");
 			return EFI_LOAD_ERROR;
 		}
+		fdt = map_sysmem(fdt_addr, 0);
 	}
 
 	/* Install device tree */
-	fdt = map_sysmem(fdt_addr, 0);
 	if (fdt_check_header(fdt)) {
 		printf("ERROR: invalid device tree\n");
 		return EFI_LOAD_ERROR;
 	}
-
-	/* Create memory reservations as indicated by the device tree */
-	efi_carve_out_dt_rsv(fdt);
 
 	/* Prepare device tree for payload */
 	ret = copy_fdt(&fdt);
@@ -267,6 +300,9 @@ static efi_status_t efi_install_fdt(const char *fdt_opt)
 		printf("ERROR: failed to process device tree\n");
 		return EFI_LOAD_ERROR;
 	}
+
+	/* Create memory reservations as indicated by the device tree */
+	efi_carve_out_dt_rsv(fdt);
 
 	/* Install device tree as UEFI table */
 	ret = efi_install_configuration_table(&efi_guid_fdt, fdt);
@@ -293,9 +329,10 @@ static efi_status_t do_bootefi_exec(efi_handle_t handle)
 	efi_status_t ret;
 	efi_uintn_t exit_data_size = 0;
 	u16 *exit_data = NULL;
+	u16 *load_options;
 
 	/* Transfer environment variable as load options */
-	ret = set_load_options(handle, "bootargs");
+	ret = set_load_options(handle, "bootargs", &load_options);
 	if (ret != EFI_SUCCESS)
 		return ret;
 
@@ -309,12 +346,7 @@ static efi_status_t do_bootefi_exec(efi_handle_t handle)
 
 	efi_restore_gd();
 
-	/*
-	 * FIXME: Who is responsible for
-	 *	free(loaded_image_info->load_options);
-	 * Once efi_exit() is implemented correctly,
-	 * handle itself doesn't exist here.
-	 */
+	free(load_options);
 
 	return ret;
 }
@@ -355,11 +387,8 @@ static int do_efibootmgr(void)
 static int do_bootefi_image(const char *image_opt)
 {
 	void *image_buf;
-	struct efi_device_path *device_path, *image_path;
-	struct efi_device_path *file_path = NULL;
 	unsigned long addr, size;
 	const char *size_str;
-	efi_handle_t mem_handle = NULL, handle;
 	efi_status_t ret;
 
 #ifdef CONFIG_CMD_BOOTEFI_HELLO
@@ -377,8 +406,10 @@ static int do_bootefi_image(const char *image_opt)
 		image_buf = map_sysmem(addr, size);
 		memcpy(image_buf, __efi_helloworld_begin, size);
 
-		device_path = NULL;
-		image_path = NULL;
+		efi_free_pool(bootefi_device_path);
+		efi_free_pool(bootefi_image_path);
+		bootefi_device_path = NULL;
+		bootefi_image_path = NULL;
 	} else
 #endif
 	{
@@ -394,19 +425,37 @@ static int do_bootefi_image(const char *image_opt)
 			return CMD_RET_USAGE;
 
 		image_buf = map_sysmem(addr, size);
-
-		device_path = bootefi_device_path;
-		image_path = bootefi_image_path;
 	}
+	ret = efi_run_image(image_buf, size);
 
-	if (!device_path && !image_path) {
+	if (ret != EFI_SUCCESS)
+		return CMD_RET_FAILURE;
+
+	return CMD_RET_SUCCESS;
+}
+
+/**
+ * efi_run_image() - run loaded UEFI image
+ *
+ * @source_buffer:	memory address of the UEFI image
+ * @source_size:	size of the UEFI image
+ * Return:		status code
+ */
+efi_status_t efi_run_image(void *source_buffer, efi_uintn_t source_size)
+{
+	efi_handle_t mem_handle = NULL, handle;
+	struct efi_device_path *file_path = NULL;
+	efi_status_t ret;
+
+	if (!bootefi_device_path || !bootefi_image_path) {
 		/*
 		 * Special case for efi payload not loaded from disk,
 		 * such as 'bootefi hello' or for example payload
 		 * loaded directly into memory via JTAG, etc:
 		 */
 		file_path = efi_dp_from_mem(EFI_RESERVED_MEMORY_TYPE,
-					    (uintptr_t)image_buf, size);
+					    (uintptr_t)source_buffer,
+					    source_size);
 		/*
 		 * Make sure that device for device_path exist
 		 * in load_image(). Otherwise, shell and grub will fail.
@@ -420,12 +469,12 @@ static int do_bootefi_image(const char *image_opt)
 		if (ret != EFI_SUCCESS)
 			goto out;
 	} else {
-		assert(device_path && image_path);
-		file_path = efi_dp_append(device_path, image_path);
+		file_path = efi_dp_append(bootefi_device_path,
+					  bootefi_image_path);
 	}
 
-	ret = EFI_CALL(efi_load_image(false, efi_root,
-				      file_path, image_buf, size, &handle));
+	ret = EFI_CALL(efi_load_image(false, efi_root, file_path, source_buffer,
+				      source_size, &handle));
 	if (ret != EFI_SUCCESS)
 		goto out;
 
@@ -436,11 +485,7 @@ out:
 		efi_delete_handle(mem_handle);
 	if (file_path)
 		efi_free_pool(file_path);
-
-	if (ret != EFI_SUCCESS)
-		return CMD_RET_FAILURE;
-
-	return CMD_RET_SUCCESS;
+	return ret;
 }
 
 #ifdef CONFIG_CMD_BOOTEFI_SELFTEST
@@ -451,6 +496,7 @@ static efi_status_t bootefi_run_prepare(const char *load_options_path,
 		struct efi_loaded_image **loaded_image_infop)
 {
 	efi_status_t ret;
+	u16 *load_options;
 
 	ret = efi_setup_loaded_image(device_path, image_path, image_objp,
 				     loaded_image_infop);
@@ -458,7 +504,8 @@ static efi_status_t bootefi_run_prepare(const char *load_options_path,
 		return ret;
 
 	/* Transfer environment variable as load options */
-	return set_load_options((efi_handle_t)*image_objp, load_options_path);
+	return set_load_options((efi_handle_t)*image_objp, load_options_path,
+				&load_options);
 }
 
 /**
@@ -556,6 +603,7 @@ static int do_efi_selftest(void)
 static int do_bootefi(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	efi_status_t ret;
+	void *fdt;
 
 	if (argc < 2)
 		return CMD_RET_USAGE;
@@ -568,7 +616,15 @@ static int do_bootefi(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		return CMD_RET_FAILURE;
 	}
 
-	ret = efi_install_fdt(argc > 2 ? argv[2] : NULL);
+	if (argc > 2) {
+		uintptr_t fdt_addr;
+
+		fdt_addr = simple_strtoul(argv[2], NULL, 16);
+		fdt = map_sysmem(fdt_addr, 0);
+	} else {
+		fdt = EFI_FDT_USE_INTERNAL;
+	}
+	ret = efi_install_fdt(fdt);
 	if (ret == EFI_INVALID_PARAMETER)
 		return CMD_RET_USAGE;
 	else if (ret != EFI_SUCCESS)

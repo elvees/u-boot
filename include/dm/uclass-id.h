@@ -19,6 +19,7 @@ enum uclass_id {
 	UCLASS_TEST_BUS,
 	UCLASS_TEST_PROBE,
 	UCLASS_TEST_DUMMY,
+	UCLASS_TEST_DEVRES,
 	UCLASS_SPI_EMUL,	/* sandbox SPI device emulator */
 	UCLASS_I2C_EMUL,	/* sandbox I2C device emulator */
 	UCLASS_I2C_EMUL_PARENT,	/* parent for I2C device emulators */
@@ -28,6 +29,7 @@ enum uclass_id {
 	UCLASS_AXI_EMUL,	/* sandbox AXI bus device emulator */
 
 	/* U-Boot uclasses start here - in alphabetical order */
+	UCLASS_ACPI_PMC,	/* (x86) Power-management controller (PMC) */
 	UCLASS_ADC,		/* Analog-to-digital converter */
 	UCLASS_AHCI,		/* SATA disk controller */
 	UCLASS_AUDIO_CODEC,	/* Audio codec with control and data path */
@@ -69,6 +71,7 @@ enum uclass_id {
 	UCLASS_NOP,		/* No-op devices */
 	UCLASS_NORTHBRIDGE,	/* Intel Northbridge / SDRAM controller */
 	UCLASS_NVME,		/* NVM Express device */
+	UCLASS_P2SB,		/* (x86) Primary-to-Sideband Bus */
 	UCLASS_PANEL,		/* Display panel, such as an LCD */
 	UCLASS_PANEL_BACKLIGHT,	/* Backlight controller for panel */
 	UCLASS_PCH,		/* x86 platform controller hub */
@@ -86,6 +89,7 @@ enum uclass_id {
 	UCLASS_REGULATOR,	/* Regulator device */
 	UCLASS_REMOTEPROC,	/* Remote Processor device */
 	UCLASS_RESET,		/* Reset controller device */
+	UCLASS_RNG,		/* Random Number Generator */
 	UCLASS_RTC,		/* Real time clock device */
 	UCLASS_SCSI,		/* SCSI device */
 	UCLASS_SERIAL,		/* Serial UART */

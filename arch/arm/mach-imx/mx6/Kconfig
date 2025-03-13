@@ -125,16 +125,49 @@ config TARGET_APALIS_IMX6
 	imply CMD_DM
 	imply CMD_SATA
 
-config TARGET_ARISTAINETOS
-	bool "aristainetos"
-
 config TARGET_ARISTAINETOS2
 	bool "aristainetos2"
 	select BOARD_LATE_INIT
+	select MX6DL
+	select SYS_I2C_MXC
+	select MXC_UART
+	select FEC_MXC
+	select DM
+	imply CMD_SATA
+	imply CMD_DM
 
 config TARGET_ARISTAINETOS2B
 	bool "Support aristainetos2-revB"
 	select BOARD_LATE_INIT
+	select MX6DL
+	select SYS_I2C_MXC
+	select MXC_UART
+	select FEC_MXC
+	select DM
+	imply CMD_SATA
+	imply CMD_DM
+
+config TARGET_ARISTAINETOS2BCSL
+	bool "Support aristainetos2-revB CSL"
+	select BOARD_LATE_INIT
+	select MX6DL
+	select SYS_I2C_MXC
+	select MXC_UART
+	select FEC_MXC
+	select DM
+	imply CMD_SATA
+	imply CMD_DM
+
+config TARGET_ARISTAINETOS2C
+	bool "Support aristainetos2-revC"
+	select BOARD_LATE_INIT
+	select MX6DL
+	select SYS_I2C_MXC
+	select MXC_UART
+	select FEC_MXC
+	select DM
+	imply CMD_SATA
+	imply CMD_DM
 
 config TARGET_CGTQMX6EVAL
 	bool "cgtqmx6eval"
@@ -226,7 +259,16 @@ config TARGET_GW_VENTANA
 config TARGET_KOSAGI_NOVENA
 	bool "Kosagi Novena"
 	select BOARD_LATE_INIT
+	select DM_ETH
+	select DM_GPIO
+	select DM_MMC
+	select DM_PCI
+	select DM_SCSI
+	select DM_USB
+	select DM_VIDEO
+	select OF_CONTROL
 	select SUPPORT_SPL
+	imply CMD_DM
 
 config TARGET_MCCMON6
 	bool "mccmon6"
@@ -507,6 +549,18 @@ config TARGET_SKSIMX6
 	bool "sks-imx6"
 	select SUPPORT_SPL
 
+config TARGET_SOMLABS_VISIONSOM_6ULL
+	bool "visionsom-6ull"
+	select MX6ULL
+	select BOARD_LATE_INIT
+	select DM
+	select DM_ETH
+	select DM_GPIO
+	select DM_MMC
+	select DM_SERIAL
+	select DM_THERMAL
+	imply CMD_DM
+
 config TARGET_TBS2910
 	bool "TBS2910 Matrix ARM mini PC"
 
@@ -661,6 +715,7 @@ source "board/logicpd/imx6/Kconfig"
 source "board/seco/Kconfig"
 source "board/sks-kinkel/sksimx6/Kconfig"
 source "board/solidrun/mx6cuboxi/Kconfig"
+source "board/somlabs/visionsom-6ull/Kconfig"
 source "board/technexion/pico-imx6/Kconfig"
 source "board/technexion/pico-imx6ul/Kconfig"
 source "board/tbs/tbs2910/Kconfig"

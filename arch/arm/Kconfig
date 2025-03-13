@@ -12,6 +12,7 @@ config ARM64
 if ARM64
 config POSITION_INDEPENDENT
 	bool "Generate position-independent pre-relocation code"
+	select INIT_SP_RELATIVE
 	help
 	  U-Boot expects to be linked to a specific hard-coded address, and to
 	  be loaded to and run from that address. This option lifts that
@@ -60,6 +61,16 @@ config LNX_KRNL_IMG_TEXT_OFFSET_BASE
 	  TEXT_OFFSET value written to the Linux kernel image header.
 endif
 endif
+
+config GIC_V3_ITS
+	bool "ARM GICV3 ITS"
+	help
+	  ARM GICV3 Interrupt translation service (ITS).
+	  Basic support for programming locality specific peripheral
+	  interrupts (LPI) configuration tables and enable LPI tables.
+	  LPI configuration table can be used by u-boot or Linux.
+	  ARM GICV3 has limitation, once the LPI table is enabled, LPI
+	  configuration table can not be re-programmed, unless GICV3 reset.
 
 config STATIC_RELA
 	bool
@@ -587,15 +598,6 @@ config TARGET_X600
 	select PL011_SERIAL
 	select SUPPORT_SPL
 
-config TARGET_WOODBURN
-	bool "Support woodburn"
-	select CPU_ARM1136
-
-config TARGET_WOODBURN_SD
-	bool "Support woodburn_sd"
-	select CPU_ARM1136
-	select SUPPORT_SPL
-
 config TARGET_FLEA3
 	bool "Support flea3"
 	select CPU_ARM1136
@@ -618,6 +620,12 @@ config ARCH_BCM283X
 
 config ARCH_BCM63158
 	bool "Broadcom BCM63158 family"
+	select DM
+	select OF_CONTROL
+	imply CMD_DM
+
+config ARCH_BCM68360
+	bool "Broadcom BCM68360 family"
 	select DM
 	select OF_CONTROL
 	imply CMD_DM
@@ -766,7 +774,6 @@ config ARCH_MESON
 
 config ARCH_MEDIATEK
 	bool "MediaTek SoCs"
-	select BINMAN
 	select DM
 	select OF_CONTROL
 	select SPL_DM if SPL
@@ -802,6 +809,14 @@ config ARCH_IMX8M
 	select SUPPORT_SPL
 	imply CMD_DM
 
+config ARCH_IMXRT
+	bool "NXP i.MXRT platform"
+	select CPU_V7M
+	select DM
+	select DM_SERIAL
+	select SUPPORT_SPL
+	imply CMD_DM
+
 config ARCH_MX23
 	bool "NXP i.MX23 family"
 	select CPU_ARM926EJS
@@ -828,6 +843,7 @@ config ARCH_MX7ULP
 	select CPU_V7A
 	select ROM_UNIFIED_SECTIONS
 	imply MXC_GPIO
+	imply SYS_THUMB_BUILD
 
 config ARCH_MX7
 	bool "Freescale MX7"
@@ -838,6 +854,7 @@ config ARCH_MX7
 	select SYS_FSL_SEC_COMPAT_4
 	select SYS_FSL_SEC_LE
 	imply MXC_GPIO
+	imply SYS_THUMB_BUILD
 
 config ARCH_MX6
 	bool "Freescale MX6"
@@ -845,8 +862,8 @@ config ARCH_MX6
 	select SYS_FSL_HAS_SEC if IMX_HAB
 	select SYS_FSL_SEC_COMPAT_4
 	select SYS_FSL_SEC_LE
-	select SYS_THUMB_BUILD if SPL
 	imply MXC_GPIO
+	imply SYS_THUMB_BUILD
 
 if ARCH_MX6
 config SPL_LDSCRIPT
@@ -910,7 +927,7 @@ config ARCH_SOCFPGA
 	bool "Altera SOCFPGA family"
 	select ARCH_EARLY_INIT_R
 	select ARCH_MISC_INIT if !TARGET_SOCFPGA_ARRIA10
-	select ARM64 if TARGET_SOCFPGA_STRATIX10
+	select ARM64 if TARGET_SOCFPGA_STRATIX10 || TARGET_SOCFPGA_AGILEX
 	select CPU_V7A if TARGET_SOCFPGA_GEN5 || TARGET_SOCFPGA_ARRIA10
 	select DM
 	select DM_SERIAL
@@ -922,7 +939,7 @@ config ARCH_SOCFPGA
 	select SPL_LIBGENERIC_SUPPORT
 	select SPL_NAND_SUPPORT if SPL_NAND_DENALI
 	select SPL_OF_CONTROL
-	select SPL_SEPARATE_BSS if TARGET_SOCFPGA_STRATIX10
+	select SPL_SEPARATE_BSS if TARGET_SOCFPGA_STRATIX10 || TARGET_SOCFPGA_AGILEX
 	select SPL_SERIAL_SUPPORT
 	select SPL_SYSRESET
 	select SPL_WATCHDOG_SUPPORT
@@ -977,6 +994,8 @@ config ARCH_SUNXI
 	select USB_KEYBOARD if DISTRO_DEFAULTS
 	select USB_STORAGE if DISTRO_DEFAULTS
 	select SPL_USE_TINY_PRINTF
+	select USE_PREBOOT
+	select SYS_RELOC_GD_ENV_ADDR
 	imply CMD_DM
 	imply CMD_GPT
 	imply CMD_UBI if MTD_RAW_NAND
@@ -992,6 +1011,24 @@ config ARCH_SUNXI
 	imply SPL_POWER_SUPPORT
 	imply SPL_SERIAL_SUPPORT
 	imply USB_GADGET
+
+config ARCH_U8500
+	bool "ST-Ericsson U8500 Series"
+	select CPU_V7A
+	select DM
+	select DM_GPIO
+	select DM_MMC if MMC
+	select DM_SERIAL
+	select DM_USB if USB
+	select OF_CONTROL
+	select SYSRESET
+	select TIMER
+	imply ARM_PL180_MMCI
+	imply DM_RTC
+	imply NOMADIK_MTU_TIMER
+	imply PL01X_SERIAL
+	imply RTC_PL031
+	imply SYSRESET_SYSCON
 
 config ARCH_VERSAL
 	bool "Support Xilinx Versal Platform"
@@ -1101,7 +1138,6 @@ config TARGET_VEXPRESS64_JUNO
 config TARGET_LS2080A_EMU
 	bool "Support ls2080a_emu"
 	select ARCH_LS2080A
-	select ARCH_MISC_INIT
 	select ARM64
 	select ARMV8_MULTIENTRY
 	select FSL_DDR_SYNC_REFRESH
@@ -1114,7 +1150,6 @@ config TARGET_LS2080A_EMU
 config TARGET_LS2080A_SIMU
 	bool "Support ls2080a_simu"
 	select ARCH_LS2080A
-	select ARCH_MISC_INIT
 	select ARM64
 	select ARMV8_MULTIENTRY
 	select BOARD_LATE_INIT
@@ -1127,7 +1162,6 @@ config TARGET_LS2080A_SIMU
 config TARGET_LS1088AQDS
 	bool "Support ls1088aqds"
 	select ARCH_LS1088A
-	select ARCH_MISC_INIT
 	select ARM64
 	select ARMV8_MULTIENTRY
 	select ARCH_SUPPORT_TFABOOT
@@ -1143,7 +1177,6 @@ config TARGET_LS1088AQDS
 config TARGET_LS2080AQDS
 	bool "Support ls2080aqds"
 	select ARCH_LS2080A
-	select ARCH_MISC_INIT
 	select ARM64
 	select ARMV8_MULTIENTRY
 	select ARCH_SUPPORT_TFABOOT
@@ -1162,7 +1195,6 @@ config TARGET_LS2080AQDS
 config TARGET_LS2080ARDB
 	bool "Support ls2080ardb"
 	select ARCH_LS2080A
-	select ARCH_MISC_INIT
 	select ARM64
 	select ARMV8_MULTIENTRY
 	select ARCH_SUPPORT_TFABOOT
@@ -1181,7 +1213,6 @@ config TARGET_LS2080ARDB
 config TARGET_LS2081ARDB
 	bool "Support ls2081ardb"
 	select ARCH_LS2080A
-	select ARCH_MISC_INIT
 	select ARM64
 	select ARMV8_MULTIENTRY
 	select BOARD_LATE_INIT
@@ -1195,7 +1226,6 @@ config TARGET_LS2081ARDB
 config TARGET_LX2160ARDB
 	bool "Support lx2160ardb"
 	select ARCH_LX2160A
-	select ARCH_MISC_INIT
 	select ARM64
 	select ARMV8_MULTIENTRY
 	select ARCH_SUPPORT_TFABOOT
@@ -1209,7 +1239,6 @@ config TARGET_LX2160ARDB
 config TARGET_LX2160AQDS
 	bool "Support lx2160aqds"
 	select ARCH_LX2160A
-	select ARCH_MISC_INIT
 	select ARM64
 	select ARMV8_MULTIENTRY
 	select ARCH_SUPPORT_TFABOOT
@@ -1332,7 +1361,6 @@ config TARGET_LS1028AQDS
 	select ARMV8_MULTIENTRY
 	select ARCH_SUPPORT_TFABOOT
 	select BOARD_LATE_INIT
-	select ARCH_MISC_INIT
 	help
 	  Support for Freescale LS1028AQDS platform
 	  The LS1028A Development System (QDS) is a high-performance
@@ -1345,6 +1373,7 @@ config TARGET_LS1028ARDB
 	select ARM64
 	select ARMV8_MULTIENTRY
 	select ARCH_SUPPORT_TFABOOT
+	select BOARD_LATE_INIT
 	help
 	  Support for Freescale LS1028ARDB platform
 	  The LS1028A Development System (RDB) is a high-performance
@@ -1354,7 +1383,6 @@ config TARGET_LS1028ARDB
 config TARGET_LS1088ARDB
 	bool "Support ls1088ardb"
 	select ARCH_LS1088A
-	select ARCH_MISC_INIT
 	select ARM64
 	select ARMV8_MULTIENTRY
 	select ARCH_SUPPORT_TFABOOT
@@ -1518,6 +1546,7 @@ config ARCH_UNIPHIER
 	select DM_GPIO
 	select DM_I2C
 	select DM_MMC
+	select DM_MTD
 	select DM_RESET
 	select DM_SERIAL
 	select DM_USB
@@ -1595,6 +1624,7 @@ config ARCH_STM32MP
 config ARCH_ROCKCHIP
 	bool "Support Rockchip SoCs"
 	select BLK
+	select BINMAN if !ARM64
 	select DM
 	select DM_GPIO
 	select DM_I2C
@@ -1642,6 +1672,10 @@ config TARGET_DURIAN
 	help
 	  Support for durian platform.
 	  It has 2GB Sdram, uart and pcie.
+
+config TARGET_PRESIDIO_ASIC
+	bool "Support Cortina Presidio ASIC Platform"
+	select ARM64
 
 endchoice
 
@@ -1727,6 +1761,8 @@ source "arch/arm/mach-imx/imx8/Kconfig"
 
 source "arch/arm/mach-imx/imx8m/Kconfig"
 
+source "arch/arm/mach-imx/imxrt/Kconfig"
+
 source "arch/arm/mach-imx/mxs/Kconfig"
 
 source "arch/arm/mach-omap2/Kconfig"
@@ -1763,6 +1799,8 @@ source "arch/arm/mach-sunxi/Kconfig"
 
 source "arch/arm/mach-tegra/Kconfig"
 
+source "arch/arm/mach-u8500/Kconfig"
+
 source "arch/arm/mach-uniphier/Kconfig"
 
 source "arch/arm/cpu/armv7/vf610/Kconfig"
@@ -1789,9 +1827,11 @@ source "board/Marvell/gplugd/Kconfig"
 source "board/armadeus/apf27/Kconfig"
 source "board/armltd/vexpress/Kconfig"
 source "board/armltd/vexpress64/Kconfig"
+source "board/cortina/presidio-asic/Kconfig"
 source "board/broadcom/bcm23550_w1d/Kconfig"
 source "board/broadcom/bcm28155_ap/Kconfig"
 source "board/broadcom/bcm963158/Kconfig"
+source "board/broadcom/bcm968360bg/Kconfig"
 source "board/broadcom/bcm968580xref/Kconfig"
 source "board/broadcom/bcmcygnus/Kconfig"
 source "board/broadcom/bcmnsp/Kconfig"
@@ -1840,7 +1880,6 @@ source "board/birdland/bav335x/Kconfig"
 source "board/toradex/colibri_pxa270/Kconfig"
 source "board/variscite/dart_6ul/Kconfig"
 source "board/vscom/baltos/Kconfig"
-source "board/woodburn/Kconfig"
 source "board/xilinx/Kconfig"
 source "board/xilinx/zynq/Kconfig"
 source "board/xilinx/zynqmp/Kconfig"

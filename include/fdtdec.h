@@ -111,6 +111,9 @@ struct fdt_pci_addr {
 	u32	phys_lo;
 };
 
+extern u8 __dtb_dt_begin[];	/* embedded device tree blob */
+extern u8 __dtb_dt_spl_begin[];	/* embedded device tree blob for SPL/TPL */
+
 /**
  * Compute the size of a resource.
  *
@@ -438,7 +441,7 @@ int fdtdec_get_pci_vendev(const void *blob, int node,
  * @param bar		returns base address of the pci device's registers
  * @return 0 if ok, negative on error
  */
-int fdtdec_get_pci_bar32(struct udevice *dev, struct fdt_pci_addr *addr,
+int fdtdec_get_pci_bar32(const struct udevice *dev, struct fdt_pci_addr *addr,
 			 u32 *bar);
 
 /**

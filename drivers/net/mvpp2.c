@@ -17,12 +17,15 @@
 #include <cpu_func.h>
 #include <dm.h>
 #include <dm/device-internal.h>
+#include <dm/device_compat.h>
+#include <dm/devres.h>
 #include <dm/lists.h>
 #include <net.h>
 #include <netdev.h>
 #include <config.h>
 #include <malloc.h>
 #include <asm/io.h>
+#include <linux/err.h>
 #include <linux/errno.h>
 #include <phy.h>
 #include <miiphy.h>
@@ -580,7 +583,7 @@ enum mv_netc_lanes {
 /* Default number of TXQs in use */
 #define MVPP2_DEFAULT_TXQ		1
 
-/* Dfault number of RXQs in use */
+/* Default number of RXQs in use */
 #define MVPP2_DEFAULT_RXQ		1
 #define CONFIG_MV_ETH_RXQ		8	/* increment by 8 */
 
@@ -959,7 +962,8 @@ struct mvpp2_port {
 	phy_interface_t phy_interface;
 	int phyaddr;
 	struct udevice *mdio_dev;
-#ifdef CONFIG_DM_GPIO
+	struct mii_dev *bus;
+#if CONFIG_IS_ENABLED(DM_GPIO)
 	struct gpio_desc phy_reset_gpio;
 	struct gpio_desc phy_tx_disable_gpio;
 #endif
@@ -4742,7 +4746,7 @@ static int phy_info_parse(struct udevice *dev, struct mvpp2_port *port)
 		return -EINVAL;
 	}
 
-#ifdef CONFIG_DM_GPIO
+#if CONFIG_IS_ENABLED(DM_GPIO)
 	gpio_request_by_name(dev, "phy-reset-gpios", 0,
 			     &port->phy_reset_gpio, GPIOD_IS_OUT);
 	gpio_request_by_name(dev, "marvell,sfp-tx-disable-gpio", 0,
@@ -4769,7 +4773,7 @@ static int phy_info_parse(struct udevice *dev, struct mvpp2_port *port)
 	return 0;
 }
 
-#ifdef CONFIG_DM_GPIO
+#if CONFIG_IS_ENABLED(DM_GPIO)
 /* Port GPIO initialization */
 static void mvpp2_gpio_init(struct mvpp2_port *port)
 {
@@ -4802,7 +4806,7 @@ static int mvpp2_port_probe(struct udevice *dev,
 	}
 	mvpp2_port_power_up(port);
 
-#ifdef CONFIG_DM_GPIO
+#if CONFIG_IS_ENABLED(DM_GPIO)
 	mvpp2_gpio_init(port);
 #endif
 

@@ -5,6 +5,7 @@
  */
 
 #include <common.h>
+#include <hang.h>
 #include <wait_bit.h>
 #include <asm/io.h>
 #include <asm/arch/mailbox_s10.h>
@@ -287,9 +288,6 @@ int mbox_qspi_close(void)
 
 int mbox_qspi_open(void)
 {
-	static const struct socfpga_system_manager *sysmgr_regs =
-		(struct socfpga_system_manager *)SOCFPGA_SYSMGR_ADDRESS;
-
 	int ret;
 	u32 resp_buf[1];
 	u32 resp_buf_len;
@@ -318,7 +316,8 @@ int mbox_qspi_open(void)
 
 	/* We are getting QSPI ref clock and set into sysmgr boot register */
 	printf("QSPI: Reference clock at %d Hz\n", resp_buf[0]);
-	writel(resp_buf[0], &sysmgr_regs->boot_scratch_cold0);
+	writel(resp_buf[0],
+	       socfpga_get_sysmgr_addr() + SYSMGR_SOC64_BOOT_SCRATCH_COLD0);
 
 	return 0;
 

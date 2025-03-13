@@ -6,6 +6,8 @@
  */
 
 #include <common.h>
+#include <hang.h>
+#include <malloc.h>
 #include <asm/io.h>
 #include <dm.h>
 #include <asm/arch/sci/sci.h>

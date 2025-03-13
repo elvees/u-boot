@@ -228,11 +228,33 @@ config CMD_LICENSE
 	help
 	  Print GPL license text
 
+config CMD_PMC
+	bool "pmc"
+	help
+	  Provides access to the Intel Power-Management Controller (PMC) so
+	  that its state can be examined. This does not currently support
+	  changing the state but it is still useful for debugging and seeing
+	  what is going on.
+
 config CMD_REGINFO
 	bool "reginfo"
 	depends on PPC
 	help
 	  Register dump
+
+config CMD_TLV_EEPROM
+	bool "tlv_eeprom"
+	depends on I2C_EEPROM
+	help
+	  Display and program the system EEPROM data block in ONIE Tlvinfo
+	  format. TLV stands for Type-Length-Value.
+
+config SPL_CMD_TLV_EEPROM
+	bool "tlv_eeprom for SPL"
+	depends on SPL_I2C_EEPROM
+	select SPL_DRIVERS_MISC_SUPPORT
+	help
+	  Read system EEPROM data block in ONIE Tlvinfo format from SPL.
 
 endmenu
 
@@ -250,6 +272,13 @@ config CMD_BOOTM
 	default y
 	help
 	  Boot an application image from the memory.
+
+config BOOTM_EFI
+	bool "Support booting UEFI FIT images"
+	depends on CMD_BOOTEFI && CMD_BOOTM && FIT
+	default y
+	help
+	  Support booting UEFI FIT images via the bootm command.
 
 config CMD_BOOTZ
 	bool "bootz"
@@ -286,6 +315,7 @@ config BOOTM_OPENRTOS
 
 config BOOTM_OSE
 	bool "Support booting Enea OSE images"
+	depends on (ARM && (ARM64 || CPU_V7A || CPU_V7R) || SANDBOX || PPC || X86)
 	depends on CMD_BOOTM
 	help
 	  Support booting Enea OSE images via the bootm command.
@@ -348,13 +378,23 @@ config CMD_BOOTMENU
 	help
 	  Add an ANSI terminal boot menu command.
 
-config CMD_DTIMG
-	bool "dtimg"
+config CMD_ADTIMG
+	bool "adtimg"
 	help
 	  Android DTB/DTBO image manipulation commands. Read dtb/dtbo files from
 	  image into RAM, dump image structure information, etc. Those dtb/dtbo
 	  files should be merged in one dtb further, which needs to be passed to
 	  the kernel, as part of a boot process.
+
+config CMD_ABOOTIMG
+	bool "abootimg"
+	depends on ANDROID_BOOT_IMAGE
+	help
+	  Android Boot Image manipulation commands. Allows one to extract
+	  images contained in boot.img, like kernel, ramdisk, dtb, etc, and
+	  obtain corresponding meta-information from boot.img.
+
+	  See doc/android/boot-image.rst for details.
 
 config CMD_ELF
 	bool "bootelf, bootvx"
@@ -662,7 +702,7 @@ config CMD_MEMORY
 	    base - print or set address offset
 	    loop - initialize loop on address range
 
-config MX_CYCLIC
+config CMD_MX_CYCLIC
 	bool "Enable cyclic md/mw commands"
 	depends on CMD_MEMORY
 	help
@@ -696,12 +736,6 @@ config SYS_ALT_MEMTEST
 	  Use a more complete alternative memory test.
 
 endif
-
-config CMD_MX_CYCLIC
-	bool "mdc, mwc"
-	help
-	  mdc - memory display cyclic
-	  mwc - memory write cyclic
 
 config CMD_SHA1SUM
 	bool "sha1sum"
@@ -840,12 +874,7 @@ config CMD_FASTBOOT
 	  Android devices. Fastboot requires either the network stack
 	  enabled or support for acting as a USB device.
 
-	  See doc/android/fastboot.txt for more information.
-
-config CMD_FDC
-	bool "fdcboot - Boot from floppy device"
-	help
-	  The 'fdtboot' command allows booting an image from a floppy disk.
+	  See doc/android/fastboot.rst for more information.
 
 config CMD_FLASH
 	bool "flinfo, erase, protect"
@@ -1656,6 +1685,13 @@ config CMD_GETTIME
 	  U-Boot started running. This shows the time in seconds and
 	  milliseconds. See also the 'bootstage' command which provides more
 	  flexibility for boot timing.
+
+config CMD_RNG
+	bool "rng command"
+	depends on DM_RNG
+	select HEXDUMP
+	help
+	  Print bytes from the hardware random number generator.
 
 # TODO: rename to CMD_SLEEP
 config CMD_MISC

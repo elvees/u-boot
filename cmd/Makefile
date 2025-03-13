@@ -47,7 +47,8 @@ obj-$(CONFIG_CMD_SOUND) += sound.o
 ifdef CONFIG_POST
 obj-$(CONFIG_CMD_DIAG) += diag.o
 endif
-obj-$(CONFIG_CMD_DTIMG) += dtimg.o
+obj-$(CONFIG_CMD_ADTIMG) += adtimg.o
+obj-$(CONFIG_CMD_ABOOTIMG) += abootimg.o
 obj-$(CONFIG_CMD_ECHO) += echo.o
 obj-$(CONFIG_ENV_IS_IN_EEPROM) += eeprom.o
 obj-$(CONFIG_CMD_EEPROM) += eeprom.o
@@ -58,7 +59,6 @@ obj-$(CONFIG_HUSH_PARSER) += exit.o
 obj-$(CONFIG_CMD_EXT4) += ext4.o
 obj-$(CONFIG_CMD_EXT2) += ext2.o
 obj-$(CONFIG_CMD_FAT) += fat.o
-obj-$(CONFIG_CMD_FDC) += fdc.o
 obj-$(CONFIG_CMD_FDT) += fdt.o
 obj-$(CONFIG_CMD_FITUPD) += fitupd.o
 obj-$(CONFIG_CMD_FLASH) += flash.o
@@ -109,6 +109,7 @@ ifdef CONFIG_PCI
 obj-$(CONFIG_CMD_PCI) += pci.o
 endif
 obj-$(CONFIG_CMD_PINMUX) += pinmux.o
+obj-$(CONFIG_CMD_PMC) += pmc.o
 obj-$(CONFIG_CMD_PXE) += pxe.o pxe_utils.o
 obj-$(CONFIG_CMD_WOL) += wol.o
 obj-$(CONFIG_CMD_QFW) += qfw.o
@@ -116,6 +117,7 @@ obj-$(CONFIG_CMD_READ) += read.o
 obj-$(CONFIG_CMD_REGINFO) += reginfo.o
 obj-$(CONFIG_CMD_REISER) += reiser.o
 obj-$(CONFIG_CMD_REMOTEPROC) += remoteproc.o
+obj-$(CONFIG_CMD_RNG) += rng.o
 obj-$(CONFIG_CMD_ROCKUSB) += rockusb.o
 obj-$(CONFIG_SANDBOX) += host.o
 obj-$(CONFIG_CMD_SATA) += sata.o
@@ -181,6 +183,8 @@ obj-$(CONFIG_X86) += x86/
 
 obj-$(CONFIG_ARCH_MVEBU) += mvebu/
 endif # !CONFIG_SPL_BUILD
+
+obj-$(CONFIG_$(SPL_)CMD_TLV_EEPROM) += tlv_eeprom.o
 
 # core command
 obj-y += nvedit.o

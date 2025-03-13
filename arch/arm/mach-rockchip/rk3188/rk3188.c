@@ -4,12 +4,14 @@
  */
 #include <common.h>
 #include <dm.h>
+#include <hang.h>
 #include <syscon.h>
 #include <asm/io.h>
 #include <asm/arch-rockchip/bootrom.h>
 #include <asm/arch-rockchip/clock.h>
 #include <asm/arch-rockchip/grf_rk3188.h>
 #include <asm/arch-rockchip/hardware.h>
+#include <linux/err.h>
 
 #define GRF_BASE	0x20008000
 

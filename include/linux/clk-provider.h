@@ -8,7 +8,12 @@
  */
 #ifndef __LINUX_CLK_PROVIDER_H
 #define __LINUX_CLK_PROVIDER_H
+
+#include <dm.h>
+#include <linux/bitops.h>
+#include <linux/err.h>
 #include <clk-uclass.h>
+#include <linux/err.h>
 
 static inline void clk_dm(ulong id, struct clk *clk)
 {

@@ -28,6 +28,7 @@
 #include <common.h>
 #include <command.h>
 #include <dm.h>
+#include <malloc.h>
 #include <memalign.h>
 #include <asm/processor.h>
 #include <linux/compiler.h>
@@ -169,6 +170,12 @@ int usb_detect_change(void)
 	}
 
 	return change;
+}
+
+/* Lock or unlock async schedule on the controller */
+__weak int usb_lock_async(struct usb_device *dev, int lock)
+{
+	return 0;
 }
 
 /*

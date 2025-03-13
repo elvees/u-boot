@@ -7,6 +7,7 @@
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
+#include <malloc.h>
 #include <pci.h>
 #include <asm/io.h>
 #include <dm/device-internal.h>
@@ -43,11 +44,24 @@ struct udevice *pci_get_controller(struct udevice *dev)
 	return dev;
 }
 
-pci_dev_t dm_pci_get_bdf(struct udevice *dev)
+pci_dev_t dm_pci_get_bdf(const struct udevice *dev)
 {
 	struct pci_child_platdata *pplat = dev_get_parent_platdata(dev);
 	struct udevice *bus = dev->parent;
 
+	/*
+	 * This error indicates that @dev is a device on an unprobed PCI bus.
+	 * The bus likely has bus=seq == -1, so the PCI_ADD_BUS() macro below
+	 * will produce a bad BDF>
+	 *
+	 * A common cause of this problem is that this function is called in the
+	 * ofdata_to_platdata() method of @dev. Accessing the PCI bus in that
+	 * method is not allowed, since it has not yet been probed. To fix this,
+	 * move that access to the probe() method of @dev instead.
+	 */
+	if (!device_active(bus))
+		log_err("PCI: Device '%s' on unprobed bus '%s'\n", dev->name,
+			bus->name);
 	return PCI_ADD_BUS(bus->seq, pplat->devfn);
 }
 
@@ -111,7 +125,7 @@ static void pci_dev_find_ofnode(struct udevice *bus, phys_addr_t bdf,
 	}
 };
 
-int pci_bus_find_devfn(struct udevice *bus, pci_dev_t find_devfn,
+int pci_bus_find_devfn(const struct udevice *bus, pci_dev_t find_devfn,
 		       struct udevice **devp)
 {
 	struct udevice *dev;
@@ -336,7 +350,7 @@ int dm_pci_write_config32(struct udevice *dev, int offset, u32 value)
 	return dm_pci_write_config(dev, offset, value, PCI_SIZE_32);
 }
 
-int pci_bus_read_config(struct udevice *bus, pci_dev_t bdf, int offset,
+int pci_bus_read_config(const struct udevice *bus, pci_dev_t bdf, int offset,
 			unsigned long *valuep, enum pci_size_t size)
 {
 	struct dm_pci_ops *ops;
@@ -360,10 +374,10 @@ int pci_read_config(pci_dev_t bdf, int offset, unsigned long *valuep,
 	return pci_bus_read_config(bus, bdf, offset, valuep, size);
 }
 
-int dm_pci_read_config(struct udevice *dev, int offset, unsigned long *valuep,
-		       enum pci_size_t size)
+int dm_pci_read_config(const struct udevice *dev, int offset,
+		       unsigned long *valuep, enum pci_size_t size)
 {
-	struct udevice *bus;
+	const struct udevice *bus;
 
 	for (bus = dev; device_is_on_pci_bus(bus);)
 		bus = bus->parent;
@@ -410,7 +424,7 @@ int pci_read_config8(pci_dev_t bdf, int offset, u8 *valuep)
 	return 0;
 }
 
-int dm_pci_read_config8(struct udevice *dev, int offset, u8 *valuep)
+int dm_pci_read_config8(const struct udevice *dev, int offset, u8 *valuep)
 {
 	unsigned long value;
 	int ret;
@@ -423,7 +437,7 @@ int dm_pci_read_config8(struct udevice *dev, int offset, u8 *valuep)
 	return 0;
 }
 
-int dm_pci_read_config16(struct udevice *dev, int offset, u16 *valuep)
+int dm_pci_read_config16(const struct udevice *dev, int offset, u16 *valuep)
 {
 	unsigned long value;
 	int ret;
@@ -436,7 +450,7 @@ int dm_pci_read_config16(struct udevice *dev, int offset, u16 *valuep)
 	return 0;
 }
 
-int dm_pci_read_config32(struct udevice *dev, int offset, u32 *valuep)
+int dm_pci_read_config32(const struct udevice *dev, int offset, u32 *valuep)
 {
 	unsigned long value;
 	int ret;
@@ -538,8 +552,9 @@ int pci_auto_config_devices(struct udevice *bus)
 }
 
 int pci_generic_mmap_write_config(
-	struct udevice *bus,
-	int (*addr_f)(struct udevice *bus, pci_dev_t bdf, uint offset, void **addrp),
+	const struct udevice *bus,
+	int (*addr_f)(const struct udevice *bus, pci_dev_t bdf, uint offset,
+		      void **addrp),
 	pci_dev_t bdf,
 	uint offset,
 	ulong value,
@@ -566,8 +581,9 @@ int pci_generic_mmap_write_config(
 }
 
 int pci_generic_mmap_read_config(
-	struct udevice *bus,
-	int (*addr_f)(struct udevice *bus, pci_dev_t bdf, uint offset, void **addrp),
+	const struct udevice *bus,
+	int (*addr_f)(const struct udevice *bus, pci_dev_t bdf, uint offset,
+		      void **addrp),
 	pci_dev_t bdf,
 	uint offset,
 	ulong *valuep,
@@ -975,12 +991,15 @@ static int pci_uclass_pre_probe(struct udevice *bus)
 	hose->bus = bus;
 	hose->first_busno = bus->seq;
 	hose->last_busno = bus->seq;
+	hose->skip_auto_config_until_reloc =
+		dev_read_bool(bus, "u-boot,skip-auto-config-until-reloc");
 
 	return 0;
 }
 
 static int pci_uclass_post_probe(struct udevice *bus)
 {
+	struct pci_controller *hose = dev_get_uclass_priv(bus);
 	int ret;
 
 	debug("%s: probing bus %d\n", __func__, bus->seq);
@@ -988,11 +1007,13 @@ static int pci_uclass_post_probe(struct udevice *bus)
 	if (ret)
 		return ret;
 
-#if CONFIG_IS_ENABLED(PCI_PNP)
-	ret = pci_auto_config_devices(bus);
-	if (ret < 0)
-		return ret;
-#endif
+	if (CONFIG_IS_ENABLED(PCI_PNP) &&
+	    (!hose->skip_auto_config_until_reloc ||
+	     (gd->flags & GD_FLG_RELOC))) {
+		ret = pci_auto_config_devices(bus);
+		if (ret < 0)
+			return log_msg_ret("pci auto-config", ret);
+	}
 
 #if defined(CONFIG_X86) && defined(CONFIG_HAVE_FSP)
 	/*
@@ -1018,22 +1039,6 @@ static int pci_uclass_post_probe(struct udevice *bus)
 	return 0;
 }
 
-int pci_get_devfn(struct udevice *dev)
-{
-	struct fdt_pci_addr addr;
-	int ret;
-
-	/* Extract the devfn from fdt_pci_addr */
-	ret = ofnode_read_pci_addr(dev_ofnode(dev), FDT_PCI_SPACE_CONFIG,
-				   "reg", &addr);
-	if (ret) {
-		if (ret != -ENOENT)
-			return -EINVAL;
-	}
-
-	return addr.phys_hi & 0xff00;
-}
-
 static int pci_uclass_child_post_bind(struct udevice *dev)
 {
 	struct pci_child_platdata *pplat;
@@ -1052,7 +1057,7 @@ static int pci_uclass_child_post_bind(struct udevice *dev)
 	return 0;
 }
 
-static int pci_bridge_read_config(struct udevice *bus, pci_dev_t bdf,
+static int pci_bridge_read_config(const struct udevice *bus, pci_dev_t bdf,
 				  uint offset, ulong *valuep,
 				  enum pci_size_t size)
 {
@@ -1199,7 +1204,7 @@ int pci_get_regions(struct udevice *dev, struct pci_region **iop,
 	return (*iop != NULL) + (*memp != NULL) + (*prefp != NULL);
 }
 
-u32 dm_pci_read_bar32(struct udevice *dev, int barnum)
+u32 dm_pci_read_bar32(const struct udevice *dev, int barnum)
 {
 	u32 addr;
 	int bar;

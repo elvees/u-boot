@@ -451,7 +451,7 @@ static int compress_using_none(struct unit_test_state *uts,
 }
 
 /**
- * run_bootm_test() - Run tests on the bootm decopmression function
+ * run_bootm_test() - Run tests on the bootm decompression function
  *
  * @comp_type:	Compression type to test
  * @compress:	Our function to compress data
@@ -540,5 +540,6 @@ int do_ut_compression(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 						 compression_test);
 	const int n_ents = ll_entry_count(struct unit_test, compression_test);
 
-	return cmd_ut_category("compression", tests, n_ents, argc, argv);
+	return cmd_ut_category("compression", "compression_test_",
+			       tests, n_ents, argc, argv);
 }

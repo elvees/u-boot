@@ -93,6 +93,7 @@
 			<&gpio_b 9 0xc 3 2 1>;
 		int-value = <1234>;
 		uint-value = <(-1234)>;
+		interrupts-extended = <&irq 3 0>;
 	};
 
 	junk {
@@ -199,6 +200,10 @@
 
 	h-test {
 		compatible = "denx,u-boot-fdt-test1";
+	};
+
+	devres-test {
+		compatible = "denx,u-boot-devres-test";
 	};
 
 	clocks {
@@ -353,6 +358,12 @@
 		vss-microvolts = <0>;
 	};
 
+	irq: irq {
+		compatible = "sandbox,irq";
+		interrupt-controller;
+		#interrupt-cells = <2>;
+	};
+
 	lcd {
 		u-boot,dm-pre-reloc;
 		compatible = "sandbox,lcd-sdl";
@@ -471,6 +482,27 @@
 			       0x01000810 0 0 0 0>;
 			sandbox,emul = <&swap_case_emul0_1>;
 		};
+		p2sb-pci@2,0 {
+			compatible = "sandbox,p2sb";
+			reg = <0x02001010 0 0 0 0>;
+			sandbox,emul = <&p2sb_emul>;
+
+			adder {
+				intel,p2sb-port-id = <3>;
+				compatible = "sandbox,adder";
+			};
+		};
+		pci@1e,0 {
+			compatible = "sandbox,pmc";
+			reg = <0xf000 0 0 0 0>;
+			sandbox,emul = <&pmc_emul1e>;
+			acpi-base = <0x400>;
+			gpe0-dwx-mask = <0xf>;
+			gpe0-dwx-shift-base = <4>;
+			gpe0-dw = <6 7 9>;
+			gpe0-sts = <0x20>;
+			gpe0-en = <0x30>;
+		};
 		pci@1f,0 {
 			compatible = "pci-generic";
 			/* reg 0 is at 0x10, using FDT_PCI_SPACE_IO */
@@ -490,6 +522,12 @@
 		};
 		swap_case_emul0_1f: emul0@1f,0 {
 			compatible = "sandbox,swap-case";
+		};
+		p2sb_emul: emul@2,0 {
+			compatible = "sandbox,p2sb-emul";
+		};
+		pmc_emul1e: emul@1e,0 {
+			compatible = "sandbox,pmc-emul";
 		};
 	};
 
@@ -597,6 +635,10 @@
 		compatible = "sandbox,reset-ctl-test";
 		resets = <&resetc 100>, <&resetc 2>;
 		reset-names = "other", "test";
+	};
+
+	rng {
+		compatible = "sandbox,sandbox-rng";
 	};
 
 	rproc_1: rproc@1 {
@@ -774,6 +816,9 @@
 	chosen {
 		#address-cells = <1>;
 		#size-cells = <1>;
+		setting = "sunrise ohoka";
+		other-node = "/some-bus/c-test@5";
+		int-values = <0x1937 72993>;
 		chosen-test {
 			compatible = "denx,u-boot-fdt-test";
 			reg = <9 1>;

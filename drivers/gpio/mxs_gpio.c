@@ -7,6 +7,7 @@
  */
 
 #include <common.h>
+#include <malloc.h>
 #include <linux/errno.h>
 #include <asm/io.h>
 #include <asm/arch/iomux.h>
@@ -128,7 +129,7 @@ int name_to_gpio(const char *name)
 
 	return (bank << MXS_PAD_BANK_SHIFT) | (pin << MXS_PAD_PIN_SHIFT);
 }
-#else /* CONFIG_DM_GPIO */
+#else /* DM_GPIO */
 #include <dm.h>
 #include <asm/gpio.h>
 #include <dt-structs.h>
@@ -312,4 +313,4 @@ U_BOOT_DRIVER(gpio_mxs) = {
 	.ofdata_to_platdata = mxs_ofdata_to_platdata,
 #endif
 };
-#endif /* CONFIG_DM_GPIO */
+#endif /* DM_GPIO */

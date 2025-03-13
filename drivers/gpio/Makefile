@@ -5,16 +5,18 @@
 
 ifndef CONFIG_SPL_BUILD
 obj-$(CONFIG_AXP_GPIO)		+= axp_gpio.o
+obj-$(CONFIG_DM_74X164)		+= 74x164_gpio.o
 endif
 obj-$(CONFIG_DWAPB_GPIO)	+= dwapb_gpio.o
-obj-$(CONFIG_DM_GPIO)		+= gpio-uclass.o
+obj-$(CONFIG_$(SPL_TPL_)DM_GPIO) += gpio-uclass.o
 
 obj-$(CONFIG_$(SPL_)DM_PCA953X)	+= pca953x_gpio.o
-obj-$(CONFIG_DM_74X164)		+= 74x164_gpio.o
 
 obj-$(CONFIG_AT91_GPIO)	+= at91_gpio.o
 obj-$(CONFIG_ATMEL_PIO4)	+= atmel_pio4.o
 obj-$(CONFIG_BCM6345_GPIO)	+= bcm6345_gpio.o
+obj-$(CONFIG_CORTINA_GPIO)      += cortina_gpio.o
+obj-$(CONFIG_INTEL_GPIO)	+= intel_gpio.o
 obj-$(CONFIG_INTEL_ICH6_GPIO)	+= intel_ich6_gpio.o
 obj-$(CONFIG_INTEL_BROADWELL_GPIO)	+= intel_broadwell_gpio.o
 obj-$(CONFIG_KIRKWOOD_GPIO)	+= kw_gpio.o
@@ -38,6 +40,7 @@ obj-$(CONFIG_DM644X_GPIO)	+= da8xx_gpio.o
 obj-$(CONFIG_ALTERA_PIO)	+= altera_pio.o
 obj-$(CONFIG_MPC83XX_GPIO)	+= mpc83xx_gpio.o
 obj-$(CONFIG_MPC8XXX_GPIO)	+= mpc8xxx_gpio.o
+obj-$(CONFIG_MPC83XX_SPISEL_BOOT)	+= mpc83xx_spisel_boot.o
 obj-$(CONFIG_SH_GPIO_PFC)	+= sh_pfc.o
 obj-$(CONFIG_OMAP_GPIO)	+= omap_gpio.o
 obj-$(CONFIG_DB8500_GPIO)	+= db8500_gpio.o

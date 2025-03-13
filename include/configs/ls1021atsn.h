@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0
- * Copyright 2016-2018 NXP Semiconductors
+ * Copyright 2016-2019 NXP Semiconductors
  * Copyright 2019 Vladimir Oltean <olteanv@gmail.com>
  */
 
@@ -107,7 +107,12 @@
 #define CONFIG_BAUDRATE			115200
 
 /* I2C */
+#ifndef CONFIG_DM_I2C
 #define CONFIG_SYS_I2C
+#else
+#define CONFIG_I2C_SET_DEFAULT_BUS_NUM
+#define CONFIG_I2C_DEFAULT_BUS_NUMBER 0
+#endif
 #define CONFIG_SYS_I2C_MXC
 #define CONFIG_SYS_I2C_MXC_I2C1		/* enable I2C bus 1 */
 #define CONFIG_SYS_I2C_MXC_I2C2		/* enable I2C bus 2 */
@@ -149,7 +154,6 @@
 #define CONFIG_EXTRA_ENV_SETTINGS					\
 	"bootargs=root=/dev/ram0 rw console=ttyS0,115200\0"		\
 	"initrd_high=0xffffffff\0"					\
-	"fdt_high=0xffffffff\0"						\
 	"fdt_addr=0x64f00000\0"						\
 	"kernel_addr=0x61000000\0"					\
 	"kernelheader_addr=0x60800000\0"				\
@@ -211,6 +215,8 @@
 		"bootm $load_addr#$board\0"
 
 /* Miscellaneous configurable options */
+#define CONFIG_SYS_BOOTMAPSZ		(256 << 20)
+
 #define CONFIG_SYS_CBSIZE		256	/* Console I/O Buffer Size */
 #define CONFIG_SYS_PBSIZE		\
 		(CONFIG_SYS_CBSIZE + sizeof(CONFIG_SYS_PROMPT) + 16)

@@ -10,10 +10,13 @@
 #include <clk.h>
 #include <clk-uclass.h>
 #include <dm.h>
-#include <dm/read.h>
 #include <dt-structs.h>
 #include <errno.h>
+#include <malloc.h>
+#include <dm/devres.h>
+#include <dm/read.h>
 #include <linux/clk-provider.h>
+#include <linux/err.h>
 
 static inline const struct clk_ops *clk_dev_ops(struct udevice *dev)
 {
@@ -326,7 +329,6 @@ int clk_set_defaults(struct udevice *dev, int stage)
 
 	return 0;
 }
-# endif /* OF_PLATDATA */
 
 int clk_get_by_name(struct udevice *dev, const char *name, struct clk *clk)
 {
@@ -342,6 +344,35 @@ int clk_get_by_name(struct udevice *dev, const char *name, struct clk *clk)
 	}
 
 	return clk_get_by_index(dev, index, clk);
+}
+# endif /* OF_PLATDATA */
+
+int clk_get_by_name_nodev(ofnode node, const char *name, struct clk *clk)
+{
+	int index;
+
+	debug("%s(node=%p, name=%s, clk=%p)\n", __func__,
+		ofnode_get_name(node), name, clk);
+	clk->dev = NULL;
+
+	index = ofnode_stringlist_search(node, "clock-names", name);
+	if (index < 0) {
+		debug("fdt_stringlist_search() failed: %d\n", index);
+		return index;
+	}
+
+	return clk_get_by_index_nodev(node, index, clk);
+}
+
+int clk_get_optional_nodev(ofnode node, const char *name, struct clk *clk)
+{
+	int ret;
+
+	ret = clk_get_by_name_nodev(node, name, clk);
+	if (ret == -ENODATA)
+		return 0;
+
+	return ret;
 }
 
 int clk_release_all(struct clk *clk, int count)
@@ -391,14 +422,14 @@ int clk_free(struct clk *clk)
 	const struct clk_ops *ops;
 
 	debug("%s(clk=%p)\n", __func__, clk);
-	if (!clk)
+	if (!clk_valid(clk))
 		return 0;
 	ops = clk_dev_ops(clk->dev);
 
-	if (!ops->free)
+	if (!ops->rfree)
 		return 0;
 
-	return ops->free(clk);
+	return ops->rfree(clk);
 }
 
 ulong clk_get_rate(struct clk *clk)
@@ -406,7 +437,7 @@ ulong clk_get_rate(struct clk *clk)
 	const struct clk_ops *ops;
 
 	debug("%s(clk=%p)\n", __func__, clk);
-	if (!clk)
+	if (!clk_valid(clk))
 		return 0;
 	ops = clk_dev_ops(clk->dev);
 
@@ -422,7 +453,7 @@ struct clk *clk_get_parent(struct clk *clk)
 	struct clk *pclk;
 
 	debug("%s(clk=%p)\n", __func__, clk);
-	if (!clk)
+	if (!clk_valid(clk))
 		return NULL;
 
 	pdev = dev_get_parent(clk->dev);
@@ -439,7 +470,7 @@ long long clk_get_parent_rate(struct clk *clk)
 	struct clk *pclk;
 
 	debug("%s(clk=%p)\n", __func__, clk);
-	if (!clk)
+	if (!clk_valid(clk))
 		return 0;
 
 	pclk = clk_get_parent(clk);
@@ -462,7 +493,7 @@ ulong clk_set_rate(struct clk *clk, ulong rate)
 	const struct clk_ops *ops;
 
 	debug("%s(clk=%p, rate=%lu)\n", __func__, clk, rate);
-	if (!clk)
+	if (!clk_valid(clk))
 		return 0;
 	ops = clk_dev_ops(clk->dev);
 
@@ -477,7 +508,7 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
 	const struct clk_ops *ops;
 
 	debug("%s(clk=%p, parent=%p)\n", __func__, clk, parent);
-	if (!clk)
+	if (!clk_valid(clk))
 		return 0;
 	ops = clk_dev_ops(clk->dev);
 
@@ -494,7 +525,7 @@ int clk_enable(struct clk *clk)
 	int ret;
 
 	debug("%s(clk=%p)\n", __func__, clk);
-	if (!clk)
+	if (!clk_valid(clk))
 		return 0;
 	ops = clk_dev_ops(clk->dev);
 
@@ -554,7 +585,7 @@ int clk_disable(struct clk *clk)
 	int ret;
 
 	debug("%s(clk=%p)\n", __func__, clk);
-	if (!clk)
+	if (!clk_valid(clk))
 		return 0;
 	ops = clk_dev_ops(clk->dev);
 
@@ -678,7 +709,7 @@ struct clk *devm_clk_get_optional(struct udevice *dev, const char *id)
 {
 	struct clk *clk = devm_clk_get(dev, id);
 
-	if (IS_ERR(clk))
+	if (PTR_ERR(clk) == -ENODATA)
 		return NULL;
 
 	return clk;

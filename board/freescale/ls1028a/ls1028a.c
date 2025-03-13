@@ -25,6 +25,7 @@
 #include <fdtdec.h>
 #include <miiphy.h>
 #include "../common/qixis.h"
+#include "../drivers/net/fsl_enetc.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -86,7 +87,19 @@ int board_init(void)
 	if (!i2c_get_chip_for_busnum(0, I2C_MUX_PCA_ADDR_PRI, 1, &dev))
 		dm_i2c_write(dev, 0x0b, &val, 1);
 #endif
+#endif
 
+#if defined(CONFIG_TARGET_LS1028ARDB)
+	u8 reg;
+
+	reg = QIXIS_READ(brdcfg[4]);
+	/*
+	 * Field | Function
+	 * 3     | DisplayPort Power Enable (net DP_PWR_EN):
+	 * DPPWR | 0= DP_PWR is enabled.
+	 */
+	reg &= ~(DP_PWD_EN_DEFAULT_MASK);
+	QIXIS_WRITE(brdcfg[4], reg);
 #endif
 	return 0;
 }
@@ -96,8 +109,8 @@ int board_eth_init(bd_t *bis)
 	return pci_eth_init(bis);
 }
 
-#if defined(CONFIG_ARCH_MISC_INIT)
-int arch_misc_init(void)
+#ifdef CONFIG_MISC_INIT_R
+int misc_init_r(void)
 {
 	config_board_mux();
 
@@ -149,6 +162,10 @@ int ft_board_setup(void *blob, bd_t *bd)
 	fdt_fixup_memory_banks(blob, base, size, 2);
 
 	fdt_fixup_icid(blob);
+
+#ifdef CONFIG_FSL_ENETC
+	fdt_fixup_enetc_mac(blob);
+#endif
 
 	return 0;
 }

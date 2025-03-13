@@ -9,6 +9,7 @@
 #include <charset.h>
 #include <command.h>
 #include <errno.h>
+#include <malloc.h>
 #include <test/test.h>
 #include <test/suites.h>
 #include <test/ut.h>
@@ -585,5 +586,6 @@ int do_ut_unicode(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	struct unit_test *tests = ll_entry_start(struct unit_test, unicode_test);
 	const int n_ents = ll_entry_count(struct unit_test, unicode_test);
 
-	return cmd_ut_category("Unicode", tests, n_ents, argc, argv);
+	return cmd_ut_category("Unicode", "unicode_test_",
+			       tests, n_ents, argc, argv);
 }

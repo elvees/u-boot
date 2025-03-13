@@ -52,11 +52,11 @@ Maintainers List (try to look for most precise areas first)
 		-----------------------------------
 ANDROID AB
 M:	Igor Opaniuk <igor.opaniuk@gmail.com>
-R:	Sam Protsenko <semen.protsenko@linaro.org>
+R:	Sam Protsenko <joe.skb7@gmail.com>
 S:	Maintained
 F:	cmd/ab_select.c
 F:	common/android_ab.c
-F:	doc/android/ab.txt
+F:	doc/android/ab.rst
 F:	include/android_ab.h
 F:	test/py/tests/test_android/test_ab.py
 
@@ -65,7 +65,7 @@ M:	Igor Opaniuk <igor.opaniuk@gmail.com>
 S:	Maintained
 F:	cmd/avb.c
 F:	common/avb_verify.c
-F:	doc/android/avb2.txt
+F:	doc/android/avb2.rst
 F:	include/avb_verify.h
 F:	lib/libavb/
 F:	test/py/tests/test_android/test_avb.py
@@ -172,6 +172,15 @@ F:	configs/bcm7*_defconfig
 F:	doc/README.bcm7xxx
 F:	drivers/mmc/bcmstb_sdhci.c
 F:	drivers/spi/bcmstb_spi.c
+
+ARM CORTINA ACCESS CAxxxx
+M:	Alex Nemirovsky <alex.nemirovsky@cortina-access.com>
+S:	Supported
+F:	board/cortina/common/
+F:	drivers/gpio/cortina_gpio.c
+F:	drivers/watchdog/cortina_wdt.c
+F:	drivers/serial/serial_cortina.c
+F:	drivers/mmc/ca_dw_mmc.c
 
 ARM/CZ.NIC TURRIS MOX SUPPORT
 M:	Marek Behun <marek.behun@nic.cz>
@@ -320,8 +329,21 @@ F:	drivers/usb/host/ehci-msm.c
 ARM STI
 M:	Patrice Chotard <patrice.chotard@st.com>
 S:	Maintained
+T:	git https://gitlab.denx.de/u-boot/custodians/u-boot-stm.git
 F:	arch/arm/mach-sti/
 F:	arch/arm/include/asm/arch-sti*/
+F:	drivers/phy/sti_usb_phy.c
+F:	drivers/pinctrl/pinctrl-sti.c
+F:	drivers/mmc/sti_sdhci.c
+F:	drivers/reset/sti-reset.c
+F:	drivers/serial/serial_sti_asc.c
+F:	drivers/sysreset/sysreset_sti.c
+F:	drivers/timer/sti-timer.c
+F:	drivers/usb/host/dwc3-sti-glue.c
+F:	include/dwc3-sti-glue.h
+F:	include/dt-bindings/clock/stih407-clks.h
+F:	include/dt-bindings/clock/stih410-clks.h
+F:	include/dt-bindings/reset/stih407-resets.h
 
 ARM STM SPEAR
 #M:	Vipin Kumar <vipin.kumar@st.com>
@@ -337,6 +359,7 @@ L:	uboot-stm32@st-md-mailman.stormreply.com (moderated for non-subscribers)
 T:	git https://gitlab.denx.de/u-boot/custodians/u-boot-stm.git
 S:	Maintained
 F:	arch/arm/mach-stm32mp/
+F:	doc/board/st/
 F:	drivers/adc/stm32-adc*
 F:	drivers/clk/clk_stm32mp1.c
 F:	drivers/gpio/stm32_gpio.c
@@ -394,7 +417,7 @@ F:	arch/arm/mach-tegra/
 F:	arch/arm/include/asm/arch-tegra*/
 
 ARM TI
-M:	Tom Rini <trini@konsulko.com>
+M:	Lokesh Vutla <lokeshvutla@ti.com>
 S:	Maintained
 T:	git https://gitlab.denx.de/u-boot/custodians/u-boot-ti.git
 F:	arch/arm/mach-davinci/
@@ -402,6 +425,14 @@ F:	arch/arm/mach-k3/
 F:	arch/arm/mach-keystone/
 F:	arch/arm/include/asm/arch-omap*/
 F:	arch/arm/include/asm/ti-common/
+
+ARM U8500
+M:	Stephan Gerhold <stephan@gerhold.net>
+R:	Linus Walleij <linus.walleij@linaro.org>
+S:	Maintained
+F:	arch/arm/dts/ste-*
+F:	arch/arm/mach-u8500/
+F:	drivers/timer/nomadik-mtu-timer.c
 
 ARM UNIPHIER
 M:	Masahiro Yamada <yamada.masahiro@socionext.com>
@@ -496,6 +527,13 @@ M:	Simon Glass <sjg@chromium.org>
 S:	Maintained
 F:	tools/binman/
 
+BTRFS
+M:	Marek Behun <marek.behun@nic.cz>
+S:	Maintained
+F:	cmd/btrfs.c
+F:	fs/btrfs/
+F:	include/btrfs.h
+
 BUILDMAN
 M:	Simon Glass <sjg@chromium.org>
 S:	Maintained
@@ -547,6 +585,7 @@ M:	Heinrich Schuchardt <xypron.glpk@gmx.de>
 R:	Alexander Graf <agraf@csgraf.de>
 S:	Maintained
 T:	git https://gitlab.denx.de/u-boot/custodians/u-boot-efi.git
+F:	doc/api/efi.rst
 F:	doc/uefi/*
 F:	include/capitalization.h
 F:	include/charset.h
@@ -646,6 +685,15 @@ M:	Daniel Schwierzeck <daniel.schwierzeck@gmail.com>
 S:	Maintained
 T:	git https://gitlab.denx.de/u-boot/custodians/u-boot-mips.git
 F:	arch/mips/
+
+MIPS CORTINA ACCESS CAxxxx
+M:	Alex Nemirovsky <alex.nemirovsky@cortina-access.com>
+S:	Supported
+F:	board/cortina/common/
+F:	drivers/gpio/cortina_gpio.c
+F:	drivers/watchdog/cortina_wdt.c
+F:	drivers/serial/serial_cortina.c
+F:	drivers/mmc/ca_dw_mmc.c
 
 MIPS MSCC
 M:	Gregory CLEMENT <gregory.clement@bootlin.com>
@@ -781,6 +829,15 @@ F:	arch/riscv/
 F:	cmd/riscv/
 F:	tools/prelink-riscv.c
 
+RNG
+M:	Sughosh Ganu <sughosh.ganu@linaro.org>
+R:	Heinrich Schuchardt <xypron.glpk@gmx.de>
+S:	Maintained
+F:	cmd/rng.c
+F:	drivers/rng/
+F:	drivers/virtio/virtio_rng.c
+F:	include/rng.h
+
 ROCKUSB
 M:	Eddie Cai <eddie.cai.linux@gmail.com>
 S:	Maintained
@@ -848,6 +905,8 @@ F:	configs/k2g_hs_evm_defconfig
 F:	configs/k2l_hs_evm_defconfig
 F:	configs/am65x_hs_evm_r5_defconfig
 F:	configs/am65x_hs_evm_a53_defconfig
+F:	configs/j721e_hs_evm_r5_defconfig
+F:	configs/j721e_hs_evm_a72_defconfig
 
 TQ GROUP
 #M:	Martin Krause <martin.krause@tq-systems.de>
@@ -885,6 +944,7 @@ T:	git https://gitlab.denx.de/u-boot/custodians/u-boot-usb.git
 F:	drivers/usb/
 F:	common/usb.c
 F:	common/usb_kbd.c
+F:	include/usb.h
 
 USB xHCI
 M:	Bin Meng <bmeng.cn@gmail.com>

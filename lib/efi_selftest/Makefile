@@ -27,6 +27,7 @@ efi_selftest_exitbootservices.o \
 efi_selftest_gop.o \
 efi_selftest_loaded_image.o \
 efi_selftest_manageprotocols.o \
+efi_selftest_mem.o \
 efi_selftest_memory.o \
 efi_selftest_open_protocol.o \
 efi_selftest_register_notify.o \
@@ -47,7 +48,9 @@ efi_selftest_unicode_collation.o
 
 obj-$(CONFIG_CPU_V7) += efi_selftest_unaligned.o
 obj-$(CONFIG_EFI_LOADER_HII) += efi_selftest_hii.o
+obj-$(CONFIG_EFI_RNG_PROTOCOL) += efi_selftest_rng.o
 obj-$(CONFIG_EFI_GET_TIME) += efi_selftest_rtc.o
+obj-$(CONFIG_EFI_LOAD_FILE2_INITRD) += efi_selftest_load_initrd.o
 
 ifeq ($(CONFIG_GENERATE_ACPI_TABLE),)
 obj-y += efi_selftest_fdt.o

@@ -96,3 +96,27 @@ void dm_dump_uclass(void)
 		puts("\n");
 	}
 }
+
+void dm_dump_drivers(void)
+{
+	struct driver *d = ll_entry_start(struct driver, driver);
+	const int n_ents = ll_entry_count(struct driver, driver);
+	struct driver *entry;
+	const struct udevice_id *match;
+
+	puts("Driver                Compatible\n");
+	puts("--------------------------------\n");
+	for (entry = d; entry < d + n_ents; entry++) {
+		match = entry->of_match;
+
+		printf("%-20.20s", entry->name);
+		if (match) {
+			printf("  %s", match->compatible);
+			match++;
+		}
+		printf("\n");
+
+		for (; match && match->compatible; match++)
+			printf("%-20.20s  %s\n", "", match->compatible);
+	}
+}

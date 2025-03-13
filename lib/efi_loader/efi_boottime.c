@@ -208,7 +208,7 @@ static void efi_process_event_queue(void)
  */
 static void efi_queue_event(struct efi_event *event)
 {
-	struct efi_event *item = NULL;
+	struct efi_event *item;
 
 	if (!event->notify_function)
 		return;
@@ -1401,7 +1401,7 @@ static efi_status_t EFIAPI efi_register_protocol_notify(
 	}
 
 	item->event = event;
-	memcpy(&item->protocol, protocol, sizeof(efi_guid_t));
+	guidcpy(&item->protocol, protocol);
 	INIT_LIST_HEAD(&item->handles);
 
 	list_add_tail(&item->link, &efi_register_notify_events);
@@ -1632,7 +1632,7 @@ efi_status_t efi_install_configuration_table(const efi_guid_t *guid,
 		return EFI_OUT_OF_RESOURCES;
 
 	/* Add a new entry */
-	memcpy(&systab.tables[i].guid, guid, sizeof(*guid));
+	guidcpy(&systab.tables[i].guid, guid);
 	systab.tables[i].table = table;
 	systab.nr_tables = i + 1;
 
@@ -2106,10 +2106,10 @@ static efi_status_t EFIAPI efi_set_watchdog_timer(unsigned long timeout,
  *
  * Return: status code
  */
-static efi_status_t EFIAPI efi_close_protocol(efi_handle_t handle,
-					      const efi_guid_t *protocol,
-					      efi_handle_t agent_handle,
-					      efi_handle_t controller_handle)
+efi_status_t EFIAPI efi_close_protocol(efi_handle_t handle,
+				       const efi_guid_t *protocol,
+				       efi_handle_t agent_handle,
+				       efi_handle_t controller_handle)
 {
 	struct efi_handler *handler;
 	struct efi_open_protocol_info_item *item;
@@ -2282,7 +2282,7 @@ static efi_status_t EFIAPI efi_protocols_per_handle(
  *
  * Return: status code
  */
-static efi_status_t EFIAPI efi_locate_handle_buffer(
+efi_status_t EFIAPI efi_locate_handle_buffer(
 			enum efi_locate_search_type search_type,
 			const efi_guid_t *protocol, void *search_key,
 			efi_uintn_t *no_handles, efi_handle_t **buffer)
@@ -2933,10 +2933,10 @@ efi_status_t EFIAPI efi_start_image(efi_handle_t image_handle,
 	ret = EFI_CALL(image_obj->entry(image_handle, &systab));
 
 	/*
-	 * Usually UEFI applications call Exit() instead of returning.
-	 * But because the world doesn't consist of ponies and unicorns,
-	 * we're happy to emulate that behavior on behalf of a payload
-	 * that forgot.
+	 * Control is returned from a started UEFI image either by calling
+	 * Exit() (where exit data can be provided) or by simply returning from
+	 * the entry point. In the latter case call Exit() on behalf of the
+	 * image.
 	 */
 	return EFI_CALL(systab.boottime->exit(image_handle, ret, 0, NULL));
 }
@@ -3182,9 +3182,9 @@ out:
  *
  * Return: status code
  */
-static efi_status_t EFIAPI efi_handle_protocol(efi_handle_t handle,
-					       const efi_guid_t *protocol,
-					       void **protocol_interface)
+efi_status_t EFIAPI efi_handle_protocol(efi_handle_t handle,
+					const efi_guid_t *protocol,
+					void **protocol_interface)
 {
 	return efi_open_protocol(handle, protocol, protocol_interface, efi_root,
 				 NULL, EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);

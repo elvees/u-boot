@@ -14,6 +14,7 @@
 #include <environment/ti/mmc.h>
 #include <environment/ti/k3_rproc.h>
 #include <environment/ti/ufs.h>
+#include <environment/ti/k3_dfu.h>
 
 /* DDR Configuration */
 #define CONFIG_SYS_SDRAM_BASE1		0x880000000
@@ -22,6 +23,8 @@
 #ifdef CONFIG_TARGET_J721E_A72_EVM
 #define CONFIG_SYS_INIT_SP_ADDR         (CONFIG_SPL_TEXT_BASE +	\
 					 CONFIG_SYS_K3_NON_SECURE_MSRAM_SIZE)
+/* Image load address in RAM for DFU boot*/
+#define CONFIG_SPL_LOAD_FIT_ADDRESS	0x81000000
 #else
 /*
  * Maximum size in memory allocated to the SPL BSS. Keep it as tight as
@@ -44,6 +47,8 @@
 /* Configure R5 SPL post-relocation malloc pool in DDR */
 #define CONFIG_SYS_SPL_MALLOC_START	0x84000000
 #define CONFIG_SYS_SPL_MALLOC_SIZE	SZ_16M
+/* Image load address in RAM for DFU boot*/
+#define CONFIG_SPL_LOAD_FIT_ADDRESS	0x80080000
 #endif
 
 #ifdef CONFIG_SYS_K3_SPL_ATF
@@ -61,7 +66,9 @@
 /* U-Boot general configuration */
 #define EXTRA_ENV_J721E_BOARD_SETTINGS					\
 	"default_device_tree=" CONFIG_DEFAULT_DEVICE_TREE ".dtb\0"	\
-	"findfdt=setenv fdtfile ${default_device_tree}\0"		\
+	"findfdt="							\
+		"setenv name_fdt ${default_device_tree};"		\
+		"setenv fdtfile ${name_fdt}\0"				\
 	"loadaddr=0x80080000\0"						\
 	"fdtaddr=0x82000000\0"						\
 	"overlayaddr=0x83000000\0"					\
@@ -69,6 +76,11 @@
 	"console=ttyS2,115200n8\0"					\
 	"args_all=setenv optargs earlycon=ns16550a,mmio32,0x02800000\0" \
 	"run_kern=booti ${loadaddr} ${rd_spec} ${fdtaddr}\0"
+
+#define PARTS_DEFAULT \
+	/* Linux partitions */ \
+	"uuid_disk=${uuid_gpt_disk};" \
+	"name=rootfs,start=0,size=-,uuid=${uuid_gpt_rootfs}\0"
 
 /* U-Boot MMC-specific configuration */
 #define EXTRA_ENV_J721E_BOARD_SETTINGS_MMC				\
@@ -78,7 +90,7 @@
 	"bootdir=/boot\0"						\
 	"rd_spec=-\0"							\
 	"init_mmc=run args_all args_mmc\0"				\
-	"get_fdt_mmc=load mmc ${bootpart} ${fdtaddr} ${bootdir}/${fdtfile}\0" \
+	"get_fdt_mmc=load mmc ${bootpart} ${fdtaddr} ${bootdir}/${name_fdt}\0" \
 	"get_overlay_mmc="						\
 		"fdt address ${fdtaddr};"				\
 		"fdt resize 0x100000;"					\
@@ -87,8 +99,12 @@
 		"load mmc ${bootpart} ${overlayaddr} ${bootdir}/${overlay} && "	\
 		"fdt apply ${overlayaddr};"				\
 		"done;\0"						\
+	"partitions=" PARTS_DEFAULT					\
 	"get_kern_mmc=load mmc ${bootpart} ${loadaddr} "		\
-		"${bootdir}/${name_kern}\0"
+		"${bootdir}/${name_kern}\0"				\
+	"get_fit_mmc=load mmc ${bootpart} ${addr_fit} "			\
+		"${bootdir}/${name_fit}\0"				\
+	"partitions=" PARTS_DEFAULT
 
 #ifdef DEFAULT_RPROCS
 #undef DEFAULT_RPROCS
@@ -100,15 +116,31 @@
 		"7 /lib/firmware/j7-c66_1-fw "				\
 		"8 /lib/firmware/j7-c71_0-fw "
 
+/* set default dfu_bufsiz to 128KB (sector size of OSPI) */
+#define EXTRA_ENV_DFUARGS \
+	"dfu_bufsiz=0x20000\0" \
+	DFU_ALT_INFO_MMC \
+	DFU_ALT_INFO_EMMC \
+	DFU_ALT_INFO_RAM \
+	DFU_ALT_INFO_OSPI
+
 /* Incorporate settings into the U-Boot environment */
 #define CONFIG_EXTRA_ENV_SETTINGS					\
 	DEFAULT_MMC_TI_ARGS						\
+	DEFAULT_FIT_TI_ARGS						\
 	EXTRA_ENV_J721E_BOARD_SETTINGS					\
 	EXTRA_ENV_J721E_BOARD_SETTINGS_MMC				\
 	EXTRA_ENV_RPROC_SETTINGS					\
+	EXTRA_ENV_DFUARGS						\
 	DEFAULT_UFS_TI_ARGS
 
 /* Now for the remaining common defines */
 #include <configs/ti_armv7_common.h>
+
+/* MMC ENV related defines */
+#ifdef CONFIG_ENV_IS_IN_MMC
+#define CONFIG_SYS_MMC_ENV_DEV		0
+#define CONFIG_SYS_MMC_ENV_PART	1
+#endif
 
 #endif /* __CONFIG_J721E_EVM_H */

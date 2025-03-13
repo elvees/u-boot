@@ -57,6 +57,16 @@ typedef u16 efi_form_id_t;
 
 struct efi_event;
 
+/* OsIndicationsSupported flags */
+#define EFI_OS_INDICATIONS_BOOT_TO_FW_UI		    0x0000000000000001
+#define EFI_OS_INDICATIONS_TIMESTAMP_REVOCATION		    0x0000000000000002
+#define EFI_OS_INDICATIONS_FILE_CAPSULE_DELIVERY_SUPPORTED  0x0000000000000004
+#define EFI_OS_INDICATIONS_FMP_CAPSULE_SUPPORTED	    0x0000000000000008
+#define EFI_OS_INDICATIONS_CAPSULE_RESULT_VAR_SUPPORTED	    0x0000000000000010
+#define EFI_OS_INDICATIONS_START_OS_RECOVERY		    0x0000000000000020
+#define EFI_OS_INDICATIONS_START_PLATFORM_RECOVERY	    0x0000000000000040
+#define EFI_OS_INDICATIONS_JSON_CONFIG_DATA_REFRESH	    0x0000000000000080
+
 /* EFI Boot Services table */
 #define EFI_BOOT_SERVICES_SIGNATURE 0x56524553544f4f42
 struct efi_boot_services {
@@ -207,11 +217,11 @@ enum efi_reset_type {
 #define CAPSULE_FLAGS_INITIATE_RESET		0x00040000
 
 struct efi_capsule_header {
-	efi_guid_t *capsule_guid;
+	efi_guid_t capsule_guid;
 	u32 header_size;
 	u32 flags;
 	u32 capsule_image_size;
-};
+} __packed;
 
 #define EFI_RT_SUPPORTED_GET_TIME			0x0001
 #define EFI_RT_SUPPORTED_SET_TIME			0x0002
@@ -227,6 +237,18 @@ struct efi_capsule_header {
 #define EFI_RT_SUPPORTED_UPDATE_CAPSULE			0x0800
 #define EFI_RT_SUPPORTED_QUERY_CAPSULE_CAPABILITIES	0x1000
 #define EFI_RT_SUPPORTED_QUERY_VARIABLE_INFO		0x2000
+
+#define EFI_RT_PROPERTIES_TABLE_GUID \
+	EFI_GUID(0xeb66918a, 0x7eef, 0x402a, 0x84, 0x2e, \
+		 0x93, 0x1d, 0x21, 0xc3, 0x8a, 0xe9)
+
+#define EFI_RT_PROPERTIES_TABLE_VERSION	0x1
+
+struct efi_rt_properties_table {
+	u16 version;
+	u16 length;
+	u32 runtime_services_supported;
+};
 
 struct efi_runtime_services {
 	struct efi_table_hdr hdr;
@@ -250,7 +272,7 @@ struct efi_runtime_services {
 					    efi_uintn_t *data_size, void *data);
 	efi_status_t (EFIAPI *get_next_variable_name)(
 			efi_uintn_t *variable_name_size,
-			u16 *variable_name, const efi_guid_t *vendor);
+			u16 *variable_name, efi_guid_t *vendor);
 	efi_status_t (EFIAPI *set_variable)(u16 *variable_name,
 					    const efi_guid_t *vendor,
 					    u32 attributes,
@@ -318,6 +340,14 @@ struct efi_runtime_services {
 #define SMBIOS_TABLE_GUID \
 	EFI_GUID(0xeb9d2d31, 0x2d88, 0x11d3,  \
 		 0x9a, 0x16, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d)
+
+#define EFI_LOAD_FILE_PROTOCOL_GUID \
+	EFI_GUID(0x56ec3091, 0x954c, 0x11d2, \
+		 0x8e, 0x3f, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b)
+
+#define EFI_LOAD_FILE2_PROTOCOL_GUID \
+	EFI_GUID(0x4006c0c1, 0xfcb3, 0x403e, \
+		 0x99, 0x6d, 0x4a, 0x6c, 0x87, 0x24, 0xe0, 0x6d)
 
 struct efi_configuration_table {
 	efi_guid_t guid;
@@ -474,6 +504,7 @@ struct efi_device_path_nvme {
 #define DEVICE_PATH_TYPE_MEDIA_DEVICE		0x04
 #  define DEVICE_PATH_SUB_TYPE_HARD_DRIVE_PATH	0x01
 #  define DEVICE_PATH_SUB_TYPE_CDROM_PATH	0x02
+#  define DEVICE_PATH_SUB_TYPE_VENDOR_PATH	0x03
 #  define DEVICE_PATH_SUB_TYPE_FILE_PATH	0x04
 
 struct efi_device_path_hard_drive_path {
@@ -1607,6 +1638,14 @@ struct efi_unicode_collation_protocol {
 	char *supported_languages;
 };
 
+struct efi_load_file_protocol {
+	efi_status_t (EFIAPI *load_file)(struct efi_load_file_protocol *this,
+					 struct efi_device_path *file_path,
+					 bool boot_policy,
+					 efi_uintn_t *buffer_size,
+					 void *buffer);
+};
+
 /* Boot manager load options */
 #define LOAD_OPTION_ACTIVE		0x00000001
 #define LOAD_OPTION_FORCE_RECONNECT	0x00000002
@@ -1615,5 +1654,32 @@ struct efi_unicode_collation_protocol {
 #define LOAD_OPTION_CATEGORY		0x00001F00
 #define LOAD_OPTION_CATEGORY_BOOT	0x00000000
 #define LOAD_OPTION_CATEGORY_APP	0x00000100
+
+/*
+ * System Resource Table
+ */
+/* Firmware Type Definitions */
+#define ESRT_FW_TYPE_UNKNOWN		0x00000000
+#define ESRT_FW_TYPE_SYSTEMFIRMWARE	0x00000001
+#define ESRT_FW_TYPE_DEVICEFIRMWARE	0x00000002
+#define ESRT_FW_TYPE_UEFIDRIVER		0x00000003
+
+/* Last Attempt Status Values */
+#define LAST_ATTEMPT_STATUS_SUCCESS			0x00000000
+#define LAST_ATTEMPT_STATUS_ERROR_UNSUCCESSFUL		0x00000001
+#define LAST_ATTEMPT_STATUS_ERROR_INSUFFICIENT_RESOURCES 0x00000002
+#define LAST_ATTEMPT_STATUS_ERROR_INCORRECT_VERSION	0x00000003
+#define LAST_ATTEMPT_STATUS_ERROR_INVALID_FORMAT	0x00000004
+#define LAST_ATTEMPT_STATUS_ERROR_AUTH_ERROR		0x00000005
+#define LAST_ATTEMPT_STATUS_ERROR_PWR_EVT_AC		0x00000006
+#define LAST_ATTEMPT_STATUS_ERROR_PWR_EVT_BATT		0x00000007
+#define LAST_ATTEMPT_STATUS_ERROR_UNSATISFIED_DEPENDENCIES 0x00000008
+
+/*
+ * The LastAttemptStatus values of 0x1000 - 0x4000 are reserved for vendor
+ * usage.
+ */
+#define LAST_ATTEMPT_STATUS_ERROR_UNSUCCESSFUL_VENDOR_RANGE_MIN 0x00001000
+#define LAST_ATTEMPT_STATUS_ERROR_UNSUCCESSFUL_VENDOR_RANGE_MAX 0x00004000
 
 #endif

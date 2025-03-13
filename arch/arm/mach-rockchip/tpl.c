@@ -6,6 +6,7 @@
 #include <common.h>
 #include <debug_uart.h>
 #include <dm.h>
+#include <hang.h>
 #include <ram.h>
 #include <spl.h>
 #include <version.h>
@@ -39,10 +40,17 @@ __weak void rockchip_stimer_init(void)
 	       TIMER_CONTROL_REG);
 }
 
+__weak int board_early_init_f(void)
+{
+	return 0;
+}
+
 void board_init_f(ulong dummy)
 {
 	struct udevice *dev;
 	int ret;
+
+	board_early_init_f();
 
 #if defined(CONFIG_DEBUG_UART) && defined(CONFIG_TPL_SERIAL_SUPPORT)
 	/*

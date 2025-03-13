@@ -34,10 +34,17 @@
 		u-boot,dm-spl;
 	};
 
-	clk_200mhz: dummy_clock {
+	clk_200mhz: dummy_clock_200mhz {
 		compatible = "fixed-clock";
 		#clock-cells = <0>;
 		clock-frequency = <200000000>;
+		u-boot,dm-spl;
+	};
+
+	clk_19_2mhz: dummy_clock_19_2mhz {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <19200000>;
 		u-boot,dm-spl;
 	};
 };
@@ -112,6 +119,34 @@
 			J721E_IOPAD(0x1ec, PIN_OUTPUT, 0) /* (AB3) UART0_TXD */
 		>;
 	};
+
+	main_usbss0_pins_default: main_usbss0_pins_default {
+		pinctrl-single,pins = <
+			J721E_IOPAD(0x290, PIN_OUTPUT, 0) /* (U6) USB0_DRVVBUS */
+			J721E_IOPAD(0x210, PIN_INPUT, 7) /* (W3) MCAN1_RX.GPIO1_3 */
+		>;
+	};
+
+	main_mmc1_pins_default: main_mmc1_pins_default {
+		pinctrl-single,pins = <
+			J721E_IOPAD(0x254, PIN_INPUT, 0) /* (R29) MMC1_CMD */
+			J721E_IOPAD(0x250, PIN_INPUT, 0) /* (P25) MMC1_CLK */
+			J721E_IOPAD(0x2ac, PIN_INPUT, 0) /* (P25) MMC1_CLKLB */
+			J721E_IOPAD(0x24c, PIN_INPUT, 0) /* (R24) MMC1_DAT0 */
+			J721E_IOPAD(0x248, PIN_INPUT, 0) /* (P24) MMC1_DAT1 */
+			J721E_IOPAD(0x244, PIN_INPUT, 0) /* (R25) MMC1_DAT2 */
+			J721E_IOPAD(0x240, PIN_INPUT, 0) /* (R26) MMC1_DAT3 */
+			J721E_IOPAD(0x258, PIN_INPUT, 0) /* (P23) MMC1_SDCD */
+			J721E_IOPAD(0x25c, PIN_INPUT, 0) /* (R28) MMC1_SDWP */
+		>;
+	};
+
+	main_i2c0_pins_default: main-i2c0-pins-default {
+		pinctrl-single,pins = <
+			J721E_IOPAD(0x220, PIN_INPUT_PULLUP, 0) /* (AC5) I2C0_SCL */
+			J721E_IOPAD(0x224, PIN_INPUT_PULLUP, 0) /* (AA5) I2C0_SDA */
+		>;
+	};
 };
 
 &wkup_uart0 {
@@ -122,9 +157,13 @@
 };
 
 &mcu_uart0 {
+	/delete-property/ power-domains;
+	/delete-property/ clocks;
+	/delete-property/ clock-names;
 	pinctrl-names = "default";
 	pinctrl-0 = <&mcu_uart0_pins_default>;
 	status = "okay";
+	clock-frequency = <48000000>;
 };
 
 &main_uart0 {
@@ -149,6 +188,8 @@
 	/delete-property/ power-domains;
 	/delete-property/ assigned-clocks;
 	/delete-property/ assigned-clock-parents;
+	pinctrl-names = "default";
+	pinctrl-0 = <&main_mmc1_pins_default>;
 	clock-names = "clk_xin";
 	clocks = <&clk_200mhz>;
 	ti,driver-strength-ohm = <50>;
@@ -182,6 +223,37 @@
 &wkup_vtm0 {
 	vdd-supply-2 = <&buck12_reg>;
 	u-boot,dm-spl;
+};
+
+&usbss0 {
+	/delete-property/ power-domains;
+	/delete-property/ assigned-clocks;
+	/delete-property/ assigned-clock-parents;
+	clocks = <&clk_19_2mhz>;
+	clock-names = "usb2_refclk";
+	pinctrl-names = "default";
+	pinctrl-0 = <&main_usbss0_pins_default>;
+	ti,vbus-divider;
+};
+
+&main_i2c0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&main_i2c0_pins_default>;
+	clock-frequency = <400000>;
+
+	exp1: gpio@20 {
+		compatible = "ti,tca6416";
+		reg = <0x20>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
+
+	exp2: gpio@22 {
+		compatible = "ti,tca6424";
+		reg = <0x22>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
 };
 
 #include "k3-j721e-common-proc-board-u-boot.dtsi"

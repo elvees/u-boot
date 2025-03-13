@@ -25,6 +25,8 @@
 #include <asm/system.h>
 #include <asm/arch/hardware.h>
 #include <asm/arch/sys_proto.h>
+#include <dm/device_compat.h>
+#include <linux/err.h>
 #include <linux/errno.h>
 
 /* Bit/mask specification */
@@ -173,6 +175,7 @@ struct emac_bd {
 #endif
 };
 
+/* Reduce amount of BUFs if you have limited amount of memory */
 #define RX_BUF 32
 /* Page table entries are set to 1MB, or multiples of 1MB
  * (not < 1MB). driver uses less bd's so use 1MB bdspace.
@@ -652,14 +655,16 @@ static int zynq_gem_probe(struct udevice *dev)
 		return -ENOMEM;
 
 	memset(priv->rxbuffers, 0, RX_BUF * PKTSIZE_ALIGN);
-	u32 addr = (ulong)priv->rxbuffers;
+	ulong addr = (ulong)priv->rxbuffers;
 	flush_dcache_range(addr, addr + roundup(RX_BUF * PKTSIZE_ALIGN, ARCH_DMA_MINALIGN));
 	barrier();
 
 	/* Align bd_space to MMU_SECTION_SHIFT */
 	bd_space = memalign(1 << MMU_SECTION_SHIFT, BD_SPACE);
-	if (!bd_space)
-		return -ENOMEM;
+	if (!bd_space) {
+		ret = -ENOMEM;
+		goto err1;
+	}
 
 	mmu_set_region_dcache_behaviour((phys_addr_t)bd_space,
 					BD_SPACE, DCACHE_OFF);
@@ -671,7 +676,7 @@ static int zynq_gem_probe(struct udevice *dev)
 	ret = clk_get_by_name(dev, "tx_clk", &priv->clk);
 	if (ret < 0) {
 		dev_err(dev, "failed to get clock\n");
-		return -EINVAL;
+		goto err1;
 	}
 
 	priv->bus = mdio_alloc();
@@ -681,9 +686,19 @@ static int zynq_gem_probe(struct udevice *dev)
 
 	ret = mdio_register_seq(priv->bus, dev->seq);
 	if (ret)
-		return ret;
+		goto err2;
 
-	return zynq_phy_init(dev);
+	ret = zynq_phy_init(dev);
+	if (ret)
+		goto err2;
+
+	return ret;
+
+err2:
+	free(priv->rxbuffers);
+err1:
+	free(priv->tx_bd);
+	return ret;
 }
 
 static int zynq_gem_remove(struct udevice *dev)

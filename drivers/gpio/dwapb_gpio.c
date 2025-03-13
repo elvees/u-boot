@@ -12,6 +12,8 @@
 #include <asm/io.h>
 #include <dm.h>
 #include <dm/device-internal.h>
+#include <dm/device_compat.h>
+#include <dm/devres.h>
 #include <dm/lists.h>
 #include <dm/root.h>
 #include <errno.h>
@@ -113,7 +115,7 @@ static int dwapb_gpio_get_function(struct udevice *dev, unsigned offset)
 
 static const struct dm_gpio_ops gpio_dwapb_ops = {
 	.request		= dwapb_gpio_request,
-	.free			= dwapb_gpio_free,
+	.rfree			= dwapb_gpio_free,
 	.direction_input	= dwapb_gpio_direction_input,
 	.direction_output	= dwapb_gpio_direction_output,
 	.get_value		= dwapb_gpio_get_value,

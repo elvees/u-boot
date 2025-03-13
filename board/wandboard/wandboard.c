@@ -361,11 +361,9 @@ int power_init_board(void)
 	struct udevice *dev;
 	int reg, ret;
 
-	puts("PMIC:  ");
-
-	ret = pmic_get("pfuze100", &dev);
+	ret = pmic_get("pfuze100@8", &dev);
 	if (ret < 0) {
-		printf("pmic_get() ret %d\n", ret);
+		debug("pmic_get() ret %d\n", ret);
 		return 0;
 	}
 

@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0+
 
+obj-$(CONFIG_$(SPL_TPL_)CACHE) += cache/
 obj-$(CONFIG_$(SPL_TPL_)CLK) += clk/
 obj-$(CONFIG_$(SPL_TPL_)DM) += core/
 obj-$(CONFIG_$(SPL_TPL_)DFU) += dfu/
@@ -25,6 +26,8 @@ obj-$(CONFIG_$(SPL_TPL_)VIRTIO) += virtio/
 obj-$(CONFIG_$(SPL_)DM_MAILBOX) += mailbox/
 obj-$(CONFIG_$(SPL_)REMOTEPROC) += remoteproc/
 obj-$(CONFIG_$(SPL_TPL_)TPM) += tpm/
+obj-$(CONFIG_$(SPL_TPL_)ACPI_PMC) += power/acpi_pmc/
+obj-$(CONFIG_$(SPL_)BOARD) += board/
 
 ifndef CONFIG_TPL_BUILD
 ifdef CONFIG_SPL_BUILD
@@ -42,7 +45,7 @@ obj-$(CONFIG_SPL_POWER_SUPPORT) += power/ power/pmic/
 obj-$(CONFIG_SPL_POWER_SUPPORT) += power/regulator/
 obj-$(CONFIG_SPL_POWER_DOMAIN) += power/domain/
 obj-$(CONFIG_SPL_DM_RESET) += reset/
-obj-$(CONFIG_SPL_DMA_SUPPORT) += dma/
+obj-$(CONFIG_SPL_DMA) += dma/
 obj-$(CONFIG_SPL_ETH_SUPPORT) += net/
 obj-$(CONFIG_SPL_ETH_SUPPORT) += net/phy/
 obj-$(CONFIG_SPL_USB_ETHER) += net/phy/
@@ -74,7 +77,6 @@ obj-y += ata/
 obj-$(CONFIG_DM_DEMO) += demo/
 obj-$(CONFIG_BIOSEMU) += bios_emulator/
 obj-y += block/
-obj-y += board/
 obj-$(CONFIG_BOOTCOUNT_LIMIT) += bootcount/
 obj-y += cache/
 obj-$(CONFIG_CPU) += cpu/
@@ -115,4 +117,5 @@ obj-$(CONFIG_W1_EEPROM) += w1-eeprom/
 
 obj-$(CONFIG_MACH_PIC32) += ddr/microchip/
 obj-$(CONFIG_DM_HWSPINLOCK) += hwspinlock/
+obj-$(CONFIG_DM_RNG) += rng/
 endif

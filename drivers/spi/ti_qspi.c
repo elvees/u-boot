@@ -17,6 +17,7 @@
 #include <asm/omap_gpio.h>
 #include <asm/omap_common.h>
 #include <asm/ti-common/ti-edma3.h>
+#include <linux/err.h>
 #include <linux/kernel.h>
 #include <regmap.h>
 #include <syscon.h>
@@ -59,6 +60,8 @@ DECLARE_GLOBAL_DATA_PTR;
 #define QSPI_SETUP0_READ_QUAD           (0x3 << 12)
 #define QSPI_SETUP0_ADDR_SHIFT		(8)
 #define QSPI_SETUP0_DBITS_SHIFT		(10)
+
+#define TI_QSPI_SETUP_REG(priv, cs)	(&(priv)->base->setup0 + (cs))
 
 /* ti qspi register set */
 struct ti_qspi_regs {
@@ -275,8 +278,8 @@ static void ti_qspi_copy_mmap(void *data, void *offset, size_t len)
 	*((unsigned int *)offset) += len;
 }
 
-static void ti_qspi_setup_mmap_read(struct ti_qspi_priv *priv, u8 opcode,
-				    u8 data_nbits, u8 addr_width,
+static void ti_qspi_setup_mmap_read(struct ti_qspi_priv *priv, int cs,
+				    u8 opcode, u8 data_nbits, u8 addr_width,
 				    u8 dummy_bytes)
 {
 	u32 memval = opcode;
@@ -296,7 +299,7 @@ static void ti_qspi_setup_mmap_read(struct ti_qspi_priv *priv, u8 opcode,
 	memval |= ((addr_width - 1) << QSPI_SETUP0_ADDR_SHIFT |
 		   dummy_bytes << QSPI_SETUP0_DBITS_SHIFT);
 
-	writel(memval, &priv->base->setup0);
+	writel(memval, TI_QSPI_SETUP_REG(priv, cs));
 }
 
 static int ti_qspi_set_mode(struct udevice *bus, uint mode)
@@ -317,13 +320,15 @@ static int ti_qspi_set_mode(struct udevice *bus, uint mode)
 static int ti_qspi_exec_mem_op(struct spi_slave *slave,
 			       const struct spi_mem_op *op)
 {
+	struct dm_spi_slave_platdata *slave_plat;
 	struct ti_qspi_priv *priv;
 	struct udevice *bus;
+	u32 from = 0;
+	int ret = 0;
 
 	bus = slave->dev->parent;
 	priv = dev_get_priv(bus);
-	u32 from = 0;
-	int ret = 0;
+	slave_plat = dev_get_parent_platdata(slave->dev);
 
 	/* Only optimize read path. */
 	if (!op->data.nbytes || op->data.dir != SPI_MEM_DATA_IN ||
@@ -335,8 +340,9 @@ static int ti_qspi_exec_mem_op(struct spi_slave *slave,
 	if (from + op->data.nbytes > priv->mmap_size)
 		return -ENOTSUPP;
 
-	ti_qspi_setup_mmap_read(priv, op->cmd.opcode, op->data.buswidth,
-				op->addr.nbytes, op->dummy.nbytes);
+	ti_qspi_setup_mmap_read(priv, slave_plat->cs, op->cmd.opcode,
+				op->data.buswidth, op->addr.nbytes,
+				op->dummy.nbytes);
 
 	ti_qspi_copy_mmap((void *)op->data.buf.in,
 			  (void *)priv->memory_map + from, op->data.nbytes);
@@ -390,7 +396,7 @@ static int ti_qspi_release_bus(struct udevice *dev)
 	writel(0, &priv->base->dc);
 	writel(0, &priv->base->cmd);
 	writel(0, &priv->base->data);
-	writel(0, &priv->base->setup0);
+	writel(0, TI_QSPI_SETUP_REG(priv, slave_plat->cs));
 
 	return 0;
 }

@@ -7,6 +7,7 @@
  */
 #undef DEBUG
 
+#include <dm/devres.h>
 #include <linux/bitops.h>
 #include <linux/usb/composite.h>
 
@@ -1003,7 +1004,11 @@ static void composite_unbind(struct usb_gadget *gadget)
 	 * so there's no i/o concurrency that could affect the
 	 * state protected by cdev->lock.
 	 */
+#ifdef __UBOOT__
+	assert_noisy(!cdev->config);
+#else
 	BUG_ON(cdev->config);
+#endif
 
 	while (!list_empty(&cdev->configs)) {
 		c = list_first_entry(&cdev->configs,

@@ -10,6 +10,8 @@
 #include <dm.h>
 #include <fdtdec.h>
 #include "mmc_private.h"
+#include <dm/device_compat.h>
+#include <linux/err.h>
 #include <linux/libfdt.h>
 #include <malloc.h>
 #include <sdhci.h>
@@ -35,7 +37,6 @@ struct arasan_sdhci_priv {
 
 static const u8 mode2timing[] = {
 	[MMC_LEGACY] = UHS_SDR12_BUS_SPEED,
-	[SD_LEGACY] = UHS_SDR12_BUS_SPEED,
 	[MMC_HS] = HIGH_SPEED_BUS_SPEED,
 	[SD_HS] = HIGH_SPEED_BUS_SPEED,
 	[MMC_HS_52] = HIGH_SPEED_BUS_SPEED,

@@ -38,7 +38,7 @@
 
 #include <linux/mii.h>
 #include <asm/io.h>
-#include <asm/dma-mapping.h>
+#include <linux/dma-mapping.h>
 #include <asm/arch/clk.h>
 #include <linux/errno.h>
 
@@ -327,8 +327,6 @@ static int _macb_send(struct macb_device *macb, const char *name, void *packet,
 	macb->tx_ring[tx_head].addr = paddr;
 	barrier();
 	macb_flush_ring_desc(macb, TX);
-	/* Do we need check paddr and length is dcache line aligned? */
-	flush_dcache_range(paddr, paddr + ALIGN(length, ARCH_DMA_MINALIGN));
 	macb_writel(macb, NCR, MACB_BIT(TE) | MACB_BIT(RE) | MACB_BIT(TSTART));
 
 	/*
@@ -344,7 +342,7 @@ static int _macb_send(struct macb_device *macb, const char *name, void *packet,
 		udelay(1);
 	}
 
-	dma_unmap_single(packet, length, paddr);
+	dma_unmap_single(paddr, length, DMA_TO_DEVICE);
 
 	if (i <= MACB_TX_TIMEOUT) {
 		if (ctrl & MACB_BIT(TX_UNDERRUN))
@@ -809,7 +807,7 @@ static int _macb_init(struct macb_device *macb, const char *name)
 	macb->next_rx_tail = 0;
 
 #ifdef CONFIG_MACB_ZYNQ
-	macb_writel(macb, DMACFG, MACB_ZYNQ_GEM_DMACR_INIT);
+	gem_writel(macb, DMACFG, MACB_ZYNQ_GEM_DMACR_INIT);
 #endif
 
 	macb_writel(macb, RBQP, macb->rx_ring_dma);

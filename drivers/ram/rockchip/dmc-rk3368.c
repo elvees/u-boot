@@ -6,6 +6,7 @@
 #include <common.h>
 #include <clk.h>
 #include <dm.h>
+#include <hang.h>
 #include <dt-bindings/memory/rk3368-dmc.h>
 #include <dt-structs.h>
 #include <ram.h>
@@ -18,6 +19,7 @@
 #include <asm/arch-rockchip/ddr_rk3368.h>
 #include <asm/arch-rockchip/sdram.h>
 #include <asm/arch-rockchip/sdram_rk3288.h>
+#include <linux/err.h>
 
 struct dram_info {
 	struct ram_info info;

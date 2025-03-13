@@ -122,13 +122,13 @@ efi_status_t efi_init_obj_list(void)
 	if (ret != EFI_SUCCESS)
 		goto out;
 
-	/* Indicate supported runtime services */
-	ret = efi_init_runtime_supported();
+	/* Initialize system table */
+	ret = efi_initialize_system_table();
 	if (ret != EFI_SUCCESS)
 		goto out;
 
-	/* Initialize system table */
-	ret = efi_initialize_system_table();
+	/* Indicate supported runtime services */
+	ret = efi_init_runtime_supported();
 	if (ret != EFI_SUCCESS)
 		goto out;
 
@@ -152,6 +152,11 @@ efi_status_t efi_init_obj_list(void)
 #endif
 #if defined(CONFIG_LCD) || defined(CONFIG_DM_VIDEO)
 	ret = efi_gop_register();
+	if (ret != EFI_SUCCESS)
+		goto out;
+#endif
+#ifdef CONFIG_EFI_LOAD_FILE2_INITRD
+	ret = efi_initrd_register();
 	if (ret != EFI_SUCCESS)
 		goto out;
 #endif

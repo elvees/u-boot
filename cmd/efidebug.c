@@ -12,6 +12,7 @@
 #include <exports.h>
 #include <hexdump.h>
 #include <malloc.h>
+#include <mapmem.h>
 #include <search.h>
 #include <linux/ctype.h>
 
@@ -244,6 +245,10 @@ static const struct {
 		EFI_HII_CONFIG_ROUTING_PROTOCOL_GUID,
 	},
 	{
+		"Load File2",
+		EFI_LOAD_FILE2_PROTOCOL_GUID,
+	},
+	{
 		"Simple Network",
 		EFI_SIMPLE_NETWORK_PROTOCOL_GUID,
 	},
@@ -251,27 +256,47 @@ static const struct {
 		"PXE Base Code",
 		EFI_PXE_BASE_CODE_PROTOCOL_GUID,
 	},
+	/* Configuration table GUIDs */
+	{
+		"ACPI table",
+		EFI_ACPI_TABLE_GUID,
+	},
+	{
+		"device tree",
+		EFI_FDT_GUID,
+	},
+	{
+		"SMBIOS table",
+		SMBIOS_TABLE_GUID,
+	},
+	{
+		"Runtime properties",
+		EFI_RT_PROPERTIES_TABLE_GUID,
+	},
 };
 
 /**
- * get_guid_text - get string of protocol guid
- * @guid:	Protocol guid
- * Return:	String
+ * get_guid_text - get string of GUID
  *
- * Return string for display to represent the protocol.
+ * Return description of GUID.
+ *
+ * @guid:	GUID
+ * Return:	description of GUID or NULL
  */
-static const char *get_guid_text(const efi_guid_t *guid)
+static const char *get_guid_text(const void *guid)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(guid_list); i++)
+	for (i = 0; i < ARRAY_SIZE(guid_list); i++) {
+		/*
+		 * As guidcmp uses memcmp() we can safely accept unaligned
+		 * GUIDs.
+		 */
 		if (!guidcmp(&guid_list[i].guid, guid))
-			break;
+			return guid_list[i].text;
+	}
 
-	if (i != ARRAY_SIZE(guid_list))
-		return guid_list[i].text;
-	else
-		return NULL;
+	return NULL;
 }
 
 /**
@@ -464,15 +489,46 @@ static int do_efi_show_memmap(cmd_tbl_t *cmdtp, int flag,
 
 		printf("%-16s %.*llx-%.*llx", type,
 		       EFI_PHYS_ADDR_WIDTH,
-		       map->physical_start,
+		       (u64)map_to_sysmem((void *)(uintptr_t)
+					  map->physical_start),
 		       EFI_PHYS_ADDR_WIDTH,
-		       map->physical_start + map->num_pages * EFI_PAGE_SIZE);
+		       (u64)map_to_sysmem((void *)(uintptr_t)
+					  (map->physical_start +
+					   map->num_pages * EFI_PAGE_SIZE)));
 
 		print_memory_attributes(map->attribute);
 		putc('\n');
 	}
 
 	EFI_CALL(BS->free_pool(memmap));
+
+	return CMD_RET_SUCCESS;
+}
+
+/**
+ * do_efi_show_tables() - show UEFI configuration tables
+ *
+ * @cmdtp:	Command table
+ * @flag:	Command flag
+ * @argc:	Number of arguments
+ * @argv:	Argument array
+ * Return:	CMD_RET_SUCCESS on success, CMD_RET_RET_FAILURE on failure
+ *
+ * Implement efidebug "tables" sub-command.
+ * Show UEFI configuration tables.
+ */
+static int do_efi_show_tables(cmd_tbl_t *cmdtp, int flag,
+			      int argc, char * const argv[])
+{
+	efi_uintn_t i;
+	const char *guid_str;
+
+	for (i = 0; i < systab.nr_tables; ++i) {
+		guid_str = get_guid_text(&systab.tables[i].guid);
+		if (!guid_str)
+			guid_str = "";
+		printf("%pUl %s\n", &systab.tables[i].guid, guid_str);
+	}
 
 	return CMD_RET_SUCCESS;
 }
@@ -597,7 +653,7 @@ static int do_efi_boot_rm(cmd_tbl_t *cmdtp, int flag,
 	int id, i;
 	char *endp;
 	char var_name[9];
-	u16 var_name16[9];
+	u16 var_name16[9], *p;
 	efi_status_t ret;
 
 	if (argc == 1)
@@ -610,11 +666,12 @@ static int do_efi_boot_rm(cmd_tbl_t *cmdtp, int flag,
 			return CMD_RET_FAILURE;
 
 		sprintf(var_name, "Boot%04X", id);
-		utf8_utf16_strncpy((u16 **)&var_name16, var_name, 9);
+		p = var_name16;
+		utf8_utf16_strncpy(&p, var_name, 9);
 
 		ret = EFI_CALL(RT->set_variable(var_name16, &guid, 0, 0, NULL));
 		if (ret) {
-			printf("Cannot remove Boot%04X", id);
+			printf("Cannot remove %ls\n", var_name16);
 			return CMD_RET_FAILURE;
 		}
 	}
@@ -1044,6 +1101,8 @@ static cmd_tbl_t cmd_efidebug_sub[] = {
 			 "", ""),
 	U_BOOT_CMD_MKENT(memmap, CONFIG_SYS_MAXARGS, 1, do_efi_show_memmap,
 			 "", ""),
+	U_BOOT_CMD_MKENT(tables, CONFIG_SYS_MAXARGS, 1, do_efi_show_tables,
+			 "", ""),
 };
 
 /**
@@ -1103,15 +1162,17 @@ static char efidebug_help_text[] =
 	"  - set/show UEFI boot order\n"
 	"\n"
 	"efidebug devices\n"
-	"  - show uefi devices\n"
+	"  - show UEFI devices\n"
 	"efidebug drivers\n"
-	"  - show uefi drivers\n"
+	"  - show UEFI drivers\n"
 	"efidebug dh\n"
-	"  - show uefi handles\n"
+	"  - show UEFI handles\n"
 	"efidebug images\n"
 	"  - show loaded images\n"
 	"efidebug memmap\n"
-	"  - show uefi memory map\n";
+	"  - show UEFI memory map\n"
+	"efidebug tables\n"
+	"  - show UEFI configuration tables\n";
 #endif
 
 U_BOOT_CMD(

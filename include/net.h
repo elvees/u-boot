@@ -51,6 +51,17 @@ struct in_addr {
 };
 
 /**
+ * do_tftpb - Run the tftpboot command
+ *
+ * @cmdtp: Command information for tftpboot
+ * @flag: Command flags (CMD_FLAG_...)
+ * @argc: Number of arguments
+ * @argv: List of arguments
+ * @return result (see enum command_ret_t)
+ */
+int do_tftpb(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[]);
+
+/**
  * An incoming packet handler.
  * @param pkt    pointer to the application packet
  * @param dport  destination UDP port
@@ -345,6 +356,7 @@ struct vlan_ethernet_hdr {
 #define PROT_VLAN	0x8100		/* IEEE 802.1q protocol		*/
 #define PROT_IPV6	0x86dd		/* IPv6 over bluebook		*/
 #define PROT_PPP_SES	0x8864		/* PPPoE session messages	*/
+#define PROT_NCSI	0x88f8		/* NC-SI control packets        */
 
 #define IPPROTO_ICMP	 1	/* Internet Control Message Protocol	*/
 #define IPPROTO_UDP	17	/* User Datagram Protocol		*/
@@ -906,4 +918,12 @@ static inline struct in_addr env_get_ip(char *var)
 {
 	return string_to_ip(env_get(var));
 }
+
+/**
+ * reset_phy() - Reset the Ethernet PHY
+ *
+ * This should be implemented by boards if CONFIG_RESET_PHY_R is enabled
+ */
+void reset_phy(void);
+
 #endif /* __NET_H__ */

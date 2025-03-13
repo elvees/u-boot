@@ -143,6 +143,13 @@ config BCM6368_ETH
 	help
 	  This driver supports the BCM6368 Ethernet MAC.
 
+config BCMGENET
+	bool "BCMGENET V5 support"
+	depends on DM_ETH
+	select PHYLIB
+	help
+	  This driver supports the BCMGENET Ethernet MAC.
+
 config DWC_ETH_QOS
 	bool "Synopsys DWC Ethernet QOS device support"
 	depends on DM_ETH
@@ -284,6 +291,22 @@ config FTGMAC100
 	  offers high-priority transmit queue for QoS and CoS
 	  applications.
 
+
+config MCFFEC
+	bool "ColdFire Ethernet Support"
+	depends on DM_ETH
+	select PHYLIB
+	help
+	  This driver supports the network interface units in the
+	  ColdFire family.
+
+config FSLDMAFEC
+        bool "ColdFire DMA Ethernet Support"
+	depends on DM_ETH
+	select PHYLIB
+	help
+	  This driver supports the network interface units in the
+	  ColdFire family.
 
 config MVGBE
 	bool "Marvell Orion5x/Kirkwood network interface support"

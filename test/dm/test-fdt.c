@@ -12,6 +12,7 @@
 #include <dm/test.h>
 #include <dm/root.h>
 #include <dm/device-internal.h>
+#include <dm/devres.h>
 #include <dm/uclass-internal.h>
 #include <dm/util.h>
 #include <dm/lists.h>
@@ -150,6 +151,64 @@ U_BOOT_DRIVER(testprobe_drv) = {
 UCLASS_DRIVER(testprobe) = {
 	.name		= "testprobe",
 	.id		= UCLASS_TEST_PROBE,
+	.flags		= DM_UC_FLAG_SEQ_ALIAS,
+};
+
+struct dm_testdevres_pdata {
+	void *ptr;
+};
+
+struct dm_testdevres_priv {
+	void *ptr;
+	void *ptr_ofdata;
+};
+
+static int testdevres_drv_bind(struct udevice *dev)
+{
+	struct dm_testdevres_pdata *pdata = dev_get_platdata(dev);
+
+	pdata->ptr = devm_kmalloc(dev, TEST_DEVRES_SIZE, 0);
+
+	return 0;
+}
+
+static int testdevres_drv_ofdata_to_platdata(struct udevice *dev)
+{
+	struct dm_testdevres_priv *priv = dev_get_priv(dev);
+
+	priv->ptr_ofdata = devm_kmalloc(dev, TEST_DEVRES_SIZE3, 0);
+
+	return 0;
+}
+
+static int testdevres_drv_probe(struct udevice *dev)
+{
+	struct dm_testdevres_priv *priv = dev_get_priv(dev);
+
+	priv->ptr = devm_kmalloc(dev, TEST_DEVRES_SIZE2, 0);
+
+	return 0;
+}
+
+static const struct udevice_id testdevres_ids[] = {
+	{ .compatible = "denx,u-boot-devres-test" },
+	{ }
+};
+
+U_BOOT_DRIVER(testdevres_drv) = {
+	.name	= "testdevres_drv",
+	.of_match	= testdevres_ids,
+	.id	= UCLASS_TEST_DEVRES,
+	.bind	= testdevres_drv_bind,
+	.ofdata_to_platdata	= testdevres_drv_ofdata_to_platdata,
+	.probe	= testdevres_drv_probe,
+	.platdata_auto_alloc_size	= sizeof(struct dm_testdevres_pdata),
+	.priv_auto_alloc_size	= sizeof(struct dm_testdevres_priv),
+};
+
+UCLASS_DRIVER(testdevres) = {
+	.name		= "testdevres",
+	.id		= UCLASS_TEST_DEVRES,
 	.flags		= DM_UC_FLAG_SEQ_ALIAS,
 };
 
@@ -389,6 +448,27 @@ static int dm_test_first_next_device(struct unit_test_state *uts)
 	return 0;
 }
 DM_TEST(dm_test_first_next_device, DM_TESTF_SCAN_PDATA | DM_TESTF_SCAN_FDT);
+
+/* Test iteration through devices in a uclass */
+static int dm_test_uclass_foreach(struct unit_test_state *uts)
+{
+	struct udevice *dev;
+	struct uclass *uc;
+	int count;
+
+	count = 0;
+	uclass_id_foreach_dev(UCLASS_TEST_FDT, dev, uc)
+		count++;
+	ut_asserteq(8, count);
+
+	count = 0;
+	uclass_foreach_dev(dev, uc)
+		count++;
+	ut_asserteq(8, count);
+
+	return 0;
+}
+DM_TEST(dm_test_uclass_foreach, DM_TESTF_SCAN_PDATA | DM_TESTF_SCAN_FDT);
 
 /**
  * check_devices() - Check return values and pointers
@@ -814,3 +894,62 @@ static int dm_test_read_int(struct unit_test_state *uts)
 	return 0;
 }
 DM_TEST(dm_test_read_int, DM_TESTF_SCAN_PDATA | DM_TESTF_SCAN_FDT);
+
+/* Test iteration through devices by drvdata */
+static int dm_test_uclass_drvdata(struct unit_test_state *uts)
+{
+	struct udevice *dev;
+
+	ut_assertok(uclass_first_device_drvdata(UCLASS_TEST_FDT,
+						DM_TEST_TYPE_FIRST, &dev));
+	ut_asserteq_str("a-test", dev->name);
+
+	ut_assertok(uclass_first_device_drvdata(UCLASS_TEST_FDT,
+						DM_TEST_TYPE_SECOND, &dev));
+	ut_asserteq_str("d-test", dev->name);
+
+	ut_asserteq(-ENODEV, uclass_first_device_drvdata(UCLASS_TEST_FDT,
+							 DM_TEST_TYPE_COUNT,
+							 &dev));
+
+	return 0;
+}
+DM_TEST(dm_test_uclass_drvdata, DM_TESTF_SCAN_PDATA | DM_TESTF_SCAN_FDT);
+
+/* Test device_first_child_ofdata_err(), etc. */
+static int dm_test_child_ofdata(struct unit_test_state *uts)
+{
+	struct udevice *bus, *dev;
+	int count;
+
+	ut_assertok(uclass_first_device_err(UCLASS_TEST_BUS, &bus));
+	count = 0;
+	device_foreach_child_ofdata_to_platdata(dev, bus) {
+		ut_assert(dev->flags & DM_FLAG_PLATDATA_VALID);
+		ut_assert(!(dev->flags & DM_FLAG_ACTIVATED));
+		count++;
+	}
+	ut_asserteq(3, count);
+
+	return 0;
+}
+DM_TEST(dm_test_child_ofdata, DM_TESTF_SCAN_PDATA | DM_TESTF_SCAN_FDT);
+
+/* Test device_first_child_err(), etc. */
+static int dm_test_first_child_probe(struct unit_test_state *uts)
+{
+	struct udevice *bus, *dev;
+	int count;
+
+	ut_assertok(uclass_first_device_err(UCLASS_TEST_BUS, &bus));
+	count = 0;
+	device_foreach_child_probe(dev, bus) {
+		ut_assert(dev->flags & DM_FLAG_PLATDATA_VALID);
+		ut_assert(dev->flags & DM_FLAG_ACTIVATED);
+		count++;
+	}
+	ut_asserteq(3, count);
+
+	return 0;
+}
+DM_TEST(dm_test_first_child_probe, DM_TESTF_SCAN_PDATA | DM_TESTF_SCAN_FDT);

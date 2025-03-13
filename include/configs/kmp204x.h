@@ -9,15 +9,12 @@
 
 #if defined(CONFIG_KMCOGE4)
 #define CONFIG_HOSTNAME		"kmcoge4"
-#define CONFIG_KM_BOARD_NAME	"kmcoge4"
 
 #else
 #error ("Board not supported")
 #endif
 
 #define CONFIG_KMP204X
-
-#define CONFIG_KM_DEF_NETDEV	"netdev=eth0\0"
 
 /* an additionnal option is required for UBI as subpage access is
  * supported in u-boot
@@ -227,6 +224,10 @@ unsigned long get_board_sys_clk(unsigned long dummy);
 #define CONFIG_KM_CONSOLE_TTY	"ttyS0"
 
 /* I2C */
+/* QRIO GPIOs used for deblocking */
+#define KM_I2C_DEBLOCK_PORT     QRIO_GPIO_A
+#define KM_I2C_DEBLOCK_SCL      20
+#define KM_I2C_DEBLOCK_SDA      21
 
 #define CONFIG_SYS_I2C
 #define CONFIG_SYS_I2C_INIT_BOARD

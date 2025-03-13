@@ -115,6 +115,7 @@ config ENV_VARS_UBOOT_CONFIG
 
 config NR_DRAM_BANKS
 	int "Number of DRAM banks"
+	default 1 if ARCH_SUNXI
 	default 4
 	help
 	  This defines the number of DRAM banks.
@@ -147,7 +148,9 @@ config SYS_MALLOC_F_LEN
 	default 0x1000 if AM33XX
 	default 0x2800 if SANDBOX
 	default 0x2000 if (ARCH_IMX8 || ARCH_IMX8M || ARCH_MX7 || \
-			   ARCH_MX7ULP || ARCH_MX6 || ARCH_MX5)
+			   ARCH_MX7ULP || ARCH_MX6 || ARCH_MX5 || \
+			   ARCH_LS1012A || ARCH_LS1021A || ARCH_LS1043A || \
+			   ARCH_LS1046A)
 	default 0x400
 	help
 	  Before relocation, memory is very limited on many platforms. Still,
@@ -254,7 +257,7 @@ config BUILD_TARGET
 	default "u-boot-spl.kwb" if ARCH_MVEBU && SPL
 	default "u-boot-elf.srec" if RCAR_GEN3
 	default "u-boot.itb" if SPL_LOAD_FIT && (ARCH_ROCKCHIP || \
-				ARCH_SUNXI || RISCV)
+				ARCH_SUNXI || RISCV || ARCH_ZYNQMP)
 	default "u-boot.kwb" if KIRKWOOD
 	default "u-boot-with-spl.bin" if ARCH_AT91 && SPL_NAND_SUPPORT
 	default "u-boot.mcom" if ARCH_MCOM
@@ -296,6 +299,11 @@ config ERR_PTR_OFFSET
 	  For such platforms, this value provides an upper range of those error
 	  pointer values - up to 'MAX_ERRNO' bytes below this value must be
 	  unused/invalid addresses.
+
+config PLATFORM_ELFENTRY
+	string
+	default "__start" if MIPS
+	default "_start"
 
 endmenu		# General setup
 
@@ -384,6 +392,14 @@ config FIT_ENABLE_RSASSA_PSS_SUPPORT
 	  Enable this to support the pss padding algorithm as described
 	  in the rfc8017 (https://tools.ietf.org/html/rfc8017).
 
+config FIT_CIPHER
+	bool "Enable ciphering data in a FIT uImages"
+	depends on DM
+	select AES
+	help
+	  Enable the feature of data ciphering/unciphering in the tool mkimage
+	  and in the u-boot support of the FIT image.
+
 config FIT_VERBOSE
 	bool "Show verbose messages when FIT images fail"
 	help
@@ -445,6 +461,24 @@ config SPL_LOAD_FIT
 	  particular it can handle selecting from multiple device tree
 	  and passing the correct one to U-Boot.
 
+config SPL_LOAD_FIT_APPLY_OVERLAY
+	bool "Enable SPL applying DT overlays from FIT"
+	depends on SPL_LOAD_FIT
+	select OF_LIBFDT_OVERLAY
+	help
+	  The device tree is loaded from the FIT image. Allow the SPL is to
+	  also load device-tree overlays from the FIT image an apply them
+	  over the device tree.
+
+config SPL_LOAD_FIT_APPLY_OVERLAY_BUF_SZ
+	depends on SPL_LOAD_FIT_APPLY_OVERLAY
+	default 0x10000
+	hex "size of temporary buffer used to load the overlays"
+	help
+	  The size of the area where the overlays will be loaded and
+	  uncompress. Must be at least as large as biggest overlay
+	  (uncompressed)
+
 config SPL_LOAD_FIT_FULL
 	bool "Enable SPL loading U-Boot as a FIT (full fitImage features)"
 	select SPL_FIT
@@ -483,6 +517,7 @@ config SPL_FIT_GENERATOR
 	depends on SPL_FIT
 	default "board/sunxi/mksunxi_fit_atf.sh" if SPL_LOAD_FIT && ARCH_SUNXI
 	default "arch/arm/mach-rockchip/make_fit_atf.py" if SPL_LOAD_FIT && ARCH_ROCKCHIP
+	default "arch/arm/mach-zynqmp/mkimage_fit_atf.sh" if SPL_LOAD_FIT && ARCH_ZYNQMP
 	default "arch/riscv/lib/mkimage_fit_opensbi.sh" if SPL_LOAD_FIT && RISCV
 	help
 	  Specifies a (platform specific) script file to generate the FIT
@@ -546,9 +581,14 @@ config SYS_EXTRA_OPTIONS
 	  configuration to Kconfig. Since this option will be removed sometime,
 	  new boards should not use this option.
 
-config SYS_TEXT_BASE
+config HAVE_SYS_TEXT_BASE
+	bool
 	depends on !NIOS2 && !XTENSA
 	depends on !EFI_APP
+	default y
+
+config SYS_TEXT_BASE
+	depends on HAVE_SYS_TEXT_BASE
 	default 0x80800000 if ARCH_OMAP2PLUS || ARCH_K3
 	default 0x4a000000 if ARCH_SUNXI && !MACH_SUN9I && !MACH_SUN8I_V3S
 	default 0x2a000000 if ARCH_SUNXI && MACH_SUN9I
@@ -556,8 +596,6 @@ config SYS_TEXT_BASE
 	hex "Text Base"
 	help
 	  The address in memory that U-Boot will be running from, initially.
-
-
 
 config SYS_CLK_FREQ
 	depends on ARC || ARCH_SUNXI || MPC83xx

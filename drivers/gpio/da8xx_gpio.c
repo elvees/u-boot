@@ -9,13 +9,14 @@
 #include <common.h>
 #include <dm.h>
 #include <fdtdec.h>
+#include <malloc.h>
 #include <asm/io.h>
 #include <asm/gpio.h>
 #include <dt-bindings/gpio/gpio.h>
 
 #include "da8xx_gpio.h"
 
-#ifndef CONFIG_DM_GPIO
+#if !CONFIG_IS_ENABLED(DM_GPIO)
 #include <asm/arch/hardware.h>
 #include <asm/arch/davinci_misc.h>
 
@@ -377,7 +378,8 @@ static int _gpio_direction_output(struct davinci_gpio *bank, unsigned int gpio,
 	_gpio_set_value(bank, gpio, value);
 	return 0;
 }
-#ifndef CONFIG_DM_GPIO
+
+#if !CONFIG_IS_ENABLED(DM_GPIO)
 
 void gpio_info(void)
 {
@@ -428,12 +430,12 @@ int gpio_set_value(unsigned int gpio, int value)
 	return _gpio_set_value(bank, gpio, value);
 }
 
-#else /* CONFIG_DM_GPIO */
+#else /* DM_GPIO */
 
 static struct davinci_gpio *davinci_get_gpio_bank(struct udevice *dev, unsigned int offset)
 {
 	struct davinci_gpio_bank *bank = dev_get_priv(dev);
-	unsigned int addr;
+	unsigned long addr;
 
 	/*
 	 * The device tree is not broken into banks but the infrastructure is
@@ -534,6 +536,7 @@ static int davinci_gpio_probe(struct udevice *dev)
 static const struct udevice_id davinci_gpio_ids[] = {
 	{ .compatible = "ti,dm6441-gpio" },
 	{ .compatible = "ti,k2g-gpio" },
+	{ .compatible = "ti,keystone-gpio" },
 	{ }
 };
 

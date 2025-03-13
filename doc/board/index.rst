@@ -14,5 +14,8 @@ Board-specific doc
    google/index
    intel/index
    renesas/index
+   rockchip/index
    sifive/index
+   st/index
+   toradex/index
    xilinx/index

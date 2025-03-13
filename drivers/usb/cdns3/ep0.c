@@ -11,6 +11,7 @@
  */
 
 #include <cpu_func.h>
+#include <dm/device_compat.h>
 #include <linux/usb/composite.h>
 #include <linux/iopoll.h>
 
@@ -561,6 +562,10 @@ static void cdns3_ep0_setup_phase(struct cdns3_device *priv_dev)
 	struct usb_ctrlrequest *ctrl = priv_dev->setup_buf;
 	struct cdns3_endpoint *priv_ep = priv_dev->eps[0];
 	int result;
+
+	/* Invalidate Setup Packet received */
+	invalidate_dcache_range(priv_dev->setup_dma,
+				priv_dev->setup_dma + ARCH_DMA_MINALIGN);
 
 	priv_dev->ep0_data_dir = ctrl->bRequestType & USB_DIR_IN;
 

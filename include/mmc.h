@@ -12,7 +12,10 @@
 #include <linux/list.h>
 #include <linux/sizes.h>
 #include <linux/compiler.h>
+#include <linux/dma-direction.h>
 #include <part.h>
+
+struct bd_info;
 
 #if CONFIG_IS_ENABLED(MMC_HS200_SUPPORT)
 #define MMC_SUPPORTS_TUNING
@@ -331,6 +334,7 @@ static inline bool mmc_is_tuning_cmd(uint cmdidx)
 
 #define MMC_QUIRK_RETRY_SEND_CID	BIT(0)
 #define MMC_QUIRK_RETRY_SET_BLOCKLEN	BIT(1)
+#define MMC_QUIRK_RETRY_APP_CMD	BIT(2)
 
 enum mmc_voltage {
 	MMC_SIGNAL_VOLTAGE_000 = 0,
@@ -405,6 +409,14 @@ struct mmc;
 
 #if CONFIG_IS_ENABLED(DM_MMC)
 struct dm_mmc_ops {
+	/**
+	 * deferred_probe() - Some configurations that need to be deferred
+	 * to just before enumerating the device
+	 *
+	 * @dev:	Device to init
+	 * @return 0 if Ok, -ve if error
+	 */
+	int (*deferred_probe)(struct udevice *dev);
 	/**
 	 * send_cmd() - Send a command to the MMC device
 	 *
@@ -488,6 +500,7 @@ int dm_mmc_get_wp(struct udevice *dev);
 int dm_mmc_execute_tuning(struct udevice *dev, uint opcode);
 int dm_mmc_wait_dat0(struct udevice *dev, int state, int timeout_us);
 int dm_mmc_host_power_cycle(struct udevice *dev);
+int dm_mmc_deferred_probe(struct udevice *dev);
 
 /* Transition functions for compatibility */
 int mmc_set_ios(struct mmc *mmc);
@@ -497,6 +510,7 @@ int mmc_execute_tuning(struct mmc *mmc, uint opcode);
 int mmc_wait_dat0(struct mmc *mmc, int state, int timeout_us);
 int mmc_set_enhanced_strobe(struct mmc *mmc);
 int mmc_host_power_cycle(struct mmc *mmc);
+int mmc_deferred_probe(struct mmc *mmc);
 
 #else
 struct mmc_ops {
@@ -531,7 +545,6 @@ struct sd_ssr {
 
 enum bus_mode {
 	MMC_LEGACY,
-	SD_LEGACY,
 	MMC_HS,
 	SD_HS,
 	MMC_HS_52,
@@ -601,6 +614,7 @@ struct mmc {
 	bool clk_disable; /* true if the clock can be turned off */
 	uint bus_width;
 	uint clock;
+	uint saved_clock;
 	enum mmc_voltage signal_voltage;
 	uint card_caps;
 	uint host_caps;
@@ -710,7 +724,7 @@ void mmc_destroy(struct mmc *mmc);
  * @return 0 if OK, -ve on error
  */
 int mmc_unbind(struct udevice *dev);
-int mmc_initialize(bd_t *bis);
+int mmc_initialize(struct bd_info *bis);
 int mmc_init_device(int num);
 int mmc_init(struct mmc *mmc);
 int mmc_send_tuning(struct mmc *mmc, u32 opcode, int *cmd_error);
@@ -855,8 +869,8 @@ void mmc_set_preinit(struct mmc *mmc, int preinit);
 #endif
 
 void board_mmc_power_init(void);
-int board_mmc_init(bd_t *bis);
-int cpu_mmc_init(bd_t *bis);
+int board_mmc_init(struct bd_info *bis);
+int cpu_mmc_init(struct bd_info *bis);
 int mmc_get_env_addr(struct mmc *mmc, int copy, u32 *env_addr);
 # ifdef CONFIG_SYS_MMC_ENV_PART
 extern uint mmc_get_env_part(struct mmc *mmc);
@@ -878,5 +892,10 @@ int mmc_get_env_dev(void);
  * @return block device if found, else NULL
  */
 struct blk_desc *mmc_get_blk_desc(struct mmc *mmc);
+
+static inline enum dma_data_direction mmc_get_dma_dir(struct mmc_data *data)
+{
+	return data->flags & MMC_DATA_WRITE ? DMA_TO_DEVICE : DMA_FROM_DEVICE;
+}
 
 #endif /* _MMC_H_ */

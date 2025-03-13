@@ -57,10 +57,13 @@
  */
 
 #include <dm.h>
+#include <dm/device_compat.h>
+#include <dm/devres.h>
+#include <linux/err.h>
 #include <linux/usb/gadget.h>
 #include <linux/compat.h>
 #include <linux/iopoll.h>
-#include <asm/dma-mapping.h>
+#include <linux/dma-mapping.h>
 #include <linux/bitmap.h>
 #include <linux/bug.h>
 

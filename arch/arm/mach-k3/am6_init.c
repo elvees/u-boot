@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * K3: Architecture initialization
+ * AM6: SoC specific initialization
  *
  * Copyright (C) 2017-2018 Texas Instruments Incorporated - http://www.ti.com/
  *	Lokesh Vutla <lokeshvutla@ti.com>
@@ -17,8 +17,29 @@
 #include <dm/uclass-internal.h>
 #include <dm/pinctrl.h>
 #include <linux/soc/ti/ti_sci_protocol.h>
+#include <mmc.h>
 
 #ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_K3_LOAD_SYSFW
+#ifdef CONFIG_TI_SECURE_DEVICE
+struct fwl_data main_cbass_fwls[] = {
+	{ "MMCSD1_CFG", 2057, 1 },
+	{ "MMCSD0_CFG", 2058, 1 },
+	{ "USB3SS0_SLV0", 2176, 2 },
+	{ "PCIE0_SLV", 2336, 8 },
+	{ "PCIE1_SLV", 2337, 8 },
+	{ "PCIE0_CFG", 2688, 1 },
+	{ "PCIE1_CFG", 2689, 1 },
+}, mcu_cbass_fwls[] = {
+	{ "MCU_ARMSS0_CORE0_SLV", 1024, 1 },
+	{ "MCU_ARMSS0_CORE1_SLV", 1028, 1 },
+	{ "MCU_FSS0_S1", 1033, 8 },
+	{ "MCU_FSS0_S0", 1036, 8 },
+	{ "MCU_CPSW0", 1220, 1 },
+};
+#endif
+#endif
+
 static void mmr_unlock(u32 base, u32 partition)
 {
 	/* Translate the base address */
@@ -66,6 +87,33 @@ static void store_boot_index_from_rom(void)
 	bootindex = *(u32 *)(CONFIG_SYS_K3_BOOT_PARAM_TABLE_INDEX);
 }
 
+#if defined(CONFIG_K3_LOAD_SYSFW)
+void k3_mmc_stop_clock(void)
+{
+	if (spl_boot_device() == BOOT_DEVICE_MMC1) {
+		struct mmc *mmc = find_mmc_device(0);
+
+		if (!mmc)
+			return;
+
+		mmc->saved_clock = mmc->clock;
+		mmc_set_clock(mmc, 0, true);
+	}
+}
+
+void k3_mmc_restart_clock(void)
+{
+	if (spl_boot_device() == BOOT_DEVICE_MMC1) {
+		struct mmc *mmc = find_mmc_device(0);
+
+		if (!mmc)
+			return;
+
+		mmc_set_clock(mmc, mmc->saved_clock, false);
+	}
+}
+#endif
+
 void board_init_f(ulong dummy)
 {
 #if defined(CONFIG_K3_LOAD_SYSFW) || defined(CONFIG_K3_AM654_DDRSS)
@@ -89,6 +137,16 @@ void board_init_f(ulong dummy)
 	/* Init DM early in-order to invoke system controller */
 	spl_early_init();
 
+#ifdef CONFIG_K3_EARLY_CONS
+	/*
+	 * Allow establishing an early console as required for example when
+	 * doing a UART-based boot. Note that this console may not "survive"
+	 * through a SYSFW PM-init step and will need a re-init in some way
+	 * due to changing module clock frequencies.
+	 */
+	early_console_init();
+#endif
+
 #ifdef CONFIG_K3_LOAD_SYSFW
 	/*
 	 * Process pinctrl for the serial0 a.k.a. WKUP_UART0 module and continue
@@ -108,7 +166,16 @@ void board_init_f(ulong dummy)
 	 * callback hook, effectively switching on (or over) the console
 	 * output.
 	 */
-	k3_sysfw_loader(preloader_console_init);
+	k3_sysfw_loader(k3_mmc_stop_clock, k3_mmc_restart_clock);
+
+	/* Prepare console output */
+	preloader_console_init();
+
+	/* Disable ROM configured firewalls right after loading sysfw */
+#ifdef CONFIG_TI_SECURE_DEVICE
+	remove_fwl_configs(main_cbass_fwls, ARRAY_SIZE(main_cbass_fwls));
+	remove_fwl_configs(mcu_cbass_fwls, ARRAY_SIZE(mcu_cbass_fwls));
+#endif
 #else
 	/* Prepare console output */
 	preloader_console_init();

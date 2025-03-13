@@ -16,6 +16,7 @@ u32 get_cpu_type(void);
 
 #define CPU_REVA	0x1000
 #define CPU_REVB	0x2000
+#define CPU_REVZ	0x2001
 
 /* return CPU_REV constants */
 u32 get_cpu_rev(void);
@@ -30,3 +31,5 @@ u32 get_cpu_package(void);
 
 /* return boot mode */
 u32 get_bootmode(void);
+
+int setup_mac_address(void);

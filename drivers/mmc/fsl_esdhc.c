@@ -22,6 +22,7 @@
 #include <fdt_support.h>
 #include <asm/io.h>
 #include <dm.h>
+#include <dm/device_compat.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -81,6 +82,7 @@ struct fsl_esdhc_plat {
 struct fsl_esdhc_priv {
 	struct fsl_esdhc *esdhc_regs;
 	unsigned int sdhc_clk;
+	bool is_sdhc_per_clk;
 	unsigned int clock;
 #if !CONFIG_IS_ENABLED(DM_MMC)
 	struct mmc *mmc;
@@ -523,7 +525,6 @@ static void set_sysctl(struct fsl_esdhc_priv *priv, struct mmc *mmc, uint clock)
 	esdhc_setbits32(&regs->sysctl, SYSCTL_PEREN | SYSCTL_CKEN);
 }
 
-#ifdef CONFIG_FSL_ESDHC_USE_PERIPHERAL_CLK
 static void esdhc_clock_control(struct fsl_esdhc_priv *priv, bool enable)
 {
 	struct fsl_esdhc *regs = priv->esdhc_regs;
@@ -550,18 +551,18 @@ static void esdhc_clock_control(struct fsl_esdhc_priv *priv, bool enable)
 		mdelay(1);
 	}
 }
-#endif
 
 static int esdhc_set_ios_common(struct fsl_esdhc_priv *priv, struct mmc *mmc)
 {
 	struct fsl_esdhc *regs = priv->esdhc_regs;
 
-#ifdef CONFIG_FSL_ESDHC_USE_PERIPHERAL_CLK
-	/* Select to use peripheral clock */
-	esdhc_clock_control(priv, false);
-	esdhc_setbits32(&regs->esdhcctl, ESDHCCTL_PCS);
-	esdhc_clock_control(priv, true);
-#endif
+	if (priv->is_sdhc_per_clk) {
+		/* Select to use peripheral clock */
+		esdhc_clock_control(priv, false);
+		esdhc_setbits32(&regs->esdhcctl, ESDHCCTL_PCS);
+		esdhc_clock_control(priv, true);
+	}
+
 	/* Set the clock speed */
 	if (priv->clock != mmc->clock)
 		set_sysctl(priv, mmc, mmc->clock);
@@ -575,6 +576,18 @@ static int esdhc_set_ios_common(struct fsl_esdhc_priv *priv, struct mmc *mmc)
 		esdhc_setbits32(&regs->proctl, PROCTL_DTW_8);
 
 	return 0;
+}
+
+static void esdhc_enable_cache_snooping(struct fsl_esdhc *regs)
+{
+#ifdef CONFIG_ARCH_MPC830X
+	immap_t *immr = (immap_t *)CONFIG_SYS_IMMR;
+	sysconf83xx_t *sysconf = &immr->sysconf;
+
+	setbits_be32(&sysconf->sdhccr, 0x02000000);
+#else
+	esdhc_write32(&regs->esdhcctl, 0x00000040);
+#endif
 }
 
 static int esdhc_init_common(struct fsl_esdhc_priv *priv, struct mmc *mmc)
@@ -592,8 +605,7 @@ static int esdhc_init_common(struct fsl_esdhc_priv *priv, struct mmc *mmc)
 			return -ETIMEDOUT;
 	}
 
-	/* Enable cache snooping */
-	esdhc_write32(&regs->esdhcctl, 0x00000040);
+	esdhc_enable_cache_snooping(regs);
 
 	esdhc_setbits32(&regs->sysctl, SYSCTL_HCKEN | SYSCTL_IPGEN);
 
@@ -716,17 +728,8 @@ void fdt_fixup_esdhc(void *blob, bd_t *bd)
 	if (esdhc_status_fixup(blob, compat))
 		return;
 
-#ifdef CONFIG_FSL_ESDHC_USE_PERIPHERAL_CLK
-	do_fixup_by_compat_u32(blob, compat, "peripheral-frequency",
-			       gd->arch.sdhc_clk, 1);
-#else
 	do_fixup_by_compat_u32(blob, compat, "clock-frequency",
 			       gd->arch.sdhc_clk, 1);
-#endif
-#ifdef CONFIG_FSL_ESDHC_ADAPTER_IDENT
-	do_fixup_by_compat_u32(blob, compat, "adapter-type",
-			       (u32)(gd->arch.sdhc_adapter), 1);
-#endif
 }
 #endif
 
@@ -788,6 +791,8 @@ int fsl_esdhc_initialize(bd_t *bis, struct fsl_esdhc_cfg *cfg)
 
 	priv->esdhc_regs = (struct fsl_esdhc *)(unsigned long)(cfg->esdhc_base);
 	priv->sdhc_clk = cfg->sdhc_clk;
+	if (gd->arch.sdhc_per_clk)
+		priv->is_sdhc_per_clk = true;
 
 	mmc_cfg = &plat->cfg;
 
@@ -826,7 +831,11 @@ int fsl_esdhc_mmc_init(bd_t *bis)
 
 	cfg = calloc(sizeof(struct fsl_esdhc_cfg), 1);
 	cfg->esdhc_base = CONFIG_SYS_FSL_ESDHC_ADDR;
-	cfg->sdhc_clk = gd->arch.sdhc_clk;
+	/* Prefer peripheral clock which provides higher frequency. */
+	if (gd->arch.sdhc_per_clk)
+		cfg->sdhc_clk = gd->arch.sdhc_per_clk;
+	else
+		cfg->sdhc_clk = gd->arch.sdhc_clk;
 	return fsl_esdhc_initialize(bis, cfg);
 }
 #else /* DM_MMC */
@@ -848,7 +857,13 @@ static int fsl_esdhc_probe(struct udevice *dev)
 #endif
 	priv->dev = dev;
 
-	priv->sdhc_clk = gd->arch.sdhc_clk;
+	if (gd->arch.sdhc_per_clk) {
+		priv->sdhc_clk = gd->arch.sdhc_per_clk;
+		priv->is_sdhc_per_clk = true;
+	} else {
+		priv->sdhc_clk = gd->arch.sdhc_clk;
+	}
+
 	if (priv->sdhc_clk <= 0) {
 		dev_err(dev, "Unable to get clk for %s\n", dev->name);
 		return -EINVAL;

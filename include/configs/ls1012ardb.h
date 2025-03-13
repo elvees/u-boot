@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
+ * Copyright 2020 NXP
  * Copyright 2016 Freescale Semiconductor, Inc.
  */
 
@@ -64,12 +65,12 @@
 	"initrd_high=0xffffffffffffffff\0"	\
 	"fdt_addr=0x00f00000\0"			\
 	"kernel_addr=0x01000000\0"		\
-	"kernelheader_addr=0x800000\0"		\
+	"kernelheader_addr=0x600000\0"		\
 	"scriptaddr=0x80000000\0"		\
 	"scripthdraddr=0x80080000\0"		\
 	"fdtheader_addr_r=0x80100000\0"		\
 	"kernelheader_addr_r=0x80200000\0"	\
-	"kernel_addr_r=0x81000000\0"		\
+	"kernel_addr_r=0x96000000\0"		\
 	"fdt_addr_r=0x90000000\0"		\
 	"load_addr=0xa0000000\0"		\
 	"kernel_size=0x2800000\0"		\

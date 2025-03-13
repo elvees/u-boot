@@ -7,10 +7,12 @@
  */
 
 #ifndef __UBOOT__
+#include <dm/devres.h>
 #include <linux/dmaengine.h>
 #include <linux/pm_runtime.h>
 #include "internals.h"
 #else
+#include <dm/device_compat.h>
 #include <spi.h>
 #include <spi-mem.h>
 #endif
@@ -120,6 +122,12 @@ static int spi_check_buswidth_req(struct spi_slave *slave, u8 buswidth, bool tx)
 	case 4:
 		if ((tx && (mode & SPI_TX_QUAD)) ||
 		    (!tx && (mode & SPI_RX_QUAD)))
+			return 0;
+
+		break;
+	case 8:
+		if ((tx && (mode & SPI_TX_OCTAL)) ||
+		    (!tx && (mode & SPI_RX_OCTAL)))
 			return 0;
 
 		break;

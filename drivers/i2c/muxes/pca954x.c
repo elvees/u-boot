@@ -9,6 +9,7 @@
 #include <dm.h>
 #include <errno.h>
 #include <i2c.h>
+#include <malloc.h>
 
 #include <asm-generic/gpio.h>
 
@@ -125,7 +126,7 @@ static int pca954x_ofdata_to_platdata(struct udevice *dev)
 
 static int pca954x_probe(struct udevice *dev)
 {
-	if (IS_ENABLED(CONFIG_DM_GPIO)) {
+	if (CONFIG_IS_ENABLED(DM_GPIO)) {
 		struct pca954x_priv *priv = dev_get_priv(dev);
 		int err;
 
@@ -146,7 +147,7 @@ static int pca954x_probe(struct udevice *dev)
 
 static int pca954x_remove(struct udevice *dev)
 {
-	if (IS_ENABLED(CONFIG_DM_GPIO)) {
+	if (CONFIG_IS_ENABLED(DM_GPIO)) {
 		struct pca954x_priv *priv = dev_get_priv(dev);
 
 		if (dm_gpio_is_valid(&priv->gpio_mux_reset))

@@ -14,6 +14,28 @@ config DM_GPIO
 	  particular GPIOs that they provide. The uclass interface
 	  is defined in include/asm-generic/gpio.h.
 
+config SPL_DM_GPIO
+	bool "Enable Driver Model for GPIO drivers in SPL"
+	depends on DM_GPIO && SPL_DM && SPL_GPIO_SUPPORT
+	default y
+	help
+	  Enable driver model for GPIO access in SPL. The standard GPIO
+	  interface (gpio_get_value(), etc.) is then implemented by
+	  the GPIO uclass. Drivers provide methods to query the
+	  particular GPIOs that they provide. The uclass interface
+	  is defined in include/asm-generic/gpio.h.
+
+config TPL_DM_GPIO
+	bool "Enable Driver Model for GPIO drivers in TPL"
+	depends on DM_GPIO && TPL_DM && TPL_GPIO_SUPPORT
+	default y
+	help
+	  Enable driver model for GPIO access in TPL. The standard GPIO
+	  interface (gpio_get_value(), etc.) is then implemented by
+	  the GPIO uclass. Drivers provide methods to query the
+	  particular GPIOs that they provide. The uclass interface
+	  is defined in include/asm-generic/gpio.h.
+
 config GPIO_HOG
 	bool "Enable GPIO hog support"
 	depends on DM_GPIO
@@ -33,9 +55,18 @@ config ALTERA_PIO
 
 config BCM6345_GPIO
 	bool "BCM6345 GPIO driver"
-	depends on DM_GPIO && (ARCH_BMIPS || ARCH_BCM6858 || ARCH_BCM63158)
+	depends on DM_GPIO && (ARCH_BMIPS || ARCH_BCM68360 || \
+			       ARCH_BCM6858 || ARCH_BCM63158)
 	help
 	  This driver supports the GPIO banks on BCM6345 SoCs.
+
+config CORTINA_GPIO
+	bool "Cortina-Access GPIO driver"
+	depends on DM_GPIO && CORTINA_PLATFORM
+	help
+	  Enable support for the GPIO controller in Cortina CAxxxx SoCs.
+	  This driver supports all CPU ISA variants supported by Cortina
+	  Access CAxxxx SoCs.
 
 config DWAPB_GPIO
 	bool "DWAPB GPIO driver"
@@ -81,6 +112,15 @@ config INTEL_BROADWELL_GPIO
 	  GPIO feature set. The difference is large enough to merit a separate
 	  driver from the common Intel ICH6 driver. It supports a total of
 	  95 GPIOs which can be configured from the device tree.
+
+config INTEL_GPIO
+	bool "Intel generic GPIO driver"
+	depends on DM_GPIO
+	help
+	  Say yes here to select Intel generic GPIO driver. This controller
+	  supports recent chips (e.g. Apollo Lake). It permits basic GPIO
+	  control including setting pins to input/output. It makes use of its
+	  parent pinctrl driver to actually effect changes.
 
 config INTEL_ICH6_GPIO
 	bool "Intel ICH6 compatible legacy GPIO driver"
@@ -382,6 +422,14 @@ config MPC8XXX_GPIO
 	  Aside from the standard functions of input/output mode, and output
 	  value setting, the open-drain feature, which can configure individual
 	  GPIOs to work as open-drain outputs, is supported.
+
+config MPC83XX_SPISEL_BOOT
+	bool "Freescale MPC83XX SPISEL_BOOT driver"
+	depends on DM_GPIO && ARCH_MPC830X
+	help
+	  GPIO driver to set/clear dedicated SPISEL_BOOT output on MPC83XX.
+
+	  This pin is typically used as spi chip select to a spi nor flash.
 
 config MT7621_GPIO
 	bool "MediaTek MT7621 GPIO driver"

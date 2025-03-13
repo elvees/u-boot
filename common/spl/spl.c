@@ -11,6 +11,7 @@
 #include <binman_sym.h>
 #include <dm.h>
 #include <handoff.h>
+#include <hang.h>
 #include <irq_func.h>
 #include <serial.h>
 #include <spl.h>
@@ -42,6 +43,12 @@ u32 *boot_params_ptr = NULL;
 
 /* See spl.h for information about this */
 binman_sym_declare(ulong, u_boot_any, image_pos);
+binman_sym_declare(ulong, u_boot_any, size);
+
+#ifdef CONFIG_TPL
+binman_sym_declare(ulong, spl, image_pos);
+binman_sym_declare(ulong, spl, size);
+#endif
 
 /* Define board data structure */
 static bd_t bdata __attribute__ ((section(".data")));
@@ -118,6 +125,20 @@ void spl_fixup_fdt(void)
 		return;
 	}
 #endif
+}
+
+ulong spl_get_image_pos(void)
+{
+	return spl_phase() == PHASE_TPL ?
+		binman_sym(ulong, spl, image_pos) :
+		binman_sym(ulong, u_boot_any, image_pos);
+}
+
+ulong spl_get_image_size(void)
+{
+	return spl_phase() == PHASE_TPL ?
+		binman_sym(ulong, spl, size) :
+		binman_sym(ulong, u_boot_any, size);
 }
 
 /*
@@ -264,9 +285,9 @@ int spl_parse_image_header(struct spl_image_info *spl_image,
 			spl_image->entry_point = image_get_ep(header);
 			spl_image->size = image_get_data_size(header);
 		} else {
-			spl_image->entry_point = image_get_load(header);
+			spl_image->entry_point = image_get_ep(header);
 			/* Load including the header */
-			spl_image->load_addr = spl_image->entry_point -
+			spl_image->load_addr = image_get_load(header) -
 				header_size;
 			spl_image->size = image_get_data_size(header) +
 				header_size;

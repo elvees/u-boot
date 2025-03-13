@@ -108,16 +108,17 @@ endif
 
 obj-y += image.o
 obj-$(CONFIG_ANDROID_AB) += android_ab.o
-obj-$(CONFIG_ANDROID_BOOT_IMAGE) += image-android.o
+obj-$(CONFIG_ANDROID_BOOT_IMAGE) += image-android.o image-android-dt.o
 obj-$(CONFIG_$(SPL_TPL_)OF_LIBFDT) += image-fdt.o
 obj-$(CONFIG_$(SPL_TPL_)FIT) += image-fit.o
 obj-$(CONFIG_$(SPL_)MULTI_DTB_FIT) += boot_fit.o common_fit.o
 obj-$(CONFIG_$(SPL_TPL_)FIT_SIGNATURE) += image-sig.o
+obj-$(CONFIG_$(SPL_TPL_)FIT_CIPHER) += image-cipher.o
 obj-$(CONFIG_IO_TRACE) += iotrace.o
 obj-y += memsize.o
 obj-y += stdio.o
 
-obj-$(CONFIG_CMD_DTIMG) += image-android-dt.o
+obj-$(CONFIG_CMD_ADTIMG) += image-android-dt.o
 
 ifdef CONFIG_CMD_EEPROM_LAYOUT
 obj-y += eeprom/eeprom_field.o eeprom/eeprom_layout.o

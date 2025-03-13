@@ -10,6 +10,7 @@
 #include <asm/arch/scu_ast2500.h>
 #include <dm/lists.h>
 #include <dt-bindings/clock/ast2500-scu.h>
+#include <linux/err.h>
 
 /*
  * MAC Clock Delay settings, taken from Aspeed SDK
@@ -490,7 +491,7 @@ struct clk_ops ast2500_clk_ops = {
 	.enable = ast2500_clk_enable,
 };
 
-static int ast2500_clk_probe(struct udevice *dev)
+static int ast2500_clk_ofdata_to_platdata(struct udevice *dev)
 {
 	struct ast2500_clk_priv *priv = dev_get_priv(dev);
 
@@ -525,5 +526,5 @@ U_BOOT_DRIVER(aspeed_ast2500_scu) = {
 	.priv_auto_alloc_size = sizeof(struct ast2500_clk_priv),
 	.ops		= &ast2500_clk_ops,
 	.bind		= ast2500_clk_bind,
-	.probe		= ast2500_clk_probe,
+	.ofdata_to_platdata		= ast2500_clk_ofdata_to_platdata,
 };

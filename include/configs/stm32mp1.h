@@ -33,17 +33,24 @@
 #define CONFIG_SYS_CBSIZE			SZ_1K
 
 /*
- * Needed by "loadb"
+ * default load address used for command tftp,  bootm , loadb, ...
  */
-#define CONFIG_SYS_LOAD_ADDR			STM32_DDR_BASE
+#define CONFIG_LOADADDR			0xc2000000
+#define CONFIG_SYS_LOAD_ADDR		CONFIG_LOADADDR
 
 /* ATAGs */
 #define CONFIG_CMDLINE_TAG
 #define CONFIG_SETUP_MEMORY_TAGS
 #define CONFIG_INITRD_TAG
 
+/*
+ * For booting Linux, use the first 256 MB of memory, since this is
+ * the maximum mapped by the Linux kernel during initialization.
+ */
+#define CONFIG_SYS_BOOTMAPSZ		SZ_256M
+
 /* Extend size of kernel image for uncompression */
-#define CONFIG_SYS_BOOTM_LEN			SZ_32M
+#define CONFIG_SYS_BOOTM_LEN		SZ_32M
 
 /* SPL support */
 #ifdef CONFIG_SPL
@@ -98,12 +105,34 @@
 
 #if !defined(CONFIG_SPL_BUILD)
 
-#define BOOT_TARGET_DEVICES(func) \
-	func(MMC, mmc, 1) \
-	func(UBIFS, ubifs, 0) \
-	func(MMC, mmc, 0) \
-	func(MMC, mmc, 2) \
-	func(PXE, pxe, na)
+#ifdef CONFIG_CMD_MMC
+#define BOOT_TARGET_MMC0(func)	func(MMC, mmc, 0)
+#define BOOT_TARGET_MMC1(func)	func(MMC, mmc, 1)
+#define BOOT_TARGET_MMC2(func)	func(MMC, mmc, 2)
+#else
+#define BOOT_TARGET_MMC0(func)
+#define BOOT_TARGET_MMC1(func)
+#define BOOT_TARGET_MMC2(func)
+#endif
+
+#ifdef CONFIG_NET
+#define BOOT_TARGET_PXE(func)	func(PXE, pxe, na)
+#else
+#define BOOT_TARGET_PXE(func)
+#endif
+
+#ifdef CONFIG_CMD_UBIFS
+#define BOOT_TARGET_UBIFS(func)	func(UBIFS, ubifs, 0)
+#else
+#define BOOT_TARGET_UBIFS(func)
+#endif
+
+#define BOOT_TARGET_DEVICES(func)	\
+	BOOT_TARGET_MMC1(func)		\
+	BOOT_TARGET_UBIFS(func)		\
+	BOOT_TARGET_MMC0(func)		\
+	BOOT_TARGET_MMC2(func)		\
+	BOOT_TARGET_PXE(func)
 
 /*
  * bootcmd for stm32mp1:
@@ -192,8 +221,6 @@
 	"pxefile_addr_r=0xc4200000\0" \
 	"splashimage=0xc4300000\0"  \
 	"ramdisk_addr_r=0xc4400000\0" \
-	"fdt_high=0xffffffff\0" \
-	"initrd_high=0xffffffff\0" \
 	"altbootcmd=run bootcmd\0" \
 	"env_default=1\0" \
 	"env_check=if test $env_default -eq 1;"\

@@ -40,7 +40,6 @@ static int do_zfs_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 	ulong addr = 0;
 	disk_partition_t info;
 	struct blk_desc *dev_desc;
-	char buf[12];
 	unsigned long count;
 	const char *addr_str;
 	struct zfs_file zfile;
@@ -112,7 +111,7 @@ static int do_zfs_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 	zfs_close(&zfile);
 
 	/* Loading ok, update default load address */
-	load_addr = addr;
+	image_load_addr = addr;
 
 	printf("%llu bytes read\n", zfile.size);
 	env_set_hex("filesize", zfile.size);

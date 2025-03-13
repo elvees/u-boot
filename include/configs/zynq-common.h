@@ -41,8 +41,6 @@
 # define CONFIG_BOOTP_MAY_FAIL
 #endif
 
-/* QSPI */
-
 /* NOR */
 #ifdef CONFIG_MTD_NOR_FLASH
 # define CONFIG_SYS_FLASH_BASE		0xE2000000
@@ -176,7 +174,16 @@
 #define BOOTENV_DEV_NAME_NOR(devtypeu, devtypel, instance) \
 	"nor "
 
+#define BOOT_TARGET_DEVICES_JTAG(func)  func(JTAG, jtag, na)
+
+#define BOOTENV_DEV_JTAG(devtypeu, devtypel, instance) \
+	"bootcmd_jtag=source $scriptaddr; echo SCRIPT FAILED: continuing...;\0"
+
+#define BOOTENV_DEV_NAME_JTAG(devtypeu, devtypel, instance) \
+	"jtag "
+
 #define BOOT_TARGET_DEVICES(func) \
+	BOOT_TARGET_DEVICES_JTAG(func) \
 	BOOT_TARGET_DEVICES_MMC(func) \
 	BOOT_TARGET_DEVICES_QSPI(func) \
 	BOOT_TARGET_DEVICES_NAND(func) \
@@ -194,7 +201,6 @@
 	"fdt_high=0x20000000\0"		\
 	"initrd_high=0x20000000\0"	\
 	"scriptaddr=0x20000\0"	\
-	"script_offset_f=0xFC0000\0"	\
 	"script_size_f=0x40000\0"	\
 	"fdt_addr_r=0x1f00000\0"        \
 	"pxefile_addr_r=0x2000000\0"    \
@@ -273,7 +279,5 @@
 #define CONFIG_SPL_BSS_MAX_SIZE		0x100000
 
 #define CONFIG_SPL_LOAD_FIT_ADDRESS 0x10000000
-
-#define CONFIG_SYS_UBOOT_START	CONFIG_SYS_TEXT_BASE
 
 #endif /* __CONFIG_ZYNQ_COMMON_H */

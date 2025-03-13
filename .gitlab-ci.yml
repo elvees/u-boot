@@ -2,7 +2,7 @@
 
 # Grab our configured image.  The source for this is found at:
 # https://gitlab.denx.de/u-boot/gitlab-ci-runner
-image: trini/u-boot-gitlab-ci-runner:bionic-20191010-20Oct2019
+image: trini/u-boot-gitlab-ci-runner:bionic-20200112-21Feb2020
 
 # We run some tests in different order, to catch some failures quicker.
 stages:
@@ -20,13 +20,12 @@ stages:
     - ln -s travis-ci /tmp/uboot-test-hooks/py/`hostname`
     - grub-mkimage --prefix="" -o ~/grub_x86.efi -O i386-efi normal  echo lsefimmap lsefi lsefisystab efinet tftp minicmd
     - grub-mkimage --prefix="" -o ~/grub_x64.efi -O x86_64-efi normal  echo lsefimmap lsefi lsefisystab efinet tftp minicmd
-    - mkdir ~/grub2-arm
-    - ( cd ~/grub2-arm; wget -O - http://download.opensuse.org/ports/armv7hl/distribution/leap/42.2/repo/oss/suse/armv7hl/grub2-arm-efi-2.02~beta2-87.1.armv7hl.rpm | rpm2cpio | cpio -di )
-    - mkdir ~/grub2-arm64
-    - ( cd ~/grub2-arm64; wget -O - http://download.opensuse.org/ports/aarch64/distribution/leap/42.2/repo/oss/suse/aarch64/grub2-arm64-efi-2.02~beta2-87.1.aarch64.rpm | rpm2cpio | cpio -di )
+    - cp /opt/grub/grubriscv64.efi ~/grub_riscv64.efi
+    - cp /opt/grub/grubaa64.efi ~/grub_arm64.efi
+    - cp /opt/grub/grubarm.efi ~/grub_arm.efi
 
   after_script:
-    - rm -rf ~/grub2* /tmp/uboot-test-hooks /tmp/venv
+    - rm -rf /tmp/uboot-test-hooks /tmp/venv
   script:
     # From buildman, exit code 129 means warnings only.  If we've been asked to
     # use clang only do one configuration.
@@ -73,7 +72,7 @@ build all 64bit ARM platforms:
   tags: [ 'all' ]
   stage: world build
   script:
-    - virtualenv /tmp/venv
+    - virtualenv -p /usr/bin/python3 /tmp/venv
     - . /tmp/venv/bin/activate
     - pip install pyelftools
     - ret=0;
@@ -123,6 +122,13 @@ grep TODO/FIXME/HACK:
     # search for HACK within source tree and ignore HACKKIT board
     - grep -r HACK . | grep -v HACKKIT
 
+# build HTML documentation
+htmldocs:
+  tags: [ 'all' ]
+  stage: testsuites
+  script:
+    - make htmldocs
+
 # some statistics about the code base
 sloccount:
   tags: [ 'all' ]
@@ -158,7 +164,7 @@ Run binman, buildman, dtoc and patman testsuites:
     - git config --global user.name "GitLab CI Runner";
       git config --global user.email trini@konsulko.com;
       export USER=gitlab;
-      virtualenv /tmp/venv;
+      virtualenv -p /usr/bin/python3 /tmp/venv;
       . /tmp/venv/bin/activate;
       pip install pyelftools;
       export UBOOT_TRAVIS_BUILD_DIR=/tmp/.bm-work/sandbox_spl;

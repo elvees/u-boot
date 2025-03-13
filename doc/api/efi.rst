@@ -125,10 +125,25 @@ Graphical output protocol
 .. kernel-doc:: lib/efi_loader/efi_gop.c
    :internal:
 
+Load file 2 protocol
+~~~~~~~~~~~~~~~~~~~~
+
+The load file 2 protocol can be used by the Linux kernel to load the initial
+RAM disk. U-Boot can be configured to provide an implementation.
+
+.. kernel-doc:: lib/efi_loader/efi_load_initrd.c
+   :internal:
+
 Network protocols
 ~~~~~~~~~~~~~~~~~
 
 .. kernel-doc:: lib/efi_loader/efi_net.c
+   :internal:
+
+Random number generator protocol
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. kernel-doc:: lib/efi_loader/efi_rng.c
    :internal:
 
 Text IO protocols

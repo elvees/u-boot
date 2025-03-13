@@ -160,6 +160,7 @@
 	"emmcboot=mmcsetn && run bootcmd_mmc${mmc_first_dev}\0" \
 	"nandboot=run bootcmd_ubifs0\0" \
 	"norboot=run tftpboot\0" \
+	"sdboot=sdsetn && run bootcmd_mmc${sd_first_dev}\0" \
 	"usbboot=run bootcmd_usb0\0" \
 	"emmcscript=setenv devtype mmc && " \
 		"mmcsetn && " \
@@ -169,17 +170,21 @@
 		"ubi part UBI && " \
 		"ubifsmount ubi0:boot && " \
 		"ubifsload ${loadaddr} ${script} && " \
-		"source\0" \
+		"source $loadaddr\0" \
+	"sdscript=setenv devtype mmc && " \
+		"sdsetn && " \
+		"setenv devnum ${sd_first_dev} && " \
+		"run loadscript_fat\0" \
 	"norscript=echo Running ${script} from tftp ... && " \
 		"tftpboot ${script} &&" \
-		"source\0" \
+		"source $loadaddr\0" \
 	"usbscript=usb start && " \
 		"setenv devtype usb && " \
 		"setenv devnum 0 && " \
 		"run loadscript_fat\0" \
 	"loadscript_fat=echo Running ${script} from ${devtype}${devnum} ... && " \
 		"load ${devtype} ${devnum}:1 ${loadaddr} ${script} && " \
-		"source\0" \
+		"source $loadaddr\0" \
 	"sramupdate=setexpr tmp_addr $nor_base + 0x50000 &&"	\
 		"tftpboot $tmp_addr $second_image && " \
 		"setexpr tmp_addr $nor_base + 0x70000 && " \
@@ -196,6 +201,12 @@
 		"nand write $loadaddr 0 0x00020000 && " \
 		"tftpboot $third_image && " \
 		"nand write $loadaddr 0x00020000 0x001e0000\0" \
+	"sdupdate=sdsetn &&" \
+		"mmc dev $sd_first_dev &&" \
+		"tftpboot $second_image && " \
+		"mmc write $loadaddr 0 100 && " \
+		"tftpboot $third_image && " \
+		"mmc write $loadaddr 100 f00\0" \
 	"usbupdate=usb start &&" \
 		"tftpboot $second_image && " \
 		"usb write $loadaddr 0 100 && " \

@@ -11,13 +11,15 @@
 #include <charset.h>
 #include <common.h>
 #include <dm.h>
+#include <dm/device_compat.h>
+#include <dm/devres.h>
 #include <dm/lists.h>
 #include <dm/device-internal.h>
 #include <malloc.h>
 #include <hexdump.h>
 #include <scsi.h>
 
-#include <asm/dma-mapping.h>
+#include <linux/dma-mapping.h>
 
 #include "ufs.h"
 

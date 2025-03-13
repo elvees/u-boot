@@ -15,6 +15,8 @@ config EFI_LOADER
 	select HAVE_BLOCK_DEVICE
 	select REGEX
 	imply CFB_CONSOLE_ANSI
+	imply USB_KEYBOARD_FN_KEYS
+	imply VIDEO_ANSI
 	help
 	  Select this option if you want to run UEFI applications (like GNU
 	  GRUB or iPXE) on top of U-Boot. If this option is enabled, U-Boot
@@ -120,4 +122,27 @@ config EFI_GRUB_ARM32_WORKAROUND
 	  GRUB prior to version 2.04 requires U-Boot to disable caches. This
 	  workaround currently is also needed on systems with caches that
 	  cannot be managed via CP15.
+
+config EFI_RNG_PROTOCOL
+	bool "EFI_RNG_PROTOCOL support"
+	depends on DM_RNG
+	help
+	  Provide a EFI_RNG_PROTOCOL implementation using the hardware random
+	  number generator of the platform.
+
+config EFI_LOAD_FILE2_INITRD
+	bool "EFI_FILE_LOAD2_PROTOCOL for Linux initial ramdisk"
+	default n
+	help
+	  Expose a EFI_FILE_LOAD2_PROTOCOL that the Linux UEFI stub can
+	  use to load the initial ramdisk. Once this is enabled using
+	  initrd=<ramdisk> will stop working.
+
+config EFI_INITRD_FILESPEC
+	string "initramfs path"
+	default "host 0:1 initrd"
+	depends on EFI_LOAD_FILE2_INITRD
+	help
+	  Full path of the initramfs file, e.g. mmc 0:2 initramfs.cpio.gz.
+
 endif

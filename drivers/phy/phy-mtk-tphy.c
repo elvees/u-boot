@@ -9,8 +9,11 @@
 #include <clk.h>
 #include <dm.h>
 #include <generic-phy.h>
+#include <malloc.h>
 #include <mapmem.h>
 #include <asm/io.h>
+#include <dm/device_compat.h>
+#include <dm/devres.h>
 
 #include <dt-bindings/phy/phy.h>
 
@@ -204,9 +207,8 @@ static int mtk_phy_init(struct phy *phy)
 	struct mtk_phy_instance *instance = tphy->phys[phy->id];
 	int ret;
 
-	/* we may use a fixed-clock here */
 	ret = clk_enable(&instance->ref_clk);
-	if (ret && ret != -ENOSYS)
+	if (ret)
 		return ret;
 
 	switch (instance->type) {
@@ -339,7 +341,8 @@ static int mtk_tphy_probe(struct udevice *dev)
 		tphy->phys[index] = instance;
 		index++;
 
-		err = clk_get_by_index_nodev(subnode, 0, &instance->ref_clk);
+		err = clk_get_optional_nodev(subnode, "ref",
+					     &instance->ref_clk);
 		if (err)
 			return err;
 	}

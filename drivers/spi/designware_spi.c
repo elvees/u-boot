@@ -18,6 +18,7 @@
 #include <spi.h>
 #include <fdtdec.h>
 #include <reset.h>
+#include <dm/device_compat.h>
 #include <linux/compat.h>
 #include <linux/iopoll.h>
 #include <asm/io.h>
@@ -120,6 +121,32 @@ static inline u32 dw_read(struct dw_spi_priv *priv, u32 offset)
 static inline void dw_write(struct dw_spi_priv *priv, u32 offset, u32 val)
 {
 	__raw_writel(val, priv->regs + offset);
+}
+
+static int request_gpio_cs(struct udevice *bus)
+{
+#if CONFIG_IS_ENABLED(DM_GPIO) && !defined(CONFIG_SPL_BUILD)
+	struct dw_spi_priv *priv = dev_get_priv(bus);
+	int ret;
+
+	/* External chip select gpio line is optional */
+	ret = gpio_request_by_name(bus, "cs-gpio", 0, &priv->cs_gpio, 0);
+	if (ret == -ENOENT)
+		return 0;
+
+	if (ret < 0) {
+		printf("Error: %d: Can't get %s gpio!\n", ret, bus->name);
+		return ret;
+	}
+
+	if (dm_gpio_is_valid(&priv->cs_gpio)) {
+		dm_gpio_set_dir_flags(&priv->cs_gpio,
+				      GPIOD_IS_OUT | GPIOD_IS_OUT_ACTIVE);
+	}
+
+	debug("%s: used external gpio for CS management\n", __func__);
+#endif
+	return 0;
 }
 
 static int dw_spi_ofdata_to_platdata(struct udevice *bus)
@@ -390,6 +417,24 @@ static int poll_transfer(struct dw_spi_priv *priv)
 	} while (priv->rx_end > priv->rx);
 
 	return 0;
+}
+
+/*
+ * We define external_cs_manage function as 'weak' as some targets
+ * (like MSCC Ocelot) don't control the external CS pin using a GPIO
+ * controller. These SoCs use specific registers to control by
+ * software the SPI pins (and especially the CS).
+ */
+__weak void external_cs_manage(struct udevice *dev, bool on)
+{
+#if CONFIG_IS_ENABLED(DM_GPIO) && !defined(CONFIG_SPL_BUILD)
+	struct dw_spi_priv *priv = dev_get_priv(dev->parent);
+
+	if (!dm_gpio_is_valid(&priv->cs_gpio))
+		return;
+
+	dm_gpio_set_value(&priv->cs_gpio, on ? 1 : 0);
+#endif
 }
 
 static int dw_spi_xfer(struct udevice *dev, unsigned int bitlen,
