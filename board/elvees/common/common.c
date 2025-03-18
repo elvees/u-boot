@@ -197,18 +197,13 @@ static void nand_pad_cfg(void)
 	writel(val, HSPERIPH_URB_NAND_PADCFG);
 }
 
-static void pad_set_bits(unsigned long reg, u32 field, u32 value)
+static void hsp_emac_pad_set_ctl(unsigned long reg, u32 value)
 {
 	u32 val = readl(reg);
 
-	val &= ~field;
-	val |= FIELD_PREP(field, value);
+	val &= ~HSP_URB_EMAC_PAD_CTR_CTL;
+	val |= FIELD_PREP(HSP_URB_EMAC_PAD_CTR_CTL, value);
 	writel(val, reg);
-}
-
-static void pad_set_ctl(unsigned long reg, u32 value)
-{
-	pad_set_bits(reg, LSP1_URB_GPIO1_PAD_CTR_CTL, value);
 }
 
 static void board_pads_cfg(void)
@@ -221,10 +216,10 @@ static void board_pads_cfg(void)
 		/* Set EMAC pads drive strength to 12 mA for data and 8 mA for clock.
 		 * Required for correct operation at 125 MHz 3.3V. See #MCOM03SW-823.
 		 */
-		pad_set_ctl(HSP_URB_EMAC0_TX_PADCFG, 0x3f);
-		pad_set_ctl(HSP_URB_EMAC0_TXC_PADCFG, 0xf);
-		pad_set_ctl(HSP_URB_EMAC1_TX_PADCFG, 0x3f);
-		pad_set_ctl(HSP_URB_EMAC1_TXC_PADCFG, 0xf);
+		hsp_emac_pad_set_ctl(HSP_URB_EMAC0_TX_PADCFG, 0x3f);
+		hsp_emac_pad_set_ctl(HSP_URB_EMAC0_TXC_PADCFG, 0xf);
+		hsp_emac_pad_set_ctl(HSP_URB_EMAC1_TX_PADCFG, 0x3f);
+		hsp_emac_pad_set_ctl(HSP_URB_EMAC1_TXC_PADCFG, 0xf);
 	} else if (of_machine_is_compatible("elvees,ecam03bl") ||
 		   of_machine_is_compatible("elvees,ecam03dm")) {
 		nand_pad_cfg();
@@ -301,10 +296,10 @@ static void board_pads_cfg(void)
 		/* Set EMAC pads drive strength to 12 mA for data and clock.
 		 * Required for correct operation at 25 MHz 3.3V.
 		 */
-		pad_set_ctl(HSP_URB_EMAC0_TX_PADCFG, 0x3f);
-		pad_set_ctl(HSP_URB_EMAC0_TXC_PADCFG, 0x3f);
-		pad_set_ctl(HSP_URB_EMAC1_TX_PADCFG, 0x3f);
-		pad_set_ctl(HSP_URB_EMAC1_TXC_PADCFG, 0x3f);
+		hsp_emac_pad_set_ctl(HSP_URB_EMAC0_TX_PADCFG, 0x3f);
+		hsp_emac_pad_set_ctl(HSP_URB_EMAC0_TXC_PADCFG, 0x3f);
+		hsp_emac_pad_set_ctl(HSP_URB_EMAC1_TX_PADCFG, 0x3f);
+		hsp_emac_pad_set_ctl(HSP_URB_EMAC1_TXC_PADCFG, 0x3f);
 	} else if (!of_machine_is_compatible("elvees,elvmc03q7") &&
 		   !of_machine_is_compatible("elvees,elvmc03ce") &&
 		   !of_machine_is_compatible("elvees,skifmp")) {
