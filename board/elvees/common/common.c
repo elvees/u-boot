@@ -4,6 +4,7 @@
  */
 
 #include <common.h>
+#include <bootstage.h>
 #include <display_options.h>
 #include <dm.h>
 #include <dm/of_access.h>
@@ -21,7 +22,12 @@
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
 
+#include <mcom03_sip.h>
+
 #include "mcom03-common.h"
+
+#define mcom03_bootstage_sip(id, param) \
+	mcom03_sip_smccc_smc(MCOM03_SIP_BOOTSTAGE, (id), (param), 0, 0, 0, 0, 0)
 
 #define SERVICE_PPOLICY(x)		(0x1F000000UL + (x) * 0x8)
 #define SERVICE_PSTATUS(x)		(0x1F000000UL + (x) * 0x8 + 0x4)
@@ -603,5 +609,16 @@ void board_prep_linux(struct bootm_headers *images)
 			return;
 		}
 	}
+
+	if (mcom03_bootstage_sip(MCOM03_SIP_BOOTSTAGE_SET_STAGE, BOOTSTAGE_ID_RUN_OS) < 0)
+		log_err("Failed to set 'RUN_OS' bootstage timestamp\n");
 }
 #endif
+
+int board_early_init_f(void)
+{
+	if (mcom03_bootstage_sip(MCOM03_SIP_BOOTSTAGE_SET_STAGE, BOOTSTAGE_ID_START_UBOOT_F) < 0)
+		log_err("Failed to set 'START_UBOOT_F' bootstage timestamp\n");
+
+	return 0;
+}
