@@ -1,11 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0+
-/*
- * Copyright 2023 RnD Center "ELVEES", JSC
- *
- * This DTS is common for all PM03CAM r2.0 based boards. Its 'compatible'
- * property shall contain string 'pm03cam-r2.0-ecam03common-r2.0' as it
- * is used by U-Boot to find default DTS for these boards in Linux.
- */
+// Copyright 2023 RnD Center "ELVEES", JSC
 
 /dts-v1/;
 
