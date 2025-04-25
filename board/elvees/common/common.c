@@ -489,13 +489,6 @@ static int mcom03_subsystem_init(enum subsystem_reset_lines line)
 	return 0;
 }
 
-static inline bool is_sdr_enabled(void)
-{
-	ofnode sdr_node = ofnode_path("/sdr@1900000");
-
-	return ofnode_valid(sdr_node);
-}
-
 int board_init(void)
 {
 	int ret;
@@ -511,12 +504,6 @@ int board_init(void)
 	ret = mcom03_subsystem_init(MEDIA_SUBS);
 	if (ret)
 		return ret;
-
-	if (is_sdr_enabled()) {
-		ret = mcom03_subsystem_init(SDR_SUBS);
-		if (ret)
-			return ret;
-	}
 
 	writel(DISPLAY_PARALLEL_POR_EN, MEDIA_SUBSYSTEM_CFG);
 
