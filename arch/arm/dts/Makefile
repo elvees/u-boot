@@ -1282,6 +1282,7 @@ dtb-$(CONFIG_ARCH_MCOM03) += \
 	mcom03-elvmc03ce-r2.4.0-elvcecb-r1.0.0.dtb \
 	mcom03-elvmc03ce-r2.5.0-elvcecb-r1.0.0.dtb \
 	mcom03-elvmc03ce-r2.8.1-elvcecb-r3.3.0.dtb \
+	mcom03-elvmc03ce-r2.11.0-elvcecb-r3.3.0.dtb \
 	mcom03-elvmc03q7-r1.0-elvq7cb-r1.0.0.dtb \
 	mcom03-elvmc03q7-r2.1.1-elvq7cb-r1.0.0.dtb \
 	mcom03-elvmc03q7-r2.8.1-elvq7cb-r1.0.0.dtb \
