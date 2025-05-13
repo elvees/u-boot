@@ -165,8 +165,11 @@
 #define CONFIG_LOADADDR			0x40000000
 
 #define CONFIG_PREBOOT \
+	"if test ${ddrctl_cmd} = disable; then " \
+		"ddrctl ${ddrctl_cmd} ${ddrctl_cid}; " \
+	"fi; " \
 	"if test -n \"${serial#}\"; then " \
-		"echo \"Board serial: ${serial#}\";" \
+		"echo \"Board serial: ${serial#}\"; " \
 	"fi;"
 
 #undef CONFIG_BOOTCOMMAND
