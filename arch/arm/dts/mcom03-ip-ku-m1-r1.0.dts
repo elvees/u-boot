@@ -1,0 +1,151 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright 2025 RnD Center "ELVEES", JSC
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/net/ti-dp83869.h>
+
+#include "mcom03.dtsi"
+
+/ {
+	model = "MCom-03 IP-KU M1 r1.0";
+	compatible = "elvees,ip-ku-m1-r1.0",
+		     "elvees,ip-ku-m1",
+		     "elvees,mcom03";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	sdhci0_supply: regulator@0 {
+		compatible = "regulator-fixed";
+		regulator-name = "sdhci0-supply";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+	};
+};
+
+&uart0 {
+	status = "okay";
+	clock-frequency = <27920454>;
+};
+
+&sdhci1 {
+	status = "okay";
+
+	/* Disable High Speed support
+	 * Disable 1.8V support
+	 * Disable SDR50, SDR104 and DDR50 support
+	 */
+	sdhci-caps-mask = <0x7 0x4200000>;
+	sdhci-caps = <0x0 0x0>;
+};
+
+&sdhci0 {
+	status = "okay";
+	non-removable;
+	bus-width = <8>;
+	vqmmc-supply = <&sdhci0_supply>;
+};
+
+&emac0 {
+	status = "okay";
+	// elvees,pads-1v8-en;
+	phy-mode = "rgmii-id";
+	phy-handle = <&ethernet_phy0>;
+
+	ethernet_phy0: ethernet-phy@0 {
+		reg = <0x0>;
+		ti,op-mode = <DP83869_RGMII_COPPER_ETHERNET>;
+		tx-internal-delay-ps = <2000>;
+		max-speed = <100>;
+	};
+};
+
+&emac1 {
+	status = "okay";
+	// elvees,pads-1v8-en;
+	phy-mode = "rgmii-id";
+	phy-handle = <&ethernet_phy1>;
+
+	ethernet_phy1: ethernet-phy@0 {
+		reg = <0x0>;
+		ti,op-mode = <DP83869_RGMII_COPPER_ETHERNET>;
+		tx-internal-delay-ps = <2000>;
+		max-speed = <100>;
+	};
+};
+
+&usb0 {
+	status = "okay";
+};
+
+&usb1 {
+	status = "okay";
+};
+
+&qspi0 {
+	status = "okay";
+
+	flash0: s25fl128s@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor", "spi-flash";
+		reg = <0x0>;
+		/* This is the highest frequency at which all commands are
+		 * supported by the flash device.
+		 */
+		spi-max-frequency = <50000000>;
+
+		spi-tx-bus-width = <4>;
+		spi-rx-bus-width = <4>;
+	};
+};
+
+&qspi1 {
+	status = "okay";
+
+	flash1: s25fl128s@1 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor", "spi-flash";
+		reg = <0x0>;
+		/* This is the highest frequency at which all commands are
+		 * supported by the flash device.
+		 */
+		spi-max-frequency = <50000000>;
+	};
+};
+
+&i2c0 {
+	clock-frequency = <100000>;
+	status = "okay";
+	// 0x50, 0x30 - EEPROM AT34C04 DD67 (up to 1 MHz)
+	// 0x51, 0x31 - EEPROM AT34C04 DD68 (up to 1 MHz)
+	// 0x1b - FAN TC664 DA86 (100 kHz)
+	// Connector PLD XP89
+	// Connector CAM0 (CSI0) XS15
+};
+
+&i2c1 {
+	clock-frequency = <400000>;
+	status = "okay";
+	// Si598 G5 (400 kHz)
+	// Connector PLS XP99
+};
+
+&i2c2 {
+	clock-frequency = <400000>;
+	status = "okay";
+	// Si598 G6 (400 kHz)
+	// Connector PLS XP100
+};
+
+&i2c3 {
+	clock-frequency = <400000>;
+	status = "okay";
+	// Si598 G8 (400 kHz)
+	// Connector PLS XP101
+};

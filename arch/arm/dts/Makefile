@@ -1316,6 +1316,7 @@ dtb-$(CONFIG_ARCH_MCOM03) += \
 	mcom03-haps-sdr.dtb \
 	mcom03-haps-media.dtb \
 	mcom03-haps-full.dtb \
+	mcom03-ip-ku-m1-r1.0.dtb \
 	mcom03-iqcam-r1.0.dtb \
 	mcom03-monoboard-r1.1.1.dtb \
 	mcom03-monoboard-r1.2.2.dtb \

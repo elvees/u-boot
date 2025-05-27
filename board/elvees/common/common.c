@@ -297,6 +297,14 @@ static void board_pads_cfg(void)
 		/* Setup GPIO_ZOOM, GPIO_FOCUS pins */
 		writel(0xFF, LSP1_GPIO_SWPORTC_DDR);
 		writel(0xFF, LSP1_GPIO_SWPORTC_DR);
+	} else if (of_machine_is_compatible("elvees,ip-ku-m1-r1.0")) {
+		/* Set EMAC pads drive strength to 12 mA for data and clock.
+		 * Required for correct operation at 25 MHz 3.3V.
+		 */
+		pad_set_ctl(HSP_URB_EMAC0_TX_PADCFG, 0x3f);
+		pad_set_ctl(HSP_URB_EMAC0_TXC_PADCFG, 0x3f);
+		pad_set_ctl(HSP_URB_EMAC1_TX_PADCFG, 0x3f);
+		pad_set_ctl(HSP_URB_EMAC1_TXC_PADCFG, 0x3f);
 	} else if (!of_machine_is_compatible("elvees,elvmc03q7") &&
 		   !of_machine_is_compatible("elvees,elvmc03ce") &&
 		   !of_machine_is_compatible("elvees,skifmp")) {
