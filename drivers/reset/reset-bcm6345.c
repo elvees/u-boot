@@ -9,9 +9,12 @@
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
+#include <log.h>
 #include <malloc.h>
 #include <reset-uclass.h>
 #include <asm/io.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
 
 #define MAX_RESETS	32
 
@@ -81,5 +84,5 @@ U_BOOT_DRIVER(bcm6345_reset) = {
 	.of_match = bcm6345_reset_ids,
 	.ops = &bcm6345_reset_reset_ops,
 	.probe = bcm6345_reset_probe,
-	.priv_auto_alloc_size = sizeof(struct bcm6345_reset_priv),
+	.priv_auto	= sizeof(struct bcm6345_reset_priv),
 };

@@ -6,7 +6,9 @@
 #include <common.h>
 #include <dm.h>
 #include <init.h>
+#include <log.h>
 #include <ram.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch-rockchip/sdram.h>
 #include <dm/uclass-internal.h>
@@ -36,7 +38,7 @@ struct tos_parameter_t {
 int dram_init_banksize(void)
 {
 	size_t top = min((unsigned long)(gd->ram_size + CONFIG_SYS_SDRAM_BASE),
-			 gd->ram_top);
+			 (unsigned long)(gd->ram_top));
 
 #ifdef CONFIG_ARM64
 	/* Reserve 0x200000 for ATF bl31 */
@@ -55,16 +57,14 @@ int dram_init_banksize(void)
 					- CONFIG_SYS_SDRAM_BASE;
 		gd->bd->bi_dram[1].start = tos_parameter->tee_mem.phy_addr +
 					tos_parameter->tee_mem.size;
-		gd->bd->bi_dram[1].size = gd->bd->bi_dram[0].start
-					+ top - gd->bd->bi_dram[1].start;
+		gd->bd->bi_dram[1].size = top - gd->bd->bi_dram[1].start;
 	} else {
 		gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
 		gd->bd->bi_dram[0].size = 0x8400000;
 		/* Reserve 32M for OPTEE with TA */
 		gd->bd->bi_dram[1].start = CONFIG_SYS_SDRAM_BASE
 					+ gd->bd->bi_dram[0].size + 0x2000000;
-		gd->bd->bi_dram[1].size = gd->bd->bi_dram[0].start
-					+ top - gd->bd->bi_dram[1].start;
+		gd->bd->bi_dram[1].size = top - gd->bd->bi_dram[1].start;
 	}
 #else
 	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;

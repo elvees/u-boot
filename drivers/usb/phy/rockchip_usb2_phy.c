@@ -5,7 +5,11 @@
 
 #include <common.h>
 #include <hang.h>
+#include <log.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
 
 #include "../gadget/dwc2_udc_otg_priv.h"
 

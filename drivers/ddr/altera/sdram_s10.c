@@ -12,8 +12,10 @@
 #include <fdtdec.h>
 #include <hang.h>
 #include <init.h>
+#include <log.h>
 #include <ram.h>
 #include <reset.h>
+#include <asm/global_data.h>
 #include "sdram_s10.h"
 #include <wait_bit.h>
 #include <asm/arch/firewall.h>
@@ -69,13 +71,13 @@ int match_ddr_conf(u32 ddr_conf)
  */
 int sdram_mmr_init_full(struct udevice *dev)
 {
-	struct altera_sdram_platdata *plat = dev->platdata;
+	struct altera_sdram_plat *plat = dev_get_plat(dev);
 	struct altera_sdram_priv *priv = dev_get_priv(dev);
 	u32 update_value, io48_value, ddrioctl;
 	u32 i;
 	int ret;
 	phys_size_t hw_size;
-	bd_t bd = {0};
+	struct bd_info bd = {0};
 
 	/* Enable access to DDR from CPU master */
 	clrbits_le32(CCU_REG_ADDR(CCU_CPU0_MPRT_ADBASE_DDRREG),

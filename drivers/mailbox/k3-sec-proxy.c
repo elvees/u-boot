@@ -7,7 +7,9 @@
  */
 
 #include <common.h>
+#include <log.h>
 #include <malloc.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <dm/device_compat.h>
 #include <linux/types.h>
@@ -211,14 +213,16 @@ static int k3_sec_proxy_send(struct mbox_chan *chan, const void *data)
 
 	ret = k3_sec_proxy_verify_thread(spt, THREAD_IS_TX);
 	if (ret) {
-		dev_err(dev, "%s: Thread%d verification failed. ret = %d\n",
+		dev_err(chan->dev,
+			"%s: Thread%d verification failed. ret = %d\n",
 			__func__, spt->id, ret);
 		return ret;
 	}
 
 	/* Check the message size. */
 	if (msg->len > spm->desc->max_msg_size) {
-		printf("%s: Thread %ld message length %zu > max msg size %d\n",
+		dev_err(chan->dev,
+			"%s: Thread %ld message length %zu > max msg size %d\n",
 		       __func__, chan->id, msg->len, spm->desc->max_msg_size);
 		return -EINVAL;
 	}
@@ -435,6 +439,6 @@ U_BOOT_DRIVER(k3_sec_proxy) = {
 	.of_match = k3_sec_proxy_ids,
 	.probe = k3_sec_proxy_probe,
 	.remove = k3_sec_proxy_remove,
-	.priv_auto_alloc_size = sizeof(struct k3_sec_proxy_mbox),
+	.priv_auto	= sizeof(struct k3_sec_proxy_mbox),
 	.ops = &k3_sec_proxy_mbox_ops,
 };

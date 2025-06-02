@@ -7,6 +7,7 @@
 #ifndef _ENETC_H
 #define _ENETC_H
 
+#include <linux/bitops.h>
 #define enetc_dbg(dev, fmt, args...)	debug("%s:" fmt, dev->name, ##args)
 
 /* PCI function IDs */
@@ -199,6 +200,11 @@ struct enetc_priv {
 
 /* PCS replicator block for USXGMII */
 #define ENETC_PCS_DEVAD_REPL		0x1f
+
+#define ENETC_PCS_REPL_LINK_TIMER_1	0x12
+#define  ENETC_PCS_REPL_LINK_TIMER_1_DEF	0x0003
+#define ENETC_PCS_REPL_LINK_TIMER_2	0x13
+#define  ENETC_PCS_REPL_LINK_TIMER_2_DEF	0x06a0
 
 /* ENETC external MDIO registers */
 #define ENETC_MDIO_BASE		0x1c00

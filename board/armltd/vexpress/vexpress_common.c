@@ -16,11 +16,14 @@
  * Philippe Robin, <philippe.robin@arm.com>
  */
 #include <common.h>
+#include <bootstage.h>
 #include <cpu_func.h>
 #include <init.h>
 #include <malloc.h>
 #include <errno.h>
+#include <net.h>
 #include <netdev.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/mach-types.h>
 #include <asm/arch/systimer.h>
@@ -53,7 +56,6 @@ int board_init(void)
 {
 	gd->bd->bi_boot_params = LINUX_BOOT_PARAM_ADDR;
 	gd->bd->bi_arch_number = MACH_TYPE_VEXPRESS;
-	gd->flags = 0;
 
 	icache_enable();
 	flash__init();
@@ -62,7 +64,7 @@ int board_init(void)
 	return 0;
 }
 
-int board_eth_init(bd_t *bis)
+int board_eth_init(struct bd_info *bis)
 {
 	int rc = 0;
 #ifdef CONFIG_SMC911X
@@ -71,7 +73,7 @@ int board_eth_init(bd_t *bis)
 	return rc;
 }
 
-int cpu_mmc_init(bd_t *bis)
+int cpu_mmc_init(struct bd_info *bis)
 {
 	int rc = 0;
 	(void) bis;

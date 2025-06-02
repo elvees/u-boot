@@ -27,6 +27,8 @@ config BOOTCOUNT_GENERIC
 
 config BOOTCOUNT_EXT
 	bool "Boot counter on EXT filesystem"
+	depends on FS_EXT4
+	select EXT4_WRITE
 	help
 	  Add support for maintaining boot count in a file on an EXT
 	  filesystem.
@@ -105,6 +107,23 @@ config DM_BOOTCOUNT_I2C_EEPROM
 	  'u-boot,bootcount-i2c-eeprom' and the 'i2c-eeprom'-property (a phandle
 	  pointing to the underlying i2c eeprom device) and an optional 'offset'
 	  property are supported.
+
+config DM_BOOTCOUNT_SPI_FLASH
+	bool "Support SPI flash devices as a backing store for bootcount"
+	depends on DM_SPI_FLASH
+	help
+	  Enabled reading/writing the bootcount in a DM SPI flash device.
+	  The wrapper device is to be specified with the compatible string
+	  'u-boot,bootcount-spi-flash' and the 'spi-flash'-property (a phandle
+	  pointing to the underlying SPI flash device) and an optional 'offset'
+	  property are supported.
+
+config BOOTCOUNT_MEM
+	bool "Support memory based bootcounter"
+	help
+	  Enabling Memory based bootcount, typically in a SoC register which
+	  is not cleared on softreset.
+	  compatible = "u-boot,bootcount";
 
 endmenu
 

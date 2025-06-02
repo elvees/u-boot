@@ -16,9 +16,6 @@
 #define CONFIG_SYS_BAUDRATE_TABLE  \
 	{300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400}
 
-/* Allow to overwrite serial and ethaddr */
-#define CONFIG_ENV_OVERWRITE
-
 /* Boot configuration */
 #define CONFIG_SYS_LOAD_ADDR		0 /* default? */
 
@@ -36,10 +33,5 @@
 #define CONFIG_SYS_BOOTM_LEN	(60 * 1024 * 1024)
 
 #define CONFIG_SKIP_LOWLEVEL_INIT
-
-/* 0x0 - 0x40 is used for placing exception vectors */
-#define CONFIG_SYS_MEMTEST_START	0x40
-#define CONFIG_SYS_MEMTEST_END		0x100
-#define CONFIG_SYS_MEMTEST_SCRATCH	0
 
 #endif /* __CONFIG_ZYNQ_ZYNQMP_R5_H */

@@ -7,8 +7,10 @@
  */
 
 #include <common.h>
+#include <log.h>
 #include <malloc.h>
 #include <asm/io.h>
+#include <linux/delay.h>
 #include <linux/errno.h>
 #include <nand.h>
 #include <linux/ioport.h>
@@ -845,7 +847,7 @@ static void zynq_nand_cmd_function(struct mtd_info *mtd, unsigned int command,
 	if (curr_cmd->end_cmd_valid == ZYNQ_NAND_CMD_PHASE)
 		end_cmd_valid = 1;
 
-	if (curr_cmd->end_cmd == NAND_CMD_NONE)
+	if (curr_cmd->end_cmd == (u8)NAND_CMD_NONE)
 		end_cmd = 0x0;
 	else
 		end_cmd = curr_cmd->end_cmd;
@@ -1081,18 +1083,23 @@ static int zynq_nand_probe(struct udevice *dev)
 	u8 set_feature[4] = {ONDIE_ECC_FEATURE_ENABLE, 0x00, 0x00, 0x00};
 	unsigned long ecc_cfg;
 	int ondie_ecc_enabled = 0;
-	int err = -1;
 	int is_16bit_bw;
 
 	smc->reg = (struct zynq_nand_smc_regs *)dev_read_addr(dev);
 	of_nand = dev_read_subnode(dev, "flash@e1000000");
 	if (!ofnode_valid(of_nand)) {
 		printf("Failed to find nand node in dt\n");
-		goto fail;
+		return -ENODEV;
 	}
+
+	if (!ofnode_is_available(of_nand)) {
+		debug("Nand node in dt disabled\n");
+		return dm_scan_fdt_dev(dev);
+	}
+
 	if (ofnode_read_resource(of_nand, 0, &res)) {
 		printf("Failed to get nand resource\n");
-		goto fail;
+		return -ENODEV;
 	}
 
 	xnand->nand_base = (void __iomem *)res.start;
@@ -1119,7 +1126,7 @@ static int zynq_nand_probe(struct udevice *dev)
 	if (is_16bit_bw == NAND_BW_UNKNOWN) {
 		printf("%s: Unable detect NAND based on MIO settings\n",
 		       __func__);
-		goto fail;
+		return -EINVAL;
 	}
 
 	if (is_16bit_bw == NAND_BW_16BIT)
@@ -1130,13 +1137,13 @@ static int zynq_nand_probe(struct udevice *dev)
 	/* Initialize the NAND flash interface on NAND controller */
 	if (zynq_nand_init_nand_flash(mtd, nand_chip->options) < 0) {
 		printf("%s: nand flash init failed\n", __func__);
-		goto fail;
+		return -EINVAL;
 	}
 
 	/* first scan to find the device and get the page size */
 	if (nand_scan_ident(mtd, 1, NULL)) {
 		printf("%s: nand_scan_ident failed\n", __func__);
-		goto fail;
+		return -EINVAL;
 	}
 	/* Send the command for reading device ID */
 	nand_chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
@@ -1199,12 +1206,10 @@ static int zynq_nand_probe(struct udevice *dev)
 		nand_chip->options |= NAND_SUBPAGE_READ;
 
 		/* On-Die ECC spare bytes offset 8 is used for ECC codes */
-		if (ondie_ecc_enabled) {
-			nand_chip->ecc.layout = &ondie_nand_oob_64;
-			/* Use the BBT pattern descriptors */
-			nand_chip->bbt_td = &bbt_main_descr;
-			nand_chip->bbt_md = &bbt_mirror_descr;
-		}
+		nand_chip->ecc.layout = &ondie_nand_oob_64;
+		/* Use the BBT pattern descriptors */
+		nand_chip->bbt_td = &bbt_main_descr;
+		nand_chip->bbt_md = &bbt_mirror_descr;
 	} else {
 		/* Hardware ECC generates 3 bytes ECC code for each 512 bytes */
 		nand_chip->ecc.mode = NAND_ECC_HW;
@@ -1261,14 +1266,12 @@ static int zynq_nand_probe(struct udevice *dev)
 	/* Second phase scan */
 	if (nand_scan_tail(mtd)) {
 		printf("%s: nand_scan_tail failed\n", __func__);
-		goto fail;
+		return -EINVAL;
 	}
 	if (nand_register(0, mtd))
-		goto fail;
+		return -EINVAL;
+
 	return 0;
-fail:
-	free(xnand);
-	return err;
 }
 
 static const struct udevice_id zynq_nand_dt_ids[] = {
@@ -1277,11 +1280,11 @@ static const struct udevice_id zynq_nand_dt_ids[] = {
 };
 
 U_BOOT_DRIVER(zynq_nand) = {
-	.name = "zynq-nand",
+	.name = "zynq_nand",
 	.id = UCLASS_MTD,
 	.of_match = zynq_nand_dt_ids,
 	.probe = zynq_nand_probe,
-	.priv_auto_alloc_size = sizeof(struct zynq_nand_info),
+	.priv_auto	= sizeof(struct zynq_nand_info),
 };
 
 void board_nand_init(void)
@@ -1290,7 +1293,7 @@ void board_nand_init(void)
 	int ret;
 
 	ret = uclass_get_device_by_driver(UCLASS_MTD,
-					  DM_GET_DRIVER(zynq_nand), &dev);
+					  DM_DRIVER_GET(zynq_nand), &dev);
 	if (ret && ret != -ENODEV)
 		pr_err("Failed to initialize %s. (error %d)\n", dev->name, ret);
 }

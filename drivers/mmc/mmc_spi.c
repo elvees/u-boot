@@ -8,10 +8,12 @@
  */
 #include <common.h>
 #include <errno.h>
+#include <log.h>
 #include <malloc.h>
 #include <part.h>
 #include <mmc.h>
 #include <stdlib.h>
+#include <linux/bitops.h>
 #include <u-boot/crc.h>
 #include <linux/crc7.h>
 #include <asm/byteorder.h>
@@ -35,7 +37,8 @@
 #define SPI_RESPONSE_CRC_ERR		((5 << 1)|1)
 #define SPI_RESPONSE_WRITE_ERR		((6 << 1)|1)
 
-/* Read and write blocks start with these tokens and end with crc;
+/*
+ * Read and write blocks start with these tokens and end with crc;
  * on error, read tokens act like a subset of R2_SPI_* values.
  */
 /* single block write multiblock read */
@@ -57,6 +60,7 @@
 #define CMD_TIMEOUT			8
 #define READ_TIMEOUT			3000000 /* 1 sec */
 #define WRITE_TIMEOUT			3000000 /* 1 sec */
+#define R1B_TIMEOUT			3000000 /* 1 sec */
 
 struct mmc_spi_plat {
 	struct mmc_config cfg;
@@ -67,13 +71,30 @@ struct mmc_spi_priv {
 	struct spi_slave *spi;
 };
 
+/**
+ * mmc_spi_sendcmd() - send a command to the SD card
+ *
+ * @dev:	mmc_spi device
+ * @cmdidx:	command index
+ * @cmdarg:	command argument
+ * @resp_type:	card response type
+ * @resp:	buffer to store the card response
+ * @resp_size:	size of the card response
+ * @resp_match:	if true, compare each of received bytes with @resp_match_value
+ * @resp_match_value:	a value to be compared with each of received bytes
+ * @r1b:	if true, receive additional bytes for busy signal token
+ * @return 0 if OK, -ETIMEDOUT if no card response is received, -ve on error
+ */
 static int mmc_spi_sendcmd(struct udevice *dev,
 			   ushort cmdidx, u32 cmdarg, u32 resp_type,
 			   u8 *resp, u32 resp_size,
-			   bool resp_match, u8 resp_match_value)
+			   bool resp_match, u8 resp_match_value, bool r1b)
 {
 	int i, rpos = 0, ret = 0;
 	u8 cmdo[7], r;
+
+	if (!resp || !resp_size)
+		return 0;
 
 	debug("%s: cmd%d cmdarg=0x%x resp_type=0x%x "
 	      "resp_size=%d resp_match=%d resp_match_value=0x%x\n",
@@ -95,32 +116,33 @@ static int mmc_spi_sendcmd(struct udevice *dev,
 	if (ret)
 		return ret;
 
-	if (!resp || !resp_size)
-		return 0;
-
 	debug("%s: cmd%d", __func__, cmdidx);
 
-	if (resp_match) {
+	if (resp_match)
 		r = ~resp_match_value;
-		i = CMD_TIMEOUT;
-		while (i--) {
-			ret = dm_spi_xfer(dev, 1 * 8, NULL, &r, 0);
-			if (ret)
-				return ret;
-			debug(" resp%d=0x%x", rpos, r);
-			rpos++;
+	i = CMD_TIMEOUT;
+	while (i) {
+		ret = dm_spi_xfer(dev, 1 * 8, NULL, &r, 0);
+		if (ret)
+			return ret;
+		debug(" resp%d=0x%x", rpos, r);
+		rpos++;
+		i--;
+
+		if (resp_match) {
 			if (r == resp_match_value)
 				break;
+		} else {
+			if (!(r & 0x80))
+				break;
 		}
-		if (!i && (r != resp_match_value))
+
+		if (!i)
 			return -ETIMEDOUT;
 	}
 
-	for (i = 0; i < resp_size; i++) {
-		if (i == 0 && resp_match) {
-			resp[i] = resp_match_value;
-			continue;
-		}
+	resp[0] = r;
+	for (i = 1; i < resp_size; i++) {
 		ret = dm_spi_xfer(dev, 1 * 8, NULL, &r, 0);
 		if (ret)
 			return ret;
@@ -129,11 +151,38 @@ static int mmc_spi_sendcmd(struct udevice *dev,
 		resp[i] = r;
 	}
 
+	if (r1b == true) {
+		i = R1B_TIMEOUT;
+		while (i) {
+			ret = dm_spi_xfer(dev, 1 * 8, NULL, &r, 0);
+			if (ret)
+				return ret;
+
+			debug(" resp%d=0x%x", rpos, r);
+			rpos++;
+			i--;
+
+			if (r)
+				break;
+		}
+		if (!i)
+			return -ETIMEDOUT;
+	}
+
 	debug("\n");
 
 	return 0;
 }
 
+/**
+ * mmc_spi_readdata() - read data block(s) from the SD card
+ *
+ * @dev:	mmc_spi device
+ * @xbuf:	buffer of the actual data (excluding token and crc) to read
+ * @bcnt:	number of data blocks to transfer
+ * @bsize:	size of the actual data (excluding token and crc) in bytes
+ * @return 0 if OK, -ECOMM if crc error, -ETIMEDOUT on other errors
+ */
 static int mmc_spi_readdata(struct udevice *dev,
 			    void *xbuf, u32 bcnt, u32 bsize)
 {
@@ -158,8 +207,10 @@ static int mmc_spi_readdata(struct udevice *dev,
 			if (ret)
 				return ret;
 #ifdef CONFIG_MMC_SPI_CRC_ON
-			if (be16_to_cpu(crc16_ccitt(0, buf, bsize)) != crc) {
-				debug("%s: data crc error\n", __func__);
+			u16 crc_ok = be16_to_cpu(crc16_ccitt(0, buf, bsize));
+			if (crc_ok != crc) {
+				debug("%s: data crc error, expected %04x got %04x\n",
+				      __func__, crc_ok, crc);
 				r1 = R1_SPI_COM_CRC;
 				break;
 			}
@@ -180,6 +231,16 @@ static int mmc_spi_readdata(struct udevice *dev,
 	return ret;
 }
 
+/**
+ * mmc_spi_writedata() - write data block(s) to the SD card
+ *
+ * @dev:	mmc_spi device
+ * @xbuf:	buffer of the actual data (excluding token and crc) to write
+ * @bcnt:	number of data blocks to transfer
+ * @bsize:	size of actual data (excluding token and crc) in bytes
+ * @multi:	indicate a transfer by multiple block write command (CMD25)
+ * @return 0 if OK, -ECOMM if crc error, -ETIMEDOUT on other errors
+ */
 static int mmc_spi_writedata(struct udevice *dev, const void *xbuf,
 			     u32 bcnt, u32 bsize, int multi)
 {
@@ -261,8 +322,8 @@ static int dm_mmc_spi_request(struct udevice *dev, struct mmc_cmd *cmd,
 	int i, multi, ret = 0;
 	u8 *resp = NULL;
 	u32 resp_size = 0;
-	bool resp_match = false;
-	u8 resp8 = 0, resp40[5] = { 0 }, resp_match_value = 0;
+	bool resp_match = false, r1b = false;
+	u8 resp8 = 0, resp16[2] = { 0 }, resp40[5] = { 0 }, resp_match_value = 0;
 
 	dm_spi_claim_bus(dev);
 
@@ -287,13 +348,21 @@ static int dm_mmc_spi_request(struct udevice *dev, struct mmc_cmd *cmd,
 		resp_size = sizeof(resp40);
 		break;
 	case MMC_CMD_SEND_STATUS:
+		resp = (u8 *)&resp16[0];
+		resp_size = sizeof(resp16);
+		break;
 	case MMC_CMD_SET_BLOCKLEN:
 	case MMC_CMD_SPI_CRC_ON_OFF:
-	case MMC_CMD_STOP_TRANSMISSION:
 		resp = &resp8;
 		resp_size = sizeof(resp8);
 		resp_match = true;
 		resp_match_value = 0x0;
+		break;
+	case MMC_CMD_STOP_TRANSMISSION:
+	case MMC_CMD_ERASE:
+		resp = &resp8;
+		resp_size = sizeof(resp8);
+		r1b = true;
 		break;
 	case MMC_CMD_SEND_CSD:
 	case MMC_CMD_SEND_CID:
@@ -301,6 +370,11 @@ static int dm_mmc_spi_request(struct udevice *dev, struct mmc_cmd *cmd,
 	case MMC_CMD_READ_MULTIPLE_BLOCK:
 	case MMC_CMD_WRITE_SINGLE_BLOCK:
 	case MMC_CMD_WRITE_MULTIPLE_BLOCK:
+	case MMC_CMD_APP_CMD:
+	case SD_CMD_ERASE_WR_BLK_START:
+	case SD_CMD_ERASE_WR_BLK_END:
+		resp = &resp8;
+		resp_size = sizeof(resp8);
 		break;
 	default:
 		resp = &resp8;
@@ -311,7 +385,7 @@ static int dm_mmc_spi_request(struct udevice *dev, struct mmc_cmd *cmd,
 	};
 
 	ret = mmc_spi_sendcmd(dev, cmd->cmdidx, cmd->cmdarg, cmd->resp_type,
-			      resp, resp_size, resp_match, resp_match_value);
+			      resp, resp_size, resp_match, resp_match_value, r1b);
 	if (ret)
 		goto done;
 
@@ -328,8 +402,10 @@ static int dm_mmc_spi_request(struct udevice *dev, struct mmc_cmd *cmd,
 		cmd->response[0] |= (uint)resp40[1] << 24;
 		break;
 	case MMC_CMD_SEND_STATUS:
-		cmd->response[0] = (resp8 & 0xff) ?
-			MMC_STATUS_ERROR : MMC_STATUS_RDY_FOR_DATA;
+		if (resp16[0] || resp16[1])
+			cmd->response[0] = MMC_STATUS_ERROR;
+		else
+			cmd->response[0] = MMC_STATUS_RDY_FOR_DATA;
 		break;
 	case MMC_CMD_SEND_CID:
 	case MMC_CMD_SEND_CSD:
@@ -373,14 +449,13 @@ done:
 static int mmc_spi_probe(struct udevice *dev)
 {
 	struct mmc_spi_priv *priv = dev_get_priv(dev);
-	struct mmc_spi_plat *plat = dev_get_platdata(dev);
+	struct mmc_spi_plat *plat = dev_get_plat(dev);
 	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(dev);
 	char *name;
 
 	priv->spi = dev_get_parent_priv(dev);
 	if (!priv->spi->max_hz)
 		priv->spi->max_hz = MMC_SPI_MAX_CLOCK;
-	priv->spi->speed = 0;
 	priv->spi->mode = SPI_MODE_0;
 	priv->spi->wordlen = 8;
 
@@ -408,7 +483,7 @@ static int mmc_spi_probe(struct udevice *dev)
 
 static int mmc_spi_bind(struct udevice *dev)
 {
-	struct mmc_spi_plat *plat = dev_get_platdata(dev);
+	struct mmc_spi_plat *plat = dev_get_plat(dev);
 
 	return mmc_bind(dev, &plat->mmc, &plat->cfg);
 }
@@ -430,6 +505,6 @@ U_BOOT_DRIVER(mmc_spi) = {
 	.ops = &mmc_spi_ops,
 	.probe = mmc_spi_probe,
 	.bind = mmc_spi_bind,
-	.platdata_auto_alloc_size = sizeof(struct mmc_spi_plat),
-	.priv_auto_alloc_size = sizeof(struct mmc_spi_priv),
+	.plat_auto	= sizeof(struct mmc_spi_plat),
+	.priv_auto	= sizeof(struct mmc_spi_priv),
 };

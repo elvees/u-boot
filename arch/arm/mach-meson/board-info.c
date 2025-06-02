@@ -5,11 +5,14 @@
  */
 
 #include <common.h>
+#include <init.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <dm.h>
 #include <linux/bitfield.h>
 #include <regmap.h>
 #include <syscon.h>
+#include <linux/bitops.h>
 #include <linux/err.h>
 
 #define AO_SEC_SD_CFG8		0xe0
@@ -36,6 +39,7 @@ static const struct meson_gx_soc_id {
 	{ "G12A",   0x28 },
 	{ "G12B",   0x29 },
 	{ "SM1",    0x2b },
+	{ "A1",	    0x2c },
 };
 
 static const struct meson_gx_package_id {
@@ -63,7 +67,11 @@ static const struct meson_gx_package_id {
 	{ "S905X2", 0x28, 0x40, 0xf0 },
 	{ "A311D",  0x29, 0x10, 0xf0 },
 	{ "S922X",  0x29, 0x40, 0xf0 },
-	{ "S905X3", 0x2b, 0x5, 0xf },
+	{ "S905D3", 0x2b, 0x4, 0xf5 },
+	{ "S905X3", 0x2b, 0x5, 0xf5 },
+	{ "S905X3", 0x2b, 0x10, 0x3f },
+	{ "S905D3", 0x2b, 0x30, 0x3f },
+	{ "A113L", 0x2c, 0x0, 0xf8 },
 };
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -124,7 +132,7 @@ static void print_board_model(void)
 	printf("Model: %s\n", model ? model : "Unknown");
 }
 
-int show_board_info(void)
+static unsigned int get_socinfo(void)
 {
 	struct regmap *regmap;
 	int nodeoffset, ret;
@@ -156,8 +164,20 @@ int show_board_info(void)
 		return 0;
 	}
 
+	return socinfo;
+}
+
+int show_board_info(void)
+{
+	unsigned int socinfo;
+
 	/* print board information */
 	print_board_model();
+
+	socinfo = get_socinfo();
+	if (!socinfo)
+		return 0;
+
 	printf("SoC:   Amlogic Meson %s (%s) Revision %x:%x (%x:%x)\n",
 	       socinfo_to_soc_id(socinfo),
 	       socinfo_to_package_id(socinfo),
@@ -167,4 +187,16 @@ int show_board_info(void)
 	       socinfo_to_misc(socinfo));
 
 	return 0;
+}
+
+int meson_get_soc_rev(char *buff, size_t buff_len)
+{
+	unsigned int socinfo;
+
+	socinfo = get_socinfo();
+	if (!socinfo)
+		return -1;
+
+	/* Write SoC info */
+	return snprintf(buff, buff_len, "%x", socinfo_to_minor(socinfo));
 }

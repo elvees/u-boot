@@ -6,13 +6,16 @@
  */
 #include <common.h>
 #include <backlight.h>
+#include <command.h>
 #include <display.h>
 #include <dm.h>
+#include <log.h>
 #include <dm/read.h>
 #include <dm/uclass-internal.h>
 #include <errno.h>
 #include <spi.h>
 #include <asm/gpio.h>
+#include <linux/delay.h>
 
 #define PWR_ON_DELAY_MSECS  120
 
@@ -208,15 +211,15 @@ static int lg4573_spi_startup(struct spi_slave *slave)
 	return 0;
 }
 
-static int do_lgset(cmd_tbl_t *cmdtp, int flag, int argc,
-		       char * const argv[])
+static int do_lgset(struct cmd_tbl *cmdtp, int flag, int argc,
+		    char *const argv[])
 {
 	struct spi_slave *slave;
 	struct udevice *dev;
 	int ret;
 
 	ret = uclass_get_device_by_driver(UCLASS_DISPLAY,
-					  DM_GET_DRIVER(lg4573_lcd), &dev);
+					  DM_DRIVER_GET(lg4573_lcd), &dev);
 	if (ret) {
 		printf("%s: Could not get lg4573 device\n", __func__);
 		return ret;
@@ -291,7 +294,7 @@ static const struct dm_display_ops lg4573_lcd_ops = {
 	.enable = lg4573_lcd_enable,
 };
 
-static int lg4573_ofdata_to_platdata(struct udevice *dev)
+static int lg4573_of_to_plat(struct udevice *dev)
 {
 	struct lg4573_lcd_priv *priv = dev_get_priv(dev);
 	int ret;
@@ -320,9 +323,9 @@ U_BOOT_DRIVER(lg4573_lcd) = {
 	.name   = "lg4573",
 	.id     = UCLASS_DISPLAY,
 	.ops    = &lg4573_lcd_ops,
-	.ofdata_to_platdata	= lg4573_ofdata_to_platdata,
+	.of_to_plat	= lg4573_of_to_plat,
 	.of_match = lg4573_ids,
 	.bind   = lg4573_bind,
 	.probe  = lg4573_probe,
-	.priv_auto_alloc_size = sizeof(struct lg4573_lcd_priv),
+	.priv_auto	= sizeof(struct lg4573_lcd_priv),
 };

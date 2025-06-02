@@ -4,16 +4,21 @@
  */
 
 #include <common.h>
+#include <fdt_support.h>
+#include <init.h>
+#include <log.h>
 #include <spl.h>
 #include <spl_gpio.h>
 #include <syscon.h>
 #include <asm/armv8/mmu.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch-rockchip/bootrom.h>
 #include <asm/arch-rockchip/clock.h>
 #include <asm/arch-rockchip/gpio.h>
 #include <asm/arch-rockchip/grf_rk3399.h>
 #include <asm/arch-rockchip/hardware.h>
+#include <linux/bitops.h>
 #include <power/regulator.h>
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -24,7 +29,7 @@ DECLARE_GLOBAL_DATA_PTR;
 const char * const boot_devices[BROM_LAST_BOOTSOURCE + 1] = {
 	[BROM_BOOTSOURCE_EMMC] = "/sdhci@fe330000",
 	[BROM_BOOTSOURCE_SPINOR] = "/spi@ff1d0000",
-	[BROM_BOOTSOURCE_SD] = "/dwmmc@fe320000",
+	[BROM_BOOTSOURCE_SD] = "/mmc@fe320000",
 };
 
 static struct mm_region rk3399_mem_map[] = {
@@ -172,7 +177,7 @@ const char *spl_decode_boot_device(u32 boot_device)
 		u32 boot_device;
 		const char *ofpath;
 	} spl_boot_devices_tbl[] = {
-		{ BOOT_DEVICE_MMC1, "/dwmmc@fe320000" },
+		{ BOOT_DEVICE_MMC1, "/mmc@fe320000" },
 		{ BOOT_DEVICE_MMC2, "/sdhci@fe330000" },
 		{ BOOT_DEVICE_SPI, "/spi@ff1d0000" },
 	};
@@ -237,8 +242,14 @@ static void rk3399_force_power_on_reset(void)
 }
 #endif
 
+void __weak led_setup(void)
+{
+}
+
 void spl_board_init(void)
 {
+	led_setup();
+
 #if defined(SPL_GPIO_SUPPORT)
 	struct rockchip_cru *cru = rockchip_get_cru();
 

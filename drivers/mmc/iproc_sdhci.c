@@ -9,6 +9,11 @@
 #include <errno.h>
 #include <malloc.h>
 #include <sdhci.h>
+#include <asm/global_data.h>
+#include "mmc_private.h"
+#include <linux/delay.h>
+
+#define MAX_TUNING_LOOP	40
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -136,17 +141,91 @@ static void sdhci_iproc_writeb(struct sdhci_host *host, u8 val, int reg)
 }
 #endif
 
-static void sdhci_iproc_set_ios_post(struct sdhci_host *host)
+static int sdhci_iproc_set_ios_post(struct sdhci_host *host)
 {
-	u32 ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+	struct mmc *mmc = (struct mmc *)host->mmc;
+	u32 ctrl;
 
-	/* Reset UHS mode bits */
-	ctrl &= ~SDHCI_CTRL_UHS_MASK;
+	if (mmc->signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
+		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+		ctrl |= SDHCI_CTRL_VDD_180;
+		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+	}
 
-	if (host->mmc->ddr_mode)
-		ctrl |= UHS_DDR50_BUS_SPEED;
+	sdhci_set_uhs_timing(host);
+	return 0;
+}
 
+static void sdhci_start_tuning(struct sdhci_host *host)
+{
+	u32 ctrl;
+
+	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+	ctrl |= SDHCI_CTRL_EXEC_TUNING;
 	sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+
+	sdhci_writel(host, SDHCI_INT_DATA_AVAIL, SDHCI_INT_ENABLE);
+	sdhci_writel(host, SDHCI_INT_DATA_AVAIL, SDHCI_SIGNAL_ENABLE);
+}
+
+static void sdhci_end_tuning(struct sdhci_host *host)
+{
+	/* Enable only interrupts served by the SD controller */
+	sdhci_writel(host, SDHCI_INT_DATA_MASK | SDHCI_INT_CMD_MASK,
+		     SDHCI_INT_ENABLE);
+	/* Mask all sdhci interrupt sources */
+	sdhci_writel(host, 0x0, SDHCI_SIGNAL_ENABLE);
+}
+
+static int sdhci_iproc_execute_tuning(struct mmc *mmc, u8 opcode)
+{
+	struct mmc_cmd cmd;
+	u32 ctrl;
+	u32 blocksize = SDHCI_MAKE_BLKSZ(SDHCI_DEFAULT_BOUNDARY_ARG, 64);
+	struct sdhci_host *host = dev_get_priv(mmc->dev);
+	char tuning_loop_counter = MAX_TUNING_LOOP;
+	int ret = 0;
+
+	sdhci_start_tuning(host);
+
+	cmd.cmdidx = opcode;
+	cmd.resp_type = MMC_RSP_R1;
+	cmd.cmdarg = 0;
+
+	if (opcode == MMC_CMD_SEND_TUNING_BLOCK_HS200 && mmc->bus_width == 8)
+		blocksize = SDHCI_MAKE_BLKSZ(SDHCI_DEFAULT_BOUNDARY_ARG, 128);
+
+	sdhci_writew(host, blocksize, SDHCI_BLOCK_SIZE);
+	sdhci_writew(host, 1, SDHCI_BLOCK_COUNT);
+	sdhci_writew(host, SDHCI_TRNS_READ, SDHCI_TRANSFER_MODE);
+
+	do {
+		mmc_send_cmd(mmc, &cmd, NULL);
+		if (opcode == MMC_CMD_SEND_TUNING_BLOCK)
+			/*
+			 * For tuning command, do not do busy loop. As tuning
+			 * is happening (CLK-DATA latching for setup/hold time
+			 * requirements), give time to complete
+			 */
+			udelay(1);
+
+		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+
+		if (tuning_loop_counter-- == 0)
+			break;
+
+	} while (ctrl & SDHCI_CTRL_EXEC_TUNING);
+
+	if (tuning_loop_counter < 0 || (!(ctrl & SDHCI_CTRL_TUNED_CLK))) {
+		ctrl &= ~(SDHCI_CTRL_TUNED_CLK | SDHCI_CTRL_EXEC_TUNING);
+		sdhci_writel(host, ctrl, SDHCI_HOST_CONTROL2);
+		printf("%s:Tuning failed, opcode = 0x%02x\n", __func__, opcode);
+		ret = -EIO;
+	}
+
+	sdhci_end_tuning(host);
+
+	return ret;
 }
 
 static struct sdhci_ops sdhci_platform_ops = {
@@ -159,6 +238,7 @@ static struct sdhci_ops sdhci_platform_ops = {
 	.write_b = sdhci_iproc_writeb,
 #endif
 	.set_ios_post = sdhci_iproc_set_ios_post,
+	.platform_execute_tuning = sdhci_iproc_execute_tuning,
 };
 
 struct iproc_sdhci_plat {
@@ -169,15 +249,14 @@ struct iproc_sdhci_plat {
 static int iproc_sdhci_probe(struct udevice *dev)
 {
 	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(dev);
-	struct iproc_sdhci_plat *plat = dev_get_platdata(dev);
+	struct iproc_sdhci_plat *plat = dev_get_plat(dev);
 	struct sdhci_host *host = dev_get_priv(dev);
 	struct sdhci_iproc_host *iproc_host;
 	int node = dev_of_offset(dev);
 	u32 f_min_max[2];
 	int ret;
 
-	iproc_host = (struct sdhci_iproc_host *)
-			malloc(sizeof(struct sdhci_iproc_host));
+	iproc_host = malloc(sizeof(struct sdhci_iproc_host));
 	if (!iproc_host) {
 		printf("%s: sdhci host malloc fail!\n", __func__);
 		return -ENOMEM;
@@ -186,10 +265,8 @@ static int iproc_sdhci_probe(struct udevice *dev)
 	iproc_host->shadow_blk = 0;
 
 	host->name = dev->name;
-	host->ioaddr = (void *)devfdt_get_addr(dev);
-	host->voltages = MMC_VDD_165_195 |
-			 MMC_VDD_32_33 | MMC_VDD_33_34;
-	host->quirks = SDHCI_QUIRK_BROKEN_VOLTAGE;
+	host->ioaddr = dev_read_addr_ptr(dev);
+	host->quirks = SDHCI_QUIRK_BROKEN_R1B;
 	host->host_caps = MMC_MODE_DDR_52MHz;
 	host->index = fdtdec_get_uint(gd->fdt_blob, node, "index", 0);
 	host->ops = &sdhci_platform_ops;
@@ -198,6 +275,7 @@ static int iproc_sdhci_probe(struct udevice *dev)
 				   "clock-freq-min-max", f_min_max, 2);
 	if (ret) {
 		printf("sdhci: clock-freq-min-max not found\n");
+		free(iproc_host);
 		return ret;
 	}
 	host->max_clk = f_min_max[1];
@@ -210,22 +288,24 @@ static int iproc_sdhci_probe(struct udevice *dev)
 
 	memcpy(&iproc_host->host, host, sizeof(struct sdhci_host));
 
-	ret = sdhci_setup_cfg(&plat->cfg, &iproc_host->host,
-			      f_min_max[1], f_min_max[0]);
-	if (ret)
-		return ret;
-
 	iproc_host->host.mmc = &plat->mmc;
 	iproc_host->host.mmc->dev = dev;
 	iproc_host->host.mmc->priv = &iproc_host->host;
 	upriv->mmc = iproc_host->host.mmc;
+
+	ret = sdhci_setup_cfg(&plat->cfg, &iproc_host->host,
+			      f_min_max[1], f_min_max[0]);
+	if (ret) {
+		free(iproc_host);
+		return ret;
+	}
 
 	return sdhci_probe(dev);
 }
 
 static int iproc_sdhci_bind(struct udevice *dev)
 {
-	struct iproc_sdhci_plat *plat = dev_get_platdata(dev);
+	struct iproc_sdhci_plat *plat = dev_get_plat(dev);
 
 	return sdhci_bind(dev, &plat->mmc, &plat->cfg);
 }
@@ -242,6 +322,6 @@ U_BOOT_DRIVER(iproc_sdhci_drv) = {
 	.ops = &sdhci_ops,
 	.bind = iproc_sdhci_bind,
 	.probe = iproc_sdhci_probe,
-	.priv_auto_alloc_size = sizeof(struct sdhci_host),
-	.platdata_auto_alloc_size = sizeof(struct iproc_sdhci_plat),
+	.priv_auto	= sizeof(struct sdhci_host),
+	.plat_auto	= sizeof(struct iproc_sdhci_plat),
 };

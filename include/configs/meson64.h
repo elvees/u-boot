@@ -18,12 +18,6 @@
 
 /* For splashscreen */
 #ifdef CONFIG_DM_VIDEO
-#define CONFIG_VIDEO_BMP_RLE8
-#define CONFIG_BMP_16BPP
-#define CONFIG_BMP_24BPP
-#define CONFIG_BMP_32BPP
-#define CONFIG_SPLASH_SCREEN
-#define CONFIG_SPLASH_SCREEN_ALIGN
 #define STDOUT_CFG "vidconsole,serial"
 #else
 #define STDOUT_CFG "serial"
@@ -75,6 +69,8 @@
 	func(DHCP, dhcp, na)
 #endif
 
+#include <config_distro_bootcmd.h>
+
 #ifndef CONFIG_EXTRA_ENV_SETTINGS
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"stdin=" STDIN_CFG "\0" \
@@ -84,11 +80,11 @@
 	"scriptaddr=0x08000000\0" \
 	"kernel_addr_r=0x08080000\0" \
 	"pxefile_addr_r=0x01080000\0" \
+	"fdtoverlay_addr_r=0x01000000\0" \
 	"ramdisk_addr_r=0x13000000\0" \
 	"fdtfile=amlogic/" CONFIG_DEFAULT_DEVICE_TREE ".dtb\0" \
 	BOOTENV
 #endif
 
-#include <config_distro_bootcmd.h>
 
 #endif /* __MESON64_CONFIG_H */

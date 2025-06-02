@@ -7,8 +7,10 @@
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <asm/io.h>
 #include <asm/gpio.h>
+#include <linux/bitops.h>
 #include <linux/compat.h>
 #include <linux/compiler.h>
 
@@ -105,7 +107,7 @@ U_BOOT_DRIVER(cortina_gpio) = {
 	.id = UCLASS_GPIO,
 	.ops = &gpio_cortina_ops,
 	.probe = ca_gpio_probe,
-	.priv_auto_alloc_size = sizeof(struct cortina_gpio_bank),
+	.priv_auto	= sizeof(struct cortina_gpio_bank),
 	.of_match = ca_gpio_ids,
 };
 #endif /* CONFIG_DM_GPIO */

@@ -5,11 +5,14 @@
 #include <clock_legacy.h>
 #include <fdt_support.h>
 #include <init.h>
+#include <net.h>
 #include <asm/arch-ls102xa/ls102xa_soc.h>
 #include <asm/arch/ls102xa_devdis.h>
 #include <asm/arch/immap_ls102xa.h>
 #include <asm/arch/ls102xa_soc.h>
 #include <asm/arch/fsl_serdes.h>
+#include <asm/global_data.h>
+#include <linux/delay.h>
 #include "../common/sleep.h"
 #include <fsl_validate.h>
 #include <fsl_immap.h>
@@ -120,7 +123,7 @@ int dram_init(void)
 	return 0;
 }
 
-int board_eth_init(bd_t *bis)
+int board_eth_init(struct bd_info *bis)
 {
 	return pci_eth_init(bis);
 }
@@ -251,7 +254,7 @@ void board_sleep_prepare(void)
 }
 #endif
 
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	ft_cpu_setup(blob, bd);
 

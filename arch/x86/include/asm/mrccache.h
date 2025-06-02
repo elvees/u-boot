@@ -7,6 +7,8 @@
 #ifndef _ASM_MRCCACHE_H
 #define _ASM_MRCCACHE_H
 
+#include <compiler.h>
+
 #define MRC_DATA_ALIGN		0x100
 #define MRC_DATA_SIGNATURE	(('M' << 0) | ('R' << 8) | \
 				 ('C' << 16) | ('D'<<24))
@@ -66,19 +68,12 @@ int mrccache_reserve(void);
  * mrccache_get_region() - get MRC region on the SPI flash
  *
  * This gets MRC region whose offset and size are described in the device tree
- * as a subnode to the SPI flash. If a non-NULL device pointer is supplied,
- * this also probes the SPI flash device and returns its device pointer for
- * the caller to use later.
- *
- * Be careful when calling this routine with a non-NULL device pointer:
- * - driver model initialization must be complete
- * - calling in the pre-relocation phase may bring some side effects during
- *   the SPI flash device probe (eg: for SPI controllers on a PCI bus, it
- *   triggers PCI bus enumeration during which insufficient memory issue
- *   might be exposed and it causes subsequent SPI flash probe fails).
+ * as a subnode to the SPI flash. This tries to find the SPI flash device
+ * (without probing it), falling back to looking for the devicetree node if
+ * driver model is not inited or the SPI flash is not found.
  *
  * @type:	Type of MRC data to use
- * @devp:	Returns pointer to the SPI flash device
+ * @devp:	Returns pointer to the SPI flash device, if found
  * @entry:	Position and size of MRC cache in SPI flash
  * @return 0 if success, -ENOENT if SPI flash node does not exist in the
  * device tree, -EPERM if MRC region subnode does not exist in the device

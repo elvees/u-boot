@@ -4,8 +4,6 @@
 # Written by Simon Glass <sjg@chromium.org>
 #
 
-from __future__ import print_function
-
 from optparse import OptionParser
 import glob
 import os
@@ -16,17 +14,16 @@ import unittest
 
 # Bring in the patman libraries
 our_path = os.path.dirname(os.path.realpath(__file__))
-for dirname in ['../patman', '..']:
-    sys.path.insert(0, os.path.join(our_path, dirname))
+sys.path.insert(1, os.path.join(our_path, '..'))
 
-import command
-import fdt
-from fdt import TYPE_BYTE, TYPE_INT, TYPE_STRING, TYPE_BOOL, BytesToValue
-import fdt_util
-from fdt_util import fdt32_to_cpu
+from dtoc import fdt
+from dtoc import fdt_util
+from dtoc.fdt_util import fdt32_to_cpu
+from fdt import Type, BytesToValue
 import libfdt
-import test_util
-import tools
+from patman import command
+from patman import test_util
+from patman import tools
 
 def _GetPropertyValue(dtb, node, prop_name):
     """Low-level function to get the property value based on its offset
@@ -49,7 +46,7 @@ def _GetPropertyValue(dtb, node, prop_name):
     # Add 12, which is sizeof(struct fdt_property), to get to start of data
     offset = prop.GetOffset() + 12
     data = dtb.GetContents()[offset:offset + len(prop.value)]
-    return prop, [tools.ToChar(x) for x in data]
+    return prop, [chr(x) for x in data]
 
 
 class TestFdt(unittest.TestCase):
@@ -130,7 +127,7 @@ class TestFdt(unittest.TestCase):
 
     def testBytesToValue(self):
         self.assertEqual(BytesToValue(b'this\0is\0'),
-                         (TYPE_STRING, ['this', 'is']))
+                         (Type.STRING, ['this', 'is']))
 
 class TestNode(unittest.TestCase):
     """Test operation of the Node class"""
@@ -252,46 +249,46 @@ class TestProp(unittest.TestCase):
     def testMakeProp(self):
         """Test we can convert all the the types that are supported"""
         prop = self._ConvertProp('boolval')
-        self.assertEqual(fdt.TYPE_BOOL, prop.type)
+        self.assertEqual(Type.BOOL, prop.type)
         self.assertEqual(True, prop.value)
 
         prop = self._ConvertProp('intval')
-        self.assertEqual(fdt.TYPE_INT, prop.type)
+        self.assertEqual(Type.INT, prop.type)
         self.assertEqual(1, fdt32_to_cpu(prop.value))
 
         prop = self._ConvertProp('intarray')
-        self.assertEqual(fdt.TYPE_INT, prop.type)
+        self.assertEqual(Type.INT, prop.type)
         val = [fdt32_to_cpu(val) for val in prop.value]
         self.assertEqual([2, 3, 4], val)
 
         prop = self._ConvertProp('byteval')
-        self.assertEqual(fdt.TYPE_BYTE, prop.type)
+        self.assertEqual(Type.BYTE, prop.type)
         self.assertEqual(5, ord(prop.value))
 
         prop = self._ConvertProp('longbytearray')
-        self.assertEqual(fdt.TYPE_BYTE, prop.type)
+        self.assertEqual(Type.BYTE, prop.type)
         val = [ord(val) for val in prop.value]
         self.assertEqual([9, 10, 11, 12, 13, 14, 15, 16, 17], val)
 
         prop = self._ConvertProp('stringval')
-        self.assertEqual(fdt.TYPE_STRING, prop.type)
+        self.assertEqual(Type.STRING, prop.type)
         self.assertEqual('message', prop.value)
 
         prop = self._ConvertProp('stringarray')
-        self.assertEqual(fdt.TYPE_STRING, prop.type)
+        self.assertEqual(Type.STRING, prop.type)
         self.assertEqual(['multi-word', 'message'], prop.value)
 
         prop = self._ConvertProp('notstring')
-        self.assertEqual(fdt.TYPE_BYTE, prop.type)
+        self.assertEqual(Type.BYTE, prop.type)
         val = [ord(val) for val in prop.value]
         self.assertEqual([0x20, 0x21, 0x22, 0x10, 0], val)
 
     def testGetEmpty(self):
         """Tests the GetEmpty() function for the various supported types"""
-        self.assertEqual(True, fdt.Prop.GetEmpty(fdt.TYPE_BOOL))
-        self.assertEqual(chr(0), fdt.Prop.GetEmpty(fdt.TYPE_BYTE))
-        self.assertEqual(tools.GetBytes(0, 4), fdt.Prop.GetEmpty(fdt.TYPE_INT))
-        self.assertEqual('', fdt.Prop.GetEmpty(fdt.TYPE_STRING))
+        self.assertEqual(True, fdt.Prop.GetEmpty(Type.BOOL))
+        self.assertEqual(chr(0), fdt.Prop.GetEmpty(Type.BYTE))
+        self.assertEqual(tools.GetBytes(0, 4), fdt.Prop.GetEmpty(Type.INT))
+        self.assertEqual('', fdt.Prop.GetEmpty(Type.STRING))
 
     def testGetOffset(self):
         """Test we can get the offset of a property"""
@@ -301,29 +298,39 @@ class TestProp(unittest.TestCase):
     def testWiden(self):
         """Test widening of values"""
         node2 = self.dtb.GetNode('/spl-test2')
+        node3 = self.dtb.GetNode('/spl-test3')
         prop = self.node.props['intval']
 
         # No action
         prop2 = node2.props['intval']
         prop.Widen(prop2)
-        self.assertEqual(fdt.TYPE_INT, prop.type)
+        self.assertEqual(Type.INT, prop.type)
         self.assertEqual(1, fdt32_to_cpu(prop.value))
 
         # Convert singla value to array
         prop2 = self.node.props['intarray']
         prop.Widen(prop2)
-        self.assertEqual(fdt.TYPE_INT, prop.type)
+        self.assertEqual(Type.INT, prop.type)
         self.assertTrue(isinstance(prop.value, list))
 
         # A 4-byte array looks like a single integer. When widened by a longer
         # byte array, it should turn into an array.
         prop = self.node.props['longbytearray']
         prop2 = node2.props['longbytearray']
+        prop3 = node3.props['longbytearray']
         self.assertFalse(isinstance(prop2.value, list))
         self.assertEqual(4, len(prop2.value))
+        self.assertEqual(b'\x09\x0a\x0b\x0c', prop2.value)
         prop2.Widen(prop)
         self.assertTrue(isinstance(prop2.value, list))
         self.assertEqual(9, len(prop2.value))
+        self.assertEqual(['\x09', '\x0a', '\x0b', '\x0c', '\0',
+                          '\0', '\0', '\0', '\0'], prop2.value)
+        prop3.Widen(prop)
+        self.assertTrue(isinstance(prop3.value, list))
+        self.assertEqual(9, len(prop3.value))
+        self.assertEqual(['\x09', '\x0a', '\x0b', '\x0c', '\x0d',
+                          '\x0e', '\x0f', '\x10', '\0'], prop3.value)
 
         # Similarly for a string array
         prop = self.node.props['stringval']
@@ -390,6 +397,12 @@ class TestProp(unittest.TestCase):
         data = self.fdt.getprop(self.node.Offset(), 'one')
         self.assertEqual(1, fdt32_to_cpu(data))
 
+        val = 1234
+        self.node.AddInt('integer', val)
+        self.dtb.Sync(auto_resize=True)
+        data = self.fdt.getprop(self.node.Offset(), 'integer')
+        self.assertEqual(val, fdt32_to_cpu(data))
+
         val = '123' + chr(0) + '456'
         self.node.AddString('string', val)
         self.dtb.Sync(auto_resize=True)
@@ -419,6 +432,10 @@ class TestProp(unittest.TestCase):
 
         self.node.SetData('empty', b'123')
         self.assertEqual(b'123', prop.bytes)
+
+        # Trying adding a lot of data at once
+        self.node.AddData('data', tools.GetBytes(65, 20000))
+        self.dtb.Sync(auto_resize=True)
 
     def testFromData(self):
         dtb2 = fdt.Fdt.FromData(self.dtb.GetContents())

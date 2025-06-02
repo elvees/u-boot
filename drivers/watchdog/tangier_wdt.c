@@ -4,6 +4,7 @@
  */
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <wdt.h>
 #include <div64.h>
 #include <asm/scu.h>
@@ -79,7 +80,7 @@ static const struct udevice_id tangier_wdt_ids[] = {
 
 static int tangier_wdt_probe(struct udevice *dev)
 {
-	debug("%s: Probing wdt%u\n", __func__, dev->seq);
+	debug("%s: Probing wdt%u\n", __func__, dev_seq(dev));
 	return 0;
 }
 

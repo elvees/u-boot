@@ -14,8 +14,13 @@ config DFU_OVER_TFTP
 	depends on NET
 
 if DFU
+config DFU_WRITE_ALT
+	bool
+	default n
+
 config DFU_TFTP
 	bool "DFU via TFTP"
+	select UPDATE_COMMON
 	select DFU_OVER_TFTP
 	help
 	  This option allows performing update of DFU-managed medium with data
@@ -71,6 +76,7 @@ config DFU_SF_PART
 config DFU_MTD
 	bool "MTD back end for DFU"
 	depends on DM_MTD
+	depends on CMD_MTDPARTS
 	help
 	  This option enables using DFU to read and write to on any MTD device.
 
@@ -81,5 +87,10 @@ config DFU_VIRT
 	  used at board level to manage specific behavior
 	  (OTP update for example).
 
+config SET_DFU_ALT_INFO
+	bool "Dynamic set of DFU alternate information"
+	help
+	  This option allows to call the function set_dfu_alt_info to
+	  dynamically build dfu_alt_info in board.
 endif
 endmenu

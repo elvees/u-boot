@@ -18,6 +18,8 @@
 #include <config.h>
 #include <net.h>
 #include <miiphy.h>
+#include <asm/global_data.h>
+#include <linux/delay.h>
 #include <linux/mii.h>
 #include <asm/immap.h>
 #include <asm/fsl_mcdmafec.h>
@@ -78,7 +80,7 @@ static void init_eth_info(struct fec_info_dma *info)
 
 static void fec_halt(struct udevice *dev)
 {
-	struct fec_info_dma *info = dev->priv;
+	struct fec_info_dma *info = dev_get_priv(dev);
 	volatile fecdma_t *fecp = (fecdma_t *)info->iobase;
 	int counter = 0xffff;
 
@@ -160,7 +162,7 @@ static void dbg_fec_regs(struct eth_device *dev)
 
 static void set_fec_duplex_speed(volatile fecdma_t *fecp, int dup_spd)
 {
-	bd_t *bd = gd->bd;
+	struct bd_info *bd = gd->bd;
 
 	if ((dup_spd >> 16) == FULL) {
 		/* Set maximum frame length */
@@ -229,7 +231,7 @@ static void fec_set_hwaddr(volatile fecdma_t *fecp, u8 *mac)
 
 static int fec_init(struct udevice *dev)
 {
-	struct fec_info_dma *info = dev->priv;
+	struct fec_info_dma *info = dev_get_priv(dev);
 	volatile fecdma_t *fecp = (fecdma_t *)info->iobase;
 	int rval, i;
 	uchar enetaddr[6];
@@ -351,7 +353,7 @@ static int mcdmafec_init(struct udevice *dev)
 
 static int mcdmafec_send(struct udevice *dev, void *packet, int length)
 {
-	struct fec_info_dma *info = dev->priv;
+	struct fec_info_dma *info = dev_get_priv(dev);
 	cbd_t *p_tbd, *p_used_tbd;
 	u16 phy_status;
 
@@ -411,7 +413,7 @@ static int mcdmafec_send(struct udevice *dev, void *packet, int length)
 
 static int mcdmafec_recv(struct udevice *dev, int flags, uchar **packetp)
 {
-	struct fec_info_dma *info = dev->priv;
+	struct fec_info_dma *info = dev_get_priv(dev);
 	volatile fecdma_t *fecp = (fecdma_t *)info->iobase;
 
 	cbd_t *prbd = &info->rxbd[info->rx_idx];
@@ -490,18 +492,18 @@ static const struct eth_ops mcdmafec_ops = {
 };
 
 /*
- * Boot sequence, called just after mcffec_ofdata_to_platdata,
+ * Boot sequence, called just after mcffec_of_to_plat,
  * as DM way, it replaces old mcffec_initialize.
  */
 static int mcdmafec_probe(struct udevice *dev)
 {
-	struct fec_info_dma *info = dev->priv;
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct fec_info_dma *info = dev_get_priv(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	int node = dev_of_offset(dev);
 	int retval;
 	const u32 *val;
 
-	info->index = dev->seq;
+	info->index = dev_seq(dev);
 	info->iobase = pdata->iobase;
 	info->miibase = pdata->iobase;
 	info->phy_addr = -1;
@@ -564,12 +566,12 @@ static int mcdmafec_remove(struct udevice *dev)
 /*
  * Boot sequence, called 1st
  */
-static int mcdmafec_ofdata_to_platdata(struct udevice *dev)
+static int mcdmafec_of_to_plat(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	const u32 *val;
 
-	pdata->iobase = (phys_addr_t)devfdt_get_addr(dev);
+	pdata->iobase = dev_read_addr(dev);
 	/* Default to 10Mbit/s */
 	pdata->max_speed = 10;
 
@@ -589,10 +591,10 @@ U_BOOT_DRIVER(mcffec) = {
 	.name	= "mcdmafec",
 	.id	= UCLASS_ETH,
 	.of_match = mcdmafec_ids,
-	.ofdata_to_platdata = mcdmafec_ofdata_to_platdata,
+	.of_to_plat = mcdmafec_of_to_plat,
 	.probe	= mcdmafec_probe,
 	.remove	= mcdmafec_remove,
 	.ops	= &mcdmafec_ops,
-	.priv_auto_alloc_size = sizeof(struct fec_info_dma),
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
+	.priv_auto	= sizeof(struct fec_info_dma),
+	.plat_auto	= sizeof(struct eth_pdata),
 };

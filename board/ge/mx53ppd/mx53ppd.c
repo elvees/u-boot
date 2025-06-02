@@ -10,6 +10,7 @@
 
 #include <common.h>
 #include <init.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/sys_proto.h>
@@ -36,7 +37,7 @@
 #include <watchdog.h>
 #include "ppd_gpio.h"
 #include <stdlib.h>
-#include "../../ge/common/ge_common.h"
+#include "../../ge/common/ge_rtc.h"
 #include "../../ge/common/vpd_reader.h"
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -225,7 +226,7 @@ int board_late_init(void)
 	struct vpd_cache vpd;
 
 	memset(&vpd, 0, sizeof(vpd));
-	res = read_vpd(&vpd, vpd_callback);
+	res = read_i2c_vpd(&vpd, vpd_callback);
 	if (!res)
 		process_vpd(&vpd);
 	else
@@ -250,7 +251,7 @@ int checkboard(void)
 }
 
 #ifdef CONFIG_OF_BOARD_SETUP
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	char *rtc_status = env_get("rtc_status");
 

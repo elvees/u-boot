@@ -146,14 +146,14 @@ static const struct sdhci_ops arasan_sdhci_ops = {
 
 static int arasan_sdhci_bind(struct udevice *dev)
 {
-	struct arasan_sdhci_plat *plat = dev_get_platdata(dev);
+	struct arasan_sdhci_plat *plat = dev_get_plat(dev);
 
 	return sdhci_bind(dev, &plat->mmc, &plat->cfg);
 }
 
 static int arasan_sdhci_probe(struct udevice *dev)
 {
-	struct arasan_sdhci_plat *plat = dev_get_platdata(dev);
+	struct arasan_sdhci_plat *plat = dev_get_plat(dev);
 	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(dev);
 	struct sdhci_host *host = dev_get_priv(dev);
 	int ret;
@@ -190,7 +190,7 @@ U_BOOT_DRIVER(arasan_sdhci_drv) = {
 	.of_match = arasan_sdhci_match_table,
 	.bind = arasan_sdhci_bind,
 	.probe = arasan_sdhci_probe,
-	.priv_auto_alloc_size = sizeof(struct sdhci_host),
-	.platdata_auto_alloc_size = sizeof(struct arasan_sdhci_plat),
+	.priv_auto = sizeof(struct sdhci_host),
+	.plat_auto = sizeof(struct arasan_sdhci_plat),
 	.ops = &sdhci_ops,
 };

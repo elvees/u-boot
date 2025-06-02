@@ -6,8 +6,20 @@
 #ifndef __ACPI_PMC_H
 #define __ACPI_PMC_H
 
+#ifndef __ASSEMBLY__
+
 enum {
 	GPE0_REG_MAX	= 4,
+};
+
+enum {
+	PM1_STS		= 0x00,
+	PM1_EN		= 0x02,
+	PM1_CNT		= 0x04,
+	PM1_TMR		= 0x08,
+
+	GPE0_STS	= 0x20,
+	GPE0_EN		= 0x30,
 };
 
 /**
@@ -168,7 +180,7 @@ int pmc_disable_tco(struct udevice *dev);
  */
 int pmc_global_reset_set_enable(struct udevice *dev, bool enable);
 
-int pmc_ofdata_to_uc_platdata(struct udevice *dev);
+int pmc_ofdata_to_uc_plat(struct udevice *dev);
 
 int pmc_disable_tco_base(ulong tco_base);
 
@@ -181,5 +193,7 @@ void pmc_dump_info(struct udevice *dev);
  * @return 0 if OK, -ve on error
  */
 int pmc_gpe_init(struct udevice *dev);
+
+#endif /* !__ASSEMBLY__ */
 
 #endif

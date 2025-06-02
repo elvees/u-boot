@@ -21,16 +21,23 @@
 #include <common.h>
 #include <cpu_func.h>
 #include <init.h>
+#include <log.h>
 #include <malloc.h>
 #include <spl.h>
 #include <asm/control_regs.h>
+#include <asm/coreboot_tables.h>
 #include <asm/cpu.h>
+#include <asm/global_data.h>
 #include <asm/mp.h>
 #include <asm/msr.h>
 #include <asm/mtrr.h>
 #include <asm/processor-flags.h>
 
 DECLARE_GLOBAL_DATA_PTR;
+
+#define CPUID_FEATURE_PAE	BIT(6)
+#define CPUID_FEATURE_PSE36	BIT(17)
+#define CPUID_FEAURE_HTT	BIT(28)
 
 /*
  * Constructor for a conventional segment GDT (or LDT) entry
@@ -169,7 +176,7 @@ void arch_setup_gd(gd_t *new_gd)
  * Per Intel FSP external architecture specification, before calling any FSP
  * APIs, we need make sure the system is in flat 32-bit mode and both the code
  * and data selectors should have full 4GB access range. Here we reuse the one
- * we used in arch/x86/cpu/start16.S, and reload the segement registers.
+ * we used in arch/x86/cpu/start16.S, and reload the segment registers.
  */
 void setup_fsp_gdt(void)
 {
@@ -362,6 +369,11 @@ static void setup_cpu_features(void)
 	: : "i" (em_rst), "i" (mp_ne_set) : "eax");
 }
 
+void cpu_reinit_fpu(void)
+{
+	asm ("fninit\n");
+}
+
 static void setup_identity(void)
 {
 	/* identify CPU via cpuid and store the decoded info into gd->arch */
@@ -379,6 +391,25 @@ static void setup_identity(void)
 
 		gd->arch.has_mtrr = has_mtrr();
 	}
+}
+
+static uint cpu_cpuid_extended_level(void)
+{
+	return cpuid_eax(0x80000000);
+}
+
+int cpu_phys_address_size(void)
+{
+	if (!has_cpuid())
+		return 32;
+
+	if (cpu_cpuid_extended_level() >= 0x80000008)
+		return cpuid_eax(0x80000008) & 0xff;
+
+	if (cpuid_edx(1) & (CPUID_FEATURE_PAE | CPUID_FEATURE_PSE36))
+		return 36;
+
+	return 32;
 }
 
 /* Don't allow PCI region 3 to use memory in the 2-4GB memory hole */
@@ -449,8 +480,15 @@ int x86_cpu_init_f(void)
 
 int x86_cpu_reinit_f(void)
 {
+	long addr;
+
 	setup_identity();
 	setup_pci_ram_top();
+	addr = locate_coreboot_table();
+	if (addr >= 0) {
+		gd->arch.coreboot_table = addr;
+		gd->flags |= GD_FLG_SKIP_LL_INIT;
+	}
 
 	return 0;
 }
@@ -611,48 +649,21 @@ int cpu_jump_to_64bit_uboot(ulong target)
 
 	func = (func_t)ptr;
 
-	/*
-	 * Copy U-Boot from ROM
-	 * TODO(sjg@chromium.org): Figure out a way to get the text base
-	 * correctly here, and in the device-tree binman definition.
-	 *
-	 * Also consider using FIT so we get the correct image length and
-	 * parameters.
-	 */
-	memcpy((char *)target, (char *)0xfff00000, 0x100000);
-
 	/* Jump to U-Boot */
 	func((ulong)pgtable, 0, (ulong)target);
 
 	return -EFAULT;
 }
 
-#ifdef CONFIG_SMP
-static int enable_smis(struct udevice *cpu, void *unused)
-{
-	return 0;
-}
-
-static struct mp_flight_record mp_steps[] = {
-	MP_FR_BLOCK_APS(mp_init_cpu, NULL, mp_init_cpu, NULL),
-	/* Wait for APs to finish initialization before proceeding */
-	MP_FR_BLOCK_APS(NULL, NULL, enable_smis, NULL),
-};
-
 int x86_mp_init(void)
 {
-	struct mp_params mp_params;
+	int ret;
 
-	mp_params.parallel_microcode_load = 0,
-	mp_params.flight_plan = &mp_steps[0];
-	mp_params.num_records = ARRAY_SIZE(mp_steps);
-	mp_params.microcode_pointer = 0;
-
-	if (mp_init(&mp_params)) {
+	ret = mp_init();
+	if (ret) {
 		printf("Warning: MP init failure\n");
-		return -EIO;
+		return log_ret(ret);
 	}
 
 	return 0;
 }
-#endif

@@ -23,6 +23,7 @@ config ARCH_LS1012A
 config ARCH_LS1028A
 	bool
 	select ARMV8_SET_SMPEN
+	select FSL_LAYERSCAPE
 	select FSL_LSCH3
 	select NXP_LSCH3_2
 	select SYS_FSL_HAS_CCI400
@@ -46,6 +47,7 @@ config ARCH_LS1028A
 	select SYS_FSL_ERRATUM_A009663 if !TFABOOT
 	select SYS_FSL_ERRATUM_A009942 if !TFABOOT
 	select SYS_FSL_ERRATUM_A050382
+	select RESV_RAM if GIC_V3_ITS
 	imply PANIC_HANG
 
 config ARCH_LS1043A
@@ -66,7 +68,6 @@ config ARCH_LS1043A
 	select SYS_FSL_ERRATUM_A009660 if !TFABOOT
 	select SYS_FSL_ERRATUM_A009663 if !TFABOOT
 	select SYS_FSL_ERRATUM_A009798
-	select SYS_FSL_ERRATUM_A009929
 	select SYS_FSL_ERRATUM_A009942 if !TFABOOT
 	select SYS_FSL_ERRATUM_A010315
 	select SYS_FSL_ERRATUM_A010539
@@ -74,7 +75,7 @@ config ARCH_LS1043A
 	select SYS_FSL_HAS_DDR4
 	select ARCH_EARLY_INIT_R
 	select BOARD_EARLY_INIT_F
-	select SYS_I2C_MXC if !DM_I2C
+	select SYS_I2C_MXC
 	select SYS_I2C_MXC_I2C1 if !DM_I2C
 	select SYS_I2C_MXC_I2C2 if !DM_I2C
 	select SYS_I2C_MXC_I2C3 if !DM_I2C
@@ -107,7 +108,7 @@ config ARCH_LS1046A
 	select SYS_FSL_SRDS_2
 	select ARCH_EARLY_INIT_R
 	select BOARD_EARLY_INIT_F
-	select SYS_I2C_MXC if !DM_I2C
+	select SYS_I2C_MXC
 	select SYS_I2C_MXC_I2C1 if !DM_I2C
 	select SYS_I2C_MXC_I2C2 if !DM_I2C
 	select SYS_I2C_MXC_I2C3 if !DM_I2C
@@ -152,6 +153,7 @@ config ARCH_LS1088A
 	select SYS_I2C_MXC_I2C2 if !TFABOOT
 	select SYS_I2C_MXC_I2C3 if !TFABOOT
 	select SYS_I2C_MXC_I2C4 if !TFABOOT
+	select RESV_RAM if GIC_V3_ITS
 	imply SCSI
 	imply PANIC_HANG
 
@@ -202,8 +204,38 @@ config ARCH_LS2080A
 	select SYS_I2C_MXC_I2C2 if !TFABOOT
 	select SYS_I2C_MXC_I2C3 if !TFABOOT
 	select SYS_I2C_MXC_I2C4 if !TFABOOT
+	select RESV_RAM if GIC_V3_ITS
 	imply DISTRO_DEFAULTS
 	imply PANIC_HANG
+
+config ARCH_LX2162A
+	bool
+	select ARMV8_SET_SMPEN
+	select FSL_LSCH3
+	select NXP_LSCH3_2
+	select SYS_HAS_SERDES
+	select SYS_FSL_SRDS_1
+	select SYS_FSL_SRDS_2
+	select SYS_FSL_DDR
+	select SYS_FSL_DDR_LE
+	select SYS_FSL_DDR_VER_50
+	select SYS_FSL_EC1
+	select SYS_FSL_EC2
+	select SYS_FSL_ERRATUM_A050106
+	select SYS_FSL_HAS_RGMII
+	select SYS_FSL_HAS_SEC
+	select SYS_FSL_HAS_CCN508
+	select SYS_FSL_HAS_DDR4
+	select SYS_FSL_SEC_COMPAT_5
+	select SYS_FSL_SEC_LE
+	select ARCH_EARLY_INIT_R
+	select BOARD_EARLY_INIT_F
+	select SYS_I2C_MXC
+	select RESV_RAM if GIC_V3_ITS
+	imply DISTRO_DEFAULTS
+	imply PANIC_HANG
+	imply SCSI
+	imply SCSI_AHCI
 
 config ARCH_LX2160A
 	bool
@@ -229,6 +261,7 @@ config ARCH_LX2160A
 	select ARCH_EARLY_INIT_R
 	select BOARD_EARLY_INIT_F
 	select SYS_I2C_MXC
+	select RESV_RAM if GIC_V3_ITS
 	imply DISTRO_DEFAULTS
 	imply PANIC_HANG
 	imply SCSI
@@ -341,7 +374,7 @@ config SYS_FSL_ERRATUM_A050106
 	help
 	  USB3.0 Receiver needs to enable fixed equalization
 	  for each of PHY instances in an SOC. This is similar
-	  to erratum A-009007, but this one is for LX2160A,
+	  to erratum A-009007, but this one is for LX2160A and LX2162A,
 	  and the register value is different.
 
 config SYS_FSL_ERRATUM_A010315
@@ -358,6 +391,7 @@ config MAX_CPUS
 	default 16 if ARCH_LS2080A
 	default 8 if ARCH_LS1088A
 	default 16 if ARCH_LX2160A
+	default 16 if ARCH_LX2162A
 	default 1
 	help
 	  Set this number to the maximum number of possible CPUs in the SoC.
@@ -487,6 +521,7 @@ config SYS_FSL_DUART_CLK_DIV
 	int "DUART clock divider"
 	default 1 if ARCH_LS1043A
 	default 4 if ARCH_LX2160A
+	default 4 if ARCH_LX2162A
 	default 2
 	help
 	  This is the divider that is used to derive DUART clock from Platform
@@ -498,6 +533,7 @@ config SYS_FSL_I2C_CLK_DIV
 	default 4 if ARCH_LS1012A
 	default 4 if ARCH_LS1028A
 	default 8 if ARCH_LX2160A
+	default 8 if ARCH_LX2162A
 	default 8 if ARCH_LS1088A
 	default 2
 	help
@@ -510,6 +546,7 @@ config SYS_FSL_IFC_CLK_DIV
 	default 4 if ARCH_LS1012A
 	default 4 if ARCH_LS1028A
 	default 8 if ARCH_LX2160A
+	default 8 if ARCH_LX2162A
 	default 8 if ARCH_LS1088A
 	default 2
 	help
@@ -556,14 +593,14 @@ config SYS_FSL_EC1
 	bool
 	help
 	  Ethernet controller 1, this is connected to
-	  MAC17 for LX2160A or to MAC3 for other SoCs
+	  MAC17 for LX2160A and LX2162A or to MAC3 for other SoCs
 	  Provides DPAA2 capabilities
 
 config SYS_FSL_EC2
 	bool
 	help
 	  Ethernet controller 2, this is connected to
-	  MAC18 for LX2160A or to MAC4 for other SoCs
+	  MAC18 for LX2160A and LX2162A or to MAC4 for other SoCs
 	  Provides DPAA2 capabilities
 
 config SYS_FSL_ERRATUM_A008336
@@ -587,9 +624,6 @@ config SYS_FSL_ERRATUM_A009635
 config SYS_FSL_ERRATUM_A009660
 	bool
 
-config SYS_FSL_ERRATUM_A009929
-	bool
-
 config SYS_FSL_ERRATUM_A050382
 	bool
 
@@ -606,3 +640,13 @@ config HAS_FSL_XHCI_USB
 	help
 	  For some SoC(such as LS1043A and LS1046A), USB and QE-HDLC multiplex use
 	  pins, select it when the pins are assigned to USB.
+
+config SYS_FSL_BOOTROM_BASE
+	hex
+	depends on FSL_LSCH2
+	default 0
+
+config SYS_FSL_BOOTROM_SIZE
+	hex
+	depends on FSL_LSCH2
+	default 0x1000000

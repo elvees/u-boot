@@ -5,6 +5,7 @@
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <rng.h>
 #include <virtio_types.h>
 #include <virtio.h>
@@ -83,6 +84,6 @@ U_BOOT_DRIVER(virtio_rng) = {
 	.probe	= virtio_rng_probe,
 	.remove = virtio_reset,
 	.ops	= &virtio_rng_ops,
-	.priv_auto_alloc_size = sizeof(struct virtio_rng_priv),
+	.priv_auto	= sizeof(struct virtio_rng_priv),
 	.flags	= DM_FLAG_ACTIVE_DMA,
 };

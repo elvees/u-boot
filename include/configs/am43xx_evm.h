@@ -26,7 +26,7 @@
 #define CONFIG_SYS_I2C_EEPROM_ADDR_LEN	2
 
 /* Power */
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 #define CONFIG_POWER
 #define CONFIG_POWER_I2C
 #endif
@@ -192,9 +192,6 @@
 
 #ifndef CONFIG_SPL_BUILD
 /* CPSW Ethernet */
-#define CONFIG_BOOTP_DEFAULT
-#define CONFIG_BOOTP_DNS2
-#define CONFIG_BOOTP_SEND_HOSTNAME
 #define CONFIG_NET_RETRY_COUNT		10
 #endif
 

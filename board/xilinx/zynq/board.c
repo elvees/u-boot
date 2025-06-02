@@ -6,6 +6,7 @@
 
 #include <common.h>
 #include <init.h>
+#include <log.h>
 #include <dm/uclass.h>
 #include <env.h>
 #include <fdtdec.h>
@@ -15,13 +16,18 @@
 #include <watchdog.h>
 #include <wdt.h>
 #include <zynqpl.h>
+#include <asm/global_data.h>
 #include <asm/arch/hardware.h>
 #include <asm/arch/sys_proto.h>
+#include "../common/board.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 
 int board_init(void)
 {
+	if (IS_ENABLED(CONFIG_SPL_BUILD))
+		printf("Silicon version:\t%d\n", zynq_get_silicon_version());
+
 	return 0;
 }
 
@@ -31,6 +37,14 @@ int board_late_init(void)
 	const char *mode;
 	char *new_targets;
 	char *env_targets;
+
+	if (!(gd->flags & GD_FLG_ENV_DEFAULT)) {
+		debug("Saved variables - Skipping\n");
+		return 0;
+	}
+
+	if (!CONFIG_IS_ENABLED(ENV_VARS_UBOOT_RUNTIME_CONFIG))
+		return 0;
 
 	switch ((zynq_slcr_get_boot_mode()) & ZYNQ_BM_MASK) {
 	case ZYNQ_BM_QSPI:
@@ -76,9 +90,7 @@ int board_late_init(void)
 
 	env_set("boot_targets", new_targets);
 
-	env_set_hex("script_offset_f", CONFIG_BOOT_SCRIPT_OFFSET);
-
-	return 0;
+	return board_late_init_xilinx();
 }
 
 #if !defined(CONFIG_SYS_SDRAM_BASE) && !defined(CONFIG_SYS_SDRAM_SIZE)

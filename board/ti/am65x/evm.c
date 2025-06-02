@@ -9,9 +9,13 @@
 
 #include <common.h>
 #include <dm.h>
+#include <fdt_support.h>
+#include <image.h>
 #include <init.h>
+#include <net.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/arch/hardware.h>
+#include <asm/global_data.h>
 #include <asm/gpio.h>
 #include <asm/io.h>
 #include <asm/omap_common.h>
@@ -34,6 +38,10 @@ enum {
 
 /* Max number of MAC addresses that are parsed/processed per daughter card */
 #define DAUGHTER_CARD_NO_OF_MAC_ADDR	8
+
+/* Regiter that controls the SERDES0 lane and clock assignment */
+#define CTRLMMR_SERDES0_CTRL    0x00104080
+#define PCIE_LANE0              0x1
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -69,11 +77,13 @@ int dram_init_banksize(void)
 	/* Bank 0 declares the memory available in the DDR low region */
 	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
 	gd->bd->bi_dram[0].size = 0x80000000;
+	gd->ram_size = 0x80000000;
 
 #ifdef CONFIG_PHYS_64BIT
 	/* Bank 1 declares the memory available in the DDR high region */
 	gd->bd->bi_dram[1].start = CONFIG_SYS_SDRAM_BASE1;
 	gd->bd->bi_dram[1].size = 0x80000000;
+	gd->ram_size = 0x100000000;
 #endif
 
 	return 0;
@@ -92,21 +102,27 @@ int board_fit_config_name_match(const char *name)
 #endif
 
 #if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	int ret;
 
-	ret = fdt_fixup_msmc_ram(blob, "/interconnect@100000", "sram@70000000");
+	ret = fdt_fixup_msmc_ram(blob, "/bus@100000", "sram@70000000");
+	if (ret < 0)
+		ret = fdt_fixup_msmc_ram(blob, "/interconnect@100000",
+					 "sram@70000000");
 	if (ret) {
 		printf("%s: fixing up msmc ram failed %d\n", __func__, ret);
 		return ret;
 	}
 
 #if defined(CONFIG_TI_SECURE_DEVICE)
-	/* Make HW RNG reserved for secure world use */
-	ret = fdt_disable_node(blob, "/interconnect@100000/trng@4e10000");
+	/* Make Crypto HW reserved for secure world use */
+	ret = fdt_disable_node(blob, "/bus@100000/crypto@4e00000");
+	if (ret < 0)
+		ret = fdt_disable_node(blob,
+				       "/interconnect@100000/crypto@4E00000");
 	if (ret)
-		printf("%s: disabling TRGN failed %d\n", __func__, ret);
+		printf("%s: disabling SA2UL failed %d\n", __func__, ret);
 #endif
 
 	return 0;
@@ -300,6 +316,18 @@ static int probe_daughtercards(void)
 						      cards[i].eth_offset + j,
 						      (uchar *)mac_addr[j]);
 		}
+
+		/*
+		 * It has been observed that setting SERDES0 lane mux to USB prevents USB
+		 * 2.0 operation on USB0. Setting SERDES0 lane mux to non-USB when USB0 is
+		 * used in USB 2.0 only mode solves this issue. For USB3.0+2.0 operation
+		 * this issue is not present.
+		 *
+		 * Implement this workaround by writing 1 to LANE_FUNC_SEL field in
+		 * CTRLMMR_SERDES0_CTRL register.
+		 */
+		if (!strncmp(ep.name, "SER-PCIE2LEVM", sizeof(ep.name)))
+			writel(PCIE_LANE0, CTRLMMR_SERDES0_CTRL);
 
 		/* Skip if no overlays are to be added */
 		if (!strlen(cards[i].dtbo_name))

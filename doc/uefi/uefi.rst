@@ -59,9 +59,10 @@ Below you find the output of an example session starting GRUB::
     120832 bytes read in 7 ms (16.5 MiB/s)
     => bootefi ${kernel_addr_r} ${fdt_addr_r}
 
-The environment variable 'bootargs' is passed as load options in the UEFI system
-table. The Linux kernel EFI stub uses the load options as command line
-arguments.
+When booting from a memory location it is unknown from which file it was loaded.
+Therefore the bootefi command uses the device path of the block device partition
+or the network adapter and the file name of the most recently loaded PE-COFF
+file when setting up the loaded image protocol.
 
 Launching a UEFI binary from a FIT image
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -97,16 +98,133 @@ Below you find the output of an example session starting GRUB::
 
 See doc/uImage.FIT/howto.txt for an introduction to FIT images.
 
+Configuring UEFI secure boot
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The UEFI specification[1] defines a secure way of executing UEFI images
+by verifying a signature (or message digest) of image with certificates.
+This feature on U-Boot is enabled with::
+
+    CONFIG_UEFI_SECURE_BOOT=y
+
+To make the boot sequence safe, you need to establish a chain of trust;
+In UEFI secure boot the chain trust is defined by the following UEFI variables
+
+* PK - Platform Key
+* KEK - Key Exchange Keys
+* db - white list database
+* dbx - black list database
+
+An in depth description of UEFI secure boot is beyond the scope of this
+document. Please, refer to the UEFI specification and available online
+documentation. Here is a simple example that you can follow for your initial
+attempt (Please note that the actual steps will depend on your system and
+environment.):
+
+Install the required tools on your host
+
+* openssl
+* efitools
+* sbsigntool
+
+Create signing keys and the key database on your host:
+
+The platform key
+
+.. code-block:: bash
+
+    openssl req -x509 -sha256 -newkey rsa:2048 -subj /CN=TEST_PK/ \
+            -keyout PK.key -out PK.crt -nodes -days 365
+    cert-to-efi-sig-list -g 11111111-2222-3333-4444-123456789abc \
+            PK.crt PK.esl;
+    sign-efi-sig-list -c PK.crt -k PK.key PK PK.esl PK.auth
+
+The key exchange keys
+
+.. code-block:: bash
+
+    openssl req -x509 -sha256 -newkey rsa:2048 -subj /CN=TEST_KEK/ \
+            -keyout KEK.key -out KEK.crt -nodes -days 365
+    cert-to-efi-sig-list -g 11111111-2222-3333-4444-123456789abc \
+            KEK.crt KEK.esl
+    sign-efi-sig-list -c PK.crt -k PK.key KEK KEK.esl KEK.auth
+
+The whitelist database
+
+.. code-block:: bash
+
+    openssl req -x509 -sha256 -newkey rsa:2048 -subj /CN=TEST_db/ \
+            -keyout db.key -out db.crt -nodes -days 365
+    cert-to-efi-sig-list -g 11111111-2222-3333-4444-123456789abc \
+            db.crt db.esl
+    sign-efi-sig-list -c KEK.crt -k KEK.key db db.esl db.auth
+
+Copy the \*.auth files to media, say mmc, that is accessible from U-Boot.
+
+Sign an image with one of the keys in "db" on your host
+
+.. code-block:: bash
+
+    sbsign --key db.key --cert db.crt helloworld.efi
+
+Now in U-Boot install the keys on your board::
+
+    fatload mmc 0:1 <tmpaddr> PK.auth
+    setenv -e -nv -bs -rt -at -i <tmpaddr>:$filesize PK
+    fatload mmc 0:1 <tmpaddr> KEK.auth
+    setenv -e -nv -bs -rt -at -i <tmpaddr>:$filesize KEK
+    fatload mmc 0:1 <tmpaddr> db.auth
+    setenv -e -nv -bs -rt -at -i <tmpaddr>:$filesize db
+
+Set up boot parameters on your board::
+
+    efidebug boot add 1 HELLO mmc 0:1 /helloworld.efi.signed ""
+
+Now your board can run the signed image via the boot manager (see below).
+You can also try this sequence by running Pytest, test_efi_secboot,
+on the sandbox
+
+.. code-block:: bash
+
+    cd <U-Boot source directory>
+    pytest.py test/py/tests/test_efi_secboot/test_signed.py --bd sandbox
+
+UEFI binaries may be signed by Microsoft using the following certificates:
+
+* KEK: Microsoft Corporation KEK CA 2011
+  http://go.microsoft.com/fwlink/?LinkId=321185.
+* db: Microsoft Windows Production PCA 2011
+  http://go.microsoft.com/fwlink/p/?linkid=321192.
+* db: Microsoft Corporation UEFI CA 2011
+  http://go.microsoft.com/fwlink/p/?linkid=321194.
+
+Using OP-TEE for EFI variables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Instead of implementing UEFI variable services inside U-Boot they can
+also be provided in the secure world by a module for OP-TEE[1]. The
+interface between U-Boot and OP-TEE for variable services is enabled by
+CONFIG_EFI_MM_COMM_TEE=y.
+
+Tianocore EDK II's standalone management mode driver for variables can
+be linked to OP-TEE for this purpose. This module uses the Replay
+Protected Memory Block (RPMB) of an eMMC device for persisting
+non-volatile variables. When calling the variable services via the
+OP-TEE API U-Boot's OP-TEE supplicant relays calls to the RPMB driver
+which has to be enabled via CONFIG_SUPPORT_EMMC_RPMB=y.
+
+[1] https://optee.readthedocs.io/ - OP-TEE documentation
+
 Executing the boot manager
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The UEFI specification foresees to define boot entries and boot sequence via UEFI
-variables. Booting according to these variables is possible via::
+The UEFI specification foresees to define boot entries and boot sequence via
+UEFI variables. Booting according to these variables is possible via::
 
     bootefi bootmgr [fdt address]
 
-As of U-Boot v2018.03 UEFI variables are not persisted and cannot be set at
-runtime.
+As of U-Boot v2020.10 UEFI variables cannot be set at runtime. The U-Boot
+command 'efidebug' can be used to set the variables.
 
 Executing the built in hello world application
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

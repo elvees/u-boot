@@ -11,6 +11,8 @@
  */
 
 #include <common.h>
+#include <command.h>
+#include <log.h>
 #include <watchdog.h>
 #include <dfu.h>
 #include <console.h>
@@ -95,6 +97,9 @@ int run_usb_dnl_gadget(int usbctrl_index, char *usb_dnl_gadget)
 			}
 		}
 #endif
+
+		if (dfu_reinit_needed)
+			goto exit;
 
 		WATCHDOG_RESET();
 		usb_gadget_handle_interrupts(usbctrl_index);

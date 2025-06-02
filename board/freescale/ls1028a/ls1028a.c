@@ -4,9 +4,12 @@
  */
 
 #include <common.h>
+#include <init.h>
 #include <malloc.h>
 #include <errno.h>
 #include <fsl_ddr.h>
+#include <net.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <hwconfig.h>
 #include <fdt_support.h>
@@ -31,6 +34,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 int config_board_mux(void)
 {
+#ifndef CONFIG_LPUART
 #if defined(CONFIG_TARGET_LS1028AQDS) && defined(CONFIG_FSL_QIXIS)
 	u8 reg;
 
@@ -55,8 +59,17 @@ int config_board_mux(void)
 	reg &= ~(0xc0);
 	QIXIS_WRITE(brdcfg[15], reg);
 #endif
+#endif
+
 	return 0;
 }
+
+#ifdef CONFIG_LPUART
+u32 get_lpuart_clk(void)
+{
+	return gd->bus_clk / CONFIG_SYS_FSL_LPUART_CLK_DIV;
+}
+#endif
 
 int board_init(void)
 {
@@ -79,7 +92,7 @@ int board_init(void)
 #if defined(CONFIG_TARGET_LS1028ARDB)
 	u8 val = I2C_MUX_CH_DEFAULT;
 
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 	i2c_write(I2C_MUX_PCA_ADDR_PRI, 0x0b, 1, &val, 1);
 #else
 	struct udevice *dev;
@@ -104,7 +117,7 @@ int board_init(void)
 	return 0;
 }
 
-int board_eth_init(bd_t *bis)
+int board_eth_init(struct bd_info *bis)
 {
 	return pci_eth_init(bis);
 }
@@ -120,11 +133,33 @@ int misc_init_r(void)
 
 int board_early_init_f(void)
 {
+#ifdef CONFIG_LPUART
+	u8 uart;
+#endif
+
 #ifdef CONFIG_SYS_I2C_EARLY_INIT
 	i2c_early_init_f();
 #endif
 
 	fsl_lsch3_early_init_f();
+
+#ifdef CONFIG_LPUART
+	/*
+	 * Field| Function
+	 * --------------------------------------------------------------
+	 * 7-6  | Controls I2C3 routing (net CFG_MUX_I2C3):
+	 * I2C3 | 11= Routes {SCL, SDA} to LPUART1 header as {SOUT, SIN}.
+	 * --------------------------------------------------------------
+	 * 5-4  | Controls I2C4 routing (net CFG_MUX_I2C4):
+	 * I2C4 |11= Routes {SCL, SDA} to LPUART1 header as {CTS_B, RTS_B}.
+	 */
+	/* use lpuart0 as system console */
+	uart = QIXIS_READ(brdcfg[13]);
+	uart &= ~CFG_LPUART_MUX_MASK;
+	uart |= CFG_LPUART_EN;
+	QIXIS_WRITE(brdcfg[13], uart);
+#endif
+
 	return 0;
 }
 
@@ -135,8 +170,48 @@ void detail_board_ddr_info(void)
 	print_ddr_info(0);
 }
 
+int esdhc_status_fixup(void *blob, const char *compat)
+{
+	void __iomem *dcfg_ccsr = (void __iomem *)DCFG_BASE;
+	char esdhc1_path[] = "/soc/mmc@2140000";
+	char esdhc2_path[] = "/soc/mmc@2150000";
+	char dspi1_path[] = "/soc/spi@2100000";
+	char dspi2_path[] = "/soc/spi@2110000";
+	u32 mux_sdhc1, mux_sdhc2;
+	u32 io = 0;
+
+	/*
+	 * The PMUX IO-expander for mux select is used to control
+	 * the muxing of various onboard interfaces.
+	 */
+
+	io = in_le32(dcfg_ccsr + DCFG_RCWSR12);
+	mux_sdhc1 = (io >> DCFG_RCWSR12_SDHC_SHIFT) & DCFG_RCWSR12_SDHC_MASK;
+
+	/* Disable esdhc1/dspi1 if not selected. */
+	if (mux_sdhc1 != 0)
+		do_fixup_by_path(blob, esdhc1_path, "status", "disabled",
+				 sizeof("disabled"), 1);
+	if (mux_sdhc1 != 2)
+		do_fixup_by_path(blob, dspi1_path, "status", "disabled",
+				 sizeof("disabled"), 1);
+
+	io = in_le32(dcfg_ccsr + DCFG_RCWSR13);
+	mux_sdhc2 = (io >> DCFG_RCWSR13_SDHC_SHIFT) & DCFG_RCWSR13_SDHC_MASK;
+
+	/* Disable esdhc2/dspi2 if not selected. */
+	if (mux_sdhc2 != 0)
+		do_fixup_by_path(blob, esdhc2_path, "status", "disabled",
+				 sizeof("disabled"), 1);
+	if (mux_sdhc2 != 2)
+		do_fixup_by_path(blob, dspi2_path, "status", "disabled",
+				 sizeof("disabled"), 1);
+
+	return 0;
+}
+
 #ifdef CONFIG_OF_BOARD_SETUP
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	u64 base[CONFIG_NR_DRAM_BANKS];
 	u64 size[CONFIG_NR_DRAM_BANKS];

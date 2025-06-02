@@ -6,6 +6,9 @@
 #include <common.h>
 #include <i2c.h>
 #include <fdt_support.h>
+#include <asm/cache.h>
+#include <init.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/fsl_serdes.h>
@@ -109,7 +112,7 @@ int misc_init_r(void)
 	u8 mux_sdhc_cd = 0x80;
 	int bus_num = 0;
 
-#ifdef CONFIG_DM_I2C
+#if CONFIG_IS_ENABLED(DM_I2C)
 	struct udevice *dev;
 	int ret;
 
@@ -278,7 +281,7 @@ static void fdt_fsl_fixup_of_pfe(void *blob)
 }
 
 #ifdef CONFIG_OF_BOARD_SETUP
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	arch_fixup_fdt(blob);
 

@@ -8,8 +8,11 @@
 
 #include <common.h>
 #include <env.h>
+#include <init.h>
+#include <net.h>
 #include <spl.h>
 #include <asm/cache.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/cpu.h>
@@ -31,7 +34,7 @@ int board_init(void)
 	return 0;
 }
 
-int board_eth_init(bd_t *bis)
+int board_eth_init(struct bd_info *bis)
 {
 	uint8_t mac_addr[6];
 	uint32_t mac_hi, mac_lo;

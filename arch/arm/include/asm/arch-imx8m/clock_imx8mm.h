@@ -8,6 +8,10 @@
 #ifndef _ASM_ARCH_IMX8MM_CLOCK_H
 #define _ASM_ARCH_IMX8MM_CLOCK_H
 
+#ifndef __ASSEMBLY__
+#include <linux/bitops.h>
+#endif
+
 #define PLL_1443X_RATE(_rate, _m, _p, _s, _k)			\
 	{							\
 		.rate	=	(_rate),			\
@@ -19,7 +23,7 @@
 
 #define LOCK_STATUS	BIT(31)
 #define LOCK_SEL_MASK	BIT(29)
-#define CLKE_MASK	BIT(11)
+#define CLKE_MASK	BIT(13)
 #define RST_MASK	BIT(9)
 #define BYPASS_MASK	BIT(4)
 #define	MDIV_SHIFT	12
@@ -363,7 +367,8 @@ enum clk_root_src {
 	EXT_CLK_2,
 	EXT_CLK_3,
 	EXT_CLK_4,
-	OSC_HDMI_CLK
+	OSC_HDMI_CLK,
+	ARM_A53_ALT_CLK,
 };
 
 enum clk_ccgr_index {

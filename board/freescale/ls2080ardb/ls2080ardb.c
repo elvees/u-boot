@@ -5,11 +5,13 @@
  */
 #include <common.h>
 #include <env.h>
+#include <init.h>
 #include <malloc.h>
 #include <errno.h>
 #include <netdev.h>
 #include <fsl_ifc.h>
 #include <fsl_ddr.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <hwconfig.h>
 #include <fdt_support.h>
@@ -40,6 +42,48 @@ enum {
 	MUX_TYPE_SDHC,
 	MUX_TYPE_DSPI,
 };
+
+#ifdef CONFIG_VID
+u16 soc_get_fuse_vid(int vid_index)
+{
+	static const u16 vdd[32] = {
+		10500,
+		0,      /* reserved */
+		9750,
+		0,      /* reserved */
+		9500,
+		0,      /* reserved */
+		0,      /* reserved */
+		0,      /* reserved */
+		9000,   /* reserved */
+		0,      /* reserved */
+		0,      /* reserved */
+		0,      /* reserved */
+		0,      /* reserved */
+		0,      /* reserved */
+		0,      /* reserved */
+		0,      /* reserved */
+		10000,  /* 1.0000V */
+		0,      /* reserved */
+		10250,
+		0,      /* reserved */
+		10500,
+		0,      /* reserved */
+		0,      /* reserved */
+		0,      /* reserved */
+		0,      /* reserved */
+		0,      /* reserved */
+		0,      /* reserved */
+		0,      /* reserved */
+		0,      /* reserved */
+		0,      /* reserved */
+		0,      /* reserved */
+		0,      /* reserved */
+	};
+
+	return vdd[vid_index];
+};
+#endif
 
 unsigned long long get_qixis_addr(void)
 {
@@ -165,7 +209,7 @@ int select_i2c_ch_pca9547(u8 ch)
 {
 	int ret;
 
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 	ret = i2c_write(I2C_MUX_PCA_ADDR_PRI, 0, 1, &ch, 1);
 #else
 	struct udevice *dev;
@@ -242,6 +286,10 @@ int board_init(void)
 #endif
 #ifdef CONFIG_FSL_CAAM
 	sec_init();
+#endif
+
+#if !defined(CONFIG_SYS_EARLY_PCI_INIT) && defined(CONFIG_DM_ETH)
+	pci_init();
 #endif
 
 	return 0;
@@ -411,7 +459,7 @@ void fsl_fdt_fixup_flash(void *fdt)
 	fdt_status_disabled(fdt, offset);
 }
 
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	int i;
 	u16 mc_memory_bank = 0;

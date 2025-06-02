@@ -10,7 +10,9 @@
 #include <command.h>
 #include <irq_func.h>
 #include <mpc83xx.h>
+#include <asm/global_data.h>
 #include <asm/processor.h>
+#include <asm/ptrace.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -71,8 +73,8 @@ void timer_interrupt_cpu (struct pt_regs *regs)
  * irqinfo - print information about PCI devices
  */
 
-void
-do_irqinfo(cmd_tbl_t *cmdtp, bd_t *bd, int flag, int argc, char * const argv[])
+void do_irqinfo(struct cmd_tbl *cmdtp, struct bd_info *bd, int flag, int argc,
+		char *const argv[])
 {
 }
 

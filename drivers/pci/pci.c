@@ -16,6 +16,9 @@
 
 #include <common.h>
 #include <init.h>
+#include <log.h>
+#include <asm/global_data.h>
+#include <linux/delay.h>
 
 #include <command.h>
 #include <env.h>
@@ -452,16 +455,18 @@ int pci_hose_scan(struct pci_controller *hose)
 	return pci_hose_scan_bus(hose, hose->current_busno);
 }
 
-void pci_init(void)
+int pci_init(void)
 {
 	hose_head = NULL;
 
 	/* allow env to disable pci init/enum */
 	if (env_get("pcidisable") != NULL)
-		return;
+		return 0;
 
 	/* now call board specific pci_init()... */
 	pci_init_board();
+
+	return 0;
 }
 
 /* Returns the address of the requested capability structure within the

@@ -6,6 +6,7 @@
 
 #include <common.h>
 #include <clk.h>
+#include <log.h>
 #include <asm-generic/io.h>
 #include <dm.h>
 #include <fdtdec.h>
@@ -26,7 +27,7 @@
 
 static int cadence_spi_write_speed(struct udevice *bus, uint hz)
 {
-	struct cadence_spi_platdata *plat = bus->platdata;
+	struct cadence_spi_plat *plat = dev_get_plat(bus);
 	struct cadence_spi_priv *priv = dev_get_priv(bus);
 
 	cadence_qspi_apb_config_baudrate_div(priv->regbase,
@@ -129,7 +130,7 @@ static int spi_calibration(struct udevice *bus, uint hz)
 
 static int cadence_spi_set_speed(struct udevice *bus, uint hz)
 {
-	struct cadence_spi_platdata *plat = bus->platdata;
+	struct cadence_spi_plat *plat = dev_get_plat(bus);
 	struct cadence_spi_priv *priv = dev_get_priv(bus);
 	int err;
 
@@ -164,12 +165,29 @@ static int cadence_spi_set_speed(struct udevice *bus, uint hz)
 
 static int cadence_spi_probe(struct udevice *bus)
 {
-	struct cadence_spi_platdata *plat = bus->platdata;
+	struct cadence_spi_plat *plat = dev_get_plat(bus);
 	struct cadence_spi_priv *priv = dev_get_priv(bus);
+	struct clk clk;
 	int ret;
 
 	priv->regbase = plat->regbase;
 	priv->ahbbase = plat->ahbbase;
+
+	if (plat->ref_clk_hz == 0) {
+		ret = clk_get_by_index(bus, 0, &clk);
+		if (ret) {
+#ifdef CONFIG_CQSPI_REF_CLK
+			plat->ref_clk_hz = CONFIG_CQSPI_REF_CLK;
+#else
+			return ret;
+#endif
+		} else {
+			plat->ref_clk_hz = clk_get_rate(&clk);
+			clk_free(&clk);
+			if (IS_ERR_VALUE(plat->ref_clk_hz))
+				return plat->ref_clk_hz;
+		}
+	}
 
 	ret = reset_get_bulk(bus, &priv->resets);
 	if (ret)
@@ -194,7 +212,7 @@ static int cadence_spi_remove(struct udevice *dev)
 
 static int cadence_spi_set_mode(struct udevice *bus, uint mode)
 {
-	struct cadence_spi_platdata *plat = bus->platdata;
+	struct cadence_spi_plat *plat = dev_get_plat(bus);
 	struct cadence_spi_priv *priv = dev_get_priv(bus);
 
 	/* Disable QSPI */
@@ -217,7 +235,7 @@ static int cadence_spi_mem_exec_op(struct spi_slave *spi,
 				   const struct spi_mem_op *op)
 {
 	struct udevice *bus = spi->dev->parent;
-	struct cadence_spi_platdata *plat = bus->platdata;
+	struct cadence_spi_plat *plat = dev_get_plat(bus);
 	struct cadence_spi_priv *priv = dev_get_priv(bus);
 	void *base = priv->regbase;
 	int err = 0;
@@ -264,12 +282,10 @@ static int cadence_spi_mem_exec_op(struct spi_slave *spi,
 	return err;
 }
 
-static int cadence_spi_ofdata_to_platdata(struct udevice *bus)
+static int cadence_spi_of_to_plat(struct udevice *bus)
 {
-	struct cadence_spi_platdata *plat = bus->platdata;
+	struct cadence_spi_plat *plat = dev_get_plat(bus);
 	ofnode subnode;
-	struct clk clk;
-	int ret;
 
 	plat->regbase = (void *)devfdt_get_addr_index(bus, 0);
 	plat->ahbbase = (void *)devfdt_get_addr_size_index(bus, 1,
@@ -305,20 +321,6 @@ static int cadence_spi_ofdata_to_platdata(struct udevice *bus)
 	plat->tchsh_ns = ofnode_read_u32_default(subnode, "cdns,tchsh-ns", 20);
 	plat->tslch_ns = ofnode_read_u32_default(subnode, "cdns,tslch-ns", 20);
 
-	ret = clk_get_by_index(bus, 0, &clk);
-	if (ret) {
-#ifdef CONFIG_CQSPI_REF_CLK
-		plat->ref_clk_hz = CONFIG_CQSPI_REF_CLK;
-#else
-		return ret;
-#endif
-	} else {
-		plat->ref_clk_hz = clk_get_rate(&clk);
-		clk_free(&clk);
-		if (IS_ERR_VALUE(plat->ref_clk_hz))
-			return plat->ref_clk_hz;
-	}
-
 	debug("%s: regbase=%p ahbbase=%p max-frequency=%d page-size=%d\n",
 	      __func__, plat->regbase, plat->ahbbase, plat->max_hz,
 	      plat->page_size);
@@ -351,9 +353,9 @@ U_BOOT_DRIVER(cadence_spi) = {
 	.id = UCLASS_SPI,
 	.of_match = cadence_spi_ids,
 	.ops = &cadence_spi_ops,
-	.ofdata_to_platdata = cadence_spi_ofdata_to_platdata,
-	.platdata_auto_alloc_size = sizeof(struct cadence_spi_platdata),
-	.priv_auto_alloc_size = sizeof(struct cadence_spi_priv),
+	.of_to_plat = cadence_spi_of_to_plat,
+	.plat_auto	= sizeof(struct cadence_spi_plat),
+	.priv_auto	= sizeof(struct cadence_spi_priv),
 	.probe = cadence_spi_probe,
 	.remove = cadence_spi_remove,
 	.flags = DM_FLAG_OS_PREPARE,

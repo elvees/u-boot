@@ -4,10 +4,14 @@
  */
 #define USB_CLASS_HUB			9
 
+#include "rockchip-u-boot.dtsi"
+
 / {
 	aliases {
 		mmc0 = &sdhci;
 		mmc1 = &sdmmc;
+		pci0 = &pcie0;
+		spi1 = &spi1;
 	};
 
 	cic: syscon@ff620000 {
@@ -23,6 +27,12 @@
 		rockchip,pmu = <&pmugrf>;
 		clocks = <&cru PCLK_DDR_MON>;
 		clock-names = "pclk_ddr_mon";
+	};
+
+	rng: rng@ff8b8000 {
+		compatible = "rockchip,cryptov1-rng";
+		reg = <0x0 0xff8b8000 0x0 0x1000>;
+		status = "okay";
 	};
 
 	dmc: dmc {
@@ -49,6 +59,30 @@
 	};
 
 };
+
+#ifdef CONFIG_ROCKCHIP_SPI_IMAGE
+&binman {
+	rom {
+		filename = "u-boot.rom";
+		size = <0x400000>;
+		pad-byte = <0xff>;
+
+		mkimage {
+			args = "-n rk3399 -T rkspi";
+			u-boot-spl {
+			};
+		};
+		u-boot-img {
+			offset = <0x40000>;
+		};
+		u-boot {
+			offset = <0x300000>;
+		};
+		fdtmap {
+		};
+	};
+};
+#endif
 
 &cru {
 	u-boot,dm-pre-reloc;
@@ -79,11 +113,15 @@
 };
 
 &sdhci {
+	max-frequency = <200000000>;
 	u-boot,dm-pre-reloc;
 };
 
 &sdmmc {
 	u-boot,dm-pre-reloc;
+
+	/* mmc to sram can't do dma, prevent aborts transferring TF-A parts */
+	u-boot,spl-fifo-mode;
 };
 
 &spi1 {

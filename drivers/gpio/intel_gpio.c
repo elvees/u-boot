@@ -7,10 +7,12 @@
 #include <dm.h>
 #include <errno.h>
 #include <fdtdec.h>
+#include <log.h>
 #include <p2sb.h>
 #include <pch.h>
 #include <pci.h>
 #include <syscon.h>
+#include <acpi/acpi_device.h>
 #include <asm/cpu.h>
 #include <asm/gpio.h>
 #include <asm/intel_pinctrl.h>
@@ -18,12 +20,15 @@
 #include <asm/io.h>
 #include <asm/pci.h>
 #include <asm/arch/gpio.h>
+#include <dm/acpi.h>
 #include <dt-bindings/gpio/x86-gpio.h>
 
 static int intel_gpio_direction_input(struct udevice *dev, uint offset)
 {
 	struct udevice *pinctrl = dev_get_parent(dev);
-	uint config_offset = intel_pinctrl_get_config_reg_addr(pinctrl, offset);
+	uint config_offset;
+
+	config_offset = intel_pinctrl_get_config_reg_offset(pinctrl, offset);
 
 	pcr_clrsetbits32(pinctrl, config_offset,
 			 PAD_CFG0_MODE_MASK | PAD_CFG0_TX_STATE |
@@ -37,7 +42,9 @@ static int intel_gpio_direction_output(struct udevice *dev, uint offset,
 				       int value)
 {
 	struct udevice *pinctrl = dev_get_parent(dev);
-	uint config_offset = intel_pinctrl_get_config_reg_addr(pinctrl, offset);
+	uint config_offset;
+
+	config_offset = intel_pinctrl_get_config_reg_offset(pinctrl, offset);
 
 	pcr_clrsetbits32(pinctrl, config_offset,
 			 PAD_CFG0_MODE_MASK | PAD_CFG0_RX_STATE |
@@ -67,10 +74,13 @@ static int intel_gpio_get_value(struct udevice *dev, uint offset)
 	return 0;
 }
 
-static int intel_gpio_set_value(struct udevice *dev, unsigned offset, int value)
+static int intel_gpio_set_value(struct udevice *dev, unsigned int offset,
+				int value)
 {
 	struct udevice *pinctrl = dev_get_parent(dev);
-	uint config_offset = intel_pinctrl_get_config_reg_addr(pinctrl, offset);
+	uint config_offset;
+
+	config_offset = intel_pinctrl_get_config_reg_offset(pinctrl, offset);
 
 	pcr_clrsetbits32(pinctrl, config_offset, PAD_CFG0_TX_STATE,
 			 value ? PAD_CFG0_TX_STATE : 0);
@@ -120,12 +130,41 @@ static int intel_gpio_xlate(struct udevice *orig_dev, struct gpio_desc *desc,
 	return 0;
 }
 
+#if CONFIG_IS_ENABLED(ACPIGEN)
+static int intel_gpio_get_acpi(const struct gpio_desc *desc,
+			       struct acpi_gpio *gpio)
+{
+	struct udevice *pinctrl;
+	int ret;
+
+	if (!dm_gpio_is_valid(desc))
+		return -ENOENT;
+	pinctrl = dev_get_parent(desc->dev);
+
+	memset(gpio, '\0', sizeof(*gpio));
+
+	gpio->type = ACPI_GPIO_TYPE_IO;
+	gpio->pull = ACPI_GPIO_PULL_DEFAULT;
+	gpio->io_restrict = ACPI_GPIO_IO_RESTRICT_OUTPUT;
+	gpio->polarity = ACPI_GPIO_ACTIVE_HIGH;
+	gpio->pin_count = 1;
+	gpio->pins[0] = intel_pinctrl_get_acpi_pin(pinctrl, desc->offset);
+	gpio->pin0_addr = intel_pinctrl_get_config_reg_addr(pinctrl,
+							    desc->offset);
+	ret = acpi_get_path(pinctrl, gpio->resource, sizeof(gpio->resource));
+	if (ret)
+		return log_msg_ret("resource", ret);
+
+	return 0;
+}
+#endif
+
 static int intel_gpio_probe(struct udevice *dev)
 {
 	return 0;
 }
 
-static int intel_gpio_ofdata_to_platdata(struct udevice *dev)
+static int intel_gpio_of_to_plat(struct udevice *dev)
 {
 	struct gpio_dev_priv *upriv = dev_get_uclass_priv(dev);
 	struct intel_pinctrl_priv *pinctrl_priv = dev_get_priv(dev->parent);
@@ -144,18 +183,23 @@ static const struct dm_gpio_ops gpio_intel_ops = {
 	.set_value		= intel_gpio_set_value,
 	.get_function		= intel_gpio_get_function,
 	.xlate			= intel_gpio_xlate,
+#if CONFIG_IS_ENABLED(ACPIGEN)
+	.get_acpi		= intel_gpio_get_acpi,
+#endif
 };
 
+#if !CONFIG_IS_ENABLED(OF_PLATDATA)
 static const struct udevice_id intel_intel_gpio_ids[] = {
 	{ .compatible = "intel,gpio" },
 	{ }
 };
+#endif
 
-U_BOOT_DRIVER(gpio_intel) = {
-	.name	= "gpio_intel",
+U_BOOT_DRIVER(intel_gpio) = {
+	.name	= "intel_gpio",
 	.id	= UCLASS_GPIO,
-	.of_match = intel_intel_gpio_ids,
+	.of_match = of_match_ptr(intel_intel_gpio_ids),
 	.ops	= &gpio_intel_ops,
-	.ofdata_to_platdata	= intel_gpio_ofdata_to_platdata,
+	.of_to_plat	= intel_gpio_of_to_plat,
 	.probe	= intel_gpio_probe,
 };

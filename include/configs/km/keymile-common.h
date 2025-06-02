@@ -7,6 +7,8 @@
 #ifndef __CONFIG_KEYMILE_H
 #define __CONFIG_KEYMILE_H
 
+#include <linux/stringify.h>
+
 /*
  * Miscellaneous configurable options
  */
@@ -29,9 +31,6 @@
  * BOOTP options
  */
 #define CONFIG_BOOTP_BOOTFILESIZE
-
-/* UBI Support for all Keymile boards */
-#define CONFIG_MTD_CONCAT
 
 #ifndef CONFIG_KM_DEF_ENV_BOOTPARAMS
 #define CONFIG_KM_DEF_ENV_BOOTPARAMS \
@@ -88,12 +87,12 @@
 		"set_fdthigh cramfsloadkernel flashargs add_default "	\
 		"addpanic boot\0"					\
 	"develop="							\
-		"tftp 200000 scripts/develop-${arch}.txt && "		\
-		"env import -t 200000 ${filesize} && "			\
+		"tftp ${load_addr_r} scripts/develop-${arch}.txt && "	\
+		"env import -t ${load_addr_r} ${filesize} && "		\
 		"run setup_debug_env\0"					\
 	"ramfs="							\
-		"tftp 200000 scripts/ramfs-${arch}.txt && "		\
-		"env import -t 200000 ${filesize} && "			\
+		"tftp ${load_addr_r} scripts/ramfs-${arch}.txt && "	\
+		"env import -t ${load_addr_r} ${filesize} && "		\
 		"run setup_debug_env\0"					\
 	""
 
@@ -141,8 +140,7 @@
 #define CONFIG_KM_DEF_ENV_FLASH_BOOT					\
 	"cramfsaddr=" __stringify(CONFIG_KM_CRAMFS_ADDR) "\0"		\
 	"cramfsloadkernel=cramfsload ${load_addr_r} ${uimage}\0"	\
-	"ubicopy=ubi read "__stringify(CONFIG_KM_CRAMFS_ADDR)		\
-			" bootfs${boot_bank}\0"				\
+	"ubicopy=ubi read ${cramfsaddr} bootfs${boot_bank}\0"		\
 	"uimage=" CONFIG_KM_UIMAGE_NAME					\
 	CONFIG_KM_DEV_ENV_FLASH_BOOT_UBI
 
@@ -158,6 +156,7 @@
 	"pnvramsize=" __stringify(CONFIG_KM_PNVRAM) "\0"		\
 	"testbootcmd=setenv boot_bank ${test_bank}; "			\
 		"run ${subbootcmds}; reset\0"				\
+	"env_version=1\0"						\
 	""
 
 #ifndef CONFIG_KM_DEF_ENV
@@ -182,9 +181,9 @@
 	"cramfsloadfdt="						\
 		"cramfsload ${fdt_addr_r} "				\
 		"fdt_0x${IVM_BoardId}_0x${IVM_HWKey}.dtb\0"		\
-	"fdt_addr_r="__stringify(CONFIG_KM_FDT_ADDR) "\0"		\
+	"fdt_addr_r=" __stringify(CONFIG_KM_FDT_ADDR) "\0"		\
 	"init=/sbin/init-overlay.sh\0"					\
-	"load_addr_r="__stringify(CONFIG_KM_KERNEL_ADDR) "\0"		\
+	"load_addr_r=" __stringify(CONFIG_KM_KERNEL_ADDR) "\0"		\
 	"load=tftpboot ${load_addr_r} ${u-boot}\0"			\
 	"mtdids=" CONFIG_MTDIDS_DEFAULT "\0"					\
 	"mtdparts=" CONFIG_MTDPARTS_DEFAULT "\0"				\

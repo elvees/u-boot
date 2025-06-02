@@ -4,7 +4,10 @@
  */
 
 #include <common.h>
+#include <command.h>
+#include <init.h>
 #include <wait_bit.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/clock_manager.h>
 
@@ -61,7 +64,8 @@ int set_cpu_clk_info(void)
 }
 
 #ifndef CONFIG_SPL_BUILD
-static int do_showclocks(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+static int do_showclocks(struct cmd_tbl *cmdtp, int flag, int argc,
+			 char *const argv[])
 {
 	cm_print_clock_quick_summary();
 	return 0;

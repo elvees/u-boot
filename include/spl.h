@@ -7,11 +7,16 @@
 #define	_SPL_H_
 
 #include <binman_sym.h>
+#include <linker_lists.h>
 
 /* Platform-specific defines */
 #include <linux/compiler.h>
+#include <asm/global_data.h>
 #include <asm/spl.h>
 #include <handoff.h>
+
+struct blk_desc;
+struct image_header;
 
 /* Value in r0 indicates we booted from U-Boot */
 #define UBOOT_NOT_LOADED_FROM_SPL	0x13578642
@@ -21,6 +26,9 @@
 #define MMCSD_MODE_RAW		1
 #define MMCSD_MODE_FS		2
 #define MMCSD_MODE_EMMCBOOT	3
+
+struct blk_desc;
+struct image_header;
 
 /*
  * u_boot_first_phase() - check if this is the first U-Boot phase
@@ -50,6 +58,7 @@ static inline bool u_boot_first_phase(void)
 }
 
 enum u_boot_phase {
+	PHASE_NONE,	/* Invalid phase, signifying before U-Boot */
 	PHASE_TPL,	/* Running in TPL */
 	PHASE_SPL,	/* Running in SPL */
 	PHASE_BOARD_F,	/* Running in U-Boot before relocation */
@@ -115,6 +124,58 @@ static inline enum u_boot_phase spl_phase(void)
 #endif
 }
 
+/**
+ * spl_prev_phase() - Figure out the previous U-Boot phase
+ *
+ * @return the previous phase from this one, e.g. if called in SPL this returns
+ *	PHASE_TPL, if TPL is enabled
+ */
+static inline enum u_boot_phase spl_prev_phase(void)
+{
+#ifdef CONFIG_TPL_BUILD
+	return PHASE_NONE;
+#elif defined(CONFIG_SPL_BUILD)
+	return IS_ENABLED(CONFIG_TPL) ? PHASE_TPL : PHASE_NONE;
+#else
+	return IS_ENABLED(CONFIG_SPL) ? PHASE_SPL : PHASE_NONE;
+#endif
+}
+
+/**
+ * spl_next_phase() - Figure out the next U-Boot phase
+ *
+ * @return the next phase from this one, e.g. if called in TPL this returns
+ *	PHASE_SPL
+ */
+static inline enum u_boot_phase spl_next_phase(void)
+{
+#ifdef CONFIG_TPL_BUILD
+	return PHASE_SPL;
+#else
+	return PHASE_BOARD_F;
+#endif
+}
+
+/**
+ * spl_phase_name() - Get the name of the current phase
+ *
+ * @return phase name
+ */
+static inline const char *spl_phase_name(enum u_boot_phase phase)
+{
+	switch (phase) {
+	case PHASE_TPL:
+		return "TPL";
+	case PHASE_SPL:
+		return "SPL";
+	case PHASE_BOARD_F:
+	case PHASE_BOARD_R:
+		return "U-Boot";
+	default:
+		return "phase?";
+	}
+}
+
 /* A string name for SPL or TPL */
 #ifdef CONFIG_SPL_BUILD
 # ifdef CONFIG_TPL_BUILD
@@ -147,7 +208,7 @@ struct spl_image_info {
 #endif
 };
 
-/*
+/**
  * Information required to load data from a device
  *
  * @dev: Pointer to the device, e.g. struct mmc *
@@ -194,6 +255,16 @@ ulong spl_get_image_pos(void);
 ulong spl_get_image_size(void);
 
 /**
+ * spl_get_image_text_base() - get the text base of the next phase
+ *
+ * This returns the address that the next stage is linked to run at, i.e.
+ * CONFIG_SPL_TEXT_BASE or CONFIG_SYS_TEXT_BASE
+ *
+ * @return text-base address
+ */
+ulong spl_get_image_text_base(void);
+
+/**
  * spl_load_simple_fit_skip_processing() - Hook to allow skipping the FIT
  *	image processing during spl_load_simple_fit().
  *
@@ -220,6 +291,19 @@ int spl_load_simple_fit(struct spl_image_info *spl_image,
 #define SPL_FIT_FOUND		2
 
 /**
+ * spl_load_legacy_img() - Loads a legacy image from a device.
+ * @spl_image:	Image description to set up
+ * @load:	Structure containing the information required to load data.
+ * @header:	Pointer to image header (including appended image)
+ *
+ * Reads an legacy image from the device. Loads u-boot image to
+ * specified load address.
+ * Returns 0 on success.
+ */
+int spl_load_legacy_img(struct spl_image_info *spl_image,
+			struct spl_load_info *load, ulong header);
+
+/**
  * spl_load_imx_container() - Loads a imx container image from a device.
  * @spl_image:	Image description to set up
  * @info:	Structure containing the information required to load data.
@@ -234,9 +318,45 @@ int spl_load_imx_container(struct spl_image_info *spl_image,
 /* SPL common functions */
 void preloader_console_init(void);
 u32 spl_boot_device(void);
-u32 spl_boot_mode(const u32 boot_device);
-int spl_boot_partition(const u32 boot_device);
-void spl_set_bd(void);
+
+/**
+ * spl_mmc_boot_mode() - Lookup function for the mode of an MMC boot source.
+ * @boot_device:	ID of the device which the MMC driver wants to read
+ *			from.  Common values are e.g. BOOT_DEVICE_MMC1,
+ *			BOOT_DEVICE_MMC2, BOOT_DEVICE_MMC2_2.
+ *
+ * This function should return one of MMCSD_MODE_FS, MMCSD_MODE_EMMCBOOT, or
+ * MMCSD_MODE_RAW for each MMC boot source which is defined for the target.  The
+ * boot_device parameter tells which device the MMC driver is interested in.
+ *
+ * If not overridden, it is weakly defined in common/spl/spl_mmc.c.
+ *
+ * Note:  It is important to use the boot_device parameter instead of e.g.
+ * spl_boot_device() as U-Boot is not always loaded from the same device as SPL.
+ */
+u32 spl_mmc_boot_mode(const u32 boot_device);
+
+/**
+ * spl_mmc_boot_partition() - MMC partition to load U-Boot from.
+ * @boot_device:	ID of the device which the MMC driver wants to load
+ *			U-Boot from.
+ *
+ * This function should return the partition number which the SPL
+ * should load U-Boot from (on the given boot_device) when
+ * CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_USE_PARTITION is set.
+ *
+ * If not overridden, it is weakly defined in common/spl/spl_mmc.c.
+ */
+int spl_mmc_boot_partition(const u32 boot_device);
+
+/**
+ * spl_alloc_bd() - Allocate space for bd_info
+ *
+ * This sets up the gd->bd pointer by allocating memory for it
+ *
+ * @return 0 if OK, -ENOMEM if out of memory
+ */
+int spl_alloc_bd(void);
 
 /**
  * spl_set_header_raw_uboot() - Set up a standard SPL image structure
@@ -454,6 +574,20 @@ int spl_mmc_load(struct spl_image_info *spl_image,
 		 int raw_part,
 		 unsigned long raw_sect);
 
+/**
+ * spl_usb_load() - Load an image file from USB mass storage
+ *
+ * @param spl_image	Image data filled in by loading process
+ * @param bootdev	Describes which device to load from
+ * @param raw_part	Fat partition to load from
+ * @param filename	Name of file to load
+ *
+ * @return 0 on success, otherwise error code
+ */
+int spl_usb_load(struct spl_image_info *spl_image,
+		 struct spl_boot_device *bootdev,
+		 int partition, const char *filename);
+
 int spl_ymodem_load_image(struct spl_image_info *spl_image,
 			  struct spl_boot_device *bootdev);
 
@@ -463,25 +597,79 @@ int spl_ymodem_load_image(struct spl_image_info *spl_image,
 void spl_invoke_atf(struct spl_image_info *spl_image);
 
 /**
- * bl2_plat_get_bl31_params() - prepare params for bl31.
- * @bl32_entry	address of BL32 executable (secure)
- * @bl33_entry	address of BL33 executable (non secure)
- * @fdt_addr	address of Flat Device Tree
+ * bl2_plat_get_bl31_params() - return params for bl31.
+ * @bl32_entry:	address of BL32 executable (secure)
+ * @bl33_entry:	address of BL33 executable (non secure)
+ * @fdt_addr:	address of Flat Device Tree
  *
- * This function assigns a pointer to the memory that the platform has kept
- * aside to pass platform specific and trusted firmware related information
- * to BL31. This memory is allocated by allocating memory to
- * bl2_to_bl31_params_mem structure which is a superset of all the
- * structure whose information is passed to BL31
- * NOTE: This function should be called only once and should be done
- * before generating params to BL31
+ * This is a weak function which might be overridden by the board code. By
+ * default it will just call bl2_plat_get_bl31_params_default().
  *
- * @return bl31 params structure pointer
+ * If you just want to manipulate or add some parameters, you can override
+ * this function, call bl2_plat_get_bl31_params_default and operate on the
+ * returned bl31 params.
+ *
+ * Return: bl31 params structure pointer
  */
 struct bl31_params *bl2_plat_get_bl31_params(uintptr_t bl32_entry,
 					     uintptr_t bl33_entry,
 					     uintptr_t fdt_addr);
 
+/**
+ * bl2_plat_get_bl31_params_default() - prepare params for bl31.
+ * @bl32_entry:	address of BL32 executable (secure)
+ * @bl33_entry:	address of BL33 executable (non secure)
+ * @fdt_addr:	address of Flat Device Tree
+ *
+ * This is the default implementation of bl2_plat_get_bl31_params(). It assigns
+ * a pointer to the memory that the platform has kept aside to pass platform
+ * specific and trusted firmware related information to BL31. This memory is
+ * allocated by allocating memory to bl2_to_bl31_params_mem structure which is
+ * a superset of all the structure whose information is passed to BL31
+ *
+ * NOTE: The memory is statically allocated, thus this function should be
+ * called only once. All subsequent calls will overwrite any changes.
+ *
+ * Return: bl31 params structure pointer
+ */
+struct bl31_params *bl2_plat_get_bl31_params_default(uintptr_t bl32_entry,
+						     uintptr_t bl33_entry,
+						     uintptr_t fdt_addr);
+
+/**
+ * bl2_plat_get_bl31_params_v2() - return params for bl31
+ * @bl32_entry:	address of BL32 executable (secure)
+ * @bl33_entry:	address of BL33 executable (non secure)
+ * @fdt_addr:	address of Flat Device Tree
+ *
+ * This function does the same as bl2_plat_get_bl31_params() except that is is
+ * used for the new LOAD_IMAGE_V2 option, which uses a slightly different
+ * method to pass the parameters.
+ *
+ * Return: bl31 params structure pointer
+ */
+struct bl_params *bl2_plat_get_bl31_params_v2(uintptr_t bl32_entry,
+					      uintptr_t bl33_entry,
+					      uintptr_t fdt_addr);
+
+/**
+ * bl2_plat_get_bl31_params_v2_default() - prepare params for bl31.
+ * @bl32_entry:	address of BL32 executable (secure)
+ * @bl33_entry:	address of BL33 executable (non secure)
+ * @fdt_addr:	address of Flat Device Tree
+ *
+ * This is the default implementation of bl2_plat_get_bl31_params_v2(). It
+ * prepares the linked list of the bl31 params, populates the image types and
+ * set the entry points for bl32 and bl33 (if available).
+ *
+ * NOTE: The memory is statically allocated, thus this function should be
+ * called only once. All subsequent calls will overwrite any changes.
+ *
+ * Return: bl31 params structure pointer
+ */
+struct bl_params *bl2_plat_get_bl31_params_v2_default(uintptr_t bl32_entry,
+						      uintptr_t bl33_entry,
+						      uintptr_t fdt_addr);
 /**
  * spl_optee_entry - entry function for optee
  *
@@ -513,9 +701,9 @@ int board_return_to_bootrom(struct spl_image_info *spl_image,
 
 /**
  * board_spl_fit_post_load - allow process images after loading finished
- *
+ * @fit: Pointer to a valid Flattened Image Tree blob
  */
-void board_spl_fit_post_load(ulong load_addr, size_t length);
+void board_spl_fit_post_load(const void *fit);
 
 /**
  * board_spl_fit_size_align - specific size align before processing payload
@@ -537,4 +725,5 @@ void spl_perform_fixups(struct spl_image_info *spl_image);
  */
 struct image_header *spl_get_load_buffer(ssize_t offset, size_t size);
 
+void spl_save_restore_data(void);
 #endif

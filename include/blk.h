@@ -33,6 +33,7 @@ enum if_type {
 	IF_TYPE_HOST,
 	IF_TYPE_NVME,
 	IF_TYPE_EFI,
+	IF_TYPE_PVBLOCK,
 	IF_TYPE_VIRTIO,
 
 	IF_TYPE_COUNT,			/* Number of interface types */
@@ -55,7 +56,7 @@ enum sig_type {
 
 /*
  * With driver model (CONFIG_BLK) this is uclass platform data, accessible
- * with dev_get_uclass_platdata(dev)
+ * with dev_get_uclass_plat(dev)
  */
 struct blk_desc {
 	/*
@@ -679,7 +680,7 @@ const char *blk_get_if_type_name(enum if_type if_type);
  * @cur_devnump: Current device number for this interface type
  * @return 0 if OK, CMD_RET_ERROR on error
  */
-int blk_common_cmd(int argc, char * const argv[], enum if_type if_type,
+int blk_common_cmd(int argc, char *const argv[], enum if_type if_type,
 		   int *cur_devnump);
 
 #endif

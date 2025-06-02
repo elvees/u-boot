@@ -15,10 +15,12 @@
 #include <spl.h>
 #include <asm/arch/bootrom.h>
 #include <asm/arch/ddr.h>
+#include <linux/delay.h>
 #endif
 #include <asm/arch/clock.h>
 #include <asm/arch/regs.h>
 #include <watchdog.h>
+#include <asm/system.h>
 
 #include <asm/io.h>
 

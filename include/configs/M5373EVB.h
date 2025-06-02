@@ -13,6 +13,8 @@
 #ifndef _M5373EVB_H
 #define _M5373EVB_H
 
+#include <linux/stringify.h>
+
 /*
  * High Level Configuration Options
  * (easy to change)
@@ -115,9 +117,6 @@
 #define CONFIG_SYS_SDRAM_CTRL		0xE1092000
 #define CONFIG_SYS_SDRAM_EMOD		0x40010000
 #define CONFIG_SYS_SDRAM_MODE		0x018D0000
-
-#define CONFIG_SYS_MEMTEST_START	CONFIG_SYS_SDRAM_BASE + 0x400
-#define CONFIG_SYS_MEMTEST_END		((CONFIG_SYS_SDRAM_SIZE - 3) << 20)
 
 #define CONFIG_SYS_MONITOR_BASE	(CONFIG_SYS_FLASH_BASE + 0x400)
 #define CONFIG_SYS_MONITOR_LEN		(256 << 10)	/* Reserve 256 kB for Monitor */

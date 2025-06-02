@@ -13,6 +13,8 @@
 #ifndef _M54451EVB_H
 #define _M54451EVB_H
 
+#include <linux/stringify.h>
+
 /*
  * High Level Configuration Options
  * (easy to change)
@@ -152,9 +154,6 @@
 #define CONFIG_SYS_SDRAM_MODE		0x008D0000
 #define CONFIG_SYS_SDRAM_DRV_STRENGTH	0x44
 
-#define CONFIG_SYS_MEMTEST_START	CONFIG_SYS_SDRAM_BASE + 0x400
-#define CONFIG_SYS_MEMTEST_END		((CONFIG_SYS_SDRAM_SIZE - 3) << 20)
-
 #ifdef CONFIG_CF_SBF
 #	define CONFIG_SERIAL_BOOT
 #	define CONFIG_SYS_MONITOR_BASE	(CONFIG_SYS_TEXT_BASE + 0x400)
@@ -178,7 +177,6 @@
  * Environment is not embedded in u-boot. First time runing may have env
  * crc error warning if there is no correct environment on the flash.
  */
-#undef CONFIG_ENV_OVERWRITE
 
 /* FLASH organization */
 #define CONFIG_SYS_FLASH_BASE		CONFIG_SYS_CS0_BASE

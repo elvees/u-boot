@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0+
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2017 Theobroma Systems Design und Consulting GmbH
  * Copyright (c) 2015 Google, Inc
@@ -8,9 +8,11 @@
 #include <common.h>
 #include <display.h>
 #include <dm.h>
+#include <log.h>
 #include <regmap.h>
 #include <video.h>
 #include <asm/arch-rockchip/hardware.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include "rk_vop.h"
 
@@ -98,5 +100,5 @@ U_BOOT_DRIVER(rk3399_vop) = {
 	.ops	= &rk3399_vop_ops,
 	.bind	= rk_vop_bind,
 	.probe	= rk3399_vop_probe,
-	.priv_auto_alloc_size	= sizeof(struct rk_vop_priv),
+	.priv_auto	= sizeof(struct rk_vop_priv),
 };

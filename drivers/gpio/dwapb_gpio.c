@@ -6,6 +6,7 @@
  */
 
 #include <common.h>
+#include <log.h>
 #include <malloc.h>
 #include <asm/arch/gpio.h>
 #include <asm/gpio.h>
@@ -18,6 +19,7 @@
 #include <dm/root.h>
 #include <errno.h>
 #include <reset.h>
+#include <linux/bitops.h>
 
 #define GPIO_SWPORT_DR(p)	(0x00 + (p) * 0xc)
 #define GPIO_SWPORT_DDR(p)	(0x04 + (p) * 0xc)
@@ -35,17 +37,17 @@ struct gpio_dwapb_priv {
 	struct reset_ctl_bulk	resets;
 };
 
-struct gpio_dwapb_platdata {
+struct gpio_dwapb_plat {
 	const char	*name;
 	int		bank;
 	int		pins;
-	fdt_addr_t	base;
+	void __iomem	*base;
 };
 
 static int dwapb_gpio_request(struct udevice *dev, unsigned pin,
 			      const char *label)
 {
-	struct gpio_dwapb_platdata *plat = dev_get_platdata(dev);
+	struct gpio_dwapb_plat *plat = dev_get_plat(dev);
 
 	clrbits_le32(plat->base + GPIO_SWPORT_CTL(plat->bank), 1 << pin);
 	return 0;
@@ -53,7 +55,7 @@ static int dwapb_gpio_request(struct udevice *dev, unsigned pin,
 
 static int dwapb_gpio_free(struct udevice *dev, unsigned pin)
 {
-	struct gpio_dwapb_platdata *plat = dev_get_platdata(dev);
+	struct gpio_dwapb_plat *plat = dev_get_plat(dev);
 
 	setbits_le32(plat->base + GPIO_SWPORT_CTL(plat->bank), 1 << pin);
 	return 0;
@@ -61,7 +63,7 @@ static int dwapb_gpio_free(struct udevice *dev, unsigned pin)
 
 static int dwapb_gpio_direction_input(struct udevice *dev, unsigned pin)
 {
-	struct gpio_dwapb_platdata *plat = dev_get_platdata(dev);
+	struct gpio_dwapb_plat *plat = dev_get_plat(dev);
 
 	clrbits_le32(plat->base + GPIO_SWPORT_DDR(plat->bank), 1 << pin);
 	return 0;
@@ -70,7 +72,7 @@ static int dwapb_gpio_direction_input(struct udevice *dev, unsigned pin)
 static int dwapb_gpio_direction_output(struct udevice *dev, unsigned pin,
 				     int val)
 {
-	struct gpio_dwapb_platdata *plat = dev_get_platdata(dev);
+	struct gpio_dwapb_plat *plat = dev_get_plat(dev);
 
 	setbits_le32(plat->base + GPIO_SWPORT_DDR(plat->bank), 1 << pin);
 
@@ -82,15 +84,9 @@ static int dwapb_gpio_direction_output(struct udevice *dev, unsigned pin,
 	return 0;
 }
 
-static int dwapb_gpio_get_value(struct udevice *dev, unsigned pin)
-{
-	struct gpio_dwapb_platdata *plat = dev_get_platdata(dev);
-	return !!(readl(plat->base + GPIO_EXT_PORT(plat->bank)) & (1 << pin));
-}
-
 static int dwapb_gpio_set_value(struct udevice *dev, unsigned pin, int val)
 {
-	struct gpio_dwapb_platdata *plat = dev_get_platdata(dev);
+	struct gpio_dwapb_plat *plat = dev_get_plat(dev);
 
 	if (val)
 		setbits_le32(plat->base + GPIO_SWPORT_DR(plat->bank), 1 << pin);
@@ -102,7 +98,7 @@ static int dwapb_gpio_set_value(struct udevice *dev, unsigned pin, int val)
 
 static int dwapb_gpio_get_function(struct udevice *dev, unsigned offset)
 {
-	struct gpio_dwapb_platdata *plat = dev_get_platdata(dev);
+	struct gpio_dwapb_plat *plat = dev_get_plat(dev);
 	u32 gpio;
 
 	gpio = readl(plat->base + GPIO_SWPORT_DDR(plat->bank));
@@ -111,6 +107,18 @@ static int dwapb_gpio_get_function(struct udevice *dev, unsigned offset)
 		return GPIOF_OUTPUT;
 	else
 		return GPIOF_INPUT;
+}
+
+static int dwapb_gpio_get_value(struct udevice *dev, unsigned pin)
+{
+	struct gpio_dwapb_plat *plat = dev_get_plat(dev);
+	u32 value;
+
+	if (dwapb_gpio_get_function(dev, pin) == GPIOF_OUTPUT)
+		value = readl(plat->base + GPIO_SWPORT_DR(plat->bank));
+	else
+		value = readl(plat->base + GPIO_EXT_PORT(plat->bank));
+	return !!(value & BIT(pin));
 }
 
 static const struct dm_gpio_ops gpio_dwapb_ops = {
@@ -153,7 +161,7 @@ static int gpio_dwapb_reset(struct udevice *dev)
 static int gpio_dwapb_probe(struct udevice *dev)
 {
 	struct gpio_dev_priv *priv = dev_get_uclass_priv(dev);
-	struct gpio_dwapb_platdata *plat = dev->platdata;
+	struct gpio_dwapb_plat *plat = dev_get_plat(dev);
 
 	if (!plat) {
 		/* Reset on parent device only */
@@ -168,7 +176,7 @@ static int gpio_dwapb_probe(struct udevice *dev)
 
 static int gpio_dwapb_bind(struct udevice *dev)
 {
-	struct gpio_dwapb_platdata *plat = dev_get_platdata(dev);
+	struct gpio_dwapb_plat *plat = dev_get_plat(dev);
 	struct udevice *subdev;
 	fdt_addr_t base;
 	u32 skip_list[32];
@@ -197,7 +205,7 @@ static int gpio_dwapb_bind(struct udevice *dev)
 		if (!plat)
 			return -ENOMEM;
 
-		plat->base = base;
+		plat->base = (void *)base;
 		plat->bank = ofnode_read_u32_default(node, "reg", 0);
 		plat->pins = ofnode_read_u32_default(node, "snps,nr-gpios", 0);
 
@@ -207,7 +215,15 @@ static int gpio_dwapb_bind(struct udevice *dev)
 			 * Fall back to node name. This means accessing pins
 			 * via bank name won't work.
 			 */
-			plat->name = ofnode_get_name(node);
+			char name[32];
+
+			snprintf(name, sizeof(name), "%s_",
+				 ofnode_get_name(node));
+			plat->name = strdup(name);
+			if (!plat->name) {
+				kfree(plat);
+				return -ENOMEM;
+			}
 		}
 
 		skip_mask = 0;
@@ -223,8 +239,8 @@ static int gpio_dwapb_bind(struct udevice *dev)
 				skip_mask |= BIT(skip_list[i]);
 		}
 
-		ret = device_bind_ofnode(dev, dev->driver, plat->name,
-					 plat, node, &subdev);
+		ret = device_bind(dev, dev->driver, plat->name, plat, node,
+				  &subdev);
 		if (ret)
 			return ret;
 		reg = readl(plat->base + GPIO_SWPORT_CTL(plat->bank));
@@ -237,7 +253,7 @@ static int gpio_dwapb_bind(struct udevice *dev)
 
 static int gpio_dwapb_remove(struct udevice *dev)
 {
-	struct gpio_dwapb_platdata *plat = dev_get_platdata(dev);
+	struct gpio_dwapb_plat *plat = dev_get_plat(dev);
 	struct gpio_dwapb_priv *priv = dev_get_priv(dev);
 
 	if (!plat && priv)
@@ -259,5 +275,5 @@ U_BOOT_DRIVER(gpio_dwapb) = {
 	.bind		= gpio_dwapb_bind,
 	.probe		= gpio_dwapb_probe,
 	.remove		= gpio_dwapb_remove,
-	.priv_auto_alloc_size   = sizeof(struct gpio_dwapb_priv),
+	.priv_auto	  = sizeof(struct gpio_dwapb_priv),
 };

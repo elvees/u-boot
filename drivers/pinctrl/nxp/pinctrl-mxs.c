@@ -5,6 +5,8 @@
  */
 
 #include <common.h>
+#include <log.h>
+#include <asm/global_data.h>
 #include <dm/device_compat.h>
 #include <dm/devres.h>
 #include <linux/io.h>
@@ -179,14 +181,16 @@ static const struct udevice_id mxs_pinctrl_match[] = {
 	{ /* sentinel */ }
 };
 
-U_BOOT_DRIVER(mxs_pinctrl) = {
-	.name = "mxs-pinctrl",
+U_BOOT_DRIVER(fsl_imx23_pinctrl) = {
+	.name = "fsl_imx23_pinctrl",
 	.id = UCLASS_PINCTRL,
 	.of_match = of_match_ptr(mxs_pinctrl_match),
 	.probe = mxs_pinctrl_probe,
 #if !CONFIG_IS_ENABLED(OF_PLATDATA)
 	.bind		= dm_scan_fdt_dev,
 #endif
-	.priv_auto_alloc_size = sizeof(struct mxs_pinctrl_priv),
+	.priv_auto	= sizeof(struct mxs_pinctrl_priv),
 	.ops = &mxs_pinctrl_ops,
 };
+
+DM_DRIVER_ALIAS(fsl_imx23_pinctrl, fsl_imx28_pinctrl)

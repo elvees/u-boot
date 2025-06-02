@@ -6,6 +6,7 @@
 #include <common.h>
 #include <command.h>
 #include <env.h>
+#include <log.h>
 #include <net.h>
 #include <netdev.h>
 #include <asm/io.h>
@@ -19,11 +20,13 @@
 #include <miiphy.h>
 #include <fsl-mc/fsl_mc.h>
 #include <fsl-mc/ldpaa_wriop.h>
+#include <linux/delay.h>
 
 #include "../common/qixis.h"
 
 #include "ls1088a_qixis.h"
 
+#ifndef CONFIG_DM_ETH
 #ifdef CONFIG_FSL_MC_ENET
 
 #define SFP_TX		0
@@ -111,12 +114,12 @@ static void sgmii_configure_repeater(int dpmac)
 		{0x18, NULL}, {0x23, &reg_val[3]},
 		{0x2d, &reg_val[4]}, {4, &reg_val[5]},
 	};
-#ifdef CONFIG_DM_I2C
+#if CONFIG_IS_ENABLED(DM_I2C)
 	struct udevice *udev;
 #endif
 
 	/* Set I2c to Slot 1 */
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 	ret = i2c_write(0x77, 0, 0, &a, 1);
 #else
 	ret = i2c_get_chip_for_busnum(0, 0x77, 1, &udev);
@@ -170,7 +173,7 @@ static void sgmii_configure_repeater(int dpmac)
 		return;
 	}
 
-#ifdef CONFIG_DM_I2C
+#if CONFIG_IS_ENABLED(DM_I2C)
 	i2c_get_chip_for_busnum(0, i2c_phy_addr, 1, &udev);
 #endif
 
@@ -181,7 +184,7 @@ static void sgmii_configure_repeater(int dpmac)
 			reg_pair[5].val = &ch_b_eq[i];
 			reg_pair[6].val = &ch_b_ctl2[j];
 			for (k = 0; k < 10; k++) {
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 				ret = i2c_write(i2c_phy_addr,
 						reg_pair[k].addr,
 						1, reg_pair[k].val, 1);
@@ -254,12 +257,12 @@ static void qsgmii_configure_repeater(int dpmac)
 	const char *dev = mdio_names[EMI1_SLOT1];
 	int ret = 0;
 	unsigned short value;
-#ifdef CONFIG_DM_I2C
+#if CONFIG_IS_ENABLED(DM_I2C)
 	struct udevice *udev;
 #endif
 
 	/* Set I2c to Slot 1 */
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 	ret = i2c_write(0x77, 0, 0, &a, 1);
 #else
 	ret = i2c_get_chip_for_busnum(0, 0x77, 1, &udev);
@@ -301,7 +304,7 @@ static void qsgmii_configure_repeater(int dpmac)
 		return;
 	}
 
-#ifdef CONFIG_DM_I2C
+#if CONFIG_IS_ENABLED(DM_I2C)
 	i2c_get_chip_for_busnum(0, i2c_phy_addr, 1, &udev);
 #endif
 
@@ -313,7 +316,7 @@ static void qsgmii_configure_repeater(int dpmac)
 			reg_pair[6].val = &ch_b_ctl2[j];
 
 			for (k = 0; k < 10; k++) {
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 				ret = i2c_write(i2c_phy_addr,
 						reg_pair[k].addr,
 						1, reg_pair[k].val, 1);
@@ -666,7 +669,7 @@ static void ls1088a_handle_phy_interface_rgmii(int dpmac_id)
 }
 #endif
 
-int board_eth_init(bd_t *bis)
+int board_eth_init(struct bd_info *bis)
 {
 	int error = 0, i;
 #ifdef CONFIG_FSL_MC_ENET
@@ -735,6 +738,7 @@ int board_eth_init(bd_t *bis)
 	error = pci_eth_init(bis);
 	return error;
 }
+#endif // !CONFIG_DM_ETH
 
 #if defined(CONFIG_RESET_PHY_R)
 void reset_phy(void)
@@ -742,3 +746,90 @@ void reset_phy(void)
 	mc_env_boot();
 }
 #endif /* CONFIG_RESET_PHY_R */
+
+#if defined(CONFIG_DM_ETH) && defined(CONFIG_MULTI_DTB_FIT)
+
+/* Structure to hold SERDES protocols supported in case of
+ * CONFIG_DM_ETH enabled (network interfaces are described in the DTS).
+ *
+ * @serdes_block: the index of the SERDES block
+ * @serdes_protocol: the decimal value of the protocol supported
+ * @dts_needed: DTS notes describing the current configuration are needed
+ *
+ * When dts_needed is true, the board_fit_config_name_match() function
+ * will try to exactly match the current configuration of the block with a DTS
+ * name provided.
+ */
+static struct serdes_configuration {
+	u8 serdes_block;
+	u32 serdes_protocol;
+	bool dts_needed;
+} supported_protocols[] = {
+	/* Serdes block #1 */
+	{1, 21, true},
+	{1, 29, true},
+};
+
+#define SUPPORTED_SERDES_PROTOCOLS ARRAY_SIZE(supported_protocols)
+
+static bool protocol_supported(u8 serdes_block, u32 protocol)
+{
+	struct serdes_configuration serdes_conf;
+	int i;
+
+	for (i = 0; i < SUPPORTED_SERDES_PROTOCOLS; i++) {
+		serdes_conf = supported_protocols[i];
+		if (serdes_conf.serdes_block == serdes_block &&
+		    serdes_conf.serdes_protocol == protocol)
+			return true;
+	}
+
+	return false;
+}
+
+static void get_str_protocol(u8 serdes_block, u32 protocol, char *str)
+{
+	struct serdes_configuration serdes_conf;
+	int i;
+
+	for (i = 0; i < SUPPORTED_SERDES_PROTOCOLS; i++) {
+		serdes_conf = supported_protocols[i];
+		if (serdes_conf.serdes_block == serdes_block &&
+		    serdes_conf.serdes_protocol == protocol) {
+			if (serdes_conf.dts_needed == true)
+				sprintf(str, "%u", protocol);
+			else
+				sprintf(str, "x");
+			return;
+		}
+	}
+}
+
+int board_fit_config_name_match(const char *name)
+{
+	struct ccsr_gur *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	char expected_dts[100];
+	char srds_s1_str[2];
+	u32 srds_s1, cfg;
+
+	cfg = in_le32(&gur->rcwsr[FSL_CHASSIS3_SRDS1_REGSR - 1]) &
+		      FSL_CHASSIS3_SRDS1_PRTCL_MASK;
+	cfg >>= FSL_CHASSIS3_SRDS1_PRTCL_SHIFT;
+	srds_s1 = serdes_get_number(FSL_SRDS_1, cfg);
+
+	/* Check for supported protocols. The default DTS will be used
+	 * in this case
+	 */
+	if (!protocol_supported(1, srds_s1))
+		return -1;
+
+	get_str_protocol(1, srds_s1, srds_s1_str);
+
+	sprintf(expected_dts, "fsl-ls1088a-qds-%s-x", srds_s1_str);
+
+	if (!strcmp(name, expected_dts))
+		return 0;
+
+	return -1;
+}
+#endif

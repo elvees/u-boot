@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) STMicroelectronics SA 2017
- * Author(s): Patrice CHOTARD, <patrice.chotard@st.com> for STMicroelectronics.
+ * Author(s): Patrice CHOTARD, <patrice.chotard@foss.st.com> for STMicroelectronics.
  */
 
 #ifndef __CONFIG_H
@@ -50,9 +50,5 @@
 			"pxefile_addr_r=0x00428000\0" \
 			"ramdisk_addr_r=0x00438000\0"		\
 			BOOTENV
-
-/*
- * Command line configuration.
- */
 
 #endif /* __CONFIG_H */

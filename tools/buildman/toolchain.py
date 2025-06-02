@@ -10,10 +10,10 @@ import sys
 import tempfile
 import urllib.request, urllib.error, urllib.parse
 
-import bsettings
-import command
-import terminal
-import tools
+from buildman import bsettings
+from patman import command
+from patman import terminal
+from patman import tools
 
 (PRIORITY_FULL_PREFIX, PRIORITY_PREFIX_GCC, PRIORITY_PREFIX_GCC_PATH,
     PRIORITY_CALC) = list(range(4))
@@ -490,7 +490,7 @@ class Toolchains:
         if arch == 'aarch64':
             arch = 'arm64'
         base = 'https://www.kernel.org/pub/tools/crosstool/files/bin'
-        versions = ['7.3.0', '6.4.0', '4.9.4']
+        versions = ['9.2.0', '7.3.0', '6.4.0', '4.9.4']
         links = []
         for version in versions:
             url = '%s/%s/%s/' % (base, arch, version)

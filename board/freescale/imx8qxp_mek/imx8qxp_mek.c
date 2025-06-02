@@ -8,6 +8,8 @@
 #include <env.h>
 #include <errno.h>
 #include <init.h>
+#include <asm/global_data.h>
+#include <linux/delay.h>
 #include <linux/libfdt.h>
 #include <fsl_esdhc_imx.h>
 #include <fdt_support.h>
@@ -16,6 +18,7 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/sci/sci.h>
 #include <asm/arch/imx8-pins.h>
+#include <asm/arch/snvs_security_sc.h>
 #include <asm/arch/iomux.h>
 #include <asm/arch/sys_proto.h>
 
@@ -111,6 +114,15 @@ int board_init(void)
 {
 	board_gpio_init();
 
+#ifdef CONFIG_IMX_SNVS_SEC_SC_AUTO
+	{
+		int ret = snvs_security_sc_init();
+
+		if (ret)
+			return ret;
+	}
+#endif
+
 	return 0;
 }
 
@@ -123,7 +135,7 @@ void reset_cpu(ulong addr)
 }
 
 #ifdef CONFIG_OF_BOARD_SETUP
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	return 0;
 }
@@ -136,10 +148,23 @@ int board_mmc_get_env_dev(int devno)
 
 int board_late_init(void)
 {
+	char *fdt_file;
+	bool m4_booted;
+
 #ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
 	env_set("board_name", "MEK");
 	env_set("board_rev", "iMX8QXP");
 #endif
+
+	fdt_file = env_get("fdt_file");
+	m4_booted = m4_parts_booted();
+
+	if (fdt_file && !strcmp(fdt_file, "undefined")) {
+		if (m4_booted)
+			env_set("fdt_file", "imx8qxp-mek-rpmsg.dtb");
+		else
+			env_set("fdt_file", "imx8qxp-mek.dtb");
+	}
 
 	return 0;
 }

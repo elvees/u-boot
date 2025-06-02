@@ -7,7 +7,6 @@
 #include <avb_verify.h>
 #include <blk.h>
 #include <cpu_func.h>
-#include <fastboot.h>
 #include <image.h>
 #include <malloc.h>
 #include <part.h>
@@ -370,7 +369,7 @@ static struct mmc_part *get_partition(AvbOps *ops, const char *partition)
 	}
 
 	ret = part_get_info_by_name(mmc_blk, partition, &part->info);
-	if (!ret) {
+	if (ret < 0) {
 		printf("Can't find partition '%s'\n", partition);
 		goto err;
 	}

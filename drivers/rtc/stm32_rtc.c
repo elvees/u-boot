@@ -2,6 +2,9 @@
 /*
  * Copyright (C) 2019, STMicroelectronics - All Rights Reserved
  */
+
+#define LOG_CATEGORY UCLASS_RTC
+
 #include <common.h>
 #include <clk.h>
 #include <dm.h>
@@ -9,6 +12,7 @@
 #include <rtc.h>
 #include <asm/io.h>
 #include <dm/device_compat.h>
+#include <linux/bitops.h>
 #include <linux/iopoll.h>
 
 #define STM32_RTC_TR		0x00
@@ -326,5 +330,5 @@ U_BOOT_DRIVER(rtc_stm32) = {
 	.probe	= stm32_rtc_probe,
 	.of_match = stm32_rtc_ids,
 	.ops	= &stm32_rtc_ops,
-	.priv_auto_alloc_size = sizeof(struct stm32_rtc_priv),
+	.priv_auto	= sizeof(struct stm32_rtc_priv),
 };

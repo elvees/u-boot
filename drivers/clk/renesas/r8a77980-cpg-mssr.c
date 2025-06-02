@@ -13,6 +13,7 @@
 #include <common.h>
 #include <clk-uclass.h>
 #include <dm.h>
+#include <linux/bitops.h>
 
 #include <dt-bindings/clock/r8a77980-cpg-mssr.h>
 
@@ -248,7 +249,7 @@ U_BOOT_DRIVER(clk_r8a77980) = {
 	.name		= "clk_r8a77980",
 	.id		= UCLASS_CLK,
 	.of_match	= r8a77980_clk_ids,
-	.priv_auto_alloc_size = sizeof(struct gen3_clk_priv),
+	.priv_auto	= sizeof(struct gen3_clk_priv),
 	.ops		= &gen3_clk_ops,
 	.probe		= gen3_clk_probe,
 	.remove		= gen3_clk_remove,

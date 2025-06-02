@@ -6,6 +6,8 @@
 
 #include <common.h>
 #include <hang.h>
+#include <init.h>
+#include <log.h>
 #include <asm/io.h>
 #include <asm/arch/at91_common.h>
 #include <asm/arch/at91_pit.h>
@@ -101,6 +103,13 @@ void board_init_f(ulong dummy)
 {
 	int ret;
 
+	if (IS_ENABLED(CONFIG_OF_CONTROL)) {
+		ret = spl_early_init();
+		if (ret) {
+			debug("spl_early_init() failed: %d\n", ret);
+			hang();
+		}
+	}
 	switch_to_main_crystal_osc();
 
 #ifdef CONFIG_SAMA5D2

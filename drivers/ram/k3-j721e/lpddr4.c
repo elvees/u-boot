@@ -199,7 +199,6 @@ uint32_t lpddr4_init(lpddr4_privatedata * pd, const lpddr4_config * cfg)
 {
 	uint32_t result = 0U;
 	uint16_t productid = 0U;
-	uint32_t version[2] = { 0, 0 };
 
 	result = lpddr4_initsf(pd, cfg);
 	if (result == (uint32_t) CDN_EOK) {
@@ -209,20 +208,7 @@ uint32_t lpddr4_init(lpddr4_privatedata * pd, const lpddr4_config * cfg)
 						     CPS_REG_READ(&
 								  (ctlregbase->
 								   LPDDR4__CONTROLLER_ID__REG))));
-		version[0] =
-		    (uint32_t) (CPS_FLD_READ
-				(LPDDR4__CONTROLLER_VERSION_0__FLD,
-				 CPS_REG_READ(&
-					      (ctlregbase->
-					       LPDDR4__CONTROLLER_VERSION_0__REG))));
-		version[1] =
-		    (uint32_t) (CPS_FLD_READ
-				(LPDDR4__CONTROLLER_VERSION_1__FLD,
-				 CPS_REG_READ(&
-					      (ctlregbase->
-					       LPDDR4__CONTROLLER_VERSION_1__REG))));
-		if ((productid == PRODUCT_ID) && (version[0] == VERSION_0)
-		    && (version[1] == VERSION_1)) {
+		if (productid == PRODUCT_ID) {
 			/* Populating configuration data to pD */
 			pd->ctlbase = ctlregbase;
 			pd->infohandler =
@@ -733,7 +719,7 @@ uint32_t lpddr4_checkctlinterrupt(const lpddr4_privatedata * pd,
 
 		/* MISRA compliance (Shifting operation) check */
 		if (fieldshift < WORD_SHIFT) {
-			if (((ctlirqstatus >> fieldshift) & BIT_MASK) > 0U) {
+			if ((ctlirqstatus >> fieldshift) & LPDDR4_BIT_MASK) {
 				*irqstatus = true;
 			} else {
 				*irqstatus = false;
@@ -760,11 +746,11 @@ uint32_t lpddr4_ackctlinterrupt(const lpddr4_privatedata * pd,
 		if (localinterrupt > WORD_SHIFT) {
 			localinterrupt =
 			    (localinterrupt - (uint32_t) WORD_SHIFT);
-			regval = ((uint32_t) BIT_MASK << localinterrupt);
+			regval = (uint32_t)LPDDR4_BIT_MASK << localinterrupt;
 			CPS_REG_WRITE(&(ctlregbase->LPDDR4__INT_ACK_1__REG),
 				      regval);
 		} else {
-			regval = ((uint32_t) BIT_MASK << localinterrupt);
+			regval = (uint32_t)LPDDR4_BIT_MASK << localinterrupt;
 			CPS_REG_WRITE(&(ctlregbase->LPDDR4__INT_ACK_0__REG),
 				      regval);
 		}
@@ -837,7 +823,7 @@ uint32_t lpddr4_checkphyindepinterrupt(const lpddr4_privatedata * pd,
 		phyindepirqstatus =
 		    CPS_REG_READ(&(ctlregbase->LPDDR4__PI_INT_STATUS__REG));
 		*irqstatus =
-		    (((phyindepirqstatus >> (uint32_t) intr) & BIT_MASK) > 0U);
+		    !!((phyindepirqstatus >> (uint32_t)intr) & LPDDR4_BIT_MASK);
 	}
 	return result;
 }
@@ -855,7 +841,7 @@ uint32_t lpddr4_ackphyindepinterrupt(const lpddr4_privatedata * pd,
 		lpddr4_ctlregs *ctlregbase = (lpddr4_ctlregs *) pd->ctlbase;
 
 		/* Write 1 to the requested bit to ACk the interrupt */
-		regval = ((uint32_t) BIT_MASK << ui32shiftinterrupt);
+		regval = (uint32_t)LPDDR4_BIT_MASK << ui32shiftinterrupt;
 		CPS_REG_WRITE(&(ctlregbase->LPDDR4__PI_INT_ACK__REG), regval);
 	}
 
@@ -908,7 +894,7 @@ static void lpddr4_checkwrlvlerror(lpddr4_ctlregs * ctlregbase,
 	    (volatile uint32_t
 	     *)(&(ctlregbase->LPDDR4__PHY_WRLVL_ERROR_OBS_0__REG));
 	/* PHY_WRLVL_ERROR_OBS_X[1:0] should be zero */
-	errbitmask = (BIT_MASK << 1) | (BIT_MASK);
+	errbitmask = (LPDDR4_BIT_MASK << 1) | LPDDR4_BIT_MASK;
 	for (snum = 0U; snum < DSLICE_NUM; snum++) {
 		regval = CPS_REG_READ(regaddress);
 		if ((regval & errbitmask) != 0U) {
@@ -1068,7 +1054,7 @@ static void lpddr4_seterrors(lpddr4_ctlregs * ctlregbase,
 			     lpddr4_debuginfo * debuginfo, bool * errfoundptr)
 {
 
-	uint32_t errbitmask = (BIT_MASK << 0x1U) | (BIT_MASK);
+	uint32_t errbitmask = (LPDDR4_BIT_MASK << 0x1U) | LPDDR4_BIT_MASK;
 	/* Check PLL observation registers for PLL lock errors */
 
 	debuginfo->pllerror =

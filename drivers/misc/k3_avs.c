@@ -14,6 +14,7 @@
 #include <i2c.h>
 #include <k3-avs.h>
 #include <dm/device_compat.h>
+#include <linux/bitops.h>
 #include <power/regulator.h>
 
 #define AM6_VTM_DEVINFO(i)	(priv->base + 0x100 + 0x20 * (i))
@@ -316,15 +317,15 @@ static struct vd_data am654_vd_data[] = {
 		.opp = AM6_OPP_NOM,
 		.opps = {
 			[AM6_OPP_NOM] = {
-				.volt = 1000000,
+				.volt = 1100000,
 				.freq = 800000000,
 			},
 			[AM6_OPP_OD] = {
-				.volt = 1100000,
+				.volt = 1200000,
 				.freq = 1000000000,
 			},
 			[AM6_OPP_TURBO] = {
-				.volt = 1220000,
+				.volt = 1240000,
 				.freq = 1100000000,
 			},
 		},
@@ -336,15 +337,15 @@ static struct vd_data am654_vd_data[] = {
 		.clk_id = 0, /* ARM clock */
 		.opps = {
 			[AM6_OPP_NOM] = {
-				.volt = 1000000,
+				.volt = 1100000,
 				.freq = 800000000,
 			},
 			[AM6_OPP_OD] = {
-				.volt = 1100000,
+				.volt = 1200000,
 				.freq = 1000000000,
 			},
 			[AM6_OPP_TURBO] = {
-				.volt = 1220000,
+				.volt = 1240000,
 				.freq = 1100000000,
 			},
 		},
@@ -389,5 +390,5 @@ U_BOOT_DRIVER(k3_avs) = {
 	.of_match = k3_avs_ids,
 	.id = UCLASS_MISC,
 	.probe = k3_avs_probe,
-	.priv_auto_alloc_size = sizeof(struct k3_avs_privdata),
+	.priv_auto	= sizeof(struct k3_avs_privdata),
 };

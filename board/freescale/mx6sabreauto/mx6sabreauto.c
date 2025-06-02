@@ -6,7 +6,10 @@
  */
 
 #include <common.h>
+#include <image.h>
 #include <init.h>
+#include <net.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/imx-regs.h>
@@ -273,7 +276,7 @@ int board_mmc_getcd(struct mmc *mmc)
 	return !gpio_get_value(IMX_GPIO_NR(6, 15));
 }
 
-int board_mmc_init(bd_t *bis)
+int board_mmc_init(struct bd_info *bis)
 {
 	SETUP_IOMUX_PADS(usdhc3_pads);
 

@@ -29,8 +29,10 @@ enum env_action {
 struct env_entry {
 	const char *key;
 	char *data;
+#ifndef CONFIG_SPL_BUILD
 	int (*callback)(const char *name, const char *value, enum env_op op,
 		int flags);
+#endif
 	int flags;
 };
 
@@ -78,11 +80,20 @@ int hsearch_r(struct env_entry item, enum env_action action,
 int hmatch_r(const char *match, int last_idx, struct env_entry **retval,
 	     struct hsearch_data *htab);
 
-/* Search and delete entry matching "key" in internal hash table. */
+/**
+ * hdelete_r() - Search and delete entry in internal hash table
+ *
+ * @key: Name of entry to delete
+ * @htab: Hash table
+ * @flag: Flags to use (H_...)
+ * @return 0 on success, -ENOENT if not found, -EPERM if the hash table callback
+ *	rejected changing the variable, -EINVAL if the hash table refused to
+ *	delete the variable
+ */
 int hdelete_r(const char *key, struct hsearch_data *htab, int flag);
 
 ssize_t hexport_r(struct hsearch_data *htab, const char sep, int flag,
-		  char **resp, size_t size, int argc, char * const argv[]);
+		  char **resp, size_t size, int argc, char *const argv[]);
 
 /*
  * nvars: length of vars array
@@ -110,5 +121,7 @@ int hwalk_r(struct hsearch_data *htab,
 #define H_MATCH_METHOD	(H_MATCH_IDENT | H_MATCH_SUBSTR | H_MATCH_REGEX)
 #define H_PROGRAMMATIC	(1 << 9) /* indicate that an import is from env_set() */
 #define H_ORIGIN_FLAGS	(H_INTERACTIVE | H_PROGRAMMATIC)
+#define H_DEFAULT	(1 << 10) /* indicate that an import is default env */
+#define H_EXTERNAL	(1 << 11) /* indicate that an import is external env */
 
 #endif /* _SEARCH_H_ */

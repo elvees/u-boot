@@ -3,22 +3,27 @@
  * Copyright (c) 2011 The Chromium OS Authors.
  */
 
+#define _GNU_SOURCE
+
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <setjmp.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h>
 #include <time.h>
+#include <ucontext.h>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <linux/compiler_attributes.h>
 #include <linux/types.h>
 
 #include <asm/getopt.h>
@@ -26,6 +31,9 @@
 #include <asm/state.h>
 #include <os.h>
 #include <rtc_def.h>
+
+/* Environment variable for time offset */
+#define ENV_TIME_OFFSET "UBOOT_SB_TIME_OFFSET"
 
 /* Operating System Interface */
 
@@ -79,13 +87,21 @@ int os_open(const char *pathname, int os_flags)
 		flags |= O_CREAT;
 	if (os_flags & OS_O_TRUNC)
 		flags |= O_TRUNC;
+	/*
+	 * During a cold reset execv() is used to relaunch the U-Boot binary.
+	 * We must ensure that all files are closed in this case.
+	 */
+	flags |= O_CLOEXEC;
 
 	return open(pathname, flags, 0777);
 }
 
 int os_close(int fd)
 {
-	return close(fd);
+	/* Do not close the console input */
+	if (fd)
+		return close(fd);
+	return -1;
 }
 
 int os_unlink(const char *pathname)
@@ -175,6 +191,49 @@ void os_fd_restore(void)
 	}
 }
 
+static void os_sigint_handler(int sig)
+{
+	os_fd_restore();
+	signal(SIGINT, SIG_DFL);
+	raise(SIGINT);
+}
+
+static void os_signal_handler(int sig, siginfo_t *info, void *con)
+{
+	ucontext_t __maybe_unused *context = con;
+	unsigned long pc;
+
+#if defined(__x86_64__)
+	pc = context->uc_mcontext.gregs[REG_RIP];
+#elif defined(__aarch64__)
+	pc = context->uc_mcontext.pc;
+#elif defined(__riscv)
+	pc = context->uc_mcontext.__gregs[REG_PC];
+#else
+	const char msg[] =
+		"\nUnsupported architecture, cannot read program counter\n";
+
+	os_write(1, msg, sizeof(msg));
+	pc = 0;
+#endif
+
+	os_signal_action(sig, pc);
+}
+
+int os_setup_signal_handlers(void)
+{
+	struct sigaction act;
+
+	act.sa_sigaction = os_signal_handler;
+	sigemptyset(&act.sa_mask);
+	act.sa_flags = SA_SIGINFO | SA_NODEFER;
+	if (sigaction(SIGILL, &act, NULL) ||
+	    sigaction(SIGBUS, &act, NULL) ||
+	    sigaction(SIGSEGV, &act, NULL))
+		return -1;
+	return 0;
+}
+
 /* Put tty into raw mode so <tab> and <ctrl+c> work */
 void os_tty_raw(int fd, bool allow_sigs)
 {
@@ -205,6 +264,7 @@ void os_tty_raw(int fd, bool allow_sigs)
 
 	term_setup = true;
 	atexit(os_fd_restore);
+	signal(SIGINT, os_sigint_handler);
 }
 
 void *os_malloc(size_t length)
@@ -733,7 +793,34 @@ int os_find_u_boot(char *fname, int maxlen)
 
 int os_spl_to_uboot(const char *fname)
 {
+	struct sandbox_state *state = state_get_current();
+
+	printf("%s\n", __func__);
+	/* U-Boot will delete ram buffer after read: "--rm_memory"*/
+	state->ram_buf_rm = true;
 	return os_jump_to_file(fname);
+}
+
+long os_get_time_offset(void)
+{
+	const char *offset;
+
+	offset = getenv(ENV_TIME_OFFSET);
+	if (offset)
+		return strtol(offset, NULL, 0);
+	return 0;
+}
+
+void os_set_time_offset(long offset)
+{
+	char buf[21];
+	int ret;
+
+	snprintf(buf, sizeof(buf), "%ld", offset);
+	ret = setenv(ENV_TIME_OFFSET, buf, true);
+	if (ret)
+		printf("Could not set environment variable %s\n",
+		       ENV_TIME_OFFSET);
 }
 
 void os_localtime(struct rtc_time *rt)
@@ -804,4 +891,10 @@ void *os_find_text_base(void)
 	close(fd);
 
 	return base;
+}
+
+void os_relaunch(char *argv[])
+{
+	execv(argv[0], argv);
+	os_exit(1);
 }

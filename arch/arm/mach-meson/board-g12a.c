@@ -6,11 +6,14 @@
 
 #include <common.h>
 #include <init.h>
+#include <log.h>
+#include <net.h>
 #include <asm/arch/boot.h>
 #include <asm/arch/eth.h>
 #include <asm/arch/g12a.h>
 #include <asm/arch/mem.h>
 #include <asm/arch/meson-vpu.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/armv8/mmu.h>
 #include <linux/sizes.h>

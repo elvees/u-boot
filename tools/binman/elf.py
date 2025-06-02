@@ -5,10 +5,7 @@
 # Handle various things related to ELF images
 #
 
-from __future__ import print_function
-
 from collections import namedtuple, OrderedDict
-import command
 import io
 import os
 import re
@@ -16,8 +13,9 @@ import shutil
 import struct
 import tempfile
 
-import tools
-import tout
+from patman import command
+from patman import tools
+from patman import tout
 
 ELF_TOOLS = True
 try:
@@ -134,7 +132,8 @@ def LookupAndWriteSymbols(elf_fname, entry, section):
                                  (msg, sym.size))
 
             # Look up the symbol in our entry tables.
-            value = section.LookupSymbol(name, sym.weak, msg, base.address)
+            value = section.GetImage().LookupImageSymbol(name, sym.weak, msg,
+                                                         base.address)
             if value is None:
                 value = -1
                 pack_string = pack_string.lower()
@@ -160,9 +159,9 @@ def MakeElf(elf_fname, text, data):
 
     # Spilt the text into two parts so that we can make the entry point two
     # bytes after the start of the text section
-    text_bytes1 = ['\t.byte\t%#x' % tools.ToByte(byte) for byte in text[:2]]
-    text_bytes2 = ['\t.byte\t%#x' % tools.ToByte(byte) for byte in text[2:]]
-    data_bytes = ['\t.byte\t%#x' % tools.ToByte(byte) for byte in data]
+    text_bytes1 = ['\t.byte\t%#x' % byte for byte in text[:2]]
+    text_bytes2 = ['\t.byte\t%#x' % byte for byte in text[2:]]
+    data_bytes = ['\t.byte\t%#x' % byte for byte in data]
     with open(s_file, 'w') as fd:
         print('''/* Auto-generated C program to produce an ELF file for testing */
 
@@ -236,8 +235,10 @@ SECTIONS
     #   text section at the start
     # -m32: Build for 32-bit x86
     # -T...: Specifies the link script, which sets the start address
-    stdout = command.Output('cc', '-static', '-nostdlib', '-Wl,--build-id=none',
-                            '-m32','-T', lds_file, '-o', elf_fname, s_file)
+    cc, args = tools.GetTargetCompileTool('cc')
+    args += ['-static', '-nostdlib', '-Wl,--build-id=none', '-m32', '-T',
+            lds_file, '-o', elf_fname, s_file]
+    stdout = command.Output(cc, *args)
     shutil.rmtree(outdir)
 
 def DecodeElf(data, location):

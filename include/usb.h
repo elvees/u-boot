@@ -103,7 +103,7 @@ enum {
  */
 struct usb_device {
 	int	devnum;			/* Device number on USB bus */
-	int	speed;			/* full/low/high */
+	enum usb_device_speed speed;	/* full/low/high */
 	char	mf[32];			/* manufacturer */
 	char	prod[32];		/* product */
 	char	serial[32];		/* serial number */
@@ -597,18 +597,18 @@ struct usb_hub_device {
 
 #if CONFIG_IS_ENABLED(DM_USB)
 /**
- * struct usb_platdata - Platform data about a USB controller
+ * struct usb_plat - Platform data about a USB controller
  *
- * Given a USB controller (UCLASS_USB) dev this is dev_get_platdata(dev)
+ * Given a USB controller (UCLASS_USB) dev this is dev_get_plat(dev)
  */
-struct usb_platdata {
+struct usb_plat {
 	enum usb_init_type init_type;
 };
 
 /**
- * struct usb_dev_platdata - Platform data about a USB device
+ * struct usb_dev_plat - Platform data about a USB device
  *
- * Given a USB device dev this structure is dev_get_parent_platdata(dev).
+ * Given a USB device dev this structure is dev_get_parent_plat(dev).
  * This is used by sandbox to provide emulation data also.
  *
  * @id:		ID used to match this device
@@ -617,7 +617,7 @@ struct usb_platdata {
  * @strings:	List of descriptor strings (for sandbox emulation purposes)
  * @desc_list:	List of descriptors (for sandbox emulation purposes)
  */
-struct usb_dev_platdata {
+struct usb_dev_plat {
 	struct usb_device_id id;
 	int devnum;
 	/*
@@ -659,14 +659,14 @@ struct usb_bus_priv {
 };
 
 /**
- * struct usb_emul_platdata - platform data about the USB emulator
+ * struct usb_emul_plat - platform data about the USB emulator
  *
  * Given a USB emulator (UCLASS_USB_EMUL) 'dev', this is
- * dev_get_uclass_platdata(dev).
+ * dev_get_uclass_plat(dev).
  *
  * @port1:	USB emulator device port number on the parent hub
  */
-struct usb_emul_platdata {
+struct usb_emul_plat {
 	int port1;	/* Port number (numbered from 1) */
 };
 
@@ -920,6 +920,15 @@ struct ehci_ctrl;
  * instead of as a host. It is untested.
  */
 int usb_setup_ehci_gadget(struct ehci_ctrl **ctlrp);
+
+/**
+ * usb_remove_ehci_gadget() - Remove a gadget USB device
+ *
+ * TODO(sjg@chromium.org): Tidy this up when USB gadgets can use driver model
+ *
+ * This provides a way to tell a controller to remove a USB device
+ */
+int usb_remove_ehci_gadget(struct ehci_ctrl **ctlrp);
 
 /**
  * usb_stor_reset() - Prepare to scan USB storage devices

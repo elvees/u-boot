@@ -12,6 +12,7 @@
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <w1.h>
 #include <w1-eeprom.h>
 
@@ -52,7 +53,7 @@ int w1_eeprom_register_new_device(u64 id)
 		if (dev_get_driver_data(dev) == family) {
 			struct w1_device *w1;
 
-			w1 = dev_get_parent_platdata(dev);
+			w1 = dev_get_parent_plat(dev);
 			if (w1->id) /* device already in use */
 				continue;
 			w1->id = id;
@@ -69,7 +70,7 @@ int w1_eeprom_register_new_device(u64 id)
 
 int w1_eeprom_get_id(struct udevice *dev, u64 *id)
 {
-	struct w1_device *w1 = dev_get_parent_platdata(dev);
+	struct w1_device *w1 = dev_get_parent_plat(dev);
 
 	if (!w1)
 		return -ENODEV;

@@ -9,6 +9,7 @@
 #include <fdt_support.h>
 #include <i2c.h>
 #include <init.h>
+#include <log.h>
 #include <asm/io.h>
 #include <asm/arch/immap_ls102xa.h>
 #include <asm/arch/clock.h>
@@ -143,7 +144,7 @@ unsigned long get_board_ddr_clk(void)
 int select_i2c_ch_pca9547(u8 ch, int bus_num)
 {
 	int ret;
-#ifdef CONFIG_DM_I2C
+#if CONFIG_IS_ENABLED(DM_I2C)
 	struct udevice *dev;
 
 	ret = i2c_get_chip_for_busnum(bus_num, I2C_MUX_PCA_ADDR_PRI,
@@ -448,7 +449,7 @@ void board_sleep_prepare(void)
 }
 #endif
 
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	ft_cpu_setup(blob, bd);
 

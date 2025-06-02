@@ -18,13 +18,9 @@
 #define USDHC2_BASE_ADDR		0x5b020000
 #define CONFIG_SUPPORT_EMMC_BOOT	/* eMMC specific */
 
-#define CONFIG_ENV_OVERWRITE
-
 #define CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
 
 /* Networking */
-#define FEC_QUIRK_ENET_MAC
-
 #define CONFIG_TFTP_TSIZE
 
 #define CONFIG_IPADDR			192.168.10.2
@@ -82,13 +78,6 @@
 
 #define CONFIG_SYS_INIT_SP_ADDR		0x80200000
 
-#define CONFIG_SYS_MEMTEST_START	0x88000000
-#define CONFIG_SYS_MEMTEST_END		0x89000000
-
-/* Environment in eMMC, before config block at the end of 1st "boot sector" */
-#define CONFIG_SYS_MMC_ENV_DEV		0	/* USDHC1 eMMC */
-#define CONFIG_SYS_MMC_ENV_PART		1
-
 #define CONFIG_SYS_MMC_IMG_LOAD_PART	1
 
 /* On Apalis iMX8 USDHC1 is eMMC, USDHC2 is 8-bit and USDHC3 is 4-bit MMC/SD */
@@ -105,11 +94,7 @@
 #define PHYS_SDRAM_1_SIZE		SZ_2G		/* 2 GB */
 #define PHYS_SDRAM_2_SIZE		SZ_2G		/* 2 GB */
 
-/* Serial */
-#define CONFIG_BAUDRATE			115200
-
 /* Monitor Command Prompt */
-#define CONFIG_SYS_PROMPT_HUSH_PS2	"> "
 #define CONFIG_SYS_CBSIZE		SZ_2K
 #define CONFIG_SYS_MAXARGS		64
 #define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE

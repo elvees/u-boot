@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
- * Author(s): Patrice Chotard, <patrice.chotard@st.com> for STMicroelectronics.
+ * Author(s): Patrice Chotard, <patrice.chotard@foss.st.com> for STMicroelectronics.
  */
 
 #ifndef __CONFIG_H
@@ -44,7 +44,6 @@
 			BOOTENV
 
 /* Extra Commands */
-#define CONFIG_CMD_ASKENV
 
 #define CONFIG_SETUP_MEMORY_TAGS
 

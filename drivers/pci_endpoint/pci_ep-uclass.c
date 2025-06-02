@@ -12,6 +12,7 @@
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
+#include <asm/global_data.h>
 #include <linux/log2.h>
 #include <pci_ep.h>
 
@@ -209,3 +210,16 @@ UCLASS_DRIVER(pci_ep) = {
 	.name		= "pci_ep",
 	.flags		= DM_UC_FLAG_SEQ_ALIAS,
 };
+
+int pci_ep_init(void)
+{
+	struct udevice *dev;
+
+	for (uclass_first_device_check(UCLASS_PCI_EP, &dev);
+	     dev;
+	     uclass_next_device_check(&dev)) {
+		;
+	}
+
+	return 0;
+}

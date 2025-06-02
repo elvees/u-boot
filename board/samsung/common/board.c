@@ -6,13 +6,17 @@
 
 #include <common.h>
 #include <cros_ec.h>
+#include <env.h>
 #include <errno.h>
 #include <fdtdec.h>
 #include <hang.h>
 #include <init.h>
+#include <log.h>
+#include <net.h>
 #include <spi.h>
 #include <tmu.h>
 #include <netdev.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/gpio.h>
 #include <asm/arch/board.h>
@@ -29,6 +33,7 @@
 #include <stdio_dev.h>
 #include <usb.h>
 #include <dwc3-uboot.h>
+#include <linux/delay.h>
 #include <samsung/misc.h>
 #include <dm/pinctrl.h>
 #include <dm.h>
@@ -216,7 +221,7 @@ static int decode_sromc(const void *blob, struct fdt_sromc *config)
 }
 #endif
 
-int board_eth_init(bd_t *bis)
+int board_eth_init(struct bd_info *bis)
 {
 #ifdef CONFIG_SMC911X
 	u32 smc_bw_conf, smc_bc_conf;
@@ -300,7 +305,6 @@ int board_late_init(void)
 	int mmcbootdev = get_boot_mmc_dev();
 	char mmcbootdev_str[16];
 
-	stdio_print_current_devices();
 	ret = uclass_first_device_err(UCLASS_CROS_EC, &dev);
 	if (ret && ret != -ENODEV) {
 		/* Force console on */

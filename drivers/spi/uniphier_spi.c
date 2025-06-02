@@ -7,9 +7,13 @@
 #include <clk.h>
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <time.h>
+#include <asm/global_data.h>
 #include <dm/device_compat.h>
 #include <linux/bitfield.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
 #include <linux/io.h>
 #include <spi.h>
 #include <wait_bit.h>
@@ -65,7 +69,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define SSI_CLK			50000000	/* internal I/O clock: 50MHz */
 
-struct uniphier_spi_platdata {
+struct uniphier_spi_plat {
 	void __iomem *base;
 	u32 frequency;			/* input frequency */
 	u32 speed_hz;
@@ -110,7 +114,7 @@ static void uniphier_spi_regdump(struct uniphier_spi_priv *priv)
 static void spi_cs_activate(struct udevice *dev)
 {
 	struct udevice *bus = dev->parent;
-	struct uniphier_spi_platdata *plat = bus->platdata;
+	struct uniphier_spi_plat *plat = dev_get_plat(bus);
 	struct uniphier_spi_priv *priv = dev_get_priv(bus);
 	ulong delay_us;		/* The delay completed so far */
 	u32 val;
@@ -136,7 +140,7 @@ static void spi_cs_activate(struct udevice *dev)
 static void spi_cs_deactivate(struct udevice *dev)
 {
 	struct udevice *bus = dev->parent;
-	struct uniphier_spi_platdata *plat = bus->platdata;
+	struct uniphier_spi_plat *plat = dev_get_plat(bus);
 	struct uniphier_spi_priv *priv = dev_get_priv(bus);
 	u32 val;
 
@@ -276,7 +280,7 @@ static int uniphier_spi_xfer(struct udevice *dev, unsigned int bitlen,
 
 static int uniphier_spi_set_speed(struct udevice *bus, uint speed)
 {
-	struct uniphier_spi_platdata *plat = bus->platdata;
+	struct uniphier_spi_plat *plat = dev_get_plat(bus);
 	struct uniphier_spi_priv *priv = dev_get_priv(bus);
 	u32 val, ckdiv;
 
@@ -359,13 +363,13 @@ static int uniphier_spi_set_mode(struct udevice *bus, uint mode)
 	return 0;
 }
 
-static int uniphier_spi_ofdata_to_platdata(struct udevice *bus)
+static int uniphier_spi_of_to_plat(struct udevice *bus)
 {
-	struct uniphier_spi_platdata *plat = bus->platdata;
+	struct uniphier_spi_plat *plat = dev_get_plat(bus);
 	const void *blob = gd->fdt_blob;
 	int node = dev_of_offset(bus);
 
-	plat->base = devfdt_get_addr_ptr(bus);
+	plat->base = dev_read_addr_ptr(bus);
 
 	plat->frequency =
 		fdtdec_get_int(blob, node, "spi-max-frequency", 12500000);
@@ -380,7 +384,7 @@ static int uniphier_spi_ofdata_to_platdata(struct udevice *bus)
 
 static int uniphier_spi_probe(struct udevice *bus)
 {
-	struct uniphier_spi_platdata *plat = dev_get_platdata(bus);
+	struct uniphier_spi_plat *plat = dev_get_plat(bus);
 	struct uniphier_spi_priv *priv = dev_get_priv(bus);
 
 	priv->base = plat->base;
@@ -408,8 +412,8 @@ U_BOOT_DRIVER(uniphier_spi) = {
 	.id	= UCLASS_SPI,
 	.of_match = uniphier_spi_ids,
 	.ops	= &uniphier_spi_ops,
-	.ofdata_to_platdata = uniphier_spi_ofdata_to_platdata,
-	.platdata_auto_alloc_size = sizeof(struct uniphier_spi_platdata),
-	.priv_auto_alloc_size = sizeof(struct uniphier_spi_priv),
+	.of_to_plat = uniphier_spi_of_to_plat,
+	.plat_auto	= sizeof(struct uniphier_spi_plat),
+	.priv_auto	= sizeof(struct uniphier_spi_priv),
 	.probe	= uniphier_spi_probe,
 };

@@ -7,9 +7,11 @@
  */
 
 #include <common.h>
+#include <asm/global_data.h>
 #include "board.h"
 #include <env.h>
 #include <hang.h>
+#include <image.h>
 #include <init.h>
 #include <spl.h>
 #include <exports.h>
@@ -47,11 +49,11 @@ int dram_init(void)
 	gd->ram_size = get_ram_size((long *)CONFIG_SYS_SDRAM_BASE,
 				    CONFIG_MAX_RAM_BANK_SIZE);
 #if defined(CONFIG_TI_AEMIF)
-	if (!board_is_k2g_ice())
+	if (!(board_is_k2g_ice() || board_is_k2g_i1()))
 		aemif_init(ARRAY_SIZE(aemif_configs), aemif_configs);
 #endif
 
-	if (!board_is_k2g_ice()) {
+	if (!(board_is_k2g_ice() || board_is_k2g_i1())) {
 		if (ddr3_size)
 			ddr3_init_ecc(KS2_DDR3A_EMIF_CTRL_BASE, ddr3_size);
 		else
@@ -92,7 +94,7 @@ u32 spl_boot_device(void)
 #endif
 
 #ifdef CONFIG_OF_BOARD_SETUP
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	int lpae;
 	char *env;
@@ -144,7 +146,7 @@ int ft_board_setup(void *blob, bd_t *bd)
 	return 0;
 }
 
-void ft_board_setup_ex(void *blob, bd_t *bd)
+void ft_board_setup_ex(void *blob, struct bd_info *bd)
 {
 	int lpae;
 	u64 size;

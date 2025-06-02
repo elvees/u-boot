@@ -7,7 +7,10 @@
  */
 
 #include <common.h>
+#include <log.h>
 #include <malloc.h>
+#include <asm/global_data.h>
+#include <linux/bitops.h>
 #include <linux/errno.h>
 #include <asm/io.h>
 #include <asm/arch/iomux.h>
@@ -136,12 +139,6 @@ int name_to_gpio(const char *name)
 #include <asm/arch/gpio.h>
 #define MXS_MAX_GPIO_PER_BANK		32
 
-#ifdef CONFIG_MX28
-#define dtd_fsl_imx_gpio dtd_fsl_imx28_gpio
-#else /* CONFIG_MX23 */
-#define dtd_fsl_imx_gpio dtd_fsl_imx23_gpio
-#endif
-
 DECLARE_GLOBAL_DATA_PTR;
 /*
  * According to i.MX28 Reference Manual:
@@ -154,9 +151,9 @@ DECLARE_GLOBAL_DATA_PTR;
  * Bank 4: 0-20 -> 21 PINS
  */
 
-struct mxs_gpio_platdata {
+struct mxs_gpio_plat {
 #if CONFIG_IS_ENABLED(OF_PLATDATA)
-	struct dtd_fsl_imx_gpio dtplat;
+	struct dtd_fsl_imx23_gpio dtplat;
 #endif
 	unsigned int bank;
 	int gpio_ranges;
@@ -239,13 +236,13 @@ static const struct dm_gpio_ops gpio_mxs_ops = {
 
 static int mxs_gpio_probe(struct udevice *dev)
 {
-	struct mxs_gpio_platdata *plat = dev_get_platdata(dev);
+	struct mxs_gpio_plat *plat = dev_get_plat(dev);
 	struct mxs_gpio_priv *priv = dev_get_priv(dev);
 	struct gpio_dev_priv *uc_priv = dev_get_uclass_priv(dev);
 	char name[16], *str;
 
 #if CONFIG_IS_ENABLED(OF_PLATDATA)
-	struct dtd_fsl_imx_gpio *dtplat = &plat->dtplat;
+	struct dtd_fsl_imx23_gpio *dtplat = &plat->dtplat;
 	priv->bank = (unsigned int)dtplat->reg[0];
 	uc_priv->gpio_count = dtplat->gpio_ranges[3];
 #else
@@ -266,14 +263,14 @@ static int mxs_gpio_probe(struct udevice *dev)
 }
 
 #if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
-static int mxs_ofdata_to_platdata(struct udevice *dev)
+static int mxs_of_to_plat(struct udevice *dev)
 {
-	struct mxs_gpio_platdata *plat = dev->platdata;
+	struct mxs_gpio_plat *plat = dev_get_plat(dev);
 	struct fdtdec_phandle_args args;
 	int node = dev_of_offset(dev);
 	int ret;
 
-	plat->bank = devfdt_get_addr(dev);
+	plat->bank = dev_read_addr(dev);
 	if (plat->bank == FDT_ADDR_T_NONE) {
 		printf("%s: No 'reg' property defined!\n", __func__);
 		return -EINVAL;
@@ -297,20 +294,18 @@ static const struct udevice_id mxs_gpio_ids[] = {
 };
 #endif
 
-U_BOOT_DRIVER(gpio_mxs) = {
-#ifdef CONFIG_MX28
-	.name = "fsl_imx28_gpio",
-#else /* CONFIG_MX23 */
+U_BOOT_DRIVER(fsl_imx23_gpio) = {
 	.name = "fsl_imx23_gpio",
-#endif
 	.id	= UCLASS_GPIO,
 	.ops	= &gpio_mxs_ops,
 	.probe	= mxs_gpio_probe,
-	.priv_auto_alloc_size = sizeof(struct mxs_gpio_priv),
-	.platdata_auto_alloc_size = sizeof(struct mxs_gpio_platdata),
+	.priv_auto	= sizeof(struct mxs_gpio_priv),
+	.plat_auto	= sizeof(struct mxs_gpio_plat),
 #if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
 	.of_match = mxs_gpio_ids,
-	.ofdata_to_platdata = mxs_ofdata_to_platdata,
+	.of_to_plat = mxs_of_to_plat,
 #endif
 };
+
+DM_DRIVER_ALIAS(fsl_imx23_gpio, fsl_imx28_gpio)
 #endif /* DM_GPIO */

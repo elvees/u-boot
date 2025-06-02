@@ -12,22 +12,19 @@
 #define CONFIG_SPL_BSS_START_ADDR	0x04000000
 #define CONFIG_SPL_BSS_MAX_SIZE		0x00100000
 
-#ifndef CONFIG_XIP
-#define CONFIG_SPL_LOAD_FIT_ADDRESS	0x00200000
-#else
-#define CONFIG_SPL_LOAD_FIT_ADDRESS	0x80010000
-#endif
-
 #ifdef CONFIG_SPL_MMC_SUPPORT
-#define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION	1
 #define CONFIG_SPL_FS_LOAD_PAYLOAD_NAME		"u-boot.itb"
 #endif
 #endif
 
+#define RISCV_MMODE_TIMERBASE           0xe6000000
+#define RISCV_MMODE_TIMER_FREQ          60000000
+
+#define RISCV_SMODE_TIMER_FREQ          60000000
+
 /*
  * CPU and Board Configuration Options
  */
-#define CONFIG_BOOTP_SEND_HOSTNAME
 
 /*
  * Miscellaneous configurable options
@@ -91,8 +88,6 @@
 /*
  * memtest works on 512 MB in DRAM
  */
-#define CONFIG_SYS_MEMTEST_START	PHYS_SDRAM_0
-#define CONFIG_SYS_MEMTEST_END		(PHYS_SDRAM_0 + PHYS_SDRAM_0_SIZE)
 
 /*
  * FLASH and environment organization
@@ -130,7 +125,6 @@
 #define CONFIG_SYS_MAX_FLASH_SECT	512
 
 /* environments */
-#define CONFIG_ENV_OVERWRITE
 
 /* SPI FLASH */
 

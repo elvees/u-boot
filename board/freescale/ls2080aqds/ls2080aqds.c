@@ -4,11 +4,13 @@
  */
 #include <common.h>
 #include <env.h>
+#include <init.h>
 #include <malloc.h>
 #include <errno.h>
 #include <netdev.h>
 #include <fsl_ifc.h>
 #include <fsl_ddr.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <fdt_support.h>
 #include <linux/libfdt.h>
@@ -162,7 +164,7 @@ unsigned long get_board_ddr_clk(void)
 int select_i2c_ch_pca9547(u8 ch)
 {
 	int ret;
-#ifdef CONFIG_DM_I2C
+#if CONFIG_IS_ENABLED(DM_I2C)
 	struct udevice *dev;
 
 	ret = i2c_get_chip_for_busnum(0, I2C_MUX_PCA_ADDR_PRI, 1, &dev);
@@ -236,7 +238,7 @@ int board_init(void)
 	select_i2c_ch_pca9547(I2C_MUX_CH_DEFAULT);
 
 #ifdef CONFIG_RTC_ENABLE_32KHZ_OUTPUT
-#ifdef CONFIG_DM_I2C
+#if CONFIG_IS_ENABLED(DM_I2C)
 	rtc_enable_32khz_output(0, CONFIG_SYS_I2C_RTC_ADDR);
 #else
 	rtc_enable_32khz_output();
@@ -249,6 +251,10 @@ int board_init(void)
 
 #ifdef CONFIG_FSL_LS_PPA
 	ppa_init();
+#endif
+
+#if !defined(CONFIG_SYS_EARLY_PCI_INIT) && defined(CONFIG_DM_ETH)
+	pci_init();
 #endif
 
 	return 0;
@@ -319,7 +325,7 @@ void board_quiesce_devices(void)
 #endif
 
 #ifdef CONFIG_OF_BOARD_SETUP
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	u64 base[CONFIG_NR_DRAM_BANKS];
 	u64 size[CONFIG_NR_DRAM_BANKS];

@@ -21,18 +21,19 @@ config WATCHDOG_TIMEOUT_MSECS
 config HW_WATCHDOG
 	bool
 
-config WATCHDOG_RESET_DISABLE
-	bool "Disable reset watchdog"
-	help
-	  Disable reset watchdog, which can let WATCHDOG_RESET invalid, so
-	  that the watchdog will not be fed in u-boot.
-
 config IMX_WATCHDOG
 	bool "Enable Watchdog Timer support for IMX and LSCH2 of NXP"
 	select HW_WATCHDOG if !WDT
 	help
 	  Select this to enable the IMX and LSCH2 of Layerscape watchdog
 	  driver.
+
+config WATCHDOG_RESET_DISABLE
+	bool "Disable reset watchdog"
+	depends on IMX_WATCHDOG
+	help
+	  Disable reset watchdog, which can let WATCHDOG_RESET invalid, so
+	  that the watchdog will not be fed in u-boot.
 
 config OMAP_WATCHDOG
 	bool "TI OMAP watchdog driver"
@@ -49,6 +50,7 @@ config ULP_WATCHDOG
 config DESIGNWARE_WATCHDOG
 	bool "Designware watchdog timer support"
 	select HW_WATCHDOG if !WDT
+	default y if WDT && ROCKCHIP_RK3399
 	help
 	  Enable this to support Designware Watchdog Timer IP, present e.g.
 	  on Altera SoCFPGA SoCs.
@@ -83,6 +85,15 @@ config WDT_ASPEED
 	  full SoC reset or CPU or just some peripherals, based on the flags.
 	  It currently does not support Boot Flash Addressing Mode Detection or
 	  Second Boot.
+
+config WDT_AST2600
+	bool "Aspeed AST2600 watchdog timer support"
+	depends on WDT
+	default y if ASPEED_AST2600
+	help
+	  Select this to enable watchdog timer for Aspeed ast2500/ast2400 devices.
+	  The watchdog timer is stopped when initialized. It performs reset, either
+	  full SoC reset or CPU or just some peripherals, based on the flags.
 
 config WDT_AT91
 	bool "AT91 watchdog timer support"
@@ -123,6 +134,13 @@ config WDT_MPC8xx
 	help
 	  Select this to enable mpc8xx watchdog timer
 
+config WDT_MT7620
+	bool "MediaTek MT7620 watchdog timer support"
+	depends on WDT && SOC_MT7620
+	help
+	  Select this to enable watchdog timer on MediaTek MT7620 and earlier
+	  SoC chips.
+
 config WDT_MT7621
 	bool "MediaTek MT7621 watchdog timer support"
 	depends on WDT && SOC_MT7628
@@ -137,6 +155,16 @@ config WDT_MTK
 	  Select this to enable watchdog timer for MediaTek SoCs.
 	  The watchdog timer is stopped when initialized.
 	  It performs full SoC reset.
+
+config WDT_OCTEONTX
+	bool "OcteonTX core watchdog support"
+	depends on WDT && (ARCH_OCTEONTX || ARCH_OCTEONTX2)
+	default y
+	imply WATCHDOG
+	help
+	  This enables OcteonTX watchdog driver, which can be
+	  found on OcteonTX/TX2 chipsets and inline with driver model.
+	  Only supports watchdog reset.
 
 config WDT_OMAP3
 	bool "TI OMAP watchdog timer support"
@@ -154,6 +182,13 @@ config WDT_ORION
 	  Select this to enable Orion watchdog timer, which can be found on some
 	  Marvell Armada chips.
 
+config WDT_K3_RTI
+	bool "Texas Instruments K3 RTI watchdog"
+	depends on WDT && ARCH_K3
+	help
+	  Say Y here if you want to include support for the K3 watchdog
+	  timer (RTI module) available in the K3 generation of processors.
+
 config WDT_SANDBOX
 	bool "Enable Watchdog Timer support for Sandbox"
 	depends on SANDBOX && WDT
@@ -161,6 +196,15 @@ config WDT_SANDBOX
 	  Enable Watchdog Timer support in Sandbox. This is a dummy device that
 	  can be probed and supports all of the methods of WDT, but does not
 	  really do anything.
+
+config WDT_SBSA
+	bool "SBSA watchdog timer support"
+	depends on WDT
+	help
+	   Select this to enable SBSA watchdog timer.
+	   This driver can operate ARM SBSA Generic Watchdog as a single stage.
+	   In the single stage mode, when the timeout is reached, your system
+	   will be reset by WS1. The first signal (WS0) is ignored.
 
 config WDT_SP805
 	bool "SP805 watchdog timer support"
@@ -184,6 +228,15 @@ config XILINX_TB_WATCHDOG
 	help
 	  Select this to enable Xilinx Axi watchdog timer, which can be found on some
 	  Xilinx Microblaze Platforms.
+
+config WDT_XILINX
+	bool "Xilinx window watchdog timer support"
+	depends on WDT && ARCH_VERSAL
+	select REGMAP
+	imply WATCHDOG
+	help
+	  Select this to enable Xilinx window watchdog timer, which can be found on
+	  Xilinx Versal Platforms.
 
 config WDT_TANGIER
 	bool "Intel Tangier watchdog timer support"

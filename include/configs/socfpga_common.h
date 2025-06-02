@@ -5,6 +5,8 @@
 #ifndef __CONFIG_SOCFPGA_COMMON_H__
 #define __CONFIG_SOCFPGA_COMMON_H__
 
+#include <linux/stringify.h>
+
 /*
  * High level configuration
  */
@@ -17,13 +19,13 @@
  */
 #define PHYS_SDRAM_1			0x0
 #define CONFIG_SYS_MALLOC_LEN		(64 * 1024 * 1024)
-#define CONFIG_SYS_MEMTEST_START	PHYS_SDRAM_1
-#define CONFIG_SYS_MEMTEST_END		PHYS_SDRAM_1_SIZE
 #if defined(CONFIG_TARGET_SOCFPGA_GEN5)
 #define CONFIG_SYS_INIT_RAM_ADDR	0xFFFF0000
 #define CONFIG_SYS_INIT_RAM_SIZE	SOCFPGA_PHYS_OCRAM_SIZE
+#define CONFIG_SPL_PAD_TO		0x10000
 #elif defined(CONFIG_TARGET_SOCFPGA_ARRIA10)
 #define CONFIG_SYS_INIT_RAM_ADDR	0xFFE00000
+#define CONFIG_SPL_PAD_TO		0x40000
 /* SPL memory allocation configuration, this is for FAT implementation */
 #ifndef CONFIG_SYS_SPL_MALLOC_SIZE
 #define CONFIG_SYS_SPL_MALLOC_SIZE	0x10000
@@ -159,9 +161,6 @@ unsigned int cm_get_qspi_controller_clk_hz(void);
  */
 
 /* Environment for SDMMC boot */
-#if defined(CONFIG_ENV_IS_IN_MMC)
-#define CONFIG_SYS_MMC_ENV_DEV		0 /* device 0 */
-#endif
 
 /* Environment for QSPI boot */
 
@@ -191,7 +190,6 @@ unsigned int cm_get_qspi_controller_clk_hz(void);
 #ifdef CONFIG_SPL_MMC_SUPPORT
 #if defined(CONFIG_SPL_FS_FAT) || defined(CONFIG_SPL_FS_EXT4)
 #define CONFIG_SPL_FS_LOAD_PAYLOAD_NAME		"u-boot.img"
-#define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION	1
 #endif
 #else
 #ifndef CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_PARTITION

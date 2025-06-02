@@ -6,10 +6,15 @@
  */
 
 #include <common.h>
+#include <bootstage.h>
 #include <command.h>
+#include <dm.h>
 #include <env.h>
+#include <log.h>
 #include <net.h>
 #include <phy.h>
+#include <asm/global_data.h>
+#include <linux/bug.h>
 #include <linux/errno.h>
 #include <net/pcap.h>
 #include "eth_internal.h"
@@ -20,12 +25,12 @@ DECLARE_GLOBAL_DATA_PTR;
  * CPU and board-specific Ethernet initializations.  Aliased function
  * signals caller to move on
  */
-static int __def_eth_init(bd_t *bis)
+static int __def_eth_init(struct bd_info *bis)
 {
 	return -1;
 }
-int cpu_eth_init(bd_t *bis) __attribute__((weak, alias("__def_eth_init")));
-int board_eth_init(bd_t *bis) __attribute__((weak, alias("__def_eth_init")));
+int cpu_eth_init(struct bd_info *bis) __attribute__((weak, alias("__def_eth_init")));
+int board_eth_init(struct bd_info *bis) __attribute__((weak, alias("__def_eth_init")));
 
 #ifdef CONFIG_API
 static struct {
@@ -257,7 +262,7 @@ int eth_initialize(void)
 	}
 
 	if (!eth_devices) {
-		puts("No ethernet found.\n");
+		log_err("No ethernet found.\n");
 		bootstage_error(BOOTSTAGE_ID_NET_ETH_START);
 	} else {
 		struct eth_device *dev = eth_devices;
@@ -315,7 +320,7 @@ int eth_init(void)
 	struct eth_device *old_current;
 
 	if (!eth_current) {
-		puts("No ethernet found.\n");
+		log_err("No ethernet found.\n");
 		return -ENODEV;
 	}
 
@@ -361,7 +366,7 @@ int eth_send(void *packet, int length)
 	ret = eth_current->send(eth_current, packet, length);
 #if defined(CONFIG_CMD_PCAP)
 	if (ret >= 0)
-		pcap_post(packet, lengeth, true);
+		pcap_post(packet, length, true);
 #endif
 	return ret;
 }

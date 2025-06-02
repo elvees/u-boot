@@ -5,6 +5,7 @@
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <ram.h>
 #include <syscon.h>
 #include <asm/arch-rockchip/clock.h>
@@ -53,5 +54,5 @@ U_BOOT_DRIVER(dmc_rk3128) = {
 	.of_match = rk3128_dmc_ids,
 	.ops = &rk3128_dmc_ops,
 	.probe = rk3128_dmc_probe,
-	.priv_auto_alloc_size = sizeof(struct dram_info),
+	.priv_auto	= sizeof(struct dram_info),
 };

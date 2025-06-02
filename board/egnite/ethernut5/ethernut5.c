@@ -60,6 +60,7 @@
 #include <i2c.h>
 #include <mmc.h>
 #include <atmel_mci.h>
+#include <asm/global_data.h>
 
 #include <asm/arch/at91sam9260.h>
 #include <asm/arch/at91sam9260_matrix.h>
@@ -147,7 +148,7 @@ int board_init(void)
 /*
  * This is optionally called last during late initialization.
  */
-int board_eth_init(bd_t *bis)
+int board_eth_init(struct bd_info *bis)
 {
 	const char *devname;
 	unsigned short mode;
@@ -180,7 +181,7 @@ int board_eth_init(bd_t *bis)
 #endif
 
 #ifdef CONFIG_GENERIC_ATMEL_MCI
-int board_mmc_init(bd_t *bd)
+int board_mmc_init(struct bd_info *bd)
 {
 	at91_periph_clk_enable(ATMEL_ID_MCI);
 

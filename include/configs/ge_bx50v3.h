@@ -46,12 +46,9 @@
 
 /* Serial Flash */
 
-/* allow to overwrite serial and ethaddr */
-#define CONFIG_ENV_OVERWRITE
-
 #define CONFIG_LOADADDR	0x12000000
 
-#ifdef CONFIG_NFS_CMD
+#ifdef CONFIG_CMD_NFS
 #define NETWORKBOOT \
         "setnetworkboot=" \
                 "setenv ipaddr 172.16.2.10; setenv serverip 172.16.2.20; " \
@@ -59,13 +56,13 @@
                 "setenv netmask 255.255.255.0; setenv ethaddr ca:fe:de:ca:f0:11; " \
                 "setenv bootargs root=/dev/nfs nfsroot=${nfsserver}:/srv/nfs/,v3,tcp rw rootwait" \
                 "setenv bootargs $bootargs ip=${ipaddr}:${nfsserver}:${gatewayip}:${netmask}::eth0:off " \
-                "setenv bootargs $bootargs cma=128M bootcause=POR ${videoargs} " \
+                "setenv bootargs $bootargs cma=128M bootcause=${bootcause} ${videoargs} " \
                 "setenv bootargs $bootargs systemd.mask=helix-network-defaults.service " \
                 "setenv bootargs $bootargs watchdog.handle_boot_enabled=1\0" \
         "networkboot=" \
                 "run setnetworkboot; " \
                 "nfs ${loadaddr} /srv/nfs/fitImage; " \
-                "bootm ${loadaddr}#conf@${confidx}\0" \
+                "bootm ${loadaddr}\0" \
 
 #define CONFIG_NETWORKBOOTCOMMAND \
 	"run networkboot; " \
@@ -77,7 +74,6 @@
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	NETWORKBOOT \
-	"bootcause=POR\0" \
 	"image=/boot/fitImage\0" \
 	"dev=mmc\0" \
 	"devnum=2\0" \
@@ -107,7 +103,6 @@
 		"setenv partnum 1; run hasfirstboot || setenv partnum 2; " \
 		"run hasfirstboot || setenv partnum 0; " \
 		"if test ${partnum} != 0; then " \
-			"setenv bootcause REVERT; " \
 			"run swappartitions loadimage doboot; " \
 		"fi; " \
 		"run failbootcmd\0" \
@@ -116,7 +111,7 @@
 	"doboot=" \
 		"echo Booting from ${dev}:${devnum}:${partnum} ...; " \
 		"run setargs; " \
-		"bootm ${loadaddr}#conf@${confidx}\0" \
+		"bootm ${loadaddr}\0" \
 	"tryboot=" \
 		"setenv partnum 1; run hasfirstboot || setenv partnum 2; " \
 		"run loadimage || run swappartitions && run loadimage || " \
@@ -133,7 +128,7 @@
 #define CONFIG_USBBOOTCOMMAND \
 	"echo Unsupported; " \
 
-#ifdef CONFIG_NFS_CMD
+#ifdef CONFIG_CMD_NFS
 #define CONFIG_BOOTCOMMAND CONFIG_NETWORKBOOTCOMMAND
 #elif CONFIG_CMD_USB
 #define CONFIG_BOOTCOMMAND CONFIG_USBBOOTCOMMAND
@@ -143,10 +138,6 @@
 
 
 /* Miscellaneous configurable options */
-
-#define CONFIG_SYS_MEMTEST_START       0x10000000
-#define CONFIG_SYS_MEMTEST_END         0x10010000
-#define CONFIG_SYS_MEMTEST_SCRATCH     0x10800000
 
 #define CONFIG_SYS_LOAD_ADDR           CONFIG_LOADADDR
 
@@ -172,7 +163,6 @@
 #define CONFIG_HIDE_LOGO_VERSION
 #define CONFIG_IMX_HDMI
 #define CONFIG_IMX_VIDEO_SKIP
-#define CONFIG_CMD_BMP
 
 #define CONFIG_IMX6_PWM_PER_CLK	66000000
 
@@ -180,7 +170,5 @@
 #define CONFIG_PCIE_IMX
 #define CONFIG_PCIE_IMX_PERST_GPIO	IMX_GPIO_NR(7, 12)
 #define CONFIG_PCIE_IMX_POWER_GPIO	IMX_GPIO_NR(1, 5)
-
-#define CONFIG_BCH
 
 #endif	/* __GE_BX50V3_CONFIG_H */

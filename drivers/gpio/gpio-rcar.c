@@ -7,11 +7,13 @@
 #include <clk.h>
 #include <dm.h>
 #include <malloc.h>
+#include <asm/global_data.h>
 #include <dm/device_compat.h>
 #include <dm/pinctrl.h>
 #include <errno.h>
 #include <asm/gpio.h>
 #include <asm/io.h>
+#include <linux/bitops.h>
 #include "../pinctrl/renesas/sh_pfc.h"
 
 #define GPIO_IOINTSEL	0x00	/* General IO/Interrupt Switching Register */
@@ -147,7 +149,7 @@ static int rcar_gpio_probe(struct udevice *dev)
 	int node = dev_of_offset(dev);
 	int ret;
 
-	priv->regs = (void __iomem *)devfdt_get_addr(dev);
+	priv->regs = dev_read_addr_ptr(dev);
 	uc_priv->bank_name = dev->name;
 
 	ret = fdtdec_parse_phandle_with_args(gd->fdt_blob, node, "gpio-ranges",
@@ -188,6 +190,6 @@ U_BOOT_DRIVER(rcar_gpio) = {
 	.id	= UCLASS_GPIO,
 	.of_match = rcar_gpio_ids,
 	.ops	= &rcar_gpio_ops,
-	.priv_auto_alloc_size = sizeof(struct rcar_gpio_priv),
+	.priv_auto	= sizeof(struct rcar_gpio_priv),
 	.probe	= rcar_gpio_probe,
 };

@@ -11,6 +11,7 @@
 #include <watchdog.h>
 #include <asm/io.h>
 #include <serial.h>
+#include <linux/bitops.h>
 #include <linux/compiler.h>
 
 /* Register definitions */
@@ -130,7 +131,7 @@ static int ca_serial_probe(struct udevice *dev)
 	return 0;
 }
 
-static int ca_serial_ofdata_to_platdata(struct udevice *dev)
+static int ca_serial_of_to_plat(struct udevice *dev)
 {
 	struct ca_uart_priv *priv = dev_get_priv(dev);
 
@@ -157,8 +158,8 @@ U_BOOT_DRIVER(serial_cortina) = {
 	.name = "serial_cortina",
 	.id = UCLASS_SERIAL,
 	.of_match = ca_serial_ids,
-	.ofdata_to_platdata = ca_serial_ofdata_to_platdata,
-	.priv_auto_alloc_size = sizeof(struct ca_uart_priv),
+	.of_to_plat = ca_serial_of_to_plat,
+	.priv_auto	= sizeof(struct ca_uart_priv),
 	.probe = ca_serial_probe,
 	.ops = &ca_serial_ops
 };

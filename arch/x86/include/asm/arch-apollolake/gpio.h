@@ -482,4 +482,25 @@
 #define GPIO_72_IRQ			0x65
 #define GPIO_73_IRQ			0x66
 
+/* This is needed by ACPI */
+#define GPIO_NUM_PAD_CFG_REGS   2 /* DW0, DW1 */
+
+#ifndef __ASSEMBLY__
+
+#include <dt-structs.h>
+
+/**
+ * struct apl_gpio_plat - platform data for each device
+ *
+ * @dtplat: of-platdata data from C struct
+ */
+struct apl_gpio_plat {
+#if CONFIG_IS_ENABLED(OF_PLATDATA)
+	/* Put this first since driver model will copy the data here */
+	struct dtd_intel_apl_pinctrl dtplat;
+#endif
+};
+
+#endif /* __ASSEMBLY__ */
+
 #endif /* _ASM_ARCH_GPIO_H_ */

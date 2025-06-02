@@ -9,6 +9,7 @@
 #include <common.h>
 #include <cpu_func.h>
 #include <hang.h>
+#include <init.h>
 #include <spl.h>
 #include <dm.h>
 #include <miiphy.h>
@@ -20,6 +21,7 @@
 # include <asm/arch/mx6-ddr.h>
 #endif
 #include <asm/arch/clock.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/gpio.h>
 

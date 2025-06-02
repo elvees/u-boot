@@ -14,6 +14,7 @@
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <malloc.h>
 #include <dm/lists.h>
 #include <dm/of_access.h>
@@ -117,7 +118,7 @@ static int socfpga_reset_probe(struct udevice *dev)
 	u32 modrst_offset;
 	void __iomem *membase;
 
-	membase = devfdt_get_addr_ptr(dev);
+	membase = dev_read_addr_ptr(dev);
 
 	modrst_offset = dev_read_u32_default(dev, "altr,modrst-offset", 0x10);
 	data->modrst_base = membase + modrst_offset;
@@ -147,7 +148,7 @@ static int socfpga_reset_bind(struct udevice *dev)
 	 * Bind it to the node, too, so that it can get its base address.
 	 */
 	ret = device_bind_driver_to_node(dev, "socfpga_sysreset", "sysreset",
-					 dev->node, &sys_child);
+					 dev_ofnode(dev), &sys_child);
 	if (ret)
 		debug("Warning: No sysreset driver: ret=%d\n", ret);
 
@@ -165,7 +166,7 @@ U_BOOT_DRIVER(socfpga_reset) = {
 	.of_match = socfpga_reset_match,
 	.bind = socfpga_reset_bind,
 	.probe = socfpga_reset_probe,
-	.priv_auto_alloc_size = sizeof(struct socfpga_reset_data),
+	.priv_auto	= sizeof(struct socfpga_reset_data),
 	.ops = &socfpga_reset_ops,
 	.remove = socfpga_reset_remove,
 	.flags	= DM_FLAG_OS_PREPARE,

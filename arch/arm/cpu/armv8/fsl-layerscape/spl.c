@@ -7,7 +7,12 @@
 #include <clock_legacy.h>
 #include <cpu_func.h>
 #include <env.h>
+#include <image.h>
+#include <init.h>
+#include <log.h>
 #include <spl.h>
+#include <asm/cache.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <fsl_ifc.h>
 #include <i2c.h>
@@ -33,6 +38,9 @@ u32 spl_boot_device(void)
 }
 
 #ifdef CONFIG_SPL_BUILD
+
+/* Define board data structure */
+static struct bd_info bdata __attribute__ ((section(".data")));
 
 void spl_board_init(void)
 {
@@ -70,7 +78,7 @@ void board_init_f(ulong dummy)
 	get_clocks();
 
 	preloader_console_init();
-	spl_set_bd();
+	gd->bd = &bdata;
 
 #ifdef CONFIG_SYS_I2C
 #ifdef CONFIG_SPL_I2C_SUPPORT

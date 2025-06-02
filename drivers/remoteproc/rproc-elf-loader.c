@@ -6,7 +6,9 @@
 #include <cpu_func.h>
 #include <dm.h>
 #include <elf.h>
+#include <log.h>
 #include <remoteproc.h>
+#include <asm/cache.h>
 #include <dm/device_compat.h>
 #include <linux/compat.h>
 
@@ -154,22 +156,6 @@ int rproc_elf64_sanity_check(ulong addr, ulong size)
 	}
 
 	return 0;
-}
-
-/* Basic function to verify ELF image format */
-int rproc_elf_sanity_check(ulong addr, ulong size)
-{
-	Elf32_Ehdr *ehdr = (Elf32_Ehdr *)addr;
-
-	if (!addr) {
-		dev_err(dev, "Invalid firmware address\n");
-		return -EFAULT;
-	}
-
-	if (ehdr->e_ident[EI_CLASS] == ELFCLASS64)
-		return rproc_elf64_sanity_check(addr, size);
-	else
-		return rproc_elf32_sanity_check(addr, size);
 }
 
 int rproc_elf32_load_image(struct udevice *dev, unsigned long addr, ulong size)

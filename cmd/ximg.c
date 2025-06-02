@@ -24,6 +24,7 @@
 #include <bzlib.h>
 #endif
 #include <asm/byteorder.h>
+#include <asm/cache.h>
 #include <asm/io.h>
 
 #ifndef CONFIG_SYS_XIMG_LEN
@@ -32,7 +33,7 @@
 #endif
 
 static int
-do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
+do_imgextract(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	ulong		addr = image_load_addr;
 	ulong		dest = 0;
@@ -135,7 +136,7 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 			"at %08lx ...\n", uname, addr);
 
 		fit_hdr = (const void *)addr;
-		if (!fit_check_format(fit_hdr)) {
+		if (fit_check_format(fit_hdr, IMAGE_SIZE_INVAL)) {
 			puts("Bad FIT image format\n");
 			return 1;
 		}

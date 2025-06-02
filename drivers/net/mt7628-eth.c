@@ -16,13 +16,17 @@
 #include <common.h>
 #include <cpu_func.h>
 #include <dm.h>
+#include <log.h>
 #include <malloc.h>
 #include <miiphy.h>
 #include <net.h>
 #include <reset.h>
 #include <wait_bit.h>
+#include <asm/cache.h>
 #include <asm/io.h>
 #include <linux/bitfield.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
 #include <linux/err.h>
 
 /* Ethernet frame engine register */
@@ -357,7 +361,7 @@ static int mt7628_eth_write_hwaddr(struct udevice *dev)
 {
 	struct mt7628_eth_dev *priv = dev_get_priv(dev);
 	void __iomem *base = priv->base;
-	u8 *addr = ((struct eth_pdata *)dev_get_platdata(dev))->enetaddr;
+	u8 *addr = ((struct eth_pdata *)dev_get_plat(dev))->enetaddr;
 	u32 val;
 
 	/* Set MAC address. */
@@ -647,6 +651,6 @@ U_BOOT_DRIVER(mt7628_eth) = {
 	.of_match = mt7628_eth_ids,
 	.probe	= mt7628_eth_probe,
 	.ops	= &mt7628_eth_ops,
-	.priv_auto_alloc_size = sizeof(struct mt7628_eth_dev),
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
+	.priv_auto	= sizeof(struct mt7628_eth_dev),
+	.plat_auto	= sizeof(struct eth_pdata),
 };

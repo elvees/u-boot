@@ -8,6 +8,7 @@
 #define	_CLOCK_MANAGER_S10_
 
 #include <asm/arch/clock_manager_soc64.h>
+#include <linux/bitops.h>
 
 /* Clock speed accessors */
 unsigned long cm_get_mpu_clk_hz(void);
@@ -85,7 +86,7 @@ void cm_basic_init(const struct cm_config * const cfg);
 #define CLKMGR_S10_MAINPLL_VCOCALIB			0x8c
 /* Periphpll group */
 #define CLKMGR_S10_PERPLL_EN				0xa4
-#define CLKMGR_S10_PERPLL_BYPASS			0xac
+#define CLKMGR_S10_PERPLL_BYPASS			0xb0
 #define CLKMGR_S10_PERPLL_CNTR2CLK			0xbc
 #define CLKMGR_S10_PERPLL_CNTR3CLK			0xc0
 #define CLKMGR_S10_PERPLL_CNTR4CLK			0xc4

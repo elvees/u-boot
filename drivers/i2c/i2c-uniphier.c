@@ -50,7 +50,7 @@ static int uniphier_i2c_probe(struct udevice *dev)
 	fdt_addr_t addr;
 	struct uniphier_i2c_priv *priv = dev_get_priv(dev);
 
-	addr = devfdt_get_addr(dev);
+	addr = dev_read_addr(dev);
 	if (addr == FDT_ADDR_T_NONE)
 		return -EINVAL;
 
@@ -214,6 +214,6 @@ U_BOOT_DRIVER(uniphier_i2c) = {
 	.id = UCLASS_I2C,
 	.of_match = uniphier_i2c_of_match,
 	.probe = uniphier_i2c_probe,
-	.priv_auto_alloc_size = sizeof(struct uniphier_i2c_priv),
+	.priv_auto	= sizeof(struct uniphier_i2c_priv),
 	.ops = &uniphier_i2c_ops,
 };

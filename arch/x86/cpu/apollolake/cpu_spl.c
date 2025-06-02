@@ -6,17 +6,19 @@
  */
 
 #include <common.h>
-#include <acpi_s3.h>
 #include <dm.h>
 #include <ec_commands.h>
+#include <init.h>
 #include <log.h>
 #include <spi_flash.h>
 #include <spl.h>
 #include <syscon.h>
+#include <acpi/acpi_s3.h>
 #include <asm/cpu.h>
 #include <asm/cpu_common.h>
 #include <asm/cpu_x86.h>
 #include <asm/fast_spi.h>
+#include <asm/global_data.h>
 #include <asm/intel_pinctrl.h>
 #include <asm/intel_regs.h>
 #include <asm/io.h>
@@ -111,26 +113,6 @@ static int fast_spi_cache_bios_region(void)
 	log_debug("BIOS cache base=%lx, size=%x\n", base, (uint)map_size);
 
 	return 0;
-}
-
-static void enable_pm_timer_emulation(struct udevice *pmc)
-{
-	struct acpi_pmc_upriv *upriv = dev_get_uclass_priv(pmc);
-	msr_t msr;
-
-	/*
-	 * The derived frequency is calculated as follows:
-	 *    (CTC_FREQ * msr[63:32]) >> 32 = target frequency.
-	 *
-	 * Back-solve the multiplier so the 3.579545MHz ACPI timer frequency is
-	 * used.
-	 */
-	msr.hi = (3579545ULL << 32) / CTC_FREQ;
-
-	/* Set PM1 timer IO port and enable */
-	msr.lo = EMULATE_PM_TMR_EN | (upriv->acpi_base + R_ACPI_PM1_TMR);
-	debug("PM timer %x %x\n", msr.hi, msr.lo);
-	msr_write(MSR_EMULATE_PM_TIMER, msr);
 }
 
 static void google_chromeec_ioport_range(uint *out_basep, uint *out_sizep)
@@ -246,12 +228,13 @@ static int arch_cpu_init_spl(void)
 	ret = pmc_init(pmc);
 	if (ret < 0)
 		return log_msg_ret("Could not init PMC", ret);
-#ifdef CONFIG_HAVE_ACPI_RESUME
-	ret = pmc_prev_sleep_state(pmc);
-	if (ret < 0)
-		return log_msg_ret("Could not get PMC sleep state", ret);
-	gd->arch.prev_sleep_state = ret;
-#endif
+	if (IS_ENABLED(CONFIG_HAVE_ACPI_RESUME)) {
+		ret = pmc_prev_sleep_state(pmc);
+		if (ret < 0)
+			return log_msg_ret("Could not get PMC sleep state",
+					   ret);
+		gd->arch.prev_sleep_state = ret;
+	}
 
 	return 0;
 }

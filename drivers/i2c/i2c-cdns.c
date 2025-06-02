@@ -9,9 +9,13 @@
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
 #include <linux/types.h>
 #include <linux/io.h>
 #include <linux/errno.h>
+#include <dm/device_compat.h>
 #include <dm/root.h>
 #include <i2c.h>
 #include <fdtdec.h>
@@ -457,7 +461,7 @@ static int cdns_i2c_xfer(struct udevice *dev, struct i2c_msg *msg,
 	return ret;
 }
 
-static int cdns_i2c_ofdata_to_platdata(struct udevice *dev)
+static int cdns_i2c_of_to_plat(struct udevice *dev)
 {
 	struct i2c_cdns_bus *i2c_bus = dev_get_priv(dev);
 	struct cdns_i2c_platform_data *pdata =
@@ -478,6 +482,12 @@ static int cdns_i2c_ofdata_to_platdata(struct udevice *dev)
 
 	i2c_bus->input_freq = clk_get_rate(&clk);
 
+	ret = clk_enable(&clk);
+	if (ret) {
+		dev_err(dev, "failed to enable clock\n");
+		return ret;
+	}
+
 	return 0;
 }
 
@@ -497,10 +507,10 @@ static const struct udevice_id cdns_i2c_of_match[] = {
 };
 
 U_BOOT_DRIVER(cdns_i2c) = {
-	.name = "i2c-cdns",
+	.name = "i2c_cdns",
 	.id = UCLASS_I2C,
 	.of_match = cdns_i2c_of_match,
-	.ofdata_to_platdata = cdns_i2c_ofdata_to_platdata,
-	.priv_auto_alloc_size = sizeof(struct i2c_cdns_bus),
+	.of_to_plat = cdns_i2c_of_to_plat,
+	.priv_auto	= sizeof(struct i2c_cdns_bus),
 	.ops = &cdns_i2c_ops,
 };

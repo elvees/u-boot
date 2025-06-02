@@ -8,8 +8,10 @@
 
 #include <common.h>
 #include <clk.h>
+#include <log.h>
 #include <malloc.h>
 #include <spi.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <dm.h>
 
@@ -308,8 +310,8 @@ static int atcspi200_spi_set_mode(struct udevice *bus, uint mode)
 
 static int atcspi200_spi_claim_bus(struct udevice *dev)
 {
-	struct dm_spi_slave_platdata *slave_plat =
-		dev_get_parent_platdata(dev);
+	struct dm_spi_slave_plat *slave_plat =
+		dev_get_parent_plat(dev);
 	struct udevice *bus = dev->parent;
 	struct nds_spi_slave *ns = dev_get_priv(bus);
 
@@ -377,7 +379,7 @@ static int atcspi200_ofdata_to_platadata(struct udevice *bus)
 	const void *blob = gd->fdt_blob;
 	int node = dev_of_offset(bus);
 
-	ns->regs = map_physmem(devfdt_get_addr(bus),
+	ns->regs = map_physmem(dev_read_addr(bus),
 				 sizeof(struct atcspi200_spi_regs),
 				 MAP_NOCACHE);
 	if (!ns->regs) {
@@ -407,7 +409,7 @@ U_BOOT_DRIVER(atcspi200_spi) = {
 	.id = UCLASS_SPI,
 	.of_match = atcspi200_spi_ids,
 	.ops = &atcspi200_spi_ops,
-	.ofdata_to_platdata = atcspi200_ofdata_to_platadata,
-	.priv_auto_alloc_size = sizeof(struct nds_spi_slave),
+	.of_to_plat = atcspi200_ofdata_to_platadata,
+	.priv_auto	= sizeof(struct nds_spi_slave),
 	.probe = atcspi200_spi_probe,
 };

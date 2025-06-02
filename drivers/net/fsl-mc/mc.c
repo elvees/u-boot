@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2014 Freescale Semiconductor, Inc.
- * Copyright 2017-2018 NXP
+ * Copyright 2017-2018, 2020 NXP
  */
 #include <common.h>
 #include <command.h>
 #include <cpu_func.h>
 #include <env.h>
 #include <errno.h>
+#include <image.h>
+#include <log.h>
 #include <malloc.h>
+#include <asm/global_data.h>
 #include <linux/bug.h>
 #include <asm/io.h>
+#include <linux/delay.h>
 #include <linux/libfdt.h>
 #include <net.h>
 #include <fdt_support.h>
@@ -138,7 +142,7 @@ int parse_mc_firmware_fit_image(u64 mc_fw_addr,
 		return -EINVAL;
 	}
 
-	if (!fit_check_format(fit_hdr)) {
+	if (fit_check_format(fit_hdr, IMAGE_SIZE_INVAL)) {
 		printf("fsl-mc: ERR: Bad firmware image (bad FIT header)\n");
 		return -EINVAL;
 	}
@@ -174,9 +178,21 @@ enum mc_fixup_type {
 };
 
 static int mc_fixup_mac_addr(void *blob, int nodeoffset,
+#ifdef CONFIG_DM_ETH
+			     const char *propname, struct udevice *eth_dev,
+#else
 			     const char *propname, struct eth_device *eth_dev,
+#endif
 			     enum mc_fixup_type type)
 {
+#ifdef CONFIG_DM_ETH
+	struct eth_pdata *plat = dev_get_plat(eth_dev);
+	unsigned char *enetaddr = plat->enetaddr;
+	int eth_index = dev_seq(eth_dev);
+#else
+	unsigned char *enetaddr = eth_dev->enetaddr;
+	int eth_index = eth_dev->index;
+#endif
 	int err = 0, len = 0, size, i;
 	unsigned char env_enetaddr[ARP_HLEN];
 	unsigned int enetaddr_32[ARP_HLEN];
@@ -184,23 +200,22 @@ static int mc_fixup_mac_addr(void *blob, int nodeoffset,
 
 	switch (type) {
 	case MC_FIXUP_DPL:
-	/* DPL likes its addresses on 32 * ARP_HLEN bits */
-	for (i = 0; i < ARP_HLEN; i++)
-		enetaddr_32[i] = cpu_to_fdt32(eth_dev->enetaddr[i]);
-	val = enetaddr_32;
-	len = sizeof(enetaddr_32);
-	break;
-
+		/* DPL likes its addresses on 32 * ARP_HLEN bits */
+		for (i = 0; i < ARP_HLEN; i++)
+			enetaddr_32[i] = cpu_to_fdt32(enetaddr[i]);
+		val = enetaddr_32;
+		len = sizeof(enetaddr_32);
+		break;
 	case MC_FIXUP_DPC:
-	val = eth_dev->enetaddr;
-	len = ARP_HLEN;
-	break;
+		val = enetaddr;
+		len = ARP_HLEN;
+		break;
 	}
 
 	/* MAC address property present */
 	if (fdt_get_property(blob, nodeoffset, propname, NULL)) {
 		/* u-boot MAC addr randomly assigned - leave the present one */
-		if (!eth_env_get_enetaddr_by_index("eth", eth_dev->index,
+		if (!eth_env_get_enetaddr_by_index("eth", eth_index,
 						   env_enetaddr))
 			return err;
 	} else {
@@ -250,7 +265,11 @@ const char *dpl_get_connection_endpoint(void *blob, char *endpoint)
 }
 
 static int mc_fixup_dpl_mac_addr(void *blob, int dpmac_id,
+#ifdef CONFIG_DM_ETH
+				 struct udevice *eth_dev)
+#else
 				 struct eth_device *eth_dev)
+#endif
 {
 	int objoff = fdt_path_offset(blob, "/objects");
 	int dpmacoff = -1, dpnioff = -1;
@@ -302,7 +321,7 @@ void fdt_fixup_mc_ddr(u64 *base, u64 *size)
 void fdt_fsl_mc_fixup_iommu_map_entry(void *blob)
 {
 	u32 *prop;
-	u32 iommu_map[4];
+	u32 iommu_map[4], phandle;
 	int offset;
 	int lenp;
 
@@ -331,10 +350,29 @@ void fdt_fsl_mc_fixup_iommu_map_entry(void *blob)
 
 	fdt_setprop_inplace(blob, offset, "iommu-map",
 			    iommu_map, sizeof(iommu_map));
+
+	/* get phandle to MSI controller */
+	prop = (u32 *)fdt_getprop(blob, offset, "msi-parent", 0);
+	if (!prop) {
+		debug("\n%s: ERROR: missing msi-parent\n", __func__);
+		return;
+	}
+	phandle = fdt32_to_cpu(*prop);
+
+	/* also set msi-map property */
+	fdt_appendprop_u32(blob, offset, "msi-map", FSL_DPAA2_STREAM_ID_START);
+	fdt_appendprop_u32(blob, offset, "msi-map", phandle);
+	fdt_appendprop_u32(blob, offset, "msi-map", FSL_DPAA2_STREAM_ID_START);
+	fdt_appendprop_u32(blob, offset, "msi-map", FSL_DPAA2_STREAM_ID_END -
+			   FSL_DPAA2_STREAM_ID_START + 1);
 }
 
 static int mc_fixup_dpc_mac_addr(void *blob, int dpmac_id,
+#ifdef CONFIG_DM_ETH
+				 struct udevice *eth_dev)
+#else
 				 struct eth_device *eth_dev)
+#endif
 {
 	int nodeoffset = fdt_path_offset(blob, "/board_info/ports"), noff;
 	int err = 0;
@@ -377,8 +415,13 @@ static int mc_fixup_dpc_mac_addr(void *blob, int dpmac_id,
 static int mc_fixup_mac_addrs(void *blob, enum mc_fixup_type type)
 {
 	int i, err = 0, ret = 0;
-	char ethname[ETH_NAME_LEN];
+#ifdef CONFIG_DM_ETH
+#define ETH_NAME_LEN 20
+	struct udevice *eth_dev;
+#else
 	struct eth_device *eth_dev;
+#endif
+	char ethname[ETH_NAME_LEN];
 
 	for (i = WRIOP1_DPMAC1; i < NUM_WRIOP_PORTS; i++) {
 		/* port not enabled */
@@ -439,8 +482,19 @@ static int mc_fixup_dpc(u64 dpc_addr)
 
 	/* fixup MAC addresses for dpmac ports */
 	nodeoffset = fdt_path_offset(blob, "/board_info/ports");
-	if (nodeoffset < 0)
-		goto out;
+	if (nodeoffset < 0) {
+		err = fdt_increase_size(blob, 512);
+		if (err) {
+			printf("fdt_increase_size: err=%s\n",
+			       fdt_strerror(err));
+			goto out;
+		}
+		nodeoffset = fdt_path_offset(blob, "/board_info");
+		if (nodeoffset < 0)
+			nodeoffset = fdt_add_subnode(blob, 0, "board_info");
+
+		nodeoffset = fdt_add_subnode(blob, nodeoffset, "ports");
+	}
 
 	err = mc_fixup_mac_addrs(blob, MC_FIXUP_DPC);
 
@@ -918,7 +972,7 @@ unsigned long mc_get_dram_block_size(void)
 	return dram_block_size;
 }
 
-int fsl_mc_ldpaa_init(bd_t *bis)
+int fsl_mc_ldpaa_init(struct bd_info *bis)
 {
 	int i;
 
@@ -1654,7 +1708,7 @@ err:
 	return err;
 }
 
-int fsl_mc_ldpaa_exit(bd_t *bd)
+int fsl_mc_ldpaa_exit(struct bd_info *bd)
 {
 	int err = 0;
 	bool is_dpl_apply_status = false;
@@ -1720,7 +1774,8 @@ err:
 	return err;
 }
 
-static int do_fsl_mc(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+static int do_fsl_mc(struct cmd_tbl *cmdtp, int flag, int argc,
+		     char *const argv[])
 {
 	int err = 0;
 	if (argc < 3)

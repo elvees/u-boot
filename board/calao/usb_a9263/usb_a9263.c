@@ -15,6 +15,7 @@
 #include <asm/arch/clk.h>
 #include <asm/arch/gpio.h>
 #include <asm-generic/gpio.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <net.h>
 #include <netdev.h>
@@ -115,7 +116,7 @@ int dram_init(void)
 	return 0;
 }
 
-int board_eth_init(bd_t *bis)
+int board_eth_init(struct bd_info *bis)
 {
 	int rc = 0;
 

@@ -11,6 +11,8 @@
 #include <div64.h>
 #include <dm.h>
 #include <asm/io.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
 
 #include "clk-mtk.h"
 
@@ -294,7 +296,7 @@ static ulong mtk_topckgen_get_factor_rate(struct clk *clk, u32 off)
 	switch (fdiv->flags & CLK_PARENT_MASK) {
 	case CLK_PARENT_APMIXED:
 		rate = mtk_clk_find_parent_rate(clk, fdiv->parent,
-				DM_GET_DRIVER(mtk_clk_apmixedsys));
+				DM_DRIVER_GET(mtk_clk_apmixedsys));
 		break;
 	case CLK_PARENT_TOPCKGEN:
 		rate = mtk_clk_find_parent_rate(clk, fdiv->parent, NULL);
@@ -472,11 +474,11 @@ static ulong mtk_clk_gate_get_rate(struct clk *clk)
 	switch (gate->flags & CLK_PARENT_MASK) {
 	case CLK_PARENT_APMIXED:
 		return mtk_clk_find_parent_rate(clk, gate->parent,
-				DM_GET_DRIVER(mtk_clk_apmixedsys));
+				DM_DRIVER_GET(mtk_clk_apmixedsys));
 		break;
 	case CLK_PARENT_TOPCKGEN:
 		return mtk_clk_find_parent_rate(clk, gate->parent,
-				DM_GET_DRIVER(mtk_clk_topckgen));
+				DM_DRIVER_GET(mtk_clk_topckgen));
 		break;
 
 	default:

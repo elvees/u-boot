@@ -5,9 +5,14 @@
 
 #include <common.h>
 #include <cpu_func.h>
+#include <fastboot.h>
 #include <init.h>
+#include <net.h>
 #include <asm/arch/boot.h>
 #include <env.h>
+#include <asm/cache.h>
+#include <asm/global_data.h>
+#include <asm/ptrace.h>
 #include <linux/libfdt.h>
 #include <linux/err.h>
 #include <asm/arch/mem.h>
@@ -49,12 +54,12 @@ int dram_init(void)
 	return 0;
 }
 
-__weak int meson_ft_board_setup(void *blob, bd_t *bd)
+__weak int meson_ft_board_setup(void *blob, struct bd_info *bd)
 {
 	return 0;
 }
 
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	meson_init_reserved_memory(blob);
 
@@ -69,11 +74,8 @@ void meson_board_add_reserved_memory(void *fdt, u64 start, u64 size)
 	if (ret)
 		printf("Could not reserve zone @ 0x%llx\n", start);
 
-	if (IS_ENABLED(CONFIG_EFI_LOADER)) {
-		efi_add_memory_map(start,
-				   ALIGN(size, EFI_PAGE_SIZE) >> EFI_PAGE_SHIFT,
-				   EFI_RESERVED_MEMORY_TYPE, false);
-	}
+	if (IS_ENABLED(CONFIG_EFI_LOADER))
+		efi_add_memory_map(start, size, EFI_RESERVED_MEMORY_TYPE);
 }
 
 int meson_generate_serial_ethaddr(void)
@@ -153,8 +155,11 @@ int board_late_init(void)
 #if CONFIG_IS_ENABLED(FASTBOOT)
 static unsigned int reboot_reason = REBOOT_REASON_NORMAL;
 
-int fastboot_set_reboot_flag()
+int fastboot_set_reboot_flag(enum fastboot_reboot_reason reason)
 {
+	if (reason != FASTBOOT_REBOOT_REASON_BOOTLOADER)
+		return -ENOTSUPP;
+
 	reboot_reason = REBOOT_REASON_BOOTLOADER;
 
 	printf("Using reboot reason: 0x%x\n", reboot_reason);

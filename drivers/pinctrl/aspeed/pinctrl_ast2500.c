@@ -6,6 +6,7 @@
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
+#include <log.h>
 #include <asm/io.h>
 #include <asm/arch/pinctrl.h>
 #include <asm/arch/scu_ast2500.h>
@@ -120,7 +121,7 @@ U_BOOT_DRIVER(pinctrl_ast2500) = {
 	.name = "aspeed_ast2500_pinctrl",
 	.id = UCLASS_PINCTRL,
 	.of_match = ast2500_pinctrl_ids,
-	.priv_auto_alloc_size = sizeof(struct ast2500_pinctrl_priv),
+	.priv_auto	= sizeof(struct ast2500_pinctrl_priv),
 	.ops = &ast2500_pinctrl_ops,
 	.probe = ast2500_pinctrl_probe,
 };

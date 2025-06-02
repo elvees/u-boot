@@ -5,10 +5,11 @@
  * Copyright (C) 2018 Xilinx, Inc.
  */
 
-#include <dm.h>
-#include <phy.h>
-#include <config.h>
 #include <common.h>
+#include <dm.h>
+#include <log.h>
+#include <phy.h>
+#include <asm/global_data.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 

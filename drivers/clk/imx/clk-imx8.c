@@ -7,6 +7,7 @@
 #include <common.h>
 #include <clk-uclass.h>
 #include <dm.h>
+#include <log.h>
 #include <malloc.h>
 #include <asm/arch/sci/sci.h>
 #include <asm/arch/clock.h>
@@ -50,7 +51,7 @@ int soc_clk_dump(void)
 	int i, ret;
 
 	ret = uclass_get_device_by_driver(UCLASS_CLK,
-					  DM_GET_DRIVER(imx8_clk), &dev);
+					  DM_DRIVER_GET(imx8_clk), &dev);
 	if (ret)
 		return ret;
 

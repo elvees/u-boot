@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2015 Google, Inc
+ * Copyright 2020 NXP
  * Written by Simon Glass <sjg@chromium.org>
  */
 
 #include <common.h>
+#include <log.h>
 #include <mmc.h>
 #include <dm.h>
 #include <dm/device-internal.h>
@@ -12,6 +14,22 @@
 #include <dm/lists.h>
 #include <linux/compat.h>
 #include "mmc_private.h"
+
+int dm_mmc_get_b_max(struct udevice *dev, void *dst, lbaint_t blkcnt)
+{
+	struct dm_mmc_ops *ops = mmc_get_ops(dev);
+	struct mmc *mmc = mmc_get_mmc_dev(dev);
+
+	if (ops->get_b_max)
+		return ops->get_b_max(dev, dst, blkcnt);
+	else
+		return mmc->cfg->b_max;
+}
+
+int mmc_get_b_max(struct mmc *mmc, void *dst, lbaint_t blkcnt)
+{
+	return dm_mmc_get_b_max(mmc->dev, dst, blkcnt);
+}
 
 int dm_mmc_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 		    struct mmc_data *data)
@@ -124,6 +142,21 @@ int mmc_set_enhanced_strobe(struct mmc *mmc)
 }
 #endif
 
+int dm_mmc_hs400_prepare_ddr(struct udevice *dev)
+{
+	struct dm_mmc_ops *ops = mmc_get_ops(dev);
+
+	if (ops->hs400_prepare_ddr)
+		return ops->hs400_prepare_ddr(dev);
+
+	return 0;
+}
+
+int mmc_hs400_prepare_ddr(struct mmc *mmc)
+{
+	return dm_mmc_hs400_prepare_ddr(mmc->dev);
+}
+
 int dm_mmc_host_power_cycle(struct udevice *dev)
 {
 	struct dm_mmc_ops *ops = mmc_get_ops(dev);
@@ -153,6 +186,21 @@ int mmc_deferred_probe(struct mmc *mmc)
 	return dm_mmc_deferred_probe(mmc->dev);
 }
 
+int dm_mmc_reinit(struct udevice *dev)
+{
+	struct dm_mmc_ops *ops = mmc_get_ops(dev);
+
+	if (ops->reinit)
+		return ops->reinit(dev);
+
+	return 0;
+}
+
+int mmc_reinit(struct mmc *mmc)
+{
+	return dm_mmc_reinit(mmc->dev);
+}
+
 int mmc_of_parse(struct udevice *dev, struct mmc_config *cfg)
 {
 	int val;
@@ -180,7 +228,7 @@ int mmc_of_parse(struct udevice *dev, struct mmc_config *cfg)
 	if (dev_read_bool(dev, "cap-sd-highspeed"))
 		cfg->host_caps |= MMC_CAP(SD_HS);
 	if (dev_read_bool(dev, "cap-mmc-highspeed"))
-		cfg->host_caps |= MMC_CAP(MMC_HS);
+		cfg->host_caps |= MMC_CAP(MMC_HS) | MMC_CAP(MMC_HS_52);
 	if (dev_read_bool(dev, "sd-uhs-sdr12"))
 		cfg->host_caps |= MMC_CAP(UHS_SDR12);
 	if (dev_read_bool(dev, "sd-uhs-sdr25"))
@@ -223,7 +271,7 @@ int mmc_of_parse(struct udevice *dev, struct mmc_config *cfg)
 	return 0;
 }
 
-struct mmc *mmc_get_mmc_dev(struct udevice *dev)
+struct mmc *mmc_get_mmc_dev(const struct udevice *dev)
 {
 	struct mmc_uclass_priv *upriv;
 
@@ -273,7 +321,7 @@ struct blk_desc *mmc_get_blk_desc(struct mmc *mmc)
 	device_find_first_child(mmc->dev, &dev);
 	if (!dev)
 		return NULL;
-	desc = dev_get_uclass_platdata(dev);
+	desc = dev_get_uclass_plat(dev);
 
 	return desc;
 }
@@ -292,9 +340,6 @@ void mmc_do_preinit(void)
 
 		if (!m)
 			continue;
-#ifdef CONFIG_FSL_ESDHC_ADAPTER_IDENT
-		mmc_set_preinit(m, 1);
-#endif
 		if (m->preinit)
 			mmc_start_init(m);
 	}
@@ -354,7 +399,7 @@ int mmc_bind(struct udevice *dev, struct mmc *mmc, const struct mmc_config *cfg)
 		debug("Cannot create block device\n");
 		return ret;
 	}
-	bdesc = dev_get_uclass_platdata(bdev);
+	bdesc = dev_get_uclass_plat(bdev);
 	mmc->cfg = cfg;
 	mmc->priv = dev;
 
@@ -390,7 +435,7 @@ static int mmc_select_hwpart(struct udevice *bdev, int hwpart)
 {
 	struct udevice *mmc_dev = dev_get_parent(bdev);
 	struct mmc *mmc = mmc_get_mmc_dev(mmc_dev);
-	struct blk_desc *desc = dev_get_uclass_platdata(bdev);
+	struct blk_desc *desc = dev_get_uclass_plat(bdev);
 	int ret;
 
 	if (desc->hwpart == hwpart)
@@ -463,5 +508,5 @@ UCLASS_DRIVER(mmc) = {
 	.id		= UCLASS_MMC,
 	.name		= "mmc",
 	.flags		= DM_UC_FLAG_SEQ_ALIAS,
-	.per_device_auto_alloc_size = sizeof(struct mmc_uclass_priv),
+	.per_device_auto	= sizeof(struct mmc_uclass_priv),
 };

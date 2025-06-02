@@ -6,6 +6,10 @@
 #ifndef __GIC_V3_H__
 #define __GIC_V3_H__
 
+#ifndef __ASSEMBLY__
+#include <linux/bitops.h>
+#endif
+
 #define GICR_CTLR_ENABLE_LPIS		BIT(0)
 #define GICR_CTLR_RWP			BIT(3)
 
@@ -123,9 +127,9 @@
 #define GIC_REDISTRIBUTOR_OFFSET 0x20000
 
 #ifdef CONFIG_GIC_V3_ITS
-int gic_lpi_tables_init(u64 base, u32 max_redist);
+int gic_lpi_tables_init(void);
 #else
-int gic_lpi_tables_init(u64 base, u32 max_redist)
+int gic_lpi_tables_init(void)
 {
 	return 0;
 }

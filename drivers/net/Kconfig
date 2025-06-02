@@ -37,6 +37,21 @@ config DM_MDIO_MUX
 	  This is currently implemented in net/mdio-mux-uclass.c
 	  Look in include/miiphy.h for details.
 
+config DM_DSA
+	bool "Enable Driver Model for DSA switches"
+	depends on DM_ETH && DM_MDIO
+	depends on PHY_FIXED
+	help
+	  Enable driver model for DSA switches
+
+	  Adds UCLASS_DSA class supporting switches that follow the Distributed
+	  Switch Architecture (DSA).  These switches rely on the presence of a
+	  management switch port connected to an Ethernet controller capable of
+	  receiving frames from the switch.  This host Ethernet controller is
+	  called the "master" Ethernet interface in DSA terminology.
+	  This is currently implemented in net/dsa-uclass.c, refer to
+	  include/net/dsa.h for API details.
+
 config MDIO_SANDBOX
 	depends on DM_MDIO && SANDBOX
 	default y
@@ -56,6 +71,12 @@ config MDIO_MUX_SANDBOX
 	  the MDIO bux.  It uses mdio_sandbox driver as parent MDIO.
 
 	  This driver is used for testing in test/dm/mdio.c
+
+config DM_ETH_PHY
+	bool "Enable Driver Model for Ethernet Generic PHY drivers"
+	depends on DM
+	help
+	  Enable driver model for Ethernet Generic PHY .
 
 menuconfig NETDEVICES
 	bool "Network device support"
@@ -150,6 +171,13 @@ config BCMGENET
 	help
 	  This driver supports the BCMGENET Ethernet MAC.
 
+config CORTINA_NI_ENET
+	bool "Cortina-Access Ethernet driver"
+	depends on DM_ETH && CORTINA_PLATFORM
+	help
+	  This driver supports the Cortina-Access Ethernet MAC for
+	  all supported CAxxxx SoCs.
+
 config DWC_ETH_QOS
 	bool "Synopsys DWC Ethernet QOS device support"
 	depends on DM_ETH
@@ -157,12 +185,34 @@ config DWC_ETH_QOS
 	help
 	  This driver supports the Synopsys Designware Ethernet QOS (Quality
 	  Of Service) IP block. The IP supports many options for bus type,
-	  clocking/reset structure, and feature list. This driver currently
-	  supports the specific configuration used in NVIDIA's Tegra186 chip,
-	  but should be extensible to other combinations quite easily.
+	  clocking/reset structure, and feature list.
+
+config DWC_ETH_QOS_IMX
+	bool "Synopsys DWC Ethernet QOS device support for IMX"
+	depends on DWC_ETH_QOS
+	help
+	  The Synopsys Designware Ethernet QOS IP block with the specific
+	  configuration used in IMX soc.
+
+config DWC_ETH_QOS_STM32
+	bool "Synopsys DWC Ethernet QOS device support for STM32"
+	depends on DWC_ETH_QOS
+	default y if ARCH_STM32MP
+	help
+	  The Synopsys Designware Ethernet QOS IP block with the specific
+	  configuration used in STM32MP soc.
+
+config DWC_ETH_QOS_TEGRA186
+	bool "Synopsys DWC Ethernet QOS device support for TEGRA186"
+	depends on DWC_ETH_QOS
+	default y if TEGRA186
+	help
+	  The Synopsys Designware Ethernet QOS IP block with specific
+	  configuration used in NVIDIA's Tegra186 chip.
 
 config E1000
 	bool "Intel PRO/1000 Gigabit Ethernet support"
+	depends on (DM_ETH && DM_PCI) || !DM_ETH
 	help
 	  This driver supports Intel(R) PRO/1000 gigabit ethernet family of
 	  adapters.  For more information on how to identify your adapter, go
@@ -192,6 +242,12 @@ config CMD_E1000
 	  This enables the 'e1000' management command for E1000 devices. When
 	  used on devices with SPI support you can reprogram the EEPROM from
 	  U-Boot.
+
+config EEPRO100
+	bool "Intel PRO/100 82557/82559/82559ER Fast Ethernet support"
+	help
+	  This driver supports Intel(R) PRO/100 82557/82559/82559ER fast
+	  ethernet family of adapters.
 
 config ETH_SANDBOX
 	depends on DM_ETH && SANDBOX
@@ -231,6 +287,13 @@ config ETH_DESIGNWARE_SOCFPGA
 	  The Altera SoCFPGA requires additional configuration of the
 	  Altera system manager to correctly interface with the PHY.
 	  This code handles those SoC specifics.
+
+config ETH_DESIGNWARE_S700
+	bool "Actins S700 glue driver for Synopsys Designware Ethernet MAC"
+	depends on DM_ETH && ETH_DESIGNWARE
+	help
+	  This provides glue layer to use Synopsys Designware Ethernet MAC
+	  present on Actions S700 SoC.
 
 config ETHOC
 	bool "OpenCores 10/100 Mbps Ethernet MAC"
@@ -308,9 +371,23 @@ config FSLDMAFEC
 	  This driver supports the network interface units in the
 	  ColdFire family.
 
+config KS8851_MLL
+	bool "Microchip KS8851-MLL controller driver"
+	help
+	  The Microchip KS8851 parallel bus external ethernet interface chip.
+
+if KS8851_MLL
+if !DM_ETH
+config KS8851_MLL_BASEADDR
+	hex "Microchip KS8851-MLL Base Address"
+	help
+	  Define this to hold the physical address of the device (I/O space)
+endif #DM_ETH
+endif #KS8851_MLL
+
 config MVGBE
 	bool "Marvell Orion5x/Kirkwood network interface support"
-	depends on KIRKWOOD || ORION5X
+	depends on ARCH_KIRKWOOD || ARCH_ORION5X
 	select PHYLIB if DM_ETH
 	help
 	  This driver supports the network interface units in the
@@ -351,6 +428,18 @@ config MACB_ZYNQ
 	  The Cadence MACB ethernet interface was used on Zynq platform.
 	  Say Y to enable support for the MACB/GEM in Zynq chip.
 
+config MT7620_ETH
+	bool "MediaTek MT7620 Ethernet Interface"
+	depends on SOC_MT7620
+	select PHYLIB
+	select DM_RESET
+	select DM_GPIO
+	select CLK
+	help
+	  The MediaTek MT7620 ethernet interface is used on MT7620 based
+	  boards. It has a built-in switch with two configurable ports which
+	  can connect to external PHY/MACs.
+
 config MT7628_ETH
 	bool "MediaTek MT7628 Ethernet Interface"
 	depends on SOC_MT7628
@@ -358,6 +447,37 @@ config MT7628_ETH
 	help
 	  The MediaTek MT7628 ethernet interface is used on MT7628 and
 	  MT7688 based boards.
+
+config NET_OCTEONTX
+	bool "OcteonTX Ethernet support"
+	depends on ARCH_OCTEONTX
+	depends on PCI_SRIOV
+	help
+	  You must select Y to enable network device support for
+	  OcteonTX SoCs. If unsure, say n
+
+config NET_OCTEONTX2
+	bool "OcteonTX2 Ethernet support"
+	depends on ARCH_OCTEONTX2
+	select OCTEONTX2_CGX_INTF
+	help
+	  You must select Y to enable network device support for
+	  OcteonTX2 SoCs. If unsure, say n
+
+config OCTEONTX_SMI
+	bool "OcteonTX SMI Device support"
+	depends on ARCH_OCTEONTX || ARCH_OCTEONTX2
+	help
+	  You must select Y to enable SMI controller support for
+	  OcteonTX or OcteonTX2 SoCs. If unsure, say n
+
+config OCTEONTX2_CGX_INTF
+	bool "OcteonTX2 CGX ATF interface support"
+	depends on ARCH_OCTEONTX2
+	default y if ARCH_OCTEONTX2
+	help
+	  You must select Y to enable CGX ATF interface support for
+	  OcteonTX2 SoCs. If unsure, say n
 
 config PCH_GBE
 	bool "Intel Platform Controller Hub EG20T GMAC driver"
@@ -378,6 +498,14 @@ config MII
 	help
 	  Enable support of the Media-Independent Interface (MII)
 
+config PCNET
+	bool "AMD PCnet series Ethernet controller driver"
+	help
+	  This driver supports AMD PCnet series fast ethernet family of
+	  PCI chipsets/adapters.
+
+source "drivers/net/qe/Kconfig"
+
 config RTL8139
 	bool "Realtek 8139 series Ethernet controller driver"
 	help
@@ -395,11 +523,13 @@ config SMC911X
 
 if SMC911X
 
+if !DM_ETH
 config SMC911X_BASE
 	hex "SMC911X Base Address"
 	help
 	  Define this to hold the physical address
 	  of the device (I/O space)
+endif #DM_ETH
 
 choice
 	prompt "SMC911X bus width"
@@ -456,8 +586,14 @@ config SH_ETHER
 
 source "drivers/net/ti/Kconfig"
 
+config TULIP
+	bool "DEC Tulip DC2114x Ethernet support"
+	depends on (DM_ETH && DM_PCI) || !DM_ETH
+	help
+	  This driver supports DEC DC2114x Fast ethernet chips.
+
 config XILINX_AXIEMAC
-	depends on DM_ETH && (MICROBLAZE || ARCH_ZYNQ || ARCH_ZYNQMP)
+	depends on DM_ETH
 	select PHYLIB
 	select MII
 	bool "Xilinx AXI Ethernet"
@@ -465,7 +601,7 @@ config XILINX_AXIEMAC
 	  This MAC is present in Xilinx Microblaze, Zynq and ZynqMP SoCs.
 
 config XILINX_EMACLITE
-	depends on DM_ETH && (MICROBLAZE || ARCH_ZYNQ || ARCH_ZYNQMP || MIPS)
+	depends on DM_ETH
 	select PHYLIB
 	select MII
 	bool "Xilinx Ethernetlite"
@@ -473,7 +609,7 @@ config XILINX_EMACLITE
 	  This MAC is present in Xilinx Microblaze, Zynq and ZynqMP SoCs.
 
 config ZYNQ_GEM
-	depends on DM_ETH && (ARCH_ZYNQ || ARCH_ZYNQMP || ARCH_VERSAL)
+	depends on DM_ETH
 	select PHYLIB
 	bool "Xilinx Ethernet GEM"
 	help
@@ -637,6 +773,13 @@ config MDIO_MUX_I2CREG
 	  an I2C chip.  The board it was developed for uses a mux controlled by
 	  on-board FPGA which in turn is accessed as a chip over I2C.
 
+config MDIO_IPQ4019
+	bool "Qualcomm IPQ4019 MDIO interface support"
+	depends on DM_MDIO
+	help
+	  This driver supports the MDIO interface found in Qualcomm
+	  IPQ40xx series Soc-s.
+
 config MVMDIO
 	bool "Marvell MDIO interface support"
 	depends on DM_MDIO
@@ -646,5 +789,12 @@ config MVMDIO
 	  Dove, Armada 370, Armada XP, Armada 37xx and Armada7K/8K/8KP).
 
 	  This driver is used by the MVPP2 and MVNETA drivers.
+
+config FSL_LS_MDIO
+	bool "NXP Layerscape MDIO interface support"
+	depends on DM_MDIO
+	help
+	  This driver supports the MDIO bus found on the Fman 10G Ethernet MACs and
+	  on the mEMAC (which supports both Clauses 22 and 45).
 
 endif # NETDEVICES

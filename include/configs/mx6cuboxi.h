@@ -7,14 +7,13 @@
 #ifndef __MX6CUBOXI_CONFIG_H
 #define __MX6CUBOXI_CONFIG_H
 
+#include <linux/stringify.h>
+
 #include "mx6_common.h"
 
 #include "imx6_spl.h"
 
-#define CONFIG_IMX_THERMAL
-
 #define CONFIG_SYS_MALLOC_LEN		(10 * SZ_1M)
-#define CONFIG_MXC_UART
 
 /* MMC Configs */
 #define CONFIG_SYS_FSL_ESDHC_ADDR	USDHC2_BASE_ADDR
@@ -27,18 +26,7 @@
 #define CONFIG_LBA48
 #endif
 
-/* Ethernet Configuration */
-#define CONFIG_FEC_MXC
-#define IMX_FEC_BASE			ENET_BASE_ADDR
-#define CONFIG_FEC_XCV_TYPE		RGMII
-#define CONFIG_FEC_MXC_PHYADDR		0
-#define CONFIG_PHY_ATHEROS
-
 /* Framebuffer */
-#define CONFIG_VIDEO_BMP_RLE8
-#define CONFIG_SPLASH_SCREEN
-#define CONFIG_SPLASH_SCREEN_ALIGN
-#define CONFIG_BMP_16BPP
 #define CONFIG_VIDEO_LOGO
 #define CONFIG_VIDEO_BMP_LOGO
 #define CONFIG_IMX_HDMI
@@ -51,7 +39,6 @@
 
 #define CONFIG_MXC_UART_BASE	UART1_BASE
 #define CONSOLE_DEV	"ttymxc0"
-#define CONFIG_SYS_MMC_ENV_DEV		0	/* SDHC2 */
 
 #ifndef CONFIG_SPL_BUILD
 #define CONFIG_EXTRA_ENV_SETTINGS \

@@ -8,6 +8,7 @@
 #include <dm.h>
 #include <errno.h>
 #include <pci_ep.h>
+#include <asm/global_data.h>
 #include <linux/sizes.h>
 #include <linux/log2.h>
 #include "pcie-cadence.h"
@@ -144,7 +145,7 @@ static int cdns_pci_ep_probe(struct udevice *dev)
 {
 	struct cdns_pcie *pdata = dev_get_priv(dev);
 
-	pdata->reg_base = (void __iomem *)devfdt_get_addr(dev);
+	pdata->reg_base = dev_read_addr_ptr(dev);
 	if (!pdata->reg_base)
 		return -ENOMEM;
 
@@ -173,5 +174,5 @@ U_BOOT_DRIVER(cdns_pcie) = {
 	.ops = &cdns_pci_ep_ops,
 	.probe = cdns_pci_ep_probe,
 	.remove = cdns_pci_ep_remove,
-	.priv_auto_alloc_size = sizeof(struct cdns_pcie),
+	.priv_auto	= sizeof(struct cdns_pcie),
 };

@@ -9,14 +9,18 @@
 
 #include <common.h>
 #include <env.h>
+#include <fastboot.h>
 #include <fdt_support.h>
+#include <image.h>
 #include <init.h>
 #include <malloc.h>
+#include <net.h>
 #include <palmas.h>
 #include <sata.h>
 #include <serial.h>
 #include <usb.h>
 #include <errno.h>
+#include <asm/global_data.h>
 #include <asm/omap_common.h>
 #include <asm/omap_sec_common.h>
 #include <asm/emif.h>
@@ -59,6 +63,10 @@ static int board_bootmode_has_emmc(void);
 #define board_is_am571x_idk()	board_ti_is("AM571IDK")
 #define board_is_bbai()		board_ti_is("BBONE-AI")
 
+#define board_is_ti_idk()	board_is_am574x_idk() || \
+				board_is_am572x_idk() || \
+				board_is_am571x_idk()
+
 #ifdef CONFIG_DRIVER_TI_CPSW
 #include <cpsw.h>
 #endif
@@ -66,8 +74,7 @@ static int board_bootmode_has_emmc(void);
 DECLARE_GLOBAL_DATA_PTR;
 
 #define GPIO_ETH_LCD		GPIO_TO_PIN(2, 22)
-/* GPIO 7_11 */
-#define GPIO_DDR_VTT_EN 203
+#define GPIO_DDR_VTT_EN		GPIO_TO_PIN(7, 11)
 
 /* Touch screen controller to identify the LCD */
 #define OSD_TS_FT_BUS_ADDRESS	0
@@ -665,7 +672,7 @@ void am57x_idk_lcd_detect(void)
 	struct udevice *dev;
 
 	/* Only valid for IDKs */
-	if (board_is_x15() || board_is_am572x_evm() ||  board_is_bbai())
+	if (!board_is_ti_idk())
 		return;
 
 	/* Only AM571x IDK has gpio control detect.. so check that */
@@ -893,7 +900,7 @@ err:
 #endif
 
 #if defined(CONFIG_MMC)
-int board_mmc_init(bd_t *bis)
+int board_mmc_init(struct bd_info *bis)
 {
 	omap_mmc_init(0, 0, 0, -1, -1);
 	omap_mmc_init(1, 0, 0, -1, -1);
@@ -1022,7 +1029,7 @@ static void u64_to_mac(u64 addr, u8 mac[6])
 	mac[0] = addr >> 40;
 }
 
-int board_eth_init(bd_t *bis)
+int board_eth_init(struct bd_info *bis)
 {
 	int ret;
 	uint8_t mac_addr[6];
@@ -1128,7 +1135,7 @@ int board_early_init_f(void)
 #endif
 
 #if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	ft_cpu_setup(blob, bd);
 
@@ -1167,8 +1174,11 @@ int board_fit_config_name_match(const char *name)
 #endif
 
 #if CONFIG_IS_ENABLED(FASTBOOT) && !CONFIG_IS_ENABLED(ENV_IS_NOWHERE)
-int fastboot_set_reboot_flag(void)
+int fastboot_set_reboot_flag(enum fastboot_reboot_reason reason)
 {
+	if (reason != FASTBOOT_REBOOT_REASON_BOOTLOADER)
+		return -ENOTSUPP;
+
 	printf("Setting reboot to fastboot flag ...\n");
 	env_set("dofastboot", "1");
 	env_save();

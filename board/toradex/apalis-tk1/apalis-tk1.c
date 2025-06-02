@@ -5,6 +5,9 @@
 
 #include <common.h>
 #include <dm.h>
+#include <env.h>
+#include <init.h>
+#include <log.h>
 #include <asm/arch-tegra/ap.h>
 #include <asm/gpio.h>
 #include <asm/io.h>
@@ -12,6 +15,7 @@
 #include <asm/arch/pinmux.h>
 #include <env_internal.h>
 #include <pci_tegra.h>
+#include <linux/delay.h>
 #include <power/as3722.h>
 #include <power/pmic.h>
 
@@ -80,7 +84,7 @@ int checkboard(void)
 }
 
 #if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	return ft_common_board_setup(blob, bd);
 }
@@ -151,7 +155,7 @@ int tegra_pcie_board_init(void)
 	int ret;
 
 	ret = uclass_get_device_by_driver(UCLASS_PMIC,
-					  DM_GET_DRIVER(pmic_as3722), &dev);
+					  DM_DRIVER_GET(pmic_as3722), &dev);
 	if (ret) {
 		pr_err("failed to find AS3722 PMIC: %d\n", ret);
 		return ret;
@@ -190,7 +194,7 @@ void tegra_pcie_board_port_reset(struct tegra_pcie_port *port)
 		int ret;
 
 		ret = uclass_get_device_by_driver(UCLASS_PMIC,
-						  DM_GET_DRIVER(pmic_as3722),
+						  DM_DRIVER_GET(pmic_as3722),
 						  &dev);
 		if (ret) {
 			debug("%s: Failed to find PMIC\n", __func__);

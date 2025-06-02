@@ -9,8 +9,11 @@
 #ifndef _DMA_H_
 #define _DMA_H_
 
+#include <linux/bitops.h>
 #include <linux/errno.h>
 #include <linux/types.h>
+
+struct udevice;
 
 /*
  * enum dma_direction - dma transfer direction indicator

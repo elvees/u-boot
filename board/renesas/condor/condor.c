@@ -9,6 +9,8 @@
 #include <common.h>
 #include <cpu_func.h>
 #include <hang.h>
+#include <init.h>
+#include <asm/global_data.h>
 #include <asm/processor.h>
 #include <asm/mach-types.h>
 #include <asm/io.h>
@@ -16,15 +18,6 @@
 #include <asm/arch/sys_proto.h>
 
 DECLARE_GLOBAL_DATA_PTR;
-
-void s_init(void)
-{
-}
-
-int board_early_init_f(void)
-{
-	return 0;
-}
 
 int board_init(void)
 {

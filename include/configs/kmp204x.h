@@ -64,9 +64,6 @@ unsigned long get_board_sys_clk(unsigned long dummy);
 
 #define CONFIG_ENABLE_36BIT_PHYS
 
-#define CONFIG_ADDR_MAP
-#define CONFIG_SYS_NUM_ADDR_MAP		64	/* number of TLB1 entries */
-
 #define CONFIG_POST CONFIG_SYS_POST_MEM_REGIONS	/* POST memory regions test */
 
 /*
@@ -127,10 +124,6 @@ unsigned long get_board_sys_clk(unsigned long dummy);
  * is not valid yet, which is the case for when u-boot copies itself to RAM
  */
 #define CONFIG_PRAM		((CONFIG_KM_PNVRAM + CONFIG_KM_PHRAM) >> 10)
-
-#define CONFIG_KM_CRAMFS_ADDR	0x2000000
-#define CONFIG_KM_KERNEL_ADDR	0x1000000	/* max kernel size 15.5Mbytes */
-#define CONFIG_KM_FDT_ADDR	0x1F80000	/* max dtb    size  0.5Mbytes */
 
 /*
  * Local Bus Definitions
@@ -244,12 +237,6 @@ unsigned long get_board_sys_clk(unsigned long dummy);
 					{0, {{I2C_MUX_PCA9547, 0x70, 1 } } }, \
 					{0, {{I2C_MUX_PCA9547, 0x70, 2 } } }, \
 				}
-#ifndef __ASSEMBLY__
-void set_sda(int state);
-void set_scl(int state);
-int get_sda(void);
-int get_scl(void);
-#endif
 
 #define CONFIG_KM_IVM_BUS		1	/* I2C1 (Mux-Port 1)*/
 
@@ -318,8 +305,6 @@ int get_scl(void);
 #define CONFIG_SYS_QE_FMAN_FW_LENGTH	0x10000
 #define CONFIG_SYS_FDT_PAD		(0x3000 + CONFIG_SYS_QE_FMAN_FW_LENGTH)
 
-#define CONFIG_PHYLIB_10G
-
 #define CONFIG_PCI_INDIRECT_BRIDGE
 
 #define CONFIG_PCI_SCAN_SHOW		/* show pci devices on startup */
@@ -346,9 +331,6 @@ int get_scl(void);
  * additionnal command line configuration.
  */
 
-/* we don't need flash support */
-#undef CONFIG_JFFS2_CMDLINE
-
 /*
  * For booting Linux, the board info and command line data
  * have to be in the first 64 MB of memory, since this is
@@ -367,7 +349,6 @@ int get_scl(void);
 /*
  * Environment Configuration
  */
-#define CONFIG_ENV_OVERWRITE
 #ifndef CONFIG_KM_DEF_ENV		/* if not set by keymile-common.h */
 #define CONFIG_KM_DEF_ENV "km-common=empty\0"
 #endif

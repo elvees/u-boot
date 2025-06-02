@@ -5,11 +5,16 @@
 
 #include <common.h>
 #include <command.h>
+#include <dm/root.h>
+#include <efi_loader.h>
 #include <errno.h>
+#include <init.h>
+#include <log.h>
 #include <os.h>
 #include <cli.h>
 #include <sort.h>
 #include <asm/getopt.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/malloc.h>
 #include <asm/sections.h>
@@ -17,6 +22,8 @@
 #include <linux/ctype.h>
 
 DECLARE_GLOBAL_DATA_PTR;
+
+static char **os_argv;
 
 /* Compare two options so that they can be sorted into alphabetical order */
 static int h_compare_opt(const void *p1, const void *p2)
@@ -209,7 +216,7 @@ static int sandbox_cmdline_cb_test_fdt(struct sandbox_state *state,
 	if (!p)
 		p = fname + strlen(fname);
 	len -= p - fname;
-	snprintf(p, len, fmt, p);
+	snprintf(p, len, fmt);
 	state->fdt_fname = fname;
 
 	return 0;
@@ -364,14 +371,23 @@ static int sandbox_cmdline_cb_log_level(struct sandbox_state *state,
 SANDBOX_CMDLINE_OPT_SHORT(log_level, 'L', 1,
 			  "Set log level (0=panic, 7=debug)");
 
-static int sandbox_cmdline_cb_show_of_platdata(struct sandbox_state *state,
-					       const char *arg)
+static int sandbox_cmdline_cb_unittests(struct sandbox_state *state,
+					const char *arg)
 {
-	state->show_of_platdata = true;
+	state->run_unittests = true;
 
 	return 0;
 }
-SANDBOX_CMDLINE_OPT(show_of_platdata, 0, "Show of-platdata in SPL");
+SANDBOX_CMDLINE_OPT_SHORT(unittests, 'u', 0, "Run unit tests");
+
+static int sandbox_cmdline_cb_select_unittests(struct sandbox_state *state,
+					       const char *arg)
+{
+	state->select_unittests = arg;
+
+	return 0;
+}
+SANDBOX_CMDLINE_OPT_SHORT(select_unittests, 'k', 1, "Select unit tests to run");
 
 static void setup_ram_buf(struct sandbox_state *state)
 {
@@ -393,11 +409,43 @@ void state_show(struct sandbox_state *state)
 	printf("\n");
 }
 
+void __efi_runtime EFIAPI efi_reset_system(
+		enum efi_reset_type reset_type,
+		efi_status_t reset_status,
+		unsigned long data_size, void *reset_data)
+{
+	os_fd_restore();
+	os_relaunch(os_argv);
+}
+
+void sandbox_reset(void)
+{
+	/* Do this here while it still has an effect */
+	os_fd_restore();
+	if (state_uninit())
+		os_exit(2);
+
+	if (dm_uninit())
+		os_exit(2);
+
+	/* Restart U-Boot */
+	os_relaunch(os_argv);
+}
+
 int main(int argc, char *argv[])
 {
 	struct sandbox_state *state;
 	gd_t data;
 	int ret;
+
+	/*
+	 * Copy argv[] so that we can pass the arguments in the original
+	 * sequence when resetting the sandbox.
+	 */
+	os_argv = calloc(argc + 1, sizeof(char *));
+	if (!os_argv)
+		os_exit(1);
+	memcpy(os_argv, argv, sizeof(char *) * (argc + 1));
 
 	memset(&data, '\0', sizeof(data));
 	gd = &data;
@@ -411,7 +459,18 @@ int main(int argc, char *argv[])
 	if (os_parse_args(state, argc, argv))
 		return 1;
 
+	/* Remove old memory file if required */
+	if (state->ram_buf_rm && state->ram_buf_fname) {
+		os_unlink(state->ram_buf_fname);
+		state->write_ram_buf = false;
+		state->ram_buf_fname = NULL;
+	}
+
 	ret = sandbox_read_state(state, state->state_fname);
+	if (ret)
+		goto err;
+
+	ret = os_setup_signal_handlers();
 	if (ret)
 		goto err;
 
@@ -428,6 +487,10 @@ int main(int argc, char *argv[])
 	 * relocated by the OS before sandbox is entered.
 	 */
 	gd->reloc_off = (ulong)gd->arch.text_base;
+
+	/* sandbox test: log functions called before log_init in board_init_f */
+	log_info("sandbox: starting...\n");
+	log_debug("debug: %s\n", __func__);
 
 	/* Do pre- and post-relocation init */
 	board_init_f(0);

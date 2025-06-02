@@ -205,6 +205,13 @@ config PINCTRL_QCA953X
 	  the GPIO definitions and pin control functions for each available
 	  multiplex function.
 
+config PINCTRL_QE
+	bool "QE based pinctrl driver, like on mpc83xx"
+	depends on DM
+	help
+	  This option is to enable the QE pinctrl driver for QE based io
+	  controller.
+
 config PINCTRL_ROCKCHIP_RV1108
 	bool "Rockchip rv1108 pin control driver"
 	depends on DM
@@ -276,14 +283,21 @@ config SPL_PINCTRL_STMFX
 	  See the help of PINCTRL_STMFX for details.
 
 config ASPEED_AST2500_PINCTRL
-  bool "Aspeed AST2500 pin control driver"
-  depends on DM && PINCTRL_GENERIC && ASPEED_AST2500
-  default y
-  help
-    Support pin multiplexing control on Aspeed ast2500 SoC. The driver uses
-	Generic Pinctrl framework and is compatible with the Linux driver,
-	i.e. it uses the same device tree configuration.
+	bool "Aspeed AST2500 pin control driver"
+	depends on DM && PINCTRL_GENERIC && ASPEED_AST2500
+	default y
+	help
+	  Support pin multiplexing control on Aspeed ast2500 SoC. The driver
+	  uses Generic Pinctrl framework and is compatible with the Linux
+	  driver, i.e. it uses the same device tree configuration.
 
+config PINCTRL_K210
+	bool "Kendryte K210 Fully-Programmable Input/Output Array driver"
+	depends on DM && PINCTRL_GENERIC
+	help
+	  Support pin multiplexing on the K210. The "FPIOA" can remap any
+	  supported function to any multifunctional IO pin. It can also perform
+	  basic GPIO functions, such as reading the current value of a pin.
 endif
 
 source "drivers/pinctrl/broadcom/Kconfig"
@@ -294,6 +308,7 @@ source "drivers/pinctrl/meson/Kconfig"
 source "drivers/pinctrl/mscc/Kconfig"
 source "drivers/pinctrl/mtmips/Kconfig"
 source "drivers/pinctrl/mvebu/Kconfig"
+source "drivers/pinctrl/nexell/Kconfig"
 source "drivers/pinctrl/nxp/Kconfig"
 source "drivers/pinctrl/renesas/Kconfig"
 source "drivers/pinctrl/rockchip/Kconfig"

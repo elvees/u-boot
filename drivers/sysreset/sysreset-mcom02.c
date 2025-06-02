@@ -34,7 +34,7 @@ static int mcom02_sysreset_request(struct udevice *dev, enum sysreset_t type)
 {
 	switch (type) {
 	case SYSRESET_COLD: {
-		struct mcom02_pdata *pdata = dev_get_platdata(dev);
+		struct mcom02_pdata *pdata = dev_get_plat(dev);
 
 		/* Reset is too fast, does not have time to print the EOL */
 		udelay(200);
@@ -58,7 +58,7 @@ static int mcom02_sysreset_request(struct udevice *dev, enum sysreset_t type)
 
 static int mcom02_sysreset_get_status(struct udevice *dev, char *buf, int size)
 {
-	struct mcom02_pdata *pdata = dev_get_platdata(dev);
+	struct mcom02_pdata *pdata = dev_get_plat(dev);
 	ulong rst = pmctr_readl(pdata, PMCTR_WARM_RST_STATUS);
 	int res;
 
@@ -79,7 +79,7 @@ static int mcom02_sysreset_get_status(struct udevice *dev, char *buf, int size)
 
 static int mcom02_ofdata_to_platdata(struct udevice *dev)
 {
-	struct mcom02_pdata *pdata = dev_get_platdata(dev);
+	struct mcom02_pdata *pdata = dev_get_plat(dev);
 
 	/* Get the controller base address */
 	pdata->base = (void *)dev_read_addr_index(dev, 0);
@@ -104,6 +104,6 @@ U_BOOT_DRIVER(mcom02_sysreset) = {
 	.id = UCLASS_SYSRESET,
 	.of_match = mcom02_sysreset_ids,
 	.ops = &mcom02_sysreset,
-	.platdata_auto_alloc_size = sizeof(struct mcom02_pdata),
-	.ofdata_to_platdata = mcom02_ofdata_to_platdata,
+	.plat_auto = sizeof(struct mcom02_pdata),
+	.of_to_plat = mcom02_ofdata_to_platdata,
 };

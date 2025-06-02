@@ -16,6 +16,8 @@
 #ifndef _I2C_H_
 #define _I2C_H_
 
+#include <linker_lists.h>
+
 /*
  * For now there are essentially two parts to this file - driver model
  * here at the top, and the older code below (with CONFIG_SYS_I2C being
@@ -56,6 +58,12 @@ enum i2c_address_mode {
 	I2C_MODE_10_BIT
 };
 
+/** enum i2c_device_t - Types of I2C devices, used for compatible strings */
+enum i2c_device_t {
+	I2C_DEVICE_GENERIC,
+	I2C_DEVICE_HID_OVER_I2C,
+};
+
 struct udevice;
 /**
  * struct dm_i2c_chip - information about an i2c chip
@@ -63,7 +71,7 @@ struct udevice;
  * An I2C chip is a device on the I2C bus. It sits at a particular address
  * and normally supports 7-bit or 10-bit addressing.
  *
- * To obtain this structure, use dev_get_parent_platdata(dev) where dev is
+ * To obtain this structure, use dev_get_parent_plat(dev) where dev is
  * the chip to examine.
  *
  * @chip_addr:	Chip address on bus
@@ -331,6 +339,24 @@ uint i2c_get_chip_addr_offset_mask(struct udevice *dev);
 int i2c_deblock(struct udevice *bus);
 
 /**
+ * i2c_deblock_gpio_loop() - recover a bus from an unknown state by toggling SDA/SCL
+ *
+ * This is the inner logic used for toggling I2C SDA/SCL lines as GPIOs
+ * for deblocking the I2C bus.
+ *
+ * @sda_pin:	SDA GPIO
+ * @scl_pin:	SCL GPIO
+ * @scl_count:	Number of SCL clock cycles generated to deblock SDA
+ * @start_count:Number of I2C start conditions sent after deblocking SDA
+ * @delay:	Delay between SCL clock line changes
+ * @return 0 if OK, -ve on error
+ */
+struct gpio_desc;
+int i2c_deblock_gpio_loop(struct gpio_desc *sda_pin, struct gpio_desc *scl_pin,
+			  unsigned int scl_count, unsigned int start_count,
+			  unsigned int delay);
+
+/**
  * struct dm_i2c_ops - driver operations for I2C uclass
  *
  * Drivers should support these operations unless otherwise noted. These
@@ -495,17 +521,17 @@ int i2c_get_chip_for_busnum(int busnum, int chip_addr, uint offset_len,
 			    struct udevice **devp);
 
 /**
- * i2c_chip_ofdata_to_platdata() - Decode standard I2C platform data
+ * i2c_chip_of_to_plat() - Decode standard I2C platform data
  *
  * This decodes the chip address from a device tree node and puts it into
  * its dm_i2c_chip structure. This should be called in your driver's
- * ofdata_to_platdata() method.
+ * of_to_plat() method.
  *
  * @blob:	Device tree blob
  * @node:	Node offset to read from
  * @spi:	Place to put the decoded information
  */
-int i2c_chip_ofdata_to_platdata(struct udevice *dev, struct dm_i2c_chip *chip);
+int i2c_chip_of_to_plat(struct udevice *dev, struct dm_i2c_chip *chip);
 
 /**
  * i2c_dump_msgs() - Dump a list of I2C messages
@@ -538,7 +564,24 @@ int i2c_emul_find(struct udevice *dev, struct udevice **emulp);
  */
 struct udevice *i2c_emul_get_device(struct udevice *emul);
 
-#ifndef CONFIG_DM_I2C
+/* ACPI operations for generic I2C devices */
+extern struct acpi_ops i2c_acpi_ops;
+
+/**
+ * acpi_i2c_of_to_plat() - Read properties intended for ACPI
+ *
+ * This reads the generic I2C properties from the device tree, so that these
+ * can be used to create ACPI information for the device.
+ *
+ * See the i2c/generic-acpi.txt binding file for information about the
+ * properties.
+ *
+ * @dev: I2C device to process
+ * @return 0 if OK, -EINVAL if acpi,hid is not present
+ */
+int acpi_i2c_of_to_plat(struct udevice *dev);
+
+#if !CONFIG_IS_ENABLED(DM_I2C)
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING

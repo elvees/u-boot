@@ -5,12 +5,14 @@
  */
 #include <common.h>
 #include <env.h>
+#include <log.h>
 #include <malloc.h>
 #include <dm/device.h>
 #include <dm/uclass-internal.h>
 #include <linux/err.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
+#include <asm/global_data.h>
 #include <mtd.h>
 
 #define MTD_NAME_MAX_LEN 20

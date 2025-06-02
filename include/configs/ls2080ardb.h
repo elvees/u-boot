@@ -13,7 +13,7 @@
 #ifdef CONFIG_TARGET_LS2081ARDB
 #define CONFIG_QIXIS_I2C_ACCESS
 #endif
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 #define CONFIG_SYS_I2C_EARLY_INIT
 #endif
 #endif
@@ -70,9 +70,6 @@ unsigned long get_board_sys_clk(void);
 #define CONFIG_SYS_SCSI_MAX_LUN			1
 #define CONFIG_SYS_SCSI_MAX_DEVICE		(CONFIG_SYS_SCSI_MAX_SCSI_ID * \
 						CONFIG_SYS_SCSI_MAX_LUN)
-#ifdef CONFIG_TFABOOT
-#define CONFIG_SYS_MMC_ENV_DEV         0
-#endif
 
 #if !defined(CONFIG_FSL_QSPI) || defined(CONFIG_TFABOOT)
 
@@ -273,12 +270,8 @@ unsigned long get_board_sys_clk(void);
 #define I2C_MUX_CH_DEFAULT      0x8
 
 /* SPI */
-#if defined(CONFIG_FSL_QSPI) || defined(CONFIG_FSL_DSPI)
-#ifdef CONFIG_FSL_DSPI
+#if defined(CONFIG_FSL_DSPI)
 #define CONFIG_SPI_FLASH_STMICRO
-#endif
-#define FSL_QSPI_FLASH_SIZE		SZ_64M	/* 64MB */
-#define FSL_QSPI_FLASH_NUM		2
 #endif
 
 /*
@@ -286,7 +279,6 @@ unsigned long get_board_sys_clk(void);
  */
 #define RTC
 #ifdef CONFIG_TARGET_LS2081ARDB
-#define CONFIG_RTC_PCF8563		1
 #define CONFIG_SYS_I2C_RTC_ADDR         0x51
 #else
 #define CONFIG_RTC_DS3231               1
@@ -321,11 +313,15 @@ unsigned long get_board_sys_clk(void);
 #include <config_distro_bootcmd.h>
 
 #ifdef CONFIG_TFABOOT
-#define QSPI_MC_INIT_CMD			\
-	"env exists secureboot && "		\
-	"esbc_validate 0x20640000 && "		\
-	"esbc_validate 0x20680000;"		\
-	"fsl_mc start mc 0x20a00000 0x20e00000 \0"
+#define QSPI_MC_INIT_CMD				\
+	"sf probe 0:0; "				\
+	"sf read 0x80640000 0x640000 0x80000; "		\
+	"env exists secureboot && "			\
+	"esbc_validate 0x80640000 && "			\
+	"esbc_validate 0x80680000; "			\
+	"sf read 0x80a00000 0xa00000 0x300000; "	\
+	"sf read 0x80e00000 0xe00000 0x100000; "	\
+	"fsl_mc start mc 0x80a00000 0x80e00000 \0"
 #define SD_MC_INIT_CMD				\
 	"mmcinfo;mmc read 0x80a00000 0x5000 0x1200;" \
 	"mmc read 0x80e00000 0x7000 0x800;"	\
@@ -342,11 +338,15 @@ unsigned long get_board_sys_clk(void);
 	"fsl_mc start mc 0x580a00000 0x580e00000 \0"
 #else
 #ifdef CONFIG_QSPI_BOOT
-#define MC_INIT_CMD				\
-	"mcinitcmd=env exists secureboot && "	\
-	"esbc_validate 0x20640000 && "		\
-	"esbc_validate 0x20680000;"		\
-	"fsl_mc start mc 0x20a00000 0x20e00000 \0"
+#define MC_INIT_CMD					\
+	"mcinitcmd=sf probe 0:0; "			\
+	"sf read 0x80640000 0x640000 0x80000; "		\
+	"env exists secureboot && "			\
+	"esbc_validate 0x80640000 && "			\
+	"esbc_validate 0x80680000; "			\
+	"sf read 0x80a00000 0xa00000 0x300000; "	\
+	"sf read 0x80e00000 0xe00000 0x100000; "	\
+	"fsl_mc start mc 0x80a00000 0x80e00000 \0"
 #elif defined(CONFIG_SD_BOOT)
 #define MC_INIT_CMD                             \
 	"mcinitcmd=mmcinfo;mmc read 0x80000000 0x5000 0x800;" \
@@ -500,10 +500,13 @@ unsigned long get_board_sys_clk(void);
 
 #ifdef CONFIG_TFABOOT
 #define QSPI_NOR_BOOTCOMMAND						\
+			"sf probe 0:0; "				\
+			"sf read 0x806c0000 0x6c0000 0x40000; "		\
 			"env exists mcinitcmd && env exists secureboot "\
-			"&& esbc_validate 0x206C0000; "			\
+			"&& esbc_validate 0x806c0000; "			\
+			"sf read 0x80d00000 0xd00000 0x100000; "	\
 			"env exists mcinitcmd && "			\
-			"fsl_mc lazyapply dpl 0x20d00000; "		\
+			"fsl_mc lazyapply dpl 0x80d00000; "		\
 			"run distro_bootcmd;run qspi_bootcmd; "		\
 			"env exists secureboot && esbc_halt;"
 
@@ -530,10 +533,13 @@ unsigned long get_board_sys_clk(void);
 #ifdef CONFIG_QSPI_BOOT
 /* Try to boot an on-QSPI kernel first, then do normal distro boot */
 #define CONFIG_BOOTCOMMAND						\
+			"sf probe 0:0; "				\
+			"sf read 0x806c0000 0x6c0000 0x40000; "		\
 			"env exists mcinitcmd && env exists secureboot "\
-			"&& esbc_validate 0x206C0000; "			\
+			"&& esbc_validate 0x806C0000; "			\
+			"sf read 0x80d00000 0xd00000 0x100000; "	\
 			"env exists mcinitcmd && "			\
-			"fsl_mc lazyapply dpl 0x20d00000; "		\
+			"fsl_mc lazyapply dpl 0x80d00000; "		\
 			"run distro_bootcmd;run qspi_bootcmd; "		\
 			"env exists secureboot && esbc_halt;"
 #elif defined(CONFIG_SD_BOOT)

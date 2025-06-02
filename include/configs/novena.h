@@ -24,9 +24,6 @@
  * as recommended by GNU/fdisk. See below for details:
  * http://homepage.ntlworld.com./jonathan.deboynepollard/FGA/disc-partition-alignment.html
  */
-#ifdef CONFIG_CMD_MMC
-#define CONFIG_SYS_MMC_ENV_DEV		0
-#endif
 
 /* Booting Linux */
 #define CONFIG_BOOTFILE			"fitImage"
@@ -43,9 +40,6 @@
 	(CONFIG_SYS_INIT_RAM_SIZE - GENERATED_GBL_DATA_SIZE)
 #define CONFIG_SYS_INIT_SP_ADDR \
 	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
-
-#define CONFIG_SYS_MEMTEST_START	0x10000000
-#define CONFIG_SYS_MEMTEST_END		0x20000000
 
 #define CONFIG_SYS_MALLOC_LEN		(64 * 1024 * 1024)
 
@@ -95,7 +89,6 @@
 #define CONFIG_LBA48
 
 /* UART */
-#define CONFIG_MXC_UART
 #define CONFIG_MXC_UART_BASE		UART2_BASE
 
 /* USB Configs */
@@ -105,13 +98,9 @@
 #define CONFIG_MXC_USB_FLAGS		0
 /* Gadget part */
 #define CONFIG_USBD_HS
-#define CONFIG_NETCONSOLE
 #endif
 
 /* Video output */
-#define CONFIG_VIDEO_BMP_RLE8
-#define CONFIG_SPLASH_SCREEN
-#define CONFIG_BMP_16BPP
 #define CONFIG_VIDEO_LOGO
 #define CONFIG_IMX_HDMI
 #define CONFIG_IMX_VIDEO_SKIP

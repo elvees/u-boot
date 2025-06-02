@@ -106,14 +106,14 @@ FDT_DATA = '''
 
 / {
     #address-cells = <1>;
-    #size-cells = <0>;
+    #size-cells = <1>;
 
     model = "%(sys-arch)s %(fdt_type)s EFI FIT Boot Test";
     compatible = "%(sys-arch)s";
 
     reset@0 {
         compatible = "%(sys-arch)s,reset";
-        reg = <0>;
+        reg = <0 4>;
     };
 };
 '''
@@ -420,12 +420,11 @@ def test_efi_fit_launch(u_boot_console):
             fit_config = 'config-efi-fdt' if enable_fdt else 'config-efi-nofdt'
 
             # Try booting.
-            cons.run_command(
-                'bootm %x#%s' % (addr, fit_config), wait_for_prompt=False)
+            output = cons.run_command('bootm %x#%s' % (addr, fit_config))
             if enable_fdt:
-                cons.wait_for('Booting using the fdt blob')
-            cons.wait_for('Hello, world')
-            cons.wait_for('## Application terminated, r = 0')
+                assert 'Booting using the fdt blob' in output
+            assert 'Hello, world' in output
+            assert '## Application failed' not in output
             cons.restart_uboot()
 
     cons = u_boot_console

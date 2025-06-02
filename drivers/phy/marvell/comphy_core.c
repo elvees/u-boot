@@ -8,10 +8,12 @@
 #include <common.h>
 #include <dm.h>
 #include <fdtdec.h>
+#include <asm/global_data.h>
+#include <asm/io.h>
 #include <dm/device_compat.h>
 #include <linux/err.h>
 #include <linux/errno.h>
-#include <asm/io.h>
+#include <linux/libfdt.h>
 
 #include "comphy_core.h"
 
@@ -97,14 +99,14 @@ static int comphy_probe(struct udevice *dev)
 	chip_cfg->comphy_lanes_count = fdtdec_get_int(blob, node,
 						      "max-lanes", 0);
 	if (chip_cfg->comphy_lanes_count <= 0) {
-		dev_err(&dev->dev, "comphy max lanes is wrong\n");
+		dev_err(dev, "comphy max lanes is wrong\n");
 		return -EINVAL;
 	}
 
 	chip_cfg->comphy_mux_bitcount = fdtdec_get_int(blob, node,
 						       "mux-bitcount", 0);
 	if (chip_cfg->comphy_mux_bitcount <= 0) {
-		dev_err(&dev->dev, "comphy mux bit count is wrong\n");
+		dev_err(dev, "comphy mux bit count is wrong\n");
 		return -EINVAL;
 	}
 
@@ -123,7 +125,7 @@ static int comphy_probe(struct udevice *dev)
 	 * compatible node is found
 	 */
 	if (!chip_cfg->ptr_comphy_chip_init) {
-		dev_err(&dev->dev, "comphy: No compatible DT node found\n");
+		dev_err(dev, "comphy: No compatible DT node found\n");
 		return -ENODEV;
 	}
 
@@ -188,5 +190,5 @@ U_BOOT_DRIVER(mvebu_comphy) = {
 	.id	= UCLASS_MISC,
 	.of_match = comphy_ids,
 	.probe	= comphy_probe,
-	.priv_auto_alloc_size = sizeof(struct chip_serdes_phy_config),
+	.priv_auto	= sizeof(struct chip_serdes_phy_config),
 };

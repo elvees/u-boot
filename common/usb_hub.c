@@ -26,11 +26,13 @@
 #include <dm.h>
 #include <env.h>
 #include <errno.h>
+#include <log.h>
 #include <malloc.h>
 #include <memalign.h>
 #include <asm/processor.h>
 #include <asm/unaligned.h>
 #include <linux/ctype.h>
+#include <linux/delay.h>
 #include <linux/list.h>
 #include <asm/byteorder.h>
 #ifdef CONFIG_SANDBOX
@@ -959,9 +961,9 @@ UCLASS_DRIVER(usb_hub) = {
 	.post_bind	= dm_scan_fdt_dev,
 	.post_probe	= usb_hub_post_probe,
 	.child_pre_probe	= usb_child_pre_probe,
-	.per_child_auto_alloc_size = sizeof(struct usb_device),
-	.per_child_platdata_auto_alloc_size = sizeof(struct usb_dev_platdata),
-	.per_device_auto_alloc_size = sizeof(struct usb_hub_device),
+	.per_child_auto	= sizeof(struct usb_device),
+	.per_child_plat_auto	= sizeof(struct usb_dev_plat),
+	.per_device_auto	= sizeof(struct usb_hub_device),
 };
 
 static const struct usb_device_id hub_id_table[] = {

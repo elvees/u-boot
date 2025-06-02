@@ -7,11 +7,16 @@
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <spl.h>
+#include <acpi/acpi_table.h>
+#include <asm/cpu_common.h>
+#include <asm/intel_acpi.h>
 #include <asm/lpc_common.h>
 #include <asm/pci.h>
 #include <asm/arch/iomap.h>
 #include <asm/arch/lpc.h>
+#include <dm/acpi.h>
 #include <linux/log2.h>
 
 void lpc_enable_fixed_io_ranges(uint io_enables)
@@ -76,10 +81,11 @@ int lpc_open_pmio_window(uint base, uint size)
 
 		lgir_reg_num = find_unused_pmio_window();
 		if (lgir_reg_num < 0) {
-			log_err("LPC: Cannot open IO window: %lx size %lx\n",
-				bridge_base, size - bridged_size);
-			log_err("No more IO windows\n");
-
+			if (spl_phase() > PHASE_TPL) {
+				log_err("LPC: Cannot open IO window: %lx size %lx\n",
+					bridge_base, size - bridged_size);
+				log_err("No more IO windows\n");
+			}
 			return -ENOSPC;
 		}
 		lgir_reg_offset = LPC_GENERIC_IO_RANGE(lgir_reg_num);
@@ -109,14 +115,30 @@ void lpc_io_setup_comm_a_b(void)
 	lpc_enable_fixed_io_ranges(com_enable);
 }
 
+static int apl_acpi_lpc_get_name(const struct udevice *dev, char *out_name)
+{
+	return acpi_copy_name(out_name, "LPCB");
+}
+
+struct acpi_ops apl_lpc_acpi_ops = {
+	.get_name	= apl_acpi_lpc_get_name,
+#ifdef CONFIG_GENERATE_ACPI_TABLE
+	.write_tables	= intel_southbridge_write_acpi_tables,
+#endif
+	.inject_dsdt	= southbridge_inject_dsdt,
+};
+
+#if !CONFIG_IS_ENABLED(OF_PLATDATA)
 static const struct udevice_id apl_lpc_ids[] = {
 	{ .compatible = "intel,apl-lpc" },
 	{ }
 };
+#endif
 
 /* All pads are LPC already configured by the hostbridge, so no probing here */
-U_BOOT_DRIVER(apl_lpc_drv) = {
+U_BOOT_DRIVER(intel_apl_lpc) = {
 	.name		= "intel_apl_lpc",
 	.id		= UCLASS_LPC,
-	.of_match	= apl_lpc_ids,
+	.of_match	= of_match_ptr(apl_lpc_ids),
+	ACPI_OPS_PTR(&apl_lpc_acpi_ops)
 };

@@ -5,9 +5,14 @@
  */
 
 #include <common.h>
+#include <command.h>
 #include <cpu_func.h>
 #include <hang.h>
+#include <image.h>
+#include <init.h>
+#include <log.h>
 #include <spl.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <errno.h>
 #include <asm/io.h>
@@ -25,11 +30,6 @@
 #include <mmc.h>
 #include <asm/arch/ddr.h>
 
-#include <dm/uclass.h>
-#include <dm/device.h>
-#include <dm/uclass-internal.h>
-#include <dm/device-internal.h>
-
 DECLARE_GLOBAL_DATA_PTR;
 
 int spl_board_boot_device(enum boot_device boot_dev_spl)
@@ -44,16 +44,7 @@ void spl_dram_init(void)
 
 void spl_board_init(void)
 {
-	struct udevice *dev;
-	int ret;
-
 	puts("Normal Boot\n");
-
-	ret = uclass_get_device_by_name(UCLASS_CLK,
-					"clock-controller@30380000",
-					&dev);
-	if (ret < 0)
-		printf("Failed to find clock node. Check device tree\n");
 }
 
 #define I2C_PAD_CTRL (PAD_CTL_DSE6 | PAD_CTL_HYS | PAD_CTL_PUE | PAD_CTL_PE)
@@ -78,7 +69,7 @@ int power_init_board(void)
 	struct pmic *p;
 	int ret;
 
-	ret = power_pca9450b_init(I2C_PMIC);
+	ret = power_pca9450_init(I2C_PMIC);
 	if (ret)
 		printf("power init failed");
 	p = pmic_get("PCA9450");
@@ -114,6 +105,7 @@ int board_fit_config_name_match(const char *name)
 }
 #endif
 
+/* Do not use BSS area in this phase */
 void board_init_f(ulong dummy)
 {
 	int ret;
@@ -124,37 +116,20 @@ void board_init_f(ulong dummy)
 
 	board_early_init_f();
 
-	timer_init();
-
-	preloader_console_init();
-
-	/* Clear the BSS. */
-	memset(__bss_start, 0, __bss_end - __bss_start);
-
-	ret = spl_init();
+	ret = spl_early_init();
 	if (ret) {
 		debug("spl_init() failed: %d\n", ret);
 		hang();
 	}
 
+	preloader_console_init();
+
 	enable_tzc380();
 
-	/* Adjust pmic voltage to 1.0V for 800M */
 	setup_i2c(0, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info1);
 
 	power_init_board();
 
 	/* DDR initialization */
 	spl_dram_init();
-
-	board_init_r(NULL, 0);
-}
-
-int do_reset(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
-{
-	puts("resetting ...\n");
-
-	reset_cpu(WDOG1_BASE_ADDR);
-
-	return 0;
 }

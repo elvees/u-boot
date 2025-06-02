@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fdt_region.h>
 
 #include "fdt_host.h"
 #include "libfdt_internal.h"
@@ -922,7 +923,9 @@ static const char usage_synopsis[] =
 /* Helper for getopt case statements */
 #define case_USAGE_COMMON_FLAGS \
 	case 'h': usage(NULL); \
+	/* fallthrough */ \
 	case 'V': util_version(); \
+	/* fallthrough */ \
 	case '?': usage("unknown option");
 
 static const char usage_short_opts[] =
@@ -1084,6 +1087,7 @@ static void scan_args(struct display_info *disp, int argc, char *argv[])
 
 		switch (opt) {
 		case_USAGE_COMMON_FLAGS
+		/* fallthrough */
 		case 'a':
 			disp->show_addr = 1;
 			break;
@@ -1095,7 +1099,7 @@ static void scan_args(struct display_info *disp, int argc, char *argv[])
 			break;
 		case 'C':
 			inc = 0;
-			/* no break */
+			/* fallthrough */
 		case 'c':
 			type = FDT_IS_COMPAT;
 			break;
@@ -1110,7 +1114,7 @@ static void scan_args(struct display_info *disp, int argc, char *argv[])
 			break;
 		case 'G':
 			inc = 0;
-			/* no break */
+			/* fallthrough */
 		case 'g':
 			type = FDT_ANY_GLOBAL;
 			break;
@@ -1128,7 +1132,7 @@ static void scan_args(struct display_info *disp, int argc, char *argv[])
 			break;
 		case 'N':
 			inc = 0;
-			/* no break */
+			/* fallthrough */
 		case 'n':
 			type = FDT_IS_NODE;
 			break;
@@ -1147,7 +1151,7 @@ static void scan_args(struct display_info *disp, int argc, char *argv[])
 			break;
 		case 'P':
 			inc = 0;
-			/* no break */
+			/* fallthrough */
 		case 'p':
 			type = FDT_IS_PROP;
 			break;

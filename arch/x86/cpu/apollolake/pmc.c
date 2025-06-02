@@ -9,12 +9,15 @@
 #define LOG_CATEGORY UCLASS_ACPI_PMC
 
 #include <common.h>
-#include <acpi_s3.h>
 #include <dt-structs.h>
 #include <dm.h>
+#include <log.h>
 #include <spl.h>
+#include <acpi/acpi_s3.h>
 #include <asm/io.h>
 #include <asm/pci.h>
+#include <asm/arch/pmc.h>
+#include <linux/bitops.h>
 #include <power/acpi_pmc.h>
 
 #define GPIO_GPE_CFG		0x1050
@@ -49,13 +52,6 @@ enum {
 	ETR		= 0x1048,
 	CF9_LOCK        = 1UL << 31,
 	CF9_GLB_RST	= 1 << 20,
-};
-
-struct apl_pmc_platdata {
-#if CONFIG_IS_ENABLED(OF_PLATDATA)
-	struct dtd_intel_apl_pmc dtplat;
-#endif
-	pci_dev_t bdf;
 };
 
 static int apl_pmc_fill_power_state(struct udevice *dev)
@@ -106,17 +102,18 @@ static int apl_global_reset_set_enable(struct udevice *dev, bool enable)
 	return 0;
 }
 
-int apl_pmc_ofdata_to_uc_platdata(struct udevice *dev)
+int apl_pmc_ofdata_to_uc_plat(struct udevice *dev)
 {
 	struct acpi_pmc_upriv *upriv = dev_get_uclass_priv(dev);
-	struct apl_pmc_platdata *plat = dev_get_platdata(dev);
+	struct apl_pmc_plat *plat = dev_get_plat(dev);
 
 #if !CONFIG_IS_ENABLED(OF_PLATDATA)
 	u32 base[6];
 	int size;
 	int ret;
 
-	ret = dev_read_u32_array(dev, "early-regs", base, ARRAY_SIZE(base));
+	ret = dev_read_u32_array(dev, "early-regs", base,
+				 ARRAY_SIZE(base));
 	if (ret)
 		return log_msg_ret("Missing/short early-regs", ret);
 	if (spl_phase() == PHASE_TPL) {
@@ -131,11 +128,6 @@ int apl_pmc_ofdata_to_uc_platdata(struct udevice *dev)
 	}
 	upriv->acpi_base = base[4];
 
-	/* Since PCI is not enabled, we must get the BDF manually */
-	plat->bdf = pci_get_devfn(dev);
-	if (plat->bdf < 0)
-		return log_msg_ret("Cannot get PMC PCI address", plat->bdf);
-
 	/* Get the dwX values for pmc gpe settings */
 	size = dev_read_size(dev, "gpe0-dw");
 	if (size < 0)
@@ -146,7 +138,7 @@ int apl_pmc_ofdata_to_uc_platdata(struct udevice *dev)
 	if (ret)
 		return log_msg_ret("Bad gpe0-dw", ret);
 
-	return pmc_ofdata_to_uc_platdata(dev);
+	return pmc_ofdata_to_uc_plat(dev);
 #else
 	struct dtd_intel_apl_pmc *dtplat = &plat->dtplat;
 
@@ -171,7 +163,7 @@ int apl_pmc_ofdata_to_uc_platdata(struct udevice *dev)
 static int enable_pmcbar(struct udevice *dev)
 {
 	struct acpi_pmc_upriv *upriv = dev_get_uclass_priv(dev);
-	struct apl_pmc_platdata *priv = dev_get_platdata(dev);
+	struct apl_pmc_plat *priv = dev_get_plat(dev);
 	pci_dev_t pmc = priv->bdf;
 
 	/*
@@ -207,24 +199,26 @@ static int apl_pmc_probe(struct udevice *dev)
 	return 0;
 }
 
-static struct acpi_pmc_ops apl_pmc_ops = {
+static const struct acpi_pmc_ops apl_pmc_ops = {
 	.init			= apl_pmc_fill_power_state,
 	.prev_sleep_state	= apl_prev_sleep_state,
 	.disable_tco		= apl_disable_tco,
 	.global_reset_set_enable = apl_global_reset_set_enable,
 };
 
+#if !CONFIG_IS_ENABLED(OF_PLATDATA)
 static const struct udevice_id apl_pmc_ids[] = {
 	{ .compatible = "intel,apl-pmc" },
 	{ }
 };
+#endif
 
-U_BOOT_DRIVER(apl_pmc) = {
+U_BOOT_DRIVER(intel_apl_pmc) = {
 	.name		= "intel_apl_pmc",
 	.id		= UCLASS_ACPI_PMC,
-	.of_match	= apl_pmc_ids,
-	.ofdata_to_platdata = apl_pmc_ofdata_to_uc_platdata,
+	.of_match	= of_match_ptr(apl_pmc_ids),
+	.of_to_plat = apl_pmc_ofdata_to_uc_plat,
 	.probe		= apl_pmc_probe,
 	.ops		= &apl_pmc_ops,
-	.platdata_auto_alloc_size = sizeof(struct apl_pmc_platdata),
+	.plat_auto	= sizeof(struct apl_pmc_plat),
 };

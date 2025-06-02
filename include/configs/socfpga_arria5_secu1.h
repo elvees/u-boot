@@ -1,12 +1,13 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * Copyright (C) 2017-2020 ABB
+ * Copyright (C) 2017-2020 Hitachi Power Grids
  *
  */
 #ifndef __CONFIG_SOCFPGA_SECU1_H__
 #define __CONFIG_SOCFPGA_SECU1_H__
 
 #include <asm/arch/base_addr_ac5.h>
+#include <linux/stringify.h>
 
 /* Call misc_init_r */
 #define CONFIG_MISC_INIT_R
@@ -27,12 +28,7 @@
 #define CONFIG_SYS_I2C_RTC_ADDR         0x68
 
 /* Booting Linux */
-#define CONFIG_BOOTDELAY	2
 #define CONFIG_BOOTFILE		"zImage"
-#define CONFIG_BOOTARGS		\
-	"console=ttyS0," __stringify(CONFIG_BAUDRATE) \
-	" ubi.fm_autoconvert=1" \
-	" uio_pdrv_genirq.of_id=\"idq,regbank\""
 
 #define CONFIG_BOOTCOMMAND	\
 	"setenv bootcmd '"	\
@@ -51,7 +47,6 @@
 #define CONFIG_SYS_BOOTM_LEN		(64 << 20)
 
 /* Environment settings */
-#define CONFIG_ENV_OVERWRITE
 
 /*
  * Autoboot

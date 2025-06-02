@@ -8,10 +8,14 @@
 #include <cpu_func.h>
 #include <dm.h>
 #include <init.h>
+#include <asm/cache.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <dm/platform_data/serial_pl01x.h>
 #include <asm/arch/hi3798cv200.h>
 #include <asm/armv8/mmu.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -37,15 +41,15 @@ static struct mm_region poplar_mem_map[] = {
 struct mm_region *mem_map = poplar_mem_map;
 
 #if !CONFIG_IS_ENABLED(OF_CONTROL)
-static const struct pl01x_serial_platdata serial_platdata = {
+static const struct pl01x_serial_plat serial_plat = {
 	.base = REG_BASE_UART0,
 	.type = TYPE_PL010,
 	.clock = 75000000,
 };
 
-U_BOOT_DEVICE(poplar_serial) = {
+U_BOOT_DRVINFO(poplar_serial) = {
 	.name = "serial_pl01x",
-	.platdata = &serial_platdata,
+	.plat = &serial_plat,
 };
 #endif
 

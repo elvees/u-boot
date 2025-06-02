@@ -30,6 +30,8 @@
 #include <asm/io.h>
 #include <asm-generic/gpio.h>
 #include <dm/device_compat.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
 #include <linux/ioport.h>
 
 /* PCIe core registers */
@@ -40,6 +42,10 @@
 #define PCIE_CORE_DEV_CTRL_STATS_REG				0xc8
 #define     PCIE_CORE_DEV_CTRL_STATS_RELAX_ORDER_DISABLE	(0 << 4)
 #define     PCIE_CORE_DEV_CTRL_STATS_SNOOP_DISABLE		(0 << 11)
+#define     PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SIZE		0x2
+#define     PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SIZE_SHIFT	5
+#define     PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE		0x2
+#define     PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE_SHIFT	12
 #define PCIE_CORE_LINK_CTRL_STAT_REG				0xd0
 #define     PCIE_CORE_LINK_TRAINING				BIT(5)
 #define PCIE_CORE_ERR_CAPCTL_REG				0x118
@@ -99,6 +105,7 @@
 #define     LTSSM_SHIFT				24
 #define     LTSSM_MASK				0x3f
 #define     LTSSM_L0				0x10
+#define VENDOR_ID_REG				(LMI_BASE_ADDR + 0x44)
 
 /* PCIe core controller registers */
 #define CTRL_CORE_BASE_ADDR			0x18000
@@ -146,6 +153,7 @@ struct pcie_advk {
 	void           *base;
 	int            first_busno;
 	struct udevice *dev;
+	struct gpio_desc reset_gpio;
 };
 
 static inline void advk_writel(struct pcie_advk *pcie, uint val, uint reg)
@@ -445,7 +453,6 @@ static int pcie_advk_write_config(struct udevice *bus, pci_dev_t bdf,
 	advk_writel(pcie, 1, PIO_START);
 
 	if (!pcie_advk_wait_pio(pcie)) {
-		dev_dbg(pcie->dev, "- wait pio timeout\n");
 		return -EINVAL;
 	}
 
@@ -523,6 +530,15 @@ static int pcie_advk_setup_hw(struct pcie_advk *pcie)
 	reg |= (IS_RC_MSK << IS_RC_SHIFT);
 	advk_writel(pcie, reg, PCIE_CORE_CTRL0_REG);
 
+	/*
+	 * Replace incorrect PCI vendor id value 0x1b4b by correct value 0x11ab.
+	 * VENDOR_ID_REG contains vendor id in low 16 bits and subsystem vendor
+	 * id in high 16 bits. Updating this register changes readback value of
+	 * read-only vendor id bits in PCIE_CORE_DEV_ID_REG register. Workaround
+	 * for erratum 4.1: "The value of device and vendor ID is incorrect".
+	 */
+	advk_writel(pcie, 0x11ab11ab, VENDOR_ID_REG);
+
 	/* Set Advanced Error Capabilities and Control PF0 register */
 	reg = PCIE_CORE_ERR_CAPCTL_ECRC_CHK_TX |
 		PCIE_CORE_ERR_CAPCTL_ECRC_CHK_TX_EN |
@@ -532,6 +548,10 @@ static int pcie_advk_setup_hw(struct pcie_advk *pcie)
 
 	/* Set PCIe Device Control and Status 1 PF0 register */
 	reg = PCIE_CORE_DEV_CTRL_STATS_RELAX_ORDER_DISABLE |
+		(PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SIZE <<
+		 PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SIZE_SHIFT) |
+		(PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE <<
+		 PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE_SHIFT) |
 		PCIE_CORE_DEV_CTRL_STATS_SNOOP_DISABLE;
 	advk_writel(pcie, reg, PCIE_CORE_DEV_CTRL_STATS_REG);
 
@@ -611,10 +631,7 @@ static int pcie_advk_probe(struct udevice *dev)
 {
 	struct pcie_advk *pcie = dev_get_priv(dev);
 
-#if CONFIG_IS_ENABLED(DM_GPIO)
-	struct gpio_desc reset_gpio;
-
-	gpio_request_by_name(dev, "reset-gpio", 0, &reset_gpio,
+	gpio_request_by_name(dev, "reset-gpios", 0, &pcie->reset_gpio,
 			     GPIOD_IS_OUT);
 	/*
 	 * Issue reset to add-in card through the dedicated GPIO.
@@ -629,24 +646,35 @@ static int pcie_advk_probe(struct udevice *dev)
 	 *     possible before PCIe PHY initialization. Moreover, the PCIe
 	 *     clock should be gated as well.
 	 */
-	if (dm_gpio_is_valid(&reset_gpio)) {
-		dev_dbg(pcie->dev, "Toggle PCIE Reset GPIO ...\n");
-		dm_gpio_set_value(&reset_gpio, 0);
+	if (dm_gpio_is_valid(&pcie->reset_gpio)) {
+		dev_dbg(dev, "Toggle PCIE Reset GPIO ...\n");
+		dm_gpio_set_value(&pcie->reset_gpio, 1);
 		mdelay(200);
-		dm_gpio_set_value(&reset_gpio, 1);
+		dm_gpio_set_value(&pcie->reset_gpio, 0);
+	} else {
+		dev_warn(dev, "PCIE Reset on GPIO support is missing\n");
 	}
-#else
-	dev_dbg(pcie->dev, "PCIE Reset on GPIO support is missing\n");
-#endif /* DM_GPIO */
 
-	pcie->first_busno = dev->seq;
+	pcie->first_busno = dev_seq(dev);
 	pcie->dev = pci_get_controller(dev);
 
 	return pcie_advk_setup_hw(pcie);
 }
 
+static int pcie_advk_remove(struct udevice *dev)
+{
+	struct pcie_advk *pcie = dev_get_priv(dev);
+	u32 reg;
+
+	reg = advk_readl(pcie, PCIE_CORE_CTRL0_REG);
+	reg &= ~LINK_TRAINING_EN;
+	advk_writel(pcie, reg, PCIE_CORE_CTRL0_REG);
+
+	return 0;
+}
+
 /**
- * pcie_advk_ofdata_to_platdata() - Translate from DT to device state
+ * pcie_advk_of_to_plat() - Translate from DT to device state
  *
  * @dev: A pointer to the device being operated on
  *
@@ -656,7 +684,7 @@ static int pcie_advk_probe(struct udevice *dev)
  *
  * Return: 0 on success, else -EINVAL
  */
-static int pcie_advk_ofdata_to_platdata(struct udevice *dev)
+static int pcie_advk_of_to_plat(struct udevice *dev)
 {
 	struct pcie_advk *pcie = dev_get_priv(dev);
 
@@ -683,7 +711,9 @@ U_BOOT_DRIVER(pcie_advk) = {
 	.id			= UCLASS_PCI,
 	.of_match		= pcie_advk_ids,
 	.ops			= &pcie_advk_ops,
-	.ofdata_to_platdata	= pcie_advk_ofdata_to_platdata,
+	.of_to_plat	= pcie_advk_of_to_plat,
 	.probe			= pcie_advk_probe,
-	.priv_auto_alloc_size	= sizeof(struct pcie_advk),
+	.remove			= pcie_advk_remove,
+	.flags			= DM_FLAG_OS_PREPARE,
+	.priv_auto	= sizeof(struct pcie_advk),
 };

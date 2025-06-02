@@ -9,10 +9,13 @@
  */
 
 #include <common.h>
+#include <image.h>
+#include <log.h>
 #include <spi.h>
 #include <spi_flash.h>
 #include <errno.h>
 #include <spl.h>
+#include <asm/global_data.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 

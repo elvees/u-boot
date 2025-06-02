@@ -9,6 +9,7 @@
 
 #include <common.h>
 #include <command.h>
+#include <asm/global_data.h>
 #include "asm/m5282.h"
 #include <bmp_layout.h>
 #include <env.h>
@@ -20,7 +21,7 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#ifdef CONFIG_VIDEO
+#if IS_ENABLED(CONFIG_VIDEO_VCXK)
 unsigned long display_width;
 unsigned long display_height;
 #endif
@@ -183,8 +184,7 @@ void __led_set(led_id_t mask, int state)
 		MCFGPTA_GPTPORT &= ~(1 << 3);
 }
 
-#if defined(CONFIG_VIDEO)
-
+#if IS_ENABLED(CONFIG_VIDEO_VCXK)
 int drv_video_init(void)
 {
 	char *s;
@@ -225,8 +225,8 @@ int drv_video_init(void)
 
 /*---------------------------------------------------------------------------*/
 
-#ifdef CONFIG_VIDEO
-int do_brightness(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+#if IS_ENABLED(CONFIG_VIDEO_VCXK)
+int do_brightness(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	int rcode = 0;
 	ulong side;

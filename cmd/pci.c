@@ -18,6 +18,7 @@
 #include <command.h>
 #include <console.h>
 #include <dm.h>
+#include <init.h>
 #include <asm/processor.h>
 #include <asm/io.h>
 #include <pci.h>
@@ -333,20 +334,21 @@ static void pciinfo(struct udevice *bus, bool short_listing)
 {
 	struct udevice *dev;
 
-	pciinfo_header(bus->seq, short_listing);
+	pciinfo_header(dev_seq(bus), short_listing);
 
 	for (device_find_first_child(bus, &dev);
 	     dev;
 	     device_find_next_child(&dev)) {
-		struct pci_child_platdata *pplat;
+		struct pci_child_plat *pplat;
 
-		pplat = dev_get_parent_platdata(dev);
+		pplat = dev_get_parent_plat(dev);
 		if (short_listing) {
-			printf("%02x.%02x.%02x   ", bus->seq,
+			printf("%02x.%02x.%02x   ", dev_seq(bus),
 			       PCI_DEV(pplat->devfn), PCI_FUNC(pplat->devfn));
 			pci_header_show_brief(dev);
 		} else {
-			printf("\nFound PCI device %02x.%02x.%02x:\n", bus->seq,
+			printf("\nFound PCI device %02x.%02x.%02x:\n",
+			       dev_seq(bus),
 			       PCI_DEV(pplat->devfn), PCI_FUNC(pplat->devfn));
 			pci_header_show(dev);
 		}
@@ -655,7 +657,7 @@ static void pci_show_regions(struct udevice *bus)
  *      pci modify[.b, .w, .l] bus.device.function [addr]
  *      pci write[.b, .w, .l] bus.device.function addr value
  */
-static int do_pci(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+static int do_pci(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	ulong addr = 0, value = 0, cmd_size = 0;
 	enum pci_size_t size = PCI_SIZE_32;

@@ -8,6 +8,8 @@
 #include <errno.h>
 #include <dm.h>
 #include <i2c.h>
+#include <log.h>
+#include <asm/global_data.h>
 #include <power/pmic.h>
 #include <power/regulator.h>
 #include <power/pca9450.h>
@@ -79,7 +81,7 @@ static struct dm_pmic_ops pca9450_ops = {
 };
 
 static const struct udevice_id pca9450_ids[] = {
-	{ .compatible = "nxp,pca9450a", .data = 0x35, },
+	{ .compatible = "nxp,pca9450a", .data = 0x25, },
 	{ .compatible = "nxp,pca9450b", .data = 0x25, },
 	{ }
 };

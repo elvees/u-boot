@@ -2,12 +2,14 @@
 /*
  * Texas Instruments' K3 R5 Remoteproc driver
  *
- * Copyright (C) 2018-2019 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2018-2020 Texas Instruments Incorporated - https://www.ti.com/
  *	Lokesh Vutla <lokeshvutla@ti.com>
+ *	Suman Anna <s-anna@ti.com>
  */
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <malloc.h>
 #include <remoteproc.h>
 #include <errno.h>
@@ -36,6 +38,8 @@
 #define PROC_BOOT_CFG_FLAG_R5_BTCM_EN			0x00001000
 #define PROC_BOOT_CFG_FLAG_R5_ATCM_EN			0x00002000
 #define PROC_BOOT_CFG_FLAG_GEN_IGN_BOOTVECTOR		0x10000000
+/* Available from J7200 SoCs onwards */
+#define PROC_BOOT_CFG_FLAG_R5_MEM_INIT_DIS		0x00004000
 
 /* R5 TI-SCI Processor Control Flags */
 #define PROC_BOOT_CTRL_FLAG_R5_CORE_HALT		0x00000001
@@ -51,6 +55,16 @@
 enum cluster_mode {
 	CLUSTER_MODE_SPLIT = 0,
 	CLUSTER_MODE_LOCKSTEP,
+};
+
+/**
+ * struct k3_r5f_ip_data - internal data structure used for IP variations
+ * @tcm_is_double: flag to denote the larger unified TCMs in certain modes
+ * @tcm_ecc_autoinit: flag to denote the auto-initialization of TCMs for ECC
+ */
+struct k3_r5f_ip_data {
+	bool tcm_is_double;
+	bool tcm_ecc_autoinit;
 };
 
 /**
@@ -73,6 +87,7 @@ struct k3_r5f_mem {
  * @cluster: pointer to the parent cluster.
  * @reset: reset control handle
  * @tsp: TI-SCI processor control handle
+ * @ipdata: cached pointer to R5F IP specific feature data
  * @mem: Array of available internal memories
  * @num_mem: Number of available memories
  * @atcm_enable: flag to control ATCM enablement
@@ -85,6 +100,7 @@ struct k3_r5f_core {
 	struct k3_r5f_cluster *cluster;
 	struct reset_ctl reset;
 	struct ti_sci_proc tsp;
+	struct k3_r5f_ip_data *ipdata;
 	struct k3_r5f_mem *mem;
 	int num_mems;
 	u32 atcm_enable;
@@ -149,7 +165,7 @@ static int k3_r5f_lockstep_release(struct k3_r5f_cluster *cluster)
 {
 	int ret, c;
 
-	dev_dbg(dev, "%s\n", __func__);
+	debug("%s\n", __func__);
 
 	for (c = NR_CORES - 1; c >= 0; c--) {
 		ret = ti_sci_proc_power_domain_on(&cluster->cores[c]->tsp);
@@ -185,7 +201,7 @@ static int k3_r5f_split_release(struct k3_r5f_core *core)
 {
 	int ret;
 
-	dev_dbg(dev, "%s\n", __func__);
+	dev_dbg(core->dev, "%s\n", __func__);
 
 	ret = ti_sci_proc_power_domain_on(&core->tsp);
 	if (ret) {
@@ -230,30 +246,46 @@ static int k3_r5f_core_sanity_check(struct k3_r5f_core *core)
 	struct k3_r5f_cluster *cluster = core->cluster;
 
 	if (core->in_use) {
-		dev_err(dev, "Invalid op: Trying to load/start on already running core %d\n",
+		dev_err(core->dev,
+			"Invalid op: Trying to load/start on already running core %d\n",
 			core->tsp.proc_id);
 		return -EINVAL;
 	}
 
 	if (cluster->mode == CLUSTER_MODE_LOCKSTEP && !cluster->cores[1]) {
-		printf("Secondary core is not probed in this cluster\n");
+		dev_err(core->dev,
+			"Secondary core is not probed in this cluster\n");
 		return -EAGAIN;
 	}
 
 	if (cluster->mode == CLUSTER_MODE_LOCKSTEP && !is_primary_core(core)) {
-		dev_err(dev, "Invalid op: Trying to start secondary core %d in lockstep mode\n",
+		dev_err(core->dev,
+			"Invalid op: Trying to start secondary core %d in lockstep mode\n",
 			core->tsp.proc_id);
 		return -EINVAL;
 	}
 
 	if (cluster->mode == CLUSTER_MODE_SPLIT && !is_primary_core(core)) {
 		if (!core->cluster->cores[0]->in_use) {
-			dev_err(dev, "Invalid seq: Enable primary core before loading secondary core\n");
+			dev_err(core->dev,
+				"Invalid seq: Enable primary core before loading secondary core\n");
 			return -EINVAL;
 		}
 	}
 
 	return 0;
+}
+
+/* Zero out TCMs so that ECC can be effective on all TCM addresses */
+void k3_r5f_init_tcm_memories(struct k3_r5f_core *core, bool auto_inited)
+{
+	if (core->ipdata->tcm_ecc_autoinit && auto_inited)
+		return;
+
+	if (core->atcm_enable)
+		memset(core->mem[0].cpu_addr, 0x00, core->mem[0].size);
+	if (core->btcm_enable)
+		memset(core->mem[1].cpu_addr, 0x00, core->mem[1].size);
 }
 
 /**
@@ -267,7 +299,9 @@ static int k3_r5f_core_sanity_check(struct k3_r5f_core *core)
 static int k3_r5f_load(struct udevice *dev, ulong addr, ulong size)
 {
 	struct k3_r5f_core *core = dev_get_priv(dev);
-	u32 boot_vector;
+	u64 boot_vector;
+	u32 ctrl, sts, cfg = 0;
+	bool mem_auto_init;
 	int ret;
 
 	dev_dbg(dev, "%s addr = 0x%lx, size = 0x%lx\n", __func__, addr, size);
@@ -280,6 +314,12 @@ static int k3_r5f_load(struct udevice *dev, ulong addr, ulong size)
 	if (ret)
 		return ret;
 
+	ret = ti_sci_proc_get_status(&core->tsp, &boot_vector, &cfg, &ctrl,
+				     &sts);
+	if (ret)
+		return ret;
+	mem_auto_init = !(cfg & PROC_BOOT_CFG_FLAG_R5_MEM_INIT_DIS);
+
 	ret = k3_r5f_prepare(dev);
 	if (ret) {
 		dev_err(dev, "R5f prepare failed for core %d\n",
@@ -287,11 +327,7 @@ static int k3_r5f_load(struct udevice *dev, ulong addr, ulong size)
 		goto proc_release;
 	}
 
-	/* Zero out TCMs so that ECC can be effective on all TCM addresses */
-	if (core->atcm_enable)
-		memset(core->mem[0].cpu_addr, 0x00, core->mem[0].size);
-	if (core->btcm_enable)
-		memset(core->mem[1].cpu_addr, 0x00, core->mem[1].size);
+	k3_r5f_init_tcm_memories(core, mem_auto_init);
 
 	ret = rproc_elf_load_image(dev, addr, size);
 	if (ret < 0) {
@@ -301,7 +337,7 @@ static int k3_r5f_load(struct udevice *dev, ulong addr, ulong size)
 
 	boot_vector = rproc_elf_get_boot_addr(dev, addr);
 
-	dev_dbg(dev, "%s: Boot vector = 0x%x\n", __func__, boot_vector);
+	dev_dbg(dev, "%s: Boot vector = 0x%llx\n", __func__, boot_vector);
 
 	ret = ti_sci_proc_set_config(&core->tsp, boot_vector, 0, 0);
 
@@ -400,7 +436,7 @@ static int k3_r5f_split_reset(struct k3_r5f_core *core)
 {
 	int ret;
 
-	dev_dbg(dev, "%s\n", __func__);
+	dev_dbg(core->dev, "%s\n", __func__);
 
 	if (reset_assert(&core->reset))
 		ret = -EINVAL;
@@ -415,7 +451,7 @@ static int k3_r5f_lockstep_reset(struct k3_r5f_cluster *cluster)
 {
 	int ret = 0, c;
 
-	dev_dbg(dev, "%s\n", __func__);
+	debug("%s\n", __func__);
 
 	for (c = 0; c < NR_CORES; c++)
 		if (reset_assert(&cluster->cores[c]->reset))
@@ -543,10 +579,11 @@ static int k3_r5f_rproc_configure(struct k3_r5f_core *core)
 {
 	struct k3_r5f_cluster *cluster = core->cluster;
 	u32 set_cfg = 0, clr_cfg = 0, cfg, ctrl, sts;
+	bool lockstep_permitted;
 	u64 boot_vec = 0;
 	int ret;
 
-	dev_dbg(dev, "%s\n", __func__);
+	dev_dbg(core->dev, "%s\n", __func__);
 
 	ret = ti_sci_proc_request(&core->tsp);
 	if (ret < 0)
@@ -560,8 +597,9 @@ static int k3_r5f_rproc_configure(struct k3_r5f_core *core)
 		goto out;
 
 	/* Sanity check for Lockstep mode */
-	if (cluster->mode && is_primary_core(core) &&
-	    !(sts & PROC_BOOT_STATUS_FLAG_R5_LOCKSTEP_PERMITTED)) {
+	lockstep_permitted = !!(sts &
+				PROC_BOOT_STATUS_FLAG_R5_LOCKSTEP_PERMITTED);
+	if (cluster->mode && is_primary_core(core) && !lockstep_permitted) {
 		dev_err(core->dev, "LockStep mode not permitted on this device\n");
 		ret = -EINVAL;
 		goto out;
@@ -573,7 +611,7 @@ static int k3_r5f_rproc_configure(struct k3_r5f_core *core)
 		clr_cfg |= PROC_BOOT_CFG_FLAG_R5_TEINIT;
 		if (cluster->mode == CLUSTER_MODE_LOCKSTEP)
 			set_cfg |= PROC_BOOT_CFG_FLAG_R5_LOCKSTEP;
-		else
+		else if (lockstep_permitted)
 			clr_cfg |= PROC_BOOT_CFG_FLAG_R5_LOCKSTEP;
 	}
 
@@ -638,11 +676,11 @@ static int k3_r5f_of_to_priv(struct k3_r5f_core *core)
 {
 	int ret;
 
-	dev_dbg(dev, "%s\n", __func__);
+	dev_dbg(core->dev, "%s\n", __func__);
 
-	core->atcm_enable = dev_read_u32_default(core->dev, "atcm-enable", 0);
-	core->btcm_enable = dev_read_u32_default(core->dev, "btcm-enable", 1);
-	core->loczrama = dev_read_u32_default(core->dev, "loczrama", 1);
+	core->atcm_enable = dev_read_u32_default(core->dev, "ti,atcm-enable", 0);
+	core->btcm_enable = dev_read_u32_default(core->dev, "ti,btcm-enable", 1);
+	core->loczrama = dev_read_u32_default(core->dev, "ti,loczrama", 1);
 
 	ret = ti_sci_proc_of_to_priv(core->dev, &core->tsp);
 	if (ret)
@@ -653,6 +691,8 @@ static int k3_r5f_of_to_priv(struct k3_r5f_core *core)
 		dev_err(core->dev, "Reset lines not available: %d\n", ret);
 		return ret;
 	}
+
+	core->ipdata = (struct k3_r5f_ip_data *)dev_get_driver_data(core->dev);
 
 	return 0;
 }
@@ -697,6 +737,38 @@ static int k3_r5f_core_of_get_memories(struct k3_r5f_core *core)
 	}
 
 	return 0;
+}
+
+/*
+ * Each R5F core within a typical R5FSS instance has a total of 64 KB of TCMs,
+ * split equally into two 32 KB banks between ATCM and BTCM. The TCMs from both
+ * cores are usable in Split-mode, but only the Core0 TCMs can be used in
+ * LockStep-mode. The newer revisions of the R5FSS IP maximizes these TCMs by
+ * leveraging the Core1 TCMs as well in certain modes where they would have
+ * otherwise been unusable (Eg: LockStep-mode on J7200 SoCs). This is done by
+ * making a Core1 TCM visible immediately after the corresponding Core0 TCM.
+ * The SoC memory map uses the larger 64 KB sizes for the Core0 TCMs, and the
+ * dts representation reflects this increased size on supported SoCs. The Core0
+ * TCM sizes therefore have to be adjusted to only half the original size in
+ * Split mode.
+ */
+static void k3_r5f_core_adjust_tcm_sizes(struct k3_r5f_core *core)
+{
+	struct k3_r5f_cluster *cluster = core->cluster;
+
+	if (cluster->mode == CLUSTER_MODE_LOCKSTEP)
+		return;
+
+	if (!core->ipdata->tcm_is_double)
+		return;
+
+	if (core == cluster->cores[0]) {
+		core->mem[0].size /= 2;
+		core->mem[1].size /= 2;
+
+		dev_dbg(core->dev, "adjusted TCM sizes, ATCM = 0x%zx BTCM = 0x%zx\n",
+			core->mem[0].size, core->mem[1].size);
+	}
 }
 
 /**
@@ -752,6 +824,8 @@ static int k3_r5f_probe(struct udevice *dev)
 		return ret;
 	}
 
+	k3_r5f_core_adjust_tcm_sizes(core);
+
 	dev_dbg(dev, "Remoteproc successfully probed\n");
 
 	return 0;
@@ -768,9 +842,20 @@ static int k3_r5f_remove(struct udevice *dev)
 	return 0;
 }
 
+static const struct k3_r5f_ip_data k3_data = {
+	.tcm_is_double = false,
+	.tcm_ecc_autoinit = false,
+};
+
+static const struct k3_r5f_ip_data j7200_data = {
+	.tcm_is_double = true,
+	.tcm_ecc_autoinit = true,
+};
+
 static const struct udevice_id k3_r5f_rproc_ids[] = {
-	{ .compatible = "ti,am654-r5f"},
-	{ .compatible = "ti,j721e-r5f"},
+	{ .compatible = "ti,am654-r5f", .data = (ulong)&k3_data, },
+	{ .compatible = "ti,j721e-r5f", .data = (ulong)&k3_data, },
+	{ .compatible = "ti,j7200-r5f", .data = (ulong)&j7200_data, },
 	{}
 };
 
@@ -781,7 +866,7 @@ U_BOOT_DRIVER(k3_r5f_rproc) = {
 	.ops = &k3_r5f_rproc_ops,
 	.probe = k3_r5f_probe,
 	.remove = k3_r5f_remove,
-	.priv_auto_alloc_size = sizeof(struct k3_r5f_core),
+	.priv_auto	= sizeof(struct k3_r5f_core),
 };
 
 static int k3_r5f_cluster_probe(struct udevice *dev)
@@ -790,7 +875,7 @@ static int k3_r5f_cluster_probe(struct udevice *dev)
 
 	dev_dbg(dev, "%s\n", __func__);
 
-	cluster->mode = dev_read_u32_default(dev, "lockstep-mode",
+	cluster->mode = dev_read_u32_default(dev, "ti,cluster-mode",
 					     CLUSTER_MODE_LOCKSTEP);
 
 	if (device_get_child_count(dev) != 2) {
@@ -807,6 +892,7 @@ static int k3_r5f_cluster_probe(struct udevice *dev)
 static const struct udevice_id k3_r5fss_ids[] = {
 	{ .compatible = "ti,am654-r5fss"},
 	{ .compatible = "ti,j721e-r5fss"},
+	{ .compatible = "ti,j7200-r5fss"},
 	{}
 };
 
@@ -815,5 +901,6 @@ U_BOOT_DRIVER(k3_r5fss) = {
 	.of_match = k3_r5fss_ids,
 	.id = UCLASS_MISC,
 	.probe = k3_r5f_cluster_probe,
-	.priv_auto_alloc_size = sizeof(struct k3_r5f_cluster),
+	.priv_auto	= sizeof(struct k3_r5f_cluster),
+	.flags = DM_FLAG_DEFAULT_PD_CTRL_OFF,
 };

@@ -6,6 +6,7 @@
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <malloc.h>
 #include <reset-uclass.h>
 #include <dm/device_compat.h>
@@ -246,7 +247,7 @@ static int uniphier_reset_probe(struct udevice *dev)
 	struct uniphier_reset_priv *priv = dev_get_priv(dev);
 	fdt_addr_t addr;
 
-	addr = devfdt_get_addr(dev->parent);
+	addr = dev_read_addr(dev->parent);
 	if (addr == FDT_ADDR_T_NONE)
 		return -EINVAL;
 
@@ -371,6 +372,6 @@ U_BOOT_DRIVER(uniphier_reset) = {
 	.id = UCLASS_RESET,
 	.of_match = uniphier_reset_match,
 	.probe = uniphier_reset_probe,
-	.priv_auto_alloc_size = sizeof(struct uniphier_reset_priv),
+	.priv_auto	= sizeof(struct uniphier_reset_priv),
 	.ops = &uniphier_reset_ops,
 };

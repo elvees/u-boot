@@ -5,14 +5,12 @@
  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
  */
 
-#include <common.h>
 #include <env.h>
 #include <init.h>
 #include <spl.h>
+#include <asm/global_data.h>
 #include <linux/libfdt.h>
-#include <nand.h>
 #include <stdio.h>
-#include <linux/io.h>
 #include <linux/printk.h>
 
 #include "init.h"
@@ -54,6 +52,7 @@ fail:
 
 static void uniphier_set_env_addr(const char *env, const char *offset_env)
 {
+	DECLARE_GLOBAL_DATA_PTR;
 	unsigned long offset = 0;
 	const char *str;
 	char *end;

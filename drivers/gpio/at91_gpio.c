@@ -590,7 +590,7 @@ static const struct dm_gpio_ops gpio_at91_ops = {
 static int at91_gpio_probe(struct udevice *dev)
 {
 	struct at91_port_priv *port = dev_get_priv(dev);
-	struct at91_port_platdata *plat = dev_get_platdata(dev);
+	struct at91_port_plat *plat = dev_get_plat(dev);
 	struct gpio_dev_priv *uc_priv = dev_get_uclass_priv(dev);
 	struct clk clk;
 	int ret;
@@ -606,7 +606,7 @@ static int at91_gpio_probe(struct udevice *dev)
 	clk_free(&clk);
 
 #if CONFIG_IS_ENABLED(OF_CONTROL)
-	plat->base_addr = (uint32_t)devfdt_get_addr_ptr(dev);
+	plat->base_addr = dev_read_addr(dev);
 #endif
 	plat->bank_name = at91_get_bank_name(plat->base_addr);
 	port->regs = (struct at91_port *)plat->base_addr;
@@ -624,15 +624,15 @@ static const struct udevice_id at91_gpio_ids[] = {
 };
 #endif
 
-U_BOOT_DRIVER(gpio_at91) = {
-	.name	= "gpio_at91",
+U_BOOT_DRIVER(atmel_at91rm9200_gpio) = {
+	.name	= "atmel_at91rm9200_gpio",
 	.id	= UCLASS_GPIO,
 #if CONFIG_IS_ENABLED(OF_CONTROL)
 	.of_match = at91_gpio_ids,
-	.platdata_auto_alloc_size = sizeof(struct at91_port_platdata),
+	.plat_auto	= sizeof(struct at91_port_plat),
 #endif
 	.ops	= &gpio_at91_ops,
 	.probe	= at91_gpio_probe,
-	.priv_auto_alloc_size = sizeof(struct at91_port_priv),
+	.priv_auto	= sizeof(struct at91_port_priv),
 };
 #endif

@@ -10,6 +10,7 @@
 #include <wdt.h>
 #include <asm/io.h>
 #include <asm/utils.h>
+#include <linux/bitops.h>
 
 #define DW_WDT_CR	0x00
 #define DW_WDT_TORR	0x04
@@ -129,7 +130,7 @@ static int designware_wdt_probe(struct udevice *dev)
 	if (ret)
 		return ret;
 
-	priv->clk_khz = clk_get_rate(&clk);
+	priv->clk_khz = clk_get_rate(&clk) / 1000;
 	if (!priv->clk_khz)
 		return -EINVAL;
 #else
@@ -167,7 +168,7 @@ U_BOOT_DRIVER(designware_wdt) = {
 	.name = "designware_wdt",
 	.id = UCLASS_WDT,
 	.of_match = designware_wdt_ids,
-	.priv_auto_alloc_size = sizeof(struct designware_wdt_priv),
+	.priv_auto	= sizeof(struct designware_wdt_priv),
 	.probe = designware_wdt_probe,
 	.ops = &designware_wdt_ops,
 	.flags = DM_FLAG_PRE_RELOC,

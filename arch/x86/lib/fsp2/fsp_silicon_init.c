@@ -10,11 +10,14 @@
 
 #include <common.h>
 #include <binman.h>
+#include <bootstage.h>
 #include <dm.h>
+#include <log.h>
 #include <asm/arch/fsp/fsp_configs.h>
 #include <asm/arch/fsp/fsp_s_upd.h>
 #include <asm/fsp/fsp_infoheader.h>
 #include <asm/fsp2/fsp_internal.h>
+#include <asm/global_data.h>
 
 int fsp_silicon_init(bool s3wake, bool use_spi_flash)
 {
@@ -24,12 +27,15 @@ int fsp_silicon_init(bool s3wake, bool use_spi_flash)
 	struct binman_entry entry;
 	struct udevice *dev;
 	ulong rom_offset = 0;
+	u32 init_addr;
 	int ret;
 
+	log_debug("Locating FSP\n");
 	ret = fsp_locate_fsp(FSP_S, &entry, use_spi_flash, &dev, &hdr,
 			     &rom_offset);
 	if (ret)
 		return log_msg_ret("locate FSP", ret);
+	binman_set_rom_offset(rom_offset);
 	gd->arch.fsp_s_hdr = hdr;
 
 	/* Copy over the default config */
@@ -41,11 +47,11 @@ int fsp_silicon_init(bool s3wake, bool use_spi_flash)
 	ret = fsps_update_config(dev, rom_offset, &upd);
 	if (ret)
 		return log_msg_ret("Could not setup config", ret);
-	log_debug("Silicon init...");
-	bootstage_start(BOOTSTATE_ID_ACCUM_FSP_S, "fsp-s");
+	log_debug("Silicon init @ %x...", init_addr);
+	bootstage_start(BOOTSTAGE_ID_ACCUM_FSP_S, "fsp-s");
 	func = (fsp_silicon_init_func)(hdr->img_base + hdr->fsp_silicon_init);
 	ret = func(&upd);
-	bootstage_accum(BOOTSTATE_ID_ACCUM_FSP_S);
+	bootstage_accum(BOOTSTAGE_ID_ACCUM_FSP_S);
 	if (ret)
 		return log_msg_ret("Silicon init fail\n", ret);
 	log_debug("done\n");

@@ -9,6 +9,8 @@
 
 #include <common.h>
 #include <eeprom.h>
+#include <log.h>
+#include <net.h>
 #include <asm/arch/hardware.h>
 #include <asm/omap_common.h>
 #include <dm/uclass.h>
@@ -20,7 +22,7 @@
 
 #include "board_detect.h"
 
-#if !defined(CONFIG_DM_I2C)
+#if !CONFIG_IS_ENABLED(DM_I2C)
 /**
  * ti_i2c_eeprom_init - Initialize an i2c bus and probe for a device
  * @i2c_bus: i2c bus number to initialize
@@ -87,7 +89,7 @@ static int __maybe_unused ti_i2c_eeprom_get(int bus_addr, int dev_addr,
 	u32 hdr_read;
 	int rc;
 
-#if defined(CONFIG_DM_I2C)
+#if CONFIG_IS_ENABLED(DM_I2C)
 	struct udevice *dev;
 	struct udevice *bus;
 
@@ -111,18 +113,15 @@ static int __maybe_unused ti_i2c_eeprom_get(int bus_addr, int dev_addr,
 
 	/* Corrupted data??? */
 	if (hdr_read != header) {
-		rc = dm_i2c_read(dev, 0, (uint8_t *)&hdr_read, 4);
 		/*
 		 * read the eeprom header using i2c again, but use only a
 		 * 1 byte address (some legacy boards need this..)
 		 */
-		if (rc) {
-			rc =  i2c_set_chip_offset_len(dev, 1);
-			if (rc)
-				return rc;
+		rc = i2c_set_chip_offset_len(dev, 1);
+		if (rc)
+			return rc;
 
-			rc = dm_i2c_read(dev, 0, (uint8_t *)&hdr_read, 4);
-		}
+		rc = dm_i2c_read(dev, 0, (uint8_t *)&hdr_read, 4);
 		if (rc)
 			return rc;
 	}
@@ -151,16 +150,13 @@ static int __maybe_unused ti_i2c_eeprom_get(int bus_addr, int dev_addr,
 
 	/* Corrupted data??? */
 	if (hdr_read != header) {
-		rc = i2c_read(dev_addr, 0x0, byte, (uint8_t *)&hdr_read, 4);
 		/*
 		 * read the eeprom header using i2c again, but use only a
 		 * 1 byte address (some legacy boards need this..)
 		 */
 		byte = 1;
-		if (rc) {
-			rc = i2c_read(dev_addr, 0x0, byte, (uint8_t *)&hdr_read,
-				      4);
-		}
+		rc = i2c_read(dev_addr, 0x0, byte, (uint8_t *)&hdr_read,
+			      4);
 		if (rc)
 			return rc;
 	}
@@ -667,17 +663,17 @@ void __maybe_unused set_board_info_env(char *name)
 
 	if (name)
 		env_set("board_name", name);
-	else if (ep->name)
+	else if (strlen(ep->name) != 0)
 		env_set("board_name", ep->name);
 	else
 		env_set("board_name", unknown);
 
-	if (ep->version)
+	if (strlen(ep->version) != 0)
 		env_set("board_rev", ep->version);
 	else
 		env_set("board_rev", unknown);
 
-	if (ep->serial)
+	if (strlen(ep->serial) != 0)
 		env_set("board_serial", ep->serial);
 	else
 		env_set("board_serial", unknown);
@@ -690,22 +686,22 @@ void __maybe_unused set_board_info_env_am6(char *name)
 
 	if (name)
 		env_set("board_name", name);
-	else if (ep->name)
+	else if (strlen(ep->name) != 0)
 		env_set("board_name", ep->name);
 	else
 		env_set("board_name", unknown);
 
-	if (ep->version)
+	if (strlen(ep->version) != 0)
 		env_set("board_rev", ep->version);
 	else
 		env_set("board_rev", unknown);
 
-	if (ep->software_revision)
+	if (strlen(ep->software_revision) != 0)
 		env_set("board_software_revision", ep->software_revision);
 	else
 		env_set("board_software_revision", unknown);
 
-	if (ep->serial)
+	if (strlen(ep->serial) != 0)
 		env_set("board_serial", ep->serial);
 	else
 		env_set("board_serial", unknown);

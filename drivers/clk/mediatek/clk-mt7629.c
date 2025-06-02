@@ -8,9 +8,11 @@
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <asm/arch-mediatek/reset.h>
 #include <asm/io.h>
 #include <dt-bindings/clock/mt7629-clk.h>
+#include <linux/bitops.h>
 
 #include "clk-mtk.h"
 
@@ -702,7 +704,7 @@ U_BOOT_DRIVER(mtk_clk_apmixedsys) = {
 	.id = UCLASS_CLK,
 	.of_match = mt7629_apmixed_compat,
 	.probe = mt7629_apmixedsys_probe,
-	.priv_auto_alloc_size = sizeof(struct mtk_clk_priv),
+	.priv_auto	= sizeof(struct mtk_clk_priv),
 	.ops = &mtk_clk_apmixedsys_ops,
 	.flags = DM_FLAG_PRE_RELOC,
 };
@@ -712,7 +714,7 @@ U_BOOT_DRIVER(mtk_clk_topckgen) = {
 	.id = UCLASS_CLK,
 	.of_match = mt7629_topckgen_compat,
 	.probe = mt7629_topckgen_probe,
-	.priv_auto_alloc_size = sizeof(struct mtk_clk_priv),
+	.priv_auto	= sizeof(struct mtk_clk_priv),
 	.ops = &mtk_clk_topckgen_ops,
 	.flags = DM_FLAG_PRE_RELOC,
 };
@@ -722,7 +724,7 @@ U_BOOT_DRIVER(mtk_clk_infracfg) = {
 	.id = UCLASS_CLK,
 	.of_match = mt7629_infracfg_compat,
 	.probe = mt7629_infracfg_probe,
-	.priv_auto_alloc_size = sizeof(struct mtk_cg_priv),
+	.priv_auto	= sizeof(struct mtk_cg_priv),
 	.ops = &mtk_clk_gate_ops,
 	.flags = DM_FLAG_PRE_RELOC,
 };
@@ -732,7 +734,7 @@ U_BOOT_DRIVER(mtk_clk_pericfg) = {
 	.id = UCLASS_CLK,
 	.of_match = mt7629_pericfg_compat,
 	.probe = mt7629_pericfg_probe,
-	.priv_auto_alloc_size = sizeof(struct mtk_cg_priv),
+	.priv_auto	= sizeof(struct mtk_cg_priv),
 	.ops = &mtk_clk_gate_ops,
 	.flags = DM_FLAG_PRE_RELOC,
 };
@@ -743,7 +745,7 @@ U_BOOT_DRIVER(mtk_clk_ethsys) = {
 	.of_match = mt7629_ethsys_compat,
 	.probe = mt7629_ethsys_probe,
 	.bind = mt7629_ethsys_bind,
-	.priv_auto_alloc_size = sizeof(struct mtk_cg_priv),
+	.priv_auto	= sizeof(struct mtk_cg_priv),
 	.ops = &mtk_clk_gate_ops,
 };
 
@@ -752,7 +754,7 @@ U_BOOT_DRIVER(mtk_clk_sgmiisys) = {
 	.id = UCLASS_CLK,
 	.of_match = mt7629_sgmiisys_compat,
 	.probe = mt7629_sgmiisys_probe,
-	.priv_auto_alloc_size = sizeof(struct mtk_cg_priv),
+	.priv_auto	= sizeof(struct mtk_cg_priv),
 	.ops = &mtk_clk_gate_ops,
 };
 
@@ -761,6 +763,6 @@ U_BOOT_DRIVER(mtk_clk_ssusbsys) = {
 	.id = UCLASS_CLK,
 	.of_match = mt7629_ssusbsys_compat,
 	.probe = mt7629_ssusbsys_probe,
-	.priv_auto_alloc_size = sizeof(struct mtk_cg_priv),
+	.priv_auto	= sizeof(struct mtk_cg_priv),
 	.ops = &mtk_clk_gate_ops,
 };

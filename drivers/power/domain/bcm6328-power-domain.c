@@ -8,6 +8,7 @@
 #include <malloc.h>
 #include <power-domain-uclass.h>
 #include <asm/io.h>
+#include <linux/bitops.h>
 
 #define MAX_DOMAINS	32
 
@@ -74,6 +75,6 @@ U_BOOT_DRIVER(bcm6328_power_domain) = {
 	.id = UCLASS_POWER_DOMAIN,
 	.of_match = bcm6328_power_domain_ids,
 	.ops = &bcm6328_power_domain_ops,
-	.priv_auto_alloc_size = sizeof(struct bcm6328_power_domain),
+	.priv_auto	= sizeof(struct bcm6328_power_domain),
 	.probe = bcm6328_power_domain_probe,
 };

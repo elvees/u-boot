@@ -8,18 +8,28 @@
  */
 
 #include <common.h>
+#include <env.h>
+#include <fdt_support.h>
+#include <image.h>
 #include <init.h>
+#include <log.h>
+#include <net.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/arch/hardware.h>
+#include <asm/global_data.h>
 #include <asm/gpio.h>
 #include <asm/io.h>
 #include <spl.h>
 #include <asm/arch/sys_proto.h>
+#include <dm.h>
+#include <dm/uclass-internal.h>
 
 #include "../common/board_detect.h"
 
 #define board_is_j721e_som()	(board_ti_k3_is("J721EX-PM1-SOM") || \
 				 board_ti_k3_is("J721EX-PM2-SOM"))
+
+#define board_is_j7200_som()	board_ti_k3_is("J7200X-PM1-SOM")
 
 /* Max number of MAC addresses that are parsed/processed per daughter card */
 #define DAUGHTER_CARD_NO_OF_MAC_ADDR	8
@@ -80,19 +90,60 @@ int board_fit_config_name_match(const char *name)
 }
 #endif
 
+#if CONFIG_IS_ENABLED(DM_GPIO) && CONFIG_IS_ENABLED(OF_LIBFDT)
+/* Returns 1, if onboard mux is set to hyperflash */
+static void __maybe_unused detect_enable_hyperflash(void *blob)
+{
+	struct gpio_desc desc = {0};
+
+	if (dm_gpio_lookup_name("6", &desc))
+		return;
+
+	if (dm_gpio_request(&desc, "6"))
+		return;
+
+	if (dm_gpio_set_dir_flags(&desc, GPIOD_IS_IN))
+		return;
+
+	if (dm_gpio_get_value(&desc)) {
+		int offset;
+
+		do_fixup_by_compat(blob, "ti,am654-hbmc", "status",
+				   "okay", sizeof("okay"), 0);
+		offset = fdt_node_offset_by_compatible(blob, -1,
+						       "ti,am654-ospi");
+		fdt_setprop(blob, offset, "status", "disabled",
+			    sizeof("disabled"));
+	}
+}
+#endif
+
+#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_TARGET_J7200_A72_EVM)
+void spl_perform_fixups(struct spl_image_info *spl_image)
+{
+	detect_enable_hyperflash(spl_image->fdt_addr);
+}
+#endif
+
 #if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	int ret;
 
-	ret = fdt_fixup_msmc_ram(blob, "/interconnect@100000", "sram@70000000");
+	ret = fdt_fixup_msmc_ram(blob, "/bus@100000", "sram@70000000");
+	if (ret < 0)
+		ret = fdt_fixup_msmc_ram(blob, "/interconnect@100000",
+					 "sram@70000000");
 	if (ret)
 		printf("%s: fixing up msmc ram failed %d\n", __func__, ret);
+
+	detect_enable_hyperflash(blob);
 
 	return ret;
 }
 #endif
 
+#ifdef CONFIG_TI_I2C_BOARD_DETECT
 int do_board_detect(void)
 {
 	int ret;
@@ -128,6 +179,8 @@ static void setup_board_eeprom_env(void)
 
 	if (board_is_j721e_som())
 		name = "j721e";
+	else if (board_is_j7200_som())
+		name = "j7200";
 	else
 		printf("Unidentified board claims %s in eeprom header\n",
 		       board_ti_get_name());
@@ -329,19 +382,49 @@ static int probe_daughtercards(void)
 
 	return 0;
 }
+#endif
 
 int board_late_init(void)
 {
-	setup_board_eeprom_env();
-	setup_serial();
+	if (IS_ENABLED(CONFIG_TI_I2C_BOARD_DETECT)) {
+		setup_board_eeprom_env();
+		setup_serial();
 
-	/* Check for and probe any plugged-in daughtercards */
-	probe_daughtercards();
+		/* Check for and probe any plugged-in daughtercards */
+		probe_daughtercards();
+	}
 
 	return 0;
 }
 
 void spl_board_init(void)
 {
-	probe_daughtercards();
+#if defined(CONFIG_ESM_K3) || defined(CONFIG_ESM_PMIC)
+	struct udevice *dev;
+	int ret;
+#endif
+
+	if ((IS_ENABLED(CONFIG_TARGET_J721E_A72_EVM) ||
+	     IS_ENABLED(CONFIG_TARGET_J7200_A72_EVM)) &&
+	    IS_ENABLED(CONFIG_TI_I2C_BOARD_DETECT))
+		probe_daughtercards();
+
+#ifdef CONFIG_ESM_K3
+	if (board_ti_k3_is("J721EX-PM2-SOM")) {
+		ret = uclass_get_device_by_driver(UCLASS_MISC,
+						  DM_DRIVER_GET(k3_esm), &dev);
+		if (ret)
+			printf("ESM init failed: %d\n", ret);
+	}
+#endif
+
+#ifdef CONFIG_ESM_PMIC
+	if (board_ti_k3_is("J721EX-PM2-SOM")) {
+		ret = uclass_get_device_by_driver(UCLASS_MISC,
+						  DM_DRIVER_GET(pmic_esm),
+						  &dev);
+		if (ret)
+			printf("ESM PMIC init failed: %d\n", ret);
+	}
+#endif
 }

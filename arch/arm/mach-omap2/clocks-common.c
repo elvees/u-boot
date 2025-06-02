@@ -15,6 +15,8 @@
 #include <common.h>
 #include <hang.h>
 #include <i2c.h>
+#include <init.h>
+#include <log.h>
 #include <asm/omap_common.h>
 #include <asm/gpio.h>
 #include <asm/arch/clock.h>
@@ -910,7 +912,7 @@ void prcm_init(void)
 		enable_basic_uboot_clocks();
 }
 
-#if !defined(CONFIG_DM_I2C)
+#if !CONFIG_IS_ENABLED(DM_I2C)
 void gpi2c_init(void)
 {
 	static int gpi2c = 1;

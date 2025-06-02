@@ -18,6 +18,7 @@
 
 #include <common.h>
 #include <cpu_func.h>
+#include <net.h>
 #include <time.h>
 #include <vsprintf.h>
 #include <watchdog.h>
@@ -26,6 +27,7 @@
 #include <netdev.h>
 #include <asm/cache.h>
 #include <asm/cpm_8xx.h>
+#include <asm/global_data.h>
 #include <linux/compiler.h>
 #include <asm/io.h>
 
@@ -194,7 +196,7 @@ void upmconfig(uint upm, uint *table, uint size)
 
 /* ------------------------------------------------------------------------- */
 
-int do_reset(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+int do_reset(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	ulong msr, addr;
 
@@ -276,7 +278,7 @@ unsigned long get_tbclk(void)
  * Initializes on-chip ethernet controllers.
  * to override, implement board_eth_init()
  */
-int cpu_eth_init(bd_t *bis)
+int cpu_eth_init(struct bd_info *bis)
 {
 #if defined(CONFIG_MPC8XX_FEC)
 	fec_initialize(bis);

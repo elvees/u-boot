@@ -18,6 +18,13 @@ config MMC_WRITE
 	help
 	  Enable write access to MMC and SD Cards
 
+config MMC_PWRSEQ
+	bool "HW reset support for eMMC"
+	depends on PWRSEQ
+	help
+	  Ths select Hardware reset support aka pwrseq-emmc for eMMC
+	  devices.
+
 config MMC_BROKEN_CD
 	bool "Poll for broken card detection case"
 	help
@@ -46,6 +53,9 @@ config SPL_DM_MMC
 
 if MMC
 
+config MMC_SDHCI_ADMA_HELPERS
+	bool
+
 config MMC_SPI
 	bool "Support for SPI-based MMC controller"
 	depends on DM_MMC && DM_SPI
@@ -66,7 +76,6 @@ config MMC_SPI_CRC_ON
 
 config ARM_PL180_MMCI
 	bool "ARM AMBA Multimedia Card Interface and compatible support"
-	depends on DM_MMC && OF_CONTROL
 	help
 	  This selects the ARM(R) AMBA(R) PrimeCell Multimedia Card
 	  Interface (PL180, PL181 and compatible) support.
@@ -264,6 +273,14 @@ config MMC_DW_SNPS
 	  This selects support for Synopsys DesignWare Memory Card Interface driver
 	  extensions used in various Synopsys ARC devboards.
 
+config NEXELL_DWMMC
+	bool "Nexell SD/MMC controller support"
+	depends on ARCH_NEXELL
+	depends on MMC_DW
+	depends on DM_MMC
+	depends on PINCTRL_NEXELL
+	default y
+
 config MMC_MESON_GX
 	bool "Meson GX EMMC controller support"
 	depends on DM_MMC && BLK && ARCH_MESON
@@ -297,6 +314,23 @@ config MMC_PCI
 	help
 	  This selects PCI-based MMC controllers.
 	  If you have an MMC controller on a PCI bus, say Y here.
+
+config MMC_OCTEONTX
+	bool "Marvell OcteonTX Multimedia Card Interface support"
+	depends on (ARCH_OCTEONTX || ARCH_OCTEONTX2)
+	depends on DM_MMC
+	help
+	  This selects the OcteonTX Multimedia card Interface.
+	  If you have an OcteonTX/TX2 board with a Multimedia Card slot,
+	  say Y here.
+
+	  If unsure, say N.
+
+config PXA_MMC_GENERIC
+	bool "Support for MMC controllers on PXA"
+	help
+	  This selects MMC controllers on PXA.
+	  If you are on a PXA architecture, say Y here.
 
 	  If unsure, say N.
 
@@ -358,6 +392,7 @@ config RENESAS_SDHI
 	depends on ARCH_RMOBILE
 	depends on BLK && DM_MMC
 	depends on OF_CONTROL
+	select BOUNCE_BUFFER
 	help
 	  This selects support for the Matsushita SD/MMC Host Controller on
 	  Renesas R-Car SoCs.
@@ -420,6 +455,7 @@ config MMC_SDHCI_SDMA
 config MMC_SDHCI_ADMA
 	bool "Support SDHCI ADMA2"
 	depends on MMC_SDHCI
+	select MMC_SDHCI_ADMA_HELPERS
 	help
 	  This enables support for the ADMA (Advanced DMA) defined
 	  in the SD Host Controller Standard Specification Version 3.00
@@ -427,6 +463,7 @@ config MMC_SDHCI_ADMA
 config SPL_MMC_SDHCI_ADMA
 	bool "Support SDHCI ADMA2 in SPL"
 	depends on MMC_SDHCI
+	select MMC_SDHCI_ADMA_HELPERS
 	help
 	  This enables support for the ADMA (Advanced DMA) defined
 	  in the SD Host Controller Standard Specification Version 3.00 in SPL.
@@ -496,6 +533,7 @@ config MMC_SDHCI_AM654
 	depends on MMC_SDHCI
 	depends on DM_MMC && OF_CONTROL && BLK
 	depends on REGMAP
+	select MMC_SDHCI_IO_ACCESSORS
 	help
 	  Support for Secure Digital Host Controller Interface (SDHCI)
 	  controllers present on TI's AM654 SOCs.
@@ -622,7 +660,7 @@ config MMC_SDHCI_TANGIER
 
 config MMC_SDHCI_TEGRA
 	bool "SDHCI platform support for the Tegra SD/MMC Controller"
-	depends on TEGRA
+	depends on ARCH_TEGRA
 	select BOUNCE_BUFFER
 	default y
 	help
@@ -644,7 +682,6 @@ config TEGRA124_MMC_DISABLE_EXT_LOOPBACK
 
 config MMC_SDHCI_ZYNQ
 	bool "Arasan SDHCI controller support"
-	depends on ARCH_ZYNQ || ARCH_ZYNQMP || ARCH_VERSAL
 	depends on DM_MMC && OF_CONTROL && BLK
 	depends on MMC_SDHCI
 	help
@@ -732,6 +769,29 @@ config FSL_ESDHC
 	help
 	  This selects support for the eSDHC (Enhanced Secure Digital Host
 	  Controller) found on numerous Freescale/NXP SoCs.
+
+config FSL_ESDHC_SUPPORT_ADMA2
+	bool "enable ADMA2 support"
+	depends on FSL_ESDHC
+	select MMC_SDHCI_ADMA_HELPERS
+	help
+	  This enables support for the ADMA2 transfer mode. If supported by the
+	  eSDHC it will allow 64bit DMA addresses.
+
+config FSL_ESDHC_33V_IO_RELIABILITY_WORKAROUND
+	bool "enable eSDHC workaround for 3.3v IO reliability issue"
+	depends on FSL_ESDHC && DM_MMC
+	default n
+	help
+	  When eSDHC operates at 3.3v, damage can accumulate in an internal
+	  level shifter at a higher than expected rate. The faster the interface
+	  runs, the more damage accumulates. This issue now is found on LX2160A
+	  eSDHC1 for only SD card. The hardware workaround is recommended to use
+	  an on-board level shifter that is 1.8v on SoC side and 3.3v on SD card
+	  side. For boards without hardware workaround, this option could be
+	  enabled, ensuring 1.8v IO voltage and disabling eSDHC if no card.
+	  This option assumes no hotplug, and u-boot has to make all the way to
+	  to linux to use 1.8v UHS-I speed mode if has card.
 
 config FSL_ESDHC_IMX
 	bool "Freescale/NXP i.MX eSDHC controller support"

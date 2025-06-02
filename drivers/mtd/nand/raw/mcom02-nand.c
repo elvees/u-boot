@@ -731,7 +731,7 @@ U_BOOT_DRIVER(mcom02_nand) = {
 	.id = UCLASS_MTD,
 	.of_match = mcom02_nand_dt_ids,
 	.probe = mcom02_nand_probe,
-	.priv_auto_alloc_size = sizeof(struct mcom02_nand_priv),
+	.priv_auto = sizeof(struct mcom02_nand_priv),
 };
 
 void board_nand_init(void)
@@ -740,7 +740,7 @@ void board_nand_init(void)
 	int ret;
 
 	ret = uclass_get_device_by_driver(UCLASS_MTD,
-					  DM_GET_DRIVER(mcom02_nand), &dev);
+					  DM_DRIVER_GET(mcom02_nand), &dev);
 	if (ret && ret != -ENODEV)
 		printf("Failed to initialize %s, error %d\n", dev->name, ret);
 }

@@ -17,6 +17,7 @@
 #include <reset.h>
 #include <bitfield.h>
 #include <generic-phy.h>
+#include <linux/delay.h>
 
 #include <linux/bitops.h>
 #include <linux/compat.h>
@@ -342,5 +343,5 @@ U_BOOT_DRIVER(meson_g12a_usb3_pcie_phy) = {
 	.of_match = meson_g12a_usb3_pcie_phy_ids,
 	.probe = meson_g12a_usb3_pcie_phy_probe,
 	.ops = &meson_g12a_usb3_pcie_phy_ops,
-	.priv_auto_alloc_size = sizeof(struct phy_g12a_usb3_pcie_priv),
+	.priv_auto	= sizeof(struct phy_g12a_usb3_pcie_priv),
 };

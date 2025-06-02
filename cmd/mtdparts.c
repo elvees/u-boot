@@ -73,7 +73,9 @@
 #include <common.h>
 #include <command.h>
 #include <env.h>
+#include <log.h>
 #include <malloc.h>
+#include <asm/global_data.h>
 #include <jffs2/load_kernel.h>
 #include <linux/list.h>
 #include <linux/ctype.h>
@@ -1915,7 +1917,8 @@ static struct part_info* mtd_part_info(struct mtd_device *dev, unsigned int part
  * @param argv arguments list
  * @return 0 on success, 1 otherwise
  */
-static int do_chpart(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+static int do_chpart(struct cmd_tbl *cmdtp, int flag, int argc,
+		     char *const argv[])
 {
 /* command line only */
 	struct mtd_device *dev;
@@ -1953,8 +1956,8 @@ static int do_chpart(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
  * @param argv arguments list
  * @return 0 on success, 1 otherwise
  */
-static int do_mtdparts(cmd_tbl_t *cmdtp, int flag, int argc,
-		       char * const argv[])
+static int do_mtdparts(struct cmd_tbl *cmdtp, int flag, int argc,
+		       char *const argv[])
 {
 	if (argc == 2) {
 		if (strcmp(argv[1], "default") == 0) {

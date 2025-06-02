@@ -7,8 +7,10 @@
 #include <common.h>
 #include <dm.h>
 #include <i2s.h>
+#include <log.h>
 #include <malloc.h>
 #include <sound.h>
+#include <linux/delay.h>
 
 #define SOUND_BITS_IN_BYTE 8
 
@@ -170,5 +172,5 @@ int sound_find_codec_i2s(struct udevice *dev)
 UCLASS_DRIVER(sound) = {
 	.id		= UCLASS_SOUND,
 	.name		= "sound",
-	.per_device_auto_alloc_size	= sizeof(struct sound_uc_priv),
+	.per_device_auto	= sizeof(struct sound_uc_priv),
 };

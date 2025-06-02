@@ -98,12 +98,27 @@ config USB_GADGET_DWC2_OTG_PHY_BUS_WIDTH_8
 
 endif # USB_GADGET_DWC2_OTG
 
+config USB_GADGET_OS_DESCRIPTORS
+	bool "USB OS Feature Descriptors support"
+	help
+	  This is a porting patch from linux kernel: 37a3a533429e
+	  ("usb: gadget: OS Feature Descriptors support"), the original commit
+	  log see below:
+	  There is a custom (non-USB IF) extension to the USB standard:
+	  http://msdn.microsoft.com/library/windows/hardware/gg463182
+
 config CI_UDC
 	bool "ChipIdea device controller"
 	select USB_GADGET_DUALSPEED
 	help
 	  Say Y here to enable device controller functionality of the
 	  ChipIdea driver.
+
+config USB_GADGET_MAX3420
+	bool "MAX3420 USB Over SPI"
+	depends on DM_SPI
+	help
+	  MAX3420, from MAXIM, implements USB-over-SPI Full-Speed device controller.
 
 config USB_GADGET_VBUS_DRAW
 	int "Maximum VBUS Power usage (2-500 mA)"
@@ -121,6 +136,10 @@ config USB_GADGET_VBUS_DRAW
 
 	   This value will be used except for system-specific gadget
 	   drivers that have more specific information.
+
+config SDP_LOADADDR
+	hex "Default load address at SDP_WRITE and SDP_JUMP"
+	default 0
 
 # Selected by UDC drivers that support high-speed operation.
 config USB_GADGET_DUALSPEED

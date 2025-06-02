@@ -3,12 +3,14 @@
  * Copyright (c) 2019, Linaro Limited
  */
 
+#include <log.h>
 #include <malloc.h>
 #include <asm/io.h>
 #include <common.h>
 #include <dm.h>
 #include <dt-bindings/reset/ti-syscon.h>
 #include <reset-uclass.h>
+#include <linux/bitops.h>
 
 struct hisi_reset_priv {
 	void __iomem *base;
@@ -100,5 +102,5 @@ U_BOOT_DRIVER(hisi_reset) = {
 	.of_match = hisi_reset_ids,
 	.ops = &hisi_reset_reset_ops,
 	.probe = hisi_reset_probe,
-	.priv_auto_alloc_size = sizeof(struct hisi_reset_priv),
+	.priv_auto	= sizeof(struct hisi_reset_priv),
 };

@@ -28,7 +28,16 @@
 #define DMAMEM_BASE			(PHYS_SDRAM + PHYS_SDRAM_SIZE - \
 					 DMAMEM_SZ_ALL)
 
-#define CONFIG_SYS_MMC_ENV_DEV		0   /* USDHC1 */
+#ifdef CONFIG_DM_VIDEO
+#define CONFIG_VIDEO_MXS
+#define CONFIG_VIDEO_LOGO
+#define CONFIG_VIDEO_BMP_LOGO
+
+#define CONFIG_EXTRA_ENV_SETTINGS \
+		"stdin=serial\0" \
+		"stdout=serial,vidconsole\0" \
+		"stderr=serial,vidconsole\0"
+#endif
 
 /*
  * Configuration of the external SDRAM memory

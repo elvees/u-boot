@@ -121,15 +121,6 @@ config NAND_DENALI_DT
 	  Enable the driver for NAND flash on platforms using a Denali NAND
 	  controller as a DT device.
 
-config NAND_DENALI_SPARE_AREA_SKIP_BYTES
-	int "Number of bytes skipped in OOB area"
-	depends on NAND_DENALI
-	range 0 63
-	help
-	  This option specifies the number of bytes to skip from the beginning
-	  of OOB area before last ECC sector data starts.  This is potentially
-	  used to preserve the bad block marker in the OOB area.
-
 config NAND_LPC32XX_SLC
 	bool "Support LPC32XX_SLC controller"
 	help
@@ -212,6 +203,9 @@ endif
 config NAND_PXA3XX
 	bool "Support for NAND on PXA3xx and Armada 370/XP/38x"
 	select SYS_NAND_SELF_INIT
+	select DM_MTD
+	select REGMAP
+	select SYSCON
 	imply CMD_NAND
 	help
 	  This enables the driver for the NAND flash device found on
@@ -250,7 +244,7 @@ endif
 config NAND_ARASAN
 	bool "Configure Arasan Nand"
 	select SYS_NAND_SELF_INIT
-	select DM_MTD
+	depends on DM_MTD
 	imply CMD_NAND
 	help
 	  This enables Nand driver support for Arasan nand flash
@@ -267,12 +261,12 @@ config NAND_MXC
 
 config NAND_MXS
 	bool "MXS NAND support"
-	depends on MX23 || MX28 || MX6 || MX7
+	depends on MX23 || MX28 || MX6 || MX7 || IMX8 || IMX8M
 	select SYS_NAND_SELF_INIT
 	imply CMD_NAND
 	select APBH_DMA
-	select APBH_DMA_BURST if ARCH_MX6 || ARCH_MX7
-	select APBH_DMA_BURST8 if ARCH_MX6 || ARCH_MX7
+	select APBH_DMA_BURST if ARCH_MX6 || ARCH_MX7 || ARCH_IMX8 || ARCH_IMX8M
+	select APBH_DMA_BURST8 if ARCH_MX6 || ARCH_MX7 || ARCH_IMX8 || ARCH_IMX8M
 	help
 	  This enables NAND driver for the NAND flash controller on the
 	  MXS processors.
@@ -308,6 +302,22 @@ config NAND_ZYNQ_USE_BOOTLOADER1_TIMINGS
 	  This flag prevent U-boot reconfigure NAND flash controller and reuse
 	  the NAND timing from 1st stage bootloader.
 
+config NAND_OCTEONTX
+	bool "Support for OcteonTX NAND controller"
+	select SYS_NAND_SELF_INIT
+	imply CMD_NAND
+	help
+	 This enables Nand flash controller hardware found on the OcteonTX
+	 processors.
+
+config NAND_OCTEONTX_HW_ECC
+	bool "Support Hardware ECC for OcteonTX NAND controller"
+	depends on NAND_OCTEONTX
+	default y
+	help
+	 This enables Hardware BCH engine found on the OcteonTX processors to
+	 support ECC for NAND flash controller.
+
 config NAND_STM32_FMC2
 	bool "Support for NAND controller on STM32MP SoCs"
 	depends on ARCH_STM32MP
@@ -318,6 +328,18 @@ config NAND_STM32_FMC2
 	  NAND controller. This controller is found on STM32MP SoCs.
 	  The controller supports a maximum 8k page size and supports
 	  a maximum 8-bit correction error per sector of 512 bytes.
+
+config CORTINA_NAND
+	bool "Support for NAND controller on Cortina-Access SoCs"
+	depends on CORTINA_PLATFORM
+	select SYS_NAND_SELF_INIT
+	select DM_MTD
+	imply CMD_NAND
+	help
+	  Enables support for NAND Flash chips on Coartina-Access SoCs platform
+	  This controller is found on Presidio/Venus SoCs.
+	  The controller supports a maximum 8k page size and supports
+	  a maximum 40-bit error correction per sector of 1024 bytes.
 
 comment "Generic NAND options"
 
@@ -411,6 +433,15 @@ config SPL_NAND_DENALI
 	help
 	  This is a small implementation of the Denali NAND controller
 	  for use on SPL.
+
+config NAND_DENALI_SPARE_AREA_SKIP_BYTES
+	int "Number of bytes skipped in OOB area"
+	depends on SPL_NAND_DENALI
+	range 0 63
+	help
+	  This option specifies the number of bytes to skip from the beginning
+	  of OOB area before last ECC sector data starts.  This is potentially
+	  used to preserve the bad block marker in the OOB area.
 
 config SPL_NAND_SIMPLE
 	bool "Use simple SPL NAND driver"

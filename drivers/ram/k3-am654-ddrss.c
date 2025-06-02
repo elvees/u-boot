@@ -9,10 +9,10 @@
 #include <common.h>
 #include <clk.h>
 #include <dm.h>
+#include <log.h>
 #include <ram.h>
 #include <asm/io.h>
 #include <power-domain.h>
-#include <dm.h>
 #include <asm/arch/sys_proto.h>
 #include <dm/device_compat.h>
 #include <power/regulator.h>
@@ -1082,5 +1082,5 @@ U_BOOT_DRIVER(am654_ddrss) = {
 	.of_match = am654_ddrss_ids,
 	.ops = &am654_ddrss_ops,
 	.probe = am654_ddrss_probe,
-	.priv_auto_alloc_size = sizeof(struct am654_ddrss_desc),
+	.priv_auto	= sizeof(struct am654_ddrss_desc),
 };

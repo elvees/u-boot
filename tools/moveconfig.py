@@ -314,11 +314,9 @@ import tempfile
 import threading
 import time
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'buildman'))
-sys.path.append(os.path.join(os.path.dirname(__file__), 'patman'))
-import bsettings
-import kconfiglib
-import toolchain
+from buildman import bsettings
+from buildman import kconfiglib
+from buildman import toolchain
 
 SHOW_GNU_MAKE = 'scripts/show-gnu-make'
 SLEEP_TIME=0.03
@@ -668,7 +666,8 @@ def cleanup_headers(configs, options):
             if dirpath == os.path.join('include', 'generated'):
                 continue
             for filename in filenames:
-                if not filename.endswith(('~', '.dts', '.dtsi')):
+                if not filename.endswith(('~', '.dts', '.dtsi', '.bin',
+                                          '.elf')):
                     header_path = os.path.join(dirpath, filename)
                     # This file contains UTF-16 data and no CONFIG symbols
                     if header_path == 'include/video_font_data.h':

@@ -1,5 +1,5 @@
 .. SPDX-License-Identifier: GPL-2.0+ OR BSD-3-Clause
-.. sectionauthor:: Patrick Delaunay <patrick.delaunay@st.com>
+.. sectionauthor:: Patrick Delaunay <patrick.delaunay@foss.st.com>
 
 STM32MP15x boards
 =================
@@ -25,6 +25,14 @@ It features:
  - Standard connectivity, widely inherited from the STM32 MCU family
  - Comprehensive security support
 
+Each line comes with a security option (cryptography & secure boot) and
+a Cortex-A frequency option:
+
+ - A : Cortex-A7 @ 650 MHz
+ - C : Secure Boot + HW Crypto + Cortex-A7 @ 650 MHz
+ - D : Cortex-A7 @ 800 MHz
+ - F : Secure Boot + HW Crypto + Cortex-A7 @ 800 MHz
+
 Everything is supported in Linux but U-Boot is limited to:
 
  1. UART
@@ -43,11 +51,11 @@ And the necessary drivers
 
 Currently the following boards are supported:
 
- + stm32mp157a-avenger96.dts
  + stm32mp157a-dk1.dts
  + stm32mp157c-dk2.dts
  + stm32mp157c-ed1.dts
  + stm32mp157c-ev1.dts
+ + stm32mp15xx-dhcor-avenger96.dts
 
 Boot Sequences
 --------------
@@ -72,32 +80,16 @@ defconfig_file : stm32mp15_trusted_defconfig
     +             +-------------------------+------------+-------+
     |             |Trusted Firmware-A (TF-A)| U-Boot     | Linux |
     +-------------+-------------------------+------------+-------+
-    | TrustZone   |TF-A secure monitor                           |
+    | TrustZone   |secure monitor                                |
     +-------------+-------------------------+------------+-------+
 
 TF-A performs a full initialization of Secure peripherals and installs a
-secure monitor (BL32=SPMin).
+secure monitor, BL32:
 
-U-Boot is running in normal world and uses TF-A monitor to access
-to secure resources.
+  * SPMin provided by TF-A or
+  * OP-TEE from specific partitions (teeh, teed, teex).
 
-The **Trusted** boot chain with **OP-TEE**
-``````````````````````````````````````````
-
-defconfig_file : stm32mp15_optee_defconfig
-
-    +-------------+-------------------------+------------+-------+
-    |  ROM code   | FSBL                    | SSBL       | OS    |
-    +             +-------------------------+------------+-------+
-    |             |Trusted Firmware-A (TF-A)| U-Boot     | Linux |
-    +-------------+-------------------------+------------+-------+
-    | TrustZone   |OP-TEE                                        |
-    +-------------+-------------------------+------------+-------+
-
-TF-A performs a full initialization of Secure peripherals and installs OP-TEE
-from specific partitions (teeh, teed, teex).
-
-U-Boot is running in normal world and uses OP-TEE monitor to access
+U-Boot is running in normal world and uses the secure monitor to access
 to secure resources.
 
 The **Basic** boot chain
@@ -145,9 +137,9 @@ the supported device trees for STM32MP15x are:
 
    + stm32mp157c-dk2
 
-+ avenger96: Avenger96 board from Arrow Electronics
++ avenger96: Avenger96 board from Arrow Electronics based on DH Elec. DHCOR SoM
 
-   + stm32mp157a-avenger96
+   + stm32mp15xx-dhcor-avenger96
 
 Build Procedure
 ---------------
@@ -172,7 +164,6 @@ Build Procedure
    for example: use one output directory for each configuration::
 
    # export KBUILD_OUTPUT=stm32mp15_trusted
-   # export KBUILD_OUTPUT=stm32mp15_optee
    # export KBUILD_OUTPUT=stm32mp15_basic
 
    you can build outside of code directory::
@@ -186,7 +177,6 @@ Build Procedure
    with <defconfig_file>:
 
    - For **trusted** boot mode : **stm32mp15_trusted_defconfig**
-   - For **trusted** with OP-TEE boot mode : **stm32mp15_optee_defconfig**
    - For basic boot mode: stm32mp15_basic_defconfig
 
 5. Configure the device-tree and build the U-Boot image::
@@ -203,8 +193,8 @@ Build Procedure
 
   b) trusted with OP-TEE boot on dk2::
 
-      # export KBUILD_OUTPUT=stm32mp15_optee
-      # make stm32mp15_optee_defconfig
+      # export KBUILD_OUTPUT=stm32mp15_trusted
+      # make stm32mp15_trusted_defconfig
       # make DEVICE_TREE=stm32mp157c-dk2 all
 
   c) basic boot on ev1::
@@ -229,7 +219,7 @@ Build Procedure
 
      # export KBUILD_OUTPUT=stm32mp15_basic
      # make stm32mp15_basic_defconfig
-     # make DEVICE_TREE=stm32mp157a-avenger96 all
+     # make DEVICE_TREE=stm32mp15xx-dhcor-avenger96 all
 
 6. Output files
 
@@ -247,7 +237,8 @@ Build Procedure
   - For Basic boot
 
      - FSBL = spl/u-boot-spl.stm32
-     - SSBL = u-boot.img
+     - SSBL = u-boot.img (without CONFIG_SPL_LOAD_FIT) or
+              u-boot.itb (with CONFIG_SPL_LOAD_FIT=y)
 
 Switch Setting for Boot Mode
 ----------------------------
@@ -357,7 +348,9 @@ c) copy the FSBL (2 times) and SSBL file on the correct partition.
 
     # dd if=u-boot-spl.stm32 of=/dev/mmcblk0p1
     # dd if=u-boot-spl.stm32 of=/dev/mmcblk0p2
-    # dd if=u-boot.img of=/dev/mmcblk0p3
+    # dd if=u-boot.img of=/dev/mmcblk0p3 # Without CONFIG_SPL_LOAD_FIT
+      OR
+      dd if=u-boot.itb of=/dev/mmcblk0p3 # With CONFIG_SPL_LOAD_FIT=y
 
    for trusted boot mode: ::
 
@@ -373,8 +366,9 @@ Prepare eMMC
 You can use U-Boot to copy binary in eMMC.
 
 In the next example, you need to boot from SD card and the images
-(u-boot-spl.stm32, u-boot.img) are presents on SD card (mmc 0)
-in ext4 partition 4 (bootfs).
+(u-boot-spl.stm32, u-boot.img for systems without CONFIG_SPL_LOAD_FIT
+or u-boot.itb for systems with CONFIG_SPL_LOAD_FIT=y) are presents on
+SD card (mmc 0) in ext4 partition 4 (bootfs).
 
 To boot from SD card, select BootPinMode = 1 0 1 and reset.
 
@@ -397,7 +391,9 @@ b) copy SPL on eMMC on firts boot partition
 
 c) copy U-Boot in first GPT partition of eMMC::
 
-    # ext4load mmc 0:4 0xC0000000 u-boo	t.img
+    # ext4load mmc 0:4 0xC0000000 u-boot.img # Without CONFIG_SPL_LOAD_FIT
+      OR
+      ext4load mmc 0:4 0xC0000000 u-boot.itb # With CONFIG_SPL_LOAD_FIT=y
     # mmc dev 1
     # part start mmc 1 1 partstart
     # mmc write ${fileaddr} ${partstart} ${filesize}
@@ -416,20 +412,26 @@ For STMicroelectonics board, it is retrieved in STM32MP15x OTP :
  - OTP_58[15:0] = MAC_ADDR[47:32]
 
 To program a MAC address on virgin OTP words above, you can use the fuse command
-on bank 0 to access to internal OTP:
+on bank 0 to access to internal OTP and lock them:
 
 Prerequisite: check if a MAC address isn't yet programmed in OTP
 
-1) check OTP: their value must be equal to 0
+1) check OTP: their value must be equal to 0::
 
-   STM32MP> fuse sense 0 57 2
-   Sensing bank 0:
-   Word 0x00000039: 00000000 00000000
+    STM32MP> fuse sense 0 57 2
+    Sensing bank 0:
+    Word 0x00000039: 00000000 00000000
 
-2) check environment variable
+2) check environment variable::
 
-   STM32MP> env print ethaddr
-   ## Error: "ethaddr" not defined
+    STM32MP> env print ethaddr
+    ## Error: "ethaddr" not defined
+
+3) check lock status of fuse 57 & 58 (at 0x39, 0=unlocked, 1=locked)::
+
+    STM32MP> fuse sense 0 0x10000039 2
+    Sensing bank 0:
+       Word 0x10000039: 00000000 00000000
 
 Example to set mac address "12:34:56:78:9a:bc"
 
@@ -443,11 +445,19 @@ Example to set mac address "12:34:56:78:9a:bc"
     Sensing bank 0:
     Word 0x00000039: 78563412 0000bc9a
 
-3) next REBOOT, in the trace::
+3) Lock OTP::
+
+    STM32MP> fuse prog 0 0x10000039 1 1
+
+    STM32MP> fuse sense 0 0x10000039 2
+    Sensing bank 0:
+       Word 0x10000039: 00000001 00000001
+
+4) next REBOOT, in the trace::
 
     ### Setting environment from OTP MAC address = "12:34:56:78:9a:bc"
 
-4) check env update::
+5) check env update::
 
     STM32MP> env print ethaddr
     ethaddr=12:34:56:78:9a:bc
@@ -514,61 +524,49 @@ On EV1 board, booting from SD card, without OP-TEE::
   dev: RAM alt: 0 name: uImage layout: RAM_ADDR
   dev: RAM alt: 1 name: devicetree.dtb layout: RAM_ADDR
   dev: RAM alt: 2 name: uramdisk.image.gz layout: RAM_ADDR
-  dev: eMMC alt: 3 name: sdcard_fsbl1 layout: RAW_ADDR
-  dev: eMMC alt: 4 name: sdcard_fsbl2 layout: RAW_ADDR
-  dev: eMMC alt: 5 name: sdcard_ssbl layout: RAW_ADDR
-  dev: eMMC alt: 6 name: sdcard_bootfs layout: RAW_ADDR
-  dev: eMMC alt: 7 name: sdcard_vendorfs layout: RAW_ADDR
-  dev: eMMC alt: 8 name: sdcard_rootfs layout: RAW_ADDR
-  dev: eMMC alt: 9 name: sdcard_userfs layout: RAW_ADDR
-  dev: eMMC alt: 10 name: emmc_fsbl1 layout: RAW_ADDR
-  dev: eMMC alt: 11 name: emmc_fsbl2 layout: RAW_ADDR
-  dev: eMMC alt: 12 name: emmc_ssbl layout: RAW_ADDR
-  dev: eMMC alt: 13 name: emmc_bootfs layout: RAW_ADDR
-  dev: eMMC alt: 14 name: emmc_vendorfs layout: RAW_ADDR
-  dev: eMMC alt: 15 name: emmc_rootfs layout: RAW_ADDR
-  dev: eMMC alt: 16 name: emmc_userfs layout: RAW_ADDR
-  dev: MTD alt: 17 name: nor_fsbl1 layout: RAW_ADDR
-  dev: MTD alt: 18 name: nor_fsbl2 layout: RAW_ADDR
-  dev: MTD alt: 19 name: nor_ssbl layout: RAW_ADDR
-  dev: MTD alt: 20 name: nor_env layout: RAW_ADDR
-  dev: MTD alt: 21 name: nand_fsbl layout: RAW_ADDR
-  dev: MTD alt: 22 name: nand_ssbl1 layout: RAW_ADDR
-  dev: MTD alt: 23 name: nand_ssbl2 layout: RAW_ADDR
-  dev: MTD alt: 24 name: nand_UBI layout: RAW_ADDR
-  dev: VIRT alt: 25 name: OTP layout: RAW_ADDR
-  dev: VIRT alt: 26 name: PMIC layout: RAW_ADDR
+  dev: eMMC alt: 3 name: mmc0_fsbl1 layout: RAW_ADDR
+  dev: eMMC alt: 4 name: mmc0_fsbl2 layout: RAW_ADDR
+  dev: eMMC alt: 5 name: mmc0_ssbl layout: RAW_ADDR
+  dev: eMMC alt: 6 name: mmc0_bootfs layout: RAW_ADDR
+  dev: eMMC alt: 7 name: mmc0_vendorfs layout: RAW_ADDR
+  dev: eMMC alt: 8 name: mmc0_rootfs layout: RAW_ADDR
+  dev: eMMC alt: 9 name: mmc0_userfs layout: RAW_ADDR
+  dev: eMMC alt: 10 name: mmc1_boot1 layout: RAW_ADDR
+  dev: eMMC alt: 11 name: mmc1_boot2 layout: RAW_ADDR
+  dev: eMMC alt: 12 name: mmc1_ssbl layout: RAW_ADDR
+  dev: eMMC alt: 13 name: mmc1_bootfs layout: RAW_ADDR
+  dev: eMMC alt: 14 name: mmc1_vendorfs layout: RAW_ADDR
+  dev: eMMC alt: 15 name: mmc1_rootfs layout: RAW_ADDR
+  dev: eMMC alt: 16 name: mmc1_userfs layout: RAW_ADDR
+  dev: MTD alt: 17 name: nor0 layout: RAW_ADDR
+  dev: MTD alt: 18 name: nand0 layout: RAW_ADDR
+  dev: VIRT alt: 19 name: OTP layout: RAW_ADDR
+  dev: VIRT alt: 20 name: PMIC layout: RAW_ADDR
 
 All the supported device are exported for dfu-util tool::
 
   $> dfu-util -l
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=26, name="PMIC", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=25, name="OTP", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=24, name="nand_UBI", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=23, name="nand_ssbl2", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=22, name="nand_ssbl1", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=21, name="nand_fsbl", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=20, name="nor_env", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=19, name="nor_ssbl", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=18, name="nor_fsbl2", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=17, name="nor_fsbl1", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=16, name="emmc_userfs", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=15, name="emmc_rootfs", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=14, name="emmc_vendorfs", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=13, name="emmc_bootfs", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=12, name="emmc_ssbl", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=11, name="emmc_fsbl2", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=10, name="emmc_fsbl1", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=9, name="sdcard_userfs", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=8, name="sdcard_rootfs", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=7, name="sdcard_vendorfs", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=6, name="sdcard_bootfs", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=5, name="sdcard_ssbl", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=4, name="sdcard_fsbl2", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=3, name="sdcard_fsbl1", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=2, name="uramdisk.image.gz", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=1, name="devicetree.dtb", serial="002700333338511934383330"
-  Found DFU: [0483:5720] ver=9999, devnum=99, cfg=1, intf=0, alt=0, name="uImage", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=20, name="PMIC", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=19, name="OTP", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=18, name="nand0", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=17, name="nor0", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=16, name="mmc1_userfs", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=15, name="mmc1_rootfs", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=14, name="mmc1_vendorfs", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=13, name="mmc1_bootfs", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=12, name="mmc1_ssbl", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=11, name="mmc1_boot2", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=10, name="mmc1_boot1", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=9, name="mmc0_userfs", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=8, name="mmc0_rootfs", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=7, name="mmc0_vendorfs", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=6, name="mmc0_bootfs", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=5, name="mmc0_ssbl", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=4, name="mmc0_fsbl2", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=3, name="mmc0_fsbl1", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=2, name="uramdisk.image.gz", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=1, name="devicetree.dtb", serial="002700333338511934383330"
+  Found DFU: [0483:df11] ver=9999, devnum=99, cfg=1, intf=0, alt=0, name="uImage", serial="002700333338511934383330"
 
 You can update the boot device:
 
@@ -592,20 +590,25 @@ You can update the boot device:
   $> dfu-util -d 0483:5720 -a 15 -D st-image-weston-openstlinux-weston-stm32mp1.ext4
   $> dfu-util -d 0483:5720 -a 16 -D st-image-userfs-openstlinux-weston-stm32mp1.ext4
 
-- NOR::
-
-  $> dfu-util -d 0483:5720 -a 17 -D tf-a-stm32mp157c-ev1-trusted.stm32
-  $> dfu-util -d 0483:5720 -a 18 -D tf-a-stm32mp157c-ev1-trusted.stm32
-  $> dfu-util -d 0483:5720 -a 19 -D u-boot-stm32mp157c-ev1-trusted.img
-
-- NAND (UBI partition used for NAND only boot or NOR + NAND boot)::
-
-  $> dfu-util -d 0483:5720 -a 21 -D tf-a-stm32mp157c-ev1-trusted.stm32
-  $> dfu-util -d 0483:5720 -a 22 -D u-boot-stm32mp157c-ev1-trusted.img
-  $> dfu-util -d 0483:5720 -a 23 -D u-boot-stm32mp157c-ev1-trusted.img
-  $> dfu-util -d 0483:5720 -a 24 -D st-image-weston-openstlinux-weston-stm32mp1_nand_4_256_multivolume.ubi
-
 - you can also dump the OTP and the PMIC NVM with::
 
-  $> dfu-util -d 0483:5720 -a 25 -U otp.bin
-  $> dfu-util -d 0483:5720 -a 26 -U pmic.bin
+  $> dfu-util -d 0483:5720 -a 19 -U otp.bin
+  $> dfu-util -d 0483:5720 -a 20 -U pmic.bin
+
+
+When the board is booting for nor0 or nand0,
+only the MTD partition on the boot devices are available, for example:
+
+- NOR (nor0 = alt 20) & NAND (nand0 = alt 26) ::
+
+  $> dfu-util -d 0483:5720 -a 21 -D tf-a-stm32mp157c-ev1-trusted.stm32
+  $> dfu-util -d 0483:5720 -a 22 -D tf-a-stm32mp157c-ev1-trusted.stm32
+  $> dfu-util -d 0483:5720 -a 23 -D u-boot-stm32mp157c-ev1-trusted.img
+  $> dfu-util -d 0483:5720 -a 27 -D st-image-weston-openstlinux-weston-stm32mp1_nand_4_256_multivolume.ubi
+
+- NAND (nand0 = alt 21)::
+
+  $> dfu-util -d 0483:5720 -a 22 -D tf-a-stm32mp157c-ev1-trusted.stm32
+  $> dfu-util -d 0483:5720 -a 23 -D u-boot-stm32mp157c-ev1-trusted.img
+  $> dfu-util -d 0483:5720 -a 24 -D u-boot-stm32mp157c-ev1-trusted.img
+  $> dfu-util -d 0483:5720 -a 25 -D st-image-weston-openstlinux-weston-stm32mp1_nand_4_256_multivolume.ubi

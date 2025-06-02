@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+ OR X11
 /*
- * Copyright 2017 - Patrice Chotard <patrice.chotard@st.com>
+ * Copyright 2017 - Patrice Chotard <patrice.chotard@foss.st.com>
  *
  */
 
@@ -17,7 +17,7 @@
 		stdout-path = "serial0:115200n8";
 	};
 
-	memory {
+	memory@d0000000 {
 		device_type = "memory";
 		reg = <0xd0000000 0x2000000>;
 	};

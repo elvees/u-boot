@@ -4,19 +4,23 @@
  */
 
 #include <common.h>
+#include <bouncebuf.h>
 #include <clk.h>
 #include <fdtdec.h>
+#include <log.h>
 #include <malloc.h>
 #include <mmc.h>
 #include <dm.h>
+#include <asm/global_data.h>
 #include <dm/device_compat.h>
+#include <linux/bitops.h>
 #include <linux/compat.h>
+#include <linux/delay.h>
 #include <linux/dma-direction.h>
 #include <linux/io.h>
 #include <linux/sizes.h>
 #include <power/regulator.h>
 #include <asm/unaligned.h>
-
 #include "tmio-common.h"
 
 #if CONFIG_IS_ENABLED(MMC_UHS_SUPPORT) || \
@@ -689,12 +693,94 @@ static int renesas_sdhi_wait_dat0(struct udevice *dev, int state,
 }
 #endif
 
+#define RENESAS_SDHI_DMA_ALIGNMENT	128
+
+static int renesas_sdhi_addr_aligned_gen(uintptr_t ubuf,
+					 size_t len, size_t len_aligned)
+{
+	/* Check if start is aligned */
+	if (!IS_ALIGNED(ubuf, RENESAS_SDHI_DMA_ALIGNMENT)) {
+		debug("Unaligned buffer address %lx\n", ubuf);
+		return 0;
+	}
+
+	/* Check if length is aligned */
+	if (len != len_aligned) {
+		debug("Unaligned buffer length %zu\n", len);
+		return 0;
+	}
+
+#ifdef CONFIG_PHYS_64BIT
+	/* Check if below 32bit boundary */
+	if ((ubuf >> 32) || (ubuf + len_aligned) >> 32) {
+		debug("Buffer above 32bit boundary %lx-%lx\n",
+			ubuf, ubuf + len_aligned);
+		return 0;
+	}
+#endif
+
+	/* Aligned */
+	return 1;
+}
+
+static int renesas_sdhi_addr_aligned(struct bounce_buffer *state)
+{
+	uintptr_t ubuf = (uintptr_t)state->user_buffer;
+
+	return renesas_sdhi_addr_aligned_gen(ubuf, state->len,
+					     state->len_aligned);
+}
+
 static int renesas_sdhi_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 				 struct mmc_data *data)
 {
+	struct bounce_buffer bbstate;
+	unsigned int bbflags;
+	bool bbok = false;
+	size_t len;
+	void *buf;
 	int ret;
 
+	if (data) {
+		if (data->flags & MMC_DATA_READ) {
+			buf = data->dest;
+			bbflags = GEN_BB_WRITE;
+		} else {
+			buf = (void *)data->src;
+			bbflags = GEN_BB_READ;
+		}
+		len = data->blocks * data->blocksize;
+
+		ret = bounce_buffer_start_extalign(&bbstate, buf, len, bbflags,
+						   RENESAS_SDHI_DMA_ALIGNMENT,
+						   renesas_sdhi_addr_aligned);
+		/*
+		 * If the amount of data to transfer is too large, we can get
+		 * -ENOMEM when starting the bounce buffer. If that happens,
+		 *  fall back to PIO as it was before, otherwise use the BB.
+		 */
+		if (!ret) {
+			bbok = true;
+			if (data->flags & MMC_DATA_READ)
+				data->dest = bbstate.bounce_buffer;
+			else
+				data->src = bbstate.bounce_buffer;
+		}
+	}
+
 	ret = tmio_sd_send_cmd(dev, cmd, data);
+
+	if (data && bbok) {
+		buf = bbstate.user_buffer;
+
+		bounce_buffer_stop(&bbstate);
+
+		if (data->flags & MMC_DATA_READ)
+			data->dest = buf;
+		else
+			data->src = buf;
+	}
+
 	if (ret)
 		return ret;
 
@@ -712,6 +798,24 @@ static int renesas_sdhi_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 	return 0;
 }
 
+int renesas_sdhi_get_b_max(struct udevice *dev, void *dst, lbaint_t blkcnt)
+{
+	struct tmio_sd_priv *priv = dev_get_priv(dev);
+	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(dev);
+	struct mmc *mmc = upriv->mmc;
+	size_t len = blkcnt * mmc->read_bl_len;
+	size_t len_align = roundup(len, RENESAS_SDHI_DMA_ALIGNMENT);
+
+	if (renesas_sdhi_addr_aligned_gen((uintptr_t)dst, len, len_align)) {
+		if (priv->quirks & TMIO_SD_CAP_16BIT)
+			return U16_MAX;
+		else
+			return U32_MAX;
+	} else {
+		return (CONFIG_SYS_MALLOC_LEN / 4) / mmc->read_bl_len;
+	}
+}
+
 static const struct dm_mmc_ops renesas_sdhi_ops = {
 	.send_cmd = renesas_sdhi_send_cmd,
 	.set_ios = renesas_sdhi_set_ios,
@@ -724,6 +828,7 @@ static const struct dm_mmc_ops renesas_sdhi_ops = {
 #if CONFIG_IS_ENABLED(MMC_UHS_SUPPORT)
 	.wait_dat0 = renesas_sdhi_wait_dat0,
 #endif
+	.get_b_max = renesas_sdhi_get_b_max,
 };
 
 #define RENESAS_GEN2_QUIRKS	TMIO_SD_CAP_RCAR_GEN2
@@ -738,6 +843,7 @@ static const struct udevice_id renesas_sdhi_match[] = {
 	{ .compatible = "renesas,sdhi-r8a7794", .data = RENESAS_GEN2_QUIRKS },
 	{ .compatible = "renesas,sdhi-r8a7795", .data = RENESAS_GEN3_QUIRKS },
 	{ .compatible = "renesas,sdhi-r8a7796", .data = RENESAS_GEN3_QUIRKS },
+	{ .compatible = "renesas,rcar-gen3-sdhi", .data = RENESAS_GEN3_QUIRKS },
 	{ .compatible = "renesas,sdhi-r8a77965", .data = RENESAS_GEN3_QUIRKS },
 	{ .compatible = "renesas,sdhi-r8a77970", .data = RENESAS_GEN3_QUIRKS },
 	{ .compatible = "renesas,sdhi-r8a77990", .data = RENESAS_GEN3_QUIRKS },
@@ -757,10 +863,13 @@ static void renesas_sdhi_filter_caps(struct udevice *dev)
 	if (!(priv->caps & TMIO_SD_CAP_RCAR_GEN3))
 		return;
 
+	if (priv->caps & TMIO_SD_CAP_DMA_INTERNAL)
+		priv->idma_bus_width = TMIO_SD_DMA_MODE_BUS_WIDTH;
+
 #if CONFIG_IS_ENABLED(MMC_UHS_SUPPORT) || \
     CONFIG_IS_ENABLED(MMC_HS200_SUPPORT) || \
     CONFIG_IS_ENABLED(MMC_HS400_SUPPORT)
-	struct tmio_sd_plat *plat = dev_get_platdata(dev);
+	struct tmio_sd_plat *plat = dev_get_plat(dev);
 
 	/* HS400 is not supported on H3 ES1.x and M3W ES1.0, ES1.1 */
 	if (((rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A7795) &&
@@ -889,6 +998,7 @@ static int renesas_sdhi_probe(struct udevice *dev)
 		return ret;
 	}
 
+	priv->quirks = quirks;
 	ret = tmio_sd_probe(dev, quirks);
 
 	renesas_sdhi_filter_caps(dev);
@@ -908,7 +1018,7 @@ U_BOOT_DRIVER(renesas_sdhi) = {
 	.of_match = renesas_sdhi_match,
 	.bind = tmio_sd_bind,
 	.probe = renesas_sdhi_probe,
-	.priv_auto_alloc_size = sizeof(struct tmio_sd_priv),
-	.platdata_auto_alloc_size = sizeof(struct tmio_sd_plat),
+	.priv_auto	= sizeof(struct tmio_sd_priv),
+	.plat_auto	= sizeof(struct tmio_sd_plat),
 	.ops = &renesas_sdhi_ops,
 };

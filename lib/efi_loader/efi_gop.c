@@ -9,8 +9,10 @@
 #include <dm.h>
 #include <efi_loader.h>
 #include <lcd.h>
+#include <log.h>
 #include <malloc.h>
 #include <video.h>
+#include <asm/global_data.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 

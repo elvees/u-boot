@@ -9,11 +9,14 @@
 
 #include <common.h>
 #include <eeprom.h>
+#include <image.h>
+#include <asm/global_data.h>
 #include <dm/uclass.h>
 #include <env.h>
 #include <fdt_support.h>
 #include <i2c.h>
 #include <init.h>
+#include <net.h>
 #include <linux/errno.h>
 #include <spl.h>
 #include <usb.h>
@@ -390,7 +393,7 @@ void scale_vcores_generic(u32 m)
 {
 	int mpu_vdd, ddr_volt;
 
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 	if (i2c_probe(TPS65218_CHIP_PM))
 		return;
 #else
@@ -448,7 +451,7 @@ void scale_vcores_idk(u32 m)
 {
 	int mpu_vdd;
 
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 	if (i2c_probe(TPS62362_I2C_ADDR))
 		return;
 #else
@@ -489,7 +492,7 @@ void gpi2c_init(void)
 
 	if (first_time) {
 		enable_i2c0_pin_mux();
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 		i2c_init(CONFIG_SYS_OMAP24_I2C_SPEED,
 			 CONFIG_SYS_OMAP24_I2C_SLAVE);
 #endif
@@ -629,14 +632,14 @@ void sdram_init(void)
 int power_init_board(void)
 {
 	int rc;
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 	struct pmic *p = NULL;
 #endif
 	if (board_is_idk()) {
 		rc = power_tps62362_init(0);
 		if (rc)
 			goto done;
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 		p = pmic_get("TPS62362");
 		if (!p || pmic_probe(p))
 			goto done;
@@ -646,7 +649,7 @@ int power_init_board(void)
 		rc = power_tps65218_init(0);
 		if (rc)
 			goto done;
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 		p = pmic_get("TPS65218_PMIC");
 		if (!p || pmic_probe(p))
 			goto done;
@@ -742,7 +745,7 @@ int board_late_init(void)
 #endif
 
 	/* Just probe the potentially supported cdce913 device */
-	uclass_get_device(UCLASS_CLK, 0, &dev);
+	uclass_get_device_by_name(UCLASS_CLK, "cdce913@65", &dev);
 
 	return 0;
 }
@@ -854,7 +857,7 @@ int board_usb_cleanup(int index, enum usb_init_type init)
 #endif /* !CONFIG_IS_ENABLED(DM_USB_GADGET) */
 
 #if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	ft_cpu_setup(blob, bd);
 

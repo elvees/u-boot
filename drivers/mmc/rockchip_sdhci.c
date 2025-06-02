@@ -34,7 +34,7 @@ struct rockchip_sdhc {
 static int arasan_sdhci_probe(struct udevice *dev)
 {
 	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(dev);
-	struct rockchip_sdhc_plat *plat = dev_get_platdata(dev);
+	struct rockchip_sdhc_plat *plat = dev_get_plat(dev);
 	struct rockchip_sdhc *prv = dev_get_priv(dev);
 	struct sdhci_host *host = &prv->host;
 	int max_frequency, ret;
@@ -46,7 +46,7 @@ static int arasan_sdhci_probe(struct udevice *dev)
 	host->name = dev->name;
 	host->ioaddr = map_sysmem(dtplat->reg[0], dtplat->reg[1]);
 	max_frequency = dtplat->max_frequency;
-	ret = clk_get_by_index_platdata(dev, 0, dtplat->clocks, &clk);
+	ret = clk_get_by_driver_info(dev, dtplat->clocks, &clk);
 #else
 	max_frequency = dev_read_u32_default(dev, "max-frequency", 0);
 	ret = clk_get_by_index(dev, 0, &clk);
@@ -81,7 +81,7 @@ static int arasan_sdhci_probe(struct udevice *dev)
 	return sdhci_probe(dev);
 }
 
-static int arasan_sdhci_ofdata_to_platdata(struct udevice *dev)
+static int arasan_sdhci_of_to_plat(struct udevice *dev)
 {
 #if !CONFIG_IS_ENABLED(OF_PLATDATA)
 	struct sdhci_host *host = dev_get_priv(dev);
@@ -96,7 +96,7 @@ static int arasan_sdhci_ofdata_to_platdata(struct udevice *dev)
 
 static int rockchip_sdhci_bind(struct udevice *dev)
 {
-	struct rockchip_sdhc_plat *plat = dev_get_platdata(dev);
+	struct rockchip_sdhc_plat *plat = dev_get_plat(dev);
 
 	return sdhci_bind(dev, &plat->mmc, &plat->cfg);
 }
@@ -110,10 +110,10 @@ U_BOOT_DRIVER(arasan_sdhci_drv) = {
 	.name		= "rockchip_rk3399_sdhci_5_1",
 	.id		= UCLASS_MMC,
 	.of_match	= arasan_sdhci_ids,
-	.ofdata_to_platdata = arasan_sdhci_ofdata_to_platdata,
+	.of_to_plat = arasan_sdhci_of_to_plat,
 	.ops		= &sdhci_ops,
 	.bind		= rockchip_sdhci_bind,
 	.probe		= arasan_sdhci_probe,
-	.priv_auto_alloc_size = sizeof(struct rockchip_sdhc),
-	.platdata_auto_alloc_size = sizeof(struct rockchip_sdhc_plat),
+	.priv_auto	= sizeof(struct rockchip_sdhc),
+	.plat_auto	= sizeof(struct rockchip_sdhc_plat),
 };

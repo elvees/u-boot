@@ -14,8 +14,6 @@
 #define CONFIG_BOARD_POSTCLK_INIT
 #define CONFIG_SYS_BOOTM_LEN		0x1000000
 
-#define CONFIG_SYS_MMC_ENV_DEV          0	/* USDHC1 */
-#define CONFIG_SYS_MMC_ENV_PART         0	/* user area */
 #define CONFIG_MMCROOT                  "/dev/mmcblk0p2"  /* USDHC1 */
 #define CONFIG_SYS_MMC_IMG_LOAD_PART    1
 
@@ -32,14 +30,8 @@
 /* Size of malloc() pool */
 #define CONFIG_SYS_MALLOC_LEN		(8 * SZ_1M)
 
-#define CONFIG_BOARD_EARLY_INIT_F
-
 /* UART */
 #define LPUART_BASE			LPUART4_RBASE
-
-/* allow to overwrite serial and ethaddr */
-#define CONFIG_ENV_OVERWRITE
-#define CONFIG_BAUDRATE			115200
 
 #define CONFIG_SYS_CACHELINE_SIZE      64
 
@@ -53,12 +45,9 @@
 
 #define PHYS_SDRAM			0x60000000
 #define PHYS_SDRAM_SIZE			SZ_1G
-#define CONFIG_SYS_MEMTEST_START	PHYS_SDRAM
 #define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM
 
 #define CONFIG_LOADADDR             0x60800000
-
-#define CONFIG_SYS_MEMTEST_END      0x9E000000
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"script=boot.scr\0" \
@@ -145,9 +134,5 @@
 	(CONFIG_SYS_INIT_RAM_SIZE - GENERATED_GBL_DATA_SIZE)
 #define CONFIG_SYS_INIT_SP_ADDR \
 	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
-
-#if !CONFIG_IS_ENABLED(SYS_DCACHE_OFF)
-#define CONFIG_CMD_CACHE
-#endif
 
 #endif	/* __CONFIG_H */

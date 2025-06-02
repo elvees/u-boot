@@ -7,8 +7,12 @@
 #include <debug_uart.h>
 #include <dm.h>
 #include <hang.h>
+#include <image.h>
+#include <init.h>
+#include <log.h>
 #include <spl.h>
 #include <asm/cpu.h>
+#include <asm/global_data.h>
 #include <asm/mtrr.h>
 #include <asm/processor.h>
 #include <asm-generic/sections.h>
@@ -72,7 +76,7 @@ void board_init_f_r(void)
 
 u32 spl_boot_device(void)
 {
-	return IS_ENABLED(CONFIG_CHROMEOS) ? BOOT_DEVICE_CROS_VBOOT :
+	return IS_ENABLED(CONFIG_CHROMEOS_VBOOT) ? BOOT_DEVICE_CROS_VBOOT :
 		BOOT_DEVICE_SPI_MMAP;
 }
 
@@ -108,7 +112,12 @@ int spl_spi_load_image(void)
 
 void __noreturn jump_to_image_no_args(struct spl_image_info *spl_image)
 {
-	debug("Jumping to U-Boot SPL at %lx\n", (ulong)spl_image->entry_point);
+	debug("Jumping to %s at %lx\n", spl_phase_name(spl_next_phase()),
+	      (ulong)spl_image->entry_point);
+#ifdef DEBUG
+	print_buffer(spl_image->entry_point, (void *)spl_image->entry_point, 1,
+		     0x20, 0);
+#endif
 	jump_to_spl(spl_image->entry_point);
 	hang();
 }
@@ -130,14 +139,16 @@ void spl_board_init(void)
  * for devices, so the TPL BARs continue to be used. Once U-Boot starts it does
  * the auto allocation (after relocation).
  */
+#if !CONFIG_IS_ENABLED(OF_PLATDATA)
 static const struct udevice_id tpl_fake_pci_ids[] = {
 	{ .compatible = "pci-x86" },
 	{ }
 };
+#endif
 
 U_BOOT_DRIVER(pci_x86) = {
 	.name	= "pci_x86",
 	.id	= UCLASS_SIMPLE_BUS,
-	.of_match = tpl_fake_pci_ids,
+	.of_match = of_match_ptr(tpl_fake_pci_ids),
 };
 #endif

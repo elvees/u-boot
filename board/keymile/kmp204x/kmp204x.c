@@ -10,6 +10,7 @@
 #include <command.h>
 #include <env.h>
 #include <fdt_support.h>
+#include <image.h>
 #include <init.h>
 #include <netdev.h>
 #include <linux/compiler.h>
@@ -221,7 +222,7 @@ void fdt_fixup_fman_mac_addresses(void *blob)
 }
 #endif
 
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	phys_addr_t base;
 	phys_size_t size;

@@ -8,6 +8,8 @@
  */
 
 #include <common.h>
+#include <dm.h>
+#include <log.h>
 #include <pci.h>
 #include <asm/arch/fsl_serdes.h>
 #include <asm/io.h>
@@ -164,7 +166,7 @@ static void fdt_fixup_pcie_ls_gen4(void *blob)
 		}
 
 		/* the DT fixup must be relative to the hose first_busno */
-		bdf = dm_pci_get_bdf(dev) - PCI_BDF(bus->seq, 0, 0);
+		bdf = dm_pci_get_bdf(dev) - PCI_BDF(dev_seq(bus), 0, 0);
 		/* map PCI b.d.f to streamID in LUT */
 		ls_pcie_g4_lut_set_mapping(pcie, index, bdf >> 8, streamid);
 		/* update msi-map in device tree */
@@ -224,7 +226,7 @@ static void ft_pcie_layerscape_gen4_setup(void *blob, struct ls_pcie_g4 *pcie)
 }
 
 /* Fixup Kernel DT for PCIe */
-void ft_pci_setup_ls_gen4(void *blob, bd_t *bd)
+void ft_pci_setup_ls_gen4(void *blob, struct bd_info *bd)
 {
 	struct ls_pcie_g4 *pcie;
 
@@ -237,7 +239,7 @@ void ft_pci_setup_ls_gen4(void *blob, bd_t *bd)
 }
 
 #else /* !CONFIG_OF_BOARD_SETUP */
-void ft_pci_setup_ls_gen4(void *blob, bd_t *bd)
+void ft_pci_setup_ls_gen4(void *blob, struct bd_info *bd)
 {
 }
 #endif

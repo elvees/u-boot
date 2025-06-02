@@ -3,15 +3,18 @@
  * Copyright (c) 2016 Rockchip Electronics Co., Ltd
  */
 #include <common.h>
+#include <command.h>
 #include <dm.h>
 #include <env.h>
 #include <clk.h>
 #include <init.h>
 #include <malloc.h>
 #include <asm/armv7.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch-rockchip/bootrom.h>
 #include <asm/arch-rockchip/clock.h>
+#include <asm/arch-rockchip/cpu_rk3288.h>
 #include <asm/arch-rockchip/cru.h>
 #include <asm/arch-rockchip/hardware.h>
 #include <asm/arch-rockchip/grf_rk3288.h>
@@ -114,8 +117,37 @@ int rk_board_late_init(void)
 	return rk3288_board_late_init();
 }
 
-static int do_clock(cmd_tbl_t *cmdtp, int flag, int argc,
-		       char * const argv[])
+static int ft_rk3288w_setup(void *blob)
+{
+	const char *path;
+	int offs, ret;
+
+	path = "/clock-controller@ff760000";
+	offs = fdt_path_offset(blob, path);
+	if (offs < 0) {
+		debug("failed to found fdt path %s\n", path);
+		return offs;
+	}
+
+	ret = fdt_setprop_string(blob, offs, "compatible", "rockchip,rk3288w-cru");
+	if (ret) {
+		printf("failed to set rk3288w-cru compatible (ret=%d)\n", ret);
+		return ret;
+	}
+
+	return ret;
+}
+
+int ft_board_setup(void *blob, struct bd_info *bd)
+{
+	if (soc_is_rk3288w())
+		return ft_rk3288w_setup(blob);
+
+	return 0;
+}
+
+static int do_clock(struct cmd_tbl *cmdtp, int flag, int argc,
+		    char *const argv[])
 {
 	static const struct {
 		char *name;

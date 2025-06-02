@@ -36,9 +36,6 @@
  */
 #define CONFIG_BOOTP_BOOTFILESIZE
 
-/*
- * Command line configuration.
- */
 #ifdef CONFIG_MCFFEC
 #	define CONFIG_MII_INIT		1
 #	define CONFIG_SYS_DISCOVER_PHY
@@ -76,9 +73,6 @@
 	""
 
 #define CONFIG_SYS_LOAD_ADDR		0x20000
-
-#define CONFIG_SYS_MEMTEST_START	0x400
-#define CONFIG_SYS_MEMTEST_END		0x380000
 
 #define	CONFIG_SYS_CLK			64000000
 

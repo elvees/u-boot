@@ -9,6 +9,7 @@
 #include <tpm-v2.h>
 #include <asm/state.h>
 #include <asm/unaligned.h>
+#include <linux/bitops.h>
 #include <u-boot/crc.h>
 
 /* Hierarchies */
@@ -624,5 +625,5 @@ U_BOOT_DRIVER(sandbox_tpm2) = {
 	.of_match = sandbox_tpm2_ids,
 	.ops    = &sandbox_tpm2_ops,
 	.probe	= sandbox_tpm2_probe,
-	.priv_auto_alloc_size = sizeof(struct sandbox_tpm2),
+	.priv_auto	= sizeof(struct sandbox_tpm2),
 };

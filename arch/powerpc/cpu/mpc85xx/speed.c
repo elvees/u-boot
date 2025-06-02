@@ -12,6 +12,7 @@
 #include <common.h>
 #include <cpu_func.h>
 #include <ppc_asm.tmpl>
+#include <asm/global_data.h>
 #include <linux/compiler.h>
 #include <asm/processor.h>
 #include <asm/io.h>
@@ -629,7 +630,7 @@ int get_clocks(void)
 	gd->arch.i2c2_clk = gd->arch.i2c1_clk;
 
 #if defined(CONFIG_FSL_ESDHC)
-#if defined(CONFIG_ARCH_MPC8569) || defined(CONFIG_ARCH_P1010)
+#if defined(CONFIG_ARCH_P1010)
 	gd->arch.sdhc_clk = gd->bus_clk;
 #else
 	gd->arch.sdhc_clk = gd->bus_clk / 2;

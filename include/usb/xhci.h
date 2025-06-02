@@ -16,6 +16,8 @@
 #ifndef HOST_XHCI_H_
 #define HOST_XHCI_H_
 
+#include <phys2bus.h>
+#include <reset.h>
 #include <asm/types.h>
 #include <asm/cache.h>
 #include <asm/io.h>
@@ -100,8 +102,6 @@ struct xhci_hccr {
 /* bits 8:18, Max Interrupters */
 #define HCS_MAX_INTRS(p)	(((p) >> 8) & 0x7ff)
 /* bits 24:31, Max Ports - max value is 0x7F = 127 ports */
-#define HCS_MAX_PORTS_SHIFT	24
-#define HCS_MAX_PORTS_MASK	(0xff << HCS_MAX_PORTS_SHIFT)
 #define HCS_MAX_PORTS(p)	(((p) >> 24) & 0xff)
 
 /* HCSPARAMS2 - hcs_params2 - bitmasks */
@@ -633,11 +633,8 @@ struct xhci_ep_ctx {
  */
 #define	FORCE_EVENT		(0x1)
 #define ERROR_COUNT(p)		(((p) & 0x3) << 1)
-#define ERROR_COUNT_SHIFT	(1)
-#define ERROR_COUNT_MASK	(0x3)
 #define CTX_TO_EP_TYPE(p)	(((p) >> 3) & 0x7)
 #define EP_TYPE(p)		((p) << 3)
-#define EP_TYPE_SHIFT		(3)
 #define ISOC_OUT_EP		1
 #define BULK_OUT_EP		2
 #define INT_OUT_EP		3
@@ -648,13 +645,10 @@ struct xhci_ep_ctx {
 /* bit 6 reserved */
 /* bit 7 is Host Initiate Disable - for disabling stream selection */
 #define MAX_BURST(p)		(((p)&0xff) << 8)
-#define MAX_BURST_MASK		(0xff)
-#define MAX_BURST_SHIFT		(8)
 #define CTX_TO_MAX_BURST(p)	(((p) >> 8) & 0xff)
 #define MAX_PACKET(p)		(((p)&0xffff) << 16)
 #define MAX_PACKET_MASK		(0xffff)
 #define MAX_PACKET_DECODED(p)	(((p) >> 16) & 0xffff)
-#define MAX_PACKET_SHIFT	(16)
 
 /* Get max packet size from ep desc. Bit 10..0 specify the max packet size.
  * USB2.0 spec 9.6.6.
@@ -670,6 +664,9 @@ struct xhci_ep_ctx {
 /* deq bitmasks */
 #define EP_CTX_CYCLE_MASK		(1 << 0)
 
+/* reserved[0] bitmasks, MediaTek xHCI used */
+#define EP_BPKTS(p)	(((p) & 0x7f) << 0)
+#define EP_BBM(p)	(((p) & 0x1) << 11)
 
 /**
  * struct xhci_input_control_context
@@ -845,10 +842,9 @@ struct xhci_event_cmd {
 /* Normal TRB fields */
 /* transfer_len bitmasks - bits 0:16 */
 #define	TRB_LEN(p)			((p) & 0x1ffff)
-#define	TRB_LEN_MASK			(0x1ffff)
+/* TD Size, packets remaining in this TD, bits 21:17 (5 bits, so max 31) */
+#define TRB_TD_SIZE(p)          (min((p), (u32)31) << 17)
 /* Interrupter Target - which MSI-X vector to target the completion event at */
-#define	TRB_INTR_TARGET_SHIFT		(22)
-#define	TRB_INTR_TARGET_MASK		(0x3ff)
 #define TRB_INTR_TARGET(p)		(((p) & 0x3ff) << 22)
 #define GET_INTR_TARGET(p)		(((p) >> 22) & 0x3ff)
 #define TRB_TBC(p)			(((p) & 0x3) << 7)
@@ -878,7 +874,6 @@ struct xhci_event_cmd {
 /* Control transfer TRB specific fields */
 #define TRB_DIR_IN		(1<<16)
 #define	TRB_TX_TYPE(p)		((p) << 16)
-#define	TRB_TX_TYPE_SHIFT	(16)
 #define	TRB_DATA_OUT		2
 #define	TRB_DATA_IN		3
 
@@ -899,7 +894,6 @@ union xhci_trb {
 /* TRB bit mask */
 #define	TRB_TYPE_BITMASK	(0xfc00)
 #define TRB_TYPE(p)		((p) << 10)
-#define TRB_TYPE_SHIFT		(10)
 #define TRB_FIELD_TO_TYPE(p)	(((p) & TRB_TYPE_BITMASK) >> 10)
 
 /* TRB type IDs */
@@ -1111,28 +1105,20 @@ static inline void xhci_writel(uint32_t volatile *regs, const unsigned int val)
  */
 static inline u64 xhci_readq(__le64 volatile *regs)
 {
-#if BITS_PER_LONG == 64
-	return readq(regs);
-#else
 	__u32 *ptr = (__u32 *)regs;
 	u64 val_lo = readl(ptr);
 	u64 val_hi = readl(ptr + 1);
 	return val_lo + (val_hi << 32);
-#endif
 }
 
 static inline void xhci_writeq(__le64 volatile *regs, const u64 val)
 {
-#if BITS_PER_LONG == 64
-	writeq(val, regs);
-#else
 	__u32 *ptr = (__u32 *)regs;
 	u32 val_lo = lower_32_bits(val);
 	/* FIXME */
 	u32 val_hi = upper_32_bits(val);
 	writel(val_lo, ptr);
 	writel(val_hi, ptr + 1);
-#endif
 }
 
 int xhci_hcd_init(int index, struct xhci_hccr **ret_hccr,
@@ -1214,6 +1200,7 @@ struct xhci_ctrl {
 #if CONFIG_IS_ENABLED(DM_USB)
 	struct udevice *dev;
 #endif
+	struct reset_ctl reset;
 	struct xhci_hccr *hccr;	/* R/O registers, not need for volatile */
 	struct xhci_hcor *hcor;
 	struct xhci_doorbell_array *dba;
@@ -1230,7 +1217,16 @@ struct xhci_ctrl {
 	struct xhci_scratchpad *scratchpad;
 	struct xhci_virt_device *devs[MAX_HC_SLOTS];
 	int rootdev;
+	u16 hci_version;
+	u32 quirks;
+#define XHCI_MTK_HOST		BIT(0)
 };
+
+#if CONFIG_IS_ENABLED(DM_USB)
+#define xhci_to_dev(_ctrl)	_ctrl->dev
+#else
+#define xhci_to_dev(_ctrl)	NULL
+#endif
 
 unsigned long trb_addr(struct xhci_segment *seg, union xhci_trb *trb);
 struct xhci_input_control_ctx
@@ -1261,7 +1257,8 @@ int xhci_check_maxpacket(struct usb_device *udev);
 void xhci_flush_cache(uintptr_t addr, u32 type_len);
 void xhci_inval_cache(uintptr_t addr, u32 type_len);
 void xhci_cleanup(struct xhci_ctrl *ctrl);
-struct xhci_ring *xhci_ring_alloc(unsigned int num_segs, bool link_trbs);
+struct xhci_ring *xhci_ring_alloc(struct xhci_ctrl *ctrl, unsigned int num_segs,
+				  bool link_trbs);
 int xhci_alloc_virt_device(struct xhci_ctrl *ctrl, unsigned int slot_id);
 int xhci_mem_init(struct xhci_ctrl *ctrl, struct xhci_hccr *hccr,
 		  struct xhci_hcor *hcor);
@@ -1288,5 +1285,15 @@ int xhci_register(struct udevice *dev, struct xhci_hccr *hccr,
 extern struct dm_usb_ops xhci_usb_ops;
 
 struct xhci_ctrl *xhci_get_ctrl(struct usb_device *udev);
+
+static inline dma_addr_t xhci_virt_to_bus(struct xhci_ctrl *ctrl, void *addr)
+{
+	return dev_phys_to_bus(xhci_to_dev(ctrl), virt_to_phys(addr));
+}
+
+static inline void *xhci_bus_to_virt(struct xhci_ctrl *ctrl, dma_addr_t addr)
+{
+	return phys_to_virt(dev_bus_to_phys(xhci_to_dev(ctrl), addr));
+}
 
 #endif /* HOST_XHCI_H_ */

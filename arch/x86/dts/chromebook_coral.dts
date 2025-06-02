@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /dts-v1/;
 
+#include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/gpio/x86-gpio.h>
 
 /include/ "skeleton.dtsi"
@@ -9,18 +10,26 @@
 /include/ "rtc.dtsi"
 /include/ "tsc_timer.dtsi"
 
-#ifdef CONFIG_CHROMEOS
+#ifdef CONFIG_CHROMEOS_VBOOT
 #include "chromeos-x86.dtsi"
 #include "flashmap-x86-ro.dtsi"
 #include "flashmap-16mb-rw.dtsi"
 #endif
 
+#include <dt-bindings/clock/intel-clock.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/interrupt-controller/x86-irq.h>
+#include <asm/e820.h>
 #include <asm/intel_pinctrl_defs.h>
 #include <asm/arch-apollolake/cpu.h>
+#include <asm/arch-apollolake/gpe.h>
 #include <asm/arch-apollolake/gpio.h>
 #include <asm/arch-apollolake/iomap.h>
 #include <asm/arch-apollolake/pm.h>
 #include <dt-bindings/clock/intel-clock.h>
+#include <asm/arch-apollolake/fsp/fsp_m_upd.h>
+#include <asm/arch-apollolake/fsp/fsp_s_upd.h>
+#include <dt-bindings/sound/nhlt.h>
 
 / {
 	model = "Google Coral";
@@ -38,6 +47,37 @@
 		i2c5 = &i2c_5;
 		i2c6 = &i2c_6;
 		i2c7 = &i2c_7;
+		mmc1 = &sdmmc;
+	};
+
+	board: board {
+		compatible = "google,coral";
+		recovery-gpios = <&gpio_nw (-1) GPIO_ACTIVE_LOW>;
+		write-protect-gpios = <&gpio_nw GPIO_75 GPIO_ACTIVE_HIGH>;
+		phase-enforce-gpios = <&gpio_n GPIO_10 GPIO_ACTIVE_HIGH>;
+		smbios {
+			/* Type 1 table */
+			system {
+				manufacturer = "Google";
+				product = "Coral";
+				version = "rev2";
+				serial = "123456789";
+				sku = "sku3";
+				family = "Google_Coral";
+			};
+
+			/* Type 2 table */
+			baseboard {
+				manufacturer = "Google";
+				product = "Coral";
+				asset-tag = "ABC123";
+			};
+
+			/* Type 3 table */
+			chassis {
+				manufacturer = "Google";
+			};
+		};
 	};
 
 	config {
@@ -46,41 +86,52 @@
 
 	chosen {
 		stdout-path = &serial;
+		e820-entries = /bits/ 64 <
+			IOMAP_P2SB_BAR IOMAP_P2SB_SIZE E820_RESERVED
+			MCH_BASE_ADDRESS     MCH_SIZE  E820_RESERVED>;
+		u-boot,acpi-ssdt-order = <&cpu_0 &cpu_1 &cpu_2 &cpu_3
+			&i2c_0 &i2c_1 &i2c_2 &i2c_3 &i2c_4 &i2c_5
+			&sdmmc &maxim_codec &wifi &da_codec &tpm
+			&elan_touchscreen &raydium_touchscreen
+			&elan_touchpad &synaptics_touchpad &wacom_digitizer>;
+		u-boot,acpi-dsdt-order = <&board &lpc>;
 	};
 
 	clk: clock {
 		compatible = "intel,apl-clk";
 		#clock-cells = <1>;
+		u-boot,dm-pre-reloc;
 	};
 
 	cpus {
-		u-boot,dm-pre-reloc;
+		u-boot,dm-pre-proper;
 		#address-cells = <1>;
 		#size-cells = <0>;
 
-		cpu@0 {
-			u-boot,dm-pre-reloc;
+		cpu_0: cpu@0 {
+			u-boot,dm-pre-proper;
+			u-boot,dm-spl;
 			device_type = "cpu";
 			compatible = "intel,apl-cpu";
 			reg = <0>;
 			intel,apic-id = <0>;
 		};
 
-		cpu@1 {
+		cpu_1: cpu@1 {
 			device_type = "cpu";
 			compatible = "intel,apl-cpu";
 			reg = <1>;
 			intel,apic-id = <2>;
 		};
 
-		cpu@2 {
+		cpu_2: cpu@2 {
 			device_type = "cpu";
 			compatible = "intel,apl-cpu";
 			reg = <2>;
 			intel,apic-id = <4>;
 		};
 
-		cpu@3 {
+		cpu_3: cpu@3 {
 			device_type = "cpu";
 			compatible = "intel,apl-cpu";
 			reg = <3>;
@@ -90,6 +141,7 @@
 	};
 
 	acpi_gpe: general-purpose-events {
+		u-boot,dm-pre-reloc;
 		reg = <IOMAP_ACPI_BASE IOMAP_ACPI_SIZE>;
 		compatible = "intel,acpi-gpe";
 		interrupt-controller;
@@ -115,6 +167,7 @@
 			reg = <0x00000000 0 0 0 0>;
 			compatible = "intel,apl-hostbridge";
 			pciex-region-size = <0x10000000>;
+			fspm,training-delay = <21>;
 			/*
 			 * Parameters used by the FSP-S binary blob. This is
 			 * really unfortunate since these parameters mostly
@@ -125,12 +178,26 @@
 			 */
 			fsp_s: fsp-s {
 			};
+			fsp_m: fsp-m {
+				u-boot,dm-spl;
+			};
+
+			nhlt {
+				intel,dmic-channels = <4>;
+			};
 		};
 
 		punit@0,1 {
-			u-boot,dm-pre-reloc;
+			u-boot,dm-pre-proper;
+			u-boot,dm-spl;
 			reg = <0x00000800 0 0 0 0>;
 			compatible = "intel,apl-punit";
+		};
+
+		gma@2,0 {
+			u-boot,dm-pre-proper;
+			reg = <0x00001000 0 0 0 0>;
+			compatible = "fsp-fb";
 		};
 
 		p2sb: p2sb@d,0 {
@@ -138,16 +205,19 @@
 			reg = <0x02006810 0 0 0 0>;
 			compatible = "intel,p2sb";
 			early-regs = <IOMAP_P2SB_BAR 0x100000>;
+			pci,no-autoconfig;
 
 			n {
 				compatible = "intel,apl-pinctrl";
 				u-boot,dm-pre-reloc;
 				intel,p2sb-port-id = <PID_GPIO_N>;
+				acpi,path = "\\_SB.GPO0";
 				gpio_n: gpio-n {
 					compatible = "intel,gpio";
 					u-boot,dm-pre-reloc;
 					gpio-controller;
 					#gpio-cells = <2>;
+					linux-name = "INT3452:00";
 				};
 			};
 
@@ -156,11 +226,13 @@
 				compatible = "intel,apl-pinctrl";
 				intel,p2sb-port-id = <PID_GPIO_NW>;
 				#gpio-cells = <2>;
+				acpi,path = "\\_SB.GPO1";
 				gpio_nw: gpio-nw {
 					compatible = "intel,gpio";
 					u-boot,dm-pre-reloc;
 					gpio-controller;
 					#gpio-cells = <2>;
+					linux-name = "INT3452:01";
 				};
 			};
 
@@ -169,11 +241,13 @@
 				compatible = "intel,apl-pinctrl";
 				intel,p2sb-port-id = <PID_GPIO_W>;
 				#gpio-cells = <2>;
+				acpi,path = "\\_SB.GPO2";
 				gpio_w: gpio-w {
 					compatible = "intel,gpio";
 					u-boot,dm-pre-reloc;
 					gpio-controller;
 					#gpio-cells = <2>;
+					linux-name = "INT3452:02";
 				};
 			};
 
@@ -182,11 +256,13 @@
 				compatible = "intel,apl-pinctrl";
 				intel,p2sb-port-id = <PID_GPIO_SW>;
 				#gpio-cells = <2>;
+				acpi,path = "\\_SB.GPO3";
 				gpio_sw: gpio-sw {
 					compatible = "intel,gpio";
 					u-boot,dm-pre-reloc;
 					gpio-controller;
 					#gpio-cells = <2>;
+					linux-name = "INT3452:03";
 				};
 			};
 
@@ -235,8 +311,27 @@
 			gpe0-en = <0x30>;
 		};
 
+		audio@e,0 {
+			reg = <0x7000 0 0 0 0>;
+			compatible = "simple-bus";
+			acpi,name = "HDAS";
+			i2s {
+				compatible = "fred";
+			};
+			maxim_codec: maxim-codec {
+				compatible = "maxim,max98357a";
+				acpi,ddn = "Maxim Integrated 98357A Amplifier";
+				sdmode-gpios = <&gpio_n GPIO_76 GPIO_ACTIVE_HIGH>;
+				sdmode-delay = <5>;
+				acpi,name = "MAXM";
+				acpi,hid = "MX98357A";
+				acpi,audio-link = <AUDIO_LINK_SSP5>;
+			};
+		};
+
 		spi: fast-spi@d,2 {
-			u-boot,dm-pre-reloc;
+			u-boot,dm-pre-proper;
+			u-boot,dm-spl;
 			reg = <0x02006a10 0 0 0 0>;
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -247,7 +342,8 @@
 			fwstore_spi: spi-flash@0 {
 				#size-cells = <1>;
 				#address-cells = <1>;
-				u-boot,dm-pre-reloc;
+				u-boot,dm-pre-proper;
+				u-boot,dm-spl;
 				reg = <0>;
 				compatible = "winbond,w25q128fw",
 					 "jedec,spi-nor";
@@ -264,74 +360,198 @@
 			};
 		};
 
+		/* WiFi */
+		pcie-a0@14,0 {
+			reg = <0x0000a000 0 0 0 0>;
+			acpi,name = "RP01";
+			wifi: wifi {
+				compatible = "intel,generic-wifi";
+				acpi,ddn = "Intel WiFi";
+				acpi,name = "WF00";
+				acpi,wake = <GPE0_DW3_00>;
+				interrupts-extended = <&acpi_gpe 0x3c 0>;
+			};
+		};
+
 		i2c_0: i2c2@16,0 {
 			compatible = "intel,apl-i2c";
 			reg = <0x0200b010 0 0 0 0>;
 			clocks = <&clk CLK_I2C>;
 			i2c-scl-rising-time-ns = <104>;
 			i2c-scl-falling-time-ns = <52>;
+			clock-frequency = <400000>;
+			i2c,speeds = <100000 400000 1000000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			da_codec: da-codec {
+				reg = <0x1a>;
+				compatible = "dlg,da7219";
+				interrupts-extended = <&acpi_gpe GPIO_116_IRQ
+					(IRQ_TYPE_LEVEL_LOW | X86_IRQ_TYPE_SHARED)>;
+				acpi,name = "DLG7";
+				acpi,ddn = "Dialog Semiconductor DA7219 Audio Codec";
+				acpi,audio-link = <AUDIO_LINK_SSP1>;
+				dlg,micbias-lvl = <2600>;
+				dlg,mic-amp-in-sel = "diff";
+				da7219_aad {
+					dlg,btn-cfg = <50>;
+					dlg,mic-det-thr = <500>;
+					dlg,jack-ins-deb = <20>;
+					dlg,jack-det-rate = "32ms_64ms";
+					dlg,jack-rem-deb = <1>;
+					dlg,a-d-btn-thr = <0xa>;
+					dlg,d-b-btn-thr = <0x16>;
+					dlg,b-c-btn-thr = <0x21>;
+					dlg,c-mic-btn-thr = <0x3e>;
+					dlg,btn-avg = <4>;
+					dlg,adc-1bit-rpt = <1>;
+				};
+			};
 		};
 
 		i2c_1: i2c2@16,1 {
 			compatible = "intel,apl-i2c";
 			reg = <0x0200b110 0 0 0 0>;
 			clocks = <&clk CLK_I2C>;
-			status = "disabled";
+			clock-frequency = <400000>;
+			i2c,speeds = <100000 400000 1000000 3400000>;
+			i2c-scl-rising-time-ns = <52>;
+			i2c-scl-falling-time-ns = <52>;
 		};
 
 		i2c_2: i2c2@16,2 {
-			compatible = "intel,apl-i2c";
+			compatible = "intel,apl-i2c", "snps,designware-i2c-pci";
 			reg = <0x0200b210 0 0 0 0>;
+			early-regs = <IOMAP_I2C2_BASE 0x1000>;
+			u-boot,dm-pre-reloc;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			clock-frequency = <400000>;
+			i2c,speeds = <100000 400000 1000000>;
 			clocks = <&clk CLK_I2C>;
 			i2c-scl-rising-time-ns = <57>;
 			i2c-scl-falling-time-ns = <28>;
-			tpm@50 {
+			tpm: tpm@50 {
 				reg = <0x50>;
 				compatible = "google,cr50";
+				u-boot,dm-pre-reloc;
 				u-boot,i2c-offset-len = <0>;
-				ready-gpio = <&gpio_n 28 GPIO_ACTIVE_LOW>;
-				interrupts-extended = <&acpi_gpe 0x3c 0>;
+				ready-gpios = <&gpio_n 28 GPIO_ACTIVE_LOW>;
+				interrupts-extended = <&acpi_gpe GPIO_28_IRQ
+					 IRQ_TYPE_EDGE_FALLING>;
+				acpi,hid = "GOOG0005";
+				acpi,ddn = "I2C TPM";
+				acpi,name = "TPMI";
 			};
 		};
 
 		i2c_3: i2c2@16,3 {
 			compatible = "intel,apl-i2c";
-			reg = <0x0200b110 0 0 0 0>;
+			reg = <0x0200b310 0 0 0 0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
 			clocks = <&clk CLK_I2C>;
 			i2c-scl-rising-time-ns = <76>;
 			i2c-scl-falling-time-ns = <164>;
+			clock-frequency = <400000>;
+			i2c,speeds = <100000 400000>;
+			elan_touchscreen: elan-touchscreen@10 {
+				compatible = "i2c-chip";
+				reg = <0x10>;
+				acpi,hid = "ELAN0001";
+				acpi,ddn = "ELAN Touchscreen";
+				interrupts-extended = <&acpi_gpe GPIO_21_IRQ
+					IRQ_TYPE_EDGE_FALLING>;
+				linux,probed;
+				reset-gpios = <&gpio_n GPIO_36 GPIO_ACTIVE_HIGH>;
+				reset-delay-ms = <20>;
+				enable-gpios = <&gpio_n GPIO_152 GPIO_ACTIVE_HIGH>;
+				enable-delay-ms = <1>;
+				acpi,has-power-resource;
+			};
+
+			raydium_touchscreen: raydium-touchscreen@39 {
+				compatible = "i2c-chip";
+				reg = <0x39>;
+				acpi,hid = "RAYD0001";
+				acpi,ddn = "Raydium Touchscreen";
+				interrupts-extended = <&acpi_gpe GPIO_21_IRQ
+					IRQ_TYPE_EDGE_FALLING>;
+				linux,probed;
+				reset-gpios = <&gpio_n GPIO_36 GPIO_ACTIVE_HIGH>;
+				reset-delay-ms = <1>;
+				enable-gpios = <&gpio_n GPIO_152 GPIO_ACTIVE_HIGH>;
+				enable-delay-ms = <50>;
+				acpi,has-power-resource;
+			};
 		};
 
 		i2c_4: i2c2@17,0 {
 			compatible = "intel,apl-i2c";
-			reg = <0x0200b110 0 0 0 0>;
+			reg = <0x0200b810 0 0 0 0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
 			clocks = <&clk CLK_I2C>;
 			i2c-sda-hold-time-ns = <350>;
 			i2c-scl-rising-time-ns = <114>;
 			i2c-scl-falling-time-ns = <164>;
+			clock-frequency = <400000>;
+			i2c,speeds = <100000 400000>;
+			elan_touchpad: elan-touchpad@15 {
+				compatible = "i2c-chip";
+				reg = <0x15>;
+				u-boot,i2c-offset-len = <0>;
+				acpi,hid = "ELAN0000";
+				acpi,ddn = "ELAN Touchpad";
+				interrupts-extended = <&acpi_gpe GPIO_18_IRQ
+					 IRQ_TYPE_EDGE_FALLING>;
+				acpi,wake = <GPE0_DW1_15>;
+				linux,probed;
+			};
+			synaptics_touchpad: synaptics-touchpad@2c {
+				compatible = "hid-over-i2c";
+				reg = <0x2c>;
+				acpi,hid = "PNP0C50";
+				acpi,ddn = "Synaptics Touchpad";
+				interrupts-extended = <&acpi_gpe GPIO_18_IRQ
+					 IRQ_TYPE_EDGE_FALLING>;
+				acpi,wake = <GPE0_DW1_15>;
+				linux,probed;
+				hid-descr-addr = <0x20>;
+			};
 		};
 
 		i2c_5: i2c2@17,1 {
 			compatible = "intel,apl-i2c";
-			reg = <0x0200b110 0 0 0 0>;
+			reg = <0x0200b910 0 0 0 0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
 			clocks = <&clk CLK_I2C>;
 			i2c-scl-rising-time-ns = <76>;
 			i2c-scl-falling-time-ns = <164>;
+			clock-frequency = <400000>;
+			i2c,speeds = <100000 400000 1000000>;
+			wacom_digitizer: wacom-digitizer@9 {
+				compatible = "hid-over-i2c";
+				reg = <0x9>;
+				acpi,hid = "WCOM50C1";
+				acpi,ddn = "WCOM Digitizer";
+				interrupts-extended = <&acpi_gpe GPIO_13_IRQ
+					(IRQ_TYPE_LEVEL_LOW | X86_IRQ_TYPE_SHARED)>;
+				hid-descr-addr = <0x1>;
+			};
 		};
 
 		i2c_6: i2c2@17,2 {
 			compatible = "intel,apl-i2c";
-			reg = <0x0200b110 0 0 0 0>;
+			reg = <0x0200ba10 0 0 0 0>;
 			clocks = <&clk CLK_I2C>;
 			status = "disabled";
 		};
 
 		i2c_7: i2c2@17,3 {
 			compatible = "intel,apl-i2c";
-			reg = <0x0200b110 0 0 0 0>;
+			reg = <0x0200bb10 0 0 0 0>;
 			clocks = <&clk CLK_I2C>;
 			status = "disabled";
 		};
@@ -344,6 +564,21 @@
 			reg-shift = <2>;
 			clock-frequency = <1843200>;
 			current-speed = <115200>;
+			acpi,name = "URT3";
+			pci,no-autoconfig;
+		};
+
+		sdmmc: sdmmc@1b,0 {
+			reg = <0x0000d800 0 0 0 0>;
+			compatible = "intel,apl-sd";
+			cd-gpios = <&gpio_n GPIO_177 GPIO_ACTIVE_LOW>;
+			acpi,name = "SDCD";
+		};
+
+		emmc: emmc@1c,0 {
+			reg = <0x0000e000 0 0 0 0>;
+			compatible = "intel,apl-emmc";
+			non-removable;
 		};
 
 		pch: pch@1f,0 {
@@ -353,13 +588,14 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 
-			lpc {
+			lpc: lpc {
 				compatible = "intel,apl-lpc";
 				#address-cells = <1>;
 				#size-cells = <0>;
 				u-boot,dm-pre-reloc;
 				cros_ec: cros-ec {
-					u-boot,dm-pre-reloc;
+					u-boot,dm-pre-proper;
+					u-boot,dm-vpl;
 					compatible = "google,cros-ec-lpc";
 					reg = <0x204 1 0x200 1 0x880 0x80>;
 
@@ -414,6 +650,7 @@
 				PAD_CFG0_TX_DISABLE | PAD_CFG0_ROUTE_IOAPIC |
 				PAD_CFG0_TRIG_LEVEL | PAD_CFG0_RX_POL_INVERT)
 			(PAD_CFG1_PULL_NONE | PAD_CFG1_IOSSTATE_TXD_RXE)
+		PAD_CFG_GPI(GPIO_25, UP_20K, DEEP)	 /* unused */
 
 		/*
 		 * WLAN_PE_RST - default to deasserted just in case FSP
@@ -434,9 +671,51 @@
 		PAD_CFG_NF(LPC_AD3, UP_20K, DEEP, NF1)	 /* LPC_AD3 */
 		PAD_CFG_NF(LPC_CLKRUNB, UP_20K, DEEP, NF1) /* LPC_CLKRUN_N */
 		PAD_CFG_NF(LPC_FRAMEB, NATIVE, DEEP, NF1) /* LPC_FRAME_N */
-		>;
 
-	lpddr4-swizzle = /bits/ 8 <
+		PAD_CFG_GPI(GPIO_101, NONE, DEEP) /* FST_IO2 -- MEM_CONFIG0 */
+		PAD_CFG_GPI(GPIO_102, NONE, DEEP) /* FST_IO3 -- MEM_CONFIG1 */
+		PAD_CFG_GPI(GPIO_38, NONE, DEEP) /* LPSS_UART0_RXD - MEM_CONFIG2*/
+		PAD_CFG_GPI(GPIO_45, NONE, DEEP) /* LPSS_UART1_CTS - MEM_CONFIG3 */
+		>;
+};
+
+&fsp_m {
+	fspm,package = <PACKAGE_BGA>;
+	fspm,profile = <PROFILE_LPDDR4_2400_24_22_22>;
+	fspm,memory-down = <MEMORY_DOWN_YES>;
+	fspm,scrambler-support = <1>;
+	fspm,interleaved-mode = <INTERLEAVED_MODE_ENABLE>;
+	fspm,channel-hash-mask = <0x36>;
+	fspm,slice-hash-mask = <0x9>;
+	fspm,dual-rank-support-enable = <1>;
+	fspm,low-memory-max-value = <2048>;
+	fspm,ch0-rank-enable = <1>;
+	fspm,ch0-device-width = <CHX_DEVICE_WIDTH_X16>;
+	fspm,ch0-dram-density = <CHX_DEVICE_DENSITY_8GB>;
+	fspm,ch0-option = <(CHX_OPTION_RANK_INTERLEAVING |
+			   CHX_OPTION_BANK_ADDRESS_HASHING_ENABLE)>;
+	fspm,ch0-odt-config = <CHX_ODT_CONFIG_DDR4_CA_ODT>;
+	fspm,ch1-rank-enable = <1>;
+	fspm,ch1-device-width = <CHX_DEVICE_WIDTH_X16>;
+	fspm,ch1-dram-density = <CHX_DEVICE_DENSITY_8GB>;
+	fspm,ch1-option = <(CHX_OPTION_RANK_INTERLEAVING |
+			   CHX_OPTION_BANK_ADDRESS_HASHING_ENABLE)>;
+	fspm,ch1-odt-config = <CHX_ODT_CONFIG_DDR4_CA_ODT>;
+	fspm,ch2-rank-enable = <1>;
+	fspm,ch2-device-width = <CHX_DEVICE_WIDTH_X16>;
+	fspm,ch2-dram-density = <CHX_DEVICE_DENSITY_8GB>;
+	fspm,ch2-option = <(CHX_OPTION_RANK_INTERLEAVING |
+			   CHX_OPTION_BANK_ADDRESS_HASHING_ENABLE)>;
+	fspm,ch2-odt-config = <CHX_ODT_CONFIG_DDR4_CA_ODT>;
+	fspm,ch3-rank-enable = <1>;
+	fspm,ch3-device-width = <CHX_DEVICE_WIDTH_X16>;
+	fspm,ch3-dram-density = <CHX_DEVICE_DENSITY_8GB>;
+	fspm,ch3-option = <(CHX_OPTION_RANK_INTERLEAVING |
+			   CHX_OPTION_BANK_ADDRESS_HASHING_ENABLE)>;
+	fspm,ch3-odt-config = <CHX_ODT_CONFIG_DDR4_CA_ODT>;
+	fspm,fspm,skip-cse-rbp = <1>;
+
+	fspm,ch-bit-swizzling = /bits/ 8 <
 		/* LP4_PHYS_CH0A */
 
 		/* DQA[0:7] pins of LPDDR4 module */
@@ -479,13 +758,27 @@
 		20 23 22 21 18 19 16 17
 		/* DQB[7:15] pins of LPDDR4 module with offset of 16 */
 		25 28 30 31 26 27 24 29>;
+
+	fspm,dimm0-spd-address = <0>;
+	fspm,dimm1-spd-address = <0>;
+	fspm,skip-cse-rbp = <1>;
+	fspm,enable-s3-heci2 = <0>;
 };
 
 &fsp_s {
 	u-boot,dm-pre-proper;
 
+	fsps,ish-enable = <0>;
+	fsps,enable-sata = <0>;
+	fsps,i2c6-enable = <I2CX_ENABLE_DISABLED>;
+	fsps,i2c7-enable = <I2CX_ENABLE_DISABLED>;
+	fsps,hsuart3-enable = <HSUARTX_ENABLE_DISABLED>;
+	fsps,spi1-enable = <SPIX_ENABLE_DISABLED>;
+	fsps,spi2-enable = <SPIX_ENABLE_DISABLED>;
+	fsps,sdio-enabled = <0>;
+
 	/* Disable unused clkreq of PCIe root ports */
-	pcie-rp-clkreq-pin = /bits/ 8 <0 /* wifi/bt */
+	fsps,pcie-rp-clk-req-number = /bits/ 8 <0 /* wifi/bt */
 		CLKREQ_DISABLED
 		CLKREQ_DISABLED
 		CLKREQ_DISABLED
@@ -539,18 +832,32 @@
 	 * [14:8] steps of delay for Auto Tuning Mode, each 125ps
 	 * [6:0] steps of delay for HS200, each 125ps
 	 */
-	emmc = <0x0c16 0x28162828 0x00181717 0x10008>;
-
 	/* Enable DPTF */
-	dptf-enable;
+	fsps,dptf-enabled;
+	fsps,emmc-tx-data-cntl1 = <0x0c16>;
+	fsps,emmc-tx-data-cntl2 = <0x28162828>;
+	fsps,emmc-rx-cmd-data-cntl1 = <0x00181717>;
+	fsps,emmc-rx-cmd-data-cntl2 = <0x10008>;
 
 	/* Enable Audio Clock and Power gating */
-	hdaudio-clk-gate-enable;
-	hdaudio-pwr-gate-enable;
-	hdaudio-bios-config-lockdown;
+	fsps,hd-audio-clk-gate = <1>;
+	fsps,hd-audio-pwr-gate = <1>;
+	fsps,bios-cfg-lock-down = <1>;
 
-	/* Enable lpss s0ix */
-	lpss-s0ix-enable;
+	/* Enable WiFi */
+	fsps,pcie-root-port-en = [01 00 00 00 00 00];
+	fsps,pcie-rp-hot-plug = [00 00 00 00 00 00];
+
+	fsps,skip-mp-init = <1>;
+	fsps,spi-eiss = <0>;
+	fsps,rtc-lock = <0>;
+
+	fsps,port-usb20-per-port-pe-txi-set = [07 07 06 06 07 07 07 01];
+	fsps,port-usb20-per-port-txi-set = [00 02 00 00 00 00 00 03];
+
+	fsps,lpss-s0ix-enable = <1>;
+	fsps,usb-otg = <0>;
+	fsps,monitor-mwait-enable = <0>;
 
 	/*
 	 * TODO(sjg@chromium.org): Move this to the I2C nodes
@@ -921,4 +1228,10 @@
 		PAD_CFG_GPI(GPIO_72, UP_20K, DEEP)	 /* GP_CAMERASB10 */
 		PAD_CFG_GPI(GPIO_73, UP_20K, DEEP)	 /* GP_CAMERASB11 */
 	>;
+};
+
+&rtc {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	u-boot,dm-pre-reloc;
 };

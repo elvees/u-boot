@@ -10,8 +10,11 @@
 #include <div64.h>
 #include <time.h>
 #include <wait_bit.h>
+#include <asm/global_data.h>
 #include <dm/lists.h>
 #include <asm/io.h>
+#include <linux/bitops.h>
+#include <linux/bug.h>
 #include <mach/pic32.h>
 #include <dt-bindings/clock/microchip,clock.h>
 
@@ -421,5 +424,5 @@ U_BOOT_DRIVER(pic32_clk) = {
 	.of_match	= pic32_clk_ids,
 	.ops		= &pic32_pic32_clk_ops,
 	.probe		= pic32_clk_probe,
-	.priv_auto_alloc_size = sizeof(struct pic32_clk_priv),
+	.priv_auto	= sizeof(struct pic32_clk_priv),
 };

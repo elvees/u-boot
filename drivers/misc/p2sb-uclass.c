@@ -8,6 +8,7 @@
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <malloc.h>
 #include <mapmem.h>
 #include <p2sb.h>
@@ -17,9 +18,19 @@
 
 #define PCR_COMMON_IOSF_1_0	1
 
-static void *_pcr_reg_address(struct udevice *dev, uint offset)
+int p2sb_set_hide(struct udevice *dev, bool hide)
 {
-	struct p2sb_child_platdata *pplat = dev_get_parent_platdata(dev);
+	struct p2sb_ops *ops = p2sb_get_ops(dev);
+
+	if (!ops->set_hide)
+		return -ENOSYS;
+
+	return ops->set_hide(dev, hide);
+}
+
+void *pcr_reg_address(struct udevice *dev, uint offset)
+{
+	struct p2sb_child_plat *pplat = dev_get_parent_plat(dev);
 	struct udevice *p2sb = dev_get_parent(dev);
 	struct p2sb_uc_priv *upriv = dev_get_uclass_priv(p2sb);
 	uintptr_t reg_addr;
@@ -54,7 +65,7 @@ uint pcr_read32(struct udevice *dev, uint offset)
 	/* Ensure the PCR offset is correctly aligned */
 	assert(IS_ALIGNED(offset, sizeof(uint32_t)));
 
-	ptr = _pcr_reg_address(dev, offset);
+	ptr = pcr_reg_address(dev, offset);
 	val = readl(ptr);
 	unmap_sysmem(ptr);
 
@@ -66,7 +77,7 @@ uint pcr_read16(struct udevice *dev, uint offset)
 	/* Ensure the PCR offset is correctly aligned */
 	check_pcr_offset_align(offset, sizeof(uint16_t));
 
-	return readw(_pcr_reg_address(dev, offset));
+	return readw(pcr_reg_address(dev, offset));
 }
 
 uint pcr_read8(struct udevice *dev, uint offset)
@@ -74,7 +85,7 @@ uint pcr_read8(struct udevice *dev, uint offset)
 	/* Ensure the PCR offset is correctly aligned */
 	check_pcr_offset_align(offset, sizeof(uint8_t));
 
-	return readb(_pcr_reg_address(dev, offset));
+	return readb(pcr_reg_address(dev, offset));
 }
 
 /*
@@ -85,7 +96,7 @@ uint pcr_read8(struct udevice *dev, uint offset)
  */
 static void write_completion(struct udevice *dev, uint offset)
 {
-	readl(_pcr_reg_address(dev, ALIGN_DOWN(offset, sizeof(uint32_t))));
+	readl(pcr_reg_address(dev, ALIGN_DOWN(offset, sizeof(uint32_t))));
 }
 
 void pcr_write32(struct udevice *dev, uint offset, uint indata)
@@ -93,7 +104,7 @@ void pcr_write32(struct udevice *dev, uint offset, uint indata)
 	/* Ensure the PCR offset is correctly aligned */
 	assert(IS_ALIGNED(offset, sizeof(indata)));
 
-	writel(indata, _pcr_reg_address(dev, offset));
+	writel(indata, pcr_reg_address(dev, offset));
 	/* Ensure the writes complete */
 	write_completion(dev, offset);
 }
@@ -103,7 +114,7 @@ void pcr_write16(struct udevice *dev, uint offset, uint indata)
 	/* Ensure the PCR offset is correctly aligned */
 	check_pcr_offset_align(offset, sizeof(uint16_t));
 
-	writew(indata, _pcr_reg_address(dev, offset));
+	writew(indata, pcr_reg_address(dev, offset));
 	/* Ensure the writes complete */
 	write_completion(dev, offset);
 }
@@ -113,7 +124,7 @@ void pcr_write8(struct udevice *dev, uint offset, uint indata)
 	/* Ensure the PCR offset is correctly aligned */
 	check_pcr_offset_align(offset, sizeof(uint8_t));
 
-	writeb(indata, _pcr_reg_address(dev, offset));
+	writeb(indata, pcr_reg_address(dev, offset));
 	/* Ensure the writes complete */
 	write_completion(dev, offset);
 }
@@ -150,33 +161,19 @@ void pcr_clrsetbits8(struct udevice *dev, uint offset, uint clr, uint set)
 
 int p2sb_get_port_id(struct udevice *dev)
 {
-	struct p2sb_child_platdata *pplat = dev_get_parent_platdata(dev);
+	struct p2sb_child_plat *pplat = dev_get_parent_plat(dev);
 
 	return pplat->pid;
 }
 
 int p2sb_set_port_id(struct udevice *dev, int portid)
 {
-	struct udevice *ps2b;
-	struct p2sb_child_platdata *pplat;
+	struct p2sb_child_plat *pplat;
 
 	if (!CONFIG_IS_ENABLED(OF_PLATDATA))
 		return -ENOSYS;
 
-	uclass_find_first_device(UCLASS_P2SB, &ps2b);
-	if (!ps2b)
-		return -EDEADLK;
-	dev->parent = ps2b;
-
-	/*
-	 * We must allocate this, since when the device was bound it did not
-	 * have a parent.
-	 * TODO(sjg@chromium.org): Add a parent pointer to child devices in dtoc
-	 */
-	dev->parent_platdata = malloc(sizeof(*pplat));
-	if (!dev->parent_platdata)
-		return -ENOMEM;
-	pplat = dev_get_parent_platdata(dev);
+	pplat = dev_get_parent_plat(dev);
 	pplat->pid = portid;
 
 	return 0;
@@ -185,7 +182,7 @@ int p2sb_set_port_id(struct udevice *dev, int portid)
 static int p2sb_child_post_bind(struct udevice *dev)
 {
 #if !CONFIG_IS_ENABLED(OF_PLATDATA)
-	struct p2sb_child_platdata *pplat = dev_get_parent_platdata(dev);
+	struct p2sb_child_plat *pplat = dev_get_parent_plat(dev);
 	int ret;
 	u32 pid;
 
@@ -209,9 +206,8 @@ static int p2sb_post_bind(struct udevice *dev)
 UCLASS_DRIVER(p2sb) = {
 	.id		= UCLASS_P2SB,
 	.name		= "p2sb",
-	.per_device_auto_alloc_size = sizeof(struct p2sb_uc_priv),
+	.per_device_auto	= sizeof(struct p2sb_uc_priv),
 	.post_bind	= p2sb_post_bind,
 	.child_post_bind = p2sb_child_post_bind,
-	.per_child_platdata_auto_alloc_size =
-		sizeof(struct p2sb_child_platdata),
+	.per_child_plat_auto = sizeof(struct p2sb_child_plat),
 };

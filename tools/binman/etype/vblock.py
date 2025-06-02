@@ -9,10 +9,10 @@
 from collections import OrderedDict
 import os
 
-from entry import Entry, EntryArg
+from binman.entry import Entry, EntryArg
 
-import fdt_util
-import tools
+from dtoc import fdt_util
+from patman import tools
 
 class Entry_vblock(Entry):
     """An entry which contains a Chromium OS verified boot block
@@ -36,7 +36,7 @@ class Entry_vblock(Entry):
     and kernel are genuine.
     """
     def __init__(self, section, etype, node):
-        Entry.__init__(self, section, etype, node)
+        super().__init__(section, etype, node)
         self.content = fdt_util.GetPhandleList(self._node, 'content')
         if not self.content:
             self.Raise("Vblock must have a 'content' property")
@@ -49,7 +49,7 @@ class Entry_vblock(Entry):
             EntryArg('kernelkey', str),
             EntryArg('preamble-flags', int)])
 
-    def ObtainContents(self):
+    def GetVblock(self):
         # Join up the data files to be signed
         input_data = b''
         for entry_phandle in self.content:
@@ -76,5 +76,16 @@ class Entry_vblock(Entry):
         ]
         #out.Notice("Sign '%s' into %s" % (', '.join(self.value), self.label))
         stdout = tools.Run('futility', *args)
-        self.SetContents(tools.ReadFile(output_fname))
+        return tools.ReadFile(output_fname)
+
+    def ObtainContents(self):
+        data = self.GetVblock()
+        if data is False:
+            return False
+        self.SetContents(data)
         return True
+
+    def ProcessContents(self):
+        # The blob may have changed due to WriteSymbols()
+        data = self.GetVblock()
+        return self.ProcessContentsUpdate(data)

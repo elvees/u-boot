@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2008, Freescale Semiconductor, Inc
+ * Copyright 2020 NXP
  * Andy Fleming
  *
  * Based vaguely on the Linux code
@@ -8,12 +9,16 @@
 
 #include <config.h>
 #include <common.h>
+#include <blk.h>
 #include <command.h>
 #include <dm.h>
+#include <log.h>
 #include <dm/device-internal.h>
 #include <errno.h>
 #include <mmc.h>
 #include <part.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
 #include <power/regulator.h>
 #include <malloc.h>
 #include <memalign.h>
@@ -202,26 +207,65 @@ int mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd, struct mmc_data *data)
 }
 #endif
 
+/**
+ * mmc_send_cmd_retry() - send a command to the mmc device, retrying on error
+ *
+ * @dev:	device to receive the command
+ * @cmd:	command to send
+ * @data:	additional data to send/receive
+ * @retries:	how many times to retry; mmc_send_cmd is always called at least
+ *              once
+ * @return 0 if ok, -ve on error
+ */
+static int mmc_send_cmd_retry(struct mmc *mmc, struct mmc_cmd *cmd,
+			      struct mmc_data *data, uint retries)
+{
+	int ret;
+
+	do {
+		ret = mmc_send_cmd(mmc, cmd, data);
+	} while (ret && retries--);
+
+	return ret;
+}
+
+/**
+ * mmc_send_cmd_quirks() - send a command to the mmc device, retrying if a
+ *                         specific quirk is enabled
+ *
+ * @dev:	device to receive the command
+ * @cmd:	command to send
+ * @data:	additional data to send/receive
+ * @quirk:	retry only if this quirk is enabled
+ * @retries:	how many times to retry; mmc_send_cmd is always called at least
+ *              once
+ * @return 0 if ok, -ve on error
+ */
+static int mmc_send_cmd_quirks(struct mmc *mmc, struct mmc_cmd *cmd,
+			       struct mmc_data *data, u32 quirk, uint retries)
+{
+	if (CONFIG_IS_ENABLED(MMC_QUIRKS) && mmc->quirks & quirk)
+		return mmc_send_cmd_retry(mmc, cmd, data, retries);
+	else
+		return mmc_send_cmd(mmc, cmd, data);
+}
+
 int mmc_send_status(struct mmc *mmc, unsigned int *status)
 {
 	struct mmc_cmd cmd;
-	int err, retries = 5;
+	int ret;
 
 	cmd.cmdidx = MMC_CMD_SEND_STATUS;
 	cmd.resp_type = MMC_RSP_R1;
 	if (!mmc_host_is_spi(mmc))
 		cmd.cmdarg = mmc->rca << 16;
 
-	while (retries--) {
-		err = mmc_send_cmd(mmc, &cmd, NULL);
-		if (!err) {
-			mmc_trace_state(mmc, &cmd);
-			*status = cmd.response[0];
-			return 0;
-		}
-	}
+	ret = mmc_send_cmd_retry(mmc, &cmd, NULL, 4);
 	mmc_trace_state(mmc, &cmd);
-	return -ECOMM;
+	if (!ret)
+		*status = cmd.response[0];
+
+	return ret;
 }
 
 int mmc_poll_for_busy(struct mmc *mmc, int timeout_ms)
@@ -269,7 +313,6 @@ int mmc_poll_for_busy(struct mmc *mmc, int timeout_ms)
 int mmc_set_blocklen(struct mmc *mmc, int len)
 {
 	struct mmc_cmd cmd;
-	int err;
 
 	if (mmc->ddr_mode)
 		return 0;
@@ -278,24 +321,8 @@ int mmc_set_blocklen(struct mmc *mmc, int len)
 	cmd.resp_type = MMC_RSP_R1;
 	cmd.cmdarg = len;
 
-	err = mmc_send_cmd(mmc, &cmd, NULL);
-
-#ifdef CONFIG_MMC_QUIRKS
-	if (err && (mmc->quirks & MMC_QUIRK_RETRY_SET_BLOCKLEN)) {
-		int retries = 4;
-		/*
-		 * It has been seen that SET_BLOCKLEN may fail on the first
-		 * attempt, let's try a few more time
-		 */
-		do {
-			err = mmc_send_cmd(mmc, &cmd, NULL);
-			if (!err)
-				break;
-		} while (retries--);
-	}
-#endif
-
-	return err;
+	return mmc_send_cmd_quirks(mmc, &cmd, NULL,
+				   MMC_QUIRK_RETRY_SET_BLOCKLEN, 4);
 }
 
 #ifdef MMC_SUPPORTS_TUNING
@@ -409,6 +436,16 @@ static int mmc_read_blocks(struct mmc *mmc, void *dst, lbaint_t start,
 	return blkcnt;
 }
 
+#if !CONFIG_IS_ENABLED(DM_MMC)
+static int mmc_get_b_max(struct mmc *mmc, void *dst, lbaint_t blkcnt)
+{
+	if (mmc->cfg->ops->get_b_max)
+		return mmc->cfg->ops->get_b_max(mmc, dst, blkcnt);
+	else
+		return mmc->cfg->b_max;
+}
+#endif
+
 #if CONFIG_IS_ENABLED(BLK)
 ulong mmc_bread(struct udevice *dev, lbaint_t start, lbaint_t blkcnt, void *dst)
 #else
@@ -417,11 +454,12 @@ ulong mmc_bread(struct blk_desc *block_dev, lbaint_t start, lbaint_t blkcnt,
 #endif
 {
 #if CONFIG_IS_ENABLED(BLK)
-	struct blk_desc *block_dev = dev_get_uclass_platdata(dev);
+	struct blk_desc *block_dev = dev_get_uclass_plat(dev);
 #endif
 	int dev_num = block_dev->devnum;
 	int err;
 	lbaint_t cur, blocks_todo = blkcnt;
+	uint b_max;
 
 	if (blkcnt == 0)
 		return 0;
@@ -451,9 +489,10 @@ ulong mmc_bread(struct blk_desc *block_dev, lbaint_t start, lbaint_t blkcnt,
 		return 0;
 	}
 
+	b_max = mmc_get_b_max(mmc, dst, blkcnt);
+
 	do {
-		cur = (blocks_todo > mmc->cfg->b_max) ?
-			mmc->cfg->b_max : blocks_todo;
+		cur = (blocks_todo > b_max) ? b_max : blocks_todo;
 		if (mmc_read_blocks(mmc, dst, start, cur) != cur) {
 			pr_debug("%s: Failed to read blocks\n", __func__);
 			return 0;
@@ -653,12 +692,15 @@ static int mmc_send_op_cond_iter(struct mmc *mmc, int use_arg)
 static int mmc_send_op_cond(struct mmc *mmc)
 {
 	int err, i;
+	int timeout = 1000;
+	uint start;
 
 	/* Some cards seem to need this */
 	mmc_go_idle(mmc);
 
+	start = get_timer(0);
  	/* Asking to the card its capabilities */
-	for (i = 0; i < 2; i++) {
+	for (i = 0; ; i++) {
 		err = mmc_send_op_cond_iter(mmc, i != 0);
 		if (err)
 			return err;
@@ -666,6 +708,10 @@ static int mmc_send_op_cond(struct mmc *mmc)
 		/* exit if not busy (flag seems to be inverted) */
 		if (mmc->ocr & OCR_BUSY)
 			break;
+
+		if (get_timer(start) > timeout)
+			return -ETIMEDOUT;
+		udelay(100);
 	}
 	mmc->op_cond_pending = 1;
 	return 0;
@@ -718,7 +764,7 @@ static int mmc_complete_op_cond(struct mmc *mmc)
 }
 
 
-static int mmc_send_ext_csd(struct mmc *mmc, u8 *ext_csd)
+int mmc_send_ext_csd(struct mmc *mmc, u8 *ext_csd)
 {
 	struct mmc_cmd cmd;
 	struct mmc_data data;
@@ -747,7 +793,6 @@ static int __mmc_switch(struct mmc *mmc, u8 set, u8 index, u8 value,
 	int timeout_ms = DEFAULT_CMD6_TIMEOUT_MS;
 	bool is_part_switch = (set == EXT_CSD_CMD_SET_NORMAL) &&
 			      (index == EXT_CSD_PART_CONF);
-	int retries = 3;
 	int ret;
 
 	if (mmc->gen_cmd6_time)
@@ -762,10 +807,7 @@ static int __mmc_switch(struct mmc *mmc, u8 set, u8 index, u8 value,
 				 (index << 16) |
 				 (value << 8);
 
-	do {
-		ret = mmc_send_cmd(mmc, &cmd, NULL);
-	} while (ret && retries-- > 0);
-
+	ret = mmc_send_cmd_retry(mmc, &cmd, NULL, 3);
 	if (ret)
 		return ret;
 
@@ -781,8 +823,10 @@ static int __mmc_switch(struct mmc *mmc, u8 set, u8 index, u8 value,
 	 * capable of polling by using mmc_wait_dat0, then rely on waiting the
 	 * stated timeout to be sufficient.
 	 */
-	if (ret == -ENOSYS && !send_status)
+	if (ret == -ENOSYS && !send_status) {
 		mdelay(timeout_ms);
+		return 0;
+	}
 
 	/* Finally wait until the card is ready or indicates a failure
 	 * to switch. It doesn't hurt to use CMD13 here even if send_status
@@ -797,7 +841,8 @@ static int __mmc_switch(struct mmc *mmc, u8 set, u8 index, u8 value,
 				 value);
 			return -EIO;
 		}
-		if (!ret && (status & MMC_STATUS_RDY_FOR_DATA))
+		if (!ret && (status & MMC_STATUS_RDY_FOR_DATA) &&
+		    (status & MMC_STATUS_CURR_STATE) == MMC_STATE_TRANS)
 			return 0;
 		udelay(100);
 	} while (get_timer(start) < timeout_ms);
@@ -808,6 +853,11 @@ static int __mmc_switch(struct mmc *mmc, u8 set, u8 index, u8 value,
 int mmc_switch(struct mmc *mmc, u8 set, u8 index, u8 value)
 {
 	return __mmc_switch(mmc, set, index, value, true);
+}
+
+int mmc_boot_wp(struct mmc *mmc)
+{
+	return mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_BOOT_WP, 1);
 }
 
 #if !CONFIG_IS_ENABLED(MMC_TINY)
@@ -1256,22 +1306,15 @@ static int sd_get_capabilities(struct mmc *mmc)
 	cmd.resp_type = MMC_RSP_R1;
 	cmd.cmdarg = 0;
 
-	timeout = 3;
-
-retry_scr:
 	data.dest = (char *)scr;
 	data.blocksize = 8;
 	data.blocks = 1;
 	data.flags = MMC_DATA_READ;
 
-	err = mmc_send_cmd(mmc, &cmd, &data);
+	err = mmc_send_cmd_retry(mmc, &cmd, &data, 3);
 
-	if (err) {
-		if (timeout--)
-			goto retry_scr;
-
+	if (err)
 		return err;
-	}
 
 	mmc->scr[0] = __be32_to_cpu(scr[0]);
 	mmc->scr[1] = __be32_to_cpu(scr[1]);
@@ -1432,28 +1475,13 @@ static int sd_read_ssr(struct mmc *mmc)
 	struct mmc_cmd cmd;
 	ALLOC_CACHE_ALIGN_BUFFER(uint, ssr, 16);
 	struct mmc_data data;
-	int timeout = 3;
 	unsigned int au, eo, et, es;
 
 	cmd.cmdidx = MMC_CMD_APP_CMD;
 	cmd.resp_type = MMC_RSP_R1;
 	cmd.cmdarg = mmc->rca << 16;
 
-	err = mmc_send_cmd(mmc, &cmd, NULL);
-#ifdef CONFIG_MMC_QUIRKS
-	if (err && (mmc->quirks & MMC_QUIRK_RETRY_APP_CMD)) {
-		int retries = 4;
-		/*
-		 * It has been seen that APP_CMD may fail on the first
-		 * attempt, let's try a few more times
-		 */
-		do {
-			err = mmc_send_cmd(mmc, &cmd, NULL);
-			if (!err)
-				break;
-		} while (retries--);
-	}
-#endif
+	err = mmc_send_cmd_quirks(mmc, &cmd, NULL, MMC_QUIRK_RETRY_APP_CMD, 4);
 	if (err)
 		return err;
 
@@ -1461,19 +1489,14 @@ static int sd_read_ssr(struct mmc *mmc)
 	cmd.resp_type = MMC_RSP_R1;
 	cmd.cmdarg = 0;
 
-retry_ssr:
 	data.dest = (char *)ssr;
 	data.blocksize = 64;
 	data.blocks = 1;
 	data.flags = MMC_DATA_READ;
 
-	err = mmc_send_cmd(mmc, &cmd, &data);
-	if (err) {
-		if (timeout--)
-			goto retry_ssr;
-
+	err = mmc_send_cmd_retry(mmc, &cmd, &data, 3);
+	if (err)
 		return err;
-	}
 
 	for (i = 0; i < 16; i++)
 		ssr[i] = be32_to_cpu(ssr[i]);
@@ -1725,6 +1748,11 @@ static int sd_select_mode_and_width(struct mmc *mmc, uint card_caps)
 		mmc_set_bus_width(mmc, 1);
 		mmc_select_mode(mmc, MMC_LEGACY);
 		mmc_set_clock(mmc, mmc->tran_speed, MMC_CLK_ENABLE);
+#if CONFIG_IS_ENABLED(MMC_WRITE)
+		err = sd_read_ssr(mmc);
+		if (err)
+			pr_warn("unable to read ssr\n");
+#endif
 		return 0;
 	}
 
@@ -1948,7 +1976,9 @@ static int mmc_select_hs400(struct mmc *mmc)
 	mmc_set_clock(mmc, mmc->tran_speed, false);
 
 	/* execute tuning if needed */
+	mmc->hs400_tuning = 1;
 	err = mmc_execute_tuning(mmc, MMC_CMD_SEND_TUNING_BLOCK_HS200);
+	mmc->hs400_tuning = 0;
 	if (err) {
 		debug("tuning failed\n");
 		return err;
@@ -1956,6 +1986,10 @@ static int mmc_select_hs400(struct mmc *mmc)
 
 	/* Set back to HS */
 	mmc_set_card_speed(mmc, MMC_HS, true);
+
+	err = mmc_hs400_prepare_ddr(mmc);
+	if (err)
+		return err;
 
 	err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_BUS_WIDTH,
 			 EXT_CSD_BUS_WIDTH_8 | EXT_CSD_DDR_FLAG);
@@ -2029,7 +2063,7 @@ static int mmc_select_hs400es(struct mmc *mmc)
 
 static int mmc_select_mode_and_width(struct mmc *mmc, uint card_caps)
 {
-	int err;
+	int err = 0;
 	const struct mode_width_tuning *mwt;
 	const struct ext_csd_bus_width *ecbw;
 
@@ -2137,7 +2171,7 @@ static int mmc_select_mode_and_width(struct mmc *mmc, uint card_caps)
 					err = mmc_execute_tuning(mmc,
 								 mwt->tuning);
 					if (err) {
-						pr_debug("tuning failed\n");
+						pr_debug("tuning failed : %d\n", err);
 						goto error;
 					}
 				}
@@ -2150,7 +2184,7 @@ static int mmc_select_mode_and_width(struct mmc *mmc, uint card_caps)
 				return 0;
 error:
 			mmc_set_signal_voltage(mmc, old_voltage);
-			/* if an error occured, revert to a safer bus mode */
+			/* if an error occurred, revert to a safer bus mode */
 			mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,
 				   EXT_CSD_BUS_WIDTH, EXT_CSD_BUS_WIDTH_1);
 			mmc_select_mode(mmc, MMC_LEGACY);
@@ -2158,7 +2192,7 @@ error:
 		}
 	}
 
-	pr_err("unable to select a mode\n");
+	pr_err("unable to select a mode : %d\n", err);
 
 	return -ENOTSUPP;
 }
@@ -2399,23 +2433,7 @@ static int mmc_startup(struct mmc *mmc)
 	cmd.resp_type = MMC_RSP_R2;
 	cmd.cmdarg = 0;
 
-	err = mmc_send_cmd(mmc, &cmd, NULL);
-
-#ifdef CONFIG_MMC_QUIRKS
-	if (err && (mmc->quirks & MMC_QUIRK_RETRY_SEND_CID)) {
-		int retries = 4;
-		/*
-		 * It has been seen that SEND_CID may fail on the first
-		 * attempt, let's try a few more time
-		 */
-		do {
-			err = mmc_send_cmd(mmc, &cmd, NULL);
-			if (!err)
-				break;
-		} while (retries--);
-	}
-#endif
-
+	err = mmc_send_cmd_quirks(mmc, &cmd, NULL, MMC_QUIRK_RETRY_SEND_CID, 4);
 	if (err)
 		return err;
 
@@ -2703,8 +2721,8 @@ static int mmc_power_on(struct mmc *mmc)
 	if (mmc->vmmc_supply) {
 		int ret = regulator_set_enable(mmc->vmmc_supply, true);
 
-		if (ret) {
-			puts("Error enabling VMMC supply\n");
+		if (ret && ret != -EACCES) {
+			printf("Error enabling VMMC supply : %d\n", ret);
 			return ret;
 		}
 	}
@@ -2719,8 +2737,8 @@ static int mmc_power_off(struct mmc *mmc)
 	if (mmc->vmmc_supply) {
 		int ret = regulator_set_enable(mmc->vmmc_supply, false);
 
-		if (ret) {
-			pr_debug("Error disabling VMMC supply\n");
+		if (ret && ret != -EACCES) {
+			pr_debug("Error disabling VMMC supply : %d\n", ret);
 			return ret;
 		}
 	}
@@ -2756,9 +2774,6 @@ int mmc_get_op_cond(struct mmc *mmc)
 	if (mmc->has_init)
 		return 0;
 
-#ifdef CONFIG_FSL_ESDHC_ADAPTER_IDENT
-	mmc_adapter_card_type_ident();
-#endif
 	err = mmc_power_init(mmc);
 	if (err)
 		return err;
@@ -2785,13 +2800,17 @@ int mmc_get_op_cond(struct mmc *mmc)
 		return err;
 
 #if CONFIG_IS_ENABLED(DM_MMC)
-	/* The device has already been probed ready for use */
+	/*
+	 * Re-initialization is needed to clear old configuration for
+	 * mmc rescan.
+	 */
+	err = mmc_reinit(mmc);
 #else
 	/* made sure it's not NULL earlier */
 	err = mmc->cfg->ops->init(mmc);
+#endif
 	if (err)
 		return err;
-#endif
 	mmc->ddr_mode = 0;
 
 retry:
@@ -2803,7 +2822,7 @@ retry:
 	if (err)
 		return err;
 
-	/* The internal partition reset to user partition(0) at every CMD0*/
+	/* The internal partition reset to user partition(0) at every CMD0 */
 	mmc_get_blk_desc(mmc)->hwpart = 0;
 
 	/* Test for SD version 2 */
@@ -2823,7 +2842,7 @@ retry:
 
 		if (err) {
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
-			pr_err("Card did not respond to voltage select!\n");
+			pr_err("Card did not respond to voltage select! : %d\n", err);
 #endif
 			return -EOPNOTSUPP;
 		}
@@ -2946,13 +2965,13 @@ int mmc_set_dsr(struct mmc *mmc, u16 val)
 }
 
 /* CPU-specific MMC initializations */
-__weak int cpu_mmc_init(bd_t *bis)
+__weak int cpu_mmc_init(struct bd_info *bis)
 {
 	return -1;
 }
 
 /* board-specific MMC initializations. */
-__weak int board_mmc_init(bd_t *bis)
+__weak int board_mmc_init(struct bd_info *bis)
 {
 	return -1;
 }
@@ -2963,7 +2982,7 @@ void mmc_set_preinit(struct mmc *mmc, int preinit)
 }
 
 #if CONFIG_IS_ENABLED(DM_MMC)
-static int mmc_probe(bd_t *bis)
+static int mmc_probe(struct bd_info *bis)
 {
 	int ret, i;
 	struct uclass *uc;
@@ -2992,7 +3011,7 @@ static int mmc_probe(bd_t *bis)
 	return 0;
 }
 #else
-static int mmc_probe(bd_t *bis)
+static int mmc_probe(struct bd_info *bis)
 {
 	if (board_mmc_init(bis) < 0)
 		cpu_mmc_init(bis);
@@ -3001,7 +3020,7 @@ static int mmc_probe(bd_t *bis)
 }
 #endif
 
-int mmc_initialize(bd_t *bis)
+int mmc_initialize(struct bd_info *bis)
 {
 	static int initialized = 0;
 	int ret;
@@ -3040,9 +3059,6 @@ int mmc_init_device(int num)
 	m = mmc_get_mmc_dev(dev);
 	if (!m)
 		return 0;
-#ifdef CONFIG_FSL_ESDHC_ADAPTER_IDENT
-	mmc_set_preinit(m, 1);
-#endif
 	if (m->preinit)
 		mmc_start_init(m);
 
@@ -3083,3 +3099,12 @@ int mmc_set_bkops_enable(struct mmc *mmc)
 	return 0;
 }
 #endif
+
+__weak int mmc_get_env_dev(void)
+{
+#ifdef CONFIG_SYS_MMC_ENV_DEV
+	return CONFIG_SYS_MMC_ENV_DEV;
+#else
+	return 0;
+#endif
+}

@@ -7,15 +7,19 @@
 #include <clk-uclass.h>
 #include <dm.h>
 #include <errno.h>
+#include <log.h>
 #include <malloc.h>
 #include <syscon.h>
 #include <asm/io.h>
 #include <asm/arch-rockchip/clock.h>
 #include <asm/arch-rockchip/cru_rk3036.h>
 #include <asm/arch-rockchip/hardware.h>
+#include <dm/device-internal.h>
 #include <dm/lists.h>
 #include <dt-bindings/clock/rk3036-cru.h>
+#include <linux/delay.h>
 #include <linux/log2.h>
+#include <linux/stringify.h>
 
 enum {
 	VCO_MAX_HZ	= 2400U * 1000000,
@@ -315,7 +319,7 @@ static struct clk_ops rk3036_clk_ops = {
 	.set_rate	= rk3036_clk_set_rate,
 };
 
-static int rk3036_clk_ofdata_to_platdata(struct udevice *dev)
+static int rk3036_clk_of_to_plat(struct udevice *dev)
 {
 	struct rk3036_clk_priv *priv = dev_get_priv(dev);
 
@@ -350,7 +354,7 @@ static int rk3036_clk_bind(struct udevice *dev)
 						    cru_glb_srst_fst_value);
 		priv->glb_srst_snd_value = offsetof(struct rk3036_cru,
 						    cru_glb_srst_snd_value);
-		sys_child->priv = priv;
+		dev_set_priv(sys_child, priv);
 	}
 
 #if CONFIG_IS_ENABLED(RESET_ROCKCHIP)
@@ -372,8 +376,8 @@ U_BOOT_DRIVER(rockchip_rk3036_cru) = {
 	.name		= "clk_rk3036",
 	.id		= UCLASS_CLK,
 	.of_match	= rk3036_clk_ids,
-	.priv_auto_alloc_size = sizeof(struct rk3036_clk_priv),
-	.ofdata_to_platdata = rk3036_clk_ofdata_to_platdata,
+	.priv_auto	= sizeof(struct rk3036_clk_priv),
+	.of_to_plat = rk3036_clk_of_to_plat,
 	.ops		= &rk3036_clk_ops,
 	.bind		= rk3036_clk_bind,
 	.probe		= rk3036_clk_probe,

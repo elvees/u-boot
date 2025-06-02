@@ -12,15 +12,18 @@
 
 #include "tegra30-common.h"
 
-/* Board-specific serial config */
+/*
+ * Board-specific serial config
+ *
+ * Apalis UART1: NVIDIA UARTA
+ * Apalis UART2: NVIDIA UARTD
+ * Apalis UART3: NVIDIA UARTB
+ * Apalis UART4: NVIDIA UARTC
+ */
 #define CONFIG_TEGRA_ENABLE_UARTA
 #define CONFIG_SYS_NS16550_COM1		NV_PA_APB_UARTA_BASE
 
 #define CONFIG_MACH_TYPE		MACH_TYPE_APALIS_T30
-
-/* Environment in eMMC, before config block at the end of 1st "boot sector" */
-#define CONFIG_SYS_MMC_ENV_DEV		0
-#define CONFIG_SYS_MMC_ENV_PART		1
 
 /* PCI networking support */
 #define CONFIG_E1000_NO_NVM

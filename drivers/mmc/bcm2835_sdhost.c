@@ -37,7 +37,10 @@
 #include <asm/arch/mbox.h>
 #include <asm/unaligned.h>
 #include <dm/device_compat.h>
+#include <linux/bitops.h>
+#include <linux/bug.h>
 #include <linux/compat.h>
+#include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>
 #include <linux/sizes.h>
@@ -182,22 +185,22 @@ struct bcm2835_host {
 
 static void bcm2835_dumpregs(struct bcm2835_host *host)
 {
-	dev_dbg(dev, "=========== REGISTER DUMP ===========\n");
-	dev_dbg(dev, "SDCMD  0x%08x\n", readl(host->ioaddr + SDCMD));
-	dev_dbg(dev, "SDARG  0x%08x\n", readl(host->ioaddr + SDARG));
-	dev_dbg(dev, "SDTOUT 0x%08x\n", readl(host->ioaddr + SDTOUT));
-	dev_dbg(dev, "SDCDIV 0x%08x\n", readl(host->ioaddr + SDCDIV));
-	dev_dbg(dev, "SDRSP0 0x%08x\n", readl(host->ioaddr + SDRSP0));
-	dev_dbg(dev, "SDRSP1 0x%08x\n", readl(host->ioaddr + SDRSP1));
-	dev_dbg(dev, "SDRSP2 0x%08x\n", readl(host->ioaddr + SDRSP2));
-	dev_dbg(dev, "SDRSP3 0x%08x\n", readl(host->ioaddr + SDRSP3));
-	dev_dbg(dev, "SDHSTS 0x%08x\n", readl(host->ioaddr + SDHSTS));
-	dev_dbg(dev, "SDVDD  0x%08x\n", readl(host->ioaddr + SDVDD));
-	dev_dbg(dev, "SDEDM  0x%08x\n", readl(host->ioaddr + SDEDM));
-	dev_dbg(dev, "SDHCFG 0x%08x\n", readl(host->ioaddr + SDHCFG));
-	dev_dbg(dev, "SDHBCT 0x%08x\n", readl(host->ioaddr + SDHBCT));
-	dev_dbg(dev, "SDHBLC 0x%08x\n", readl(host->ioaddr + SDHBLC));
-	dev_dbg(dev, "===========================================\n");
+	dev_dbg(host->dev, "=========== REGISTER DUMP ===========\n");
+	dev_dbg(host->dev, "SDCMD  0x%08x\n", readl(host->ioaddr + SDCMD));
+	dev_dbg(host->dev, "SDARG  0x%08x\n", readl(host->ioaddr + SDARG));
+	dev_dbg(host->dev, "SDTOUT 0x%08x\n", readl(host->ioaddr + SDTOUT));
+	dev_dbg(host->dev, "SDCDIV 0x%08x\n", readl(host->ioaddr + SDCDIV));
+	dev_dbg(host->dev, "SDRSP0 0x%08x\n", readl(host->ioaddr + SDRSP0));
+	dev_dbg(host->dev, "SDRSP1 0x%08x\n", readl(host->ioaddr + SDRSP1));
+	dev_dbg(host->dev, "SDRSP2 0x%08x\n", readl(host->ioaddr + SDRSP2));
+	dev_dbg(host->dev, "SDRSP3 0x%08x\n", readl(host->ioaddr + SDRSP3));
+	dev_dbg(host->dev, "SDHSTS 0x%08x\n", readl(host->ioaddr + SDHSTS));
+	dev_dbg(host->dev, "SDVDD  0x%08x\n", readl(host->ioaddr + SDVDD));
+	dev_dbg(host->dev, "SDEDM  0x%08x\n", readl(host->ioaddr + SDEDM));
+	dev_dbg(host->dev, "SDHCFG 0x%08x\n", readl(host->ioaddr + SDHCFG));
+	dev_dbg(host->dev, "SDHBCT 0x%08x\n", readl(host->ioaddr + SDHBCT));
+	dev_dbg(host->dev, "SDHBLC 0x%08x\n", readl(host->ioaddr + SDHBLC));
+	dev_dbg(host->dev, "===========================================\n");
 }
 
 static void bcm2835_reset_internal(struct bcm2835_host *host)
@@ -735,7 +738,7 @@ static void bcm2835_add_host(struct bcm2835_host *host)
 	cfg->f_min = host->max_clk / SDCDIV_MAX_CDIV;
 	cfg->b_max = 65535;
 
-	dev_dbg(dev, "f_max %d, f_min %d\n",
+	dev_dbg(host->dev, "f_max %d, f_min %d\n",
 		cfg->f_max, cfg->f_min);
 
 	/* host controller capabilities */
@@ -752,7 +755,7 @@ static void bcm2835_add_host(struct bcm2835_host *host)
 
 static int bcm2835_probe(struct udevice *dev)
 {
-	struct bcm2835_plat *plat = dev_get_platdata(dev);
+	struct bcm2835_plat *plat = dev_get_plat(dev);
 	struct bcm2835_host *host = dev_get_priv(dev);
 	struct mmc *mmc = mmc_get_mmc_dev(dev);
 	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(dev);
@@ -763,7 +766,7 @@ static int bcm2835_probe(struct udevice *dev)
 	upriv->mmc = &plat->mmc;
 	plat->cfg.name = dev->name;
 
-	host->phys_addr = devfdt_get_addr(dev);
+	host->phys_addr = dev_read_addr(dev);
 	if (host->phys_addr == FDT_ADDR_T_NONE)
 		return -EINVAL;
 
@@ -792,7 +795,7 @@ static const struct dm_mmc_ops bcm2835_ops = {
 
 static int bcm2835_bind(struct udevice *dev)
 {
-	struct bcm2835_plat *plat = dev_get_platdata(dev);
+	struct bcm2835_plat *plat = dev_get_plat(dev);
 
 	return mmc_bind(dev, &plat->mmc, &plat->cfg);
 }
@@ -803,7 +806,7 @@ U_BOOT_DRIVER(bcm2835_sdhost) = {
 	.of_match = bcm2835_match,
 	.bind = bcm2835_bind,
 	.probe = bcm2835_probe,
-	.priv_auto_alloc_size = sizeof(struct bcm2835_host),
-	.platdata_auto_alloc_size = sizeof(struct bcm2835_plat),
+	.priv_auto	= sizeof(struct bcm2835_host),
+	.plat_auto	= sizeof(struct bcm2835_plat),
 	.ops = &bcm2835_ops,
 };

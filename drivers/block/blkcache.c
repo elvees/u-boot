@@ -4,12 +4,18 @@
  * Author: Eric Nelson<eric@nelint.com>
  *
  */
-#include <config.h>
 #include <common.h>
+#include <blk.h>
+#include <log.h>
 #include <malloc.h>
 #include <part.h>
+#include <asm/global_data.h>
 #include <linux/ctype.h>
 #include <linux/list.h>
+
+#ifdef CONFIG_NEEDS_MANUAL_RELOC
+DECLARE_GLOBAL_DATA_PTR;
+#endif
 
 struct block_cache_node {
 	struct list_head lh;
@@ -21,21 +27,20 @@ struct block_cache_node {
 	char *cache;
 };
 
-#ifndef CONFIG_M68K
 static LIST_HEAD(block_cache);
-#else
-static struct list_head block_cache;
-#endif
 
 static struct block_cache_stats _stats = {
 	.max_blocks_per_entry = 8,
 	.max_entries = 32
 };
 
-#ifdef CONFIG_M68K
+#ifdef CONFIG_NEEDS_MANUAL_RELOC
 int blkcache_init(void)
 {
-	INIT_LIST_HEAD(&block_cache);
+	struct list_head *head = &block_cache;
+
+	head->next = (uintptr_t)head->next + gd->reloc_off;
+	head->prev = (uintptr_t)head->prev + gd->reloc_off;
 
 	return 0;
 }

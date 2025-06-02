@@ -7,15 +7,19 @@
  */
 
 #include <common.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <dm.h>
 #include <errno.h>
 #include <generic-phy.h>
 #include <regmap.h>
+#include <soc.h>
 #include <syscon.h>
+#include <linux/bitops.h>
 #include <linux/err.h>
 
 #define OMAP_USB2_CALIBRATE_FALSE_DISCONNECT	BIT(0)
+#define OMAP_USB2_DISABLE_CHG_DET		BIT(1)
 
 #define OMAP_DEV_PHY_PD		BIT(0)
 #define OMAP_USB2_PHY_PD	BIT(28)
@@ -31,6 +35,10 @@
 #define AM654_USB2_OTG_PD		BIT(8)
 #define AM654_USB2_VBUS_DET_EN		BIT(5)
 #define AM654_USB2_VBUSVALID_DET_EN	BIT(4)
+
+#define USB2PHY_CHRG_DET		 0x14
+#define USB2PHY_USE_CHG_DET_REG		BIT(29)
+#define USB2PHY_DIS_CHG_DET		BIT(28)
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -159,6 +167,12 @@ static int omap_usb2_phy_init(struct phy *usb_phy)
 		writel(val, priv->phy_base + USB2PHY_ANA_CONFIG1);
 	}
 
+	if (priv->flags & OMAP_USB2_DISABLE_CHG_DET) {
+		val = readl(priv->phy_base + USB2PHY_CHRG_DET);
+		val |= USB2PHY_USE_CHG_DET_REG | USB2PHY_DIS_CHG_DET;
+		writel(val, priv->phy_base + USB2PHY_CHRG_DET);
+	}
+
 	return 0;
 }
 
@@ -184,6 +198,11 @@ struct phy_ops omap_usb2_phy_ops = {
 	.exit = omap_usb2_phy_exit,
 };
 
+static const struct soc_attr am65x_sr10_soc_devices[] = {
+	{ .family = "AM65X", .revision = "SR1.0" },
+	{ /* sentinel */ }
+};
+
 int omap_usb2_phy_probe(struct udevice *dev)
 {
 	int rc;
@@ -196,13 +215,24 @@ int omap_usb2_phy_probe(struct udevice *dev)
 	if (!data)
 		return -EINVAL;
 
-	if (data->flags & OMAP_USB2_CALIBRATE_FALSE_DISCONNECT) {
-		priv->phy_base = dev_read_addr_ptr(dev);
+	priv->phy_base = dev_read_addr_ptr(dev);
 
-		if (!priv->phy_base)
-			return -EINVAL;
+	if (!priv->phy_base)
+		return -EINVAL;
+
+	if (data->flags & OMAP_USB2_CALIBRATE_FALSE_DISCONNECT)
 		priv->flags |= OMAP_USB2_CALIBRATE_FALSE_DISCONNECT;
-	}
+
+	/*
+	 * AM654x PG1.0 has a silicon bug that D+ is pulled high after
+	 * POR, which could cause enumeration failure with some USB hubs.
+	 * Disabling the USB2_PHY Charger Detect function will put D+
+	 * into the normal state.
+	 *
+	 * Enable this workaround for AM654x PG1.0.
+	 */
+	if (soc_device_match(am65x_sr10_soc_devices))
+		priv->flags |= OMAP_USB2_DISABLE_CHG_DET;
 
 	regmap = syscon_regmap_lookup_by_phandle(dev, "syscon-phy-power");
 	if (!IS_ERR(regmap)) {
@@ -232,5 +262,5 @@ U_BOOT_DRIVER(omap_usb2_phy) = {
 	.of_match = omap_usb2_id_table,
 	.probe = omap_usb2_phy_probe,
 	.ops = &omap_usb2_phy_ops,
-	.priv_auto_alloc_size = sizeof(struct omap_usb2_phy),
+	.priv_auto	= sizeof(struct omap_usb2_phy),
 };

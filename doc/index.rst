@@ -25,6 +25,18 @@ trying to get it to work optimally on a given system.
    :maxdepth: 2
 
    build/index
+   usage/index
+
+Developer-oriented documentation
+--------------------------------
+
+The following manuals are written for *developers* of the U-Boot - those who
+want to contribute to U-Boot.
+
+.. toctree::
+   :maxdepth: 2
+
+   develop/index
 
 Unified Extensible Firmware (UEFI)
 ----------------------------------

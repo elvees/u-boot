@@ -8,9 +8,11 @@
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <asm/arch-mediatek/reset.h>
 #include <asm/io.h>
 #include <dt-bindings/clock/mt7623-clk.h>
+#include <linux/bitops.h>
 
 #include "clk-mtk.h"
 
@@ -857,7 +859,7 @@ U_BOOT_DRIVER(mtk_clk_apmixedsys) = {
 	.id = UCLASS_CLK,
 	.of_match = mt7623_apmixed_compat,
 	.probe = mt7623_apmixedsys_probe,
-	.priv_auto_alloc_size = sizeof(struct mtk_clk_priv),
+	.priv_auto	= sizeof(struct mtk_clk_priv),
 	.ops = &mtk_clk_apmixedsys_ops,
 	.flags = DM_FLAG_PRE_RELOC,
 };
@@ -867,7 +869,7 @@ U_BOOT_DRIVER(mtk_clk_topckgen) = {
 	.id = UCLASS_CLK,
 	.of_match = mt7623_topckgen_compat,
 	.probe = mt7623_topckgen_probe,
-	.priv_auto_alloc_size = sizeof(struct mtk_clk_priv),
+	.priv_auto	= sizeof(struct mtk_clk_priv),
 	.ops = &mtk_clk_topckgen_ops,
 	.flags = DM_FLAG_PRE_RELOC,
 };
@@ -877,7 +879,7 @@ U_BOOT_DRIVER(mtk_clk_infracfg) = {
 	.id = UCLASS_CLK,
 	.of_match = mt7623_infracfg_compat,
 	.probe = mt7623_infracfg_probe,
-	.priv_auto_alloc_size = sizeof(struct mtk_cg_priv),
+	.priv_auto	= sizeof(struct mtk_cg_priv),
 	.ops = &mtk_clk_gate_ops,
 	.flags = DM_FLAG_PRE_RELOC,
 };
@@ -887,7 +889,7 @@ U_BOOT_DRIVER(mtk_clk_pericfg) = {
 	.id = UCLASS_CLK,
 	.of_match = mt7623_pericfg_compat,
 	.probe = mt7623_pericfg_probe,
-	.priv_auto_alloc_size = sizeof(struct mtk_cg_priv),
+	.priv_auto	= sizeof(struct mtk_cg_priv),
 	.ops = &mtk_clk_gate_ops,
 	.flags = DM_FLAG_PRE_RELOC,
 };
@@ -898,7 +900,7 @@ U_BOOT_DRIVER(mtk_clk_hifsys) = {
 	.of_match = mt7623_hifsys_compat,
 	.probe = mt7623_hifsys_probe,
 	.bind = mt7623_ethsys_hifsys_bind,
-	.priv_auto_alloc_size = sizeof(struct mtk_cg_priv),
+	.priv_auto	= sizeof(struct mtk_cg_priv),
 	.ops = &mtk_clk_gate_ops,
 };
 
@@ -908,6 +910,6 @@ U_BOOT_DRIVER(mtk_clk_ethsys) = {
 	.of_match = mt7623_ethsys_compat,
 	.probe = mt7623_ethsys_probe,
 	.bind = mt7623_ethsys_hifsys_bind,
-	.priv_auto_alloc_size = sizeof(struct mtk_cg_priv),
+	.priv_auto	= sizeof(struct mtk_cg_priv),
 	.ops = &mtk_clk_gate_ops,
 };

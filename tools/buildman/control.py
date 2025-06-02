@@ -5,18 +5,18 @@
 import multiprocessing
 import os
 import shutil
+import subprocess
 import sys
 
-import board
-import bsettings
-from builder import Builder
-import gitutil
-import patchstream
-import terminal
-from terminal import Print
-import toolchain
-import command
-import subprocess
+from buildman import board
+from buildman import bsettings
+from buildman import toolchain
+from buildman.builder import Builder
+from patman import command
+from patman import gitutil
+from patman import patchstream
+from patman import terminal
+from patman.terminal import Print
 
 def GetPlural(count):
     """Returns a plural 's' if count is not 1"""
@@ -85,38 +85,15 @@ def ShowActions(series, why_selected, boards_selected, builder, options,
         for warning in board_warnings:
             print(col.Color(col.YELLOW, warning))
 
-def CheckOutputDir(output_dir):
-    """Make sure that the output directory is not within the current directory
-
-    If we try to use an output directory which is within the current directory
-    (which is assumed to hold the U-Boot source) we may end up deleting the
-    U-Boot source code. Detect this and print an error in this case.
-
-    Args:
-        output_dir: Output directory path to check
-    """
-    path = os.path.realpath(output_dir)
-    cwd_path = os.path.realpath('.')
-    while True:
-        if os.path.realpath(path) == cwd_path:
-            Print("Cannot use output directory '%s' since it is within the current directory '%s'" %
-                  (path, cwd_path))
-            sys.exit(1)
-        parent = os.path.dirname(path)
-        if parent == path:
-            break
-        path = parent
-
-def ShowToolchainInfo(boards, toolchains, print_arch, print_prefix):
+def ShowToolchainPrefix(boards, toolchains):
     """Show information about a the tool chain used by one or more boards
 
-    The function checks that all boards use the same toolchain.
+    The function checks that all boards use the same toolchain, then prints
+    the correct value for CROSS_COMPILE.
 
     Args:
         boards: Boards object containing selected boards
         toolchains: Toolchains object containing available toolchains
-        print_arch: True to print ARCH value
-        print_prefix: True to print CROSS_COMPILE value
 
     Return:
         None on success, string error message otherwise
@@ -129,10 +106,7 @@ def ShowToolchainInfo(boards, toolchains, print_arch, print_prefix):
         return 'Supplied boards must share one toolchain'
         return False
     tc = tc_set.pop()
-    if print_arch:
-        print(tc.GetEnvArgs(toolchain.VAR_ARCH))
-    if print_prefix:
-        print(tc.GetEnvArgs(toolchain.VAR_CROSS_COMPILE))
+    print(tc.GetEnvArgs(toolchain.VAR_CROSS_COMPILE))
     return None
 
 def DoBuildman(options, args, toolchains=None, make_func=None, boards=None,
@@ -198,15 +172,29 @@ def DoBuildman(options, args, toolchains=None, make_func=None, boards=None,
         print()
         return 0
 
+    if options.incremental:
+        print(col.Color(col.RED,
+                        'Warning: -I has been removed. See documentation'))
+    if not options.output_dir:
+        if options.work_in_output:
+            sys.exit(col.Color(col.RED, '-w requires that you specify -o'))
+        options.output_dir = '..'
+
     # Work out what subset of the boards we are building
     if not boards:
         if not os.path.exists(options.output_dir):
             os.makedirs(options.output_dir)
         board_file = os.path.join(options.output_dir, 'boards.cfg')
-        genboardscfg = os.path.join(options.git, 'tools/genboardscfg.py')
+        our_path = os.path.dirname(os.path.realpath(__file__))
+        genboardscfg = os.path.join(our_path, '../genboardscfg.py')
+        if not os.path.exists(genboardscfg):
+            genboardscfg = os.path.join(options.git, 'tools/genboardscfg.py')
         status = subprocess.call([genboardscfg, '-q', '-o', board_file])
         if status != 0:
-            sys.exit("Failed to generate boards.cfg")
+            # Older versions don't support -q
+            status = subprocess.call([genboardscfg, '-o', board_file])
+            if status != 0:
+                sys.exit("Failed to generate boards.cfg")
 
         boards = board.Boards()
         boards.ReadBoards(board_file)
@@ -228,9 +216,8 @@ def DoBuildman(options, args, toolchains=None, make_func=None, boards=None,
     if not len(selected):
         sys.exit(col.Color(col.RED, 'No matching boards found'))
 
-    if options.print_arch or options.print_prefix:
-        err = ShowToolchainInfo(boards, toolchains, options.print_arch,
-                                options.print_prefix)
+    if options.print_prefix:
+        err = ShowToolchainPrefix(boards, toolchains)
         if err:
             sys.exit(col.Color(col.RED, err))
         return 0
@@ -263,6 +250,13 @@ def DoBuildman(options, args, toolchains=None, make_func=None, boards=None,
         str = ("No commits found to process in branch '%s': "
                "set branch's upstream or use -c flag" % options.branch)
         sys.exit(col.Color(col.RED, str))
+    if options.work_in_output:
+        if len(selected) != 1:
+            sys.exit(col.Color(col.RED,
+                               '-w can only be used with a single board'))
+        if count != 1:
+            sys.exit(col.Color(col.RED,
+                               '-w can only be used with a single commit'))
 
     # Read the metadata from the commits. First look at the upstream commit,
     # then the ones in the branch. We would like to do something like
@@ -282,14 +276,14 @@ def DoBuildman(options, args, toolchains=None, make_func=None, boards=None,
                                                       options.branch)
             upstream_commit = gitutil.GetUpstream(options.git_dir,
                                                   options.branch)
-            series = patchstream.GetMetaDataForList(upstream_commit,
+            series = patchstream.get_metadata_for_list(upstream_commit,
                 options.git_dir, 1, series=None, allow_overwrite=True)
 
-            series = patchstream.GetMetaDataForList(range_expr,
+            series = patchstream.get_metadata_for_list(range_expr,
                     options.git_dir, None, series, allow_overwrite=True)
         else:
             # Honour the count
-            series = patchstream.GetMetaDataForList(options.branch,
+            series = patchstream.get_metadata_for_list(options.branch,
                     options.git_dir, count, series=None, allow_overwrite=True)
     else:
         series = None
@@ -300,7 +294,7 @@ def DoBuildman(options, args, toolchains=None, make_func=None, boards=None,
 
     # By default we have one thread per CPU. But if there are not enough jobs
     # we can have fewer threads and use a high '-j' value for make.
-    if not options.threads:
+    if options.threads is None:
         options.threads = min(multiprocessing.cpu_count(), len(selected))
     if not options.jobs:
         options.jobs = max(1, (multiprocessing.cpu_count() +
@@ -324,17 +318,17 @@ def DoBuildman(options, args, toolchains=None, make_func=None, boards=None,
             output_dir = os.path.join(options.output_dir, dirname)
         if clean_dir and os.path.exists(output_dir):
             shutil.rmtree(output_dir)
-    CheckOutputDir(output_dir)
     builder = Builder(toolchains, output_dir, options.git_dir,
             options.threads, options.jobs, gnu_make=gnu_make, checkout=True,
             show_unknown=options.show_unknown, step=options.step,
             no_subdirs=options.no_subdirs, full_path=options.full_path,
             verbose_build=options.verbose_build,
-            incremental=options.incremental,
+            mrproper=options.mrproper,
             per_board_out_dir=options.per_board_out_dir,
             config_only=options.config_only,
             squash_config_y=not options.preserve_config_y,
-            warnings_as_errors=options.warnings_as_errors)
+            warnings_as_errors=options.warnings_as_errors,
+            work_in_output=options.work_in_output)
     builder.force_config_on_failure = not options.quick
     if make_func:
         builder.do_make = make_func
@@ -361,23 +355,23 @@ def DoBuildman(options, args, toolchains=None, make_func=None, boards=None,
             commits = None
 
         Print(GetActionSummary(options.summary, commits, board_selected,
-                                options))
+                               options))
 
         # We can't show function sizes without board details at present
         if options.show_bloat:
             options.show_detail = True
-        builder.SetDisplayOptions(options.show_errors, options.show_sizes,
-                                  options.show_detail, options.show_bloat,
-                                  options.list_error_boards,
-                                  options.show_config,
-                                  options.show_environment)
+        builder.SetDisplayOptions(
+            options.show_errors, options.show_sizes, options.show_detail,
+            options.show_bloat, options.list_error_boards, options.show_config,
+            options.show_environment, options.filter_dtb_warnings,
+            options.filter_migration_warnings)
         if options.summary:
             builder.ShowSummary(commits, board_selected)
         else:
             fail, warned = builder.BuildBoards(commits, board_selected,
                                 options.keep_outputs, options.verbose)
             if fail:
-                return 128
-            elif warned:
-                return 129
+                return 100
+            elif warned and not options.ignore_warnings:
+                return 101
     return 0

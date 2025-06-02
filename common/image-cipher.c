@@ -9,8 +9,9 @@
 #else
 #include <common.h>
 #include <malloc.h>
+#include <asm/global_data.h>
 DECLARE_GLOBAL_DATA_PTR;
-#endif /* !USE_HOSTCC*/
+#endif /* !USE_HOSdTCC*/
 #include <image.h>
 #include <uboot_aes.h>
 #include <u-boot/aes.h>
@@ -94,9 +95,11 @@ static int fit_image_setup_decrypt(struct image_cipher_info *info,
 		return -1;
 	}
 
+	info->iv = fdt_getprop(fit, cipher_noffset, "iv", NULL);
 	info->ivname = fdt_getprop(fit, cipher_noffset, "iv-name-hint", NULL);
-	if (!info->ivname) {
-		printf("Can't get IV name\n");
+
+	if (!info->iv && !info->ivname) {
+		printf("Can't get IV or IV name\n");
 		return -1;
 	}
 
@@ -120,8 +123,12 @@ static int fit_image_setup_decrypt(struct image_cipher_info *info,
 	 * Search the cipher node in the u-boot fdt
 	 * the path should be: /cipher/key-<algo>-<key>-<iv>
 	 */
-	snprintf(node_path, sizeof(node_path), "/%s/key-%s-%s-%s",
-		 FIT_CIPHER_NODENAME, algo_name, info->keyname, info->ivname);
+	if (info->ivname)
+		snprintf(node_path, sizeof(node_path), "/%s/key-%s-%s-%s",
+			 FIT_CIPHER_NODENAME, algo_name, info->keyname, info->ivname);
+	else
+		snprintf(node_path, sizeof(node_path), "/%s/key-%s-%s",
+			 FIT_CIPHER_NODENAME, algo_name, info->keyname);
 
 	noffset = fdt_path_offset(fdt, node_path);
 	if (noffset < 0) {
@@ -137,10 +144,12 @@ static int fit_image_setup_decrypt(struct image_cipher_info *info,
 	}
 
 	/* read iv */
-	info->iv = fdt_getprop(fdt, noffset, "iv", NULL);
 	if (!info->iv) {
-		printf("Can't get IV in cipher node '%s'\n", node_path);
-		return -1;
+		info->iv = fdt_getprop(fdt, noffset, "iv", NULL);
+		if (!info->iv) {
+			printf("Can't get IV in cipher node '%s'\n", node_path);
+			return -1;
+		}
 	}
 
 	return 0;

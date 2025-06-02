@@ -11,22 +11,11 @@
 #include <common.h>
 #include <dm.h>
 #include <dt-structs.h>
+#include <log.h>
 #include <p2sb.h>
 #include <asm/intel_pinctrl.h>
 #include <asm-generic/gpio.h>
 #include <asm/intel_pinctrl_defs.h>
-
-/**
- * struct apl_gpio_platdata - platform data for each device
- *
- * @dtplat: of-platdata data from C struct
- */
-struct apl_gpio_platdata {
-#if CONFIG_IS_ENABLED(OF_PLATDATA)
-	/* Put this first since driver model will copy the data here */
-	struct dtd_intel_apl_pinctrl dtplat;
-#endif
-};
 
 static const struct reset_mapping rst_map[] = {
 	{ .logical = PAD_CFG0_LOGICAL_RESET_PWROK, .chipset = 0U << 30 },
@@ -74,7 +63,6 @@ static const struct pad_community apl_gpio_communities[] = {
 		.gpi_smi_en_reg_0 = GPI_SMI_EN_0,
 		.max_pads_per_group = GPIO_MAX_NUM_PER_GROUP,
 		.name = "GPIO_GPE_N",
-		.acpi_path = "\\_SB.GPO0",
 		.reset_map = rst_map,
 		.num_reset_vals = ARRAY_SIZE(rst_map),
 		.groups = apl_community_n_groups,
@@ -93,7 +81,6 @@ static const struct pad_community apl_gpio_communities[] = {
 		.gpi_smi_en_reg_0 = GPI_SMI_EN_0,
 		.max_pads_per_group = GPIO_MAX_NUM_PER_GROUP,
 		.name = "GPIO_GPE_NW",
-		.acpi_path = "\\_SB.GPO1",
 		.reset_map = rst_map,
 		.num_reset_vals = ARRAY_SIZE(rst_map),
 		.groups = apl_community_nw_groups,
@@ -112,7 +99,6 @@ static const struct pad_community apl_gpio_communities[] = {
 		.gpi_smi_en_reg_0 = GPI_SMI_EN_0,
 		.max_pads_per_group = GPIO_MAX_NUM_PER_GROUP,
 		.name = "GPIO_GPE_W",
-		.acpi_path = "\\_SB.GPO2",
 		.reset_map = rst_map,
 		.num_reset_vals = ARRAY_SIZE(rst_map),
 		.groups = apl_community_w_groups,
@@ -131,7 +117,6 @@ static const struct pad_community apl_gpio_communities[] = {
 		.gpi_smi_en_reg_0 = GPI_SMI_EN_0,
 		.max_pads_per_group = GPIO_MAX_NUM_PER_GROUP,
 		.name = "GPIO_GPE_SW",
-		.acpi_path = "\\_SB.GPO3",
 		.reset_map = rst_map,
 		.num_reset_vals = ARRAY_SIZE(rst_map),
 		.groups = apl_community_sw_groups,
@@ -139,14 +124,14 @@ static const struct pad_community apl_gpio_communities[] = {
 	},
 };
 
-static int apl_pinctrl_ofdata_to_platdata(struct udevice *dev)
+static int apl_pinctrl_of_to_plat(struct udevice *dev)
 {
-	struct p2sb_child_platdata *pplat;
+	struct p2sb_child_plat *pplat;
 	const struct pad_community *comm = NULL;
 	int i;
 
 #if CONFIG_IS_ENABLED(OF_PLATDATA)
-	struct apl_gpio_platdata *plat = dev_get_platdata(dev);
+	struct apl_gpio_plat *plat = dev_get_plat(dev);
 	int ret;
 
 	/*
@@ -155,38 +140,38 @@ static int apl_pinctrl_ofdata_to_platdata(struct udevice *dev)
 	 * linker list (i.e. alphabetical order by driver name). So the GPIO
 	 * device may well be bound before its parent (p2sb), and this call
 	 * will fail if p2sb is not bound yet.
-	 *
-	 * TODO(sjg@chromium.org): Add a parent pointer to child devices in dtoc
 	 */
 	ret = p2sb_set_port_id(dev, plat->dtplat.intel_p2sb_port_id);
 	if (ret)
 		return log_msg_ret("Could not set port id", ret);
 #endif
 	/* Attach this device to its community structure */
-	pplat = dev_get_parent_platdata(dev);
+	pplat = dev_get_parent_plat(dev);
 	for (i = 0; i < ARRAY_SIZE(apl_gpio_communities); i++) {
 		if (apl_gpio_communities[i].port == pplat->pid)
 			comm = &apl_gpio_communities[i];
 	}
 
-	return intel_pinctrl_ofdata_to_platdata(dev, comm, 2);
+	return intel_pinctrl_of_to_plat(dev, comm, 2);
 }
 
+#if !CONFIG_IS_ENABLED(OF_PLATDATA)
 static const struct udevice_id apl_gpio_ids[] = {
 	{ .compatible = "intel,apl-pinctrl"},
 	{ }
 };
+#endif
 
-U_BOOT_DRIVER(apl_pinctrl_drv) = {
+U_BOOT_DRIVER(intel_apl_pinctrl) = {
 	.name		= "intel_apl_pinctrl",
 	.id		= UCLASS_PINCTRL,
-	.of_match	= apl_gpio_ids,
+	.of_match	= of_match_ptr(apl_gpio_ids),
 	.probe		= intel_pinctrl_probe,
 	.ops		= &intel_pinctrl_ops,
 #if !CONFIG_IS_ENABLED(OF_PLATDATA)
 	.bind		= dm_scan_fdt_dev,
 #endif
-	.ofdata_to_platdata = apl_pinctrl_ofdata_to_platdata,
-	.priv_auto_alloc_size = sizeof(struct intel_pinctrl_priv),
-	.platdata_auto_alloc_size = sizeof(struct apl_gpio_platdata),
+	.of_to_plat = apl_pinctrl_of_to_plat,
+	.priv_auto	= sizeof(struct intel_pinctrl_priv),
+	.plat_auto	= sizeof(struct apl_gpio_plat),
 };

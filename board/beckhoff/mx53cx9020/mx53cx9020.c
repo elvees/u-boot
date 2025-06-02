@@ -13,9 +13,11 @@
 #include <asm/arch/sys_proto.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/iomux-mx53.h>
+#include <asm/global_data.h>
 #include <asm/mach-imx/mx5_video.h>
 #include <ACEX1K.h>
 #include <asm/gpio.h>
+#include <linux/delay.h>
 
 enum LED_GPIOS {
 	GPIO_SD1_CD = IMX_GPIO_NR(1, 1),

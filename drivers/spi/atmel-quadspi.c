@@ -17,6 +17,7 @@
 #include <errno.h>
 #include <fdtdec.h>
 #include <dm/device_compat.h>
+#include <linux/bitops.h>
 #include <linux/err.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>
@@ -623,6 +624,6 @@ U_BOOT_DRIVER(atmel_qspi) = {
 	.id             = UCLASS_SPI,
 	.of_match       = atmel_qspi_ids,
 	.ops            = &atmel_qspi_ops,
-	.priv_auto_alloc_size = sizeof(struct atmel_qspi),
+	.priv_auto	= sizeof(struct atmel_qspi),
 	.probe          = atmel_qspi_probe,
 };

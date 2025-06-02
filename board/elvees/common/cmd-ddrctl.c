@@ -24,7 +24,7 @@ static void disable_ddrmc(int ddrmc_id)
 	printf("DDR controller #%d disabled\n", ddrmc_id);
 }
 
-static int do_ddrctl(cmd_tbl_t *cmdtp, int flag, int argc,
+static int do_ddrctl(struct cmd_tbl *cmdtp, int flag, int argc,
 		     char * const argv[])
 {
 	if (argc < 3)

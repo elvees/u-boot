@@ -37,9 +37,9 @@ config SPL_FRAMEWORK_BOARD_INIT_F
 config SPL_SIZE_LIMIT
 	hex "Maximum size of SPL image"
 	depends on SPL
-	default 69632 if ARCH_MX6 && !MX6_OCRAM_256KB
-	default 200704 if ARCH_MX6 && MX6_OCRAM_256KB
-	default 0
+	default 0x11000 if ARCH_MX6 && !MX6_OCRAM_256KB
+	default 0x31000 if ARCH_MX6 && MX6_OCRAM_256KB
+	default 0x0
 	help
 	  Specifies the maximum length of the U-Boot SPL image.
 	  If this value is zero, it is ignored.
@@ -113,11 +113,20 @@ config SPL_FSL_PBL
 	  Create boot binary having SPL binary in PBI format concatenated with
 	  u-boot binary.
 
+config SPL_ALLOC_BD
+	bool "Allocate memory for bd_info"
+	default y if X86 || SANDBOX
+	help
+	  Some boards don't allocate space for this in their board_init_f()
+	  code. In this case U-Boot can allocate space for gd->bd in the
+	  standard SPL flow (board_init_r()). Enable this option to support
+	  this feature.
+
 endmenu
 
 config HANDOFF
 	bool "Pass hand-off information from SPL to U-Boot proper"
-	depends on BLOBLIST
+	depends on SPL && BLOBLIST
 	help
 	  It is useful to be able to pass information from SPL to U-Boot
 	  proper to preserve state that is known in SPL and is needed in U-Boot.
@@ -139,7 +148,7 @@ config SPL_HANDOFF
 
 config SPL_LDSCRIPT
 	string "Linker script for the SPL stage"
-	default "arch/$(ARCH)/cpu/u-boot-spl.lds"
+	default "arch/\$(ARCH)/cpu/u-boot-spl.lds"
 	help
 	  The SPL stage will usually require a different linker-script
 	  (as it runs from a different memory region) than the regular
@@ -150,7 +159,7 @@ config SPL_TEXT_BASE
 	hex "SPL Text Base"
 	default ISW_ENTRY_ADDR if AM43XX || AM33XX || OMAP54XX || ARCH_KEYSTONE
 	default 0x10060 if MACH_SUN50I || MACH_SUN50I_H5 || MACH_SUN9I
-	default 0x20060 if MACH_SUN50I_H6
+	default 0x20060 if SUN50I_GEN_H6
 	default 0x00060 if ARCH_SUNXI
 	default 0xfffc0000 if ARCH_ZYNQMP
 	default 0x0
@@ -177,7 +186,7 @@ config SPL_BOOTROM_SUPPORT
 
 config SPL_BOOTCOUNT_LIMIT
 	bool "Support bootcount in SPL"
-	depends on SPL_ENV_SUPPORT
+	depends on SPL_ENV_SUPPORT && !TPL_BOOTCOUNT_LIMIT
 	help
 	  On some boards, which use 'falcon' mode, it is necessary to check
 	  and increment the number of boot attempts. Such boards do not
@@ -308,7 +317,7 @@ config SYS_MMCSD_RAW_MODE_U_BOOT_USE_SECTOR
 		     ARCH_MX6 || ARCH_MX7 || \
 		     ARCH_ROCKCHIP || ARCH_MVEBU ||  ARCH_SOCFPGA || \
 		     ARCH_AT91 || ARCH_ZYNQ || ARCH_KEYSTONE || OMAP34XX || \
-		     OMAP44XX || OMAP54XX || AM33XX || AM43XX
+		     OMAP44XX || OMAP54XX || AM33XX || AM43XX || TARGET_SIFIVE_FU540
 	help
 	  Use sector number for specifying U-Boot location on MMC/SD in
 	  raw mode.
@@ -316,7 +325,7 @@ config SYS_MMCSD_RAW_MODE_U_BOOT_USE_SECTOR
 config SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR
 	hex "Address on the MMC to load U-Boot from"
 	depends on SYS_MMCSD_RAW_MODE_U_BOOT_USE_SECTOR
-	default 0x50 if ARCH_SUNXI
+	default 0x40 if ARCH_SUNXI
 	default 0x75 if ARCH_DAVINCI
 	default 0x8a if ARCH_MX6 || ARCH_MX7
 	default 0x100 if ARCH_UNIPHIER
@@ -325,6 +334,7 @@ config SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR
 	default 0x300 if ARCH_ZYNQ || ARCH_KEYSTONE || OMAP34XX || OMAP44XX || \
 		         OMAP54XX || AM33XX || AM43XX || ARCH_K3
 	default 0x4000 if ARCH_ROCKCHIP
+	default 0x822 if TARGET_SIFIVE_FU540
 	help
 	  Address on the MMC to load U-Boot from, when the MMC is being used
 	  in raw mode. Units: MMC sectors (1 sector = 512 bytes).
@@ -332,6 +342,7 @@ config SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR
 config SYS_MMCSD_RAW_MODE_U_BOOT_DATA_PART_OFFSET
 	hex "U-Boot main hardware partition image offset"
 	depends on SYS_MMCSD_RAW_MODE_U_BOOT_USE_SECTOR
+	default 0x10 if ARCH_SUNXI
 	default 0x0
 	help
 	  On some platforms SPL location depends on hardware partition. The ROM
@@ -411,7 +422,7 @@ config SPL_MD5_SUPPORT
 	  secure as it is possible (with a brute-force attack) to adjust the
 	  image while still retaining the same MD5 hash value. For secure
 	  applications where images may be changed maliciously, you should
-	  consider SHA1 or SHA256.
+	  consider SHA256 or SHA384.
 
 config SPL_SHA1_SUPPORT
 	bool "Support SHA1"
@@ -423,7 +434,7 @@ config SPL_SHA1_SUPPORT
 	  image contents have not been corrupted or maliciously altered.
 	  While SHA1 is fairly secure it is coming to the end of its life
 	  due to the expanding computing power available to brute-force
-	  attacks. For more security, consider SHA256.
+	  attacks. For more security, consider SHA256 or SHA384.
 
 config SPL_SHA256_SUPPORT
 	bool "Support SHA256"
@@ -432,25 +443,39 @@ config SPL_SHA256_SUPPORT
 	help
 	  Enable this to support SHA256 in FIT images within SPL. A SHA256
 	  checksum is a 256-bit (32-byte) hash value used to check that the
-	  image contents have not been corrupted. SHA256 is recommended for
-	  use in secure applications since (as at 2016) there is no known
-	  feasible attack that could produce a 'collision' with differing
-	  input data. Use this for the highest security. Note that only the
-	  SHA256 variant is supported: SHA512 and others are not currently
-	  supported in U-Boot.
+	  image contents have not been corrupted.
+
+config SPL_SHA384_SUPPORT
+	bool "Support SHA384"
+	depends on SPL_FIT
+	select SHA384
+	select SHA512_ALGO
+	help
+	  Enable this to support SHA384 in FIT images within SPL. A SHA384
+	  checksum is a 384-bit (48-byte) hash value used to check that the
+	  image contents have not been corrupted. Use this for the highest
+	  security.
+
+config SPL_SHA512_SUPPORT
+	bool "Support SHA512"
+	depends on SPL_FIT
+	select SHA512
+	select SHA512_ALGO
+	help
+	  Enable this to support SHA512 in FIT images within SPL. A SHA512
+	  checksum is a 512-bit (64-byte) hash value used to check that the
+	  image contents have not been corrupted.
 
 config SPL_FIT_IMAGE_TINY
 	bool "Remove functionality from SPL FIT loading to reduce size"
 	depends on SPL_FIT
-	default y if MACH_SUN50I || MACH_SUN50I_H5 || MACH_SUN50I_H6
+	default y if MACH_SUN50I || MACH_SUN50I_H5 || SUN50I_GEN_H6
 	default y if ARCH_IMX8M
 	help
 	  Enable this to reduce the size of the FIT image loading code
 	  in SPL, if space for the SPL binary is very tight.
 
-	  This removes the detection of image types (which forces the
-	  first image to be treated as having a U-Boot style calling
-	  convention) and skips the recording of each loaded payload
+	  This skips the recording of each loaded payload
 	  (i.e. loadable) into the FDT (modifying the loaded FDT to
 	  ensure this information is available to the next image
 	  invoked).
@@ -508,12 +533,6 @@ config SPL_DMA
 	  the CPU moving the data. Enable this option to build the drivers
 	  in drivers/dma as part of an SPL build.
 
-config SPL_DM_GPIO
-	bool "Support Driver Model GPIO drivers"
-	depends on SPL_GPIO_SUPPORT && DM_GPIO
-	help
-	  Enable support for Driver Model based GPIO drivers in SPL.
-
 config SPL_DRIVERS_MISC_SUPPORT
 	bool "Support misc drivers"
 	help
@@ -566,6 +585,15 @@ config SPL_FS_EXT4
 	  filesystem from within SPL. Support for the underlying block
 	  device (e.g. MMC or USB) must be enabled separately.
 
+config SPL_FS_SQUASHFS
+	bool "Support SquashFS filesystems"
+	select FS_SQUASHFS
+	help
+	  Enable support for SquashFS filesystems with SPL. This permits
+	  U-Boot (or Linux in Falcon mode) to be loaded from a SquashFS
+	  filesystem from within SPL. Support for the underlying block
+	  device (e.g. MMC or USB) must be enabled separately.
+
 config SPL_FS_FAT
 	bool "Support FAT filesystems"
 	select FS_FAT
@@ -582,7 +610,7 @@ config SPL_FAT_WRITE
 	  Support for the underlying block device (e.g. MMC or USB) must be
 	  enabled separately.
 
-config SPL_FPGA_SUPPORT
+config SPL_FPGA
 	bool "Support FPGAs"
 	help
 	  Enable support for FPGAs in SPL. Field-programmable Gate Arrays
@@ -669,14 +697,12 @@ config SPL_MMC_SUPPORT
 	  this option to build the drivers in drivers/mmc as part of an SPL
 	  build.
 
-config SPL_FORCE_MMC_BOOT
-	bool "Force SPL booting from MMC"
-	depends on SPL_MMC_SUPPORT
-	default n
+config SYS_MMCSD_FS_BOOT_PARTITION
+	int "MMC Boot Partition"
+	default 1
 	help
-	  Force SPL to use MMC device for Linux kernel booting even when the
-	  SoC ROM recognized boot medium is not eMMC/SD. This is crucial for
-	  factory or 'falcon mode' booting.
+	  Partition on the MMC to load U-Boot from when the MMC is being
+          used in fs mode
 
 config SPL_MMC_TINY
 	bool "Tiny MMC framework in SPL"
@@ -736,6 +762,32 @@ config SPL_NAND_SUPPORT
 	  This enables the drivers in drivers/mtd/nand/raw as part of an SPL
 	  build.
 
+config SPL_NAND_DRIVERS
+	bool "Use standard NAND driver"
+	help
+	  SPL uses normal NAND drivers, not minimal drivers.
+
+config SPL_NAND_ECC
+	bool "Include standard software ECC in the SPL"
+
+config SPL_NAND_SIMPLE
+	bool "Support simple NAND drivers in SPL"
+	help
+	  Support for NAND boot using simple NAND drivers that
+	  expose the cmd_ctrl() interface.
+
+config SPL_NAND_BASE
+	depends on SPL_NAND_DRIVERS
+	bool "Use Base NAND Driver"
+        help
+          Include nand_base.c in the SPL.
+
+config SPL_NAND_IDENT
+	depends on SPL_NAND_BASE
+	bool "Use chip ID to identify NAND flash"
+	help
+	  SPL uses the chip ID list to identify the NAND flash.
+
 config SPL_UBI
 	bool "Support UBI"
 	help
@@ -753,6 +805,11 @@ config SPL_DM_SPI
 	bool "Support SPI DM drivers in SPL"
 	help
 	  Enable support for SPI DM drivers in SPL.
+
+config SPL_DM_SPI_FLASH
+	bool "Support SPI DM FLASH drivers in SPL"
+	help
+	  Enable support for SPI DM flash drivers in SPL.
 
 endif
 if SPL_UBI
@@ -985,7 +1042,7 @@ config SPL_POWER_DOMAIN
 
 config SPL_RAM_SUPPORT
 	bool "Support booting from RAM"
-	default y if MICROBLAZE || ARCH_SOCFPGA || TEGRA || ARCH_ZYNQ
+	default y if MICROBLAZE || ARCH_SOCFPGA || ARCH_TEGRA || ARCH_ZYNQ
 	help
 	  Enable booting of an image in RAM. The image can be preloaded or
 	  it can be loaded by SPL directly into RAM (e.g. using USB).
@@ -993,7 +1050,7 @@ config SPL_RAM_SUPPORT
 config SPL_RAM_DEVICE
 	bool "Support booting from preloaded image in RAM"
 	depends on SPL_RAM_SUPPORT
-	default y if MICROBLAZE || ARCH_SOCFPGA || TEGRA || ARCH_ZYNQ
+	default y if MICROBLAZE || ARCH_SOCFPGA || ARCH_TEGRA || ARCH_ZYNQ
 	help
 	  Enable booting of an image already loaded in RAM. The image has to
 	  be already in memory when SPL takes over, e.g. loaded by the boot
@@ -1090,6 +1147,11 @@ config SPL_SPI_FLASH_SFDP_SUPPORT
 	 SPI NOR flashes using Serial Flash Discoverable Parameters (SFDP)
 	 tables as per JESD216 standard in SPL.
 
+config SPL_SPI_FLASH_MTD
+	bool "Support for SPI flash MTD drivers in SPL"
+	help
+	  Enable support for SPI flash MTD drivers in SPL.
+
 config SPL_SPI_LOAD
 	bool "Support loading from SPI flash"
 	help
@@ -1183,10 +1245,19 @@ endchoice
 
 config SPL_USB_SDP_SUPPORT
 	bool "Support SDP (Serial Download Protocol)"
+	depends on SPL_SERIAL_SUPPORT
 	help
 	  Enable Serial Download Protocol (SDP) device support in SPL. This
 	  allows to download images into memory and execute (jump to) them
 	  using the same protocol as implemented by the i.MX family's boot ROM.
+
+config SPL_SDP_USB_DEV
+	int "SDP USB controller index"
+	default 0
+	depends on SPL_USB_SDP_SUPPORT
+	help
+	  Some boards have USB controller other than 0. Define this option
+	  so it can be used in compiled environment.
 endif
 
 config SPL_WATCHDOG_SUPPORT
@@ -1209,11 +1280,20 @@ config SPL_YMODEM_SUPPORT
 
 config SPL_ATF
 	bool "Support ARM Trusted Firmware"
-	depends on ARM64
+	depends on ARM64 && SPL_FIT
 	help
 	  ATF(ARM Trusted Firmware) is a component for ARM AArch64 which
 	  is loaded by SPL (which is considered as BL2 in ATF terminology).
 	  More detail at: https://github.com/ARM-software/arm-trusted-firmware
+
+config SPL_ATF_LOAD_IMAGE_V2
+	bool "Use the new LOAD_IMAGE_V2 parameter passing"
+	depends on SPL_ATF
+	help
+	  Some platforms use the newer LOAD_IMAGE_V2 parameter passing.
+
+	  If you want to load a bl31 image from the SPL and need the new
+	  method, say Y.
 
 config SPL_ATF_NO_PLATFORM_PARAM
         bool "Pass no platform parameter"
@@ -1272,7 +1352,7 @@ if TPL
 config TPL_SIZE_LIMIT
 	hex "Maximum size of TPL image"
 	depends on TPL
-	default 0
+	default 0x0
 	help
 	  Specifies the maximum length of the U-Boot TPL image.
 	  If this value is zero, it is ignored.
@@ -1302,11 +1382,18 @@ config TPL_BOARD_INIT
 	  spl_board_init() from board_init_r(). This function should be
 	  provided by the board.
 
+config TPL_BOOTCOUNT_LIMIT
+	bool "Support bootcount in TPL"
+	depends on TPL_ENV_SUPPORT
+	help
+	  If this option is enabled, the TPL will support bootcount.
+	  For example, it may be useful to choose the device to boot.
+
 config TPL_LDSCRIPT
         string "Linker script for the TPL stage"
 	depends on TPL
 	default "arch/arm/cpu/armv8/u-boot-spl.lds" if ARM64
-	default "arch/$(ARCH)/cpu/u-boot-spl.lds"
+	default "arch/\$(ARCH)/cpu/u-boot-spl.lds"
 	help
 	  The TPL stage will usually require a different linker-script
 	  (as it runs from a different memory region) than the regular
@@ -1476,6 +1563,16 @@ config TPL_SPI_FLASH_SUPPORT
 	  Enable support for using SPI flash in TPL. See SPL_SPI_FLASH_SUPPORT
 	  for details.
 
+config TPL_SPI_FLASH_TINY
+	bool "Enable low footprint TPL SPI Flash support"
+	depends on TPL_SPI_FLASH_SUPPORT && !SPI_FLASH_BAR
+	default y if SPI_FLASH
+	help
+	 Enable lightweight TPL SPI Flash support that supports just reading
+	 data/images from flash. No support to write/erase flash. Enable
+	 this if you have TPL size limitations and don't need full-fledged
+	 SPI flash support.
+
 config TPL_SPI_LOAD
 	bool "Support loading from SPI flash"
 	depends on TPL_SPI_FLASH_SUPPORT
@@ -1488,6 +1585,16 @@ config TPL_SPI_SUPPORT
 	help
 	  Enable support for using SPI in TPL. See SPL_SPI_SUPPORT for
 	  details.
+
+config TPL_DM_SPI
+	bool "Support SPI DM drivers in TPL"
+	help
+	  Enable support for SPI DM drivers in TPL.
+
+config TPL_DM_SPI_FLASH
+	bool "Support SPI DM FLASH drivers in TPL"
+	help
+	  Enable support for SPI DM flash drivers in TPL.
 
 config TPL_YMODEM_SUPPORT
 	bool "Support loading using Ymodem"

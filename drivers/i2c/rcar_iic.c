@@ -14,6 +14,8 @@
 #include <dm.h>
 #include <i2c.h>
 #include <asm/io.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
 
 struct rcar_iic_priv {
 	void __iomem		*base;
@@ -267,6 +269,6 @@ U_BOOT_DRIVER(iic_rcar) = {
 	.id		= UCLASS_I2C,
 	.of_match	= rcar_iic_ids,
 	.probe		= rcar_iic_probe,
-	.priv_auto_alloc_size = sizeof(struct rcar_iic_priv),
+	.priv_auto	= sizeof(struct rcar_iic_priv),
 	.ops		= &rcar_iic_ops,
 };

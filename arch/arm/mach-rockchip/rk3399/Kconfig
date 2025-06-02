@@ -5,6 +5,8 @@ choice
 
 config TARGET_CHROMEBOOK_BOB
 	bool "Asus Flip C101PA Chromebook (RK3399)"
+	select HAS_ROM
+	select ROCKCHIP_SPI_IMAGE
 	help
 	  Bob is a small RK3299-based device similar in apperance to Minnie.
 	  It has two USB 3.0 type-C ports, 4GB of SDRAM, WiFi and a 10.1",
@@ -18,6 +20,13 @@ config TARGET_EVB_RK3399
 	  RK3399evb is a evaluation board for Rockchip RK3399,
 	  with full function and physical connectors support like Type-C ports,
 	  USB.0 host ports, LVDS, JTAG, MAC, SD card, HDMI, USB-to-serial...
+
+config TARGET_PINEBOOK_PRO_RK3399
+	bool "Pinebook Pro"
+	help
+	  Pinebook Pro is a laptop based on the Rockchip rk3399 SoC
+	  with 4Gb RAM, onboard eMMC, USB-C, a USB3 and USB2 port,
+	  1920*1080 screen and all the usual laptop features.
 
 config TARGET_PUMA_RK3399
 	bool "Theobroma Systems RK3399-Q7 (Puma)"
@@ -144,6 +153,7 @@ endif # BOOTCOUNT_LIMIT
 
 source "board/firefly/roc-pc-rk3399/Kconfig"
 source "board/google/gru/Kconfig"
+source "board/pine64/pinebook-pro-rk3399/Kconfig"
 source "board/pine64/rockpro64_rk3399/Kconfig"
 source "board/rockchip/evb_rk3399/Kconfig"
 source "board/theobroma-systems/puma_rk3399/Kconfig"

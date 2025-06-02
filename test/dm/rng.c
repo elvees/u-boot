@@ -5,6 +5,7 @@
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <rng.h>
 #include <dm/test.h>
 #include <test/ut.h>
@@ -23,4 +24,4 @@ static int dm_test_rng_read(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_rng_read, DM_TESTF_SCAN_PDATA | DM_TESTF_SCAN_FDT);
+DM_TEST(dm_test_rng_read, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);

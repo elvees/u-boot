@@ -9,6 +9,8 @@
 #include <clk.h>
 #include <dm.h>
 #include <dt-structs.h>
+#include <init.h>
+#include <log.h>
 #include <ram.h>
 #include <regmap.h>
 #include <syscon.h>
@@ -20,6 +22,7 @@
 #include <asm/arch-rockchip/hardware.h>
 #include <asm/arch-rockchip/sdram.h>
 #include <asm/arch-rockchip/sdram_rk3399.h>
+#include <linux/delay.h>
 #include <linux/err.h>
 #include <time.h>
 
@@ -2548,8 +2551,10 @@ static int lpddr4_set_rate(struct dram_info *dram,
 		lpddr4_set_ctl(dram, params, ctl_fn,
 			       dfs_cfgs_lpddr4[ctl_fn].base.ddr_freq);
 
-		printf("%s: change freq to %d mhz %d, %d\n", __func__,
-		       dfs_cfgs_lpddr4[ctl_fn].base.ddr_freq, ctl_fn, phy_fn);
+		if (IS_ENABLED(CONFIG_RAM_ROCKCHIP_DEBUG))
+			printf("%s: change freq to %d mhz %d, %d\n", __func__,
+			       dfs_cfgs_lpddr4[ctl_fn].base.ddr_freq,
+			       ctl_fn, phy_fn);
 	}
 
 	return 0;
@@ -2872,31 +2877,6 @@ static unsigned char calculate_stride(struct rk3399_sdram_params *params)
 		if (stride == (-1))
 			goto error;
 	}
-	switch (stride) {
-	case 0xc:
-		printf("128B stride\n");
-		break;
-	case 5:
-	case 9:
-	case 0xd:
-	case 0x11:
-	case 0x19:
-		printf("256B stride\n");
-		break;
-	case 0xa:
-	case 0xe:
-	case 0x12:
-		printf("512B stride\n");
-		break;
-	case 0xf:
-		printf("4K stride\n");
-		break;
-	case 0x1f:
-		printf("32MB + 256B stride\n");
-		break;
-	default:
-		printf("no stride\n");
-	}
 
 	sdram_print_stride(stride);
 
@@ -2988,8 +2968,10 @@ static int sdram_init(struct dram_info *dram,
 			params->base.num_channels++;
 		}
 
-		printf("Channel ");
-		printf(channel ? "1: " : "0: ");
+		if (IS_ENABLED(CONFIG_RAM_ROCKCHIP_DEBUG)) {
+			printf("Channel ");
+			printf(channel ? "1: " : "0: ");
+		}
 
 		if (channel == 0)
 			set_ddr_stride(dram->pmusgrf, 0x17);
@@ -3029,10 +3011,10 @@ static int sdram_init(struct dram_info *dram,
 	return 0;
 }
 
-static int rk3399_dmc_ofdata_to_platdata(struct udevice *dev)
+static int rk3399_dmc_of_to_plat(struct udevice *dev)
 {
 #if !CONFIG_IS_ENABLED(OF_PLATDATA)
-	struct rockchip_dmc_plat *plat = dev_get_platdata(dev);
+	struct rockchip_dmc_plat *plat = dev_get_plat(dev);
 	int ret;
 
 	ret = dev_read_u32_array(dev, "rockchip,sdram-params",
@@ -3052,15 +3034,14 @@ static int rk3399_dmc_ofdata_to_platdata(struct udevice *dev)
 }
 
 #if CONFIG_IS_ENABLED(OF_PLATDATA)
-static int conv_of_platdata(struct udevice *dev)
+static int conv_of_plat(struct udevice *dev)
 {
-	struct rockchip_dmc_plat *plat = dev_get_platdata(dev);
+	struct rockchip_dmc_plat *plat = dev_get_plat(dev);
 	struct dtd_rockchip_rk3399_dmc *dtplat = &plat->dtplat;
 	int ret;
 
-	ret = regmap_init_mem_platdata(dev, dtplat->reg,
-				       ARRAY_SIZE(dtplat->reg) / 2,
-				       &plat->map);
+	ret = regmap_init_mem_plat(dev, dtplat->reg,
+				   ARRAY_SIZE(dtplat->reg) / 2, &plat->map);
 	if (ret)
 		return ret;
 
@@ -3085,7 +3066,7 @@ static const struct sdram_rk3399_ops rk3399_ops = {
 static int rk3399_dmc_init(struct udevice *dev)
 {
 	struct dram_info *priv = dev_get_priv(dev);
-	struct rockchip_dmc_plat *plat = dev_get_platdata(dev);
+	struct rockchip_dmc_plat *plat = dev_get_plat(dev);
 	int ret;
 #if !CONFIG_IS_ENABLED(OF_PLATDATA)
 	struct rk3399_sdram_params *params = &plat->sdram_params;
@@ -3094,7 +3075,7 @@ static int rk3399_dmc_init(struct udevice *dev)
 	struct rk3399_sdram_params *params =
 					(void *)dtplat->rockchip_sdram_params;
 
-	ret = conv_of_platdata(dev);
+	ret = conv_of_plat(dev);
 	if (ret)
 		return ret;
 #endif
@@ -3125,7 +3106,7 @@ static int rk3399_dmc_init(struct udevice *dev)
 	      priv->cic, priv->pmugrf, priv->pmusgrf, priv->pmucru, priv->pmu);
 
 #if CONFIG_IS_ENABLED(OF_PLATDATA)
-	ret = clk_get_by_index_platdata(dev, 0, dtplat->clocks, &priv->ddr_clk);
+	ret = clk_get_by_driver_info(dev, dtplat->clocks, &priv->ddr_clk);
 #else
 	ret = clk_get_by_index(dev, 0, &priv->ddr_clk);
 #endif
@@ -3193,12 +3174,12 @@ U_BOOT_DRIVER(dmc_rk3399) = {
 	.ops = &rk3399_dmc_ops,
 #if defined(CONFIG_TPL_BUILD) || \
 	(!defined(CONFIG_TPL) && defined(CONFIG_SPL_BUILD))
-	.ofdata_to_platdata = rk3399_dmc_ofdata_to_platdata,
+	.of_to_plat = rk3399_dmc_of_to_plat,
 #endif
 	.probe = rk3399_dmc_probe,
-	.priv_auto_alloc_size = sizeof(struct dram_info),
+	.priv_auto	= sizeof(struct dram_info),
 #if defined(CONFIG_TPL_BUILD) || \
 	(!defined(CONFIG_TPL) && defined(CONFIG_SPL_BUILD))
-	.platdata_auto_alloc_size = sizeof(struct rockchip_dmc_plat),
+	.plat_auto	= sizeof(struct rockchip_dmc_plat),
 #endif
 };

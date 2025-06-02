@@ -5,8 +5,10 @@
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <mmc.h>
 #include <spl.h>
+#include <asm/global_data.h>
 
 #if CONFIG_IS_ENABLED(OF_LIBFDT)
 /**
@@ -45,7 +47,7 @@ static int spl_node_to_boot_device(int node)
 		     dev;
 		     device_find_next_child(&dev)) {
 			if (device_get_uclass_id(dev) == UCLASS_BLK) {
-				desc = dev_get_uclass_platdata(dev);
+				desc = dev_get_uclass_plat(dev);
 				break;
 			}
 		}
@@ -98,6 +100,12 @@ __weak const char *board_spl_was_booted_from(void)
 
 void board_boot_order(u32 *spl_boot_list)
 {
+	/* In case of no fdt (or only plat), use spl_boot_device() */
+	if (!CONFIG_IS_ENABLED(OF_CONTROL) || CONFIG_IS_ENABLED(OF_PLATDATA)) {
+		spl_boot_list[0] = spl_boot_device();
+		return;
+	}
+
 	const void *blob = gd->fdt_blob;
 	int chosen_node = fdt_path_offset(blob, "/chosen");
 	int idx = 0;

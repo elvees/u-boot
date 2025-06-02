@@ -5,14 +5,18 @@
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <pci.h>
 #include <generic-phy.h>
 #include <power-domain.h>
 #include <regmap.h>
 #include <syscon.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm-generic/gpio.h>
 #include <dm/device_compat.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
 #include <linux/err.h>
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -631,7 +635,7 @@ static int pcie_dw_ti_probe(struct udevice *dev)
 	generic_phy_init(&phy1);
 	generic_phy_power_on(&phy1);
 
-	pci->first_busno = dev->seq;
+	pci->first_busno = dev_seq(dev);
 	pci->dev = dev;
 
 	pcie_dw_setup_host(pci);
@@ -641,11 +645,11 @@ static int pcie_dw_ti_probe(struct udevice *dev)
 		pcie_am654_set_mode(pci, DW_PCIE_RC_TYPE);
 
 	if (!pcie_dw_ti_pcie_link_up(pci, LINK_SPEED_GEN_2)) {
-		printf("PCIE-%d: Link down\n", dev->seq);
+		printf("PCIE-%d: Link down\n", dev_seq(dev));
 		return -ENODEV;
 	}
 
-	printf("PCIE-%d: Link up (Gen%d-x%d, Bus%d)\n", dev->seq,
+	printf("PCIE-%d: Link up (Gen%d-x%d, Bus%d)\n", dev_seq(dev),
 	       pcie_dw_get_link_speed(pci),
 	       pcie_dw_get_link_width(pci),
 	       hose->first_busno);
@@ -668,7 +672,7 @@ static int pcie_dw_ti_probe(struct udevice *dev)
 }
 
 /**
- * pcie_dw_ti_ofdata_to_platdata() - Translate from DT to device state
+ * pcie_dw_ti_of_to_plat() - Translate from DT to device state
  *
  * @dev: A pointer to the device being operated on
  *
@@ -678,7 +682,7 @@ static int pcie_dw_ti_probe(struct udevice *dev)
  *
  * Return: 0 on success, else -EINVAL
  */
-static int pcie_dw_ti_ofdata_to_platdata(struct udevice *dev)
+static int pcie_dw_ti_of_to_plat(struct udevice *dev)
 {
 	struct pcie_dw_ti *pcie = dev_get_priv(dev);
 
@@ -721,7 +725,7 @@ U_BOOT_DRIVER(pcie_dw_ti) = {
 	.id			= UCLASS_PCI,
 	.of_match		= pcie_dw_ti_ids,
 	.ops			= &pcie_dw_ti_ops,
-	.ofdata_to_platdata	= pcie_dw_ti_ofdata_to_platdata,
+	.of_to_plat	= pcie_dw_ti_of_to_plat,
 	.probe			= pcie_dw_ti_probe,
-	.priv_auto_alloc_size	= sizeof(struct pcie_dw_ti),
+	.priv_auto	= sizeof(struct pcie_dw_ti),
 };

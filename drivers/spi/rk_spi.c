@@ -15,8 +15,10 @@
 #include <dm.h>
 #include <dt-structs.h>
 #include <errno.h>
+#include <log.h>
 #include <spi.h>
 #include <time.h>
+#include <linux/delay.h>
 #include <linux/errno.h>
 #include <asm/io.h>
 #include <asm/arch-rockchip/clock.h>
@@ -38,7 +40,7 @@ struct rockchip_spi_params {
 	bool master_manages_fifo;
 };
 
-struct rockchip_spi_platdata {
+struct rockchip_spi_plat {
 #if CONFIG_IS_ENABLED(OF_PLATDATA)
 	struct dtd_rockchip_rk3288_spi of_plat;
 #endif
@@ -133,7 +135,7 @@ static int rkspi_wait_till_not_busy(struct rockchip_spi *regs)
 static void spi_cs_activate(struct udevice *dev, uint cs)
 {
 	struct udevice *bus = dev->parent;
-	struct rockchip_spi_platdata *plat = bus->platdata;
+	struct rockchip_spi_plat *plat = dev_get_plat(bus);
 	struct rockchip_spi_priv *priv = dev_get_priv(bus);
 	struct rockchip_spi *regs = priv->regs;
 
@@ -159,7 +161,7 @@ static void spi_cs_activate(struct udevice *dev, uint cs)
 static void spi_cs_deactivate(struct udevice *dev, uint cs)
 {
 	struct udevice *bus = dev->parent;
-	struct rockchip_spi_platdata *plat = bus->platdata;
+	struct rockchip_spi_plat *plat = dev_get_plat(bus);
 	struct rockchip_spi_priv *priv = dev_get_priv(bus);
 	struct rockchip_spi *regs = priv->regs;
 
@@ -172,28 +174,27 @@ static void spi_cs_deactivate(struct udevice *dev, uint cs)
 }
 
 #if CONFIG_IS_ENABLED(OF_PLATDATA)
-static int conv_of_platdata(struct udevice *dev)
+static int conv_of_plat(struct udevice *dev)
 {
-	struct rockchip_spi_platdata *plat = dev->platdata;
+	struct rockchip_spi_plat *plat = dev_get_plat(dev);
 	struct dtd_rockchip_rk3288_spi *dtplat = &plat->of_plat;
 	struct rockchip_spi_priv *priv = dev_get_priv(dev);
 	int ret;
 
 	plat->base = dtplat->reg[0];
 	plat->frequency = 20000000;
-	ret = clk_get_by_index_platdata(dev, 0, dtplat->clocks, &priv->clk);
+	ret = clk_get_by_driver_info(dev, dtplat->clocks, &priv->clk);
 	if (ret < 0)
 		return ret;
-	dev->req_seq = 0;
 
 	return 0;
 }
 #endif
 
-static int rockchip_spi_ofdata_to_platdata(struct udevice *bus)
+static int rockchip_spi_of_to_plat(struct udevice *bus)
 {
 #if !CONFIG_IS_ENABLED(OF_PLATDATA)
-	struct rockchip_spi_platdata *plat = dev_get_platdata(bus);
+	struct rockchip_spi_plat *plat = dev_get_plat(bus);
 	struct rockchip_spi_priv *priv = dev_get_priv(bus);
 	int ret;
 
@@ -251,13 +252,13 @@ static int rockchip_spi_calc_modclk(ulong max_freq)
 
 static int rockchip_spi_probe(struct udevice *bus)
 {
-	struct rockchip_spi_platdata *plat = dev_get_platdata(bus);
+	struct rockchip_spi_plat *plat = dev_get_plat(bus);
 	struct rockchip_spi_priv *priv = dev_get_priv(bus);
 	int ret;
 
 	debug("%s: probe\n", __func__);
 #if CONFIG_IS_ENABLED(OF_PLATDATA)
-	ret = conv_of_platdata(bus);
+	ret = conv_of_plat(bus);
 	if (ret)
 		return ret;
 #endif
@@ -430,7 +431,7 @@ static int rockchip_spi_xfer(struct udevice *dev, unsigned int bitlen,
 	struct udevice *bus = dev->parent;
 	struct rockchip_spi_priv *priv = dev_get_priv(bus);
 	struct rockchip_spi *regs = priv->regs;
-	struct dm_spi_slave_platdata *slave_plat = dev_get_parent_platdata(dev);
+	struct dm_spi_slave_plat *slave_plat = dev_get_parent_plat(dev);
 	int len = bitlen >> 3;
 	const u8 *out = dout;
 	u8 *in = din;
@@ -543,7 +544,9 @@ const  struct rockchip_spi_params rk3399_spi_params = {
 };
 
 static const struct udevice_id rockchip_spi_ids[] = {
+	{ .compatible = "rockchip,rk3066-spi" },
 	{ .compatible = "rockchip,rk3288-spi" },
+	{ .compatible = "rockchip,rk3328-spi" },
 	{ .compatible = "rockchip,rk3368-spi",
 	  .data = (ulong)&rk3399_spi_params },
 	{ .compatible = "rockchip,rk3399-spi",
@@ -551,17 +554,15 @@ static const struct udevice_id rockchip_spi_ids[] = {
 	{ }
 };
 
-U_BOOT_DRIVER(rockchip_spi) = {
-#if CONFIG_IS_ENABLED(OF_PLATDATA)
+U_BOOT_DRIVER(rockchip_rk3288_spi) = {
 	.name	= "rockchip_rk3288_spi",
-#else
-	.name	= "rockchip_spi",
-#endif
 	.id	= UCLASS_SPI,
 	.of_match = rockchip_spi_ids,
 	.ops	= &rockchip_spi_ops,
-	.ofdata_to_platdata = rockchip_spi_ofdata_to_platdata,
-	.platdata_auto_alloc_size = sizeof(struct rockchip_spi_platdata),
-	.priv_auto_alloc_size = sizeof(struct rockchip_spi_priv),
+	.of_to_plat = rockchip_spi_of_to_plat,
+	.plat_auto	= sizeof(struct rockchip_spi_plat),
+	.priv_auto	= sizeof(struct rockchip_spi_priv),
 	.probe	= rockchip_spi_probe,
 };
+
+DM_DRIVER_ALIAS(rockchip_rk3288_spi, rockchip_rk3368_spi)

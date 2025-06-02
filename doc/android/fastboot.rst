@@ -19,10 +19,15 @@ The current implementation supports the following standard commands:
 - ``reboot``
 - ``reboot-bootloader``
 - ``set_active`` (only a stub implementation which always succeeds)
+- ``ucmd`` (if enabled)
+- ``acmd`` (if enabled)
 
 The following OEM commands are supported (if enabled):
 
 - ``oem format`` - this executes ``gpt write mmc %x $partitions``
+- ``oem partconf`` - this executes ``mmc partconf %x <arg> 0`` to configure eMMC
+  with <arg> = boot_ack boot_partition
+- ``oem bootbus``  - this executes ``mmc bootbus %x %s`` to configure eMMC
 
 Support for both eMMC and NAND devices is included.
 
@@ -85,6 +90,25 @@ for example::
 
     fastboot_partition_alias_boot=LNX
 
+Raw partition descriptors
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In cases where no partition table is present, a raw partition descriptor can be
+defined, specifying the offset, size, and optionally the MMC hardware partition
+number for a given partition name.
+
+This is useful when using fastboot to flash files (e.g. SPL or U-Boot) to a
+specific offset in the eMMC boot partition, without having to update the entire
+boot partition.
+
+To define a raw partition descriptor, add an environment variable similar to::
+
+    fastboot_raw_partition_<raw partition name>=<offset> <size> [mmcpart <num>]
+
+for example::
+
+    fastboot_raw_partition_boot=0x100 0x1f00 mmcpart 1
+
 Variable overrides
 ^^^^^^^^^^^^^^^^^^
 
@@ -131,6 +155,10 @@ The device type is as follows:
 The device index starts from ``a`` and refers to the interface (e.g. USB
 controller, SD/MMC controller) or disk index. The partition index starts
 from ``1`` and describes the partition number on the particular device.
+
+Alternatively, partition types may be specified using :ref:`U-Boot's partition
+syntax <partitions>`. This allows specifying partitions like ``0.1``,
+``0#boot``, or ``:3``. The interface is always ``mmc``.
 
 Writing Partition Table
 -----------------------

@@ -78,6 +78,12 @@ Memory services
 .. kernel-doc:: lib/efi_loader/efi_memory.c
    :internal:
 
+SetWatchdogTimer service
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. kernel-doc:: lib/efi_loader/efi_watchdog.c
+   :internal:
+
 Runtime services
 ----------------
 
@@ -87,6 +93,8 @@ Runtime services
 Variable services
 ~~~~~~~~~~~~~~~~~
 
+.. kernel-doc:: include/efi_variable.h
+   :internal:
 .. kernel-doc:: lib/efi_loader/efi_variable.c
    :internal:
 
@@ -150,4 +158,19 @@ Text IO protocols
 ~~~~~~~~~~~~~~~~~
 
 .. kernel-doc:: lib/efi_loader/efi_console.c
+   :internal:
+
+Unicode Collation protocol
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. kernel-doc:: lib/efi_loader/efi_unicode_collation.c
+   :internal:
+
+Unit testing
+------------
+
+The following library functions are provided to support writing UEFI unit tests.
+The should not be used elsewhere.
+
+.. kernel-doc:: include/efi_selftest.h
    :internal:

@@ -4,30 +4,41 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
+#define LOG_CATEGORY LOGC_ARCH
+
 #include <common.h>
-#include <acpi_s3.h>
 #include <handoff.h>
+#include <init.h>
+#include <log.h>
 #include <spl.h>
+#include <acpi/acpi_s3.h>
 #include <asm/arch/cpu.h>
 #include <asm/fsp/fsp_support.h>
 #include <asm/fsp2/fsp_api.h>
 #include <asm/fsp2/fsp_internal.h>
+#include <asm/global_data.h>
+#include <linux/sizes.h>
 
 int dram_init(void)
 {
 	int ret;
 
+	if (!ll_boot_init()) {
+		/* Use a small and safe amount of 1GB */
+		gd->ram_size = SZ_1G;
+
+		return 0;
+	}
 	if (spl_phase() == PHASE_SPL) {
-#ifdef CONFIG_HAVE_ACPI_RESUME
-		bool s3wake = gd->arch.prev_sleep_state == ACPI_S3;
-#else
 		bool s3wake = false;
-#endif
+
+		s3wake = IS_ENABLED(CONFIG_HAVE_ACPI_RESUME) &&
+			gd->arch.prev_sleep_state == ACPI_S3;
 
 		ret = fsp_memory_init(s3wake,
 			      IS_ENABLED(CONFIG_APL_BOOT_FROM_FAST_SPI_FLASH));
 		if (ret) {
-			debug("Memory init failed (err=%x)\n", ret);
+			log_debug("Memory init failed (err=%x)\n", ret);
 			return ret;
 		}
 
@@ -52,7 +63,7 @@ int dram_init(void)
 		struct spl_handoff *ho = gd->spl_handoff;
 
 		if (!ho) {
-			debug("No SPL handoff found\n");
+			log_debug("No SPL handoff found\n");
 			return -ESTRPIPE;
 		}
 		gd->ram_size = ho->ram_size;
@@ -68,8 +79,13 @@ int dram_init(void)
 
 ulong board_get_usable_ram_top(ulong total_size)
 {
+	if (!ll_boot_init())
+		return gd->ram_size;
+
 #if CONFIG_IS_ENABLED(HANDOFF)
 	struct spl_handoff *ho = gd->spl_handoff;
+
+	log_debug("usable_ram_top = %lx\n", ho->arch.usable_ram_top);
 
 	return ho->arch.usable_ram_top;
 #endif

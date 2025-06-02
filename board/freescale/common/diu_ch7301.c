@@ -12,6 +12,7 @@
 #include <common.h>
 #include <stdio_dev.h>
 #include <i2c.h>
+#include <linux/delay.h>
 
 #define I2C_DVI_INPUT_DATA_FORMAT_REG		0x1F
 #define I2C_DVI_PLL_CHARGE_CNTL_REG		0x33
@@ -52,7 +53,7 @@ int diu_set_dvi_encoder(unsigned int pixclock)
 	u8 temp;
 
 	temp = I2C_DVI_TEST_PATTERN_VAL;
-#ifdef CONFIG_DM_I2C
+#if CONFIG_IS_ENABLED(DM_I2C)
 	struct udevice *dev;
 
 	ret = i2c_get_chip_for_busnum(CONFIG_SYS_I2C_DVI_BUS_NUM,

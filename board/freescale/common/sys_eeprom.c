@@ -10,7 +10,9 @@
 #include <command.h>
 #include <env.h>
 #include <i2c.h>
+#include <init.h>
 #include <linux/ctype.h>
+#include <linux/delay.h>
 #include <u-boot/crc.h>
 
 #ifdef CONFIG_SYS_I2C_EEPROM_CCID
@@ -150,7 +152,7 @@ static int read_eeprom(void)
 {
 	int ret;
 #ifdef CONFIG_SYS_EEPROM_BUS_NUM
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 	unsigned int bus;
 #endif
 #endif
@@ -159,13 +161,13 @@ static int read_eeprom(void)
 		return 0;
 
 #ifdef CONFIG_SYS_EEPROM_BUS_NUM
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 	bus = i2c_get_bus_num();
 	i2c_set_bus_num(CONFIG_SYS_EEPROM_BUS_NUM);
 #endif
 #endif
 
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 	ret = i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0,
 		       CONFIG_SYS_I2C_EEPROM_ADDR_LEN,
 		       (void *)&e, sizeof(e));
@@ -173,16 +175,18 @@ static int read_eeprom(void)
 	struct udevice *dev;
 #ifdef CONFIG_SYS_EEPROM_BUS_NUM
 	ret = i2c_get_chip_for_busnum(CONFIG_SYS_EEPROM_BUS_NUM,
-				      CONFIG_SYS_I2C_EEPROM_ADDR, 1, &dev);
+				      CONFIG_SYS_I2C_EEPROM_ADDR,
+				      CONFIG_SYS_I2C_EEPROM_ADDR_LEN, &dev);
 #else
-	ret = i2c_get_chip_for_busnum(0, CONFIG_SYS_I2C_EEPROM_ADDR, 1, &dev);
+	ret = i2c_get_chip_for_busnum(0, CONFIG_SYS_I2C_EEPROM_ADDR,
+				      CONFIG_SYS_I2C_EEPROM_ADDR_LEN, &dev);
 #endif
 	if (!ret)
 		ret = dm_i2c_read(dev, 0, (void *)&e, sizeof(e));
 #endif
 
 #ifdef CONFIG_SYS_EEPROM_BUS_NUM
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 	i2c_set_bus_num(bus);
 #endif
 #endif
@@ -219,7 +223,7 @@ static int prog_eeprom(void)
 	int i;
 	void *p;
 #ifdef CONFIG_SYS_EEPROM_BUS_NUM
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 	unsigned int bus;
 #endif
 #endif
@@ -233,7 +237,7 @@ static int prog_eeprom(void)
 #endif
 	update_crc();
 
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 #ifdef CONFIG_SYS_EEPROM_BUS_NUM
 	bus = i2c_get_bus_num();
 	i2c_set_bus_num(CONFIG_SYS_EEPROM_BUS_NUM);
@@ -246,7 +250,7 @@ static int prog_eeprom(void)
 	 * complete a given write.
 	 */
 	for (i = 0, p = &e; i < sizeof(e); i += 8, p += 8) {
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 		ret = i2c_write(CONFIG_SYS_I2C_EEPROM_ADDR, i,
 				CONFIG_SYS_I2C_EEPROM_ADDR_LEN,
 				p, min((int)(sizeof(e) - i), 8));
@@ -275,7 +279,7 @@ static int prog_eeprom(void)
 		/* Verify the write by reading back the EEPROM and comparing */
 		struct eeprom e2;
 
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 		ret = i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0,
 			       CONFIG_SYS_I2C_EEPROM_ADDR_LEN,
 			       (void *)&e2, sizeof(e2));
@@ -298,7 +302,7 @@ static int prog_eeprom(void)
 			ret = -1;
 	}
 
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 #ifdef CONFIG_SYS_EEPROM_BUS_NUM
 	i2c_set_bus_num(bus);
 #endif
@@ -382,7 +386,7 @@ static void set_mac_address(unsigned int index, const char *string)
 	update_crc();
 }
 
-int do_mac(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+int do_mac(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	char cmd;
 
@@ -590,11 +594,12 @@ unsigned int get_cpu_board_revision(void)
 		u8 minor;         /* 0x05        Board revision, minor */
 	} be;
 
-#ifndef CONFIG_DM_I2C
+#if !CONFIG_IS_ENABLED(DM_I2C)
 	i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0, CONFIG_SYS_I2C_EEPROM_ADDR_LEN,
 		(void *)&be, sizeof(be));
 #else
 	struct udevice *dev;
+	int ret;
 #ifdef CONFIG_SYS_EEPROM_BUS_NUM
 	ret = i2c_get_chip_for_busnum(CONFIG_SYS_EEPROM_BUS_NUM,
 				      CONFIG_SYS_I2C_EEPROM_ADDR,
@@ -603,7 +608,7 @@ unsigned int get_cpu_board_revision(void)
 #else
 	ret = i2c_get_chip_for_busnum(0, CONFIG_SYS_I2C_EEPROM_ADDR,
 				      CONFIG_SYS_I2C_EEPROM_ADDR_LEN,
-				      &dev)
+				      &dev);
 #endif
 	if (!ret)
 		dm_i2c_read(dev, 0, (void *)&be, sizeof(be));

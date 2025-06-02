@@ -3,9 +3,6 @@
 # Copyright (c) 2016 Google, Inc
 #
 
-from __future__ import print_function
-
-import command
 import glob
 import os
 import shutil
@@ -13,7 +10,8 @@ import struct
 import sys
 import tempfile
 
-import tout
+from patman import command
+from patman import tout
 
 # Output directly (generally this is temporary)
 outdir = None
@@ -96,6 +94,14 @@ def GetOutputFilename(fname):
     """
     return os.path.join(outdir, fname)
 
+def GetOutputDir():
+    """Return the current output directory
+
+    Returns:
+        str: The output directory
+    """
+    return outdir
+
 def _FinaliseForTest():
     """Remove the output directory (for use by tests)"""
     global outdir
@@ -116,14 +122,16 @@ def SetInputDirs(dirname):
     indir = dirname
     tout.Debug("Using input directories %s" % indir)
 
-def GetInputFilename(fname):
+def GetInputFilename(fname, allow_missing=False):
     """Return a filename for use as input.
 
     Args:
         fname: Filename to use for new file
+        allow_missing: True if the filename can be missing
 
     Returns:
-        The full path of the filename, within the input directory
+        The full path of the filename, within the input directory, or
+        None on error
     """
     if not indir or fname[:1] == '/':
         return fname
@@ -132,6 +140,8 @@ def GetInputFilename(fname):
         if os.path.exists(pathname):
             return pathname
 
+    if allow_missing:
+        return None
     raise ValueError("Filename '%s' not found in input path (%s) (cwd='%s')" %
                      (fname, ','.join(indir), os.getcwd()))
 
@@ -186,6 +196,120 @@ def PathHasFile(path_spec, fname):
             return True
     return False
 
+def GetHostCompileTool(name):
+    """Get the host-specific version for a compile tool
+
+    This checks the environment variables that specify which version of
+    the tool should be used (e.g. ${HOSTCC}).
+
+    The following table lists the host-specific versions of the tools
+    this function resolves to:
+
+        Compile Tool  | Host version
+        --------------+----------------
+        as            |  ${HOSTAS}
+        ld            |  ${HOSTLD}
+        cc            |  ${HOSTCC}
+        cpp           |  ${HOSTCPP}
+        c++           |  ${HOSTCXX}
+        ar            |  ${HOSTAR}
+        nm            |  ${HOSTNM}
+        ldr           |  ${HOSTLDR}
+        strip         |  ${HOSTSTRIP}
+        objcopy       |  ${HOSTOBJCOPY}
+        objdump       |  ${HOSTOBJDUMP}
+        dtc           |  ${HOSTDTC}
+
+    Args:
+        name: Command name to run
+
+    Returns:
+        host_name: Exact command name to run instead
+        extra_args: List of extra arguments to pass
+    """
+    host_name = None
+    extra_args = []
+    if name in ('as', 'ld', 'cc', 'cpp', 'ar', 'nm', 'ldr', 'strip',
+                'objcopy', 'objdump', 'dtc'):
+        host_name, *host_args = env.get('HOST' + name.upper(), '').split(' ')
+    elif name == 'c++':
+        host_name, *host_args = env.get('HOSTCXX', '').split(' ')
+
+    if host_name:
+        return host_name, extra_args
+    return name, []
+
+def GetTargetCompileTool(name, cross_compile=None):
+    """Get the target-specific version for a compile tool
+
+    This first checks the environment variables that specify which
+    version of the tool should be used (e.g. ${CC}). If those aren't
+    specified, it checks the CROSS_COMPILE variable as a prefix for the
+    tool with some substitutions (e.g. "${CROSS_COMPILE}gcc" for cc).
+
+    The following table lists the target-specific versions of the tools
+    this function resolves to:
+
+        Compile Tool  | First choice   | Second choice
+        --------------+----------------+----------------------------
+        as            |  ${AS}         | ${CROSS_COMPILE}as
+        ld            |  ${LD}         | ${CROSS_COMPILE}ld.bfd
+                      |                |   or ${CROSS_COMPILE}ld
+        cc            |  ${CC}         | ${CROSS_COMPILE}gcc
+        cpp           |  ${CPP}        | ${CROSS_COMPILE}gcc -E
+        c++           |  ${CXX}        | ${CROSS_COMPILE}g++
+        ar            |  ${AR}         | ${CROSS_COMPILE}ar
+        nm            |  ${NM}         | ${CROSS_COMPILE}nm
+        ldr           |  ${LDR}        | ${CROSS_COMPILE}ldr
+        strip         |  ${STRIP}      | ${CROSS_COMPILE}strip
+        objcopy       |  ${OBJCOPY}    | ${CROSS_COMPILE}objcopy
+        objdump       |  ${OBJDUMP}    | ${CROSS_COMPILE}objdump
+        dtc           |  ${DTC}        | (no CROSS_COMPILE version)
+
+    Args:
+        name: Command name to run
+
+    Returns:
+        target_name: Exact command name to run instead
+        extra_args: List of extra arguments to pass
+    """
+    env = dict(os.environ)
+
+    target_name = None
+    extra_args = []
+    if name in ('as', 'ld', 'cc', 'cpp', 'ar', 'nm', 'ldr', 'strip',
+                'objcopy', 'objdump', 'dtc'):
+        target_name, *extra_args = env.get(name.upper(), '').split(' ')
+    elif name == 'c++':
+        target_name, *extra_args = env.get('CXX', '').split(' ')
+
+    if target_name:
+        return target_name, extra_args
+
+    if cross_compile is None:
+        cross_compile = env.get('CROSS_COMPILE', '')
+    if not cross_compile:
+        return name, []
+
+    if name in ('as', 'ar', 'nm', 'ldr', 'strip', 'objcopy', 'objdump'):
+        target_name = cross_compile + name
+    elif name == 'ld':
+        try:
+            if Run(cross_compile + 'ld.bfd', '-v'):
+                target_name = cross_compile + 'ld.bfd'
+        except:
+            target_name = cross_compile + 'ld'
+    elif name == 'cc':
+        target_name = cross_compile + 'gcc'
+    elif name == 'cpp':
+        target_name = cross_compile + 'gcc'
+        extra_args = ['-E']
+    elif name == 'c++':
+        target_name = cross_compile + 'g++'
+    else:
+        target_name = name
+    return target_name, extra_args
+
 def Run(name, *args, **kwargs):
     """Run a tool with some arguments
 
@@ -196,16 +320,28 @@ def Run(name, *args, **kwargs):
     Args:
         name: Command name to run
         args: Arguments to the tool
+        for_host: True to resolve the command to the version for the host
+        for_target: False to run the command as-is, without resolving it
+                   to the version for the compile target
 
     Returns:
         CommandResult object
     """
     try:
         binary = kwargs.get('binary')
+        for_host = kwargs.get('for_host', False)
+        for_target = kwargs.get('for_target', not for_host)
         env = None
         if tool_search_paths:
             env = dict(os.environ)
             env['PATH'] = ':'.join(tool_search_paths) + ':' + env['PATH']
+        if for_target:
+            name, extra_args = GetTargetCompileTool(name)
+            args = tuple(extra_args) + args
+        elif for_host:
+            name, extra_args = GetHostCompileTool(name)
+            args = tuple(extra_args) + args
+        name = os.path.expanduser(name)  # Expand paths containing ~
         all_args = (name,) + args
         result = command.RunPipe([all_args], capture=True, capture_stderr=True,
                                  env=env, raise_on_error=False, binary=binary)
@@ -272,7 +408,7 @@ def ReadFile(fname, binary=True):
                    #(fname, len(data), len(data)))
     return data
 
-def WriteFile(fname, data):
+def WriteFile(fname, data, binary=True):
     """Write data into a file.
 
     Args:
@@ -281,13 +417,11 @@ def WriteFile(fname, data):
     """
     #self._out.Info("Write file '%s' size %d (%#0x)" %
                    #(fname, len(data), len(data)))
-    with open(Filename(fname), 'wb') as fd:
+    with open(Filename(fname), binary and 'wb' or 'w') as fd:
         fd.write(data)
 
 def GetBytes(byte, size):
     """Get a string of bytes of a given size
-
-    This handles the unfortunate different between Python 2 and Python 2.
 
     Args:
         byte: Numeric byte value to use
@@ -296,81 +430,7 @@ def GetBytes(byte, size):
     Returns:
         A bytes type with 'byte' repeated 'size' times
     """
-    if sys.version_info[0] >= 3:
-        data = bytes([byte]) * size
-    else:
-        data = chr(byte) * size
-    return data
-
-def ToUnicode(val):
-    """Make sure a value is a unicode string
-
-    This allows some amount of compatibility between Python 2 and Python3. For
-    the former, it returns a unicode object.
-
-    Args:
-        val: string or unicode object
-
-    Returns:
-        unicode version of val
-    """
-    if sys.version_info[0] >= 3:
-        return val
-    return val if isinstance(val, unicode) else val.decode('utf-8')
-
-def FromUnicode(val):
-    """Make sure a value is a non-unicode string
-
-    This allows some amount of compatibility between Python 2 and Python3. For
-    the former, it converts a unicode object to a string.
-
-    Args:
-        val: string or unicode object
-
-    Returns:
-        non-unicode version of val
-    """
-    if sys.version_info[0] >= 3:
-        return val
-    return val if isinstance(val, str) else val.encode('utf-8')
-
-def ToByte(ch):
-    """Convert a character to an ASCII value
-
-    This is useful because in Python 2 bytes is an alias for str, but in
-    Python 3 they are separate types. This function converts the argument to
-    an ASCII value in either case.
-
-    Args:
-        ch: A string (Python 2) or byte (Python 3) value
-
-    Returns:
-        integer ASCII value for ch
-    """
-    return ord(ch) if type(ch) == str else ch
-
-def ToChar(byte):
-    """Convert a byte to a character
-
-    This is useful because in Python 2 bytes is an alias for str, but in
-    Python 3 they are separate types. This function converts an ASCII value to
-    a value with the appropriate type in either case.
-
-    Args:
-        byte: A byte or str value
-    """
-    return chr(byte) if type(byte) != str else byte
-
-def ToChars(byte_list):
-    """Convert a list of bytes to a str/bytes type
-
-    Args:
-        byte_list: List of ASCII values representing the string
-
-    Returns:
-        string made by concatenating all the ASCII values
-    """
-    return ''.join([chr(byte) for byte in byte_list])
+    return bytes([byte]) * size
 
 def ToBytes(string):
     """Convert a str type into a bytes type
@@ -379,12 +439,9 @@ def ToBytes(string):
         string: string to convert
 
     Returns:
-        Python 3: A bytes type
-        Python 2: A string type
+        A bytes type
     """
-    if sys.version_info[0] >= 3:
-        return string.encode('utf-8')
-    return string
+    return string.encode('utf-8')
 
 def ToString(bval):
     """Convert a bytes type into a str type
@@ -419,7 +476,8 @@ def Compress(indata, algo, with_header=True):
     fname = GetOutputFilename('%s.comp.tmp' % algo)
     WriteFile(fname, indata)
     if algo == 'lz4':
-        data = Run('lz4', '--no-frame-crc', '-c', fname, binary=True)
+        data = Run('lz4', '--no-frame-crc', '-B4', '-5', '-c', fname,
+                   binary=True)
     # cbfstool uses a very old version of lzma
     elif algo == 'lzma':
         outfname = GetOutputFilename('%s.comp.otmp' % algo)

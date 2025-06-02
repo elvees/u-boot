@@ -2,6 +2,8 @@
 #define __EXPORTS_H__
 
 #include <irq_func.h>
+#include <asm/global_data.h>
+#include <linux/delay.h>
 
 #ifndef __ASSEMBLY__
 #ifdef CONFIG_PHY_AQUANTIA
@@ -11,10 +13,17 @@
 
 #include <irq_func.h>
 
+struct cmd_tbl;
 struct spi_slave;
 
-/* Set up the jump table for use by the API */
-void jumptable_init(void);
+/**
+ * jumptable_init() - Set up the jump table for use by the API
+ *
+ * It is called during the generic post-relocation init sequence.
+ *
+ * Return: 0 if OK
+ */
+int jumptable_init(void);
 
 /* These are declarations of exported functions available in C code */
 unsigned long get_version(void);
@@ -40,7 +49,7 @@ long simple_strtol(const char *cp, char **endp, unsigned int base);
 int strcmp(const char *cs, const char *ct);
 unsigned long ustrtoul(const char *cp, char **endp, unsigned int base);
 unsigned long long ustrtoull(const char *cp, char **endp, unsigned int base);
-#if defined(CONFIG_CMD_I2C) && !defined(CONFIG_DM_I2C)
+#if defined(CONFIG_CMD_I2C) && !CONFIG_IS_ENABLED(DM_I2C)
 int i2c_write (uchar, uint, int , uchar* , int);
 int i2c_read (uchar, uint, int , uchar* , int);
 #endif

@@ -6,6 +6,7 @@
 #include <common.h>
 #include <command.h>
 #include <cpu_func.h>
+#include <asm/global_data.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -17,7 +18,7 @@ unsigned long do_go_exec(ulong (*entry)(int, char * const []),
 	 * whole SDRAM area, since we don't know the size of the image
 	 * that was loaded.
 	 */
-	flush_cache(gd->bd->bi_memstart, gd->ram_top - gd->bd->bi_memstart);
+	flush_cache(gd->ram_base, gd->ram_top - gd->ram_base);
 
 	return entry(argc, argv);
 }

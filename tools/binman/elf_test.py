@@ -10,11 +10,11 @@ import sys
 import tempfile
 import unittest
 
-import command
-import elf
-import test_util
-import tools
-import tout
+from binman import elf
+from patman import command
+from patman import test_util
+from patman import tools
+from patman import tout
 
 binman_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
 
@@ -45,10 +45,12 @@ class FakeSection:
     def GetPath(self):
         return 'section_path'
 
-    def LookupSymbol(self, name, weak, msg, base_addr):
+    def LookupImageSymbol(self, name, weak, msg, base_addr):
         """Fake implementation which returns the same value for all symbols"""
         return self.sym_value
 
+    def GetImage(self):
+        return self
 
 def BuildElfTestFiles(target_dir):
     """Build ELF files used for testing in binman
@@ -186,7 +188,9 @@ class TestElf(unittest.TestCase):
         # Make an Elf file and then convert it to a fkat binary file. This
         # should produce the original data.
         elf.MakeElf(elf_fname, expected_text, expected_data)
-        stdout = command.Output('objcopy', '-O', 'binary', elf_fname, bin_fname)
+        objcopy, args = tools.GetTargetCompileTool('objcopy')
+        args += ['-O', 'binary', elf_fname, bin_fname]
+        stdout = command.Output(objcopy, *args)
         with open(bin_fname, 'rb') as fd:
             data = fd.read()
         self.assertEqual(expected_text + expected_data, data)

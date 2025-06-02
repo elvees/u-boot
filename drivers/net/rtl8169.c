@@ -43,14 +43,17 @@
 #include <cpu_func.h>
 #include <dm.h>
 #include <errno.h>
+#include <log.h>
 #include <malloc.h>
 #include <memalign.h>
 #include <net.h>
 #ifndef CONFIG_DM_ETH
 #include <netdev.h>
 #endif
+#include <asm/cache.h>
 #include <asm/io.h>
 #include <pci.h>
+#include <linux/delay.h>
 
 #undef DEBUG_RTL8169
 #undef DEBUG_RTL8169_TX
@@ -237,6 +240,9 @@ enum RTL8169_register_content {
 
 	/*_TBICSRBit*/
 	TBILinkOK = 0x02000000,
+
+	/* FuncEvent/Misc */
+	RxDv_Gated_En = 0x80000,
 };
 
 static struct {
@@ -884,7 +890,7 @@ static void rtl8169_common_start(pci_dev_t dev, unsigned char *enetaddr,
 #ifdef CONFIG_DM_ETH
 static int rtl8169_eth_start(struct udevice *dev)
 {
-	struct eth_pdata *plat = dev_get_platdata(dev);
+	struct eth_pdata *plat = dev_get_plat(dev);
 	struct rtl8169_private *priv = dev_get_priv(dev);
 
 	rtl8169_common_start(dev, plat->enetaddr, priv->iobase);
@@ -895,7 +901,7 @@ static int rtl8169_eth_start(struct udevice *dev)
 /**************************************************************************
 RESET - Finish setting up the ethernet interface
 ***************************************************************************/
-static int rtl_reset(struct eth_device *dev, bd_t *bis)
+static int rtl_reset(struct eth_device *dev, struct bd_info *bis)
 {
 	rtl8169_common_start((pci_dev_t)(unsigned long)dev->priv,
 			     dev->enetaddr, dev->iobase);
@@ -947,7 +953,7 @@ static void rtl_halt(struct eth_device *dev)
 #ifdef CONFIG_DM_ETH
 static int rtl8169_write_hwaddr(struct udevice *dev)
 {
-	struct eth_pdata *plat = dev_get_platdata(dev);
+	struct eth_pdata *plat = dev_get_plat(dev);
 	unsigned int i;
 
 	RTL_W8(Cfg9346, Cfg9346_Unlock);
@@ -1113,7 +1119,7 @@ static int rtl_init(unsigned long dev_ioaddr, const char *name,
 }
 
 #ifndef CONFIG_DM_ETH
-int rtl8169_initialize(bd_t *bis)
+int rtl8169_initialize(struct bd_info *bis)
 {
 	pci_dev_t devno;
 	int card_number = 0;
@@ -1181,9 +1187,9 @@ int rtl8169_initialize(bd_t *bis)
 #ifdef CONFIG_DM_ETH
 static int rtl8169_eth_probe(struct udevice *dev)
 {
-	struct pci_child_platdata *pplat = dev_get_parent_platdata(dev);
+	struct pci_child_plat *pplat = dev_get_parent_plat(dev);
 	struct rtl8169_private *priv = dev_get_priv(dev);
-	struct eth_pdata *plat = dev_get_platdata(dev);
+	struct eth_pdata *plat = dev_get_plat(dev);
 	u32 iobase;
 	int region;
 	int ret;
@@ -1207,6 +1213,19 @@ static int rtl8169_eth_probe(struct udevice *dev)
 		return ret;
 	}
 
+	/*
+	 * WAR for DHCP failure after rebooting from kernel.
+	 * Clear RxDv_Gated_En bit which was set by kernel driver.
+	 * Without this, U-Boot can't get an IP via DHCP.
+	 * Register (FuncEvent, aka MISC) and RXDV_GATED_EN bit are from
+	 * the r8169.c kernel driver.
+	 */
+
+	u32 val = RTL_R32(FuncEvent);
+	debug("%s: FuncEvent/Misc (0xF0) = 0x%08X\n", __func__, val);
+	val &= ~RxDv_Gated_En;
+	RTL_W32(FuncEvent, val);
+
 	return 0;
 }
 
@@ -1229,8 +1248,8 @@ U_BOOT_DRIVER(eth_rtl8169) = {
 	.of_match = rtl8169_eth_ids,
 	.probe	= rtl8169_eth_probe,
 	.ops	= &rtl8169_eth_ops,
-	.priv_auto_alloc_size = sizeof(struct rtl8169_private),
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
+	.priv_auto	= sizeof(struct rtl8169_private),
+	.plat_auto	= sizeof(struct eth_pdata),
 };
 
 U_BOOT_PCI_DEVICE(eth_rtl8169, supported);

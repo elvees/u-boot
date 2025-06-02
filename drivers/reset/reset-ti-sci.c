@@ -11,6 +11,7 @@
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
+#include <log.h>
 #include <malloc.h>
 #include <reset-uclass.h>
 #include <dm/device_compat.h>
@@ -204,6 +205,6 @@ U_BOOT_DRIVER(ti_sci_reset) = {
 	.id = UCLASS_RESET,
 	.of_match = ti_sci_reset_of_match,
 	.probe = ti_sci_reset_probe,
-	.priv_auto_alloc_size = sizeof(struct ti_sci_reset_data),
+	.priv_auto	= sizeof(struct ti_sci_reset_data),
 	.ops = &ti_sci_reset_ops,
 };

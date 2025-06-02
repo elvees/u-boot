@@ -11,14 +11,18 @@
 #include <env.h>
 #include <i2c.h>
 #include <init.h>
+#include <log.h>
 #include <miiphy.h>
+#include <net.h>
 #include <netdev.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/cpu.h>
 #include <asm/arch/soc.h>
 #include <dm/uclass.h>
 #include <fdt_support.h>
 #include <time.h>
+#include <linux/bitops.h>
 #include <u-boot/crc.h>
 # include <atsha204a-i2c.h>
 
@@ -282,6 +286,7 @@ static struct mv_ddr_topology_map board_topology_map_1g = {
 	    MV_DDR_TIM_2T} },		/* timing */
 	BUS_MASK_32BIT,			/* Busses mask */
 	MV_DDR_CFG_DEFAULT,		/* ddr configuration data source */
+	NOT_COMBINED,			/* ddr twin-die combined */
 	{ {0} },			/* raw spd data */
 	{0}				/* timing parameters */
 };
@@ -304,6 +309,7 @@ static struct mv_ddr_topology_map board_topology_map_2g = {
 	    MV_DDR_TIM_2T} },		/* timing */
 	BUS_MASK_32BIT,			/* Busses mask */
 	MV_DDR_CFG_DEFAULT,		/* ddr configuration data source */
+	NOT_COMBINED,			/* ddr twin-die combined */
 	{ {0} },			/* raw spd data */
 	{0}				/* timing parameters */
 };

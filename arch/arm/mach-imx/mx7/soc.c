@@ -4,6 +4,7 @@
  */
 
 #include <common.h>
+#include <init.h>
 #include <asm/io.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/clock.h>
@@ -12,12 +13,14 @@
 #include <asm/mach-imx/hab.h>
 #include <asm/mach-imx/rdc-sema.h>
 #include <asm/arch/imx-rdc.h>
+#include <asm/mach-imx/boot_mode.h>
 #include <asm/arch/crm_regs.h>
 #include <dm.h>
 #include <env.h>
 #include <imx_thermal.h>
 #include <fsl_sec.h>
 #include <asm/setup.h>
+#include <linux/delay.h>
 
 #define IOMUXC_GPR1		0x4
 #define BM_IOMUXC_GPR1_IRQ	0x1000
@@ -57,9 +60,9 @@ static const struct imx_thermal_plat imx7_thermal_plat = {
 	.fuse_word = 3,
 };
 
-U_BOOT_DEVICE(imx7_thermal) = {
+U_BOOT_DRVINFO(imx7_thermal) = {
 	.name = "imx_thermal",
-	.platdata = &imx7_thermal_plat,
+	.plat = &imx7_thermal_plat,
 };
 #endif
 
@@ -216,7 +219,7 @@ const struct rproc_att hostmap[] = {
 	{ 0x00940000, 0x00940000, 0x20000 }, /* OCRAM_PXP */
 	{ 0x20240000, 0x00940000, 0x20000 }, /* OCRAM_PXP */
 	{ 0x10000000, 0x80000000, 0x0fff0000 }, /* DDR Code alias */
-	{ 0x80000000, 0x80000000, 0xe0000000 }, /* DDRC */
+	{ 0x80000000, 0x80000000, 0x60000000 }, /* DDRC */
 	{ /* sentinel */ }
 };
 #endif
@@ -407,6 +410,22 @@ void s_init(void)
 
 	return;
 }
+
+#ifndef CONFIG_SPL_BUILD
+const struct boot_mode soc_boot_modes[] = {
+	{"normal",	MAKE_CFGVAL(0x00, 0x00, 0x00, 0x00)},
+	{"primary",	MAKE_CFGVAL_PRIMARY_BOOT},
+	{"secondary",	MAKE_CFGVAL_SECONDARY_BOOT},
+	{NULL,		0},
+};
+
+int boot_mode_getprisec(void)
+{
+	struct src *psrc = (struct src *)SRC_BASE_ADDR;
+
+	return !!(readl(&psrc->gpr10) & IMX7_SRC_GPR10_PERSIST_SECONDARY_BOOT);
+}
+#endif
 
 void reset_misc(void)
 {

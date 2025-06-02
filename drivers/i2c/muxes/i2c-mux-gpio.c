@@ -7,6 +7,7 @@
  * Peng Fan <peng.fan@nxp.com>
  */
 
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm-generic/gpio.h>
 #include <common.h>
@@ -17,6 +18,7 @@
 #include <fdtdec.h>
 #include <i2c.h>
 #include <linux/errno.h>
+#include <linux/libfdt.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -135,5 +137,5 @@ U_BOOT_DRIVER(i2c_mux_gpio) = {
 	.of_match = i2c_mux_gpio_ids,
 	.ops = &i2c_mux_gpio_ops,
 	.probe = i2c_mux_gpio_probe,
-	.priv_auto_alloc_size = sizeof(struct i2c_mux_gpio_priv),
+	.priv_auto	= sizeof(struct i2c_mux_gpio_priv),
 };

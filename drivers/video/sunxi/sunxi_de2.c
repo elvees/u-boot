@@ -12,6 +12,8 @@
 #include <efi_loader.h>
 #include <fdtdec.h>
 #include <fdt_support.h>
+#include <log.h>
+#include <part.h>
 #include <video.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
@@ -19,6 +21,7 @@
 #include <asm/arch/display2.h>
 #include <dm/device-internal.h>
 #include <dm/uclass-internal.h>
+#include <linux/bitops.h>
 #include "simplefb_common.h"
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -186,7 +189,7 @@ static int sunxi_de2_init(struct udevice *dev, ulong fbbase,
 	struct display_plat *disp_uc_plat;
 	int ret;
 
-	disp_uc_plat = dev_get_uclass_platdata(disp);
+	disp_uc_plat = dev_get_uclass_plat(disp);
 	debug("Using device '%s', disp_uc_priv=%p\n", disp->name, disp_uc_plat);
 	if (display_in_use(disp)) {
 		debug("   - device in use\n");
@@ -224,9 +227,9 @@ static int sunxi_de2_init(struct udevice *dev, ulong fbbase,
 
 #ifdef CONFIG_EFI_LOADER
 	efi_add_memory_map(fbbase,
-			   ALIGN(timing.hactive.typ * timing.vactive.typ *
-			   (1 << l2bpp) / 8, EFI_PAGE_SIZE) >> EFI_PAGE_SHIFT,
-			   EFI_RESERVED_MEMORY_TYPE, false);
+			   timing.hactive.typ * timing.vactive.typ *
+			   (1 << l2bpp) / 8,
+			   EFI_RESERVED_MEMORY_TYPE);
 #endif
 
 	return 0;
@@ -234,7 +237,7 @@ static int sunxi_de2_init(struct udevice *dev, ulong fbbase,
 
 static int sunxi_de2_probe(struct udevice *dev)
 {
-	struct video_uc_platdata *plat = dev_get_uclass_platdata(dev);
+	struct video_uc_plat *plat = dev_get_uclass_plat(dev);
 	struct udevice *disp;
 	int ret;
 
@@ -296,7 +299,7 @@ static int sunxi_de2_probe(struct udevice *dev)
 
 static int sunxi_de2_bind(struct udevice *dev)
 {
-	struct video_uc_platdata *plat = dev_get_uclass_platdata(dev);
+	struct video_uc_plat *plat = dev_get_uclass_plat(dev);
 
 	plat->size = LCD_MAX_WIDTH * LCD_MAX_HEIGHT *
 		(1 << LCD_MAX_LOG2_BPP) / 8;
@@ -316,7 +319,7 @@ U_BOOT_DRIVER(sunxi_de2) = {
 	.flags	= DM_FLAG_PRE_RELOC,
 };
 
-U_BOOT_DEVICE(sunxi_de2) = {
+U_BOOT_DRVINFO(sunxi_de2) = {
 	.name = "sunxi_de2"
 };
 
@@ -328,7 +331,7 @@ int sunxi_simplefb_setup(void *blob)
 {
 	struct udevice *de2, *hdmi, *lcd;
 	struct video_priv *de2_priv;
-	struct video_uc_platdata *de2_plat;
+	struct video_uc_plat *de2_plat;
 	int mux;
 	int offset, ret;
 	u64 start, size;
@@ -380,7 +383,7 @@ int sunxi_simplefb_setup(void *blob)
 	}
 
 	de2_priv = dev_get_uclass_priv(de2);
-	de2_plat = dev_get_uclass_platdata(de2);
+	de2_plat = dev_get_uclass_plat(de2);
 
 	offset = sunxi_simplefb_fdt_match(blob, pipeline);
 	if (offset < 0) {

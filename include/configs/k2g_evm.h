@@ -35,6 +35,8 @@
 			"setenv name_fdt keystone-k2g-evm.dtb; " \
 		"else if test $board_name = 66AK2GIC; then " \
 			 "setenv name_fdt keystone-k2g-ice.dtb; " \
+		"else if test $board_name = 66AK2GI1; then " \
+			 "setenv name_fdt keystone-k2g-ice.dtb; " \
 		"else if test $name_fdt = undefined; then " \
 			"echo WARNING: Could not determine device tree to use;"\
 		"fi;fi;fi;fi; setenv fdtfile ${name_fdt}\0" \
@@ -82,7 +84,6 @@
 #define PHY_ANEG_TIMEOUT	10000 /* PHY needs longer aneg time */
 
 #ifndef CONFIG_SPL_BUILD
-#define CONFIG_CADENCE_QSPI
 #define CONFIG_CQSPI_REF_CLK 384000000
 #endif
 

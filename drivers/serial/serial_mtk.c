@@ -11,8 +11,10 @@
 #include <div64.h>
 #include <dm.h>
 #include <errno.h>
+#include <log.h>
 #include <serial.h>
 #include <watchdog.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/types.h>
 #include <linux/err.h>
@@ -215,7 +217,7 @@ static int mtk_serial_probe(struct udevice *dev)
 	return 0;
 }
 
-static int mtk_serial_ofdata_to_platdata(struct udevice *dev)
+static int mtk_serial_of_to_plat(struct udevice *dev)
 {
 	struct mtk_serial_priv *priv = dev_get_priv(dev);
 	fdt_addr_t addr;
@@ -266,8 +268,8 @@ U_BOOT_DRIVER(serial_mtk) = {
 	.name = "serial_mtk",
 	.id = UCLASS_SERIAL,
 	.of_match = mtk_serial_ids,
-	.ofdata_to_platdata = mtk_serial_ofdata_to_platdata,
-	.priv_auto_alloc_size = sizeof(struct mtk_serial_priv),
+	.of_to_plat = mtk_serial_of_to_plat,
+	.priv_auto	= sizeof(struct mtk_serial_priv),
 	.probe = mtk_serial_probe,
 	.ops = &mtk_serial_ops,
 	.flags = DM_FLAG_PRE_RELOC,

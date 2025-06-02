@@ -5,7 +5,9 @@
  */
 
 #include <common.h>
+#include <init.h>
 #include <syscon.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch-rockchip/clock.h>
 #include <asm/arch-rockchip/grf_rv1108.h>
@@ -14,7 +16,7 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-int mach_cpu_init(void)
+int board_early_init_f(void)
 {
 	struct rv1108_grf *grf;
 	enum {

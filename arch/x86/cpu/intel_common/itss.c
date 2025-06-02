@@ -13,29 +13,12 @@
 #include <dm.h>
 #include <dt-structs.h>
 #include <irq.h>
+#include <log.h>
 #include <malloc.h>
 #include <p2sb.h>
 #include <spl.h>
+#include <asm/global_data.h>
 #include <asm/itss.h>
-
-struct itss_platdata {
-#if CONFIG_IS_ENABLED(OF_PLATDATA)
-	/* Put this first since driver model will copy the data here */
-	struct dtd_intel_itss dtplat;
-#endif
-};
-
-/* struct pmc_route - Routing for PMC to GPIO */
-struct pmc_route {
-	u32 pmc;
-	u32 gpio;
-};
-
-struct itss_priv {
-	struct pmc_route *route;
-	uint route_count;
-	u32 irq_snapshot[NUM_IPC_REGS];
-};
 
 static int set_polarity(struct udevice *dev, uint irq, bool active_low)
 {
@@ -64,13 +47,22 @@ static int snapshot_polarities(struct udevice *dev)
 	int i;
 
 	reg_start = start / IRQS_PER_IPC;
-	reg_end = (end + IRQS_PER_IPC - 1) / IRQS_PER_IPC;
+	reg_end = DIV_ROUND_UP(end, IRQS_PER_IPC);
 
+	log_debug("ITSS IRQ Polarities snapshot %p\n", priv->irq_snapshot);
 	for (i = reg_start; i < reg_end; i++) {
 		uint reg = PCR_ITSS_IPC0_CONF + sizeof(u32) * i;
 
 		priv->irq_snapshot[i] = pcr_read32(dev, reg);
+		log_debug("   - %d, reg %x: irq_snapshot[i] %x\n", i, reg,
+			  priv->irq_snapshot[i]);
 	}
+
+	/* Save the snapshot for use after relocation */
+	gd->start_addr_sp -= sizeof(*priv);
+	gd->start_addr_sp &= ~0xf;
+	gd->arch.itss_priv = (void *)gd->start_addr_sp;
+	memcpy(gd->arch.itss_priv, priv, sizeof(*priv));
 
 	return 0;
 }
@@ -79,27 +71,37 @@ static void show_polarities(struct udevice *dev, const char *msg)
 {
 	int i;
 
-	log_info("ITSS IRQ Polarities %s:\n", msg);
+	log_debug("ITSS IRQ Polarities %s:\n", msg);
 	for (i = 0; i < NUM_IPC_REGS; i++) {
 		uint reg = PCR_ITSS_IPC0_CONF + sizeof(u32) * i;
 
-		log_info("IPC%d: 0x%08x\n", i, pcr_read32(dev, reg));
+		log_debug("IPC%d: 0x%08x\n", i, pcr_read32(dev, reg));
 	}
 }
 
 static int restore_polarities(struct udevice *dev)
 {
 	struct itss_priv *priv = dev_get_priv(dev);
+	struct itss_priv *old_priv;
 	const int start = GPIO_IRQ_START;
 	const int end = GPIO_IRQ_END;
 	int reg_start;
 	int reg_end;
 	int i;
 
+	/* Get the snapshot which was stored by the pre-reloc device */
+	old_priv = gd->arch.itss_priv;
+	if (!old_priv)
+		return log_msg_ret("priv", -EFAULT);
+	memcpy(priv->irq_snapshot, old_priv->irq_snapshot,
+	       sizeof(priv->irq_snapshot));
+
 	show_polarities(dev, "Before");
+	log_debug("priv->irq_snapshot %p\n", priv->irq_snapshot);
 
 	reg_start = start / IRQS_PER_IPC;
-	reg_end = (end + IRQS_PER_IPC - 1) / IRQS_PER_IPC;
+	reg_end = DIV_ROUND_UP(end, IRQS_PER_IPC);
+
 
 	for (i = reg_start; i < reg_end; i++) {
 		u32 mask;
@@ -124,6 +126,8 @@ static int restore_polarities(struct udevice *dev)
 		mask &= ~((1U << irq_start) - 1);
 
 		reg = PCR_ITSS_IPC0_CONF + sizeof(u32) * i;
+		log_debug("   - %d, reg %x: mask %x, irq_snapshot[i] %x\n",
+			  i, reg, mask, priv->irq_snapshot[i]);
 		pcr_clrsetbits32(dev, reg, mask, mask & priv->irq_snapshot[i]);
 	}
 
@@ -156,13 +160,13 @@ static int itss_bind(struct udevice *dev)
 	return 0;
 }
 
-static int itss_ofdata_to_platdata(struct udevice *dev)
+static int itss_of_to_plat(struct udevice *dev)
 {
 	struct itss_priv *priv = dev_get_priv(dev);
 	int ret;
 
 #if CONFIG_IS_ENABLED(OF_PLATDATA)
-	struct itss_platdata *plat = dev_get_platdata(dev);
+	struct itss_plat *plat = dev_get_plat(dev);
 	struct dtd_intel_itss *dtplat = &plat->dtplat;
 
 	/*
@@ -208,18 +212,20 @@ static const struct irq_ops itss_ops = {
 #endif
 };
 
+#if !CONFIG_IS_ENABLED(OF_PLATDATA)
 static const struct udevice_id itss_ids[] = {
 	{ .compatible = "intel,itss", .data = X86_IRQT_ITSS },
 	{ }
 };
+#endif
 
-U_BOOT_DRIVER(itss_drv) = {
+U_BOOT_DRIVER(intel_itss) = {
 	.name		= "intel_itss",
 	.id		= UCLASS_IRQ,
-	.of_match	= itss_ids,
+	.of_match	= of_match_ptr(itss_ids),
 	.ops		= &itss_ops,
 	.bind		= itss_bind,
-	.ofdata_to_platdata = itss_ofdata_to_platdata,
-	.platdata_auto_alloc_size = sizeof(struct itss_platdata),
-	.priv_auto_alloc_size = sizeof(struct itss_priv),
+	.of_to_plat = itss_of_to_plat,
+	.plat_auto	= sizeof(struct itss_plat),
+	.priv_auto	= sizeof(struct itss_priv),
 };

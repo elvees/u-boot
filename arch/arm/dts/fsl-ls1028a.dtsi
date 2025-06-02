@@ -2,7 +2,7 @@
 /*
  * NXP ls1028a SOC common device tree source
  *
- * Copyright 2019 NXP
+ * Copyright 2019-2020 NXP
  *
  */
 
@@ -42,6 +42,12 @@
 		interrupt-controller;
 		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_RAW(0xf) |
 					 IRQ_TYPE_LEVEL_LOW)>;
+	};
+
+	gic_lpi_base: syscon@0x80000000 {
+		compatible = "gic-lpi-base";
+		reg = <0x0 0x80000000 0x0 0x100000>;
+		max-gic-redistributors = <2>;
 	};
 
 	timer {
@@ -85,7 +91,7 @@
 		status = "disabled";
 	};
 
-	pcie@3400000 {
+	pcie1: pcie@3400000 {
 	       compatible = "fsl,ls-pcie", "fsl,ls1028-pcie", "snps,dw-pcie";
 	       reg = <0x00 0x03400000 0x0 0x80000
 		       0x00 0x03480000 0x0 0x40000   /* lut registers */
@@ -101,7 +107,7 @@
 		       0x82000000 0x0 0x40000000 0x80 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
 	};
 
-	pcie@3500000 {
+	pcie2: pcie@3500000 {
 	       compatible = "fsl,ls-pcie", "fsl,ls1028-pcie", "snps,dw-pcie";
 	       reg = <0x00 0x03500000 0x0 0x80000
 		       0x00 0x03580000 0x0 0x40000   /* lut registers */
@@ -145,9 +151,63 @@
 			reg = <0x000300 0 0 0 0>;
 			status = "disabled";
 		};
+
+		mscc_felix: pci@0,5 {
+			reg = <0x000500 0 0 0 0>;
+			status = "disabled";
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				mscc_felix_port0: port@0 {
+					reg = <0>;
+					status = "disabled";
+				};
+
+				mscc_felix_port1: port@1 {
+					reg = <1>;
+					status = "disabled";
+				};
+
+				mscc_felix_port2: port@2 {
+					reg = <2>;
+					status = "disabled";
+				};
+
+				mscc_felix_port3: port@3 {
+					reg = <3>;
+					status = "disabled";
+				};
+
+				mscc_felix_port4: port@4 {
+					reg = <4>;
+					phy-mode = "internal";
+					status = "disabled";
+
+					fixed-link {
+						speed = <2500>;
+						full-duplex;
+					};
+				};
+
+				mscc_felix_port5: port@5 {
+					reg = <5>;
+					phy-mode = "internal";
+					status = "disabled";
+
+					fixed-link {
+						speed = <1000>;
+						full-duplex;
+					};
+
+				};
+			};
+		};
+
 		enetc6: pci@0,6 {
 			reg = <0x000600 0 0 0 0>;
-			status = "okay";
+			status = "disabled";
 			phy-mode = "internal";
 		};
 	};
@@ -240,6 +300,66 @@
 		status = "disabled";
 	};
 
+	lpuart0: serial@2260000 {
+		compatible = "fsl,ls1021a-lpuart";
+		reg = <0x0 0x2260000 0x0 0x1000>;
+		interrupts = <0 232 0x4>;
+		clocks = <&sysclk>;
+		clock-names = "ipg";
+		little-endian;
+		status = "disabled";
+	};
+
+	lpuart1: serial@2270000 {
+		compatible = "fsl,ls1021a-lpuart";
+		reg = <0x0 0x2270000 0x0 0x1000>;
+		interrupts = <0 233 0x4>;
+		clocks = <&sysclk>;
+		clock-names = "ipg";
+		little-endian;
+		status = "disabled";
+	};
+
+	lpuart2: serial@2280000 {
+		compatible = "fsl,ls1021a-lpuart";
+		reg = <0x0 0x2280000 0x0 0x1000>;
+		interrupts = <0 234 0x4>;
+		clocks = <&sysclk>;
+		clock-names = "ipg";
+		little-endian;
+		status = "disabled";
+	};
+
+	lpuart3: serial@2290000 {
+		compatible = "fsl,ls1021a-lpuart";
+		reg = <0x0 0x2290000 0x0 0x1000>;
+		interrupts = <0 235 0x4>;
+		clocks = <&sysclk>;
+		clock-names = "ipg";
+		little-endian;
+		status = "disabled";
+	};
+
+	lpuart4: serial@22a0000 {
+		compatible = "fsl,ls1021a-lpuart";
+		reg = <0x0 0x22a0000 0x0 0x1000>;
+		interrupts = <0 236 0x4>;
+		clocks = <&sysclk>;
+		clock-names = "ipg";
+		little-endian;
+		status = "disabled";
+	};
+
+	lpuart5: serial@22b0000 {
+		compatible = "fsl,ls1021a-lpuart";
+		reg = <0x0 0x22b0000 0x0 0x1000>;
+		interrupts = <0 237 0x4>;
+		clocks = <&sysclk>;
+		clock-names = "ipg";
+		little-endian;
+		status = "disabled";
+	};
+
 	usb1: usb3@3100000 {
 		compatible = "fsl,layerscape-dwc3";
 		reg = <0x0 0x3100000 0x0 0x10000>;
@@ -312,6 +432,39 @@
 		non-removable;
 		bus-width = <4>;
 		status = "disabled";
+	};
+
+	gpio0: gpio@2300000 {
+		compatible = "fsl,ls1028a-gpio","fsl,qoriq-gpio";
+		reg = <0x0 0x2300000 0x0 0x10000>;
+		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		interrupt-controller;
+		#interrupt-cells = <2>;
+		little-endian;
+	};
+
+	gpio1: gpio@2310000 {
+		compatible = "fsl,ls1028a-gpio","fsl,qoriq-gpio";
+		reg = <0x0 0x2310000 0x0 0x10000>;
+		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		interrupt-controller;
+		#interrupt-cells = <2>;
+		little-endian;
+	};
+
+	gpio2: gpio@2320000 {
+		compatible = "fsl,ls1028a-gpio","fsl,qoriq-gpio";
+		reg = <0x0 0x2320000 0x0 0x10000>;
+		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		interrupt-controller;
+		#interrupt-cells = <2>;
+		little-endian;
 	};
 
 	sata: sata@3200000 {

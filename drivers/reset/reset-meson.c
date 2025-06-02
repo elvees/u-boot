@@ -8,9 +8,11 @@
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <malloc.h>
 #include <reset-uclass.h>
 #include <regmap.h>
+#include <linux/bitops.h>
 
 #define REG_COUNT	8
 #define BITS_PER_REG	32
@@ -87,5 +89,5 @@ U_BOOT_DRIVER(meson_reset) = {
 	.of_match = meson_reset_ids,
 	.probe = meson_reset_probe,
 	.ops = &meson_reset_ops,
-	.priv_auto_alloc_size = sizeof(struct meson_reset_priv),
+	.priv_auto	= sizeof(struct meson_reset_priv),
 };

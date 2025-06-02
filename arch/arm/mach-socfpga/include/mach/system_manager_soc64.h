@@ -6,6 +6,7 @@
 #ifndef _SYSTEM_MANAGER_SOC64_H_
 #define _SYSTEM_MANAGER_SOC64_H_
 
+#include <linux/bitops.h>
 void sysmgr_pinmux_init(void);
 void populate_sysmgr_fpgaintf_module(void);
 void populate_sysmgr_pinmux(void);
@@ -45,13 +46,21 @@ void sysmgr_pinmux_table_delay(const u32 **table, unsigned int *table_len);
 #define SYSMGR_SOC64_GPO			0xe4
 #define SYSMGR_SOC64_GPI			0xe8
 #define SYSMGR_SOC64_MPU			0xf0
+/* store qspi ref clock */
 #define SYSMGR_SOC64_BOOT_SCRATCH_COLD0		0x200
+/* store osc1 clock freq */
 #define SYSMGR_SOC64_BOOT_SCRATCH_COLD1		0x204
+/* store fpga clock freq */
 #define SYSMGR_SOC64_BOOT_SCRATCH_COLD2		0x208
+/* reserved for customer use */
 #define SYSMGR_SOC64_BOOT_SCRATCH_COLD3		0x20c
+/* store PSCI_CPU_ON value */
 #define SYSMGR_SOC64_BOOT_SCRATCH_COLD4		0x210
+/* store PSCI_CPU_ON value */
 #define SYSMGR_SOC64_BOOT_SCRATCH_COLD5		0x214
+/* store VBAR_EL3 value */
 #define SYSMGR_SOC64_BOOT_SCRATCH_COLD6		0x218
+/* store VBAR_EL3 value */
 #define SYSMGR_SOC64_BOOT_SCRATCH_COLD7		0x21c
 #define SYSMGR_SOC64_BOOT_SCRATCH_COLD8		0x220
 #define SYSMGR_SOC64_BOOT_SCRATCH_COLD9		0x224
@@ -87,8 +96,12 @@ void sysmgr_pinmux_table_delay(const u32 **table, unsigned int *table_len);
 #define SYSMGR_ECC_OCRAM_EN	BIT(0)
 #define SYSMGR_ECC_OCRAM_SERR	BIT(3)
 #define SYSMGR_ECC_OCRAM_DERR	BIT(4)
-#define SYSMGR_FPGAINTF_USEFPGA	0x1
+#define SYSMGR_FPGACONFIG_FPGA_COMPLETE		BIT(0)
+#define SYSMGR_FPGACONFIG_EARLY_USERMODE	BIT(1)
+#define SYSMGR_FPGACONFIG_READY_MASK	(SYSMGR_FPGACONFIG_FPGA_COMPLETE | \
+					 SYSMGR_FPGACONFIG_EARLY_USERMODE)
 
+#define SYSMGR_FPGAINTF_USEFPGA	0x1
 #define SYSMGR_FPGAINTF_NAND	BIT(4)
 #define SYSMGR_FPGAINTF_SDMMC	BIT(8)
 #define SYSMGR_FPGAINTF_SPIM0	BIT(16)

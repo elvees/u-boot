@@ -14,6 +14,7 @@
 #include <panel.h>
 #include <asm/gpio.h>
 #include <dm/device_compat.h>
+#include <linux/delay.h>
 #include <power/regulator.h>
 
 #define OTM8009A_BACKLIGHT_DEFAULT	240
@@ -61,9 +62,6 @@
 struct otm8009a_panel_priv {
 	struct udevice *reg;
 	struct gpio_desc reset;
-	unsigned int lanes;
-	enum mipi_dsi_pixel_format format;
-	unsigned long mode_flags;
 };
 
 static const struct display_timing default_timing = {
@@ -81,7 +79,7 @@ static const struct display_timing default_timing = {
 static void otm8009a_dcs_write_buf(struct udevice *dev, const void *data,
 				   size_t len)
 {
-	struct mipi_dsi_panel_plat *plat = dev_get_platdata(dev);
+	struct mipi_dsi_panel_plat *plat = dev_get_plat(dev);
 	struct mipi_dsi_device *device = plat->device;
 
 	if (mipi_dsi_dcs_write_buffer(device, data, len) < 0)
@@ -91,7 +89,7 @@ static void otm8009a_dcs_write_buf(struct udevice *dev, const void *data,
 static void otm8009a_dcs_write_buf_hs(struct udevice *dev, const void *data,
 				      size_t len)
 {
-	struct mipi_dsi_panel_plat *plat = dev_get_platdata(dev);
+	struct mipi_dsi_panel_plat *plat = dev_get_plat(dev);
 	struct mipi_dsi_device *device = plat->device;
 
 	/* data will be sent in dsi hs mode (ie. no lpm) */
@@ -126,7 +124,7 @@ static void otm8009a_dcs_write_buf_hs(struct udevice *dev, const void *data,
 
 static int otm8009a_init_sequence(struct udevice *dev)
 {
-	struct mipi_dsi_panel_plat *plat = dev_get_platdata(dev);
+	struct mipi_dsi_panel_plat *plat = dev_get_plat(dev);
 	struct mipi_dsi_device *device = plat->device;
 	int ret;
 
@@ -257,7 +255,7 @@ static int otm8009a_init_sequence(struct udevice *dev)
 
 static int otm8009a_panel_enable_backlight(struct udevice *dev)
 {
-	struct mipi_dsi_panel_plat *plat = dev_get_platdata(dev);
+	struct mipi_dsi_panel_plat *plat = dev_get_plat(dev);
 	struct mipi_dsi_device *device = plat->device;
 	int ret;
 
@@ -292,21 +290,12 @@ static int otm8009a_panel_enable_backlight(struct udevice *dev)
 static int otm8009a_panel_get_display_timing(struct udevice *dev,
 					     struct display_timing *timings)
 {
-	struct mipi_dsi_panel_plat *plat = dev_get_platdata(dev);
-	struct mipi_dsi_device *device = plat->device;
-	struct otm8009a_panel_priv *priv = dev_get_priv(dev);
-
 	memcpy(timings, &default_timing, sizeof(*timings));
-
-	/* fill characteristics of DSI data link */
-	device->lanes = priv->lanes;
-	device->format = priv->format;
-	device->mode_flags = priv->mode_flags;
 
 	return 0;
 }
 
-static int otm8009a_panel_ofdata_to_platdata(struct udevice *dev)
+static int otm8009a_panel_of_to_plat(struct udevice *dev)
 {
 	struct otm8009a_panel_priv *priv = dev_get_priv(dev);
 	int ret;
@@ -334,6 +323,7 @@ static int otm8009a_panel_ofdata_to_platdata(struct udevice *dev)
 static int otm8009a_panel_probe(struct udevice *dev)
 {
 	struct otm8009a_panel_priv *priv = dev_get_priv(dev);
+	struct mipi_dsi_panel_plat *plat = dev_get_plat(dev);
 	int ret;
 
 	if (IS_ENABLED(CONFIG_DM_REGULATOR) && priv->reg) {
@@ -349,9 +339,10 @@ static int otm8009a_panel_probe(struct udevice *dev)
 	dm_gpio_set_value(&priv->reset, false);
 	mdelay(10); /* >5ms */
 
-	priv->lanes = 2;
-	priv->format = MIPI_DSI_FMT_RGB888;
-	priv->mode_flags = MIPI_DSI_MODE_VIDEO |
+	/* fill characteristics of DSI data link */
+	plat->lanes = 2;
+	plat->format = MIPI_DSI_FMT_RGB888;
+	plat->mode_flags = MIPI_DSI_MODE_VIDEO |
 			   MIPI_DSI_MODE_VIDEO_BURST |
 			   MIPI_DSI_MODE_LPM;
 
@@ -373,8 +364,8 @@ U_BOOT_DRIVER(otm8009a_panel) = {
 	.id			  = UCLASS_PANEL,
 	.of_match		  = otm8009a_panel_ids,
 	.ops			  = &otm8009a_panel_ops,
-	.ofdata_to_platdata	  = otm8009a_panel_ofdata_to_platdata,
+	.of_to_plat	  = otm8009a_panel_of_to_plat,
 	.probe			  = otm8009a_panel_probe,
-	.platdata_auto_alloc_size = sizeof(struct mipi_dsi_panel_plat),
-	.priv_auto_alloc_size	= sizeof(struct otm8009a_panel_priv),
+	.plat_auto	= sizeof(struct mipi_dsi_panel_plat),
+	.priv_auto	= sizeof(struct otm8009a_panel_priv),
 };

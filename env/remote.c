@@ -8,13 +8,14 @@
 #include <common.h>
 #include <command.h>
 #include <env_internal.h>
+#include <asm/global_data.h>
 #include <linux/stddef.h>
 #include <u-boot/crc.h>
 
 #ifdef ENV_IS_EMBEDDED
-env_t *env_ptr = &environment;
+static env_t *env_ptr = &environment;
 #else /* ! ENV_IS_EMBEDDED */
-env_t *env_ptr = (env_t *)CONFIG_ENV_ADDR;
+static env_t *env_ptr = (env_t *)CONFIG_ENV_ADDR;
 #endif /* ENV_IS_EMBEDDED */
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -45,7 +46,7 @@ static int env_remote_save(void)
 static int env_remote_load(void)
 {
 #ifndef ENV_IS_EMBEDDED
-	return env_import((char *)env_ptr, 1);
+	return env_import((char *)env_ptr, 1, H_EXTERNAL);
 #endif
 
 	return 0;

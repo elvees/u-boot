@@ -17,9 +17,15 @@ int qemu_cpu_fixup(void)
 	int ret;
 	int cpu_num;
 	int cpu_online;
+	struct uclass *uc;
 	struct udevice *dev, *pdev;
-	struct cpu_platdata *plat;
+	struct cpu_plat *plat;
 	char *cpu;
+
+	/* This will cause the CPUs devices to be bound */
+	ret = uclass_get(UCLASS_CPU, &uc);
+	if (ret)
+		return ret;
 
 	/* first we need to find '/cpus' */
 	for (device_find_first_child(dm_root(), &pdev);
@@ -67,7 +73,7 @@ int qemu_cpu_fixup(void)
 			printf("binding cpu@%d failed: %d\n", cpu_num, ret);
 			return ret;
 		}
-		plat = dev_get_parent_platdata(dev);
+		plat = dev_get_parent_plat(dev);
 		plat->cpu_id = cpu_num;
 	}
 	return 0;

@@ -405,7 +405,7 @@ static void arasan_gemac_stop(struct udevice *dev)
 
 static int arasan_gemac_write_hwaddr(struct udevice *dev)
 {
-	struct eth_pdata *pdata = dev_get_platdata(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct arasan_gemac_priv *priv = dev_get_priv(dev);
 	unsigned char *enetaddr = pdata->enetaddr;
 
@@ -609,7 +609,7 @@ U_BOOT_DRIVER(arasan_gemac_drv) = {
 	.of_match = arasan_gemac_match_table,
 	.probe = arasan_gemac_probe,
 	.remove = arasan_gemac_remove,
-	.priv_auto_alloc_size = sizeof(struct arasan_gemac_priv),
-	.platdata_auto_alloc_size = sizeof(struct eth_pdata),
+	.priv_auto = sizeof(struct arasan_gemac_priv),
+	.plat_auto = sizeof(struct eth_pdata),
 	.ops = &arasan_gemac_ops,
 };

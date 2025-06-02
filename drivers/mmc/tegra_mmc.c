@@ -10,10 +10,13 @@
 #include <common.h>
 #include <dm.h>
 #include <errno.h>
+#include <log.h>
 #include <mmc.h>
 #include <asm/gpio.h>
 #include <asm/io.h>
 #include <asm/arch-tegra/tegra_mmc.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
 #include <linux/err.h>
 #if defined(CONFIG_TEGRA30) || defined(CONFIG_TEGRA210)
 #include <asm/arch/clock.h>
@@ -677,7 +680,7 @@ static const struct dm_mmc_ops tegra_mmc_ops = {
 static int tegra_mmc_probe(struct udevice *dev)
 {
 	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(dev);
-	struct tegra_mmc_plat *plat = dev_get_platdata(dev);
+	struct tegra_mmc_plat *plat = dev_get_plat(dev);
 	struct tegra_mmc_priv *priv = dev_get_priv(dev);
 	struct mmc_config *cfg = &plat->cfg;
 	int bus_width, ret;
@@ -746,7 +749,7 @@ static int tegra_mmc_probe(struct udevice *dev)
 
 static int tegra_mmc_bind(struct udevice *dev)
 {
-	struct tegra_mmc_plat *plat = dev_get_platdata(dev);
+	struct tegra_mmc_plat *plat = dev_get_plat(dev);
 
 	return mmc_bind(dev, &plat->mmc, &plat->cfg);
 }
@@ -768,6 +771,6 @@ U_BOOT_DRIVER(tegra_mmc_drv) = {
 	.bind		= tegra_mmc_bind,
 	.probe		= tegra_mmc_probe,
 	.ops		= &tegra_mmc_ops,
-	.platdata_auto_alloc_size = sizeof(struct tegra_mmc_plat),
-	.priv_auto_alloc_size = sizeof(struct tegra_mmc_priv),
+	.plat_auto	= sizeof(struct tegra_mmc_plat),
+	.priv_auto	= sizeof(struct tegra_mmc_priv),
 };

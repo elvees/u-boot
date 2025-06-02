@@ -8,7 +8,9 @@
 #include <errno.h>
 #include <fdtdec.h>
 #include <irq.h>
+#include <log.h>
 #include <malloc.h>
+#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/pci.h>
@@ -361,5 +363,5 @@ U_BOOT_DRIVER(irq_router_drv) = {
 	.id		= UCLASS_IRQ,
 	.of_match	= irq_router_ids,
 	.probe		= irq_router_probe,
-	.priv_auto_alloc_size = sizeof(struct irq_router),
+	.priv_auto	= sizeof(struct irq_router),
 };

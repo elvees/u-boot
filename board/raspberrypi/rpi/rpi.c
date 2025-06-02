@@ -157,6 +157,16 @@ static const struct rpi_model rpi_models_new_scheme[] = {
 		DTB_DIR "bcm2711-rpi-4-b.dtb",
 		true,
 	},
+	[0x13] = {
+		"400",
+		DTB_DIR "bcm2711-rpi-400.dtb",
+		true,
+	},
+	[0x14] = {
+		"Compute Module 4",
+		DTB_DIR "bcm2711-rpi-cm4.dtb",
+		true,
+	},
 };
 
 static const struct rpi_model rpi_models_old_scheme[] = {
@@ -267,6 +277,13 @@ int dram_init(void)
 	}
 
 	gd->ram_size = msg->get_arm_mem.body.resp.mem_size;
+
+	/*
+	 * In some configurations the memory size returned by VideoCore
+	 * is not aligned to the section size, what is mandatory for
+	 * the u-boot's memory setup.
+	 */
+	gd->ram_size &= ~MMU_SECTION_SIZE;
 
 	return 0;
 }
@@ -478,7 +495,7 @@ void *board_fdt_blob_setup(void)
 	return (void *)fw_dtb_pointer;
 }
 
-int ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	/*
 	 * For now, we simply always add the simplefb DT node. Later, we
@@ -489,7 +506,8 @@ int ft_board_setup(void *blob, bd_t *bd)
 
 #ifdef CONFIG_EFI_LOADER
 	/* Reserve the spin table */
-	efi_add_memory_map(0, 1, EFI_RESERVED_MEMORY_TYPE, 0);
+	efi_add_memory_map(0, CONFIG_RPI_EFI_NR_SPIN_PAGES << EFI_PAGE_SHIFT,
+			   EFI_RESERVED_MEMORY_TYPE);
 #endif
 
 	return 0;

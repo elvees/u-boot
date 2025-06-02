@@ -8,6 +8,7 @@
 #include <common.h>
 #include <fdtdec.h>
 #include <i2c.h>
+#include <linux/bitops.h>
 #include <linux/libfdt.h>
 #include <pca953x.h>
 #include <asm/arch-tegra/cboot.h>
@@ -169,7 +170,7 @@ static void ft_carveout_setup(void *fdt)
 	}
 }
 
-int ft_board_setup(void *fdt, bd_t *bd)
+int ft_board_setup(void *fdt, struct bd_info *bd)
 {
 	ft_mac_address_setup(fdt);
 	ft_carveout_setup(fdt);

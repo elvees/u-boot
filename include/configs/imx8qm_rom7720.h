@@ -7,14 +7,13 @@
 #define __IMX8QM_ROM7720_H
 
 #include <linux/sizes.h>
+#include <linux/stringify.h>
 #include <asm/arch/imx-regs.h>
 #define CONFIG_REMAKE_ELF
 
 #define CONFIG_SPL_MAX_SIZE		(124 * 1024)
 #define CONFIG_SPL_BSS_START_ADDR	0x00128000
 #define CONFIG_SPL_BSS_MAX_SIZE	0x1000  /* 4 KB */
-
-#undef CONFIG_BOOTM_NETBSD
 
 #define CONFIG_FSL_USDHC
 #define CONFIG_SYS_BOOTMAPSZ		(256 << 20)
@@ -25,11 +24,8 @@
 
 #define CONFIG_SUPPORT_EMMC_BOOT	/* eMMC specific */
 
-#define CONFIG_ENV_OVERWRITE
-
 #define CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
 /* FUSE command */
-#define CONFIG_CMD_FUSE
 
 /* Boot M4 */
 #define M4_BOOT_ENV \
@@ -139,8 +135,6 @@
 #define CONFIG_ENV_SPI_CS	CONFIG_SF_DEFAULT_CS
 #define CONFIG_ENV_SPI_MODE	CONFIG_SF_DEFAULT_MODE
 #define CONFIG_ENV_SPI_MAX_HZ	CONFIG_SF_DEFAULT_SPEED
-#else
-#define CONFIG_SYS_MMC_ENV_PART		0	/* user area */
 #endif
 
 #define CONFIG_SYS_MMC_IMG_LOAD_PART	1
@@ -149,7 +143,6 @@
  * USDHC3 is for SD on base board On DDR4 board, USDHC1 is mux for NAND,
  * USDHC2 is for SD, USDHC3 is for SD on base board
  */
-#define CONFIG_SYS_MMC_ENV_DEV		2   /* USDHC3 */
 #define CONFIG_MMCROOT			"/dev/mmcblk2p2"  /* USDHC3 */
 #define CONFIG_SYS_FSL_USDHC_NUM	3
 
@@ -163,17 +156,11 @@
 /* LPDDR4 board total DDR is 6GB, DDR4 board total DDR is 4 GB */
 #define PHYS_SDRAM_2_SIZE		0x80000000	/* 2 GB */
 
-#define CONFIG_SYS_MEMTEST_START	0xA0000000
-#define CONFIG_SYS_MEMTEST_END      (CONFIG_SYS_MEMTEST_START + (PHYS_SDRAM_1_SIZE >> 2))
-
-/* Serial */
-#define CONFIG_BAUDRATE			115200
-
 /* Generic Timer Definitions */
 #define COUNTER_FREQUENCY		8000000	/* 8MHz */
 
 /* Networking */
 #define CONFIG_FEC_XCV_TYPE		RGMII
-#define FEC_QUIRK_ENET_MAC
 
+#include <linux/stringify.h>
 #endif /* __IMX8QM_ROM7720_H */

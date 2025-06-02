@@ -1,18 +1,21 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
- * Author(s): Patrice Chotard, <patrice.chotard@st.com> for STMicroelectronics.
+ * Author(s): Patrice Chotard, <patrice.chotard@foss.st.com> for STMicroelectronics.
  */
 
 #include <common.h>
 #include <errno.h>
+#include <log.h>
 #include <malloc.h>
 #include <wait_bit.h>
 #include <dm.h>
 #include <reset-uclass.h>
 #include <regmap.h>
 #include <syscon.h>
+#include <asm/global_data.h>
 #include <dt-bindings/reset/stih407-resets.h>
+#include <linux/bitops.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -334,6 +337,6 @@ U_BOOT_DRIVER(sti_reset) = {
 	.id = UCLASS_RESET,
 	.of_match = sti_reset_ids,
 	.probe = sti_reset_probe,
-	.priv_auto_alloc_size = sizeof(struct sti_reset),
+	.priv_auto	= sizeof(struct sti_reset),
 	.ops = &sti_reset_ops,
 };

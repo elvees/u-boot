@@ -13,10 +13,12 @@
 
 #include <common.h>
 #include <dm.h>
+#include <log.h>
 #include <dm/device-internal.h>
 #include <dm/device_compat.h>
 #include <dm/devres.h>
 #include <dm/lists.h>
+#include <linux/bug.h>
 #include <linux/kernel.h>
 #include <linux/io.h>
 #include <usb.h>
@@ -108,7 +110,7 @@ static int cdns3_core_init_role(struct cdns3 *cdns)
 	enum usb_dr_mode dr_mode;
 	int ret = 0;
 
-	dr_mode = usb_get_dr_mode(dev_of_offset(dev));
+	dr_mode = usb_get_dr_mode(dev_ofnode(dev));
 	cdns->role = USB_ROLE_NONE;
 
 	/*
@@ -384,22 +386,20 @@ static const struct udevice_id cdns3_ids[] = {
 
 int cdns3_bind(struct udevice *parent)
 {
-	int from = dev_of_offset(parent);
-	const void *fdt = gd->fdt_blob;
 	enum usb_dr_mode dr_mode;
 	struct udevice *dev;
 	const char *driver;
 	const char *name;
-	int node;
+	ofnode node;
 	int ret;
 
-	node = fdt_node_offset_by_compatible(fdt, from, "cdns,usb3");
-	if (node < 0) {
+	node = ofnode_by_compatible(dev_ofnode(parent), "cdns,usb3");
+	if (!ofnode_valid(node)) {
 		ret = -ENODEV;
 		goto fail;
 	}
 
-	name = fdt_get_name(fdt, node, NULL);
+	name = ofnode_get_name(node);
 	dr_mode = usb_get_dr_mode(node);
 
 	switch (dr_mode) {
@@ -422,8 +422,7 @@ int cdns3_bind(struct udevice *parent)
 		goto fail;
 	};
 
-	ret = device_bind_driver_to_node(parent, driver, name,
-					 offset_to_ofnode(node), &dev);
+	ret = device_bind_driver_to_node(parent, driver, name, node, &dev);
 	if (ret) {
 		printf("%s: not able to bind usb device mode\n",
 		       __func__);
@@ -462,7 +461,7 @@ U_BOOT_DRIVER(cdns_usb3_peripheral) = {
 	.of_match = cdns3_ids,
 	.probe = cdns3_gadget_probe,
 	.remove = cdns3_gadget_remove,
-	.priv_auto_alloc_size = sizeof(struct cdns3_gadget_priv),
+	.priv_auto	= sizeof(struct cdns3_gadget_priv),
 	.flags = DM_FLAG_ALLOC_PRIV_DMA,
 };
 #endif
@@ -493,7 +492,7 @@ U_BOOT_DRIVER(cdns_usb3_host) = {
 	.of_match = cdns3_ids,
 	.probe = cdns3_host_probe,
 	.remove = cdns3_host_remove,
-	.priv_auto_alloc_size = sizeof(struct cdns3_host_priv),
+	.priv_auto	= sizeof(struct cdns3_host_priv),
 	.ops = &xhci_usb_ops,
 	.flags = DM_FLAG_ALLOC_PRIV_DMA,
 };

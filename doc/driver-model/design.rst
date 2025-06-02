@@ -59,7 +59,7 @@ uclass:
 The demo class is pretty simple, but not trivial. The intention is that it
 can be used for testing, so it will implement all driver model features and
 provide good code coverage of them. It does have multiple drivers, it
-handles parameter data and platdata (data which tells the driver how
+handles parameter data and plat (data which tells the driver how
 to operate on a particular platform) and it uses private driver data.
 
 To try it, see the example session below::
@@ -282,7 +282,7 @@ in drivers/demo/demo-simple.c:
 
 	static int simple_hello(struct udevice *dev, int ch)
 	{
-		const struct dm_demo_pdata *pdata = dev_get_platdata(dev);
+		const struct dm_demo_pdata *pdata = dev_get_plat(dev);
 
 		printf("Hello from %08x: %s %d\n", map_to_sysmem(dev),
 		       pdata->colour, pdata->sides);
@@ -333,11 +333,11 @@ Briefly, they are:
 
    * bind - make the driver model aware of a device (bind it to its driver)
    * unbind - make the driver model forget the device
-   * ofdata_to_platdata - convert device tree data to platdata - see later
+   * of_to_plat - convert device tree data to plat - see later
    * probe - make a device ready for use
    * remove - remove a device so it cannot be used until probed again
 
-The sequence to get a device to work is bind, ofdata_to_platdata (if using
+The sequence to get a device to work is bind, of_to_plat (if using
 device tree) and probe.
 
 
@@ -396,7 +396,7 @@ The data can be interpreted by the drivers however they like - it is
 basically a communication scheme between the board-specific code and
 the generic drivers, which are intended to work on any board.
 
-Drivers can access their data via dev->info->platdata. Here is
+Drivers can access their data via dev->info->plat. Here is
 the declaration for the platform data, which would normally appear
 in the board file.
 
@@ -410,7 +410,7 @@ in the board file.
 	static const struct driver_info info[] = {
 		{
 			.name = "demo_shape_drv",
-			.platdata = &red_square,
+			.plat = &red_square,
 		},
 	};
 
@@ -420,9 +420,9 @@ in the board file.
 Device Tree
 -----------
 
-While platdata is useful, a more flexible way of providing device data is
+While plat is useful, a more flexible way of providing device data is
 by using device tree. In U-Boot you should use this where possible. Avoid
-sending patches which make use of the U_BOOT_DEVICE() macro unless strictly
+sending patches which make use of the U_BOOT_DRVINFO() macro unless strictly
 necessary.
 
 With device tree we replace the above code with the following device tree
@@ -436,7 +436,7 @@ fragment:
 		sides = <4>;
 	};
 
-This means that instead of having lots of U_BOOT_DEVICE() declarations in
+This means that instead of having lots of U_BOOT_DRVINFO() declarations in
 the board file, we put these in the device tree. This approach allows a lot
 more generality, since the same board file can support many types of boards
 (e,g. with the same SoC) just by using different device trees. An added
@@ -448,24 +448,24 @@ The easiest way to make this work it to add a few members to the driver:
 
 .. code-block:: c
 
-	.platdata_auto_alloc_size = sizeof(struct dm_test_pdata),
-	.ofdata_to_platdata = testfdt_ofdata_to_platdata,
+	.plat_auto = sizeof(struct dm_test_pdata),
+	.of_to_plat = testfdt_of_to_plat,
 
-The 'auto_alloc' feature allowed space for the platdata to be allocated
-and zeroed before the driver's ofdata_to_platdata() method is called. The
-ofdata_to_platdata() method, which the driver write supplies, should parse
-the device tree node for this device and place it in dev->platdata. Thus
+The 'auto' feature allowed space for the plat to be allocated
+and zeroed before the driver's of_to_plat() method is called. The
+of_to_plat() method, which the driver write supplies, should parse
+the device tree node for this device and place it in dev->plat. Thus
 when the probe method is called later (to set up the device ready for use)
 the platform data will be present.
 
-Note that both methods are optional. If you provide an ofdata_to_platdata
+Note that both methods are optional. If you provide an of_to_plat
 method then it will be called first (during activation). If you provide a
 probe method it will be called next. See Driver Lifecycle below for more
 details.
 
-If you don't want to have the platdata automatically allocated then you
-can leave out platdata_auto_alloc_size. In this case you can use malloc
-in your ofdata_to_platdata (or probe) method to allocate the required memory,
+If you don't want to have the plat automatically allocated then you
+can leave out plat_auto. In this case you can use malloc
+in your of_to_plat (or probe) method to allocate the required memory,
 and you should free it in the remove method.
 
 The driver model tree is intended to mirror that of the device tree. The
@@ -515,11 +515,23 @@ cases. While it might be tempting to automatically renumber the devices
 where there are gaps in the sequence, this can lead to confusion and is
 not the way that U-Boot works.
 
-Each device can request a sequence number. If none is required then the
-device will be automatically allocated the next available sequence number.
+Where a device gets its sequence number is controlled by the DM_SEQ_ALIAS
+Kconfig option, which can have a different value in U-Boot proper and SPL.
+If this option is not set, aliases are ignored.
 
-To specify the sequence number in the device tree an alias is typically
-used. Make sure that the uclass has the DM_UC_FLAG_SEQ_ALIAS flag set.
+Even if CONFIG_DM_SEQ_ALIAS is enabled, the uclass must still have the
+DM_UC_FLAG_SEQ_ALIAS flag set, for its devices to be sequenced by aliases.
+
+With those options set, devices with an alias (e.g. "serial2") will get that
+sequence number (e.g. 2). Other devices get the next available number after all
+aliases and all existing numbers. This means that if there is just a single
+alias "serial2", unaliased serial devices will be assigned 3 or more, with 0 and
+1 being unused.
+
+If CONFIG_DM_SEQ_ALIAS or DM_UC_FLAG_SEQ_ALIAS are not set, all devices will get
+sequence numbers in a simple ordering starting from 0. To find the next number
+to allocate, driver model scans through to find the maximum existing number,
+then uses the next one. It does not attempt to fill in gaps.
 
 .. code-block:: none
 
@@ -546,12 +558,18 @@ More commonly you can use node references, which expand to the full path:
 The alias resolves to the same string in this case, but this version is
 easier to read.
 
-Device sequence numbers are resolved when a device is probed. Before then
-the sequence number is only a request which may or may not be honoured,
-depending on what other devices have been probed. However the numbering is
-entirely under the control of the board author so a conflict is generally
-an error.
+Device sequence numbers are resolved when a device is bound and the number does
+not change for the life of the device.
 
+There are some situations where the uclass must allocate sequence numbers,
+since a strictly increase sequence (with devicetree nodes bound first) is not
+suitable. An example of this is the PCI bus. In this case, you can set the
+uclass DM_UC_FLAG_NO_AUTO_SEQ flag. With this flag set, only devices with an
+alias will be assigned a number by driver model. The rest is left to the uclass
+to sort out, e.g. when enumerating the bus.
+
+Note that changing the sequence number for a device (e.g. in a driver) is not
+permitted. If it is felt to be necessary, ask on the mailing list.
 
 Bus Drivers
 -----------
@@ -579,7 +597,7 @@ a USB bus with several devices attached to it, each from a different (made
 up) uclass::
 
    xhci_usb (UCLASS_USB)
-      eth (UCLASS_ETHERNET)
+      eth (UCLASS_ETH)
       camera (UCLASS_CAMERA)
       flash (UCLASS_FLASH_STORAGE)
 
@@ -587,9 +605,9 @@ Each of the devices is connected to a different address on the USB bus.
 The bus device wants to store this address and some other information such
 as the bus speed for each device.
 
-To achieve this, the bus device can use dev->parent_platdata in each of its
+To achieve this, the bus device can use dev->parent_plat in each of its
 three children. This can be auto-allocated if the bus driver (or bus uclass)
-has a non-zero value for per_child_platdata_auto_alloc_size. If not, then
+has a non-zero value for per_child_plat_auto. If not, then
 the bus device or uclass can allocate the space itself before the child
 device is probed.
 
@@ -613,7 +631,7 @@ be connected on a SATA bus or standalone with no bus::
    xhci_usb (UCLASS_USB)
       flash (UCLASS_FLASH_STORAGE)  - parent data/methods defined by USB bus
 
-   sata (UCLASS_SATA)
+   sata (UCLASS_AHCI)
       flash (UCLASS_FLASH_STORAGE)  - parent data/methods defined by SATA bus
 
    flash (UCLASS_FLASH_STORAGE)  - no parent data/methods (not on a bus)
@@ -628,7 +646,7 @@ parent device which is a bus, causes the device to start behaving like a
 bus device, regardless of its own views on the matter.
 
 The uclass for the device can also contain data private to that uclass.
-But note that each device on the bus may be a memeber of a different
+But note that each device on the bus may be a member of a different
 uclass, and this data has nothing to do with the child data for each child
 on the bus. It is the bus' uclass that controls the child with respect to
 the bus.
@@ -647,31 +665,35 @@ Bind stage
 
 U-Boot discovers devices using one of these two methods:
 
-- Scan the U_BOOT_DEVICE() definitions. U-Boot looks up the name specified
+- Scan the U_BOOT_DRVINFO() definitions. U-Boot looks up the name specified
   by each, to find the appropriate U_BOOT_DRIVER() definition. In this case,
-  there is no path by which driver_data may be provided, but the U_BOOT_DEVICE()
-  may provide platdata.
+  there is no path by which driver_data may be provided, but the U_BOOT_DRVINFO()
+  may provide plat.
 
 - Scan through the device tree definitions. U-Boot looks at top-level
   nodes in the the device tree. It looks at the compatible string in each node
   and uses the of_match table of the U_BOOT_DRIVER() structure to find the
   right driver for each node. In this case, the of_match table may provide a
-  driver_data value, but platdata cannot be provided until later.
+  driver_data value, but plat cannot be provided until later.
 
 For each device that is discovered, U-Boot then calls device_bind() to create a
 new device, initializes various core fields of the device object such as name,
 uclass & driver, initializes any optional fields of the device object that are
-applicable such as of_offset, driver_data & platdata, and finally calls the
+applicable such as of_offset, driver_data & plat, and finally calls the
 driver's bind() method if one is defined.
 
 At this point all the devices are known, and bound to their drivers. There
 is a 'struct udevice' allocated for all devices. However, nothing has been
 activated (except for the root device). Each bound device that was created
-from a U_BOOT_DEVICE() declaration will hold the platdata pointer specified
+from a U_BOOT_DRVINFO() declaration will hold the plat pointer specified
 in that declaration. For a bound device created from the device tree,
-platdata will be NULL, but of_offset will be the offset of the device tree
+plat will be NULL, but of_offset will be the offset of the device tree
 node that caused the device to be created. The uclass is set correctly for
 the device.
+
+The device's sequence number is assigned, either the requested one or the next
+available one (after all aliases are processed) if nothing particular is
+requested.
 
 The device's bind() method is permitted to perform simple actions, but
 should not scan the device tree node, not initialise hardware, nor set up
@@ -683,79 +705,121 @@ probe/remove which is independent of bind/unbind. This is partly because in
 U-Boot it may be expensive to probe devices and we don't want to do it until
 they are needed, or perhaps until after relocation.
 
-Activation/probe
-^^^^^^^^^^^^^^^^
+Reading ofdata
+^^^^^^^^^^^^^^
 
-When a device needs to be used, U-Boot activates it, by following these
-steps (see device_probe()):
+Most devices have data in the device tree which they can read to find out the
+base address of hardware registers and parameters relating to driver
+operation. This is called 'ofdata' (Open-Firmware data).
 
-   1. If priv_auto_alloc_size is non-zero, then the device-private space
+The device's of_to_plat() implemnents allocation and reading of
+plat. A parent's ofdata is always read before a child.
+
+The steps are:
+
+   1. If priv_auto is non-zero, then the device-private space
    is allocated for the device and zeroed. It will be accessible as
    dev->priv. The driver can put anything it likes in there, but should use
    it for run-time information, not platform data (which should be static
    and known before the device is probed).
 
-   2. If platdata_auto_alloc_size is non-zero, then the platform data space
+   2. If plat_auto is non-zero, then the platform data space
    is allocated. This is only useful for device tree operation, since
-   otherwise you would have to specific the platform data in the
-   U_BOOT_DEVICE() declaration. The space is allocated for the device and
-   zeroed. It will be accessible as dev->platdata.
+   otherwise you would have to specify the platform data in the
+   U_BOOT_DRVINFO() declaration. The space is allocated for the device and
+   zeroed. It will be accessible as dev->plat.
 
-   3. If the device's uclass specifies a non-zero per_device_auto_alloc_size,
+   3. If the device's uclass specifies a non-zero per_device_auto,
    then this space is allocated and zeroed also. It is allocated for and
    stored in the device, but it is uclass data. owned by the uclass driver.
    It is possible for the device to access it.
 
-   4. If the device's immediate parent specifies a per_child_auto_alloc_size
+   4. If the device's immediate parent specifies a per_child_auto
    then this space is allocated. This is intended for use by the parent
    device to keep track of things related to the child. For example a USB
    flash stick attached to a USB host controller would likely use this
    space. The controller can hold information about the USB state of each
    of its children.
 
-   5. All parent devices are probed. It is not possible to activate a device
+   5. If the driver provides an of_to_plat() method, then this is
+   called to convert the device tree data into platform data. This should
+   do various calls like dev_read_u32(dev, ...) to access the node and store
+   the resulting information into dev->plat. After this point, the device
+   works the same way whether it was bound using a device tree node or
+   U_BOOT_DRVINFO() structure. In either case, the platform data is now stored
+   in the plat structure. Typically you will use the
+   plat_auto feature to specify the size of the platform data
+   structure, and U-Boot will automatically allocate and zero it for you before
+   entry to of_to_plat(). But if not, you can allocate it yourself in
+   of_to_plat(). Note that it is preferable to do all the device tree
+   decoding in of_to_plat() rather than in probe(). (Apart from the
+   ugliness of mixing configuration and run-time data, one day it is possible
+   that U-Boot will cache platform data for devices which are regularly
+   de/activated).
+
+   6. The device is marked 'plat valid'.
+
+Note that ofdata reading is always done (for a child and all its parents)
+before probing starts. Thus devices go through two distinct states when
+probing: reading platform data and actually touching the hardware to bring
+the device up.
+
+Having probing separate from ofdata-reading helps deal with of-platdata, where
+the probe() method is common to both DT/of-platdata operation, but the
+of_to_plat() method is implemented differently.
+
+Another case has come up where this separate is useful. Generation of ACPI
+tables uses the of-platdata but does not want to probe the device. Probing
+would cause U-Boot to violate one of its design principles, viz that it
+should only probe devices that are used. For ACPI we want to generate a
+table for each device, even if U-Boot does not use it. In fact it may not
+even be possible to probe the device - e.g. an SD card which is not
+present will cause an error on probe, yet we still must tell Linux about
+the SD card connector in case it is used while Linux is running.
+
+It is important that the of_to_plat() method does not actually probe
+the device itself. However there are cases where other devices must be probed
+in the of_to_plat() method. An example is where a device requires a
+GPIO for it to operate. To select a GPIO obviously requires that the GPIO
+device is probed. This is OK when used by common, core devices such as GPIO,
+clock, interrupts, reset and the like.
+
+If your device relies on its parent setting up a suitable address space, so
+that dev_read_addr() works correctly, then make sure that the parent device
+has its setup code in of_to_plat(). If it has it in the probe method,
+then you cannot call dev_read_addr() from the child device's
+of_to_plat() method. Move it to probe() instead. Buses like PCI can
+fall afoul of this rule.
+
+Activation/probe
+^^^^^^^^^^^^^^^^
+
+When a device needs to be used, U-Boot activates it, by first reading ofdata
+as above and then following these steps (see device_probe()):
+
+   1. All parent devices are probed. It is not possible to activate a device
    unless its predecessors (all the way up to the root device) are activated.
    This means (for example) that an I2C driver will require that its bus
    be activated.
 
-   6. The device's sequence number is assigned, either the requested one
-   (assuming no conflicts) or the next available one if there is a conflict
-   or nothing particular is requested.
-
-   7. If the driver provides an ofdata_to_platdata() method, then this is
-   called to convert the device tree data into platform data. This should
-   do various calls like fdtdec_get_int(gd->fdt_blob, dev_of_offset(dev), ...)
-   to access the node and store the resulting information into dev->platdata.
-   After this point, the device works the same way whether it was bound
-   using a device tree node or U_BOOT_DEVICE() structure. In either case,
-   the platform data is now stored in the platdata structure. Typically you
-   will use the platdata_auto_alloc_size feature to specify the size of the
-   platform data structure, and U-Boot will automatically allocate and zero
-   it for you before entry to ofdata_to_platdata(). But if not, you can
-   allocate it yourself in ofdata_to_platdata(). Note that it is preferable
-   to do all the device tree decoding in ofdata_to_platdata() rather than
-   in probe(). (Apart from the ugliness of mixing configuration and run-time
-   data, one day it is possible that U-Boot will cache platform data for
-   devices which are regularly de/activated).
-
-   8. The device's probe() method is called. This should do anything that
+   2. The device's probe() method is called. This should do anything that
    is required by the device to get it going. This could include checking
    that the hardware is actually present, setting up clocks for the
    hardware and setting up hardware registers to initial values. The code
    in probe() can access:
 
-      - platform data in dev->platdata (for configuration)
+      - platform data in dev->plat (for configuration)
       - private data in dev->priv (for run-time state)
       - uclass data in dev->uclass_priv (for things the uclass stores
         about this device)
 
-   Note: If you don't use priv_auto_alloc_size then you will need to
+   Note: If you don't use priv_auto then you will need to
    allocate the priv space here yourself. The same applies also to
-   platdata_auto_alloc_size. Remember to free them in the remove() method.
+   plat_auto. Remember to free them in the remove() method.
 
-   9. The device is marked 'activated'
+   3. The device is marked 'activated'
 
-   10. The uclass's post_probe() method is called, if one exists. This may
+   4. The uclass's post_probe() method is called, if one exists. This may
    cause the uclass to do some housekeeping to record the device as
    activated and 'known' by the uclass.
 
@@ -791,27 +855,20 @@ remove it. This performs the probe steps in reverse:
    4. The device memory is freed (platform data, private data, uclass data,
    parent data).
 
-   Note: Because the platform data for a U_BOOT_DEVICE() is defined with a
+   Note: Because the platform data for a U_BOOT_DRVINFO() is defined with a
    static pointer, it is not de-allocated during the remove() method. For
    a device instantiated using the device tree data, the platform data will
    be dynamically allocated, and thus needs to be deallocated during the
    remove() method, either:
 
-      - if the platdata_auto_alloc_size is non-zero, the deallocation
-        happens automatically within the driver model core; or
+      - if the plat_auto is non-zero, the deallocation happens automatically
+        within the driver model core in the unbind stage; or
 
-      - when platdata_auto_alloc_size is 0, both the allocation (in probe()
-        or preferably ofdata_to_platdata()) and the deallocation in remove()
+      - when plat_auto is 0, both the allocation (in probe()
+        or preferably of_to_plat()) and the deallocation in remove()
         are the responsibility of the driver author.
 
-   5. The device sequence number is set to -1, meaning that it no longer
-   has an allocated sequence. If the device is later reactivated and that
-   sequence number is still free, it may well receive the name sequence
-   number again. But from this point, the sequence number previously used
-   by this device will no longer exist (think of SPI bus 2 being removed
-   and bus 2 is no longer available for use).
-
-   6. The device is marked inactive. Note that it is still bound, so the
+   5. The device is marked inactive. Note that it is still bound, so the
    device structure itself is not freed at this point. Should the device be
    activated again, then the cycle starts again at step 2 above.
 
@@ -822,6 +879,26 @@ The device is unbound. This is the step that actually destroys the device.
 If a parent has children these will be destroyed first. After this point
 the device does not exist and its memory has be deallocated.
 
+
+Special cases for removal
+-------------------------
+
+Some devices need to do clean-up before the OS is called. For example, a USB
+driver may want to stop the bus. This can be done in the remove() method.
+Some special flags are used to determine whether to remove the device:
+
+   DM_FLAG_OS_PREPARE - indicates that the device needs to get ready for OS
+          boot. The device will be removed just before the OS is booted
+   DM_REMOVE_ACTIVE_DMA - indicates that the device uses DMA. This is
+          effectively the same as DM_FLAG_OS_PREPARE, so the device is removed
+          before the OS is booted
+   DM_FLAG_VITAL - indicates that the device is 'vital' to the operation of
+          other devices. It is possible to remove this device after all regular
+          devices are removed. This is useful e.g. for a clock, which need to
+          be active during the device-removal phase.
+
+The dm_remove_devices_flags() function can be used to remove devices based on
+their driver flags.
 
 Data Structures
 ---------------
@@ -844,14 +921,14 @@ original patches, but makes at least the following changes:
   the driver operations structure in the driver, rather than passing it
   to the driver bind function.
 - Rename some structures to make them more similar to Linux (struct udevice
-  instead of struct instance, struct platdata, etc.)
+  instead of struct instance, struct plat, etc.)
 - Change the name 'core' to 'uclass', meaning U-Boot class. It seems that
   this concept relates to a class of drivers (or a subsystem). We shouldn't
   use 'class' since it is a C++ reserved word, so U-Boot class (uclass) seems
   better than 'core'.
 - Remove 'struct driver_instance' and just use a single 'struct udevice'.
   This removes a level of indirection that doesn't seem necessary.
-- Built in device tree support, to avoid the need for platdata
+- Built in device tree support, to avoid the need for plat
 - Removed the concept of driver relocation, and just make it possible for
   the new driver (created after relocation) to access the old driver data.
   I feel that relocation is a very special case and will only apply to a few
@@ -874,7 +951,7 @@ property can provide better control granularity on which device is bound
 before relocation. While with DM_FLAG_PRE_RELOC flag of the driver all
 devices with the same driver are bound, which requires allocation a large
 amount of memory. When device tree is not used, DM_FLAG_PRE_RELOC is the
-only way for statically declared devices via U_BOOT_DEVICE() to be bound
+only way for statically declared devices via U_BOOT_DRVINFO() to be bound
 prior to relocation.
 
 It is possible to limit this to specific relocation steps, by using

@@ -2,6 +2,13 @@
 /*
  * Copyright 2020 Toradex
  */
+/ {
+	wdt-reboot {
+		compatible = "wdt-reboot";
+		wdt = <&wdog1>;
+		u-boot,dm-spl;
+	};
+};
 
 &aips1 {
 	u-boot,dm-spl;
@@ -82,11 +89,11 @@
 	u-boot,dm-spl;
 };
 
-&{/soc@0/bus@30800000/i2c@30a20000/pmic@4b} {
+&{/soc@0/bus@30800000/i2c@30a20000/pmic} {
 	u-boot,dm-spl;
 };
 
-&{/soc@0/bus@30800000/i2c@30a20000/pmic@4b/regulators} {
+&{/soc@0/bus@30800000/i2c@30a20000/pmic/regulators} {
 	u-boot,dm-spl;
 };
 
@@ -103,5 +110,9 @@
 };
 
 &usdhc3 {
+	u-boot,dm-spl;
+};
+
+&wdog1 {
 	u-boot,dm-spl;
 };

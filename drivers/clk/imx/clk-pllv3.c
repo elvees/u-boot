@@ -20,11 +20,13 @@
 #define UBOOT_DM_CLK_IMX_PLLV3_SYS	"imx_clk_pllv3_sys"
 #define UBOOT_DM_CLK_IMX_PLLV3_USB	"imx_clk_pllv3_usb"
 #define UBOOT_DM_CLK_IMX_PLLV3_AV	"imx_clk_pllv3_av"
+#define UBOOT_DM_CLK_IMX_PLLV3_ENET     "imx_clk_pllv3_enet"
 
 #define PLL_NUM_OFFSET		0x10
 #define PLL_DENOM_OFFSET	0x20
 
 #define BM_PLL_POWER		(0x1 << 12)
+#define BM_PLL_ENABLE		(0x1 << 13)
 #define BM_PLL_LOCK		(0x1 << 31)
 
 struct clk_pllv3 {
@@ -32,8 +34,10 @@ struct clk_pllv3 {
 	void __iomem	*base;
 	u32		power_bit;
 	bool		powerup_set;
+	u32		enable_bit;
 	u32		div_mask;
 	u32		div_shift;
+	unsigned long   ref_clock;
 };
 
 #define to_clk_pllv3(_clk) container_of(_clk, struct clk_pllv3, clk)
@@ -83,6 +87,9 @@ static int clk_pllv3_generic_enable(struct clk *clk)
 		val |= pll->power_bit;
 	else
 		val &= ~pll->power_bit;
+
+	val |= pll->enable_bit;
+
 	writel(val, pll->base);
 
 	return 0;
@@ -98,6 +105,9 @@ static int clk_pllv3_generic_disable(struct clk *clk)
 		val &= ~pll->power_bit;
 	else
 		val |= pll->power_bit;
+
+	val &= ~pll->enable_bit;
+
 	writel(val, pll->base);
 
 	return 0;
@@ -224,6 +234,19 @@ static const struct clk_ops clk_pllv3_av_ops = {
 	.set_rate	= clk_pllv3_av_set_rate,
 };
 
+static ulong clk_pllv3_enet_get_rate(struct clk *clk)
+{
+	struct clk_pllv3 *pll = to_clk_pllv3(clk);
+
+	return pll->ref_clock;
+}
+
+static const struct clk_ops clk_pllv3_enet_ops = {
+	.enable	= clk_pllv3_generic_enable,
+	.disable	= clk_pllv3_generic_disable,
+	.get_rate	= clk_pllv3_enet_get_rate,
+};
+
 struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
 			  const char *parent_name, void __iomem *base,
 			  u32 div_mask)
@@ -238,6 +261,7 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
 		return ERR_PTR(-ENOMEM);
 
 	pll->power_bit = BM_PLL_POWER;
+	pll->enable_bit = BM_PLL_ENABLE;
 
 	switch (type) {
 	case IMX_PLLV3_GENERIC:
@@ -259,6 +283,10 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
 		drv_name = UBOOT_DM_CLK_IMX_PLLV3_AV;
 		pll->div_shift = 0;
 		pll->powerup_set = false;
+		break;
+	case IMX_PLLV3_ENET:
+		drv_name = UBOOT_DM_CLK_IMX_PLLV3_ENET;
+		pll->ref_clock = 500000000;
 		break;
 	default:
 		kfree(pll);
@@ -304,4 +332,10 @@ U_BOOT_DRIVER(clk_pllv3_av) = {
 	.id	= UCLASS_CLK,
 	.ops	= &clk_pllv3_av_ops,
 	.flags = DM_FLAG_PRE_RELOC,
+};
+
+U_BOOT_DRIVER(clk_pllv3_enet) = {
+	.name	= UBOOT_DM_CLK_IMX_PLLV3_ENET,
+	.id	= UCLASS_CLK,
+	.ops	= &clk_pllv3_enet_ops,
 };

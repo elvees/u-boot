@@ -15,8 +15,48 @@
 		#sound-dai-cells = <1>;
 	};
 
-	gpio_a: gpios@0 {
+	buttons {
+		compatible = "gpio-keys";
+
+		btn1 {
+			gpios = <&gpio_a 3 0>;
+			label = "button1";
+		};
+
+		btn2 {
+			gpios = <&gpio_a 4 0>;
+			label = "button2";
+		};
+	};
+
+	clk_fixed: clk-fixed {
 		u-boot,dm-pre-reloc;
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <1234>;
+	};
+
+	clk_sandbox: clk-sbox {
+		u-boot,dm-pre-reloc;
+		compatible = "sandbox,clk";
+		#clock-cells = <1>;
+		assigned-clocks = <&clk_sandbox 3>;
+		assigned-clock-rates = <321>;
+	};
+
+	clk-test {
+		u-boot,dm-pre-reloc;
+		compatible = "sandbox,clk-test";
+		clocks = <&clk_fixed>,
+			 <&clk_sandbox 1>,
+			 <&clk_sandbox 0>,
+			 <&clk_sandbox 3>,
+			 <&clk_sandbox 2>;
+		clock-names = "fixed", "i2c", "spi", "uart2", "uart1";
+	};
+
+	gpio_a: gpios@0 {
+		u-boot,dm-pre-proper;
 		gpio-controller;
 		compatible = "sandbox,gpio";
 		#gpio-cells = <1>;
@@ -25,7 +65,7 @@
 	};
 
 	gpio_b: gpios@1 {
-		u-boot,dm-pre-reloc;
+		u-boot,dm-pre-proper;
 		gpio-controller;
 		compatible = "sandbox,gpio";
 		#gpio-cells = <2>;
@@ -50,6 +90,7 @@
 			reg = <0x43>;
 			compatible = "sandbox-rtc";
 			sandbox,emul = <&emul0>;
+			u-boot,dm-pre-reloc;
 		};
 		sandbox_pmic: sandbox_pmic {
 			reg = <0x40>;
@@ -79,7 +120,7 @@
 	};
 
 	lcd {
-		u-boot,dm-pre-reloc;
+		u-boot,dm-pre-proper;
 		compatible = "sandbox,lcd-sdl";
 		xres = <1366>;
 		yres = <768>;
@@ -100,7 +141,7 @@
 		};
 	};
 
-	pci-controller {
+	pci@0 {
 		pci@1e,0 {
 			compatible = "sandbox,pmc";
 			reg = <0xf000 0 0 0 0>;
@@ -168,7 +209,7 @@
 
 	spi@0 {
 		firmware_storage_spi: flash@0 {
-			u-boot,dm-pre-reloc;
+			u-boot,dm-pre-proper;
 			reg = <0>;
 			compatible = "spansion,m25p16", "jedec,spi-nor";
 			spi-max-frequency = <40000000>;
@@ -207,11 +248,6 @@
 		stringarray = "one";
 	};
 
-	spl-test4 {
-		u-boot,dm-pre-reloc;
-		compatible = "sandbox,spl-test.2";
-	};
-
 	spl-test5 {
 		u-boot,dm-tpl;
 		compatible = "sandbox,spl-test";
@@ -224,10 +260,14 @@
 		stringarray = "pre-proper";
 	};
 
-	spl-test7 {
+	test-bus {
+		compatible = "simple-bus";
 		u-boot,dm-spl;
-		compatible = "sandbox,spl-test";
-		stringarray = "spl";
+		spl-test7 {
+			u-boot,dm-spl;
+			compatible = "sandbox,spl-test";
+			stringarray = "spl";
+		};
 	};
 
 	square {
@@ -242,7 +282,6 @@
 	};
 
 	tpm {
-		u-boot,dm-pre-reloc;
 		compatible = "google,sandbox-tpm";
 	};
 
@@ -379,6 +418,6 @@
 	};
 
 	keyboard-controller {
-		u-boot,dm-pre-reloc;
+		u-boot,dm-pre-proper;
 	};
 };

@@ -7,16 +7,21 @@
 #define LOG_CATEGORY UCLASS_SYSRESET
 
 #include <common.h>
+#include <command.h>
 #include <cpu_func.h>
-#include <hang.h>
-#include <sysreset.h>
 #include <dm.h>
 #include <errno.h>
+#include <hang.h>
+#include <log.h>
 #include <regmap.h>
+#include <spl.h>
+#include <sysreset.h>
 #include <dm/device-internal.h>
 #include <dm/lists.h>
 #include <dm/root.h>
+#include <linux/delay.h>
 #include <linux/err.h>
+#include <asm/global_data.h>
 
 int sysreset_request(struct udevice *dev, enum sysreset_t type)
 {
@@ -98,7 +103,10 @@ void sysreset_walk_halt(enum sysreset_t type)
 		mdelay(100);
 
 	/* Still no reset? Give up */
-	log_err("System reset not supported on this platform\n");
+	if (spl_phase() <= PHASE_SPL)
+		log_err("no sysreset\n");
+	else
+		log_err("System reset not supported on this platform\n");
 	hang();
 }
 
@@ -111,17 +119,20 @@ void reset_cpu(ulong addr)
 }
 
 
-int do_reset(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+#if IS_ENABLED(CONFIG_SYSRESET_CMD_RESET)
+int do_reset(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	printf("resetting ...\n");
+	mdelay(100);
 
 	sysreset_walk_halt(SYSRESET_COLD);
 
 	return 0;
 }
+#endif
 
 #if IS_ENABLED(CONFIG_SYSRESET_CMD_POWEROFF)
-int do_poweroff(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+int do_poweroff(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	int ret;
 
