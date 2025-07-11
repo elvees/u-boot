@@ -48,6 +48,7 @@
 	non-removable;
 	bus-width = <8>;
 	vqmmc-supply = <&sdhci0_supply>;
+	elvees,drive-strength-clk = <8>;
 };
 
 &emac0 {
