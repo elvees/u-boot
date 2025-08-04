@@ -501,9 +501,13 @@ const struct flash_info spi_nor_ids[] = {
 			SPI_NOR_HAS_LOCK | SPI_NOR_HAS_TB)
 	},
 	{
+		/* TODO: w25q256fw and w25q256jw use the same IDs but w25q256fw
+		 * does not support SPI_NOR_4B_OPCODES. Required workaround via
+		 * SFDP as in Linux driver. Now w25q256fw will not work.
+		 */
 		INFO("w25q256fw", 0xef6019, 0, 64 * 1024, 512,
 			SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
-			SPI_NOR_HAS_LOCK | SPI_NOR_HAS_TB)
+			SPI_NOR_HAS_LOCK | SPI_NOR_HAS_TB | SPI_NOR_4B_OPCODES)
 	},
 	{
 		INFO("w25q256jw", 0xef7019, 0, 64 * 1024, 512,
