@@ -534,7 +534,8 @@ int misc_init_r(void)
 	char board_name[BOARD_NAME_MAX_SIZE] = { };
 
 	if (!IS_ENABLED(CONFIG_ENV_IS_NOWHERE) &&
-	    !IS_ENABLED(CONFIG_TARGET_MCOM03_ECAM03_RECOVERY)) {
+	    !IS_ENABLED(CONFIG_TARGET_MCOM03_ECAM03_RECOVERY) &&
+	    !IS_ENABLED(CONFIG_TARGET_MCOM03R_ECAM03_RECOVERY)) {
 		if (!env_get("first_boot_checker")) {
 			printf("*** First boot\n");
 			env_set_hex("first_boot_checker", 0x0);

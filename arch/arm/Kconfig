@@ -809,7 +809,7 @@ config ARCH_OMAP2PLUS
 	imply SPL_SEPARATE_BSS
 
 config ARCH_MCOM03
-	bool "ELVEES MCom-03 SoC"
+	bool "ELVEES MCom-03/MCom-03R SoCs"
 	select ARM64
 	select DM
 	select DM_SERIAL

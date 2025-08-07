@@ -1,19 +1,17 @@
-
 config SYS_VENDOR
 	default "elvees"
 
 if ARCH_MCOM03
 
 choice
-	prompt "MCom-03 board select"
+	prompt "MCom-03/MCom-03R board select"
 
 config TARGET_HAPS
 	bool "HAPS"
 	select DM_ETH
 	select DM_MMC
 	help
-	  Support for the following boards:
-	    HAPS prototype for MCom-03
+	  Support for HAPS prototype for MCom-03.
 
 config TARGET_MCOM03
 	bool "MCom-03"
@@ -21,42 +19,57 @@ config TARGET_MCOM03
 	select DM_MMC
 	select DM_GPIO
 	help
-	  Support for the following boards:
-	    ELV-MC03-SMARC r1.0-r1.1, NGFW-CB r1.0
-	    ELV-MC03-SMARC r1.0-r1.1, Rock Pi N10
-	    ELV-MC03-SMARC r1.0-r1.1, ELV-SMARC-CB r1.0
-	    ELV-MC03-SMARC r2.2, ELV-SMARC-CB r2.9
-	    MCom-03 Bring-Up Board r1.3.0
-	    MCom-03 Bring-Up Board r1.5.0
-	    Trustphone PM r1.5, Trustphone CB r1.1
-	    Trustphone PM r2.0, Trustphone CB r2.0
-	    ELV-MC03-Q7 r1.0, ELV-Q7-CB r1.0
-	    ELV-MC03 r2.2, ELV-MC03-CB r1.0
-	    EGW-PM r1.0, EGW-CB r1.0
+	  Support for all MCom-03 based boards, except MCom-03 ECAM03.
 
 config TARGET_MCOM03_ECAM03
-	bool "ECAM03"
+	bool "MCom-03 ECAM03"
 	select DM_ETH
 	select DM_MMC
 	select DM_GPIO
 	help
-	  Support for the following boards:
-	    ECAM03BL r1.0
-	    ECAM03DM r1.0
-	    ECAM03PTZ r1.0
-	    PM03CAM r1.0
+	  Support for MCom-03 ECAM03 boards.
 
 config TARGET_MCOM03_ECAM03_RECOVERY
-	bool "ECAM03 recovery"
+	bool "MCom-03 ECAM03 recovery"
 	select DM_ETH
 	select DM_MMC
 	select DM_GPIO
 	help
-	  Support for the following boards:
-	    ECAM03*
-	    PM03CAM*
+	  Support for MCom-03 ECAM03 recovery boot.
+
+config TARGET_MCOM03R
+	bool "MCom-03R"
+	select DM_ETH
+	select DM_MMC
+	select DM_GPIO
+	help
+	  Support for all MCom-03R based boards, except MCom-03R ECAM03.
+
+config TARGET_MCOM03R_ECAM03
+	bool "MCom-03R ECAM03"
+	select DM_ETH
+	select DM_MMC
+	select DM_GPIO
+	help
+	  Support for MCom-03R ECAM03 boards.
+
+config TARGET_MCOM03R_ECAM03_RECOVERY
+	bool "MCom-03R ECAM03 recovery"
+	select DM_ETH
+	select DM_MMC
+	select DM_GPIO
+	help
+	  Support for MCom-03R ECAM03 recovery boot.
 
 endchoice
+
+config SYS_SOC
+        default "mcom03" if TARGET_MCOM03
+	default "mcom03" if TARGET_MCOM03_ECAM03
+	default "mcom03" if TARGET_MCOM03_ECAM03_RECOVERY
+	default "mcom03r" if TARGET_MCOM03R
+	default "mcom03r" if TARGET_MCOM03R_ECAM03
+	default "mcom03r" if TARGET_MCOM03R_ECAM03_RECOVERY
 
 source "board/elvees/common/Kconfig"
 
