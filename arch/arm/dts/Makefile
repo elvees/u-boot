@@ -1273,10 +1273,14 @@ dtb-$(CONFIG_TARGET_PE2201) += phytium-pe2201.dtb
 
 dtb-$(CONFIG_TARGET_PRESIDIO_ASIC) += ca-presidio-engboard.dtb
 
-dtb-$(CONFIG_ARCH_MCOM03) += \
-	mcom03-ecam03bl-r1.0.dtb \
-	mcom03-ecam03dm-r1.0.dtb \
-	mcom03-ecam03ptz-r1.0.dtb \
+dtb-$(CONFIG_TARGET_HAPS) += \
+	mcom03-haps-cpu.dtb \
+	mcom03-haps-sdr.dtb \
+	mcom03-haps-media.dtb \
+	mcom03-haps-full.dtb \
+	mcom03-rtl.dtb
+
+dtb-$(CONFIG_TARGET_MCOM03) += \
 	mcom03-egwpm-r1.0-egwcb-r1.0.dtb \
 	mcom03-elvmc03-r2.2-elvmc03cb-r1.1.0.dtb \
 	mcom03-elvmc03ce-r2.4.0-elvcecb-r1.0.0.dtb \
@@ -1295,7 +1299,6 @@ dtb-$(CONFIG_ARCH_MCOM03) += \
 	mcom03-elvmc03smarc-r2.9.1-smarccommoncb-r1.0.dtb \
 	mcom03-elvmc03smarc-r2.10.0-smarccommoncb-r1.0.dtb \
 	mcom03-elvmc03smarc-r2.11.0-smarccommoncb-r1.0.dtb \
-	mcom03-elvmc03smarc-r3.0.0-smarccommoncb-r1.0.dtb \
 	mcom03-elvmc03smarc-r1.0-ngfwcb-r1.0.dtb \
 	mcom03-elvmc03smarc-r1.0-elvsmarccb-r1.0.dtb \
 	mcom03-elvmc03smarc-r1.0-elvsmarccb-r2.10.3.dtb \
@@ -1312,24 +1315,35 @@ dtb-$(CONFIG_ARCH_MCOM03) += \
 	mcom03-elvmc03smarc-r2.9.1-elvsmarccb-r3.3.0.dtb \
 	mcom03-elvmc03smarc-r2.10.0-elvsmarccb-r3.3.0.dtb \
 	mcom03-elvmc03smarc-r2.11.0-elvsmarccb-r3.3.0.dtb \
-	mcom03-elvmc03smarc-r3.0.0-elvsmarccb-r3.3.0.dtb \
 	mcom03-mcom03bub-r1.3.0.dtb \
-	mcom03-haps-cpu.dtb \
-	mcom03-haps-sdr.dtb \
-	mcom03-haps-media.dtb \
-	mcom03-haps-full.dtb \
-	mcom03-ip-ku-m1-r1.0.dtb \
 	mcom03-iqcam-r1.0.dtb \
 	mcom03-monoboard-r1.1.1.dtb \
 	mcom03-monoboard-r1.2.2.dtb \
-	mcom03-pm03cam-r1.0.dtb \
-	mcom03-pm03cam-r2.0-ecam03common-r2.0.dtb \
-	mcom03-pm03camosm-r1.04-ecam03ptz-r1.0.dtb \
-	mcom03-rtl.dtb \
 	mcom03-pico-itx-r2.dtb \
 	mcom03-skifmp-v1.0.dtb \
 	mcom03-trustphonepm-r1.5-trustphonecb-r1.1.dtb \
 	mcom03-trustphonepm-r2.1-trustphonecb-r2.0.dtb
+
+dtb-$(CONFIG_TARGET_MCOM03_ECAM03) += \
+	mcom03-ecam03bl-r1.0.dtb \
+	mcom03-ecam03dm-r1.0.dtb \
+	mcom03-ecam03ptz-r1.0.dtb \
+	mcom03-pm03cam-r1.0.dtb \
+	mcom03-pm03cam-r2.0-ecam03common-r2.0.dtb \
+	mcom03-pm03camosm-r1.04-ecam03ptz-r1.0.dtb
+
+dtb-$(CONFIG_TARGET_MCOM03_ECAM03_RECOVERY) += \
+	mcom03-ecam03bl-r1.0.dtb \
+	mcom03-ecam03dm-r1.0.dtb \
+	mcom03-ecam03ptz-r1.0.dtb \
+	mcom03-pm03cam-r1.0.dtb \
+	mcom03-pm03cam-r2.0-ecam03common-r2.0.dtb \
+	mcom03-pm03camosm-r1.04-ecam03ptz-r1.0.dtb
+
+dtb-$(CONFIG_TARGET_MCOM03R) += \
+	mcom03r-elvmc03smarc-r3.0.0-elvsmarccb-r3.3.0.dtb \
+	mcom03r-elvmc03smarc-r3.0.0-smarccommoncb-r1.0.dtb \
+	mcom03r-ip-ku-m1-r1.0.dtb
 
 dtb-$(CONFIG_TARGET_GXP) += hpe-bmc-dl360gen10.dts
 

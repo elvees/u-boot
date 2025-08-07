@@ -3,7 +3,7 @@
 
 /dts-v1/;
 
-#include "mcom03-elvmc03smarc-r2.6.1.dtsi"
+#include "mcom03r-elvmc03smarc-r3.0.0.dtsi"
 #include "mcom03-smarccommoncb-r1.0.dtsi"
 
 / {
@@ -14,7 +14,7 @@
 		     "elvees,smarccommoncb",
 		     "elvees,elvmc03smarc-r3.0.0",
 		     "elvees,elvmc03smarc",
-		     "elvees,mcom03";
+		     "elvees,mcom03r";
 
 	chosen {
 		stdout-path = "serial0:115200n8";
