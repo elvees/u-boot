@@ -325,7 +325,7 @@ defined(CONFIG_TARGET_ECAM02DM3) || defined(CONFIG_TARGET_ECAM02DM31)
 #define FDTFILE CONFIG_DEFAULT_DEVICE_TREE
 #endif
 
-#define FDTFILE_ENV "fdtfile=" __stringify(FDTFILE) ".dtb\0"
+#define FDTFILE_ENV "fdtfile=" FDTFILE ".dtb\0"
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"bootm_size=0x8000000\0" \
