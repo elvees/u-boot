@@ -8,26 +8,16 @@
 
 #include <linux/sizes.h>
 
-#define CONFIG_SYS_LOAD_ADDR 0x80000000
-/* Start just below the second bank so we don't clobber it during reloc */
-#define CONFIG_SYS_INIT_SP_ADDR 0x803FFFFF
-#define CONFIG_SYS_MALLOC_LEN SZ_128K
-#define CONFIG_SYS_CACHELINE_SIZE 64
+#define CFG_SYS_SDRAM_BASE 0x80000000
+#define CFG_SYS_SDRAM_SIZE SZ_8M
 
-#define CONFIG_SYS_SDRAM_BASE 0x80000000
-/* Don't relocate into AI ram since it isn't set up yet */
-#define CONFIG_SYS_SDRAM_SIZE (SZ_4M + SZ_2M)
-
-/* For early init */
-#define K210_SYSCTL_BASE 0x50440000
-
-#ifndef CONFIG_EXTRA_ENV_SETTINGS
-#define CONFIG_EXTRA_ENV_SETTINGS \
+#ifndef CFG_EXTRA_ENV_SETTINGS
+#define CFG_EXTRA_ENV_SETTINGS \
 	"loadaddr=0x80060000\0" \
 	"fdt_addr_r=0x80400000\0" \
 	"scriptaddr=0x80020000\0" \
 	"kernel_addr_r=0x80060000\0" \
-	"fdtfile=kendryte/" CONFIG_DEFAULT_DEVICE_TREE ".dtb\0" \
+	"fdtfile=k210/" CONFIG_DEFAULT_DEVICE_TREE ".dtb\0" \
 	"k210_bootcmd=load mmc 0:1 $loadaddr /uImage && " \
 		"load mmc 0:1 $fdt_addr_r /k210.dtb && " \
 		"bootm $loadaddr - $fdt_addr_r\0"

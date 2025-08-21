@@ -3,7 +3,7 @@
  * Copyright 2015 Freescale Semiconductor, Inc.
  * Author: Zhuoyu Zhang <Zhuoyu.Zhang@freescale.com>
  */
-#include <common.h>
+#include <config.h>
 #include <asm/io.h>
 #include <asm/arch-ls102xa/immap_ls102xa.h>
 #include <asm/arch-ls102xa/config.h>
@@ -14,7 +14,7 @@
 void device_disable(const struct devdis_table *tbl, uint32_t num)
 {
 	int i;
-	struct ccsr_gur __iomem *gur = (void *)CONFIG_SYS_FSL_GUTS_ADDR;
+	struct ccsr_gur __iomem *gur = (void *)CFG_SYS_FSL_GUTS_ADDR;
 
 	/*
 	 * Extract hwconfig from environment and disable unused device.
@@ -25,4 +25,3 @@ void device_disable(const struct devdis_table *tbl, uint32_t num)
 				tbl[i].mask);
 	}
 }
-

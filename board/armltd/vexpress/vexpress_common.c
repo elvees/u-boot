@@ -15,7 +15,7 @@
  * ARM Ltd.
  * Philippe Robin, <philippe.robin@arm.com>
  */
-#include <common.h>
+#include <config.h>
 #include <bootstage.h>
 #include <cpu_func.h>
 #include <init.h>
@@ -29,7 +29,6 @@
 #include <asm/arch/systimer.h>
 #include <asm/arch/sysctrl.h>
 #include <asm/arch/wdt.h>
-#include "../drivers/mmc/arm_pl180_mmci.h"
 
 static struct systimer *systimer_base = (struct systimer *)V2M_TIMER01;
 static struct sysctrl *sysctrl_base = (struct sysctrl *)SCTL_BASE;
@@ -64,42 +63,6 @@ int board_init(void)
 	return 0;
 }
 
-int board_eth_init(struct bd_info *bis)
-{
-	int rc = 0;
-#ifdef CONFIG_SMC911X
-	rc = smc911x_initialize(0, CONFIG_SMC911X_BASE);
-#endif
-	return rc;
-}
-
-int cpu_mmc_init(struct bd_info *bis)
-{
-	int rc = 0;
-	(void) bis;
-#ifdef CONFIG_ARM_PL180_MMCI
-	struct pl180_mmc_host *host;
-	struct mmc *mmc;
-
-	host = malloc(sizeof(struct pl180_mmc_host));
-	if (!host)
-		return -ENOMEM;
-	memset(host, 0, sizeof(*host));
-
-	strcpy(host->name, "MMC");
-	host->base = (struct sdi_registers *)CONFIG_ARM_PL180_MMCI_BASE;
-	host->pwr_init = INIT_PWR;
-	host->clkdiv_init = SDI_CLKCR_CLKDIV_INIT_V1 | SDI_CLKCR_CLKEN;
-	host->voltages = VOLTAGE_WINDOW_MMC;
-	host->caps = 0;
-	host->clock_in = ARM_MCLK;
-	host->clock_min = ARM_MCLK / (2 * (SDI_CLKCR_CLKDIV_INIT_V1 + 1));
-	host->clock_max = CONFIG_ARM_PL180_MMCI_CLOCK_FREQ;
-	rc = arm_pl180_mmci_init(host, &mmc);
-#endif
-	return rc;
-}
-
 static void flash__init(void)
 {
 	/* Setup the sytem control register to allow writing to flash */
@@ -110,7 +73,7 @@ static void flash__init(void)
 int dram_init(void)
 {
 	gd->ram_size =
-		get_ram_size((long *)CONFIG_SYS_SDRAM_BASE, PHYS_SDRAM_1_SIZE);
+		get_ram_size((long *)CFG_SYS_SDRAM_BASE, PHYS_SDRAM_1_SIZE);
 	return 0;
 }
 
@@ -174,7 +137,7 @@ int v2m_cfg_write(u32 devfn, u32 data)
 }
 
 /* Use the ARM Watchdog System to cause reset */
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 	if (v2m_cfg_write(SYS_CFG_REBOOT | SYS_CFG_SITE_MB, 0))
 		printf("Unable to reboot\n");

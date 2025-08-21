@@ -7,7 +7,6 @@
 /*
  * RTC, Date & Time support: get and set date & time
  */
-#include <common.h>
 #include <command.h>
 #include <dm.h>
 #include <rtc.h>
@@ -19,12 +18,6 @@ DECLARE_GLOBAL_DATA_PTR;
 static const char * const weekdays[] = {
 	"Sun", "Mon", "Tues", "Wednes", "Thurs", "Fri", "Satur",
 };
-
-#ifdef CONFIG_NEEDS_MANUAL_RELOC
-#define RELOC(a)	((typeof(a))((unsigned long)(a) + gd->reloc_off))
-#else
-#define RELOC(a)	a
-#endif
 
 int mk_date (const char *, struct rtc_time *);
 
@@ -38,43 +31,29 @@ static int do_date(struct cmd_tbl *cmdtp, int flag, int argc,
 	int old_bus __maybe_unused;
 
 	/* switch to correct I2C bus */
-#ifdef CONFIG_DM_RTC
 	struct udevice *dev;
 
-	rcode = uclass_get_device(UCLASS_RTC, 0, &dev);
+	rcode = uclass_get_device_by_seq(UCLASS_RTC, 0, &dev);
 	if (rcode) {
-		printf("Cannot find RTC: err=%d\n", rcode);
-		return CMD_RET_FAILURE;
+		rcode = uclass_get_device(UCLASS_RTC, 0, &dev);
+		if (rcode) {
+			printf("Cannot find RTC: err=%d\n", rcode);
+			return CMD_RET_FAILURE;
+		}
 	}
-#elif defined(CONFIG_SYS_I2C)
-	old_bus = i2c_get_bus_num();
-	i2c_set_bus_num(CONFIG_SYS_RTC_BUS_NUM);
-#else
-	old_bus = I2C_GET_BUS();
-	I2C_SET_BUS(CONFIG_SYS_RTC_BUS_NUM);
-#endif
 
 	switch (argc) {
 	case 2:			/* set date & time */
 		if (strcmp(argv[1],"reset") == 0) {
 			puts ("Reset RTC...\n");
-#ifdef CONFIG_DM_RTC
 			rcode = dm_rtc_reset(dev);
 			if (!rcode)
 				rcode = dm_rtc_set(dev, &default_tm);
-#else
-			rtc_reset();
-			rcode = rtc_set(&default_tm);
-#endif
 			if (rcode)
 				puts("## Failed to set date after RTC reset\n");
 		} else {
 			/* initialize tm with current time */
-#ifdef CONFIG_DM_RTC
 			rcode = dm_rtc_get(dev, &tm);
-#else
-			rcode = rtc_get(&tm);
-#endif
 			if (!rcode) {
 				/* insert new date & time */
 				if (mk_date(argv[1], &tm) != 0) {
@@ -82,11 +61,7 @@ static int do_date(struct cmd_tbl *cmdtp, int flag, int argc,
 					break;
 				}
 				/* and write to RTC */
-#ifdef CONFIG_DM_RTC
 				rcode = dm_rtc_set(dev, &tm);
-#else
-				rcode = rtc_set(&tm);
-#endif
 				if (rcode) {
 					printf("## Set date failed: err=%d\n",
 					       rcode);
@@ -95,13 +70,9 @@ static int do_date(struct cmd_tbl *cmdtp, int flag, int argc,
 				puts("## Get date failed\n");
 			}
 		}
-		/* FALL TROUGH */
+		fallthrough;
 	case 1:			/* get date & time */
-#ifdef CONFIG_DM_RTC
 		rcode = dm_rtc_get(dev, &tm);
-#else
-		rcode = rtc_get(&tm);
-#endif
 		if (rcode) {
 			puts("## Get date failed\n");
 			break;
@@ -110,20 +81,13 @@ static int do_date(struct cmd_tbl *cmdtp, int flag, int argc,
 		printf ("Date: %4d-%02d-%02d (%sday)    Time: %2d:%02d:%02d\n",
 			tm.tm_year, tm.tm_mon, tm.tm_mday,
 			(tm.tm_wday<0 || tm.tm_wday>6) ?
-				"unknown " : RELOC(weekdays[tm.tm_wday]),
+				"unknown " : weekdays[tm.tm_wday],
 			tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 		break;
 	default:
 		rcode = CMD_RET_USAGE;
 	}
-
-	/* switch back to original I2C bus */
-#ifdef CONFIG_SYS_I2C
-	i2c_set_bus_num(old_bus);
-#elif !defined(CONFIG_DM_RTC)
-	I2C_SET_BUS(old_bus);
-#endif
 
 	return rcode ? CMD_RET_FAILURE : 0;
 }

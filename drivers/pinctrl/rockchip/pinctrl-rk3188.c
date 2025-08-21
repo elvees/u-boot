@@ -3,7 +3,6 @@
  * (C) Copyright 2019 Rockchip Electronics Co., Ltd
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <dm/pinctrl.h>
@@ -106,7 +105,7 @@ static struct rockchip_pin_bank rk3188_pin_banks[] = {
 	PIN_BANK(3, 32, "gpio3"),
 };
 
-static struct rockchip_pin_ctrl rk3188_pin_ctrl = {
+static const struct rockchip_pin_ctrl rk3188_pin_ctrl = {
 	.pin_banks		= rk3188_pin_banks,
 	.nr_banks		= ARRAY_SIZE(rk3188_pin_banks),
 	.grf_mux_offset		= 0x60,
@@ -126,7 +125,7 @@ U_BOOT_DRIVER(rockchip_rk3188_pinctrl) = {
 	.of_match	= rk3188_pinctrl_ids,
 	.priv_auto	= sizeof(struct rockchip_pinctrl_priv),
 	.ops		= &rockchip_pinctrl_ops,
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	.bind		= dm_scan_fdt_dev,
 #endif
 	.probe		= rockchip_pinctrl_probe,

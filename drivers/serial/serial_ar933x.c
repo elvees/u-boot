@@ -3,7 +3,6 @@
  * Copyright (C) 2015-2016 Wills Wang <wills.wang@live.com>
  */
 
-#include <common.h>
 #include <clock_legacy.h>
 #include <dm.h>
 #include <div64.h>
@@ -199,7 +198,7 @@ U_BOOT_DRIVER(serial_ar933x) = {
 
 static inline void _debug_uart_init(void)
 {
-	void __iomem *regs = (void *)CONFIG_DEBUG_UART_BASE;
+	void __iomem *regs = (void *)CONFIG_VAL(DEBUG_UART_BASE);
 	u32 val, scale, step;
 
 	/*
@@ -227,7 +226,7 @@ static inline void _debug_uart_init(void)
 
 static inline void _debug_uart_putc(int c)
 {
-	void __iomem *regs = (void *)CONFIG_DEBUG_UART_BASE;
+	void __iomem *regs = (void *)CONFIG_VAL(DEBUG_UART_BASE);
 	u32 data;
 
 	do {

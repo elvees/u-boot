@@ -5,7 +5,6 @@
  * From coreboot Apollo Lake support lpc.c
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <spl.h>
@@ -81,7 +80,7 @@ int lpc_open_pmio_window(uint base, uint size)
 
 		lgir_reg_num = find_unused_pmio_window();
 		if (lgir_reg_num < 0) {
-			if (spl_phase() > PHASE_TPL) {
+			if (xpl_phase() > PHASE_TPL) {
 				log_err("LPC: Cannot open IO window: %lx size %lx\n",
 					bridge_base, size - bridged_size);
 				log_err("No more IO windows\n");
@@ -128,7 +127,7 @@ struct acpi_ops apl_lpc_acpi_ops = {
 	.inject_dsdt	= southbridge_inject_dsdt,
 };
 
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 static const struct udevice_id apl_lpc_ids[] = {
 	{ .compatible = "intel,apl-lpc" },
 	{ }

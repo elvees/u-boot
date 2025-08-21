@@ -21,11 +21,17 @@
  * @crc_start: CRC8 start value
  * @vptr: Buffer to checksum
  * @len: Length of buffer in bytes
- * @return CRC8 checksum
+ * Return: CRC8 checksum
  */
 unsigned int crc8(unsigned int crc_start, const unsigned char *vptr, int len);
 
-/* lib/crc16.c - 16 bit CRC with polynomial x^16+x^12+x^5+1 (CRC-CCITT) */
+void crc8_wd_buf(const unsigned char *input, unsigned int len,
+		 unsigned char output[1], unsigned int chunk_sz);
+
+/* lib/crc16.c - 16 bit CRC with polynomial x^16 + x^15 + x^2 + 1 */
+uint16_t crc16(uint16_t crc, const unsigned char *buffer, size_t len);
+
+/* lib/crc16-ccitt.c - 16 bit CRC with polynomial x^16+x^12+x^5+1 (CRC-CCITT) */
 uint16_t crc16_ccitt(uint16_t crc_start, const unsigned char *s, int len);
 /**
  * crc16_ccitt_wd_buf - Perform CRC16-CCIT on an input buffer and return the
@@ -48,7 +54,7 @@ void crc16_ccitt_wd_buf(const uint8_t *in, uint len,
  *	calculation)
  * @buf: Bytes to checksum
  * @len: Number of bytes to checksum
- * @return checksum value
+ * Return: checksum value
  */
 uint32_t crc32(uint32_t crc, const unsigned char *buf, uint len);
 
@@ -63,7 +69,7 @@ uint32_t crc32(uint32_t crc, const unsigned char *buf, uint len);
  * @buf: Bytes to checksum
  * @len: Number of bytes to checksum
  * @chunk_sz: Chunk size to use between watchdog resets
- * @return checksum
+ * Return: checksum
  */
 uint32_t crc32_wd(uint32_t crc, const unsigned char *buf, uint len,
 		  uint chunk_sz);
@@ -78,7 +84,7 @@ uint32_t crc32_wd(uint32_t crc, const unsigned char *buf, uint len,
  *	calculation)
  * @buf: Bytes to checksum
  * @len: Number of bytes to checksum
- * @return checksum value
+ * Return: checksum value
  */
 uint32_t crc32_no_comp(uint32_t crc, const unsigned char *buf, uint len);
 
@@ -115,7 +121,7 @@ void crc32c_init(uint32_t *crc32c_table, uint32_t pol);
  * @data: Data bytes to checksum
  * @length: Number of bytes to process
  * @crc32c_table:: CRC table
- * @return checksum value
+ * Return: checksum value
  */
 uint32_t crc32c_cal(uint32_t crc, const char *data, int length,
 		    uint32_t *crc32c_table);

@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
+ * Copyright (C) 2011, Texas Instruments, Incorporated - https://www.ti.com/
  * Copyright (C) 2017, Grinn - http://grinn-global.com/
  */
 
-#include <common.h>
 #include <init.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/clk_synthesizer.h>
@@ -22,7 +21,7 @@
 #include <power/tps65217.h>
 #include <spl.h>
 
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT)
 
 static struct ctrl_dev *cdev = (struct ctrl_dev *)CTRL_DEVICE_BASE;
 
@@ -103,7 +102,6 @@ void chilisom_spl_board_init(void)
 	/* Get the frequency */
 	dpll_mpu_opp100.m = am335x_get_efuse_mpu_max_freq(cdev);
 
-
 	if (i2c_probe(TPS65217_CHIP_PM))
 		return;
 
@@ -182,4 +180,4 @@ void sdram_init(void)
 		   &ddr3_chilisom_emif_reg_data, 0);
 }
 
-#endif /* CONFIG_SKIP_LOWLEVEL_INIT */
+#endif /* CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT) */

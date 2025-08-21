@@ -4,7 +4,7 @@
  * Copyright 2017 NXP
  */
 
-#include <common.h>
+#include <config.h>
 #include <dm.h>
 #include <net.h>
 #include <asm/io.h>
@@ -80,7 +80,7 @@ int pfe_eth_board_init(struct udevice *dev)
 	struct mii_dev *bus;
 	struct pfe_mdio_info mac_mdio_info;
 	struct pfe_eth_dev *priv = dev_get_priv(dev);
-	struct ccsr_gur __iomem *gur = (void *)CONFIG_SYS_FSL_GUTS_ADDR;
+	struct ccsr_gur __iomem *gur = (void *)CFG_SYS_FSL_GUTS_ADDR;
 
 	int srds_s1 = in_be32(&gur->rcwsr[4]) &
 			FSL_CHASSIS2_RCWSR4_SRDS1_PRTCL_MASK;
@@ -121,12 +121,12 @@ int pfe_eth_board_init(struct udevice *dev)
 			/* MAC1 */
 			pfe_set_phy_address_mode(priv->gemac_port,
 						 CONFIG_PFE_EMAC1_PHY_ADDR,
-						 PHY_INTERFACE_MODE_SGMII_2500);
+						 PHY_INTERFACE_MODE_2500BASEX);
 		} else {
 			/* MAC2 */
 			pfe_set_phy_address_mode(priv->gemac_port,
 						 CONFIG_PFE_EMAC2_PHY_ADDR,
-						 PHY_INTERFACE_MODE_SGMII_2500);
+						 PHY_INTERFACE_MODE_2500BASEX);
 		}
 		break;
 	default:

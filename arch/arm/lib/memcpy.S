@@ -59,7 +59,7 @@
 #endif
 ENTRY(memcpy)
 		cmp	r0, r1
-		bxeq	lr
+		reteq	lr
 
 		enter	r4, lr
 
@@ -148,7 +148,7 @@ ENTRY(memcpy)
 		str1b	r0, ip, cs, abort=21f
 
 		exit	r4, lr
-		bx	lr
+		ret	lr
 
 9:		rsb	ip, ip, #4
 		cmp	ip, #2
@@ -210,7 +210,7 @@ ENTRY(memcpy)
 		orr	r9, r9, ip, lspush #\push
 		mov	ip, ip, lspull #\pull
 		orr	ip, ip, lr, lspush #\push
-		str8w	r0, r3, r4, r5, r6, r7, r8, r9, ip, , abort=19f
+		str8w	r0, r3, r4, r5, r6, r7, r8, r9, ip, abort=19f
 		bge	12b
 	PLD(	cmn	r2, #96			)
 	PLD(	bge	13b			)
@@ -258,7 +258,7 @@ ENTRY(memcpy)
 
 	.macro	copy_abort_end
 	ldmfd	sp!, {r4, lr}
-	bx	lr
+	ret	lr
 	.endm
 
 ENDPROC(memcpy)

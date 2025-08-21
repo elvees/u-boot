@@ -8,7 +8,6 @@
 
 #include <log.h>
 #include <asm/io.h>
-#include <common.h>
 #include <dm.h>
 #include <linux/bitops.h>
 #include <linux/iopoll.h>
@@ -76,15 +75,7 @@ static int hsdk_reset_reset(struct reset_ctl *rst_ctl)
 	return hsdk_reset_do(rst);
 }
 
-static int hsdk_reset_noop(struct reset_ctl *rst_ctl)
-{
-	return 0;
-}
-
 static const struct reset_ops hsdk_reset_ops = {
-	.request	= hsdk_reset_noop,
-	.rfree		= hsdk_reset_noop,
-	.rst_assert	= hsdk_reset_noop,
 	.rst_deassert	= hsdk_reset_reset,
 };
 

@@ -5,9 +5,11 @@
  * Copyright (c) 2020 Heinrich Schuchardt
  */
 
-#include <common.h>
+#define LOG_CATEGORY LOGC_EFI
+
 #include <efi_dt_fixup.h>
 #include <efi_loader.h>
+#include <efi_rng.h>
 #include <fdtdec.h>
 #include <mapmem.h>
 
@@ -38,6 +40,43 @@ static void efi_reserve_memory(u64 addr, u64 size, bool nomap)
 	if (ret != EFI_SUCCESS)
 		log_err("Reserved memory mapping failed addr %llx size %llx\n",
 			addr, size);
+}
+
+/**
+ * efi_try_purge_rng_seed() - Remove unused kaslr-seed, rng-seed
+ *
+ * Kernel's EFI STUB only relies on EFI_RNG_PROTOCOL for randomization
+ * and completely ignores the kaslr-seed for its own randomness needs
+ * (i.e the randomization of the physical placement of the kernel).
+ * Weed it out from the DTB we hand over, which would mess up our DTB
+ * TPM measurements as well.
+ *
+ * @fdt: Pointer to device tree
+ */
+void efi_try_purge_rng_seed(void *fdt)
+{
+	const char * const prop[] = {"kaslr-seed", "rng-seed"};
+	const efi_guid_t efi_guid_rng_protocol = EFI_RNG_PROTOCOL_GUID;
+	struct efi_handler *handler;
+	efi_status_t ret;
+	int nodeoff = 0;
+	int err = 0;
+
+	ret = efi_search_protocol(efi_root, &efi_guid_rng_protocol, &handler);
+	if (ret != EFI_SUCCESS)
+		return;
+
+	nodeoff = fdt_path_offset(fdt, "/chosen");
+	if (nodeoff < 0)
+		return;
+
+	for (size_t i = 0; i < ARRAY_SIZE(prop); ++i) {
+		err = fdt_delprop(fdt, nodeoff, prop[i]);
+		if (err < 0 && err != -FDT_ERR_NOTFOUND)
+			log_err("Error deleting %s\n", prop[i]);
+		else
+			log_debug("Deleted /chosen/%s\n", prop[i]);
+	}
 }
 
 /**
@@ -112,7 +151,7 @@ efi_dt_fixup(struct efi_dt_fixup_protocol *this, void *dtb,
 	efi_status_t ret;
 	size_t required_size;
 	size_t total_size;
-	bootm_headers_t img = { 0 };
+	struct bootm_headers img = { 0 };
 
 	EFI_ENTRY("%p, %p, %p, %d", this, dtb, buffer_size, flags);
 
@@ -129,7 +168,7 @@ efi_dt_fixup(struct efi_dt_fixup_protocol *this, void *dtb,
 		/* Check size */
 		required_size = fdt_off_dt_strings(dtb) +
 				fdt_size_dt_strings(dtb) +
-				0x3000;
+				CONFIG_SYS_FDT_PAD;
 		total_size = fdt_totalsize(dtb);
 		if (required_size < total_size)
 			required_size = total_size;
@@ -140,7 +179,7 @@ efi_dt_fixup(struct efi_dt_fixup_protocol *this, void *dtb,
 		}
 
 		fdt_set_totalsize(dtb, *buffer_size);
-		if (image_setup_libfdt(&img, dtb, 0, NULL)) {
+		if (image_setup_libfdt(&img, dtb, false)) {
 			log_err("failed to process device tree\n");
 			ret = EFI_INVALID_PARAMETER;
 			goto out;

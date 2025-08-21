@@ -15,19 +15,31 @@
 	};
 
 	ocp {
-		u-boot,dm-pre-reloc;
+		bootph-all;
+
+		l4_wkup@44c00000 {
+			bootph-all;
+
+			segment@200000 {
+				bootph-all;
+
+				target-module@9000 {
+					bootph-all;
+				};
+			};
+		};
 	};
 };
 
 &i2c0 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &uart0 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &mmc1 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 	cd-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
 };

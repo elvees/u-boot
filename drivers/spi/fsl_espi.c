@@ -8,7 +8,7 @@
  *	   Chuanhua Han (chuanhua.han@nxp.com)
  */
 
-#include <common.h>
+#include <config.h>
 #include <log.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
@@ -390,7 +390,7 @@ struct spi_slave *spi_setup_slave(unsigned int bus, unsigned int cs,
 	if (!fsl)
 		return NULL;
 
-	fsl->espi = (void *)(CONFIG_SYS_MPC85xx_ESPI_ADDR);
+	fsl->espi = (void *)(CFG_SYS_MPC85xx_ESPI_ADDR);
 	fsl->mode = mode;
 	fsl->max_transfer_length = ESPI_MAX_DATA_TRANSFER_LEN;
 	fsl->speed_hz = max_hz;
@@ -513,8 +513,8 @@ static int fsl_espi_child_pre_probe(struct udevice *dev)
 	struct udevice *bus = dev->parent;
 	struct fsl_spi_slave *fsl = dev_get_priv(bus);
 
-	debug("%s cs %u\n", __func__, slave_plat->cs);
-	fsl->cs = slave_plat->cs;
+	debug("%s cs %u\n", __func__, slave_plat->cs[0]);
+	fsl->cs = slave_plat->cs[0];
 
 	return 0;
 }
@@ -541,7 +541,7 @@ static const struct dm_spi_ops fsl_espi_ops = {
 	.set_mode	= fsl_espi_set_mode,
 };
 
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 static int fsl_espi_of_to_plat(struct udevice *bus)
 {
 	fdt_addr_t addr;
@@ -572,7 +572,7 @@ static const struct udevice_id fsl_espi_ids[] = {
 U_BOOT_DRIVER(fsl_espi) = {
 	.name	= "fsl_espi",
 	.id	= UCLASS_SPI,
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	.of_match = fsl_espi_ids,
 	.of_to_plat = fsl_espi_of_to_plat,
 #endif

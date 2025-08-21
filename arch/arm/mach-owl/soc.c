@@ -5,13 +5,13 @@
  * Copyright (C) 2018 Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
  */
 
+#include <config.h>
 #include <cpu_func.h>
 #include <init.h>
 #include <asm/cache.h>
 #include <asm/global_data.h>
 #include <linux/arm-smccc.h>
 #include <linux/psci.h>
-#include <common.h>
 #include <asm/io.h>
 #include <asm/mach-types.h>
 #include <asm/psci.h>
@@ -50,7 +50,7 @@ int dram_init(void)
 /* This is called after dram_init() so use get_ram_size result */
 int dram_init_banksize(void)
 {
-	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
+	gd->bd->bi_dram[0].start = CFG_SYS_SDRAM_BASE;
 	gd->bd->bi_dram[0].size = gd->ram_size;
 
 	return 0;
@@ -74,7 +74,7 @@ int board_init(void)
 	return 0;
 }
 
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 	psci_system_reset();
 }

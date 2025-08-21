@@ -6,7 +6,7 @@
  * Copyright (C) 2015-2016 Stefan Roese <sr@denx.de>
  */
 
-#include <common.h>
+#include <config.h>
 #include <init.h>
 #include <spl.h>
 #include <asm/arch/clock.h>
@@ -156,7 +156,7 @@ int board_mmc_init(struct bd_info *bis)
 {
 	int i, ret;
 
-	for (i = 0; i < CONFIG_SYS_FSL_USDHC_NUM; i++) {
+	for (i = 0; i < CFG_SYS_FSL_USDHC_NUM; i++) {
 		switch (i) {
 		case 0:
 			SETUP_IOMUX_PADS(usdhc1_pads);

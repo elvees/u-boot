@@ -20,7 +20,7 @@
 #include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/sizes.h>
-#include <common.h>
+#include <config.h>
 #include <fsl_esdhc_imx.h>
 #include <miiphy.h>
 #include <netdev.h>
@@ -32,10 +32,6 @@
 #include <pca953x.h>
 
 DECLARE_GLOBAL_DATA_PTR;
-
-#define UART_PAD_CTRL  (PAD_CTL_PKE | PAD_CTL_PUE |		\
-	PAD_CTL_PUS_100K_UP | PAD_CTL_SPEED_MED |		\
-	PAD_CTL_DSE_40ohm   | PAD_CTL_SRE_FAST  | PAD_CTL_HYS)
 
 #define ENET_PAD_CTRL  (PAD_CTL_PUS_100K_UP | PAD_CTL_PUE |     \
 	PAD_CTL_SPEED_HIGH   |                                   \
@@ -59,11 +55,6 @@ int dram_init(void)
 	return 0;
 }
 
-static iomux_v3_cfg_t const uart1_pads[] = {
-	MX6_PAD_GPIO1_IO04__UART1_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
-	MX6_PAD_GPIO1_IO05__UART1_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
-};
-
 static iomux_v3_cfg_t const fec2_pads[] = {
 	MX6_PAD_ENET1_MDC__ENET2_MDC | MUX_PAD_CTRL(ENET_PAD_CTRL),
 	MX6_PAD_ENET1_MDIO__ENET2_MDIO | MUX_PAD_CTRL(ENET_PAD_CTRL),
@@ -80,11 +71,6 @@ static iomux_v3_cfg_t const fec2_pads[] = {
 	MX6_PAD_RGMII2_TD3__ENET2_TX_DATA_3 | MUX_PAD_CTRL(ENET_PAD_CTRL),
 	MX6_PAD_RGMII2_TXC__ENET2_RGMII_TXC | MUX_PAD_CTRL(ENET_PAD_CTRL),
 };
-
-static void setup_iomux_uart(void)
-{
-	imx_iomux_v3_setup_multiple_pads(uart1_pads, ARRAY_SIZE(uart1_pads));
-}
 
 static int setup_fec(void)
 {
@@ -104,7 +90,7 @@ int board_eth_init(struct bd_info *bis)
 	setup_fec();
 
 	ret = fecmxc_initialize_multi(bis, 1,
-		CONFIG_FEC_MXC_PHYADDR, IMX_FEC_BASE);
+		CFG_FEC_MXC_PHYADDR, IMX_FEC_BASE);
 	if (ret)
 		printf("FEC%d MXC: %s:failed\n", 1, __func__);
 
@@ -148,7 +134,6 @@ int power_init_board(void)
 	dev_id = pmic_reg_read(dev, PFUZE100_DEVICEID);
 	rev_id = pmic_reg_read(dev, PFUZE100_REVID);
 	printf("PMIC: PFUZE100! DEV_ID=0x%x REV_ID=0x%x\n", dev_id, rev_id);
-
 
 	/* Init mode to APS_PFM */
 	pmic_reg_write(dev, PFUZE100_SW1ABMODE, APS_PFM);
@@ -216,8 +201,6 @@ int board_ehci_hcd_init(int port)
 
 int board_early_init_f(void)
 {
-	setup_iomux_uart();
-
 	return 0;
 }
 

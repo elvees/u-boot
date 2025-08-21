@@ -8,7 +8,7 @@
  *
  */
 
-#include <common.h>
+#include <config.h>
 #include <init.h>
 #include <asm/global_data.h>
 
@@ -19,7 +19,7 @@ int dram_init(void)
 {
 	/* MIG IP block is smart and doesn't need SW
 	 * to do any init */
-	gd->ram_size = CONFIG_SYS_SDRAM_SIZE;	/* in bytes */
+	gd->ram_size = CFG_SYS_SDRAM_SIZE;	/* in bytes */
 
 	return 0;
 }

@@ -4,7 +4,8 @@
  * Copyright (C) 2009 David Brownell
  */
 
-#include <common.h>
+#include <config.h>
+#include <clock_legacy.h>
 #include <init.h>
 #include <asm/arch/hardware.h>
 #include <asm/global_data.h>
@@ -41,7 +42,7 @@ int clk_get(enum davinci_clk_ids id)
 	int pll_out;
 	unsigned int pll_base;
 
-	pll_out = CONFIG_SYS_OSCIN_FREQ;
+	pll_out = CFG_SYS_OSCIN_FREQ;
 
 	if (id == DAVINCI_AUXCLK_CLKID)
 		goto out;
@@ -90,4 +91,9 @@ int set_cpu_clk_info(void)
 				(clk_get(DAVINCI_DDR_CLKID) / 1000000);
 	gd->bd->bi_dsp_freq = 0;
 	return 0;
+}
+
+unsigned long get_board_sys_clk(void)
+{
+	return clk_get(DAVINCI_ARM_CLKID);
 }

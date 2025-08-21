@@ -4,11 +4,11 @@
  *
  */
 
-#include <common.h>
 #include <command.h>
 #include <malloc.h>
 #include <part.h>
 #include <blk.h>
+#include <time.h>
 #include <vsprintf.h>
 
 #define BUFSIZE (1 * 1024 * 1024)
@@ -34,7 +34,7 @@ static int do_clone(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv
 		printf("Unable to open destination device\n");
 		return 1;
 	}
-	requested = simple_strtoul(argv[5], &unit, 10);
+	requested = dectoul(argv[5], &unit);
 	srcbz = srcdesc->blksz;
 	destbz = destdesc->blksz;
 

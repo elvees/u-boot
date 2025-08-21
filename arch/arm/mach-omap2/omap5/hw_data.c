@@ -8,7 +8,6 @@
  *
  * Sricharan R <r.sricharan@ti.com>
  */
-#include <common.h>
 #include <palmas.h>
 #include <asm/arch/omap.h>
 #include <asm/arch/sys_proto.h>
@@ -377,6 +376,85 @@ struct vcores_data omap5430_volts_es2 = {
 };
 
 /*
+ * Enable IPU1 clock domains, modules and
+ * do some additional special settings needed
+ */
+void enable_ipu1_clocks(void)
+{
+	if (!IS_ENABLED(CONFIG_DRA7XX) ||
+	    !IS_ENABLED(CONFIG_REMOTEPROC_TI_IPU))
+		return;
+
+	u32 const clk_domains[] = {
+		(*prcm)->cm_ipu_clkstctrl,
+		(*prcm)->cm_ipu1_clkstctrl,
+		0
+	};
+
+	u32 const clk_modules_hw_auto_essential[] = {
+		(*prcm)->cm_ipu1_ipu1_clkctrl,
+		0
+	};
+
+	u32 const clk_modules_explicit_en_essential[] = {
+		(*prcm)->cm_l4per_gptimer11_clkctrl,
+		(*prcm)->cm1_abe_timer7_clkctrl,
+		(*prcm)->cm1_abe_timer8_clkctrl,
+		0
+	};
+	do_enable_ipu_clocks(clk_domains, clk_modules_hw_auto_essential,
+			     clk_modules_explicit_en_essential, 0);
+
+	/* Enable optional additional functional clock for IPU1 */
+	setbits_le32((*prcm)->cm_ipu1_ipu1_clkctrl,
+		     IPU1_CLKCTRL_CLKSEL_MASK);
+	/* Enable optional additional functional clock for IPU1 */
+	setbits_le32((*prcm)->cm1_abe_timer7_clkctrl,
+		     IPU1_CLKCTRL_CLKSEL_MASK);
+	/* Enable optional additional functional clock for IPU1 */
+	setbits_le32((*prcm)->cm1_abe_timer8_clkctrl,
+		     IPU1_CLKCTRL_CLKSEL_MASK);
+}
+
+/*
+ * Enable IPU2 clock domains, modules and
+ * do some additional special settings needed
+ */
+void enable_ipu2_clocks(void)
+{
+	if (!IS_ENABLED(CONFIG_DRA7XX) ||
+	    !IS_ENABLED(CONFIG_REMOTEPROC_TI_IPU))
+		return;
+
+	u32 const clk_domains[] = {
+		(*prcm)->cm_ipu_clkstctrl,
+		(*prcm)->cm_ipu2_clkstctrl,
+		0
+	};
+
+	u32 const clk_modules_hw_auto_essential[] = {
+		(*prcm)->cm_ipu2_ipu2_clkctrl,
+		0
+	};
+
+	u32 const clk_modules_explicit_en_essential[] = {
+		(*prcm)->cm_l4per_gptimer3_clkctrl,
+		(*prcm)->cm_l4per_gptimer4_clkctrl,
+		(*prcm)->cm_l4per_gptimer9_clkctrl,
+		0
+	};
+	do_enable_ipu_clocks(clk_domains, clk_modules_hw_auto_essential,
+			     clk_modules_explicit_en_essential, 0);
+
+	/* Enable optional additional functional clock for IPU2 */
+	setbits_le32((*prcm)->cm_l4per_gptimer4_clkctrl,
+		     IPU1_CLKCTRL_CLKSEL_MASK);
+	/* Enable optional additional functional clock for IPU2 */
+	setbits_le32((*prcm)->cm_l4per_gptimer9_clkctrl,
+		     IPU1_CLKCTRL_CLKSEL_MASK);
+}
+
+/*
  * Enable essential clock domains, modules and
  * do some additional special settings needed
  */
@@ -406,9 +484,6 @@ void enable_basic_clocks(void)
 		(*prcm)->cm_l4per_gpio6_clkctrl,
 		(*prcm)->cm_l4per_gpio7_clkctrl,
 		(*prcm)->cm_l4per_gpio8_clkctrl,
-#ifdef CONFIG_SCSI_AHCI_PLAT
-		(*prcm)->cm_l3init_ocp2scp3_clkctrl,
-#endif
 		0
 	};
 
@@ -427,9 +502,6 @@ void enable_basic_clocks(void)
 
 #ifdef CONFIG_TI_QSPI
 		(*prcm)->cm_l4per_qspi_clkctrl,
-#endif
-#ifdef CONFIG_SCSI_AHCI_PLAT
-		(*prcm)->cm_l3init_sata_clkctrl,
 #endif
 		0
 	};
@@ -463,12 +535,6 @@ void enable_basic_clocks(void)
 	setbits_le32((*prcm)->cm_l4per_qspi_clkctrl, (1<<24));
 #endif
 
-#ifdef CONFIG_SCSI_AHCI_PLAT
-	/* Enable optional functional clock for SATA */
-	setbits_le32((*prcm)->cm_l3init_sata_clkctrl,
-		     SATA_CLKCTRL_OPTFCLKEN_MASK);
-#endif
-
 	/* Enable SCRM OPT clocks for PER and CORE dpll */
 	setbits_le32((*prcm)->cm_wkupaon_scrm_clkctrl,
 			OPTFCLKEN_SCRM_PER_MASK);
@@ -478,12 +544,13 @@ void enable_basic_clocks(void)
 
 void enable_basic_uboot_clocks(void)
 {
-	u32 const clk_domains_essential[] = {
-#if defined(CONFIG_DRA7XX)
-		(*prcm)->cm_ipu_clkstctrl,
-#endif
-		0
-	};
+	u32 cm_ipu_clkstctrl = 0;
+
+	if (IS_ENABLED(CONFIG_DRA7XX) &&
+	    !IS_ENABLED(CONFIG_REMOTEPROC_TI_IPU))
+		cm_ipu_clkstctrl = (*prcm)->cm_ipu_clkstctrl;
+
+	u32 const clk_domains_essential[] = {cm_ipu_clkstctrl, 0};
 
 	u32 const clk_modules_hw_auto_essential[] = {
 		(*prcm)->cm_l3init_hsusbtll_clkctrl,

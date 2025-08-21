@@ -5,7 +5,6 @@
  * Author: Weijie Gao <weijie.gao@mediatek.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
@@ -17,16 +16,6 @@
 struct mtmips_reset_priv {
 	void __iomem *base;
 };
-
-static int mtmips_reset_request(struct reset_ctl *reset_ctl)
-{
-	return 0;
-}
-
-static int mtmips_reset_free(struct reset_ctl *reset_ctl)
-{
-	return 0;
-}
 
 static int mtmips_reset_assert(struct reset_ctl *reset_ctl)
 {
@@ -47,8 +36,6 @@ static int mtmips_reset_deassert(struct reset_ctl *reset_ctl)
 }
 
 static const struct reset_ops mtmips_reset_ops = {
-	.request	= mtmips_reset_request,
-	.rfree		= mtmips_reset_free,
 	.rst_assert	= mtmips_reset_assert,
 	.rst_deassert	= mtmips_reset_deassert,
 };

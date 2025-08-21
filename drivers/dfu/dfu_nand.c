@@ -9,7 +9,6 @@
  * author: Lukasz Majewski <l.majewski@samsung.com>
  */
 
-#include <common.h>
 #include <log.h>
 #include <malloc.h>
 #include <errno.h>
@@ -194,20 +193,25 @@ unsigned int dfu_polltimeout_nand(struct dfu_entity *dfu)
 	return DFU_DEFAULT_POLL_TIMEOUT;
 }
 
-int dfu_fill_entity_nand(struct dfu_entity *dfu, char *devstr, char *s)
+int dfu_fill_entity_nand(struct dfu_entity *dfu, char *devstr, char **argv, int argc)
 {
-	char *st;
+	char *s;
 	int ret, dev, part;
 
 	dfu->data.nand.ubi = 0;
 	dfu->dev_type = DFU_DEV_NAND;
-	st = strsep(&s, " ");
-	if (!strcmp(st, "raw")) {
+	if (argc != 3)
+		return -EINVAL;
+
+	if (!strcmp(argv[0], "raw")) {
 		dfu->layout = DFU_RAW_ADDR;
-		dfu->data.nand.start = simple_strtoul(s, &s, 16);
-		s++;
-		dfu->data.nand.size = simple_strtoul(s, &s, 16);
-	} else if ((!strcmp(st, "part")) || (!strcmp(st, "partubi"))) {
+		dfu->data.nand.start = hextoul(argv[1], &s);
+		if (*s)
+			return -EINVAL;
+		dfu->data.nand.size = hextoul(argv[2], &s);
+		if (*s)
+			return -EINVAL;
+	} else if ((!strcmp(argv[0], "part")) || (!strcmp(argv[0], "partubi"))) {
 		char mtd_id[32];
 		struct mtd_device *mtd_dev;
 		u8 part_num;
@@ -215,9 +219,12 @@ int dfu_fill_entity_nand(struct dfu_entity *dfu, char *devstr, char *s)
 
 		dfu->layout = DFU_RAW_ADDR;
 
-		dev = simple_strtoul(s, &s, 10);
-		s++;
-		part = simple_strtoul(s, &s, 10);
+		dev = dectoul(argv[1], &s);
+		if (*s)
+			return -EINVAL;
+		part = dectoul(argv[2], &s);
+		if (*s)
+			return -EINVAL;
 
 		sprintf(mtd_id, "%s%d,%d", "nand", dev, part - 1);
 		debug("using id '%s'\n", mtd_id);
@@ -232,10 +239,10 @@ int dfu_fill_entity_nand(struct dfu_entity *dfu, char *devstr, char *s)
 
 		dfu->data.nand.start = pi->offset;
 		dfu->data.nand.size = pi->size;
-		if (!strcmp(st, "partubi"))
+		if (!strcmp(argv[0], "partubi"))
 			dfu->data.nand.ubi = 1;
 	} else {
-		printf("%s: Memory layout (%s) not supported!\n", __func__, st);
+		printf("%s: Memory layout (%s) not supported!\n", __func__, argv[0]);
 		return -1;
 	}
 

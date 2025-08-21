@@ -65,7 +65,7 @@ struct clk_mux {
 	 */
 	const char	* const *parent_names;
 	u8		num_parents;
-#if CONFIG_IS_ENABLED(SANDBOX_CLK_CCF)
+#if IS_ENABLED(CONFIG_SANDBOX_CLK_CCF)
 	u32             io_mux_val;
 #endif
 
@@ -74,6 +74,7 @@ struct clk_mux {
 #define to_clk_mux(_clk) container_of(_clk, struct clk_mux, clk)
 extern const struct clk_ops clk_mux_ops;
 u8 clk_mux_get_parent(struct clk *clk);
+int clk_mux_fetch_parent_index(struct clk *clk, struct clk *parent);
 
 /**
  * clk_mux_index_to_val() - Convert the parent index to the register value
@@ -84,7 +85,7 @@ u8 clk_mux_get_parent(struct clk *clk);
  * @table: array of register values corresponding to the parent index (optional)
  * @flags: hardware-specific flags
  * @index: parent clock index
- * @return the register value
+ * Return: the register value
  */
 unsigned int clk_mux_index_to_val(u32 *table, unsigned int flags, u8 index);
 
@@ -93,7 +94,7 @@ struct clk_gate {
 	void __iomem	*reg;
 	u8		bit_idx;
 	u8		flags;
-#if CONFIG_IS_ENABLED(SANDBOX_CLK_CCF)
+#if IS_ENABLED(CONFIG_SANDBOX_CLK_CCF)
 	u32		io_gate_val;
 #endif
 };
@@ -104,7 +105,7 @@ struct clk_gate {
 #define CLK_GATE_HIWORD_MASK		BIT(1)
 
 extern const struct clk_ops clk_gate_ops;
-struct clk *clk_register_gate(struct device *dev, const char *name,
+struct clk *clk_register_gate(struct udevice *dev, const char *name,
 			      const char *parent_name, unsigned long flags,
 			      void __iomem *reg, u8 bit_idx,
 			      u8 clk_gate_flags, spinlock_t *lock);
@@ -121,7 +122,7 @@ struct clk_divider {
 	u8		width;
 	u8		flags;
 	const struct clk_div_table	*table;
-#if CONFIG_IS_ENABLED(SANDBOX_CLK_CCF)
+#if IS_ENABLED(CONFIG_SANDBOX_CLK_CCF)
 	u32             io_divider_val;
 #endif
 };
@@ -143,7 +144,7 @@ extern const struct clk_ops clk_divider_ops;
  *
  * @table:  array of register values corresponding to valid dividers
  * @val: value to convert
- * @return the divider
+ * Return: the divider
  */
 unsigned int clk_divider_get_table_div(const struct clk_div_table *table,
 				       unsigned int val);
@@ -156,7 +157,7 @@ unsigned int clk_divider_get_table_div(const struct clk_div_table *table,
  *
  * @table: array of register values corresponding to valid dividers
  * @div: requested divider
- * @return the register value
+ * Return: the register value
  */
 unsigned int clk_divider_get_table_val(const struct clk_div_table *table,
 				       unsigned int div);
@@ -167,7 +168,7 @@ unsigned int clk_divider_get_table_val(const struct clk_div_table *table,
  * @table: array of valid dividers (optional)
  * @div: divider to check
  * @flags: hardware-specific flags
- * @return true if the divider is valid, false otherwise
+ * Return: true if the divider is valid, false otherwise
  */
 bool clk_divider_is_valid_div(const struct clk_div_table *table,
 			      unsigned int div, unsigned long flags);
@@ -177,7 +178,7 @@ bool clk_divider_is_valid_div(const struct clk_div_table *table,
  *
  * @table: array of valid dividers
  * @div: divider to check
- * @return true if the divider is found in the @table array, false otherwise
+ * Return: true if the divider is found in the @table array, false otherwise
  */
 bool clk_divider_is_valid_table_div(const struct clk_div_table *table,
 				    unsigned int div);
@@ -192,6 +193,8 @@ struct clk_fixed_factor {
 	unsigned int	div;
 };
 
+extern const struct clk_ops clk_fixed_rate_ops;
+
 #define to_clk_fixed_factor(_clk) container_of(_clk, struct clk_fixed_factor,\
 					       clk)
 
@@ -201,6 +204,9 @@ struct clk_fixed_rate {
 };
 
 #define to_clk_fixed_rate(dev)	((struct clk_fixed_rate *)dev_get_plat(dev))
+
+void clk_fixed_rate_ofdata_to_plat_(struct udevice *dev,
+				    struct clk_fixed_rate *plat);
 
 struct clk_composite {
 	struct clk	clk;
@@ -213,11 +219,13 @@ struct clk_composite {
 	const struct clk_ops	*mux_ops;
 	const struct clk_ops	*rate_ops;
 	const struct clk_ops	*gate_ops;
+
+	struct udevice *dev;
 };
 
 #define to_clk_composite(_clk) container_of(_clk, struct clk_composite, clk)
 
-struct clk *clk_register_composite(struct device *dev, const char *name,
+struct clk *clk_register_composite(struct udevice *dev, const char *name,
 		const char * const *parent_names, int num_parents,
 		struct clk *mux_clk, const struct clk_ops *mux_ops,
 		struct clk *rate_clk, const struct clk_ops *rate_ops,
@@ -227,23 +235,34 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
 int clk_register(struct clk *clk, const char *drv_name, const char *name,
 		 const char *parent_name);
 
-struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+struct clk *clk_register_fixed_factor(struct udevice *dev, const char *name,
 		const char *parent_name, unsigned long flags,
 		unsigned int mult, unsigned int div);
 
-struct clk *clk_register_divider(struct device *dev, const char *name,
+struct clk *clk_register_divider(struct udevice *dev, const char *name,
 		const char *parent_name, unsigned long flags,
 		void __iomem *reg, u8 shift, u8 width,
 		u8 clk_divider_flags);
 
-struct clk *clk_register_mux(struct device *dev, const char *name,
+struct clk *clk_register_mux(struct udevice *dev, const char *name,
 		const char * const *parent_names, u8 num_parents,
 		unsigned long flags,
 		void __iomem *reg, u8 shift, u8 width,
 		u8 clk_mux_flags);
 
+struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+				    ulong rate);
+
 const char *clk_hw_get_name(const struct clk *hw);
 ulong clk_generic_get_rate(struct clk *clk);
 
 struct clk *dev_get_clk_ptr(struct udevice *dev);
+
+ulong ccf_clk_get_rate(struct clk *clk);
+ulong ccf_clk_set_rate(struct clk *clk, unsigned long rate);
+int ccf_clk_set_parent(struct clk *clk, struct clk *parent);
+int ccf_clk_enable(struct clk *clk);
+int ccf_clk_disable(struct clk *clk);
+extern const struct clk_ops ccf_clk_ops;
+
 #endif /* __LINUX_CLK_PROVIDER_H */

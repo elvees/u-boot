@@ -20,12 +20,17 @@
  */
 
 #ifndef __ASSEMBLY__
+#include <board_f.h>
+#include <event_internal.h>
 #include <fdtdec.h>
-#include <membuff.h>
+#include <membuf.h>
 #include <linux/list.h>
+#include <linux/build_bug.h>
+#include <asm-offsets.h>
 
 struct acpi_ctx;
 struct driver_rt;
+struct upl;
 
 typedef struct global_data gd_t;
 
@@ -38,38 +43,140 @@ struct global_data {
 	 */
 	struct bd_info *bd;
 	/**
+	 * @new_gd: pointer to relocated global data
+	 */
+	struct global_data *new_gd;
+	/**
+	 * @fdt_blob: U-Boot's own device tree, NULL if none
+	 */
+	const void *fdt_blob;
+	/**
+	 * @cur_serial_dev: current serial device
+	 */
+	struct udevice *cur_serial_dev;
+#ifndef CONFIG_XPL_BUILD
+	/**
+	 * @jt: jump table
+	 *
+	 * The jump table contains pointers to exported functions. A pointer to
+	 * the jump table is passed to standalone applications.
+	 */
+	struct jt_funcs *jt;
+	/**
+	 * @boardf: information only used before relocation
+	 */
+	struct board_f *boardf;
+#endif
+	/**
+	 * @ram_size: RAM size in bytes
+	 */
+	phys_size_t ram_size;
+	/**
+	 * @ram_top: top address of RAM used by U-Boot
+	 */
+	phys_addr_t ram_top;
+	/**
 	 * @flags: global data flags
 	 *
 	 * See &enum gd_flags
 	 */
 	unsigned long flags;
 	/**
-	 * @baudrate: baud rate of the serial interface
-	 */
-	unsigned int baudrate;
-	/**
 	 * @cpu_clk: CPU clock rate in Hz
 	 */
 	unsigned long cpu_clk;
+#if CONFIG_IS_ENABLED(ENV_SUPPORT)
+	/**
+	 * @env_addr: address of environment structure
+	 *
+	 * @env_addr contains the address of the structure holding the
+	 * environment variables.
+	 */
+	unsigned long env_addr;
+#endif /* ENV_SUPPORT */
+	/**
+	 * @ram_base: base address of RAM used by U-Boot
+	 */
+	unsigned long ram_base;
+	/**
+	 * @relocaddr: start address of U-Boot in RAM
+	 *
+	 * After relocation this field indicates the address to which U-Boot
+	 * has been relocated. It can be displayed using the bdinfo command.
+	 * Its value is needed to display the source code when debugging with
+	 * GDB using the 'add-symbol-file u-boot <relocaddr>' command.
+	 */
+	unsigned long relocaddr;
+	/**
+	 * @irq_sp: IRQ stack pointer
+	 */
+	unsigned long irq_sp;
+	/**
+	 * @start_addr_sp: initial stack pointer address
+	 */
+	unsigned long start_addr_sp;
+	/**
+	 * @reloc_off: relocation offset
+	 */
+	unsigned long reloc_off;
 	/**
 	 * @bus_clk: platform clock rate in Hz
 	 */
-	unsigned long bus_clk;
-	/**
-	 * @pci_clk: PCI clock rate in Hz
-	 */
-	/* We cannot bracket this with CONFIG_PCI due to mpc5xxx */
-	unsigned long pci_clk;
+	unsigned int bus_clk;
 	/**
 	 * @mem_clk: memory clock rate in Hz
 	 */
-	unsigned long mem_clk;
-#if defined(CONFIG_LCD) || defined(CONFIG_VIDEO) || defined(CONFIG_DM_VIDEO)
+	unsigned int mem_clk;
 	/**
-	 * @fb_base: base address of frame buffer memory
+	 * @mon_len: monitor length in bytes
 	 */
-	unsigned long fb_base;
-#endif
+	unsigned int mon_len;
+	/**
+	 * @baudrate: baud rate of the serial interface
+	 */
+	unsigned int baudrate;
+#if CONFIG_IS_ENABLED(ENV_SUPPORT)
+	/**
+	 * @env_has_init: bit mask indicating environment locations
+	 *
+	 * &enum env_location defines which bit relates to which location
+	 */
+	unsigned short env_has_init;
+	/**
+	 * @env_valid: environment is valid
+	 *
+	 * See &enum env_valid
+	 */
+	unsigned char env_valid;
+	/**
+	 * @env_load_prio: priority of the loaded environment
+	 */
+	char env_load_prio;
+	/**
+	 * @env_buf: buffer for env_get() before reloc
+	 */
+	char env_buf[32];
+#endif /* ENV_SUPPORT */
+	/**
+	 * @fdt_src: Source of FDT
+	 */
+	enum fdt_source_t fdt_src;
+	/**
+	 * @arch: architecture-specific data
+	 */
+	struct arch_global_data arch;
+	/**
+	 * @dmtag_list: List of DM tags
+	 */
+	struct list_head dmtag_list;
+	/**
+	 * @timebase_h: high 32 bits of timer
+	 */
+	unsigned int timebase_h;
+	/**
+	 * @timebase_l: low 32 bits of timer
+	 */
+	unsigned int timebase_l;
 #if defined(CONFIG_POST)
 	/**
 	 * @post_log_word: active POST tests
@@ -99,104 +206,24 @@ struct global_data {
 	 */
 	unsigned long board_type;
 #endif
-	/**
-	 * @have_console: console is available
-	 *
-	 * A value of 1 indicates that serial_init() was called and a console
-	 * is available.
-	 * A value of 0 indicates that console input and output drivers shall
-	 * not be called.
-	 */
-	unsigned long have_console;
 #if CONFIG_IS_ENABLED(PRE_CONSOLE_BUFFER)
 	/**
 	 * @precon_buf_idx: pre-console buffer index
 	 *
-	 * @precon_buf_idx indicates the current position of the buffer used to
-	 * collect output before the console becomes available
+	 * @precon_buf_idx indicates the current position of the
+	 * buffer used to collect output before the console becomes
+	 * available. When negative, the pre-console buffer is
+	 * temporarily disabled (used when the pre-console buffer is
+	 * being written out, to prevent adding its contents to
+	 * itself).
 	 */
-	unsigned long precon_buf_idx;
+	long precon_buf_idx;
 #endif
-	/**
-	 * @env_addr: address of environment structure
-	 *
-	 * @env_addr contains the address of the structure holding the
-	 * environment variables.
-	 */
-	unsigned long env_addr;
-	/**
-	 * @env_valid: environment is valid
-	 *
-	 * See &enum env_valid
-	 */
-	unsigned long env_valid;
-	/**
-	 * @env_has_init: bit mask indicating environment locations
-	 *
-	 * &enum env_location defines which bit relates to which location
-	 */
-	unsigned long env_has_init;
-	/**
-	 * @env_load_prio: priority of the loaded environment
-	 */
-	int env_load_prio;
-	/**
-	 * @ram_base: base address of RAM used by U-Boot
-	 */
-	unsigned long ram_base;
-	/**
-	 * @ram_top: top address of RAM used by U-Boot
-	 */
-	phys_addr_t ram_top;
-	/**
-	 * @relocaddr: start address of U-Boot in RAM
-	 *
-	 * After relocation this field indicates the address to which U-Boot
-	 * has been relocated. It can be displayed using the bdinfo command.
-	 * Its value is needed to display the source code when debugging with
-	 * GDB using the 'add-symbol-file u-boot <relocaddr>' command.
-	 */
-	unsigned long relocaddr;
-	/**
-	 * @ram_size: RAM size in bytes
-	 */
-	phys_size_t ram_size;
-	/**
-	 * @mon_len: monitor length in bytes
-	 */
-	unsigned long mon_len;
-	/**
-	 * @irq_sp: IRQ stack pointer
-	 */
-	unsigned long irq_sp;
-	/**
-	 * @start_addr_sp: initial stack pointer address
-	 */
-	unsigned long start_addr_sp;
-	/**
-	 * @reloc_off: relocation offset
-	 */
-	unsigned long reloc_off;
-	/**
-	 * @new_gd: pointer to relocated global data
-	 */
-	struct global_data *new_gd;
-
 #ifdef CONFIG_DM
-	/**
-	 * @dm_flags: additional flags for Driver Model
-	 *
-	 * See &enum gd_dm_flags
-	 */
-	unsigned long dm_flags;
 	/**
 	 * @dm_root: root instance for Driver Model
 	 */
 	struct udevice *dm_root;
-	/**
-	 * @dm_root_f: pre-relocation root instance
-	 */
-	struct udevice *dm_root_f;
 	/**
 	 * @uclass_root_s:
 	 * head of core tree when uclasses are not in read-only memory.
@@ -215,9 +242,19 @@ struct global_data {
 	 * @uclass_root_s.
 	 */
 	struct list_head *uclass_root;
-# if CONFIG_IS_ENABLED(OF_PLATDATA)
+# if CONFIG_IS_ENABLED(OF_PLATDATA_DRIVER_RT)
 	/** @dm_driver_rt: Dynamic info about the driver */
 	struct driver_rt *dm_driver_rt;
+# endif
+#if CONFIG_IS_ENABLED(OF_PLATDATA_RT)
+	/** @dm_udevice_rt: Dynamic info about the udevice */
+	struct udevice_rt *dm_udevice_rt;
+	/**
+	 * @dm_priv_base: Base address of the priv/plat region used when
+	 * udevices and uclasses are in read-only memory. This is NULL if not
+	 * used
+	 */
+	void *dm_priv_base;
 # endif
 #endif
 #ifdef CONFIG_TIMER
@@ -226,42 +263,18 @@ struct global_data {
 	 */
 	struct udevice *timer;
 #endif
-	/**
-	 * @fdt_blob: U-Boot's own device tree, NULL if none
-	 */
-	const void *fdt_blob;
-	/**
-	 * @new_fdt: relocated device tree
-	 */
-	void *new_fdt;
-	/**
-	 * @fdt_size: space reserved for relocated device space
-	 */
-	unsigned long fdt_size;
 #if CONFIG_IS_ENABLED(OF_LIVE)
 	/**
 	 * @of_root: root node of the live tree
 	 */
 	struct device_node *of_root;
 #endif
-
 #if CONFIG_IS_ENABLED(MULTI_DTB_FIT)
 	/**
 	 * @multi_dtb_fit: pointer to uncompressed multi-dtb FIT image
 	 */
 	const void *multi_dtb_fit;
 #endif
-	/**
-	 * @jt: jump table
-	 *
-	 * The jump table contains pointers to exported functions. A pointer to
-	 * the jump table is passed to standalone applications.
-	 */
-	struct jt_funcs *jt;
-	/**
-	 * @env_buf: buffer for env_get() before reloc
-	 */
-	char env_buf[32];
 #ifdef CONFIG_TRACE
 	/**
 	 * @trace_buff: trace buffer
@@ -271,79 +284,48 @@ struct global_data {
 	 */
 	void *trace_buff;
 #endif
-#if defined(CONFIG_SYS_I2C)
+#if CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
 	/**
 	 * @cur_i2c_bus: currently used I2C bus
 	 */
 	int cur_i2c_bus;
 #endif
+#if CONFIG_IS_ENABLED(CMD_BDINFO_EXTRA)
 	/**
-	 * @timebase_h: high 32 bits of timer
+	 * @malloc_start: start of malloc() region
 	 */
-	unsigned int timebase_h;
-	/**
-	 * @timebase_l: low 32 bits of timer
-	 */
-	unsigned int timebase_l;
-#if CONFIG_VAL(SYS_MALLOC_F_LEN)
+	unsigned long malloc_start;
+#endif
+#if CONFIG_IS_ENABLED(SYS_MALLOC_F)
 	/**
 	 * @malloc_base: base address of early malloc()
 	 */
 	unsigned long malloc_base;
 	/**
-	 * @malloc_limit: limit address of early malloc()
+	 * @malloc_limit: maximum size of early malloc()
 	 */
-	unsigned long malloc_limit;
+	unsigned int malloc_limit;
 	/**
-	 * @malloc_ptr: current address of early malloc()
+	 * @malloc_ptr: currently used bytes of early malloc()
 	 */
-	unsigned long malloc_ptr;
+	unsigned int malloc_ptr;
 #endif
-#ifdef CONFIG_PCI
-	/**
-	 * @hose: PCI hose for early use
-	 */
-	struct pci_controller *hose;
-	/**
-	 * @pci_ram_top: top of region accessible to PCI
-	 */
-	phys_addr_t pci_ram_top;
-#endif
-#ifdef CONFIG_PCI_BOOTDELAY
-	/**
-	 * @pcidelay_done: delay time before scanning of PIC hose expired
-	 *
-	 * If CONFIG_PCI_BOOTDELAY=y, pci_hose_scan() waits for the number of
-	 * milliseconds defined by environment variable pcidelay before
-	 * scanning. Once this delay has expired the flag @pcidelay_done
-	 * is set to 1.
-	 */
-	int pcidelay_done;
-#endif
-	/**
-	 * @cur_serial_dev: current serial device
-	 */
-	struct udevice *cur_serial_dev;
-	/**
-	 * @arch: architecture-specific data
-	 */
-	struct arch_global_data arch;
 #ifdef CONFIG_CONSOLE_RECORD
 	/**
 	 * @console_out: output buffer for console recording
 	 *
 	 * This buffer is used to collect output during console recording.
 	 */
-	struct membuff console_out;
+	struct membuf console_out;
 	/**
 	 * @console_in: input buffer for console recording
 	 *
 	 * If console recording is activated, this buffer can be used to
 	 * emulate input.
 	 */
-	struct membuff console_in;
+	struct membuf console_in;
 #endif
-#ifdef CONFIG_DM_VIDEO
+#if CONFIG_IS_ENABLED(VIDEO)
 	/**
 	 * @video_top: top of video frame buffer area
 	 */
@@ -358,12 +340,18 @@ struct global_data {
 	 * @bootstage: boot stage information
 	 */
 	struct bootstage_data *bootstage;
-	/**
-	 * @new_bootstage: relocated boot stage information
-	 */
-	struct bootstage_data *new_bootstage;
 #endif
 #ifdef CONFIG_LOG
+	/**
+	 * @log_head: list of logging devices
+	 */
+	struct list_head log_head;
+	/**
+	 * @log_fmt: bit mask for logging format
+	 *
+	 * The @log_fmt bit mask selects the fields to be shown in log messages.
+	 * &enum log_fmt defines the bits of the bit mask.
+	 */
 	/**
 	 * @log_drop_count: number of dropped log messages
 	 *
@@ -378,19 +366,26 @@ struct global_data {
 	 * For logging devices without filters @default_log_level defines the
 	 * logging level, cf. &enum log_level_t.
 	 */
-	int default_log_level;
+	char default_log_level;
+	char log_fmt;
 	/**
-	 * @log_head: list of logging devices
-	 */
-	struct list_head log_head;
-	/**
-	 * @log_fmt: bit mask for logging format
+	 * @logc_prev: logging category of previous message
 	 *
-	 * The @log_fmt bit mask selects the fields to be shown in log messages.
-	 * &enum log_fmt defines the bits of the bit mask.
+	 * This value is used as logging category for continuation messages.
 	 */
-	int log_fmt;
-
+	unsigned char logc_prev;
+	/**
+	 * @logl_prev: logging level of the previous message
+	 *
+	 * This value is used as logging level for continuation messages.
+	 */
+	unsigned char logl_prev;
+	/**
+	 * @log_cont: Previous log line did not finished wtih \n
+	 *
+	 * This allows for chained log messages on the same line
+	 */
+	bool log_cont;
 	/**
 	 * @processing_msg: a log message is being processed
 	 *
@@ -398,28 +393,12 @@ struct global_data {
 	 * while another message is being processed.
 	 */
 	bool processing_msg;
-	/**
-	 * @logc_prev: logging category of previous message
-	 *
-	 * This value is used as logging category for continuation messages.
-	 */
-	int logc_prev;
-	/**
-	 * @logl_prev: logging level of the previous message
-	 *
-	 * This value is used as logging level for continuation messages.
-	 */
-	int logl_prev;
 #endif
 #if CONFIG_IS_ENABLED(BLOBLIST)
 	/**
 	 * @bloblist: blob list information
 	 */
 	struct bloblist_hdr *bloblist;
-	/**
-	 * @new_bloblist: relocated blob list information
-	 */
-	struct bloblist_hdr *new_bloblist;
 #endif
 #if CONFIG_IS_ENABLED(HANDOFF)
 	/**
@@ -435,17 +414,15 @@ struct global_data {
 	 */
 	fdt_addr_t translation_offset;
 #endif
-#if CONFIG_IS_ENABLED(WDT)
-	/**
-	 * @watchdog_dev: watchdog device
-	 */
-	struct udevice *watchdog_dev;
-#endif
-#ifdef CONFIG_GENERATE_ACPI_TABLE
+#ifdef CONFIG_ACPI
 	/**
 	 * @acpi_ctx: ACPI context pointer
 	 */
 	struct acpi_ctx *acpi_ctx;
+	/**
+	 * @acpi_start: Start address of ACPI tables
+	 */
+	ulong acpi_start;
 #endif
 #if CONFIG_IS_ENABLED(GENERATE_SMBIOS_TABLE)
 	/**
@@ -453,7 +430,28 @@ struct global_data {
 	 */
 	char *smbios_version;
 #endif
+#if CONFIG_IS_ENABLED(EVENT)
+	/**
+	 * @event_state: Points to the current state of events
+	 */
+	struct event_state event_state;
+#endif
+#if CONFIG_IS_ENABLED(CYCLIC)
+	/**
+	 * @cyclic_list: list of registered cyclic functions
+	 */
+	struct hlist_head cyclic_list;
+#endif
+#if CONFIG_IS_ENABLED(UPL)
+	/**
+	 * @upl: Universal Payload-handoff information
+	 */
+	struct upl *upl;
+#endif
 };
+#ifndef DO_DEPS_ONLY
+static_assert(sizeof(struct global_data) == GD_SIZE);
+#endif
 
 /**
  * gd_board_type() - retrieve board type
@@ -477,7 +475,7 @@ struct global_data {
 #define gd_set_of_root(_root)
 #endif
 
-#if CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_PLATDATA_DRIVER_RT)
 #define gd_set_dm_driver_rt(dyn)	gd->dm_driver_rt = dyn
 #define gd_dm_driver_rt()		gd->dm_driver_rt
 #else
@@ -485,16 +483,102 @@ struct global_data {
 #define gd_dm_driver_rt()		NULL
 #endif
 
-#ifdef CONFIG_GENERATE_ACPI_TABLE
-#define gd_acpi_ctx()		gd->acpi_ctx
+#if CONFIG_IS_ENABLED(OF_PLATDATA_RT)
+#define gd_set_dm_udevice_rt(dyn)	gd->dm_udevice_rt = dyn
+#define gd_dm_udevice_rt()		gd->dm_udevice_rt
+#define gd_set_dm_priv_base(dyn)	gd->dm_priv_base = dyn
+#define gd_dm_priv_base()		gd->dm_priv_base
 #else
-#define gd_acpi_ctx()		NULL
+#define gd_set_dm_udevice_rt(dyn)
+#define gd_dm_udevice_rt()		NULL
+#define gd_set_dm_priv_base(dyn)
+#define gd_dm_priv_base()		NULL
 #endif
 
-#if CONFIG_IS_ENABLED(DM)
-#define gd_size_cells_0()	(gd->dm_flags & GD_DM_FLG_SIZE_CELLS_0)
+#ifdef CONFIG_ACPI
+#define gd_acpi_ctx()		gd->acpi_ctx
+#define gd_acpi_start()		gd->acpi_start
+#define gd_set_acpi_start(addr)	gd->acpi_start = addr
 #else
-#define gd_size_cells_0()	(0)
+#define gd_acpi_ctx()		NULL
+#define gd_acpi_start()		0UL
+#define gd_set_acpi_start(addr)
+#endif
+
+#ifdef CONFIG_SMBIOS
+#define gd_smbios_start()	gd->arch.smbios_start
+#define gd_set_smbios_start(addr)	gd->arch.smbios_start = addr
+#else
+#define gd_smbios_start()	0UL
+#define gd_set_smbios_start(addr)
+#endif
+
+#if CONFIG_IS_ENABLED(MULTI_DTB_FIT)
+#define gd_multi_dtb_fit()	gd->multi_dtb_fit
+#define gd_set_multi_dtb_fit(_dtb)	gd->multi_dtb_fit = _dtb
+#else
+#define gd_multi_dtb_fit()	NULL
+#define gd_set_multi_dtb_fit(_dtb)
+#endif
+
+#if CONFIG_IS_ENABLED(EVENT_DYNAMIC)
+#define gd_event_state()	((struct event_state *)&gd->event_state)
+#else
+#define gd_event_state()	NULL
+#endif
+
+#if CONFIG_IS_ENABLED(CMD_BDINFO_EXTRA)
+#define gd_malloc_start()		gd->malloc_start
+#define gd_set_malloc_start(_val)	gd->malloc_start = (_val)
+#else
+#define gd_malloc_start()	0
+#define gd_set_malloc_start(val)
+#endif
+
+#if CONFIG_VAL(SYS_MALLOC_F_LEN)
+#define gd_malloc_ptr()		gd->malloc_ptr
+#else
+#define gd_malloc_ptr()		0L
+#endif
+
+#if CONFIG_IS_ENABLED(UPL)
+#define gd_upl()		gd->upl
+#define gd_set_upl(_val)	gd->upl = (_val)
+#else
+#define gd_upl()		NULL
+#define gd_set_upl(val)
+#endif
+
+#if CONFIG_IS_ENABLED(BLOBLIST)
+#define gd_bloblist()		gd->bloblist
+#define gd_set_bloblist(_val)	gd->bloblist = (_val)
+#else
+#define gd_bloblist()		NULL
+#define gd_set_bloblist(_val)
+#endif
+
+#if CONFIG_IS_ENABLED(BOOTSTAGE)
+#define gd_bootstage()		gd->bootstage
+#else
+#define gd_bootstage()		NULL
+#endif
+
+#if CONFIG_IS_ENABLED(TRACE)
+#define gd_trace_buff()		gd->trace_buff
+#define gd_trace_size()		CONFIG_TRACE_BUFFER_SIZE
+#else
+#define gd_trace_buff()		NULL
+#define gd_trace_size()		0
+#endif
+
+#if CONFIG_IS_ENABLED(VIDEO)
+#define gd_video_top()		gd->video_top
+#define gd_video_bottom()	gd->video_bottom
+#define gd_video_size()		(gd->video_top - gd->video_bottom)
+#else
+#define gd_video_top()		0
+#define gd_video_bottom()	0
+#define gd_video_size()		0
 #endif
 
 /**
@@ -556,41 +640,68 @@ enum gd_flags {
 	 */
 	GD_FLG_RECORD = 0x01000,
 	/**
+	 * @GD_FLG_RECORD_OVF: record console overflow
+	 */
+	GD_FLG_RECORD_OVF = 0x02000,
+	/**
 	 * @GD_FLG_ENV_DEFAULT: default variable flag
 	 */
-	GD_FLG_ENV_DEFAULT = 0x02000,
+	GD_FLG_ENV_DEFAULT = 0x04000,
 	/**
 	 * @GD_FLG_SPL_EARLY_INIT: early SPL initialization is done
 	 */
-	GD_FLG_SPL_EARLY_INIT = 0x04000,
+	GD_FLG_SPL_EARLY_INIT = 0x08000,
 	/**
 	 * @GD_FLG_LOG_READY: log system is ready for use
 	 */
-	GD_FLG_LOG_READY = 0x08000,
+	GD_FLG_LOG_READY = 0x10000,
 	/**
-	 * @GD_FLG_WDT_READY: watchdog is ready for use
+	 * @GD_FLG_CYCLIC_RUNNING: cyclic_run is in progress
 	 */
-	GD_FLG_WDT_READY = 0x10000,
+	GD_FLG_CYCLIC_RUNNING = 0x20000,
 	/**
 	 * @GD_FLG_SKIP_LL_INIT: don't perform low-level initialization
 	 */
-	GD_FLG_SKIP_LL_INIT = 0x20000,
+	GD_FLG_SKIP_LL_INIT = 0x40000,
 	/**
 	 * @GD_FLG_SMP_READY: SMP initialization is complete
 	 */
-	GD_FLG_SMP_READY = 0x40000,
-};
-
-/**
- * enum gd_dm_flags - global data flags for Driver Model
- *
- * See field dm_flags of &struct global_data.
- */
-enum gd_dm_flags {
+	GD_FLG_SMP_READY = 0x80000,
 	/**
-	 * @GD_DM_FLG_SIZE_CELLS_0: Enable #size-cells=<0> translation
+	 * @GD_FLG_FDT_CHANGED: Device tree change has been detected by tests
 	 */
-	GD_DM_FLG_SIZE_CELLS_0 = 0x00001,
+	GD_FLG_FDT_CHANGED = 0x100000,
+	/**
+	 * @GD_FLG_OF_TAG_MIGRATE: Device tree has old u-boot,dm- tags
+	 */
+	GD_FLG_OF_TAG_MIGRATE = 0x200000,
+	/**
+	 * @GD_FLG_DM_DEAD: Driver model is not accessible. This can be set when
+	 * the memory used to holds its tables has been mapped out.
+	 */
+	GD_FLG_DM_DEAD = 0x400000,
+	/**
+	 * @GD_FLG_BLOBLIST_READY: bloblist is ready for use
+	 */
+	GD_FLG_BLOBLIST_READY = 0x800000,
+	/**
+	 * @GD_FLG_HUSH_OLD_PARSER: Use hush old parser.
+	 */
+	GD_FLG_HUSH_OLD_PARSER = 0x1000000,
+	/**
+	 * @GD_FLG_HUSH_MODERN_PARSER: Use hush 2021 parser.
+	 */
+	GD_FLG_HUSH_MODERN_PARSER = 0x2000000,
+	/**
+	 * @GD_FLG_UPL: Read/write a Universal Payload (UPL) handoff
+	 */
+	GD_FLG_UPL = 0x4000000,
+	/**
+	 * @GD_FLG_HAVE_CONSOLE: serial_init() was called and a console
+	 * is available. When not set, indicates that console input and output
+	 * drivers shall not be called.
+	 */
+	GD_FLG_HAVE_CONSOLE = 0x8000000,
 };
 
 #endif /* __ASSEMBLY__ */

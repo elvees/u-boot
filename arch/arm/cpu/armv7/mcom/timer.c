@@ -9,7 +9,6 @@
 /* Supports: Synopsys dw_timers
  */
 
-#include <common.h>
 #include <asm/io.h>
 #include <asm/arch/regs.h>
 #include <asm/global_data.h>

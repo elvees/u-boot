@@ -9,7 +9,6 @@
 #ifndef __QE_H__
 #define __QE_H__
 
-#include "common.h"
 #ifdef CONFIG_U_QE
 #include <linux/immap_qe.h>
 #endif
@@ -40,7 +39,7 @@ typedef struct qe_snum {
 #define	QE_RISC_ALLOCATION_RISC2	0x2  /* RISC 2 */
 #define	QE_RISC_ALLOCATION_RISC3	0x4  /* RISC 3 */
 #define	QE_RISC_ALLOCATION_RISC4	0x8  /* RISC 4 */
-#define	QE_RISC_ALLOCATION_RISC1_AND_RISC2 	(QE_RISC_ALLOCATION_RISC1 | \
+#define	QE_RISC_ALLOCATION_RISC1_AND_RISC2	(QE_RISC_ALLOCATION_RISC1 | \
 						 QE_RISC_ALLOCATION_RISC2)
 #define	QE_RISC_ALLOCATION_FOUR_RISCS	(QE_RISC_ALLOCATION_RISC1 | \
 					 QE_RISC_ALLOCATION_RISC2 | \

@@ -6,12 +6,14 @@
 #ifndef _FSL_PORTALS_H_
 #define _FSL_PORTALS_H_
 
+#include <linux/types.h>
+
 /* entries must be in order and contiguous */
 enum fsl_dpaa_dev {
 	FSL_HW_PORTAL_SEC,
 #ifdef CONFIG_SYS_DPAA_FMAN
 	FSL_HW_PORTAL_FMAN1,
-#if (CONFIG_SYS_NUM_FMAN == 2)
+#if (CFG_SYS_NUM_FMAN == 2)
 	FSL_HW_PORTAL_FMAN2,
 #endif
 #endif

@@ -8,7 +8,6 @@
  * Jason Liu <r64343@freescale.com>
  */
 
-#include <common.h>
 #include <init.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
@@ -33,7 +32,7 @@
 #include <fsl_pmic.h>
 #include <linux/fb.h>
 #include <ipu_pixfmt.h>
-#include <version.h>
+#include <version_string.h>
 #include <watchdog.h>
 #include "ppd_gpio.h"
 #include <stdlib.h>
@@ -81,10 +80,12 @@ int dram_init_banksize(void)
 	return 0;
 }
 
+#ifdef CONFIG_REVISION_TAG
 u32 get_board_rev(void)
 {
 	return get_cpu_rev() & ~(0xF << 8);
 }
+#endif
 
 #ifdef CONFIG_USB_EHCI_MX5
 int board_ehci_hcd_init(int port)

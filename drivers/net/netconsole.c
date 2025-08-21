@@ -4,18 +4,18 @@
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  */
 
-#include <common.h>
 #include <command.h>
 #include <env.h>
 #include <log.h>
 #include <stdio_dev.h>
 #include <net.h>
+#include <vsprintf.h>
 
-#ifndef CONFIG_NETCONSOLE_BUFFER_SIZE
-#define CONFIG_NETCONSOLE_BUFFER_SIZE 512
+#ifndef CFG_NETCONSOLE_BUFFER_SIZE
+#define CFG_NETCONSOLE_BUFFER_SIZE 512
 #endif
 
-static char input_buffer[CONFIG_NETCONSOLE_BUFFER_SIZE];
+static char input_buffer[CFG_NETCONSOLE_BUFFER_SIZE];
 static int input_size; /* char count in input buffer */
 static int input_offset; /* offset to valid chars in input buffer */
 static int input_recursion;
@@ -87,7 +87,7 @@ static int refresh_settings_from_env(void)
 				return -1;	/* ncip is 0.0.0.0 */
 			p = strchr(env_get("ncip"), ':');
 			if (p != NULL) {
-				nc_out_port = simple_strtoul(p + 1, NULL, 10);
+				nc_out_port = dectoul(p + 1, NULL);
 				nc_in_port = nc_out_port;
 			}
 		} else {
@@ -96,10 +96,10 @@ static int refresh_settings_from_env(void)
 
 		p = env_get("ncoutport");
 		if (p != NULL)
-			nc_out_port = simple_strtoul(p, NULL, 10);
+			nc_out_port = dectoul(p, NULL);
 		p = env_get("ncinport");
 		if (p != NULL)
-			nc_in_port = simple_strtoul(p, NULL, 10);
+			nc_in_port = dectoul(p, NULL);
 
 		if (is_broadcast(nc_ip))
 			/* broadcast MAC address */
@@ -172,11 +172,7 @@ int nc_input_packet(uchar *pkt, struct in_addr src_ip, unsigned dest_port,
 
 static void nc_send_packet(const char *buf, int len)
 {
-#ifdef CONFIG_DM_ETH
 	struct udevice *eth;
-#else
-	struct eth_device *eth;
-#endif
 	int inited = 0;
 	uchar *pkt;
 	uchar *ether;
@@ -298,11 +294,7 @@ static int nc_stdio_getc(struct stdio_dev *dev)
 
 static int nc_stdio_tstc(struct stdio_dev *dev)
 {
-#ifdef CONFIG_DM_ETH
 	struct udevice *eth;
-#else
-	struct eth_device *eth;
-#endif
 
 	if (input_recursion)
 		return 0;

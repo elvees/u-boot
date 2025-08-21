@@ -3,13 +3,11 @@
  *  Copyright (C) 2012 Altera Corporation <www.altera.com>
  */
 
-#include <common.h>
 #include <hang.h>
 #include <init.h>
 #include <log.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
-#include <asm/u-boot.h>
 #include <asm/utils.h>
 #include <image.h>
 #include <asm/arch/reset_manager.h>
@@ -52,8 +50,8 @@ u32 spl_boot_device(void)
 	}
 }
 
-#ifdef CONFIG_SPL_MMC_SUPPORT
-u32 spl_mmc_boot_mode(const u32 boot_device)
+#ifdef CONFIG_SPL_MMC
+u32 spl_mmc_boot_mode(struct mmc *mmc, const u32 boot_device)
 {
 #if defined(CONFIG_SPL_FS_FAT) || defined(CONFIG_SPL_FS_EXT4)
 	return MMCSD_MODE_FS;

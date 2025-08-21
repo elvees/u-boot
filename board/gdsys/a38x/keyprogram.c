@@ -4,7 +4,6 @@
  * Mario Six, Guntermann & Drunck GmbH, mario.six@gdsys.cc
  */
 
-#include <common.h>
 #include <command.h>
 #include <env.h>
 #include <tpm-v1.h>
@@ -23,15 +22,15 @@ int flush_keys(struct udevice *tpm)
 	uint i;
 
 	/* fetch list of already loaded keys in the TPM */
-	err = tpm_get_capability(tpm, TPM_CAP_HANDLE, TPM_RT_KEY, buf,
-				 sizeof(buf));
+	err = tpm1_get_capability(tpm, TPM_CAP_HANDLE, TPM_RT_KEY, buf,
+				  sizeof(buf));
 	if (err)
 		return -1;
 	key_count = get_unaligned_be16(buf);
 	ptr = buf + 2;
 	for (i = 0; i < key_count; ++i, ptr += 4) {
-		err = tpm_flush_specific(tpm, get_unaligned_be32(ptr),
-					 TPM_RT_KEY);
+		err = tpm1_flush_specific(tpm, get_unaligned_be32(ptr),
+					  TPM_RT_KEY);
 		if (err && err != TPM_KEY_OWNER_CONTROL)
 			return err;
 	}

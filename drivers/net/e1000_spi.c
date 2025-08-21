@@ -1,9 +1,9 @@
-#include <common.h>
 #include <command.h>
 #include <console.h>
 #include <linux/delay.h>
 #include "e1000.h"
 #include <malloc.h>
+#include <vsprintf.h>
 #include <linux/compiler.h>
 
 /*-----------------------------------------------------------------------
@@ -399,7 +399,7 @@ static int do_e1000_spi_dump(struct cmd_tbl *cmdtp, struct e1000_hw *hw,
 	}
 
 	/* Parse the arguments */
-	dest = (void *)simple_strtoul(argv[0], NULL, 16);
+	dest = (void *)hextoul(argv[0], NULL);
 	offset = simple_strtoul(argv[1], NULL, 0);
 	length = simple_strtoul(argv[2], NULL, 0);
 
@@ -444,7 +444,7 @@ static int do_e1000_spi_program(struct cmd_tbl *cmdtp, struct e1000_hw *hw,
 	}
 
 	/* Parse the arguments */
-	source = (const void *)simple_strtoul(argv[0], NULL, 16);
+	source = (const void *)hextoul(argv[0], NULL);
 	offset = simple_strtoul(argv[1], NULL, 0);
 	length = simple_strtoul(argv[2], NULL, 0);
 

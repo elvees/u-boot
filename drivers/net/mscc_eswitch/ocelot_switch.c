@@ -3,7 +3,6 @@
  * Copyright (c) 2018 Microsemi Corporation
  */
 
-#include <common.h>
 #include <config.h>
 #include <dm.h>
 #include <log.h>
@@ -17,6 +16,7 @@
 #include <miiphy.h>
 #include <net.h>
 #include <wait_bit.h>
+#include <linux/printk.h>
 
 #include "mscc_xfer.h"
 #include "mscc_mac_table.h"
@@ -530,7 +530,6 @@ static int ocelot_probe(struct udevice *dev)
 	struct ocelot_private *priv = dev_get_priv(dev);
 	int i, ret;
 	struct resource res;
-	fdt32_t faddr;
 	phys_addr_t addr_base;
 	unsigned long addr_size;
 	ofnode eth_node, node, mdio_node;
@@ -578,9 +577,8 @@ static int ocelot_probe(struct udevice *dev)
 
 		if (ofnode_read_resource(mdio_node, 0, &res))
 			return -ENOMEM;
-		faddr = cpu_to_fdt32(res.start);
 
-		addr_base = ofnode_translate_address(mdio_node, &faddr);
+		addr_base = res.start;
 		addr_size = res.end - res.start;
 
 		/* If the bus is new then create a new bus */
@@ -610,7 +608,7 @@ static int ocelot_probe(struct udevice *dev)
 
 		phy = phy_connect(priv->ports[i].bus,
 				  priv->ports[i].phy_addr, dev,
-				  PHY_INTERFACE_MODE_NONE);
+				  PHY_INTERFACE_MODE_NA);
 		if (phy && external_bus(priv, i))
 			board_phy_config(phy);
 	}

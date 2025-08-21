@@ -5,7 +5,6 @@
  * Copyright (C) 2009-2010, Intel Corporation and its suppliers.
  */
 
-#include <common.h>
 #include <dm.h>
 #include <malloc.h>
 #include <nand.h>
@@ -1246,7 +1245,7 @@ int denali_init(struct denali_nand_info *denali)
 
 	denali->active_bank = DENALI_INVALID_BANK;
 
-	chip->flash_node = dev_of_offset(denali->dev);
+	chip->flash_node = dev_ofnode(denali->dev);
 	/* Fallback to the default name if DT did not give "label" property */
 	if (!mtd->name)
 		mtd->name = "denali-nand";

@@ -160,14 +160,14 @@ struct usb_ep_caps {
  *	endpoint. It's set once by UDC driver when endpoint is initialized, and
  *	should not be changed. Should not be confused with maxpacket.
  * @max_streams: The maximum number of streams supported
- * 	by this EP (0 - 16, actual number is 2^n)
+ *	by this EP (0 - 16, actual number is 2^n)
  * @maxburst: the maximum number of bursts supported by this EP (for usb3)
  * @driver_data:for use by the gadget driver.  all other fields are
  *	read-only to gadget drivers.
  * @desc: endpoint descriptor.  This pointer is set before the endpoint is
- * 	enabled and remains valid until the endpoint is disabled.
+ *	enabled and remains valid until the endpoint is disabled.
  * @comp_desc: In case of SuperSpeed support, this is the endpoint companion
- * 	descriptor that is used to configure the endpoint
+ *	descriptor that is used to configure the endpoint
  *
  * the bus controller driver lists all the general purpose endpoints in
  * gadget->ep_list.  the control endpoint (gadget->ep0) is not in that list,
@@ -179,6 +179,7 @@ struct usb_ep {
 	const struct usb_ep_ops	*ops;
 	struct list_head	ep_list;
 	struct usb_ep_caps	caps;
+	bool			enabled;
 	unsigned		maxpacket:16;
 	unsigned		maxpacket_limit:16;
 	unsigned		max_streams:16;
@@ -230,7 +231,18 @@ static inline void usb_ep_set_maxpacket_limit(struct usb_ep *ep,
 static inline int usb_ep_enable(struct usb_ep *ep,
 				const struct usb_endpoint_descriptor *desc)
 {
-	return ep->ops->enable(ep, desc);
+	int ret;
+
+	if (ep->enabled)
+		return 0;
+
+	ret = ep->ops->enable(ep, desc);
+	if (ret)
+		return ret;
+
+	ep->enabled = true;
+
+	return 0;
 }
 
 /**
@@ -247,7 +259,18 @@ static inline int usb_ep_enable(struct usb_ep *ep,
  */
 static inline int usb_ep_disable(struct usb_ep *ep)
 {
-	return ep->ops->disable(ep);
+	int ret;
+
+	if (!ep->enabled)
+		return 0;
+
+	ret = ep->ops->disable(ep);
+	if (ret)
+		return ret;
+
+	ep->enabled = false;
+
+	return 0;
 }
 
 /**
@@ -446,7 +469,6 @@ static inline void usb_ep_fifo_flush(struct usb_ep *ep)
 		ep->ops->fifo_flush(ep);
 }
 
-
 /*-------------------------------------------------------------------------*/
 
 struct usb_dcd_config_params {
@@ -566,7 +588,6 @@ static inline struct usb_gadget *dev_to_usb_gadget(struct device *dev)
 /* iterates the non-control endpoints; 'tmp' is a struct usb_ep pointer */
 #define gadget_for_each_ep(tmp, gadget) \
 	list_for_each_entry(tmp, &(gadget)->ep_list, ep_list)
-
 
 /**
  * gadget_is_dualspeed - return true iff the hardware handles high speed
@@ -769,7 +790,6 @@ static inline int usb_gadget_disconnect(struct usb_gadget *gadget)
 	return gadget->ops->pullup(gadget, 0);
 }
 
-
 /*-------------------------------------------------------------------------*/
 
 /**
@@ -855,7 +875,6 @@ struct usb_gadget_driver {
 	void			(*resume)(struct usb_gadget *);
 	void			(*reset)(struct usb_gadget *);
 };
-
 
 /*-------------------------------------------------------------------------*/
 
@@ -968,23 +987,31 @@ extern struct usb_ep *usb_ep_autoconfig(struct usb_gadget *,
 
 extern void usb_ep_autoconfig_reset(struct usb_gadget *);
 
-extern int usb_gadget_handle_interrupts(int index);
+extern int dm_usb_gadget_handle_interrupts(struct udevice *);
 
-#if CONFIG_IS_ENABLED(DM_USB_GADGET)
-int usb_gadget_initialize(int index);
-int usb_gadget_release(int index);
-int dm_usb_gadget_handle_interrupts(struct udevice *dev);
-#else
-#include <usb.h>
-static inline int usb_gadget_initialize(int index)
-{
-	return board_usb_init(index, USB_INIT_DEVICE);
-}
+/**
+ * struct usb_gadget_generic_ops - The functions that a gadget driver must implement.
+ * @handle_interrupts: Handle UDC interrupts.
+ */
+struct usb_gadget_generic_ops {
+	int (*handle_interrupts)(struct udevice *udevice);
+};
 
-static inline int usb_gadget_release(int index)
-{
-	return board_usb_cleanup(index, USB_INIT_DEVICE);
-}
-#endif
+/**
+ * udc_device_get_by_index() - Get UDC udevice by index
+ * @index: UDC device index
+ * @udev: UDC udevice matching the index (if found)
+ *
+ * Return: 0 if Ok, -ve on error
+ */
+int udc_device_get_by_index(int index, struct udevice **udev);
+
+/**
+ * udc_device_put() - Put UDC udevice
+ * @udev: UDC udevice
+ *
+ * Return: 0 if Ok, -ve on error
+ */
+int udc_device_put(struct udevice *udev);
 
 #endif	/* __LINUX_USB_GADGET_H */

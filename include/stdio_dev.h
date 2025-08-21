@@ -17,6 +17,7 @@
 #define DEV_FLAGS_INPUT	 0x00000001	/* Device can be used as input	console */
 #define DEV_FLAGS_OUTPUT 0x00000002	/* Device can be used as output console */
 #define DEV_FLAGS_DM     0x00000004	/* Device priv is a struct udevice * */
+#define STDIO_NAME_LEN 32
 
 int stdio_file_to_flags(const int file);
 
@@ -24,7 +25,7 @@ int stdio_file_to_flags(const int file);
 struct stdio_dev {
 	int	flags;			/* Device flags: input/output/system	*/
 	int	ext;			/* Supported extensions			*/
-	char	name[32];		/* Device name				*/
+	char	name[STDIO_NAME_LEN];	/* Device name				*/
 
 /* GENERAL functions */
 
@@ -37,6 +38,13 @@ struct stdio_dev {
 	void (*putc)(struct stdio_dev *dev, const char c);
 	/* To put a string (accelerator) */
 	void (*puts)(struct stdio_dev *dev, const char *s);
+#ifdef CONFIG_CONSOLE_FLUSH_SUPPORT
+	/* To flush output queue */
+	void (*flush)(struct stdio_dev *dev);
+#define STDIO_DEV_ASSIGN_FLUSH(dev, flush_func) ((dev)->flush = (flush_func))
+#else
+#define STDIO_DEV_ASSIGN_FLUSH(dev, flush_func)
+#endif
 
 /* INPUT functions */
 
@@ -78,15 +86,6 @@ int stdio_init_tables(void);
 int stdio_add_devices(void);
 
 /**
- * stdio_init() - Sets up stdio ready for use
- *
- * This calls stdio_init_tables() and stdio_add_devices()
- */
-int stdio_init(void);
-
-void stdio_print_current_devices(void);
-
-/**
  * stdio_deregister_dev() - deregister the device "devname".
  *
  * @dev: Stdio device to deregister
@@ -102,7 +101,7 @@ struct stdio_dev *stdio_clone(struct stdio_dev *dev);
 int drv_lcd_init(void);
 int drv_video_init(void);
 int drv_keyboard_init(void);
-int drv_usbtty_init(void);
+int drv_usbacm_init(void);
 int drv_nc_init(void);
 int drv_jtag_console_init(void);
 int cbmemc_init(void);

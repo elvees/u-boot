@@ -12,7 +12,6 @@
  * Maxime Ripard <maxime.ripard@free-electrons.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <malloc.h>
@@ -24,6 +23,7 @@
 #include <linux/bitops.h>
 #include <linux/io.h>
 #include <linux/sizes.h>
+#include <linux/kconfig.h>
 
 #define BANK_INCREMENT		4
 #define NR_BANKS		8
@@ -47,7 +47,7 @@ struct socfpga_reset_data {
  */
 static bool socfpga_reset_keep_enabled(void)
 {
-#if !defined(CONFIG_SPL_BUILD) || CONFIG_IS_ENABLED(ENV_SUPPORT)
+#if !defined(CONFIG_XPL_BUILD) || CONFIG_IS_ENABLED(ENV_SUPPORT)
 	const char *env_str;
 	long val;
 
@@ -89,25 +89,7 @@ static int socfpga_reset_deassert(struct reset_ctl *reset_ctl)
 				 false, 500, false);
 }
 
-static int socfpga_reset_request(struct reset_ctl *reset_ctl)
-{
-	debug("%s(reset_ctl=%p) (dev=%p, id=%lu)\n", __func__,
-	      reset_ctl, reset_ctl->dev, reset_ctl->id);
-
-	return 0;
-}
-
-static int socfpga_reset_free(struct reset_ctl *reset_ctl)
-{
-	debug("%s(reset_ctl=%p) (dev=%p, id=%lu)\n", __func__, reset_ctl,
-	      reset_ctl->dev, reset_ctl->id);
-
-	return 0;
-}
-
 static const struct reset_ops socfpga_reset_ops = {
-	.request = socfpga_reset_request,
-	.rfree = socfpga_reset_free,
 	.rst_assert = socfpga_reset_assert,
 	.rst_deassert = socfpga_reset_deassert,
 };
@@ -133,6 +115,8 @@ static int socfpga_reset_remove(struct udevice *dev)
 	if (socfpga_reset_keep_enabled()) {
 		puts("Deasserting all peripheral resets\n");
 		writel(0, data->modrst_base + 4);
+		if (IS_ENABLED(CONFIG_TARGET_SOCFPGA_ARRIA10))
+			writel(0, data->modrst_base + 8);
 	}
 
 	return 0;

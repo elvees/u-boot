@@ -3,9 +3,9 @@
  * Copyright (C) EETS GmbH, 2017, Felix Brack <f.brack@eets.ch>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
+#include <linux/printk.h>
 #include <power/pmic.h>
 #include <power/regulator.h>
 #include <power/tps65910_pmic.h>

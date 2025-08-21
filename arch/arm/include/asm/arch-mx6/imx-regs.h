@@ -23,7 +23,7 @@
 #define GPU_ARB_END_ADDR                0x01803FFF
 #define APBH_DMA_ARB_BASE_ADDR          0x01804000
 #define APBH_DMA_ARB_END_ADDR           0x0180BFFF
-#define M4_BOOTROM_BASE_ADDR			0x007F8000
+#define MCU_BOOTROM_BASE_ADDR			0x007F8000
 
 #elif !defined(CONFIG_MX6SLL)
 #define CAAM_ARB_BASE_ADDR              0x00100000
@@ -238,13 +238,12 @@
 #endif
 #define ARM_BASE_ADDR		    (ATZ2_BASE_ADDR + 0x40000)
 
-#define CONFIG_SYS_FSL_SEC_OFFSET   0
-#define CONFIG_SYS_FSL_SEC_ADDR     (CAAM_BASE_ADDR + \
-				     CONFIG_SYS_FSL_SEC_OFFSET)
-#define CONFIG_SYS_FSL_JR0_OFFSET   0x1000
-#define CONFIG_SYS_FSL_JR0_ADDR     (CAAM_BASE_ADDR + \
-				     CONFIG_SYS_FSL_JR0_OFFSET)
-#define CONFIG_SYS_FSL_MAX_NUM_OF_SEC	1
+#define CFG_SYS_FSL_SEC_OFFSET   0
+#define CFG_SYS_FSL_SEC_ADDR     (CAAM_BASE_ADDR + \
+				     CFG_SYS_FSL_SEC_OFFSET)
+#define CFG_SYS_FSL_JR0_OFFSET   0x1000
+#define CFG_SYS_FSL_JR0_ADDR     (CAAM_BASE_ADDR + \
+				     CFG_SYS_FSL_JR0_OFFSET)
 
 #define USB_PL301_BASE_ADDR         (AIPS2_OFF_BASE_ADDR + 0x0000)
 #define USB_BASE_ADDR               (AIPS2_OFF_BASE_ADDR + 0x4000)
@@ -385,7 +384,6 @@
 			  MX6UL_LCDIF1_BASE_ADDR :		\
 			  ((is_mx6ull()) ?	\
 			  MX6ULL_LCDIF1_BASE_ADDR : MX6SX_LCDIF1_BASE_ADDR)))
-
 
 extern void imx_get_mac_from_fuse(int dev_id, unsigned char *mac);
 

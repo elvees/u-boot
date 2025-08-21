@@ -18,8 +18,11 @@ from binman.etype import image_header
 from binman.etype import section
 from dtoc import fdt
 from dtoc import fdt_util
-from patman import tools
-from patman import tout
+from u_boot_pylib import tools
+from u_boot_pylib import tout
+
+# This is imported if needed
+state = None
 
 class Image(section.Entry_section):
     """A Image, representing an output from binman
@@ -36,6 +39,9 @@ class Image(section.Entry_section):
         fdtmap_data: Contents of the fdtmap when loading from a file
         allow_repack: True to add properties to allow the image to be safely
             repacked later
+        test_section_timeout: Use a zero timeout for section multi-threading
+            (for testing)
+        symlink: Name of symlink to image
 
     Args:
         copy_to_orig: Copy offset/size to orig_offset/orig_size after reading
@@ -47,27 +53,56 @@ class Image(section.Entry_section):
             exception). This should be used if the Image is being loaded from
             a file rather than generated. In that case we obviously don't need
             the entry arguments since the contents already exists.
+        use_expanded: True if we are updating the FDT wth entry offsets, etc.
+            and should use the expanded versions of the U-Boot entries.
+            Any entry type that includes a devicetree must put it in a
+            separate entry so that it will be updated. For example. 'u-boot'
+            normally just picks up 'u-boot.bin' which includes the
+            devicetree, but this is not updateable, since it comes into
+            binman as one piece and binman doesn't know that it is actually
+            an executable followed by a devicetree. Of course it could be
+            taught this, but then when reading an image (e.g. 'binman ls')
+            it may need to be able to split the devicetree out of the image
+            in order to determine the location of things. Instead we choose
+            to ignore 'u-boot-bin' in this case, and build it ourselves in
+            binman with 'u-boot-dtb.bin' and 'u-boot.dtb'. See
+            Entry_u_boot_expanded and Entry_blob_phase for details.
+        missing_etype: Use a default entry type ('blob') if the requested one
+            does not exist in binman. This is useful if an image was created by
+            binman a newer version of binman but we want to list it in an older
+            version which does not support all the entry types.
+        generate: If true, generator nodes are processed. If false they are
+            ignored which is useful when an existing image is read back from a
+            file.
     """
     def __init__(self, name, node, copy_to_orig=True, test=False,
-                 ignore_missing=False):
+                 ignore_missing=False, use_expanded=False, missing_etype=False,
+                 generate=True):
+        # Put this here to allow entry-docs and help to work without libfdt
+        global state
+        from binman import state
+
         super().__init__(None, 'section', node, test=test)
         self.copy_to_orig = copy_to_orig
-        self.name = 'main-section'
+        self.name = name
         self.image_name = name
         self._filename = '%s.bin' % self.image_name
         self.fdtmap_dtb = None
         self.fdtmap_data = None
         self.allow_repack = False
         self._ignore_missing = ignore_missing
+        self.missing_etype = missing_etype
+        self.use_expanded = use_expanded
+        self.test_section_timeout = False
+        self.bintools = {}
+        self.generate = generate
         if not test:
             self.ReadNode()
 
     def ReadNode(self):
         super().ReadNode()
-        filename = fdt_util.GetString(self._node, 'filename')
-        if filename:
-            self._filename = filename
         self.allow_repack = fdt_util.GetBool(self._node, 'allow-repack')
+        self._symlink = fdt_util.GetString(self._node, 'symlink')
 
     @classmethod
     def FromFile(cls, fname):
@@ -82,7 +117,7 @@ class Image(section.Entry_section):
         Raises:
             ValueError if something goes wrong
         """
-        data = tools.ReadFile(fname)
+        data = tools.read_file(fname)
         size = len(data)
 
         # First look for an image header
@@ -99,14 +134,15 @@ class Image(section.Entry_section):
         dtb_size = probe_dtb.GetFdtObj().totalsize()
         fdtmap_data = data[pos:pos + dtb_size + fdtmap.FDTMAP_HDR_LEN]
         fdt_data = fdtmap_data[fdtmap.FDTMAP_HDR_LEN:]
-        out_fname = tools.GetOutputFilename('fdtmap.in.dtb')
-        tools.WriteFile(out_fname, fdt_data)
+        out_fname = tools.get_output_filename('fdtmap.in.dtb')
+        tools.write_file(out_fname, fdt_data)
         dtb = fdt.Fdt(out_fname)
         dtb.Scan()
 
         # Return an Image with the associated nodes
         root = dtb.GetRoot()
-        image = Image('image', root, copy_to_orig=False, ignore_missing=True)
+        image = Image('image', root, copy_to_orig=False, ignore_missing=True,
+                      missing_etype=True, generate=False)
 
         image.image_node = fdt_util.GetString(root, 'image-node', 'image')
         image.fdtmap_dtb = dtb
@@ -144,12 +180,31 @@ class Image(section.Entry_section):
 
     def BuildImage(self):
         """Write the image to a file"""
-        fname = tools.GetOutputFilename(self._filename)
-        tout.Info("Writing image to '%s'" % fname)
+        fname = tools.get_output_filename(self._filename)
+        tout.info("Writing image to '%s'" % fname)
         with open(fname, 'wb') as fd:
             data = self.GetPaddedData()
             fd.write(data)
-        tout.Info("Wrote %#x bytes" % len(data))
+        tout.info("Wrote %#x bytes" % len(data))
+        # Create symlink to file if symlink given
+        if self._symlink is not None:
+            sname = tools.get_output_filename(self._symlink)
+            if os.path.islink(sname):
+                os.remove(sname)
+            os.symlink(fname, sname)
+
+    def WriteAlternates(self):
+        """Write out alternative devicetree blobs, each in its own file"""
+        alt_entry = self.FindEntryType('alternates-fdt')
+        if not alt_entry:
+            return
+
+        for alt in alt_entry.alternates:
+            fname, data = alt_entry.ProcessWithFdt(alt)
+            pathname = tools.get_output_filename(fname)
+            tout.info(f"Writing alternate '{alt}' to '{pathname}'")
+            tools.write_file(pathname, data)
+            tout.info("Wrote %#x bytes" % len(data))
 
     def WriteMap(self):
         """Write a map of the image to a .map file
@@ -158,7 +213,7 @@ class Image(section.Entry_section):
             Filename of map file written
         """
         filename = '%s.map' % self.image_name
-        fname = tools.GetOutputFilename(filename)
+        fname = tools.get_output_filename(filename)
         with open(fname, 'w') as fd:
             print('%8s  %8s  %8s  %s' % ('ImagePos', 'Offset', 'Size', 'Name'),
                   file=fd)
@@ -199,8 +254,8 @@ class Image(section.Entry_section):
             entries = entry.GetEntries()
         return entry
 
-    def ReadData(self, decomp=True):
-        tout.Debug("Image '%s' ReadData(), size=%#x" %
+    def ReadData(self, decomp=True, alt_format=None):
+        tout.debug("Image '%s' ReadData(), size=%#x" %
                    (self.GetPath(), len(self._data)))
         return self._data
 
@@ -326,11 +381,10 @@ class Image(section.Entry_section):
             selected_entries.append(entry)
         return selected_entries, lines, widths
 
-    def LookupImageSymbol(self, sym_name, optional, msg, base_addr):
-        """Look up a symbol in an ELF file
+    def GetImageSymbolValue(self, sym_name, optional, msg, base_addr):
+        """Get the value of a Binman symbol
 
-        Looks up a symbol in an ELF file. Only entry types which come from an
-        ELF image can be used by this function.
+        Look up a Binman symbol and obtain its value.
 
         This searches through this image including all of its subsections.
 
@@ -350,12 +404,10 @@ class Image(section.Entry_section):
             optional: True if the symbol is optional. If False this function
                 will raise if the symbol is not found
             msg: Message to display if an error occurs
-            base_addr: Base address of image. This is added to the returned
-                image_pos in most cases so that the returned position indicates
-                where the targeted entry/binary has actually been loaded. But
-                if end-at-4gb is used, this is not done, since the binary is
-                already assumed to be linked to the ROM position and using
-                execute-in-place (XIP).
+            base_addr (int): Base address of image. This is added to the
+                returned value of image-pos so that the returned position
+                indicates where the targeted entry/binary has actually been
+                loaded
 
         Returns:
             Value that should be assigned to that symbol, or None if it was
@@ -368,5 +420,22 @@ class Image(section.Entry_section):
         entries = OrderedDict()
         entries_by_name = {}
         self._CollectEntries(entries, entries_by_name, self)
-        return self.LookupSymbol(sym_name, optional, msg, base_addr,
-                                 entries_by_name)
+        return self.GetSymbolValue(sym_name, optional, msg, base_addr,
+                                   entries_by_name)
+
+    def CollectBintools(self):
+        """Collect all the bintools used by this image
+
+        Returns:
+            Dict of bintools:
+                key: name of tool
+                value: Bintool object
+        """
+        bintools = {}
+        super().AddBintools(bintools)
+        self.bintools = bintools
+        return bintools
+
+    def FdtContents(self, fdt_etype):
+        """This base-class implementation simply calls the state function"""
+        return state.GetFdtContents(fdt_etype)

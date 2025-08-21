@@ -9,8 +9,9 @@
 #ifndef _SPI_H_
 #define _SPI_H_
 
-#include <common.h>
 #include <linux/bitops.h>
+
+struct spinand_info;
 
 /* SPI mode flags */
 #define SPI_CPHA	BIT(0)	/* clock phase (1 = SPI_CLOCK_PHASE_SECOND) */
@@ -38,6 +39,12 @@
 #define SPI_PREAMBLE_END_BYTE	0xec
 
 #define SPI_DEFAULT_WORDLEN	8
+
+#define SPI_3BYTE_MODE 0x0
+#define SPI_4BYTE_MODE 0x1
+
+/* Max no. of CS supported per spi device */
+#define SPI_CS_CNT_MAX	2
 
 /**
  * struct dm_spi_bus - SPI bus info
@@ -72,7 +79,7 @@ struct dm_spi_bus {
  * @mode:	SPI mode to use for this device (see SPI mode flags)
  */
 struct dm_spi_slave_plat {
-	unsigned int cs;
+	unsigned int cs[SPI_CS_CNT_MAX];
 	uint max_hz;
 	uint mode;
 };
@@ -156,6 +163,17 @@ struct spi_slave {
 #define SPI_XFER_BEGIN		BIT(0)	/* Assert CS before transfer */
 #define SPI_XFER_END		BIT(1)	/* Deassert CS after transfer */
 #define SPI_XFER_ONCE		(SPI_XFER_BEGIN | SPI_XFER_END)
+#define SPI_XFER_U_PAGE		BIT(4)
+#define SPI_XFER_STACKED	BIT(5)
+#define SPI_XFER_LOWER		BIT(6)
+
+	/*
+	 * Flag indicating that the spi-controller has multi chip select
+	 * capability and can assert/de-assert more than one chip select
+	 * at once.
+	 */
+	bool multi_cs_cap;
+	u32 bytemode;
 };
 
 /**
@@ -352,8 +370,10 @@ void spi_cs_deactivate(struct spi_slave *slave);
  * This sets a new speed to be applied for next spi_xfer().
  * @slave:	The SPI slave
  * @hz:		The transfer speed
+ *
+ * Returns:	0 on success, or a negative value on error.
  */
-void spi_set_speed(struct spi_slave *slave, uint hz);
+int spi_set_speed(struct spi_slave *slave, uint hz);
 
 /**
  * Write 8 bits, then read 8 bits.
@@ -519,6 +539,16 @@ struct dm_spi_ops {
 	 */
 	int (*get_mmap)(struct udevice *dev, ulong *map_basep,
 			uint *map_sizep, uint *offsetp);
+
+	/**
+	 * setup_for_spinand() - Setup the SPI for attached SPI NAND
+	 *
+	 * @dev:	The SPI flash slave device
+	 * @spinand_info: The SPI NAND info to configure for
+	 * @return 0 if OK, -ve value on error
+	 */
+	int (*setup_for_spinand)(struct spi_slave *slave,
+				 const struct spinand_info *spinand_info);
 };
 
 struct dm_spi_emul_ops {
@@ -561,13 +591,30 @@ struct dm_spi_emul_ops {
  * @cs:		Chip select to look for
  * @busp:	Returns bus device
  * @devp:	Return slave device
- * @return 0 if found, -ENODEV on error
+ * Return: 0 if found, -ENODEV on error
  */
 int spi_find_bus_and_cs(int busnum, int cs, struct udevice **busp,
 			struct udevice **devp);
 
 /**
  * spi_get_bus_and_cs() - Find and activate bus and slave devices by number
+ *
+ * Given a bus number and chip select, this finds the corresponding bus
+ * device and slave device.
+ *
+ * @busnum:	SPI bus number
+ * @cs:		Chip select to look for
+ * @busp:	Returns bus device
+ * @devp:	Return slave device
+ * @return 0 if found, -ve on error
+ */
+int spi_get_bus_and_cs(int busnum, int cs,
+		       struct udevice **busp, struct spi_slave **devp);
+
+/**
+ * _spi_get_bus_and_cs() - Find and activate bus and slave devices by number
+ * As spi_flash_probe(), This is an old-style function. We should remove
+ * it when all SPI flash drivers use dm
  *
  * Given a bus number and chip select, this finds the corresponding bus
  * device and slave device.
@@ -586,16 +633,16 @@ int spi_find_bus_and_cs(int busnum, int cs, struct udevice **busp,
  * @dev_name:	Name of the new device thus created
  * @busp:	Returns bus device
  * @devp:	Return slave device
- * @return 0 if found, -ve on error
+ * Return: 0 if found, -ve on error
  */
-int spi_get_bus_and_cs(int busnum, int cs, int speed, int mode,
+int _spi_get_bus_and_cs(int busnum, int cs, int speed, int mode,
 			const char *drv_name, const char *dev_name,
 			struct udevice **busp, struct spi_slave **devp);
 
 /**
  * spi_chip_select() - Get the chip select for a slave
  *
- * @return the chip select this slave is attached to
+ * Return: the chip select this slave is attached to
  */
 int spi_chip_select(struct udevice *slave);
 
@@ -605,7 +652,7 @@ int spi_chip_select(struct udevice *slave);
  * @bus:	SPI bus to search
  * @cs:		Chip select to look for
  * @devp:	Returns the slave device if found
- * @return 0 if found, -EINVAL if cs is invalid, -ENODEV if no device attached,
+ * Return: 0 if found, -EINVAL if cs is invalid, -ENODEV if no device attached,
  *	   other -ve value on error
  */
 int spi_find_chip_select(struct udevice *bus, int cs, struct udevice **devp);
@@ -630,7 +677,7 @@ int spi_slave_of_to_plat(struct udevice *dev, struct dm_spi_slave_plat *plat);
  * @bus:	The SPI bus
  * @cs:		The chip select (0..n-1)
  * @info:	Returns information about the chip select, if valid
- * @return 0 if OK (and @info is set up), -ENODEV if the chip select
+ * Return: 0 if OK (and @info is set up), -ENODEV if the chip select
  *	   is invalid, other -ve value on error
  */
 int spi_cs_info(struct udevice *bus, uint cs, struct spi_cs_info *info);
@@ -649,7 +696,7 @@ struct sandbox_state;
  * @bus:	SPI bus requesting the emulator
  * @slave:	SPI slave device requesting the emulator
  * @emuip:	Returns pointer to emulator
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int sandbox_spi_get_emul(struct sandbox_state *state,
 			 struct udevice *bus, struct udevice *slave,
@@ -715,7 +762,7 @@ int dm_spi_xfer(struct udevice *dev, unsigned int bitlen,
  * @map_sizep:	Returns size of mapped SPI
  * @offsetp:	Returns start offset of SPI flash where the map works
  *	correctly (offsets before this are not visible)
- * @return 0 if OK, -ENOSYS if no operation, -EFAULT if memory mapping is not
+ * Return: 0 if OK, -ENOSYS if no operation, -EFAULT if memory mapping is not
  *	available
  */
 int dm_spi_get_mmap(struct udevice *dev, ulong *map_basep, uint *map_sizep,
@@ -724,5 +771,7 @@ int dm_spi_get_mmap(struct udevice *dev, ulong *map_basep, uint *map_sizep,
 /* Access the operations for a SPI device */
 #define spi_get_ops(dev)	((struct dm_spi_ops *)(dev)->driver->ops)
 #define spi_emul_get_ops(dev)	((struct dm_spi_emul_ops *)(dev)->driver->ops)
+
+int spi_get_env_dev(void);
 
 #endif	/* _SPI_H_ */

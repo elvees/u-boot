@@ -3,7 +3,6 @@
  * Copyright 2020 RnD Center "ELVEES", JSC
  */
 
-#include <common.h>
 #ifdef CONFIG_SPL_BUILD
 #include <spl.h>
 #include <asm/arch/ddr.h>

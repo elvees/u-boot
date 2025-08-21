@@ -9,9 +9,7 @@
 #include <log.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
-#include <asm/u-boot.h>
 #include <asm/utils.h>
-#include <common.h>
 #include <debug_uart.h>
 #include <image.h>
 #include <spl.h>
@@ -25,23 +23,6 @@
 #include <dm/uclass.h>
 
 DECLARE_GLOBAL_DATA_PTR;
-
-u32 spl_boot_device(void)
-{
-	/* TODO: Get from SDM or handoff */
-	return BOOT_DEVICE_MMC1;
-}
-
-#ifdef CONFIG_SPL_MMC_SUPPORT
-u32 spl_mmc_boot_mode(const u32 boot_device)
-{
-#if defined(CONFIG_SPL_FS_FAT) || defined(CONFIG_SPL_FS_EXT4)
-	return MMCSD_MODE_FS;
-#else
-	return MMCSD_MODE_RAW;
-#endif
-}
-#endif
 
 void board_init_f(ulong dummy)
 {
@@ -70,6 +51,10 @@ void board_init_f(ulong dummy)
 
 	socfpga_per_reset(SOCFPGA_RESET(OSC1TIMER0), 0);
 	timer_init();
+
+	mbox_init();
+
+	mbox_hps_stage_notify(HPS_EXECUTION_STATE_FSBL);
 
 	sysmgr_pinmux_init();
 
@@ -102,8 +87,6 @@ void board_init_f(ulong dummy)
 			hang();
 		}
 #endif
-
-	mbox_init();
 
 #ifdef CONFIG_CADENCE_QSPI
 	mbox_qspi_open();

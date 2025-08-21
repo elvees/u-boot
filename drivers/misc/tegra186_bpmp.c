@@ -3,7 +3,6 @@
  * Copyright (c) 2016, NVIDIA CORPORATION.
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <malloc.h>
@@ -17,6 +16,7 @@
 #include <asm/arch-tegra/ivc.h>
 #include <linux/bitops.h>
 #include <linux/err.h>
+#include <linux/printk.h>
 
 #define BPMP_IVC_FRAME_COUNT 1
 #define BPMP_IVC_FRAME_SIZE 128

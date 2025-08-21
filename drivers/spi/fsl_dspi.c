@@ -11,10 +11,8 @@
 
 #include <asm/global_data.h>
 #include <linux/math64.h>
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
-#include <common.h>
 #include <log.h>
 #include <spi.h>
 #include <malloc.h>
@@ -26,9 +24,8 @@
 #include <fsl_dspi.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
-
-/* linux/include/time.h */
-#define NSEC_PER_SEC	1000000000L
+#include <linux/printk.h>
+#include <linux/time.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -455,9 +452,9 @@ static int fsl_dspi_child_pre_probe(struct udevice *dev)
 	unsigned char pcssck = 0, cssck = 0;
 	unsigned char pasc = 0, asc = 0;
 
-	if (slave_plat->cs >= priv->num_chipselect) {
+	if (slave_plat->cs[0] >= priv->num_chipselect) {
 		debug("DSPI invalid chipselect number %d(max %d)!\n",
-		      slave_plat->cs, priv->num_chipselect - 1);
+		      slave_plat->cs[0], priv->num_chipselect - 1);
 		return -EINVAL;
 	}
 
@@ -472,12 +469,12 @@ static int fsl_dspi_child_pre_probe(struct udevice *dev)
 	/* Set After SCK delay scale values */
 	ns_delay_scale(&pasc, &asc, sck_cs_delay, priv->bus_clk);
 
-	priv->ctar_val[slave_plat->cs] = DSPI_CTAR_DEFAULT_VALUE |
+	priv->ctar_val[slave_plat->cs[0]] = DSPI_CTAR_DEFAULT_VALUE |
 					 DSPI_CTAR_PCSSCK(pcssck) |
 					 DSPI_CTAR_PASC(pasc);
 
 	debug("DSPI pre_probe slave device on CS %u, max_hz %u, mode 0x%x.\n",
-	      slave_plat->cs, slave_plat->max_hz, slave_plat->mode);
+	      slave_plat->cs[0], slave_plat->max_hz, slave_plat->mode);
 
 	return 0;
 }
@@ -491,7 +488,7 @@ static int fsl_dspi_probe(struct udevice *bus)
 
 	dm_spi_bus = dev_get_uclass_priv(bus);
 
-	/* cpu speical pin muxing configure */
+	/* cpu special pin muxing configure */
 	cpu_dspi_port_conf();
 
 	/* get input clk frequency */
@@ -530,13 +527,13 @@ static int fsl_dspi_claim_bus(struct udevice *dev)
 	priv = dev_get_priv(bus);
 
 	/* processor special preparation work */
-	cpu_dspi_claim_bus(dev_seq(bus), slave_plat->cs);
+	cpu_dspi_claim_bus(dev_seq(bus), slave_plat->cs[0]);
 
 	/* configure transfer mode */
-	fsl_dspi_cfg_ctar_mode(priv, slave_plat->cs, priv->mode);
+	fsl_dspi_cfg_ctar_mode(priv, slave_plat->cs[0], priv->mode);
 
 	/* configure active state of CSX */
-	fsl_dspi_cfg_cs_active_state(priv, slave_plat->cs,
+	fsl_dspi_cfg_cs_active_state(priv, slave_plat->cs[0],
 				     priv->mode);
 
 	fsl_dspi_clr_fifo(priv);
@@ -562,7 +559,7 @@ static int fsl_dspi_release_bus(struct udevice *dev)
 	dspi_halt(priv, 1);
 
 	/* processor special release work */
-	cpu_dspi_release_bus(dev_seq(bus), slave_plat->cs);
+	cpu_dspi_release_bus(dev_seq(bus), slave_plat->cs[0]);
 
 	return 0;
 }
@@ -586,8 +583,9 @@ static int fsl_dspi_of_to_plat(struct udevice *bus)
 	if (fdtdec_get_bool(blob, node, "big-endian"))
 		plat->flags |= DSPI_FLAG_REGMAP_ENDIAN_BIG;
 
-	plat->num_chipselect =
-		fdtdec_get_int(blob, node, "num-cs", FSL_DSPI_MAX_CHIPSELECT);
+	plat->num_chipselect = fdtdec_get_int(blob, node,
+					      "spi-num-chipselects",
+					      FSL_DSPI_MAX_CHIPSELECT);
 
 	addr = dev_read_addr(bus);
 	if (addr == FDT_ADDR_T_NONE) {
@@ -599,7 +597,7 @@ static int fsl_dspi_of_to_plat(struct udevice *bus)
 	plat->speed_hz = fdtdec_get_int(blob,
 			node, "spi-max-frequency", FSL_DSPI_DEFAULT_SCK_FREQ);
 
-	debug("DSPI: regs=%pa, max-frequency=%d, endianess=%s, num-cs=%d\n",
+	debug("DSPI: regs=%pa, max-frequency=%d, endianness=%s, num-cs=%d\n",
 	      &plat->regs_addr, plat->speed_hz,
 	      plat->flags & DSPI_FLAG_REGMAP_ENDIAN_BIG ? "be" : "le",
 	      plat->num_chipselect);
@@ -617,7 +615,7 @@ static int fsl_dspi_xfer(struct udevice *dev, unsigned int bitlen,
 	bus = dev->parent;
 	priv = dev_get_priv(bus);
 
-	return dspi_xfer(priv, slave_plat->cs, bitlen, dout, din, flags);
+	return dspi_xfer(priv, slave_plat->cs[0], bitlen, dout, din, flags);
 }
 
 static int fsl_dspi_set_speed(struct udevice *bus, uint speed)
@@ -654,6 +652,7 @@ static const struct dm_spi_ops fsl_dspi_ops = {
 
 static const struct udevice_id fsl_dspi_ids[] = {
 	{ .compatible = "fsl,vf610-dspi" },
+	{ .compatible = "fsl,ls1021a-v1.0-dspi" },
 	{ }
 };
 

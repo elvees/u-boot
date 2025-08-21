@@ -4,7 +4,7 @@
  * Przemyslaw Marczak <p.marczak@samsung.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <adc.h>
 #include <dm.h>
 #include <errno.h>
@@ -47,18 +47,6 @@ struct odroid_rev_info odroid_info[] = {
 	{ EXYNOS5_BOARD_ODROID_UNKNOWN, 0, 4095, "unknown" },
 };
 
-static unsigned int odroid_get_rev(void)
-{
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(odroid_info); i++) {
-		if (odroid_info[i].board_type == gd->board_type)
-			return odroid_info[i].board_rev;
-	}
-
-	return 0;
-}
-
 /*
  * Read ADC at least twice and check the resuls.  If regulator providing voltage
  * on to measured point was just turned on, first reads might require time
@@ -69,7 +57,7 @@ static int odroid_get_adc_val(unsigned int *adcval)
 	unsigned int adcval_prev = 0;
 	int ret, retries = 20;
 
-	ret = adc_channel_single_shot("adc@12D10000", CONFIG_ODROID_REV_AIN,
+	ret = adc_channel_single_shot("adc@12D10000", CFG_ODROID_REV_AIN,
 				      &adcval_prev);
 	if (ret)
 		return ret;
@@ -78,7 +66,7 @@ static int odroid_get_adc_val(unsigned int *adcval)
 		mdelay(5);
 
 		ret = adc_channel_single_shot("adc@12D10000",
-					      CONFIG_ODROID_REV_AIN, adcval);
+					      CFG_ODROID_REV_AIN, adcval);
 		if (ret)
 			return ret;
 
@@ -200,6 +188,19 @@ bool board_is_generic(void)
 	return false;
 }
 
+#ifdef CONFIG_REVISION_TAG
+static unsigned int odroid_get_rev(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(odroid_info); i++) {
+		if (odroid_info[i].board_type == gd->board_type)
+			return odroid_info[i].board_rev;
+	}
+
+	return 0;
+}
+
 /**
  * get_board_rev() - return detected board revision.
  *
@@ -212,6 +213,7 @@ u32 get_board_rev(void)
 
 	return odroid_get_rev();
 }
+#endif
 
 /**
  * get_board_type() - returns board type string.

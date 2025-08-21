@@ -33,6 +33,7 @@
 #else
 #include <linux/bug.h>
 #include <linux/log2.h>
+#include <linux/printk.h>
 #endif
 #include <linux/err.h>
 #include <ubi_uboot.h>
@@ -86,13 +87,7 @@ static bool fm_debug;
 #endif
 #else
 #ifdef CONFIG_MTD_UBI_FASTMAP
-#if !defined(CONFIG_MTD_UBI_FASTMAP_AUTOCONVERT)
-#define CONFIG_MTD_UBI_FASTMAP_AUTOCONVERT 0
-#endif
 static bool fm_autoconvert = CONFIG_MTD_UBI_FASTMAP_AUTOCONVERT;
-#if !defined(CONFIG_MTD_UBI_FM_DEBUG)
-#define CONFIG_MTD_UBI_FM_DEBUG 0
-#endif
 static bool fm_debug = CONFIG_MTD_UBI_FM_DEBUG;
 #endif
 #endif
@@ -115,7 +110,7 @@ static struct ubi_device *ubi_devices[UBI_MAX_DEVICES];
 #else
 struct ubi_device *ubi_devices[UBI_MAX_DEVICES];
 #endif
- 
+
 #ifndef __UBOOT__
 /* Serializes UBI devices creations and removals */
 DEFINE_MUTEX(ubi_devices_mutex);
@@ -684,10 +679,8 @@ static int io_init(struct ubi_device *ubi, int max_beb_per1024)
 		ubi->bad_peb_limit = get_bad_peb_limit(ubi, max_beb_per1024);
 	}
 
-	if (ubi->mtd->type == MTD_NORFLASH) {
-		ubi_assert(ubi->mtd->writesize == 1);
+	if (ubi->mtd->type == MTD_NORFLASH)
 		ubi->nor_flash = 1;
-	}
 
 	ubi->min_io_size = ubi->mtd->writesize;
 	ubi->hdrs_min_io_size = ubi->mtd->writesize >> ubi->mtd->subpage_sft;
@@ -1159,10 +1152,10 @@ int ubi_detach_mtd_dev(int ubi_num, int anyway)
 	ubi_wl_close(ubi);
 	ubi_free_internal_volumes(ubi);
 	vfree(ubi->vtbl);
-	put_mtd_device(ubi->mtd);
 	vfree(ubi->peb_buf);
 	vfree(ubi->fm_buf);
 	ubi_msg(ubi, "mtd%d is detached", ubi->mtd->index);
+	put_mtd_device(ubi->mtd);
 	put_device(&ubi->dev);
 	return 0;
 }
@@ -1279,7 +1272,6 @@ int ubi_init(void)
 	err = ubi_debugfs_init();
 	if (err)
 		goto out_slab;
-
 
 	/* Attach MTD devices */
 	for (i = 0; i < mtd_devs; i++) {
@@ -1408,12 +1400,15 @@ static int __init bytes_str_to_int(const char *str)
 	switch (*endp) {
 	case 'G':
 		result *= 1024;
+		fallthrough;
 	case 'M':
 		result *= 1024;
+		fallthrough;
 	case 'K':
 		result *= 1024;
 		if (endp[1] == 'i' && endp[2] == 'B')
 			endp += 2;
+		fallthrough;
 	case '\0':
 		break;
 	default:

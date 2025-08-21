@@ -7,7 +7,7 @@
 #include <dt-bindings/memory/stm32-sdram.h>
 /{
 	clocks {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 	};
 
 	aliases {
@@ -26,20 +26,20 @@
 	};
 
 	soc {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 		pin-controller {
-			u-boot,dm-pre-reloc;
+			bootph-all;
 		};
 
 		fmc: fmc@A0000000 {
 			compatible = "st,stm32-fmc";
-			reg = <0xA0000000 0x1000>;
+			reg = <0xa0000000 0x1000>;
 			clocks = <&rcc 0 STM32F4_AHB3_CLOCK(FMC)>;
 			st,syscfg = <&syscfg>;
 			pinctrl-0 = <&fmc_pins_d32>;
 			pinctrl-names = "default";
 			st,mem_remap = <4>;
-			u-boot,dm-pre-reloc;
+			bootph-all;
 
 			/*
 			 * Memory configuration from sdram
@@ -68,86 +68,86 @@
 };
 
 &clk_hse {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &clk_lse {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &clk_i2s_ckin {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &pwrcfg {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &syscfg {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &rcc {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioa {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpiob {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioc {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpiod {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioe {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpiof {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpiog {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioh {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioi {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioj {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpiok {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &pinctrl {
 	usart1_pins_a: usart1-0	{
-		u-boot,dm-pre-reloc;
+		bootph-all;
 		pins1 {
-			u-boot,dm-pre-reloc;
+			bootph-all;
 		};
 		pins2 {
-			u-boot,dm-pre-reloc;
+			bootph-all;
 		};
 	};
 
 	fmc_pins_d32: fmc_d32@0 {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 		pins
 		{
 			pinmux = <STM32_PINMUX('I',10, AF12)>, /* D31 */
@@ -213,11 +213,11 @@
 				 <STM32_PINMUX('H', 2, AF12)>, /* SDCKE0 */
 				 <STM32_PINMUX('G', 8, AF12)>; /* SDCLK> */
 			slew-rate = <2>;
-			u-boot,dm-pre-reloc;
+			bootph-all;
 		};
 	};
 };
 
-&timer5 {
-	u-boot,dm-pre-reloc;
+&timers5 {
+	bootph-all;
 };

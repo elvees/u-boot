@@ -4,7 +4,6 @@
  * Copyright (C) 2010 Freescale Semiconductor, Inc.
  */
 
-#include <common.h>
 #include <log.h>
 #include <usb.h>
 #include <errno.h>
@@ -21,7 +20,6 @@
 #include "ehci.h"
 
 #define MX5_USBOTHER_REGS_OFFSET 0x800
-
 
 #define MXC_OTG_OFFSET			0
 #define MXC_H1_OFFSET			0x200
@@ -80,6 +78,10 @@
 
 /* USB_CTRL_1 */
 #define MXC_USB_CTRL_UH1_EXT_CLK_EN	(1 << 25)
+
+#ifndef CFG_MXC_USB_PORTSC
+#define CFG_MXC_USB_PORTSC	(PORT_PTS_UTMI | PORT_PTS_PTW)
+#endif
 
 int mxc_set_usbcontrol(int port, unsigned int flags)
 {
@@ -228,52 +230,6 @@ __weak void mx5_ehci_powerup_fixup(struct ehci_ctrl *ctrl, uint32_t *status_reg,
 	mdelay(50);
 }
 
-#if !CONFIG_IS_ENABLED(DM_USB)
-static const struct ehci_ops mx5_ehci_ops = {
-	.powerup_fixup		= mx5_ehci_powerup_fixup,
-};
-
-int ehci_hcd_init(int index, enum usb_init_type init,
-		struct ehci_hccr **hccr, struct ehci_hcor **hcor)
-{
-	struct usb_ehci *ehci;
-
-	/* The only user for this is efikamx-usb */
-	ehci_set_controller_priv(index, NULL, &mx5_ehci_ops);
-	set_usboh3_clk();
-	enable_usboh3_clk(true);
-	set_usb_phy_clk();
-	enable_usb_phy1_clk(true);
-	enable_usb_phy2_clk(true);
-	mdelay(1);
-
-	/* Do board specific initialization */
-	board_ehci_hcd_init(CONFIG_MXC_USB_PORT);
-
-	ehci = (struct usb_ehci *)(OTG_BASE_ADDR +
-		(0x200 * CONFIG_MXC_USB_PORT));
-	*hccr = (struct ehci_hccr *)((uint32_t)&ehci->caplength);
-	*hcor = (struct ehci_hcor *)((uint32_t)*hccr +
-			HC_LENGTH(ehci_readl(&(*hccr)->cr_capbase)));
-	setbits_le32(&ehci->usbmode, CM_HOST);
-
-	__raw_writel(CONFIG_MXC_USB_PORTSC, &ehci->portsc);
-	setbits_le32(&ehci->portsc, USB_EN);
-
-	mxc_set_usbcontrol(CONFIG_MXC_USB_PORT, CONFIG_MXC_USB_FLAGS);
-	mdelay(10);
-
-	/* Do board specific post-initialization */
-	board_ehci_hcd_postinit(ehci, CONFIG_MXC_USB_PORT);
-
-	return 0;
-}
-
-int ehci_hcd_stop(int index)
-{
-	return 0;
-}
-#else /* CONFIG_IS_ENABLED(DM_USB) */
 struct ehci_mx5_priv_data {
 	struct ehci_ctrl ctrl;
 	struct usb_ehci *ehci;
@@ -331,9 +287,9 @@ static int ehci_usb_probe(struct udevice *dev)
 		debug("%s: No vbus supply\n", dev->name);
 
 	if (!ret && priv->vbus_supply) {
-		ret = regulator_set_enable(priv->vbus_supply,
-					   (type == USB_INIT_DEVICE) ?
-					   false : true);
+		ret = regulator_set_enable_if_allowed(priv->vbus_supply,
+						      (type == USB_INIT_DEVICE) ?
+						      false : true);
 		if (ret) {
 			puts("Error enabling VBUS supply\n");
 			return ret;
@@ -345,10 +301,10 @@ static int ehci_usb_probe(struct udevice *dev)
 			HC_LENGTH(ehci_readl(&(hccr)->cr_capbase)));
 	setbits_le32(&ehci->usbmode, CM_HOST);
 
-	__raw_writel(CONFIG_MXC_USB_PORTSC, &ehci->portsc);
+	__raw_writel(CFG_MXC_USB_PORTSC, &ehci->portsc);
 	setbits_le32(&ehci->portsc, USB_EN);
 
-	mxc_set_usbcontrol(priv->portnr, CONFIG_MXC_USB_FLAGS);
+	mxc_set_usbcontrol(priv->portnr, CFG_MXC_USB_FLAGS);
 	mdelay(10);
 
 	return ehci_register(dev, hccr, hcor, &mx5_ehci_ops, 0,
@@ -372,4 +328,3 @@ U_BOOT_DRIVER(usb_mx5) = {
 	.priv_auto	= sizeof(struct ehci_mx5_priv_data),
 	.flags	= DM_FLAG_ALLOC_PRIV_DMA,
 };
-#endif /* !CONFIG_IS_ENABLED(DM_USB) */

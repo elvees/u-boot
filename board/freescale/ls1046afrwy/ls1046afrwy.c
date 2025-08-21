@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2019 NXP
+ * Copyright 2019, 2021 NXP
  */
 
-#include <common.h>
+#include <config.h>
 #include <i2c.h>
 #include <fdt_support.h>
 #include <init.h>
@@ -20,8 +20,8 @@
 #include <fm_eth.h>
 #include <fsl_csu.h>
 #include <fsl_esdhc.h>
-#include <fsl_sec.h>
 #include <fsl_dspi.h>
+#include "../common/i2c_mux.h"
 
 #define LS1046A_PORSR1_REG 0x1EE0000
 #define BOOT_SRC_SD        0x20000000
@@ -37,32 +37,6 @@
 #define SPI_MCR_REG	0x2100000
 
 DECLARE_GLOBAL_DATA_PTR;
-
-int select_i2c_ch_pca9547(u8 ch, int bus_num)
-{
-	int ret;
-
-#if CONFIG_IS_ENABLED(DM_I2C)
-	struct udevice *dev;
-
-	ret = i2c_get_chip_for_busnum(bus_num, I2C_MUX_PCA_ADDR_PRI,
-				      1, &dev);
-	if (ret) {
-		printf("%s: Cannot find udev for a bus %d\n", __func__,
-		       bus_num);
-		return ret;
-	}
-	ret = dm_i2c_write(dev, 0, &ch, 1);
-#else
-	ret = i2c_write(I2C_MUX_PCA_ADDR_PRI, 0, 1, &ch, 1);
-#endif
-	if (ret) {
-		puts("PCA: failed to select proper channel\n");
-		return ret;
-	}
-
-	return 0;
-}
 
 static inline void demux_select_usb2(void)
 {
@@ -160,9 +134,8 @@ val = (in_le32(SMMU_SCR0) | SCR0_CLIENTPD_MASK) & ~(SCR0_USFCFG_MASK);
 	out_le32(SMMU_NSCR0, val);
 #endif
 
-#ifdef CONFIG_FSL_CAAM
-	sec_init();
-#endif
+	if (!IS_ENABLED(CONFIG_SYS_EARLY_PCI_INIT))
+		pci_init();
 
 	select_i2c_ch_pca9547(I2C_MUX_CH_DEFAULT, 0);
 	return 0;
@@ -176,7 +149,7 @@ int board_setup_core_volt(u32 vdd)
 void config_board_mux(void)
 {
 #ifdef CONFIG_HAS_FSL_XHCI_USB
-	struct ccsr_scfg *scfg = (struct ccsr_scfg *)CONFIG_SYS_FSL_SCFG_ADDR;
+	struct ccsr_scfg *scfg = (struct ccsr_scfg *)CFG_SYS_FSL_SCFG_ADDR;
 	u32 usb_pwrfault;
 	/*
 	 * USB2 is used, configure mux to USB2_DRVVBUS/USB2_PWRFAULT

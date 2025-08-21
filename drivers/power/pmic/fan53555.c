@@ -3,13 +3,13 @@
  * (C) 2018 Theobroma Systems Design und Consulting GmbH
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <dm/device-internal.h>
 #include <dm/device_compat.h>
 #include <dm/lists.h>
 #include <i2c.h>
+#include <linux/printk.h>
 #include <power/fan53555.h>
 #include <power/pmic.h>
 #include <power/regulator.h>
@@ -23,7 +23,7 @@ static int pmic_fan53555_read(struct udevice *dev, uint reg,
 			      u8 *buff, int len)
 {
 	if (dm_i2c_read(dev, reg, buff, len)) {
-		pr_err("%s: read error for register: %#x!", dev->name, reg);
+		pr_err("%s: read error for register: %#x!\n", dev->name, reg);
 		return -EIO;
 	}
 

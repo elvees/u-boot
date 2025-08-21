@@ -5,7 +5,6 @@ choice
 
 config TARGET_CHROMEBOOK_BOB
 	bool "Asus Flip C101PA Chromebook (RK3399)"
-	select HAS_ROM
 	select ROCKCHIP_SPI_IMAGE
 	help
 	  Bob is a small RK3299-based device similar in apperance to Minnie.
@@ -13,6 +12,16 @@ config TARGET_CHROMEBOOK_BOB
 	  1280x800 display. It uses its USB ports for both power and external
 	  display. It includes a Chrome OS EC (Cortex-M3) to provide access to
 	  the keyboard and battery functions.
+
+config TARGET_CHROMEBOOK_KEVIN
+	bool "Samsung Chromebook Plus (RK3399)"
+	select ROCKCHIP_SPI_IMAGE
+	help
+	  Kevin is a RK3399-based convertible chromebook. It has two USB 3.0
+	  Type-C ports, 4GB of SDRAM, WiFi and a 12.3" 2400x1600 display. It
+	  uses its USB ports for both power and external display. It includes
+	  a Chromium OS EC (Cortex-M3) to provide access to the keyboard and
+	  battery functions.
 
 config TARGET_EVB_RK3399
 	bool "RK3399 evaluation board"
@@ -27,6 +36,13 @@ config TARGET_PINEBOOK_PRO_RK3399
 	  Pinebook Pro is a laptop based on the Rockchip rk3399 SoC
 	  with 4Gb RAM, onboard eMMC, USB-C, a USB3 and USB2 port,
 	  1920*1080 screen and all the usual laptop features.
+
+config TARGET_PINEPHONE_PRO_RK3399
+	bool "PinePhone Pro"
+	help
+	  PinePhone Pro is a phone based on a variant of the Rockchip
+	  rk3399 SoC with 4Gb RAM, onboard eMMC, USB-C, headphone jack,
+	  720x1440 screen and a Quectel 4G/LTE modem.
 
 config TARGET_PUMA_RK3399
 	bool "Theobroma Systems RK3399-Q7 (Puma)"
@@ -71,6 +87,11 @@ config TARGET_ROCK960_RK3399
 	   * 2x USB 3.0 type A, 2x USB 2.0 type A (host mode only),
 	     1x USB 3.0 type C OTG
 
+config TARGET_ROCKPI4_RK3399
+	bool "Radxa ROCK Pi 4 board"
+	help
+	  Support for ROCK Pi 4 board family by Radxa.
+
 config TARGET_ROCKPRO64_RK3399
 	bool "Pine64 Rockpro64 board"
 	help
@@ -114,32 +135,20 @@ endchoice
 config ROCKCHIP_BOOT_MODE_REG
 	default 0xff320300
 
+config ROCKCHIP_STIMER_BASE
+	default 0xff8680a0
+
 config SYS_SOC
 	default "rk3399"
 
-config SYS_MALLOC_F_LEN
-	default 0x4000
-
-config SPL_LIBCOMMON_SUPPORT
-	default y
-
-config SPL_LIBGENERIC_SUPPORT
-	default y
-
 config TPL_LDSCRIPT
 	default "arch/arm/mach-rockchip/u-boot-tpl-v8.lds"
-
-config TPL_MAX_SIZE
-        default 188416
 
 config TPL_STACK
         default 0xff8effff
 
 config TPL_TEXT_BASE
         default 0xff8c2000
-
-config SPL_STACK_R_ADDR
-	default 0x04000000
 
 if BOOTCOUNT_LIMIT
 
@@ -154,7 +163,9 @@ endif # BOOTCOUNT_LIMIT
 source "board/firefly/roc-pc-rk3399/Kconfig"
 source "board/google/gru/Kconfig"
 source "board/pine64/pinebook-pro-rk3399/Kconfig"
+source "board/pine64/pinephone-pro-rk3399/Kconfig"
 source "board/pine64/rockpro64_rk3399/Kconfig"
+source "board/radxa/rockpi4-rk3399/Kconfig"
 source "board/rockchip/evb_rk3399/Kconfig"
 source "board/theobroma-systems/puma_rk3399/Kconfig"
 source "board/vamrs/rock960_rk3399/Kconfig"

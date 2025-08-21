@@ -11,7 +11,6 @@
 
 #define LOG_CATEGORY UCLASS_NORTHBRIDGE
 
-#include <common.h>
 #include <dm.h>
 #include <dt-structs.h>
 #include <log.h>
@@ -220,7 +219,7 @@ static int apl_hostbridge_of_to_plat(struct udevice *dev)
 	ret = uclass_first_device_err(UCLASS_PINCTRL, &pinctrl);
 	if (ret)
 		return log_msg_ret("no hostbridge PINCTRL", ret);
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	int root;
 
 	/* Get length of PCI Express Region */
@@ -256,7 +255,7 @@ static int apl_hostbridge_of_to_plat(struct udevice *dev)
 
 static int apl_hostbridge_probe(struct udevice *dev)
 {
-	if (spl_phase() == PHASE_TPL)
+	if (xpl_phase() == PHASE_TPL)
 		return apl_hostbridge_early_init(dev);
 
 	return 0;
@@ -299,7 +298,7 @@ static int apl_acpi_hb_write_tables(const struct udevice *dev,
 
 	/* (Re)calculate length and checksum */
 	header->length = ctx->current - (void *)dmar;
-	header->checksum = table_compute_checksum((void *)dmar, header->length);
+	acpi_update_checksum(header);
 
 	acpi_align(ctx);
 	acpi_add_table(ctx, dmar);
@@ -375,7 +374,7 @@ struct acpi_ops apl_hostbridge_acpi_ops = {
 #endif
 };
 
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 static const struct udevice_id apl_hostbridge_ids[] = {
 	{ .compatible = "intel,apl-hostbridge" },
 	{ }

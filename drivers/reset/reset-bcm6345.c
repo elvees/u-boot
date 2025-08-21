@@ -6,7 +6,6 @@
  *	Copyright (C) 2012 Jonas Gorski <jonas.gorski@gmail.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
@@ -42,11 +41,6 @@ static int bcm6345_reset_deassert(struct reset_ctl *rst)
 	return 0;
 }
 
-static int bcm6345_reset_free(struct reset_ctl *rst)
-{
-	return 0;
-}
-
 static int bcm6345_reset_request(struct reset_ctl *rst)
 {
 	if (rst->id >= MAX_RESETS)
@@ -56,7 +50,6 @@ static int bcm6345_reset_request(struct reset_ctl *rst)
 }
 
 struct reset_ops bcm6345_reset_reset_ops = {
-	.rfree = bcm6345_reset_free,
 	.request = bcm6345_reset_request,
 	.rst_assert = bcm6345_reset_assert,
 	.rst_deassert = bcm6345_reset_deassert,

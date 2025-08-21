@@ -4,7 +4,8 @@
  * (C) Copyright 2014 - 2016 Cadence Design Systems Inc.
  */
 
-#include <common.h>
+#include <config.h>
+#include <clock_legacy.h>
 #include <command.h>
 #include <dm.h>
 #include <init.h>
@@ -21,7 +22,6 @@ DECLARE_GLOBAL_DATA_PTR;
  * Check board idendity.
  * (Print information about the board to stdout.)
  */
-
 
 #if defined(CONFIG_XTFPGA_LX60)
 const char *board = "XT_AV60";
@@ -49,7 +49,7 @@ int checkboard(void)
 	return 0;
 }
 
-int board_postclk_init(void)
+unsigned long get_board_sys_clk(void)
 {
 	/*
 	 * Obtain CPU clock frequency from board and cache in global
@@ -57,12 +57,23 @@ int board_postclk_init(void)
 	 * else non-zero (hang).
 	 */
 
-#ifdef CONFIG_SYS_FPGAREG_FREQ
-	gd->cpu_clk = (*(volatile unsigned long *)CONFIG_SYS_FPGAREG_FREQ);
+#ifdef CFG_SYS_FPGAREG_FREQ
+	return (*(volatile unsigned long *)CFG_SYS_FPGAREG_FREQ);
 #else
 	/* early Tensilica bitstreams lack this reg, but most run at 50 MHz */
-	gd->cpu_clk = 50000000UL;
+	return 50000000;
 #endif
+}
+
+int dram_init(void)
+{
+	return 0;
+}
+
+int board_postclk_init(void)
+{
+	gd->cpu_clk = get_board_sys_clk();
+
 	return 0;
 }
 
@@ -82,8 +93,8 @@ int misc_init_r(void)
 	char *s = env_get("ethaddr");
 	if (s == 0) {
 		unsigned int x;
-		char s[] = __stringify(CONFIG_ETHBASE);
-		x = (*(volatile u32 *)CONFIG_SYS_FPGAREG_DIPSW)
+		char s[] = __stringify(CFG_ETHBASE);
+		x = (*(volatile u32 *)CFG_SYS_FPGAREG_DIPSW)
 			& FPGAREG_MAC_MASK;
 		sprintf(&s[15], "%02x", x);
 		env_set("ethaddr", s);
@@ -99,9 +110,9 @@ U_BOOT_DRVINFO(sysreset) = {
 
 static struct ethoc_eth_pdata ethoc_pdata = {
 	.eth_pdata = {
-		.iobase = CONFIG_SYS_ETHOC_BASE,
+		.iobase = CFG_SYS_ETHOC_BASE,
 	},
-	.packet_base = CONFIG_SYS_ETHOC_BUFFER_ADDR,
+	.packet_base = CFG_SYS_ETHOC_BUFFER_ADDR,
 };
 
 U_BOOT_DRVINFO(ethoc) = {

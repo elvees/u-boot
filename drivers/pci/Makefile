@@ -3,32 +3,27 @@
 # (C) Copyright 2000-2007
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
 
-ifneq ($(CONFIG_DM_PCI),)
-obj-$(CONFIG_DM_VIDEO) += pci_rom.o
+obj-$(CONFIG_VIDEO) += pci_rom.o
 obj-$(CONFIG_PCI) += pci-uclass.o pci_auto.o
 obj-$(CONFIG_DM_PCI_COMPAT) += pci_compat.o
 obj-$(CONFIG_PCI_SANDBOX) += pci_sandbox.o
 obj-$(CONFIG_SANDBOX) += pci-emul-uclass.o
 obj-$(CONFIG_X86) += pci_x86.o pci_rom.o
-else
-obj-$(CONFIG_PCI) += pci.o pci_auto_old.o
-endif
 obj-$(CONFIG_PCI) += pci_auto_common.o pci_common.o
 
 obj-$(CONFIG_PCIE_ECAM_GENERIC) += pcie_ecam_generic.o
-obj-$(CONFIG_FSL_PCI_INIT) += fsl_pci_init.o
-obj-$(CONFIG_PCI_INDIRECT_BRIDGE) += pci_indirect.o
+obj-$(CONFIG_PCIE_ECAM_SYNQUACER) += pcie_ecam_synquacer.o
+obj-$(CONFIG_PCIE_APPLE) += pcie_apple.o
+obj-$(CONFIG_PCIE_CDNS_TI) += pcie_cdns_ti.o
+obj-$(CONFIG_PCI_FTPCI100) += pci_ftpci100.o
 obj-$(CONFIG_PCI_GT64120) += pci_gt64120.o
 obj-$(CONFIG_PCI_MPC85XX) += pci_mpc85xx.o
 obj-$(CONFIG_PCI_MSC01) += pci_msc01.o
 obj-$(CONFIG_PCIE_IMX) += pcie_imx.o
-obj-$(CONFIG_FTPCI100) += pci_ftpci100.o
 obj-$(CONFIG_PCI_MVEBU) += pci_mvebu.o
 obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
 obj-$(CONFIG_PCI_RCAR_GEN3) += pci-rcar-gen3.o
-obj-$(CONFIG_SH4_PCI) += pci_sh4.o
 obj-$(CONFIG_SH7751_PCI) +=pci_sh7751.o
-obj-$(CONFIG_SH7780_PCI) +=pci_sh7780.o
 obj-$(CONFIG_PCI_TEGRA) += pci_tegra.o
 obj-$(CONFIG_PCIE_IPROC) += pcie_iproc.o
 obj-$(CONFIG_PCI_AARDVARK) += pci-aardvark.o
@@ -45,9 +40,20 @@ obj-$(CONFIG_PCIE_LAYERSCAPE_GEN4) += pcie_layerscape_gen4.o \
 obj-$(CONFIG_PCI_XILINX) += pcie_xilinx.o
 obj-$(CONFIG_PCI_PHYTIUM) += pcie_phytium.o
 obj-$(CONFIG_PCIE_INTEL_FPGA) += pcie_intel_fpga.o
+obj-$(CONFIG_PCIE_DW_COMMON) += pcie_dw_common.o
 obj-$(CONFIG_PCI_KEYSTONE) += pcie_dw_ti.o
 obj-$(CONFIG_PCIE_MEDIATEK) += pcie_mediatek.o
+obj-$(CONFIG_PCIE_MEDIATEK_GEN3) += pcie_mediatek_gen3.o
 obj-$(CONFIG_PCIE_ROCKCHIP) += pcie_rockchip.o
 obj-$(CONFIG_PCIE_DW_ROCKCHIP) += pcie_dw_rockchip.o
+obj-$(CONFIG_PCIE_DW_MESON) += pcie_dw_meson.o
+obj-$(CONFIG_PCIE_DW_QCOM) += pcie_dw_qcom.o
 obj-$(CONFIG_PCI_BRCMSTB) += pcie_brcmstb.o
 obj-$(CONFIG_PCI_OCTEONTX) += pci_octeontx.o
+obj-$(CONFIG_PCIE_OCTEON) += pcie_octeon.o
+obj-$(CONFIG_PCIE_DW_SIFIVE) += pcie_dw_sifive.o
+obj-$(CONFIG_PCIE_UNIPHIER) += pcie_uniphier.o
+obj-$(CONFIG_PCIE_XILINX_NWL) += pcie-xilinx-nwl.o
+obj-$(CONFIG_PCIE_PLDA_COMMON) += pcie_plda_common.o
+obj-$(CONFIG_PCIE_STARFIVE_JH7110) += pcie_starfive_jh7110.o
+obj-$(CONFIG_PCIE_DW_IMX) += pcie_dw_imx.o

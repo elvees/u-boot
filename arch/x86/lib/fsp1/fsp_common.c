@@ -3,7 +3,6 @@
  * Copyright (C) 2014, Bin Meng <bmeng.cn@gmail.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <init.h>
@@ -101,3 +100,4 @@ int arch_fsp_init(void)
 
 	return 0;
 }
+EVENT_SPY_SIMPLE(EVT_FSP_INIT_F, arch_fsp_init);

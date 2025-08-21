@@ -282,4 +282,10 @@ static inline void instruction_hazard_barrier(void)
 	: "=&r"(tmp));
 }
 
+#ifdef CONFIG_SYS_NONCACHED_MEMORY
+/* 1MB granularity */
+#define MMU_SECTION_SHIFT	20
+#define MMU_SECTION_SIZE	(1 << MMU_SECTION_SHIFT)
+#endif /* CONFIG_SYS_NONCACHED_MEMORY */
+
 #endif /* _ASM_SYSTEM_H */

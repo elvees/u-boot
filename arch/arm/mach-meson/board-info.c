@@ -4,10 +4,10 @@
  * (C) Copyright 2019 Neil Armstrong <narmstrong@baylibre.com>
  */
 
-#include <common.h>
 #include <init.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
+#include <asm/types.h>
 #include <dm.h>
 #include <linux/bitfield.h>
 #include <regmap.h>
@@ -64,6 +64,7 @@ static const struct meson_gx_package_id {
 	{ "A113X",  0x25, 0x37, 0xff },
 	{ "A113D",  0x25, 0x22, 0xff },
 	{ "S905D2", 0x28, 0x10, 0xf0 },
+	{ "S905Y2", 0x28, 0x30, 0xf0 },
 	{ "S905X2", 0x28, 0x40, 0xf0 },
 	{ "A311D",  0x29, 0x10, 0xf0 },
 	{ "S922X",  0x29, 0x40, 0xf0 },
@@ -125,19 +126,12 @@ static const char *socinfo_to_soc_id(u32 socinfo)
 	return "Unknown";
 }
 
-static void print_board_model(void)
-{
-	const char *model;
-	model = fdt_getprop(gd->fdt_blob, 0, "model", NULL);
-	printf("Model: %s\n", model ? model : "Unknown");
-}
-
-static unsigned int get_socinfo(void)
+u32 meson_get_socinfo(void)
 {
 	struct regmap *regmap;
 	int nodeoffset, ret;
 	ofnode node;
-	unsigned int socinfo;
+	u32 socinfo;
 
 	/* find the offset of compatible node */
 	nodeoffset = fdt_node_offset_by_compatible(gd->fdt_blob, -1,
@@ -167,14 +161,11 @@ static unsigned int get_socinfo(void)
 	return socinfo;
 }
 
-int show_board_info(void)
+int checkboard(void)
 {
-	unsigned int socinfo;
+	u32 socinfo;
 
-	/* print board information */
-	print_board_model();
-
-	socinfo = get_socinfo();
+	socinfo = meson_get_socinfo();
 	if (!socinfo)
 		return 0;
 
@@ -191,9 +182,9 @@ int show_board_info(void)
 
 int meson_get_soc_rev(char *buff, size_t buff_len)
 {
-	unsigned int socinfo;
+	u32 socinfo;
 
-	socinfo = get_socinfo();
+	socinfo = meson_get_socinfo();
 	if (!socinfo)
 		return -1;
 

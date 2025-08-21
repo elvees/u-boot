@@ -5,7 +5,6 @@
  * Modified to support C structur SoC access by
  * Andreas Bießmann <biessmann@corscience.de>
  */
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <errno.h>
@@ -18,7 +17,7 @@
 #include <linux/delay.h>
 
 #include <asm/io.h>
-#ifdef CONFIG_DM_SERIAL
+#if CONFIG_IS_ENABLED(DM_SERIAL)
 #include <asm/arch/atmel_serial.h>
 #endif
 #include <asm/arch/clk.h>
@@ -28,7 +27,7 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#ifndef CONFIG_DM_SERIAL
+#if !CONFIG_IS_ENABLED(DM_SERIAL)
 static void atmel_serial_setbrg_internal(atmel_usart3_t *usart, int id,
 					 int baudrate)
 {
@@ -72,13 +71,13 @@ static void atmel_serial_activate(atmel_usart3_t *usart)
 
 static void atmel_serial_setbrg(void)
 {
-	atmel_serial_setbrg_internal((atmel_usart3_t *)CONFIG_USART_BASE,
-				     CONFIG_USART_ID, gd->baudrate);
+	atmel_serial_setbrg_internal((atmel_usart3_t *)CFG_USART_BASE,
+				     CFG_USART_ID, gd->baudrate);
 }
 
 static int atmel_serial_init(void)
 {
-	atmel_usart3_t *usart = (atmel_usart3_t *)CONFIG_USART_BASE;
+	atmel_usart3_t *usart = (atmel_usart3_t *)CFG_USART_BASE;
 
 	atmel_serial_init_internal(usart);
 	serial_setbrg();
@@ -89,7 +88,7 @@ static int atmel_serial_init(void)
 
 static void atmel_serial_putc(char c)
 {
-	atmel_usart3_t *usart = (atmel_usart3_t *)CONFIG_USART_BASE;
+	atmel_usart3_t *usart = (atmel_usart3_t *)CFG_USART_BASE;
 
 	if (c == '\n')
 		serial_putc('\r');
@@ -100,16 +99,16 @@ static void atmel_serial_putc(char c)
 
 static int atmel_serial_getc(void)
 {
-	atmel_usart3_t *usart = (atmel_usart3_t *)CONFIG_USART_BASE;
+	atmel_usart3_t *usart = (atmel_usart3_t *)CFG_USART_BASE;
 
 	while (!(readl(&usart->csr) & USART3_BIT(RXRDY)))
-		 WATCHDOG_RESET();
+		 schedule();
 	return readl(&usart->rhr);
 }
 
 static int atmel_serial_tstc(void)
 {
-	atmel_usart3_t *usart = (atmel_usart3_t *)CONFIG_USART_BASE;
+	atmel_usart3_t *usart = (atmel_usart3_t *)CFG_USART_BASE;
 	return (readl(&usart->csr) & USART3_BIT(RXRDY)) != 0;
 }
 
@@ -133,9 +132,7 @@ __weak struct serial_device *default_serial_console(void)
 {
 	return &atmel_serial_drv;
 }
-#endif
-
-#ifdef CONFIG_DM_SERIAL
+#else
 enum serial_clk_type {
 	CLK_TYPE_NORMAL = 0,
 	CLK_TYPE_DBGU,
@@ -221,7 +218,7 @@ static const struct dm_serial_ops atmel_serial_ops = {
 	.setbrg = atmel_serial_setbrg,
 };
 
-#if defined(CONFIG_SPL_BUILD) && !defined(CONFIG_SPL_CLK)
+#if defined(CONFIG_XPL_BUILD) && !defined(CONFIG_SPL_CLK)
 static int atmel_serial_enable_clk(struct udevice *dev)
 {
 	struct atmel_serial_priv *priv = dev_get_priv(dev);
@@ -254,8 +251,6 @@ static int atmel_serial_enable_clk(struct udevice *dev)
 		return -EINVAL;
 
 	priv->usart_clk_rate = clk_rate;
-
-	clk_free(&clk);
 
 	return 0;
 }
@@ -319,14 +314,14 @@ U_BOOT_DRIVER(serial_atmel) = {
 #ifdef CONFIG_DEBUG_UART_ATMEL
 static inline void _debug_uart_init(void)
 {
-	atmel_usart3_t *usart = (atmel_usart3_t *)CONFIG_DEBUG_UART_BASE;
+	atmel_usart3_t *usart = (atmel_usart3_t *)CONFIG_VAL(DEBUG_UART_BASE);
 
 	_atmel_serial_init(usart, CONFIG_DEBUG_UART_CLOCK, CONFIG_BAUDRATE);
 }
 
 static inline void _debug_uart_putc(int ch)
 {
-	atmel_usart3_t *usart = (atmel_usart3_t *)CONFIG_DEBUG_UART_BASE;
+	atmel_usart3_t *usart = (atmel_usart3_t *)CONFIG_VAL(DEBUG_UART_BASE);
 
 	while (!(readl(&usart->csr) & USART3_BIT(TXRDY)))
 		;

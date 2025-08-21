@@ -4,21 +4,44 @@
  *
  *  Copyright (C) 2019 Linaro Ltd. <sughosh.ganu@linaro.org>
  *  Copyright (C) 2019 Linaro Ltd. <ilias.apalodimas@linaro.org>
+ *  Copyright 2022-2023 Arm Limited and/or its affiliates <open-source-office@arm.com>
+ *
+ *  Authors:
+ *    Abdellatif El Khlifi <abdellatif.elkhlifi@arm.com>
  */
 
-#include <common.h>
+#define LOG_CATEGORY LOGC_EFI
+
+#if CONFIG_IS_ENABLED(ARM_FFA_TRANSPORT)
+#include <arm_ffa.h>
+#endif
+#include <cpu_func.h>
+#include <dm.h>
 #include <efi.h>
 #include <efi_api.h>
 #include <efi_loader.h>
 #include <efi_variable.h>
-#include <tee.h>
 #include <malloc.h>
+#include <mapmem.h>
 #include <mm_communication.h>
+#include <tee.h>
 
-#define OPTEE_PAGE_SIZE BIT(12)
+#if CONFIG_IS_ENABLED(ARM_FFA_TRANSPORT)
+/* MM return codes */
+#define MM_SUCCESS (0)
+#define MM_NOT_SUPPORTED (-1)
+#define MM_INVALID_PARAMETER (-2)
+#define MM_DENIED (-3)
+#define MM_NO_MEMORY (-5)
+
+static const char *mm_sp_svc_uuid = MM_SP_UUID;
+static u16 mm_sp_id;
+#endif
+
 extern struct efi_var_file __efi_runtime_data *efi_var_buf;
 static efi_uintn_t max_buffer_size;	/* comm + var + func + data */
 static efi_uintn_t max_payload_size;	/* func + data */
+static const u16 __efi_runtime_rodata pk[] = u"PK";
 
 struct mm_connection {
 	struct udevice *tee;
@@ -114,7 +137,11 @@ static efi_status_t optee_mm_communicate(void *comm_buf, ulong dsize)
 	rc = tee_invoke_func(conn.tee, &arg, 2, param);
 	tee_shm_free(shm);
 	tee_close_session(conn.tee, conn.session);
-	if (rc || arg.ret != TEE_SUCCESS)
+	if (rc)
+		return EFI_DEVICE_ERROR;
+	if (arg.ret == TEE_ERROR_EXCESS_DATA)
+		log_err("Variable payload too large\n");
+	if (arg.ret != TEE_SUCCESS)
 		return EFI_DEVICE_ERROR;
 
 	switch (param[1].u.value.a) {
@@ -141,12 +168,238 @@ static efi_status_t optee_mm_communicate(void *comm_buf, ulong dsize)
 	return ret;
 }
 
+#if CONFIG_IS_ENABLED(ARM_FFA_TRANSPORT)
 /**
- * mm_communicate() - Adjust the cmonnucation buffer to StandAlonneMM and send
+ * ffa_notify_mm_sp() - Announce there is data in the shared buffer
+ *
+ * Notify the MM partition in the trusted world that
+ * data is available in the shared buffer.
+ * This is a blocking call during which trusted world has exclusive access
+ * to the MM shared buffer.
+ *
+ * Return:
+ *
+ * 0 on success
+ */
+static int ffa_notify_mm_sp(void)
+{
+	struct ffa_send_direct_data msg = {0};
+	int ret;
+	int sp_event_ret;
+	struct udevice *dev;
+
+	ret = uclass_first_device_err(UCLASS_FFA, &dev);
+	if (ret) {
+		log_err("EFI: Cannot find FF-A bus device, notify MM SP failure\n");
+		return ret;
+	}
+
+	msg.data0 = CONFIG_FFA_SHARED_MM_BUF_OFFSET; /* x3 */
+
+	ret = ffa_sync_send_receive(dev, mm_sp_id, &msg, 1);
+	if (ret)
+		return ret;
+
+	sp_event_ret = msg.data0; /* x3 */
+
+	switch (sp_event_ret) {
+	case MM_SUCCESS:
+		ret = 0;
+		break;
+	case MM_NOT_SUPPORTED:
+		ret = -EINVAL;
+		break;
+	case MM_INVALID_PARAMETER:
+		ret = -EPERM;
+		break;
+	case MM_DENIED:
+		ret = -EACCES;
+		break;
+	case MM_NO_MEMORY:
+		ret = -EBUSY;
+		break;
+	default:
+		ret = -EACCES;
+	}
+
+	return ret;
+}
+
+/**
+ * ffa_discover_mm_sp_id() - Query the MM partition ID
+ *
+ * Use the FF-A driver to get the MM partition ID.
+ * If multiple partitions are found, use the first one.
+ * This is a boot time function.
+ *
+ * Return:
+ *
+ * 0 on success
+ */
+static int ffa_discover_mm_sp_id(void)
+{
+	u32 count = 0;
+	int ret;
+	struct ffa_partition_desc *descs;
+	struct udevice *dev;
+
+	ret = uclass_first_device_err(UCLASS_FFA, &dev);
+	if (ret) {
+		log_err("EFI: Cannot find FF-A bus device, MM SP discovery failure\n");
+		return ret;
+	}
+
+	/* Ask the driver to fill the buffer with the SPs info */
+	ret = ffa_partition_info_get(dev, mm_sp_svc_uuid, &count, &descs);
+	if (ret) {
+		log_err("EFI: Failure in querying SPs info (%d), MM SP discovery failure\n", ret);
+		return ret;
+	}
+
+	/* MM SPs found , use the first one */
+
+	mm_sp_id = descs[0].info.id;
+
+	log_info("EFI: MM partition ID 0x%x\n", mm_sp_id);
+
+	return 0;
+}
+
+/**
+ * ffa_mm_communicate() - Exchange EFI services data with  the MM partition using FF-A
+ * @comm_buf:		locally allocated communication buffer used for rx/tx
+ * @dsize:				communication buffer size
+ *
+ * Issue a door bell event to notify the MM partition (SP) running in OP-TEE
+ * that there is data to read from the shared buffer.
+ * Communication with the MM SP is performed using FF-A transport.
+ * On the event, MM SP can read the data from the buffer and
+ * update the MM shared buffer with response data.
+ * The response data is copied back to the communication buffer.
+ *
+ * Return:
+ *
+ * EFI status code
+ */
+static efi_status_t ffa_mm_communicate(void *comm_buf, ulong comm_buf_size)
+{
+	ulong tx_data_size;
+	int ffa_ret;
+	efi_status_t efi_ret;
+	struct efi_mm_communicate_header *mm_hdr;
+	void *virt_shared_buf;
+
+	if (!comm_buf)
+		return EFI_INVALID_PARAMETER;
+
+	/* Discover MM partition ID at boot time */
+	if (!mm_sp_id && ffa_discover_mm_sp_id()) {
+		log_err("EFI: Failure to discover MM SP ID at boot time, FF-A MM comms failure\n");
+		return EFI_UNSUPPORTED;
+	}
+
+	mm_hdr = (struct efi_mm_communicate_header *)comm_buf;
+	tx_data_size = mm_hdr->message_len + sizeof(efi_guid_t) + sizeof(size_t);
+
+	if (comm_buf_size != tx_data_size || tx_data_size > CONFIG_FFA_SHARED_MM_BUF_SIZE)
+		return EFI_INVALID_PARAMETER;
+
+	/* Copy the data to the shared buffer */
+
+	virt_shared_buf = map_sysmem((phys_addr_t)CONFIG_FFA_SHARED_MM_BUF_ADDR, 0);
+	memcpy(virt_shared_buf, comm_buf, tx_data_size);
+
+	/*
+	 * The secure world might have cache disabled for
+	 * the device region used for shared buffer (which is the case for Optee).
+	 * In this case, the secure world reads the data from DRAM.
+	 * Let's flush the cache so the DRAM is updated with the latest data.
+	 */
+#ifdef CONFIG_ARM64
+	invalidate_dcache_all();
+#endif
+
+	/* Announce there is data in the shared buffer */
+
+	ffa_ret = ffa_notify_mm_sp();
+
+	switch (ffa_ret) {
+	case 0: {
+		ulong rx_data_size;
+		/* Copy the MM SP response from the shared buffer to the communication buffer */
+		rx_data_size = ((struct efi_mm_communicate_header *)virt_shared_buf)->message_len +
+			sizeof(efi_guid_t) +
+			sizeof(size_t);
+
+		if (rx_data_size > comm_buf_size) {
+			efi_ret = EFI_OUT_OF_RESOURCES;
+			break;
+		}
+
+		memcpy(comm_buf, virt_shared_buf, rx_data_size);
+		efi_ret = EFI_SUCCESS;
+		break;
+	}
+	case -EINVAL:
+		efi_ret = EFI_DEVICE_ERROR;
+		break;
+	case -EPERM:
+		efi_ret = EFI_INVALID_PARAMETER;
+		break;
+	case -EACCES:
+		efi_ret = EFI_ACCESS_DENIED;
+		break;
+	case -EBUSY:
+		efi_ret = EFI_OUT_OF_RESOURCES;
+		break;
+	default:
+		efi_ret = EFI_ACCESS_DENIED;
+	}
+
+	unmap_sysmem(virt_shared_buf);
+	return efi_ret;
+}
+
+/**
+ * get_mm_comms() - detect the available MM transport
+ *
+ * Make sure the FF-A bus is probed successfully
+ * which means FF-A communication with secure world works and ready
+ * for use.
+ *
+ * If FF-A bus is not ready, use OPTEE comms.
+ *
+ * Return:
+ *
+ * MM_COMMS_FFA or MM_COMMS_OPTEE
+ */
+static enum mm_comms_select get_mm_comms(void)
+{
+	struct udevice *dev;
+	int ret;
+
+	ret = uclass_first_device_err(UCLASS_FFA, &dev);
+	if (ret) {
+		log_debug("EFI: Cannot find FF-A bus device, trying Optee comms\n");
+		return MM_COMMS_OPTEE;
+	}
+
+	return MM_COMMS_FFA;
+}
+#endif
+
+/**
+ * mm_communicate() - Adjust the communication buffer to the MM SP and send
  * it to OP-TEE
  *
- * @comm_buf:		locally allocted communcation buffer
+ * @comm_buf:		locally allocated communication buffer
  * @dsize:		buffer size
+ *
+ * The SP (also called partition) can be any MM SP such as  StandAlonneMM or smm-gateway.
+ * The comm_buf format is the same for both partitions.
+ * When using the u-boot OP-TEE driver, StandAlonneMM is supported.
+ * When using the u-boot FF-A  driver, any MM SP is supported.
+ *
  * Return:		status code
  */
 static efi_status_t mm_communicate(u8 *comm_buf, efi_uintn_t dsize)
@@ -154,12 +407,24 @@ static efi_status_t mm_communicate(u8 *comm_buf, efi_uintn_t dsize)
 	efi_status_t ret;
 	struct efi_mm_communicate_header *mm_hdr;
 	struct smm_variable_communicate_header *var_hdr;
+#if CONFIG_IS_ENABLED(ARM_FFA_TRANSPORT)
+	enum mm_comms_select mm_comms;
+#endif
 
 	dsize += MM_COMMUNICATE_HEADER_SIZE + MM_VARIABLE_COMMUNICATE_SIZE;
 	mm_hdr = (struct efi_mm_communicate_header *)comm_buf;
 	var_hdr = (struct smm_variable_communicate_header *)mm_hdr->data;
 
-	ret = optee_mm_communicate(comm_buf, dsize);
+#if CONFIG_IS_ENABLED(ARM_FFA_TRANSPORT)
+	mm_comms = get_mm_comms();
+	if (mm_comms == MM_COMMS_FFA)
+		ret = ffa_mm_communicate(comm_buf, dsize);
+	else
+		ret = optee_mm_communicate(comm_buf, dsize);
+#else
+		ret = optee_mm_communicate(comm_buf, dsize);
+#endif
+
 	if (ret != EFI_SUCCESS) {
 		log_err("%s failed!\n", __func__);
 		return ret;
@@ -256,15 +521,6 @@ efi_status_t EFIAPI get_max_payload(efi_uintn_t *size)
 	}
 	*size = var_payload->size;
 	/*
-	 * Although the max payload is configurable on StMM, we only share a
-	 * single page from OP-TEE for the non-secure buffer used to communicate
-	 * with StMM. Since OP-TEE will reject to map anything bigger than that,
-	 * make sure we are in bounds.
-	 */
-	if (*size > OPTEE_PAGE_SIZE)
-		*size = OPTEE_PAGE_SIZE - MM_COMMUNICATE_HEADER_SIZE  -
-			MM_VARIABLE_COMMUNICATE_SIZE;
-	/*
 	 * There seems to be a bug in EDK2 miscalculating the boundaries and
 	 * size checks, so deduct 2 more bytes to fulfill this requirement. Fix
 	 * it up here to ensure backwards compatibility with older versions
@@ -284,7 +540,8 @@ out:
  * StMM can store internal attributes and properties for variables, i.e enabling
  * R/O variables
  */
-static efi_status_t set_property_int(u16 *variable_name, efi_uintn_t name_size,
+static efi_status_t set_property_int(const u16 *variable_name,
+				     efi_uintn_t name_size,
 				     const efi_guid_t *vendor,
 				     struct var_check_property *var_property)
 {
@@ -317,7 +574,8 @@ out:
 	return ret;
 }
 
-static efi_status_t get_property_int(u16 *variable_name, efi_uintn_t name_size,
+static efi_status_t get_property_int(const u16 *variable_name,
+				     efi_uintn_t name_size,
 				     const efi_guid_t *vendor,
 				     struct var_check_property *var_property)
 {
@@ -361,7 +619,8 @@ out:
 	return ret;
 }
 
-efi_status_t efi_get_variable_int(u16 *variable_name, const efi_guid_t *vendor,
+efi_status_t efi_get_variable_int(const u16 *variable_name,
+				  const efi_guid_t *vendor,
 				  u32 *attributes, efi_uintn_t *data_size,
 				  void *data, u64 *timep)
 {
@@ -371,7 +630,7 @@ efi_status_t efi_get_variable_int(u16 *variable_name, const efi_guid_t *vendor,
 	efi_uintn_t name_size;
 	efi_uintn_t tmp_dsize;
 	u8 *comm_buf = NULL;
-	efi_status_t ret;
+	efi_status_t ret, tmp;
 
 	if (!variable_name || !vendor || !data_size) {
 		ret = EFI_INVALID_PARAMETER;
@@ -410,22 +669,31 @@ efi_status_t efi_get_variable_int(u16 *variable_name, const efi_guid_t *vendor,
 
 	/* Communicate */
 	ret = mm_communicate(comm_buf, payload_size);
-	if (ret == EFI_SUCCESS || ret == EFI_BUFFER_TOO_SMALL) {
-		/* Update with reported data size for trimmed case */
-		*data_size = var_acc->data_size;
-	}
-	if (ret != EFI_SUCCESS)
+	if (ret != EFI_SUCCESS && ret != EFI_BUFFER_TOO_SMALL)
 		goto out;
 
-	ret = get_property_int(variable_name, name_size, vendor, &var_property);
-	if (ret != EFI_SUCCESS)
-		goto out;
-
+	/* Update with reported data size for trimmed case */
+	*data_size = var_acc->data_size;
+	/*
+	 * UEFI > 2.7 needs the attributes set even if the buffer is
+	 * smaller
+	 */
 	if (attributes) {
+		tmp = get_property_int(variable_name, name_size, vendor,
+				       &var_property);
+		if (tmp != EFI_SUCCESS) {
+			ret = tmp;
+			goto out;
+		}
 		*attributes = var_acc->attr;
-		if (var_property.property & VAR_CHECK_VARIABLE_PROPERTY_READ_ONLY)
+		if (var_property.property &
+		    VAR_CHECK_VARIABLE_PROPERTY_READ_ONLY)
 			*attributes |= EFI_VARIABLE_READ_ONLY;
 	}
+
+	/* return if ret is EFI_BUFFER_TOO_SMALL */
+	if (ret != EFI_SUCCESS)
+		goto out;
 
 	if (data)
 		memcpy(data, (u8 *)var_acc->name + var_acc->name_size,
@@ -502,9 +770,10 @@ out:
 	return ret;
 }
 
-efi_status_t efi_set_variable_int(u16 *variable_name, const efi_guid_t *vendor,
-				  u32 attributes, efi_uintn_t data_size,
-				  const void *data, bool ro_check)
+efi_status_t efi_set_variable_int(const u16 *variable_name,
+				  const efi_guid_t *vendor, u32 attributes,
+				  efi_uintn_t data_size, const void *data,
+				  bool ro_check)
 {
 	efi_status_t ret, alt_ret = EFI_SUCCESS;
 	struct var_check_property var_property;
@@ -590,7 +859,7 @@ efi_status_t efi_set_variable_int(u16 *variable_name, const efi_guid_t *vendor,
 	if (alt_ret != EFI_SUCCESS)
 		goto out;
 
-	if (!u16_strcmp(variable_name, L"PK"))
+	if (!u16_strcmp(variable_name, pk))
 		alt_ret = efi_init_secure_state();
 out:
 	free(comm_buf);
@@ -606,6 +875,11 @@ efi_status_t efi_query_variable_info_int(u32 attributes,
 	efi_uintn_t payload_size;
 	efi_status_t ret;
 	u8 *comm_buf;
+
+	if (!max_variable_storage_size ||
+	    !remain_variable_storage_size ||
+	    !max_variable_size || !attributes)
+		return EFI_INVALID_PARAMETER;
 
 	payload_size = sizeof(*mm_query_info);
 	comm_buf = setup_mm_hdr((void **)&mm_query_info, payload_size,
@@ -690,14 +964,9 @@ void efi_variables_boot_exit_notify(void)
 		ret = EFI_NOT_FOUND;
 
 	if (ret != EFI_SUCCESS)
-		log_err("Unable to notify StMM for ExitBootServices\n");
+		log_err("Unable to notify the MM partition for ExitBootServices\n");
 	free(comm_buf);
 
-	/*
-	 * Populate the list for runtime variables.
-	 * asking EFI_VARIABLE_RUNTIME_ACCESS is redundant, since
-	 * efi_var_mem_notify_exit_boot_services will clean those, but that's fine
-	 */
 	ret = efi_var_collect(&var_buf, &len, EFI_VARIABLE_RUNTIME_ACCESS);
 	if (ret != EFI_SUCCESS)
 		log_err("Can't populate EFI variables. No runtime variables will be available\n");

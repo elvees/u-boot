@@ -3,7 +3,6 @@
  * Copyright (C) 2013 Google, Inc
  */
 
-#include <common.h>
 #include <command.h>
 #include <dm.h>
 #include <fdtdec.h>
@@ -21,7 +20,7 @@
 /* Simple test of sandbox SPI flash */
 static int dm_test_spi_flash(struct unit_test_state *uts)
 {
-	struct udevice *dev;
+	struct udevice *dev, *emul;
 	int full_size = 0x200000;
 	int size = 0x10000;
 	u8 *src, *dst;
@@ -51,6 +50,14 @@ static int dm_test_spi_flash(struct unit_test_state *uts)
 	ut_assertok(spi_flash_read_dm(dev, 0, size, dst));
 	ut_asserteq_mem(src, dst, size);
 
+	/* Try the write-protect stuff */
+	ut_assertok(uclass_first_device_err(UCLASS_SPI_EMUL, &emul));
+	ut_asserteq(0, spl_flash_get_sw_write_prot(dev));
+	sandbox_sf_set_block_protect(emul, 1);
+	ut_asserteq(1, spl_flash_get_sw_write_prot(dev));
+	sandbox_sf_set_block_protect(emul, 0);
+	ut_asserteq(0, spl_flash_get_sw_write_prot(dev));
+
 	/* Check mapping */
 	ut_assertok(dm_spi_get_mmap(dev, &map_base, &map_size, &offset));
 	ut_asserteq(0x1000, map_base);
@@ -65,7 +72,7 @@ static int dm_test_spi_flash(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_spi_flash, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_spi_flash, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 /* Functional test that sandbox SPI flash works correctly */
 static int dm_test_spi_flash_func(struct unit_test_state *uts)
@@ -93,4 +100,4 @@ static int dm_test_spi_flash_func(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_spi_flash_func, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_spi_flash_func, UTF_SCAN_PDATA | UTF_SCAN_FDT);

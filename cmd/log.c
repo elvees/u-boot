@@ -4,7 +4,6 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
 #include <command.h>
 #include <dm.h>
 #include <getopt.h>
@@ -116,30 +115,27 @@ static int do_log_filter_list(struct cmd_tbl *cmdtp, int flag, int argc,
 		return CMD_RET_FAILURE;
 	}
 
-	/*      <3> < 6  > <2+1 + 7 > <      16      > < unbounded... */
-	printf("num policy level            categories files\n");
 	list_for_each_entry(filt, &ldev->filter_head, sibling_node) {
-		printf("%3d %6.6s %s %-7.7s ", filt->filter_num,
-		       filt->flags & LOGFF_DENY ? "deny" : "allow",
+		printf("%-3d: %s %s %s\n", filt->filter_num,
+		       filt->flags & LOGFF_DENY ? "DENY" : "ALLOW",
 		       filt->flags & LOGFF_LEVEL_MIN ? ">=" : "<=",
 		       log_get_level_name(filt->level));
 
 		if (filt->flags & LOGFF_HAS_CAT) {
-			int i;
-
-			if (filt->cat_list[0] != LOGC_END)
-				printf("%16.16s %s\n",
-				       log_get_cat_name(filt->cat_list[0]),
-				       filt->file_list ? filt->file_list : "");
-
-			for (i = 1; i < LOGF_MAX_CATEGORIES &&
-				    filt->cat_list[i] != LOGC_END; i++)
-				printf("%21c %16.16s\n", ' ',
+			printf("     Categories:");
+			for (int i = 0;
+			     i < LOGF_MAX_CATEGORIES &&
+			     filt->cat_list[i] != LOGC_END;
+			     ++i) {
+				printf(" %s",
 				       log_get_cat_name(filt->cat_list[i]));
-		} else {
-			printf("%16c %s\n", ' ',
-			       filt->file_list ? filt->file_list : "");
+			}
+			printf("\n");
 		}
+		if (filt->file_list)
+			printf("     Files: %s\n", filt->file_list);
+		if (filt->func_list)
+			printf("     Functions: %s\n", filt->func_list);
 	}
 
 	return CMD_RET_SUCCESS;
@@ -152,6 +148,7 @@ static int do_log_filter_add(struct cmd_tbl *cmdtp, int flag, int argc,
 	bool print_num = false;
 	bool type_set = false;
 	char *file_list = NULL;
+	char *func_list = NULL;
 	const char *drv_name = "console";
 	int opt, err;
 	int cat_count = 0;
@@ -161,7 +158,7 @@ static int do_log_filter_add(struct cmd_tbl *cmdtp, int flag, int argc,
 	struct getopt_state gs;
 
 	getopt_init_state(&gs);
-	while ((opt = getopt(&gs, argc, argv, "Ac:d:Df:l:L:p")) > 0) {
+	while ((opt = getopt(&gs, argc, argv, "Ac:d:Df:F:l:L:p")) > 0) {
 		switch (opt) {
 		case 'A':
 #define do_type() do { \
@@ -200,6 +197,9 @@ static int do_log_filter_add(struct cmd_tbl *cmdtp, int flag, int argc,
 		case 'f':
 			file_list = gs.arg;
 			break;
+		case 'F':
+			func_list = gs.arg;
+			break;
 		case 'l':
 #define do_level() do { \
 			if (level_set) { \
@@ -230,7 +230,7 @@ static int do_log_filter_add(struct cmd_tbl *cmdtp, int flag, int argc,
 
 	cat_list[cat_count] = LOGC_END;
 	err = log_add_filter_flags(drv_name, cat_count ? cat_list : NULL, level,
-				   file_list, flags);
+				   file_list, func_list, flags);
 	if (err < 0) {
 		printf("Could not add filter (err = %d)\n", err);
 		return CMD_RET_FAILURE;
@@ -352,7 +352,7 @@ static int do_log_rec(struct cmd_tbl *cmdtp, int flag, int argc,
 	if (argc < 7)
 		return CMD_RET_USAGE;
 	cat = log_get_cat_by_name(argv[1]);
-	level = simple_strtoul(argv[2], &end, 10);
+	level = dectoul(argv[2], &end);
 	if (end == argv[2]) {
 		level = log_get_level_by_name(argv[2]);
 
@@ -366,7 +366,7 @@ static int do_log_rec(struct cmd_tbl *cmdtp, int flag, int argc,
 		return CMD_RET_USAGE;
 	}
 	file = argv[3];
-	line = simple_strtoul(argv[4], NULL, 10);
+	line = dectoul(argv[4], NULL);
 	func = argv[5];
 	msg = argv[6];
 	if (_log(cat, level, file, line, func, "%s\n", msg))
@@ -375,8 +375,7 @@ static int do_log_rec(struct cmd_tbl *cmdtp, int flag, int argc,
 	return 0;
 }
 
-#ifdef CONFIG_SYS_LONGHELP
-static char log_help_text[] =
+U_BOOT_LONGHELP(log,
 	"level [<level>] - get/set log level\n"
 	"categories - list log categories\n"
 	"drivers - list log drivers\n"
@@ -390,7 +389,8 @@ static char log_help_text[] =
 	"\t-d <driver> - Specify the log driver to add the filter to; defaults\n"
 	"\t              to console\n"
 	"\t-D - Deny messages matching this filter; mutually exclusive with -A\n"
-	"\t-f <files_list> - A comma-separated list of files to match\n"
+	"\t-f <file_list> - A comma-separated list of files to match\n"
+	"\t-F <func_list> - A comma-separated list of functions to match\n"
 	"\t-l <level> - Match log levels less than or equal to <level>;\n"
 	"\t             mutually-exclusive with -L\n"
 	"\t-L <level> - Match log levels greather than or equal to <level>;\n"
@@ -405,9 +405,7 @@ static char log_help_text[] =
 	"\tc=category, l=level, F=file, L=line number, f=function, m=msg\n"
 	"\tor 'default', or 'all' for all\n"
 	"log rec <category> <level> <file> <line> <func> <message> - "
-		"output a log record"
-	;
-#endif
+		"output a log record");
 
 U_BOOT_CMD_WITH_SUBCMDS(log, "log system", log_help_text,
 	U_BOOT_SUBCMD_MKENT(level, 2, 1, do_log_level),

@@ -2,7 +2,6 @@
 #ifndef __GLUE_ZLIB_H__
 #define __GLUE_ZLIB_H__
 
-#include <common.h>
 #include <linux/compiler.h>
 #include <asm/unaligned.h>
 #include <watchdog.h>
@@ -11,7 +10,6 @@
 /* avoid conflicts */
 #undef OFF
 #undef ASMINF
-#undef POSTINC
 #undef NO_GZIP
 #define GUNZIP
 #undef STDC

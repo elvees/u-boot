@@ -6,13 +6,12 @@
  */
 
 #ifndef USE_HOSTCC
-#include <common.h>
-#include <linux/string.h>
-#else
-#include <string.h>
+#include <u-boot/schedule.h>
 #endif /* USE_HOSTCC */
-#include <watchdog.h>
+#include <string.h>
 #include <u-boot/sha256.h>
+
+#include <linux/compiler_attributes.h>
 
 const uint8_t sha256_der_prefix[SHA256_DER_LEN] = {
 	0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86,
@@ -55,7 +54,7 @@ void sha256_starts(sha256_context * ctx)
 	ctx->state[7] = 0x5BE0CD19;
 }
 
-static void sha256_process(sha256_context *ctx, const uint8_t data[64])
+static void sha256_process_one(sha256_context *ctx, const uint8_t data[64])
 {
 	uint32_t temp1, temp2;
 	uint32_t W[64];
@@ -186,6 +185,18 @@ static void sha256_process(sha256_context *ctx, const uint8_t data[64])
 	ctx->state[7] += H;
 }
 
+__weak void sha256_process(sha256_context *ctx, const unsigned char *data,
+			   unsigned int blocks)
+{
+	if (!blocks)
+		return;
+
+	while (blocks--) {
+		sha256_process_one(ctx, data);
+		data += 64;
+	}
+}
+
 void sha256_update(sha256_context *ctx, const uint8_t *input, uint32_t length)
 {
 	uint32_t left, fill;
@@ -204,17 +215,15 @@ void sha256_update(sha256_context *ctx, const uint8_t *input, uint32_t length)
 
 	if (left && length >= fill) {
 		memcpy((void *) (ctx->buffer + left), (void *) input, fill);
-		sha256_process(ctx, ctx->buffer);
+		sha256_process(ctx, ctx->buffer, 1);
 		length -= fill;
 		input += fill;
 		left = 0;
 	}
 
-	while (length >= 64) {
-		sha256_process(ctx, input);
-		length -= 64;
-		input += 64;
-	}
+	sha256_process(ctx, input, length / 64);
+	input += length / 64 * 64;
+	length = length % 64;
 
 	if (length)
 		memcpy((void *) (ctx->buffer + left), (void *) input, length);
@@ -256,36 +265,53 @@ void sha256_finish(sha256_context * ctx, uint8_t digest[32])
 	PUT_UINT32_BE(ctx->state[7], digest, 28);
 }
 
-/*
- * Output = SHA-256( input buffer ). Trigger the watchdog every 'chunk_sz'
- * bytes of input processed.
- */
-void sha256_csum_wd(const unsigned char *input, unsigned int ilen,
-		unsigned char *output, unsigned int chunk_sz)
+int sha256_hmac(const unsigned char *key, int keylen,
+		const unsigned char *input, unsigned int ilen,
+		unsigned char *output)
 {
+	int i;
 	sha256_context ctx;
-#if defined(CONFIG_HW_WATCHDOG) || defined(CONFIG_WATCHDOG)
-	const unsigned char *end;
-	unsigned char *curr;
-	int chunk;
-#endif
+	unsigned char keybuf[64];
+	unsigned char k_ipad[64];
+	unsigned char k_opad[64];
+	unsigned char tmpbuf[32];
+	int keybuf_len;
+
+	if (keylen > 64) {
+		sha256_starts(&ctx);
+		sha256_update(&ctx, key, keylen);
+		sha256_finish(&ctx, keybuf);
+
+		keybuf_len = 32;
+	} else {
+		memset(keybuf, 0, sizeof(keybuf));
+		memcpy(keybuf, key, keylen);
+		keybuf_len = keylen;
+	}
+
+	memset(k_ipad, 0x36, 64);
+	memset(k_opad, 0x5C, 64);
+
+	for (i = 0; i < keybuf_len; i++) {
+		k_ipad[i] ^= keybuf[i];
+		k_opad[i] ^= keybuf[i];
+	}
 
 	sha256_starts(&ctx);
-
-#if defined(CONFIG_HW_WATCHDOG) || defined(CONFIG_WATCHDOG)
-	curr = (unsigned char *)input;
-	end = input + ilen;
-	while (curr < end) {
-		chunk = end - curr;
-		if (chunk > chunk_sz)
-			chunk = chunk_sz;
-		sha256_update(&ctx, curr, chunk);
-		curr += chunk;
-		WATCHDOG_RESET();
-	}
-#else
+	sha256_update(&ctx, k_ipad, sizeof(k_ipad));
 	sha256_update(&ctx, input, ilen);
-#endif
+	sha256_finish(&ctx, tmpbuf);
 
+	sha256_starts(&ctx);
+	sha256_update(&ctx, k_opad, sizeof(k_opad));
+	sha256_update(&ctx, tmpbuf, sizeof(tmpbuf));
 	sha256_finish(&ctx, output);
+
+	memset(k_ipad, 0, sizeof(k_ipad));
+	memset(k_opad, 0, sizeof(k_opad));
+	memset(tmpbuf, 0, sizeof(tmpbuf));
+	memset(keybuf, 0, sizeof(keybuf));
+	memset(&ctx, 0, sizeof(sha256_context));
+
+	return 0;
 }

@@ -7,7 +7,6 @@
  *	   Honghui Zhang <honghui.zhang@mediatek.com>
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <generic-phy.h>
@@ -20,6 +19,7 @@
 #include <linux/bitops.h>
 #include <linux/iopoll.h>
 #include <linux/list.h>
+#include <linux/printk.h>
 #include "pci_internal.h"
 
 /* PCIe shared registers */
@@ -41,10 +41,6 @@
 #define PCIE_BAR_ENABLE		BIT(0)
 #define PCIE_REVISION_ID	BIT(0)
 #define PCIE_CLASS_CODE		(0x60400 << 8)
-#define PCIE_CONF_REG(regn)	(((regn) & GENMASK(7, 2)) | \
-				((((regn) >> 8) & GENMASK(3, 0)) << 24))
-#define PCIE_CONF_ADDR(regn, bdf) \
-				(PCIE_CONF_REG(regn) | (bdf))
 
 /* MediaTek specific configuration registers */
 #define PCIE_FTS_NUM		0x70c
@@ -147,8 +143,11 @@ static int mtk_pcie_config_address(const struct udevice *udev, pci_dev_t bdf,
 				   uint offset, void **paddress)
 {
 	struct mtk_pcie *pcie = dev_get_priv(udev);
+	u32 val;
 
-	writel(PCIE_CONF_ADDR(offset, bdf), pcie->base + PCIE_CFG_ADDR);
+	val = PCI_CONF1_EXT_ADDRESS(PCI_BUS(bdf), PCI_DEV(bdf),
+				    PCI_FUNC(bdf), offset) & ~PCI_CONF1_ENABLE;
+	writel(val, pcie->base + PCIE_CFG_ADDR);
 	*paddress = pcie->base + PCIE_CFG_DATA + (offset & 3);
 
 	return 0;
@@ -330,7 +329,6 @@ static void mtk_pcie_port_free(struct mtk_pcie_port *port)
 static int mtk_pcie_startup_port(struct mtk_pcie_port *port)
 {
 	struct mtk_pcie *pcie = port->pcie;
-	u32 slot = PCI_DEV(port->slot << 11);
 	u32 val;
 	int err;
 
@@ -357,13 +355,14 @@ static int mtk_pcie_startup_port(struct mtk_pcie_port *port)
 	writel(PCIE_CLASS_CODE | PCIE_REVISION_ID, port->base + PCIE_CLASS);
 
 	/* configure FC credit */
-	writel(PCIE_CONF_ADDR(PCIE_FC_CREDIT, slot),
-	       pcie->base + PCIE_CFG_ADDR);
+	val = PCI_CONF1_EXT_ADDRESS(0, port->slot, 0, PCIE_FC_CREDIT) & ~PCI_CONF1_ENABLE;
+	writel(val, pcie->base + PCIE_CFG_ADDR);
 	clrsetbits_le32(pcie->base + PCIE_CFG_DATA, PCIE_FC_CREDIT_MASK,
 			PCIE_FC_CREDIT_VAL(0x806c));
 
 	/* configure RC FTS number to 250 when it leaves L0s */
-	writel(PCIE_CONF_ADDR(PCIE_FTS_NUM, slot), pcie->base + PCIE_CFG_ADDR);
+	val = PCI_CONF1_EXT_ADDRESS(0, port->slot, 0, PCIE_FTS_NUM) & ~PCI_CONF1_ENABLE;
+	writel(val, pcie->base + PCIE_CFG_ADDR);
 	clrsetbits_le32(pcie->base + PCIE_CFG_DATA, PCIE_FTS_NUM_MASK,
 			PCIE_FTS_NUM_L0(0x50));
 
@@ -525,7 +524,7 @@ exit:
 	mtk_pcie_port_free(port);
 }
 
-static int mtk_pcie_parse_port(struct udevice *dev, u32 slot)
+static int mtk_pcie_parse_port(struct udevice *dev, u32 slot, int index)
 {
 	struct mtk_pcie *pcie = dev_get_priv(dev);
 	struct mtk_pcie_port *port;
@@ -546,11 +545,11 @@ static int mtk_pcie_parse_port(struct udevice *dev, u32 slot)
 	if (err)
 		return err;
 
-	err = reset_get_by_index(dev, slot, &port->reset);
+	err = reset_get_by_index(dev, index, &port->reset);
 	if (err)
 		return err;
 
-	err = generic_phy_get_by_index(dev, slot, &port->phy);
+	err = generic_phy_get_by_index(dev, index, &port->phy);
 	if (err)
 		return err;
 
@@ -632,18 +631,58 @@ static int mtk_pcie_parse_port_v2(struct udevice *dev, u32 slot)
 	return 0;
 }
 
+static int mtk_pcie_subsys_get(struct udevice *dev)
+{
+	struct mtk_pcie *pcie = dev_get_priv(dev);
+	ofnode cfg_node;
+	fdt_addr_t addr;
+
+	cfg_node = ofnode_by_compatible(ofnode_null(),
+					"mediatek,generic-pciecfg");
+	if (!ofnode_valid(cfg_node))
+		return -ENOENT;
+
+	addr = ofnode_get_addr(cfg_node);
+	if (addr == FDT_ADDR_T_NONE)
+		return -ENODEV;
+
+	pcie->base = map_physmem(addr, 0, MAP_NOCACHE);
+	if (!pcie->base)
+		return -ENOENT;
+
+	return 0;
+}
+
 static int mtk_pcie_probe(struct udevice *dev)
 {
 	struct mtk_pcie *pcie = dev_get_priv(dev);
 	struct mtk_pcie_port *port, *tmp;
+	bool split_pcie_node = false;
 	ofnode subnode;
+	unsigned int slot;
 	int err;
 
 	INIT_LIST_HEAD(&pcie->ports);
 
-	pcie->base = dev_remap_addr_name(dev, "subsys");
-	if (!pcie->base)
-		return -ENOENT;
+	/* Check if upstream implementation is used */
+	err = mtk_pcie_subsys_get(dev);
+	if (!err) {
+		/*
+		 * Assume split port node implementation with "mediatek,generic-pciecfg"
+		 * found. We check reg-names and check if the node is for port0 or port1.
+		 */
+		split_pcie_node = true;
+		if (!strcmp(dev_read_string(dev, "reg-names"), "port0"))
+			slot = 0;
+		else if (!strcmp(dev_read_string(dev, "reg-names"), "port1"))
+			slot = 1;
+		else
+			return -EINVAL;
+	} else {
+		pcie->base = dev_remap_addr_name(dev, "subsys");
+		if (!pcie->base)
+			return -ENOENT;
+	}
 
 	err = clk_get_by_name(dev, "free_ck", &pcie->free_ck);
 	if (err)
@@ -654,20 +693,27 @@ static int mtk_pcie_probe(struct udevice *dev)
 	if (err)
 		return err;
 
-	dev_for_each_subnode(subnode, dev) {
-		struct fdt_pci_addr addr;
-		u32 slot = 0;
+	if (!split_pcie_node) {
+		dev_for_each_subnode(subnode, dev) {
+			struct fdt_pci_addr addr;
 
-		if (!ofnode_is_available(subnode))
-			continue;
+			slot = 0;
 
-		err = ofnode_read_pci_addr(subnode, 0, "reg", &addr);
-		if (err)
-			return err;
+			if (!ofnode_is_enabled(subnode))
+				continue;
 
-		slot = PCI_DEV(addr.phys_hi);
+			err = ofnode_read_pci_addr(subnode, 0, "reg", &addr, NULL);
+			if (err)
+				return err;
 
-		err = mtk_pcie_parse_port(dev, slot);
+			slot = PCI_DEV(addr.phys_hi);
+
+			err = mtk_pcie_parse_port(dev, slot, slot);
+			if (err)
+				return err;
+		}
+	} else {
+		err = mtk_pcie_parse_port(dev, slot, 0);
 		if (err)
 			return err;
 	}
@@ -683,28 +729,54 @@ static int mtk_pcie_probe_v2(struct udevice *dev)
 {
 	struct mtk_pcie *pcie = dev_get_priv(dev);
 	struct mtk_pcie_port *port, *tmp;
-	struct fdt_pci_addr addr;
+	bool split_pcie_node = false;
 	ofnode subnode;
 	unsigned int slot;
 	int err;
 
 	INIT_LIST_HEAD(&pcie->ports);
 
-	pcie->base = dev_remap_addr_name(dev, "subsys");
-	if (!pcie->base)
-		return -ENOENT;
+	/* Check if upstream implementation is used */
+	err = mtk_pcie_subsys_get(dev);
+	if (!err) {
+		/*
+		 * Assume split port node implementation with "mediatek,generic-pciecfg"
+		 * found. We check reg-names and check if the node is for port0 or port1.
+		 */
+		split_pcie_node = true;
+		if (!strcmp(dev_read_string(dev, "reg-names"), "port0"))
+			slot = 0;
+		else if (!strcmp(dev_read_string(dev, "reg-names"), "port1"))
+			slot = 1;
+		else
+			return -EINVAL;
+	} else {
+		pcie->base = dev_remap_addr_name(dev, "subsys");
+		if (!pcie->base)
+			return -ENOENT;
+	}
 
 	pcie->priv = dev;
 
-	dev_for_each_subnode(subnode, dev) {
-		if (!ofnode_is_available(subnode))
-			continue;
+	if (!split_pcie_node) {
+		dev_for_each_subnode(subnode, dev) {
+			struct fdt_pci_addr addr;
 
-		err = ofnode_read_pci_addr(subnode, 0, "reg", &addr);
-		if (err)
-			return err;
+			slot = 0;
 
-		slot = PCI_DEV(addr.phys_hi);
+			if (!ofnode_is_enabled(subnode))
+				continue;
+
+			err = ofnode_read_pci_addr(subnode, 0, "reg", &addr, NULL);
+			if (err)
+				return err;
+
+			slot = PCI_DEV(addr.phys_hi);
+			err = mtk_pcie_parse_port_v2(dev, slot);
+			if (err)
+				return err;
+		}
+	} else {
 		err = mtk_pcie_parse_port_v2(dev, slot);
 		if (err)
 			return err;

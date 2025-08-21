@@ -5,7 +5,6 @@
  * Copyright (c) 2018, Ramon Fried <ramon.fried@gmail.com>
  */
 
-#include <common.h>
 #include <errno.h>
 #include <dm.h>
 #include <asm/global_data.h>
@@ -18,6 +17,7 @@
 #include <linux/err.h>
 #include <linux/ioport.h>
 #include <linux/io.h>
+#include <linux/sizes.h>
 #include <smem.h>
 
 DECLARE_GLOBAL_DATA_PTR;

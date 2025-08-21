@@ -30,7 +30,7 @@ int x86_cpu_init_f(void);
  * identify so that CPU functions can be used correctly, but does not change
  * anything.
  *
- * @return 0 (indicating success, to mimic cpu_init_f())
+ * Return: 0 (indicating success, to mimic cpu_init_f())
  */
 int x86_cpu_reinit_f(void);
 
@@ -39,9 +39,18 @@ int x86_cpu_reinit_f(void);
  *
  * This just sets up the CPU features and figured out the identity
  *
- * @return 0 (indicating success, to mimic cpu_init_f())
+ * Return: 0 (indicating success, to mimic cpu_init_f())
  */
 int x86_cpu_init_tpl(void);
+
+/**
+ * x86_get_identity_for_timer() - Set up CPU identity for use by the early timer
+ *
+ * The timer can be needed early in board_f if bootstage is enabled. This
+ * function can be called from the TSC timer to make sure that the CPU-identity
+ * info has been set up
+ */
+void x86_get_identity_for_timer(void);
 
 /**
  * cpu_reinit_fpu() - Reinit the FPU if something is wrong with it
@@ -50,6 +59,14 @@ int x86_cpu_init_tpl(void);
  * it so that the FPU can be used safely
  */
 void cpu_reinit_fpu(void);
+
+/**
+ * x86_cpu_vendor_info() - Get the CPU-vendor name and device number
+ *
+ * @name: 13-byte area to hold the returned string
+ * Return: CPU device number read from cpuid
+ */
+int x86_cpu_vendor_info(char *name);
 
 int cpu_init_f(void);
 void setup_gdt(struct global_data *id, u64 *gdt_addr);
@@ -77,8 +94,7 @@ int x86_cleanup_before_linux(void);
 void x86_enable_caches(void);
 void x86_disable_caches(void);
 int x86_init_cache(void);
-ulong board_get_usable_ram_top(ulong total_size);
-int default_print_cpuinfo(void);
+phys_addr_t board_get_usable_ram_top(phys_size_t total_size);
 
 /* Set up a UART which can be used with printch(), printhex8(), etc. */
 int setup_internal_uart(int enable);
@@ -102,13 +118,36 @@ int video_bios_init(void);
  */
 int fsp_save_s3_stack(void);
 
-void	board_init_f_r_trampoline(ulong) __attribute__ ((noreturn));
-void	board_init_f_r(void) __attribute__ ((noreturn));
+/**
+ * board_init_f_r_trampoline() - jump to relocated address with new stack
+ *
+ * @sp: New stack pointer to use
+ */
+void __noreturn board_init_f_r_trampoline(ulong sp);
+
+/**
+ * board_init_f_r() - jump to relocated U-Boot
+ *
+ * This is used to jump from pre-relocation to post-relocation U-Boot. It
+ * enables the cache and jump to the new location.
+ */
+void __noreturn board_init_f_r(void);
+
+/*
+ * board_init_f_r_trampoline64() - jump to relocated address with new stack
+ *
+ * This is the 64-bit version
+ *
+ * @new_gd: New global_data pointer to use
+ * @sp: New stack pointer to pass on to board_init_r()
+ */
+void __noreturn board_init_f_r_trampoline64(struct global_data *new_gd,
+					    ulong sp);
 
 int arch_misc_init(void);
 
 /* Read the time stamp counter */
-static inline __attribute__((no_instrument_function)) uint64_t rdtsc(void)
+static inline notrace uint64_t rdtsc(void)
 {
 	uint32_t high, low;
 	__asm__ __volatile__("rdtsc" : "=a" (low), "=d" (high));

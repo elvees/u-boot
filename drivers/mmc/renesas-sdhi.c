@@ -3,7 +3,6 @@
  * Copyright (C) 2018 Marek Vasut <marek.vasut@gmail.com>
  */
 
-#include <common.h>
 #include <bouncebuf.h>
 #include <clk.h>
 #include <fdtdec.h>
@@ -20,6 +19,7 @@
 #include <linux/io.h>
 #include <linux/sizes.h>
 #include <power/regulator.h>
+#include <reset.h>
 #include <asm/unaligned.h>
 #include "tmio-common.h"
 
@@ -71,42 +71,28 @@
 
 #define CALIB_TABLE_MAX	(RENESAS_SDHI_SCC_TMPPORT_CALIB_CODE_MASK + 1)
 
-static const u8 r8a7795_calib_table[2][CALIB_TABLE_MAX] = {
-	{ 0,  0,  0,  0,  0,  1,  1,  2,  3,  4,  5,  5,  6,  6,  7, 11,
-	 15, 16, 16, 17, 17, 17, 17, 17, 18, 18, 18, 18, 19, 20, 21, 21 },
-	{ 3,  3,  4,  4,  5,  6,  6,  7,  8,  8,  9,  9, 10, 11, 12, 15,
-	 16, 16, 17, 17, 17, 17, 17, 18, 18, 18, 18, 19, 20, 21, 22, 22 }
-};
-
-static const u8 r8a7796_rev1_calib_table[2][CALIB_TABLE_MAX] = {
-	{ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  2,  3,  4,  9,
-	 15, 15, 15, 16, 16, 16, 16, 16, 17, 18, 19, 20, 21, 21, 22, 22 },
-	{ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,
-	  2,  9, 16, 17, 17, 17, 18, 18, 18, 18, 19, 20, 21, 22, 23, 24}
-};
-
-static const u8 r8a7796_rev3_calib_table[2][CALIB_TABLE_MAX] = {
-	{ 0,  0,  0,  0,  2,  3,  4,  4,  5,  6,  7,  7,  8,  9,  9, 10,
-	 11, 12, 13, 15, 16, 17, 17, 18, 19, 19, 20, 21, 21, 22, 23, 23 },
-	{ 1,  2,  2,  3,  4,  4,  5,  6,  6,  7,  8,  9,  9, 10, 11, 12,
-	 13, 14, 15, 16, 17, 17, 18, 19, 20, 20, 21, 22, 22, 23, 24, 24 }
+static const u8 r8a7796_rev13_calib_table[2][CALIB_TABLE_MAX] = {
+	{ 3,  3,  3,  3,  3,  3,  3,  4,  4,  5,  6,  7,  8,  9, 10, 15,
+	 16, 16, 16, 16, 16, 16, 17, 18, 18, 19, 20, 21, 22, 23, 24, 25 },
+	{ 5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  5,  6,  7,  8, 11,
+	 12, 17, 18, 18, 18, 18, 18, 18, 18, 19, 20, 21, 22, 23, 25, 25 }
 };
 
 static const u8 r8a77965_calib_table[2][CALIB_TABLE_MAX] = {
-	{ 0,  1,  2,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 15,
-	 16, 17, 18, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 29 },
-	{ 0,  1,  2,  2,  2,  3,  4,  5,  6,  7,  9, 10, 11, 12, 13, 15,
-	 16, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 31 }
+	{ 1,  2,  6,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 15, 15, 16,
+	 17, 18, 19, 20, 21, 22, 23, 24, 25, 25, 26, 27, 28, 29, 30, 31 },
+	{ 2,  3,  4,  4,  5,  6,  7,  9, 10, 11, 12, 13, 14, 15, 16, 17,
+	 17, 17, 20, 21, 22, 23, 24, 25, 27, 28, 29, 30, 31, 31, 31, 31 }
 };
 
 static const u8 r8a77990_calib_table[2][CALIB_TABLE_MAX] = {
 	{ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 },
-	{ 0,  0,  1,  2,  3,  4,  4,  4,  4,  5,  5,  6,  7,  8, 10, 11,
-	 12, 13, 14, 16, 17, 18, 18, 18, 19, 19, 20, 24, 26, 26, 26, 26 }
+	{ 0,  0,  0,  1,  2,  3,  3,  4,  4,  4,  5,  5,  6,  8,  9, 10,
+	 11, 12, 13, 15, 16, 17, 17, 18, 18, 19, 20, 22, 24, 25, 26, 26 }
 };
 
-static int rmobile_is_gen3_mmc0(struct tmio_sd_priv *priv)
+static int rcar_is_gen3_mmc0(struct tmio_sd_priv *priv)
 {
 	/* On R-Car Gen3, MMC0 is at 0xee140000 */
 	return (uintptr_t)(priv->regbase) == 0xee140000;
@@ -332,7 +318,7 @@ static unsigned int renesas_sdhi_init_tuning(struct tmio_sd_priv *priv)
 		RENESAS_SDHI_SCC_DTCNTL_TAPNUM_MASK;
 }
 
-static void renesas_sdhi_reset_tuning(struct tmio_sd_priv *priv)
+static void renesas_sdhi_reset_tuning(struct tmio_sd_priv *priv, bool clk_disable)
 {
 	u32 reg;
 
@@ -364,6 +350,12 @@ static void renesas_sdhi_reset_tuning(struct tmio_sd_priv *priv)
 	reg = tmio_sd_readl(priv, RENESAS_SDHI_SCC_RVSCNTL);
 	reg &= ~RENESAS_SDHI_SCC_RVSCNTL_RVSEN;
 	tmio_sd_writel(priv, reg, RENESAS_SDHI_SCC_RVSCNTL);
+
+	if (clk_disable) {
+		reg = tmio_sd_readl(priv, TMIO_SD_CLKCTL);
+		reg &= ~TMIO_SD_CLKCTL_SCLKEN;
+		tmio_sd_writel(priv, reg, TMIO_SD_CLKCTL);
+	}
 }
 
 static int renesas_sdhi_hs400(struct udevice *dev)
@@ -372,13 +364,21 @@ static int renesas_sdhi_hs400(struct udevice *dev)
 	struct mmc *mmc = mmc_get_mmc_dev(dev);
 	bool hs400 = (mmc->selected_mode == MMC_HS_400);
 	int ret, taps = hs400 ? priv->nrtaps : 8;
+	const u32 sdn_rate = 200000000;
+	u32 sdnh_rate = 800000000;
 	unsigned long new_tap;
 	u32 reg;
 
-	if (taps == 4)	/* HS400 on 4tap SoC needs different clock */
-		ret = clk_set_rate(&priv->clk, 400000000);
-	else
-		ret = clk_set_rate(&priv->clk, 200000000);
+	if (clk_valid(&priv->clkh) && !priv->needs_clkh_fallback) {
+		/* HS400 on 4tap SoC => SDnH=400 MHz, SDn=200 MHz */
+		if (taps == 4)
+			sdnh_rate /= 2;
+		ret = clk_set_rate(&priv->clkh, sdnh_rate);
+		if (ret < 0)
+			return ret;
+	}
+
+	ret = clk_set_rate(&priv->clk, sdn_rate);
 	if (ret < 0)
 		return ret;
 
@@ -568,10 +568,10 @@ int renesas_sdhi_execute_tuning(struct udevice *dev, uint opcode)
 	struct mmc *mmc = upriv->mmc;
 	unsigned int tap_num;
 	unsigned int taps = 0;
-	int i, ret = 0;
-	u32 caps;
+	int i, ret = 0, sret;
+	u32 caps, reg;
 
-	/* Only supported on Renesas RCar */
+	/* Only supported on Renesas R-Car */
 	if (!(priv->caps & TMIO_SD_CAP_RCAR_UHS))
 		return -EINVAL;
 
@@ -605,18 +605,29 @@ int renesas_sdhi_execute_tuning(struct udevice *dev, uint opcode)
 		caps = priv->caps;
 		priv->caps &= ~TMIO_SD_CAP_DMA_INTERNAL;
 
-		ret = mmc_send_tuning(mmc, opcode, NULL);
+		ret = mmc_send_tuning(mmc, opcode);
 
 		priv->caps = caps;
 
 		if (ret == 0)
 			taps |= BIT(i);
 
-		ret = renesas_sdhi_compare_scc_data(priv);
-		if (ret == 0)
+		reg = renesas_sdhi_compare_scc_data(priv);
+		if (reg == 0)
 			priv->smpcmp |= BIT(i);
 
 		mdelay(1);
+
+		/*
+		 * eMMC specification specifies that CMD12 can be used to stop a tuning
+		 * command, but SD specification does not, so do nothing unless it is
+		 * eMMC.
+		 */
+		if (ret && (opcode == MMC_CMD_SEND_TUNING_BLOCK_HS200)) {
+			sret = mmc_send_stop_transmission(mmc, false);
+			if (sret < 0)
+				dev_dbg(dev, "Tuning abort fail (%d)\n", sret);
+		}
 	}
 
 	ret = renesas_sdhi_select_tuning(priv, taps);
@@ -624,7 +635,7 @@ int renesas_sdhi_execute_tuning(struct udevice *dev, uint opcode)
 out:
 	if (ret < 0) {
 		dev_warn(dev, "Tuning procedure failed\n");
-		renesas_sdhi_reset_tuning(priv);
+		renesas_sdhi_reset_tuning(priv, true);
 	}
 
 	return ret;
@@ -663,7 +674,7 @@ static int renesas_sdhi_set_ios(struct udevice *dev)
 	    (mmc->selected_mode != UHS_SDR104) &&
 	    (mmc->selected_mode != MMC_HS_200) &&
 	    (mmc->selected_mode != MMC_HS_400)) {
-		renesas_sdhi_reset_tuning(priv);
+		renesas_sdhi_reset_tuning(priv, mmc->clk_disable);
 	}
 #endif
 
@@ -787,9 +798,12 @@ static int renesas_sdhi_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 #if CONFIG_IS_ENABLED(MMC_UHS_SUPPORT) || \
     CONFIG_IS_ENABLED(MMC_HS200_SUPPORT) || \
     CONFIG_IS_ENABLED(MMC_HS400_SUPPORT)
+	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(dev);
 	struct tmio_sd_priv *priv = dev_get_priv(dev);
+	struct mmc *mmc = upriv->mmc;
 
-	renesas_sdhi_check_scc_error(dev);
+	if (!mmc->tuning)
+		renesas_sdhi_check_scc_error(dev);
 
 	if (cmd->cmdidx == MMC_CMD_SEND_STATUS)
 		renesas_sdhi_adjust_hs400_mode_enable(priv);
@@ -843,11 +857,14 @@ static const struct udevice_id renesas_sdhi_match[] = {
 	{ .compatible = "renesas,sdhi-r8a7794", .data = RENESAS_GEN2_QUIRKS },
 	{ .compatible = "renesas,sdhi-r8a7795", .data = RENESAS_GEN3_QUIRKS },
 	{ .compatible = "renesas,sdhi-r8a7796", .data = RENESAS_GEN3_QUIRKS },
+	{ .compatible = "renesas,sdhi-r8a77961", .data = RENESAS_GEN3_QUIRKS },
 	{ .compatible = "renesas,rcar-gen3-sdhi", .data = RENESAS_GEN3_QUIRKS },
 	{ .compatible = "renesas,sdhi-r8a77965", .data = RENESAS_GEN3_QUIRKS },
 	{ .compatible = "renesas,sdhi-r8a77970", .data = RENESAS_GEN3_QUIRKS },
 	{ .compatible = "renesas,sdhi-r8a77990", .data = RENESAS_GEN3_QUIRKS },
 	{ .compatible = "renesas,sdhi-r8a77995", .data = RENESAS_GEN3_QUIRKS },
+	{ .compatible = "renesas,rcar-gen4-sdhi", .data = RENESAS_GEN3_QUIRKS },
+	{ .compatible = "renesas,rzg2l-sdhi", .data = RENESAS_GEN3_QUIRKS },
 	{ /* sentinel */ }
 };
 
@@ -871,101 +888,162 @@ static void renesas_sdhi_filter_caps(struct udevice *dev)
     CONFIG_IS_ENABLED(MMC_HS400_SUPPORT)
 	struct tmio_sd_plat *plat = dev_get_plat(dev);
 
-	/* HS400 is not supported on H3 ES1.x and M3W ES1.0, ES1.1 */
-	if (((rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A7795) &&
-	    (rmobile_get_cpu_rev_integer() <= 1)) ||
-	    ((rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A7796) &&
-	    (rmobile_get_cpu_rev_integer() == 1) &&
-	    (rmobile_get_cpu_rev_fraction() < 2)))
+	/* HS400 is not supported on H3 ES1.x, M3W ES1.[012], V3M, V3H ES1.x, D3 */
+	if (((renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A7795) &&
+	    (renesas_get_cpu_rev_integer() <= 1)) ||
+	    ((renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A7796) &&
+	    (renesas_get_cpu_rev_integer() == 1) &&
+	    (renesas_get_cpu_rev_fraction() <= 2)) ||
+	    (renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A77970) ||
+	    ((renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A77980) &&
+	    (renesas_get_cpu_rev_integer() <= 1)) ||
+	    (renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A77995))
 		plat->cfg.host_caps &= ~MMC_MODE_HS400;
 
 	/* H3 ES2.0, ES3.0 and M3W ES1.2 and M3N bad taps */
-	if (((rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A7795) &&
-	    (rmobile_get_cpu_rev_integer() >= 2)) ||
-	    ((rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A7796) &&
-	    (rmobile_get_cpu_rev_integer() == 1) &&
-	    (rmobile_get_cpu_rev_fraction() == 2)) ||
-	    (rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A77965))
+	if (((renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A7795) &&
+	    (renesas_get_cpu_rev_integer() >= 2)) ||
+	    ((renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A7796) &&
+	    (renesas_get_cpu_rev_integer() == 1) &&
+	    (renesas_get_cpu_rev_fraction() == 2)) ||
+	    (renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A77965))
 		priv->hs400_bad_tap = BIT(2) | BIT(3) | BIT(6) | BIT(7);
 
-	/* H3 ES3.0 can use HS400 with manual adjustment */
-	if ((rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A7795) &&
-	    (rmobile_get_cpu_rev_integer() >= 3)) {
-		priv->adjust_hs400_enable = true;
-		priv->adjust_hs400_offset = 0;
-		priv->adjust_hs400_calib_table =
-			r8a7795_calib_table[!rmobile_is_gen3_mmc0(priv)];
-	}
-
-	/* M3W ES1.2 can use HS400 with manual adjustment */
-	if ((rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A7796) &&
-	    (rmobile_get_cpu_rev_integer() == 1) &&
-	    (rmobile_get_cpu_rev_fraction() == 2)) {
+	/* M3W ES1.x for x>2 can use HS400 with manual adjustment and taps */
+	if ((renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A7796) &&
+	    (renesas_get_cpu_rev_integer() == 1) &&
+	    (renesas_get_cpu_rev_fraction() > 2)) {
 		priv->adjust_hs400_enable = true;
 		priv->adjust_hs400_offset = 3;
-		priv->adjust_hs400_calib_table =
-			r8a7796_rev1_calib_table[!rmobile_is_gen3_mmc0(priv)];
-	}
-
-	/* M3W ES1.x for x>2 can use HS400 with manual adjustment and taps */
-	if ((rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A7796) &&
-	    (rmobile_get_cpu_rev_integer() == 1) &&
-	    (rmobile_get_cpu_rev_fraction() > 2)) {
-		priv->adjust_hs400_enable = true;
-		priv->adjust_hs400_offset = 0;
 		priv->hs400_bad_tap = BIT(1) | BIT(3) | BIT(5) | BIT(7);
 		priv->adjust_hs400_calib_table =
-			r8a7796_rev3_calib_table[!rmobile_is_gen3_mmc0(priv)];
+			r8a7796_rev13_calib_table[!rcar_is_gen3_mmc0(priv)];
 	}
 
+	/* M3W+ bad taps */
+	if ((renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A7796) &&
+	    (renesas_get_cpu_rev_integer() == 3))
+		priv->hs400_bad_tap = BIT(1) | BIT(3) | BIT(5) | BIT(7);
+
 	/* M3N can use HS400 with manual adjustment */
-	if (rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A77965) {
+	if (renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A77965) {
 		priv->adjust_hs400_enable = true;
 		priv->adjust_hs400_offset = 3;
 		priv->adjust_hs400_calib_table =
-			r8a77965_calib_table[!rmobile_is_gen3_mmc0(priv)];
+			r8a77965_calib_table[!rcar_is_gen3_mmc0(priv)];
 	}
 
 	/* E3 can use HS400 with manual adjustment */
-	if (rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A77990) {
+	if (renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A77990) {
 		priv->adjust_hs400_enable = true;
 		priv->adjust_hs400_offset = 3;
 		priv->adjust_hs400_calib_table =
-			r8a77990_calib_table[!rmobile_is_gen3_mmc0(priv)];
+			r8a77990_calib_table[!rcar_is_gen3_mmc0(priv)];
 	}
 
-	/* H3 ES1.x, ES2.0 and M3W ES1.0, ES1.1, ES1.2 uses 4 tuning taps */
-	if (((rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A7795) &&
-	    (rmobile_get_cpu_rev_integer() <= 2)) ||
-	    ((rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A7796) &&
-	    (rmobile_get_cpu_rev_integer() == 1) &&
-	    (rmobile_get_cpu_rev_fraction() <= 2)))
+	/* H3 ES1.x, ES2.0 and M3W ES1.[0123] uses 4 tuning taps */
+	if (((renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A7795) &&
+	    (renesas_get_cpu_rev_integer() <= 2)) ||
+	    ((renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A7796) &&
+	    (renesas_get_cpu_rev_integer() == 1) &&
+	    (renesas_get_cpu_rev_fraction() <= 3)))
 		priv->nrtaps = 4;
 	else
 		priv->nrtaps = 8;
 #endif
 	/* H3 ES1.x and M3W ES1.0 uses bit 17 for DTRAEND */
-	if (((rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A7795) &&
-	    (rmobile_get_cpu_rev_integer() <= 1)) ||
-	    ((rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A7796) &&
-	    (rmobile_get_cpu_rev_integer() == 1) &&
-	    (rmobile_get_cpu_rev_fraction() == 0)))
+	if (((renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A7795) &&
+	    (renesas_get_cpu_rev_integer() <= 1)) ||
+	    ((renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A7796) &&
+	    (renesas_get_cpu_rev_integer() == 1) &&
+	    (renesas_get_cpu_rev_fraction() == 0)))
 		priv->read_poll_flag = TMIO_SD_DMA_INFO1_END_RD;
 	else
 		priv->read_poll_flag = TMIO_SD_DMA_INFO1_END_RD2;
+
+	/* V3M handles SD0H differently than other Gen3 SoCs */
+	if (renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A77970)
+		priv->needs_clkh_fallback = true;
+	else
+		priv->needs_clkh_fallback = false;
+}
+
+static int rzg2l_sdhi_setup(struct udevice *dev)
+{
+	struct tmio_sd_priv *priv = dev_get_priv(dev);
+	struct clk imclk2, aclk;
+	struct reset_ctl rst;
+	int ret;
+
+	/*
+	 * On members of the RZ/G2L SoC family, we need to enable
+	 * additional chip detect and bus clocks, then release the SDHI
+	 * module from reset.
+	 */
+	ret = clk_get_by_name(dev, "cd", &imclk2);
+	if (ret < 0) {
+		dev_err(dev, "failed to get imclk2 (chip detect clk)\n");
+		return ret;
+	}
+
+	ret = clk_get_by_name(dev, "aclk", &aclk);
+	if (ret < 0) {
+		dev_err(dev, "failed to get aclk\n");
+		return ret;
+	}
+
+	ret = clk_enable(&imclk2);
+	if (ret < 0) {
+		dev_err(dev, "failed to enable imclk2 (chip detect clk)\n");
+		return ret;
+	}
+
+	ret = clk_enable(&aclk);
+	if (ret < 0) {
+		dev_err(dev, "failed to enable aclk\n");
+		goto err_aclk;
+	}
+
+	ret = reset_get_by_index(dev, 0, &rst);
+	if (ret < 0) {
+		dev_err(dev, "failed to get reset line\n");
+		goto err_get_reset;
+	}
+
+	ret = reset_deassert(&rst);
+	if (ret < 0) {
+		dev_err(dev, "failed to de-assert reset line\n");
+		goto err_reset;
+	}
+
+	ret = tmio_sd_probe(dev, priv->quirks);
+	if (ret)
+		goto err_tmio_probe;
+
+	return 0;
+
+err_tmio_probe:
+	reset_assert(&rst);
+err_reset:
+	reset_free(&rst);
+err_get_reset:
+	clk_disable(&aclk);
+err_aclk:
+	clk_disable(&imclk2);
+	return ret;
 }
 
 static int renesas_sdhi_probe(struct udevice *dev)
 {
 	struct tmio_sd_priv *priv = dev_get_priv(dev);
-	u32 quirks = dev_get_driver_data(dev);
 	struct fdt_resource reg_res;
 	DECLARE_GLOBAL_DATA_PTR;
 	int ret;
 
 	priv->clk_get_rate = renesas_sdhi_clk_get_rate;
 
-	if (quirks == RENESAS_GEN2_QUIRKS) {
+	priv->quirks = dev_get_driver_data(dev);
+	if (priv->quirks == RENESAS_GEN2_QUIRKS) {
 		ret = fdt_get_resource(gd->fdt_blob, dev_of_offset(dev),
 				       "reg", 0, &reg_res);
 		if (ret < 0) {
@@ -975,7 +1053,7 @@ static int renesas_sdhi_probe(struct udevice *dev)
 		}
 
 		if (fdt_resource_size(&reg_res) == 0x100)
-			quirks |= TMIO_SD_CAP_16BIT;
+			priv->quirks |= TMIO_SD_CAP_16BIT;
 	}
 
 	ret = clk_get_by_index(dev, 0, &priv->clk);
@@ -984,31 +1062,50 @@ static int renesas_sdhi_probe(struct udevice *dev)
 		return ret;
 	}
 
+	/* optional SDnH clock */
+	ret = clk_get_by_name(dev, "clkh", &priv->clkh);
+	if (ret < 0) {
+		dev_dbg(dev, "failed to get clkh\n");
+	} else {
+		ret = clk_set_rate(&priv->clkh, 800000000);
+		if (ret < 0) {
+			dev_err(dev, "failed to set rate for SDnH clock (%d)\n", ret);
+			return ret;
+		}
+	}
+
 	/* set to max rate */
 	ret = clk_set_rate(&priv->clk, 200000000);
 	if (ret < 0) {
-		dev_err(dev, "failed to set rate for host clock\n");
-		clk_free(&priv->clk);
+		dev_err(dev, "failed to set rate for SDn clock (%d)\n", ret);
 		return ret;
 	}
 
 	ret = clk_enable(&priv->clk);
 	if (ret) {
-		dev_err(dev, "failed to enable host clock\n");
+		dev_err(dev, "failed to enable SDn clock (%d)\n", ret);
 		return ret;
 	}
 
-	priv->quirks = quirks;
-	ret = tmio_sd_probe(dev, quirks);
+	if (device_is_compatible(dev, "renesas,sdhi-r9a07g044"))
+		ret = rzg2l_sdhi_setup(dev);
+	else
+		ret = tmio_sd_probe(dev, priv->quirks);
+	if (ret)
+		goto err_tmio_probe;
 
 	renesas_sdhi_filter_caps(dev);
 
 #if CONFIG_IS_ENABLED(MMC_UHS_SUPPORT) || \
     CONFIG_IS_ENABLED(MMC_HS200_SUPPORT) || \
     CONFIG_IS_ENABLED(MMC_HS400_SUPPORT)
-	if (!ret && (priv->caps & TMIO_SD_CAP_RCAR_UHS))
-		renesas_sdhi_reset_tuning(priv);
+	if (priv->caps & TMIO_SD_CAP_RCAR_UHS)
+		renesas_sdhi_reset_tuning(priv, true);
 #endif
+	return 0;
+
+err_tmio_probe:
+	clk_disable(&priv->clk);
 	return ret;
 }
 

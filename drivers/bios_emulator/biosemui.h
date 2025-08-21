@@ -128,19 +128,60 @@ typedef struct {
 	u32 finalVal;
 } BE_portInfo;
 
-#define PM_inpb(port)	inb(port+VIDEO_IO_OFFSET)
-#define PM_inpw(port)	inw(port+VIDEO_IO_OFFSET)
-#define PM_inpd(port)	inl(port+VIDEO_IO_OFFSET)
-#define PM_outpb(port,val)	outb(val,port+VIDEO_IO_OFFSET)
-#define PM_outpw(port,val)	outw(val,port+VIDEO_IO_OFFSET)
-#define PM_outpd(port,val)	outl(val,port+VIDEO_IO_OFFSET)
+#if defined(X86EMU_RAW_IO)
+#define PM_inpb(port)	inb(port)
+#define PM_inpw(port)	inw(port)
+#define PM_inpd(port)	inl(port)
+#define PM_outpb(port, val)	outb(val, port)
+#define PM_outpw(port, val)	outw(val, port)
+#define PM_outpd(port, val)	outl(val, port)
+
+#else
+
+/*
+ * Until the emulator code is fixed, at least print warnings.
+ */
+
+static inline u8 PM_inpb(u16 port)
+{
+	printf("x86 port 0x%x read attempt, returning 0\n", port);
+	return 0;
+}
+
+static inline u16 PM_inpw(u16 port)
+{
+	printf("x86 port 0x%x read attempt, returning 0\n", port);
+	return 0;
+}
+
+static inline u32 PM_inpd(u16 port)
+{
+	printf("x86 port 0x%x read attempt, returning 0\n", port);
+	return 0;
+}
+
+static inline void PM_outpb(u16 port, u8 val)
+{
+	printf("x86 port 0x%x write attempt, ignoring\n", port);
+}
+
+static inline void PM_outpw(u16 port, u16 val)
+{
+	printf("x86 port 0x%x write attempt, ignoring\n", port);
+}
+
+static inline void PM_outpd(u16 port, u32 val)
+{
+	printf("x86 port 0x%x write attempt, ignoring\n", port);
+}
+#endif
 
 #define LOG_inpb(port)	PM_inpb(port)
 #define LOG_inpw(port)	PM_inpw(port)
 #define LOG_inpd(port)	PM_inpd(port)
-#define LOG_outpb(port,val)	PM_outpb(port,val)
-#define LOG_outpw(port,val)	PM_outpw(port,val)
-#define LOG_outpd(port,val)	PM_outpd(port,val)
+#define LOG_outpb(port, val)	PM_outpb(port, val)
+#define LOG_outpw(port, val)	PM_outpw(port, val)
+#define LOG_outpd(port, val)	PM_outpd(port, val)
 
 /*-------------------------- Function Prototypes --------------------------*/
 

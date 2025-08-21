@@ -9,7 +9,6 @@
  * @brief PFE utility commands
  */
 
-#include <common.h>
 #include <command.h>
 #include <log.h>
 #include <linux/delay.h>
@@ -41,7 +40,7 @@ static void pfe_command_pe(int argc, char *const argv[])
 			}
 
 			id = simple_strtoul(argv[4], NULL, 0);
-			addr = simple_strtoul(argv[5], NULL, 16);
+			addr = hextoul(argv[5], NULL);
 			size = 4;
 
 			for (i = 0; i < num; i++, addr += 4) {
@@ -75,7 +74,7 @@ static void pfe_command_pe(int argc, char *const argv[])
 			}
 
 			id = simple_strtoul(argv[4], NULL, 0);
-			addr = simple_strtoul(argv[5], NULL, 16);
+			addr = hextoul(argv[5], NULL);
 			size = 4;
 
 			for (i = 0; i < num; i++, addr += 4) {
@@ -99,9 +98,9 @@ static void pfe_command_pe(int argc, char *const argv[])
 			}
 
 			id = simple_strtoul(argv[4], NULL, 0);
-			val = simple_strtoul(argv[5], NULL, 16);
+			val = hextoul(argv[5], NULL);
 			val = cpu_to_be32(val);
-			addr = simple_strtoul(argv[6], NULL, 16);
+			addr = hextoul(argv[6], NULL);
 			size = 4;
 			pe_dmem_write(id, val, addr, size);
 		} else {
@@ -123,7 +122,7 @@ static void pfe_command_pe(int argc, char *const argv[])
 				return;
 			}
 
-			offset = simple_strtoul(argv[4], NULL, 16);
+			offset = hextoul(argv[4], NULL);
 
 			for (i = 0; i < num; i++, offset += 4) {
 				pe_lmem_read(&val, 4, offset);
@@ -141,9 +140,9 @@ static void pfe_command_pe(int argc, char *const argv[])
 				return;
 			}
 
-			val = simple_strtoul(argv[4], NULL, 16);
+			val = hextoul(argv[4], NULL);
 			val = cpu_to_be32(val);
-			offset = simple_strtoul(argv[5], NULL, 16);
+			offset = hextoul(argv[5], NULL);
 			pe_lmem_write(&val, 4, offset);
 		} else {
 			printf("Usage: pfe pe lmem [read | write] <parameters>\n");
@@ -418,7 +417,7 @@ static void send_dummy_pkt_to_hif(void)
 	writel(buf, TMU_PHY_INQ_PKTINFO);
 }
 
-static void pfe_command_stop(int argc, char *const argv[])
+void pfe_command_stop(int argc, char *const argv[])
 {
 	int pfe_pe_id, hif_stop_loop = 10;
 	u32 rx_status;

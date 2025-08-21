@@ -14,8 +14,11 @@
 
 #include <linux/types.h>
 
-/* Avoid using CONFIG_EFI_STUB directly as we may boot from other loaders */
-#ifdef CONFIG_EFI_STUB
+/*
+ * In case of the EFI app the UEFI firmware provides the low-level
+ * initialisation.
+ */
+#ifdef CONFIG_EFI
 #define ll_boot_init()	false
 #else
 #include <asm/global_data.h>
@@ -43,17 +46,6 @@ void board_init_f(ulong dummy);
 int arch_cpu_init(void);
 
 /**
- * arch_cpu_init_dm() - init CPU after driver model is available
- *
- * This is called immediately after driver model is available before
- * relocation. This is similar to arch_cpu_init() but is able to reference
- * devices
- *
- * Return: 0 if OK, -ve on error
- */
-int arch_cpu_init_dm(void);
-
-/**
  * mach_cpu_init() - SoC/machine dependent CPU setup
  *
  * This is called after arch_cpu_init(). It should handle any
@@ -64,17 +56,6 @@ int arch_cpu_init_dm(void);
  * Return: 0 on success, otherwise error
  */
 int mach_cpu_init(void);
-
-/**
- * arch_fsp_init() - perform firmware support package init
- *
- * Where U-Boot relies on binary blobs to handle part of the system init, this
- * function can be used to set up the blobs. This is used on some Intel
- * platforms.
- *
- * Return: 0
- */
-int arch_fsp_init(void);
 
 /**
  * arch_fsp_init() - perform post-relocation firmware support package init
@@ -98,8 +79,8 @@ int dram_init(void);
  *
  * If this is not provided, a default implementation will try to set up a
  * single bank. It will do this if CONFIG_NR_DRAM_BANKS and
- * CONFIG_SYS_SDRAM_BASE are set. The bank will have a start address of
- * CONFIG_SYS_SDRAM_BASE and the size will be determined by a call to
+ * CFG_SYS_SDRAM_BASE are set. The bank will have a start address of
+ * CFG_SYS_SDRAM_BASE and the size will be determined by a call to
  * get_effective_memsize().
  *
  * Return: 0 if OK, -ve on error
@@ -110,6 +91,19 @@ long get_ram_size(long *base, long size);
 phys_size_t get_effective_memsize(void);
 
 int testdram(void);
+
+/**
+ * arch_setup_dest_addr() - Fix up initial reloc address
+ *
+ * This is called in generic board init sequence in common/board_f.c at the end
+ * of the setup_dest_addr() initcall. Each architecture could provide this
+ * function to make adjustments to the initial reloc address.
+ *
+ * If an implementation is not provided, it will just be a nop stub.
+ *
+ * Return: 0 if OK
+ */
+int arch_setup_dest_addr(void);
 
 /**
  * arch_reserve_stacks() - Reserve all necessary stacks
@@ -163,6 +157,30 @@ int arch_setup_bdinfo(void);
  */
 int setup_bdinfo(void);
 
+#if defined(CONFIG_SAVE_PREV_BL_INITRAMFS_START_ADDR) || \
+defined(CONFIG_SAVE_PREV_BL_FDT_ADDR)
+/**
+ * save_prev_bl_data - Save prev bl data in env vars.
+ *
+ * When u-boot is chain-loaded, save previous bootloader data,
+ * like initramfs address to environment variables.
+ *
+ * Return: 0 if ok; -ENODATA on error
+ */
+int save_prev_bl_data(void);
+
+/**
+ * get_prev_bl_fdt_addr - When u-boot is chainloaded, get the address
+ * of the FDT passed by the previous bootloader.
+ *
+ * Return: the address of the FDT passed by the previous bootloader
+ * or 0 if not found.
+ */
+phys_addr_t get_prev_bl_fdt_addr(void);
+#else
+#define get_prev_bl_fdt_addr() 0LLU
+#endif
+
 /**
  * cpu_secondary_init_r() - CPU-specific secondary initialization
  *
@@ -214,7 +232,6 @@ int init_cache_f_r(void);
 int print_cpuinfo(void);
 #endif
 int timer_init(void);
-int misc_init_f(void);
 
 #if defined(CONFIG_DTB_RESELECT)
 int embedded_dtb_select(void);
@@ -264,30 +281,56 @@ void board_init_r(struct global_data *id, ulong dest_addr)
 	__attribute__ ((noreturn));
 
 int cpu_init_r(void);
-int last_stage_init(void);
 int mac_read_from_eeprom(void);
+
+/**
+ *  serial_read_from_eeprom - read the serial number from EEPROM
+ *
+ *  This function reads the serial number from the EEPROM and sets the
+ *  appropriate environment variable.
+ *
+ *  The environment variable is only set if it has not been set
+ *  already. This ensures that any user-saved variables are never
+ *  overwritten.
+ *
+ *  This function must be called after relocation.
+ */
+int serial_read_from_eeprom(int devnum);
 int set_cpu_clk_info(void);
 int update_flash_size(int flash_size);
 int arch_early_init_r(void);
 int misc_init_r(void);
-#if defined(CONFIG_VID)
-int init_func_vid(void);
-#endif
 
 /* common/board_info.c */
 int checkboard(void);
+
+/**
+ * show_board_info() - Show board information
+ *
+ * Check sysinfo for board information. Failing that if the root node of the DTB
+ * has a "model" property, show it.
+ *
+ * Then call checkboard().
+ *
+ * Return 0 if OK, -ve on error
+ */
 int show_board_info(void);
 
 /**
- * Get the uppermost pointer that is valid to access
+ * board_get_usable_ram_top() - get uppermost address for U-Boot relocation
  *
- * Some systems may not map all of their address space. This function allows
- * boards to indicate what their highest support pointer value is for DRAM
- * access.
+ * Some systems have reserved memory areas in high memory. By implementing this
+ * function boards can indicate the highest address value to be used when
+ * relocating U-Boot. The returned address is exclusive (i.e. 1 byte above the
+ * last usable address).
  *
- * @param total_size	Size of U-Boot (unused?)
+ * Due to overflow on systems with 32bit phys_addr_t a value 0 is used instead
+ * of 4GiB.
+ *
+ * @total_size:	monitor length in bytes (size of U-Boot code)
+ * Return:	uppermost address for U-Boot relocation
  */
-ulong board_get_usable_ram_top(ulong total_size);
+phys_addr_t board_get_usable_ram_top(phys_size_t total_size);
 
 int board_early_init_f(void);
 
@@ -296,9 +339,6 @@ int board_fix_fdt(void *rw_fdt_blob);
 int board_late_init(void);
 int board_postclk_init(void); /* after clocks/timebase, before env/serial */
 int board_early_init_r(void);
-
-/* TODO(sjg@chromium.org): Drop this when DM_PCI migration is completed */
-void pci_init_board(void);
 
 /**
  * arch_initr_trap() - Init traps
@@ -309,6 +349,16 @@ void pci_init_board(void);
  * Return: 0 if OK
  */
 int arch_initr_trap(void);
+
+/**
+ * init_addr_map()
+ *
+ * Initialize non-identity virtual-physical memory mappings for 32bit CPUs.
+ * It is called during the generic board init sequence, after relocation.
+ *
+ * Return: 0 if OK
+ */
+int init_addr_map(void);
 
 /**
  * main_loop() - Enter the main loop of U-Boot
@@ -329,11 +379,31 @@ void relocate_code(ulong start_addr_sp, struct global_data *new_gd,
 void bdinfo_print_num_l(const char *name, ulong value);
 void bdinfo_print_num_ll(const char *name, unsigned long long value);
 
+/* Print a string value (for use in arch_print_bdinfo()) */
+void bdinfo_print_str(const char *name, const char *str);
+
 /* Print a clock speed in MHz */
 void bdinfo_print_mhz(const char *name, unsigned long hz);
 
+/**
+ * bdinfo_print_size - print size variables in bdinfo format
+ * @name:	string to print before the size
+ * @size:	size to print
+ *
+ * Helper function for displaying size variables as properly formatted bdinfo
+ * entries. The size is printed as "xxx Bytes", "xxx KiB", "xxx MiB",
+ * "xxx GiB", etc. as needed;
+ *
+ * For use in arch_print_bdinfo().
+ */
+void bdinfo_print_size(const char *name, uint64_t size);
+
 /* Show arch-specific information for the 'bd' command */
 void arch_print_bdinfo(void);
+
+struct cmd_tbl;
+
+int do_bdinfo(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[]);
 
 #endif	/* __ASSEMBLY__ */
 /* Put only stuff here that the assembler can digest */

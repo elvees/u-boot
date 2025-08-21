@@ -12,7 +12,6 @@
  * on behalf of DENX Software Engineering GmbH
  */
 
-#include <common.h>
 #include <config.h>
 #include <asm/io.h>
 #include <asm/arch/iomux-mx28.h>
@@ -111,13 +110,6 @@ const iomux_cfg_t iomux_setup[] = {
 	/* I2C0 Codec */
 	MX28_PAD_I2C0_SCL__I2C0_SCL,
 	MX28_PAD_I2C0_SDA__I2C0_SDA,
-
-	/* I2S Codec */
-	MX28_PAD_SAIF0_BITCLK__SAIF0_BITCLK,
-	MX28_PAD_SAIF0_LRCLK__SAIF0_LRCLK,
-	MX28_PAD_SAIF0_MCLK__SAIF0_MCLK,
-	MX28_PAD_SAIF0_SDATA0__SAIF0_SDATA0,
-	MX28_PAD_SAIF1_SDATA0__SAIF1_SDATA0,
 
 	/* PWR-Hold */
 	MX28_PAD_SPDIF__GPIO_3_27,
@@ -232,11 +224,23 @@ const iomux_cfg_t iomux_setup[] = {
 	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | MUX_CONFIG_ENET,
 	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | MUX_CONFIG_ENET,
 	MX28_PAD_ENET0_TXD3__ENET1_TXD1 | MUX_CONFIG_ENET,
-	MX28_PAD_SSP1_CMD__GPIO_2_13, /* PHY reset */
+	MX28_PAD_SSP1_CMD__GPIO_2_13, /* PHY reset HW Rev. 1*/
+	MX28_PAD_SAIF0_LRCLK__GPIO_3_21, /* PHY reset HW Rev. 2*/
 
 	/* TIVA boot control */
 	MX28_PAD_GPMI_RDY3__GPIO_0_23 | MUX_CONFIG_BOOT, /* TIVA0 */
 	MX28_PAD_GPMI_WRN__GPIO_0_25 | MUX_CONFIG_BOOT, /* TIVA1 */
+
+	/* HW revision ID Base Board */
+	MX28_PAD_LCD_D12__GPIO_1_12,
+	MX28_PAD_LCD_D13__GPIO_1_13,
+	MX28_PAD_LCD_D14__GPIO_1_14,
+
+	/* HW revision ID (SoM) */
+	MX28_PAD_LCD_D15__GPIO_1_15,
+	MX28_PAD_LCD_D16__GPIO_1_16,
+	MX28_PAD_LCD_D17__GPIO_1_17,
+	MX28_PAD_LCD_D18__GPIO_1_18,
 };
 
 u32 mxs_dram_vals[] = {
@@ -290,6 +294,12 @@ u32 mxs_dram_vals[] = {
 	0x00000000, 0xffffffff
 };
 
+#ifndef CONFIG_SPL_FRAMEWORK
+void board_init_ll(const u32 arg, const uint32_t *resptr)
+{
+	mxs_common_spl_init(arg, resptr, iomux_setup, ARRAY_SIZE(iomux_setup));
+}
+#else
 void lowlevel_init(void)
 {
 	struct mxs_pinctrl_regs *pinctrl_regs =
@@ -301,3 +311,4 @@ void lowlevel_init(void)
 
 	mxs_common_spl_init(0, NULL, iomux_setup, ARRAY_SIZE(iomux_setup));
 }
+#endif

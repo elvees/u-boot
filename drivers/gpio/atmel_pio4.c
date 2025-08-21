@@ -5,7 +5,6 @@
  * Copyright (C) 2015 Atmel Corporation
  *		 Wenyou.Yang <wenyou.yang@atmel.com>
  */
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <fdtdec.h>
@@ -36,6 +35,11 @@ static struct atmel_pio4_port *atmel_pio4_port_base(u32 port)
 	case AT91_PIO_PORTD:
 		base = (struct atmel_pio4_port *)ATMEL_BASE_PIOD;
 		break;
+#if (ATMEL_PIO_PORTS > 4)
+	case AT91_PIO_PORTE:
+		base = (struct atmel_pio4_port *)ATMEL_BASE_PIOE;
+		break;
+#endif
 	default:
 		printf("Error: Atmel PIO4: Failed to get PIO base of port#%d!\n",
 		       port);
@@ -173,8 +177,15 @@ int atmel_pio4_get_pio_input(u32 port, u32 pin)
 
 #if CONFIG_IS_ENABLED(DM_GPIO)
 
+/**
+ * struct atmel_pioctrl_data - Atmel PIO controller (pinmux + gpio) data struct
+ * @nbanks: number of PIO banks
+ * @last_bank_count: number of lines in the last bank (can be less than
+ *     the rest of the banks).
+ */
 struct atmel_pioctrl_data {
 	u32 nbanks;
+	u32 last_bank_count;
 };
 
 struct atmel_pio4_plat {
@@ -298,8 +309,6 @@ static int atmel_pio4_probe(struct udevice *dev)
 	if (ret)
 		return ret;
 
-	clk_free(&clk);
-
 	addr_base = dev_read_addr(dev);
 	if (addr_base == FDT_ADDR_T_NONE)
 		return -EINVAL;
@@ -313,6 +322,12 @@ static int atmel_pio4_probe(struct udevice *dev)
 					  NULL);
 	uc_priv->gpio_count = nbanks * ATMEL_PIO_NPINS_PER_BANK;
 
+	/* if last bank has limited number of pins, adjust accordingly */
+	if (pioctrl_data->last_bank_count != ATMEL_PIO_NPINS_PER_BANK) {
+		uc_priv->gpio_count -= ATMEL_PIO_NPINS_PER_BANK;
+		uc_priv->gpio_count += pioctrl_data->last_bank_count;
+	}
+
 	return 0;
 }
 
@@ -322,12 +337,19 @@ static int atmel_pio4_probe(struct udevice *dev)
  */
 static const struct atmel_pioctrl_data atmel_sama5d2_pioctrl_data = {
 	.nbanks	= 4,
+	.last_bank_count = ATMEL_PIO_NPINS_PER_BANK,
+};
+
+static const struct atmel_pioctrl_data microchip_sama7g5_pioctrl_data = {
+	.nbanks	= 5,
+	.last_bank_count = 8, /* 5th bank has only 8 lines on sama7g5 */
 };
 
 static const struct udevice_id atmel_pio4_ids[] = {
 	{
-		.compatible = "atmel,sama5d2-gpio",
 		.data = (ulong)&atmel_sama5d2_pioctrl_data,
+	}, {
+		.data = (ulong)&microchip_sama7g5_pioctrl_data,
 	},
 	{}
 };

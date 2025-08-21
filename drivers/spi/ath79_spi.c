@@ -3,7 +3,6 @@
  * Copyright (C) 2015-2016 Wills Wang <wills.wang@live.com>
  */
 
-#include <common.h>
 #include <clock_legacy.h>
 #include <spi.h>
 #include <dm.h>
@@ -74,7 +73,7 @@ static int ath79_spi_xfer(struct udevice *dev, unsigned int bitlen,
 	if (restbits)
 		bytes++;
 
-	out = AR71XX_SPI_IOC_CS_ALL & ~(AR71XX_SPI_IOC_CS(slave->cs));
+	out = AR71XX_SPI_IOC_CS_ALL & ~(AR71XX_SPI_IOC_CS(slave->cs[0]));
 	while (bytes > 0) {
 		bytes--;
 		curbyte = 0;
@@ -133,7 +132,6 @@ static int ath79_spi_xfer(struct udevice *dev, unsigned int bitlen,
 
 	return 0;
 }
-
 
 static int ath79_spi_set_speed(struct udevice *bus, uint speed)
 {

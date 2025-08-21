@@ -3,7 +3,6 @@
  * Copyright (C) 2018 Synopsys, Inc. All rights reserved.
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <init.h>
 #include <malloc.h>
@@ -151,7 +150,7 @@ int mach_cpu_init(void)
 
 #define IOTDK_RESET_SEQ		0x55AA6699
 
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 	writel(IOTDK_RESET_SEQ, RESET_REG);
 }

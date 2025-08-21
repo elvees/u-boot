@@ -4,7 +4,6 @@
  * Copyright (C) 2019 Oliver Graute <oliver.graute@kococonnector.com>
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <env.h>
 #include <errno.h>
@@ -15,7 +14,7 @@
 #include <asm/io.h>
 #include <asm/gpio.h>
 #include <asm/arch/clock.h>
-#include <asm/arch/sci/sci.h>
+#include <firmware/imx/sci/sci.h>
 #include <asm/arch/imx8-pins.h>
 #include <asm/arch/iomux.h>
 #include <asm/arch/sys_proto.h>
@@ -110,14 +109,6 @@ int board_init(void)
 	sc_pm_set_resource_power_mode(-1, SC_R_BOARD_R1, SC_PM_PW_MODE_ON);
 
 	return 0;
-}
-
-/*
- * Board specific reset that is system reset.
- */
-void reset_cpu(ulong addr)
-{
-	/* TODO */
 }
 
 int board_mmc_get_env_dev(int devno)

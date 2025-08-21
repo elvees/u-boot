@@ -18,7 +18,6 @@
  * ext4write : Based on generic ext4 protocol.
  */
 
-#include <common.h>
 #include <blk.h>
 #include <ext_common.h>
 #include <ext4fs.h>
@@ -427,14 +426,14 @@ uint16_t ext4fs_checksum_update(uint32_t i)
 	if (le32_to_cpu(fs->sb->feature_ro_compat) & EXT4_FEATURE_RO_COMPAT_GDT_CSUM) {
 		int offset = offsetof(struct ext2_block_group, bg_checksum);
 
-		crc = ext2fs_crc16(~0, fs->sb->unique_id,
+		crc = crc16(~0, (__u8 *)fs->sb->unique_id,
 				   sizeof(fs->sb->unique_id));
-		crc = ext2fs_crc16(crc, &le32_i, sizeof(le32_i));
-		crc = ext2fs_crc16(crc, desc, offset);
+		crc = crc16(crc, (__u8 *)&le32_i, sizeof(le32_i));
+		crc = crc16(crc, (__u8 *)desc, offset);
 		offset += sizeof(desc->bg_checksum);	/* skip checksum */
 		assert(offset == sizeof(*desc));
 		if (offset < fs->gdsize) {
-			crc = ext2fs_crc16(crc, (__u8 *)desc + offset,
+			crc = crc16(crc, (__u8 *)desc + offset,
 					   fs->gdsize - offset);
 		}
 	}
@@ -765,11 +764,6 @@ int ext4fs_get_parent_inode_num(const char *dirname, char *dname, int flags)
 	struct ext2_inode *first_inode = NULL;
 	struct ext2_inode temp_inode;
 
-	if (*dirname != '/') {
-		printf("Please supply Absolute path\n");
-		return -1;
-	}
-
 	/* TODO: input validation make equivalent to linux */
 	depth_dirname = zalloc(strlen(dirname) + 1);
 	if (!depth_dirname)
@@ -850,15 +844,20 @@ end:
 
 fail:
 	free(depth_dirname);
-	free(parse_dirname);
-	for (i = 0; i < depth; i++) {
-		if (!ptr[i])
-			break;
-		free(ptr[i]);
+	if (parse_dirname)
+		free(parse_dirname);
+	if (ptr) {
+		for (i = 0; i < depth; i++) {
+			if (!ptr[i])
+				break;
+			free(ptr[i]);
+		}
+		free(ptr);
 	}
-	free(ptr);
-	free(parent_inode);
-	free(first_inode);
+	if (parent_inode)
+		free(parent_inode);
+	if (first_inode)
+		free(first_inode);
 
 	return result_inode_no;
 }
@@ -1205,7 +1204,6 @@ fail:
 	return -1;
 
 }
-
 
 static void alloc_single_indirect_block(struct ext2_inode *file_inode,
 					unsigned int *total_remaining_blocks,
@@ -2048,24 +2046,23 @@ int ext4fs_iterate_dir(struct ext2fs_node *dir, char *name,
 	unsigned int fpos = 0;
 	int status;
 	loff_t actread;
-	struct ext2fs_node *diro = (struct ext2fs_node *) dir;
 
 #ifdef DEBUG
 	if (name != NULL)
 		printf("Iterate dir %s\n", name);
 #endif /* of DEBUG */
-	if (!diro->inode_read) {
-		status = ext4fs_read_inode(diro->data, diro->ino, &diro->inode);
+	if (!dir->inode_read) {
+		status = ext4fs_read_inode(dir->data, dir->ino, &dir->inode);
 		if (status == 0)
 			return 0;
 	}
 	/* Search the file.  */
-	while (fpos < le32_to_cpu(diro->inode.size)) {
+	while (fpos < le32_to_cpu(dir->inode.size)) {
 		struct ext2_dirent dirent;
 
-		status = ext4fs_read_file(diro, fpos,
-					   sizeof(struct ext2_dirent),
-					   (char *)&dirent, &actread);
+		status = ext4fs_read_file(dir, fpos,
+					  sizeof(struct ext2_dirent),
+					  (char *)&dirent, &actread);
 		if (status < 0)
 			return 0;
 
@@ -2079,7 +2076,7 @@ int ext4fs_iterate_dir(struct ext2fs_node *dir, char *name,
 			struct ext2fs_node *fdiro;
 			int type = FILETYPE_UNKNOWN;
 
-			status = ext4fs_read_file(diro,
+			status = ext4fs_read_file(dir,
 						  fpos +
 						  sizeof(struct ext2_dirent),
 						  dirent.namelen, filename,
@@ -2091,7 +2088,7 @@ int ext4fs_iterate_dir(struct ext2fs_node *dir, char *name,
 			if (!fdiro)
 				return 0;
 
-			fdiro->data = diro->data;
+			fdiro->data = dir->data;
 			fdiro->ino = le32_to_cpu(dirent.inode);
 
 			filename[dirent.namelen] = '\0';
@@ -2106,7 +2103,7 @@ int ext4fs_iterate_dir(struct ext2fs_node *dir, char *name,
 				else if (dirent.filetype == FILETYPE_REG)
 					type = FILETYPE_REG;
 			} else {
-				status = ext4fs_read_inode(diro->data,
+				status = ext4fs_read_inode(dir->data,
 							   le32_to_cpu
 							   (dirent.inode),
 							   &fdiro->inode);
@@ -2140,35 +2137,6 @@ int ext4fs_iterate_dir(struct ext2fs_node *dir, char *name,
 					*fnode = fdiro;
 					return 1;
 				}
-			} else {
-				if (fdiro->inode_read == 0) {
-					status = ext4fs_read_inode(diro->data,
-								 le32_to_cpu(
-								 dirent.inode),
-								 &fdiro->inode);
-					if (status == 0) {
-						free(fdiro);
-						return 0;
-					}
-					fdiro->inode_read = 1;
-				}
-				switch (type) {
-				case FILETYPE_DIRECTORY:
-					printf("<DIR> ");
-					break;
-				case FILETYPE_SYMLINK:
-					printf("<SYM> ");
-					break;
-				case FILETYPE_REG:
-					printf("      ");
-					break;
-				default:
-					printf("< ? > ");
-					break;
-				}
-				printf("%10u %s\n",
-				       le32_to_cpu(fdiro->inode.size),
-					filename);
 			}
 			free(fdiro);
 		}
@@ -2183,13 +2151,18 @@ static char *ext4fs_read_symlink(struct ext2fs_node *node)
 	struct ext2fs_node *diro = node;
 	int status;
 	loff_t actread;
+	size_t alloc_size;
 
 	if (!diro->inode_read) {
 		status = ext4fs_read_inode(diro->data, diro->ino, &diro->inode);
 		if (status == 0)
 			return NULL;
 	}
-	symlink = zalloc(le32_to_cpu(diro->inode.size) + 1);
+
+	if (__builtin_add_overflow(le32_to_cpu(diro->inode.size), 1, &alloc_size))
+		return NULL;
+
+	symlink = zalloc(alloc_size);
 	if (!symlink)
 		return NULL;
 
@@ -2209,9 +2182,8 @@ static char *ext4fs_read_symlink(struct ext2fs_node *node)
 	return symlink;
 }
 
-static int ext4fs_find_file1(const char *currpath,
-			     struct ext2fs_node *currroot,
-			     struct ext2fs_node **currfound, int *foundtype)
+int ext4fs_find_file1(const char *currpath, struct ext2fs_node *currroot,
+		      struct ext2fs_node **currfound, int *foundtype)
 {
 	char fpath[strlen(currpath) + 1];
 	char *name = fpath;
@@ -2363,7 +2335,7 @@ fail:
 	return -1;
 }
 
-int ext4fs_mount(unsigned part_length)
+int ext4fs_mount(void)
 {
 	struct ext2_data *data;
 	int status;
@@ -2382,11 +2354,24 @@ int ext4fs_mount(unsigned part_length)
 	if (le16_to_cpu(data->sblock.magic) != EXT2_MAGIC)
 		goto fail_noerr;
 
-
 	if (le32_to_cpu(data->sblock.revision_level) == 0) {
 		fs->inodesz = 128;
 		fs->gdsize = 32;
 	} else {
+		int missing = __le32_to_cpu(data->sblock.feature_incompat) &
+			      ~(EXT4_FEATURE_INCOMPAT_SUPP |
+				EXT4_FEATURE_INCOMPAT_SUPP_LAZY_RO);
+
+		if (missing) {
+			/*
+			 * This code used to be relaxed about feature flags.
+			 * We don't stop the mount to avoid breaking existing setups.
+			 * But, incompatible features can cause serious read errors.
+			 */
+			log_err("fs uses incompatible features: %08x, ignoring\n",
+				missing);
+		}
+
 		debug("EXT4 features COMPAT: %08x INCOMPAT: %08x RO_COMPAT: %08x\n",
 		      __le32_to_cpu(data->sblock.feature_compatibility),
 		      __le32_to_cpu(data->sblock.feature_incompat),
@@ -2415,7 +2400,7 @@ int ext4fs_mount(unsigned part_length)
 
 	return 1;
 fail:
-	printf("Failed to mount ext2 filesystem...\n");
+	log_debug("Failed to mount ext2 filesystem...\n");
 fail_noerr:
 	free(data);
 	ext4fs_root = NULL;

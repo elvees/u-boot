@@ -6,13 +6,13 @@
  * Copyright 2004 Freescale Semiconductor, Inc.
  */
 
-#include <common.h>
 #include <command.h>
 #include <irq_func.h>
 #include <mpc83xx.h>
 #include <asm/global_data.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
+#include "initreg/initreg.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -30,9 +30,8 @@ void interrupt_init_cpu (unsigned *decrementer_count)
 
 	/* Enable e300 time base */
 
-	immr->sysconf.spcr |= 0x00400000;
+	immr->sysconf.spcr |= SPCR_TBEN_MASK;
 }
-
 
 /*
  * Handle external interrupts
@@ -41,7 +40,6 @@ void interrupt_init_cpu (unsigned *decrementer_count)
 void external_interrupt(struct pt_regs *regs)
 {
 }
-
 
 /*
  * Install and free an interrupt handler.
@@ -52,18 +50,15 @@ irq_install_handler(int irq, interrupt_handler_t * handler, void *arg)
 {
 }
 
-
 void irq_free_handler(int irq)
 {
 }
-
 
 void timer_interrupt_cpu (struct pt_regs *regs)
 {
 	/* nothing to do here */
 	return;
 }
-
 
 #if defined(CONFIG_CMD_IRQ)
 

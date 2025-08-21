@@ -3,7 +3,6 @@
  * Copyright (C) 2018, STMicroelectronics - All Rights Reserved
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <i2c.h>
@@ -34,7 +33,9 @@ static const struct pmic_child_info stpmic1_children_info[] = {
 	{ .prefix = "ldo", .driver = "stpmic1_ldo" },
 	{ .prefix = "buck", .driver = "stpmic1_buck" },
 	{ .prefix = "vref_ddr", .driver = "stpmic1_vref_ddr" },
+	{ .prefix = "vref-ddr", .driver = "stpmic1_vref_ddr" },
 	{ .prefix = "pwr_sw", .driver = "stpmic1_pwr_sw" },
+	{ .prefix = "pwr-sw", .driver = "stpmic1_pwr_sw" },
 	{ .prefix = "boost", .driver = "stpmic1_boost" },
 	{ },
 };
@@ -90,7 +91,7 @@ static int stpmic1_bind(struct udevice *dev)
 		dev_dbg(dev, "no child found\n");
 #endif /* DM_REGULATOR */
 
-	if (!IS_ENABLED(CONFIG_SPL_BUILD)) {
+	if (!IS_ENABLED(CONFIG_XPL_BUILD)) {
 		ret = device_bind_driver(dev, "stpmic1-nvm",
 					 "stpmic1-nvm", NULL);
 		if (ret)
@@ -123,7 +124,7 @@ U_BOOT_DRIVER(pmic_stpmic1) = {
 	.ops = &stpmic1_ops,
 };
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 static int stpmic1_nvm_rw(struct udevice *dev, u8 addr, u8 *buf, int buf_len,
 			  enum pmic_nvm_op op)
 {
@@ -229,7 +230,7 @@ U_BOOT_DRIVER(stpmic1_nvm) = {
 	.id = UCLASS_MISC,
 	.ops = &stpmic1_nvm_ops,
 };
-#endif /* CONFIG_SPL_BUILD */
+#endif /* CONFIG_XPL_BUILD */
 
 #ifdef CONFIG_SYSRESET
 static int stpmic1_sysreset_request(struct udevice *dev, enum sysreset_t type)

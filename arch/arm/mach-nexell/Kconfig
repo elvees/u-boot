@@ -4,10 +4,9 @@ config ARCH_S5P4418
 	bool "Nexell S5P4418 SoC"
 	select CPU_V7A
 	select OF_CONTROL
-	select OF_SEPARATE
 	select NX_GPIO
-	select PL011_SERIAL
-	select PL011_SERIAL_FLUSH_ON_INIT
+	select DM_SERIAL
+	select PL01X_SERIAL
 	help
 	  Enable support for Nexell S5P4418 SoC.
 
@@ -33,6 +32,12 @@ config TARGET_NANOPI2
 
 endchoice
 
+config SYS_PLLFIN
+	int
+
+config TIMER_SYS_TICK_CH
+	int
+
 config SYS_BOARD
 	default "nanopi2"
 
@@ -45,13 +50,13 @@ config SYS_SOC
 config SYS_CONFIG_NAME
 	default "s5p4418_nanopi2"
 
-endmenu
-
 config SYS_PLLFIN
-	int
+	default 24000000
 
 config TIMER_SYS_TICK_CH
-	int
+	default 0
+
+endmenu
 
 source "board/friendlyarm/Kconfig"
 

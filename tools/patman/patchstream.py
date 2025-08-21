@@ -14,10 +14,10 @@ import queue
 import shutil
 import tempfile
 
-from patman import command
 from patman import commit
-from patman import gitutil
 from patman.series import Series
+from u_boot_pylib import command
+from u_boot_pylib import gitutil
 
 # Tags that we detect and remove
 RE_REMOVE = re.compile(r'^BUG=|^TEST=|^BRANCH=|^Review URL:'
@@ -48,7 +48,7 @@ RE_TAG = re.compile('^(Tested-by|Acked-by|Reviewed-by|Patch-cc|Fixes): (.*)')
 RE_COMMIT = re.compile('^commit ([0-9a-f]*)$')
 
 # We detect these since checkpatch doesn't always do it
-RE_SPACE_BEFORE_TAB = re.compile('^[+].* \t')
+RE_SPACE_BEFORE_TAB = re.compile(r'^[+].* \t')
 
 # Match indented lines for changes
 RE_LEADING_WHITESPACE = re.compile(r'^\s')
@@ -59,11 +59,15 @@ RE_DIFF = re.compile(r'^>.*diff --git a/(.*) b/(.*)$')
 # Detect a context line, like '> @@ -153,8 +153,13 @@ CheckPatch
 RE_LINE = re.compile(r'>.*@@ \-(\d+),\d+ \+(\d+),\d+ @@ *(.*)')
 
+# Detect line with invalid TAG
+RE_INV_TAG = re.compile('^Serie-([a-z-]*): *(.*)')
+
 # States we can be in - can we use range() and still have comments?
 STATE_MSG_HEADER = 0        # Still in the message header
 STATE_PATCH_SUBJECT = 1     # In patch subject (first line of log for a commit)
 STATE_PATCH_HEADER = 2      # In patch header (after the subject)
 STATE_DIFFS = 3             # In the diff part (past --- line)
+
 
 class PatchStream:
     """Class for detecting/injecting tags in a patch or series of patches
@@ -72,8 +76,13 @@ class PatchStream:
     are interested in. We can also process a patch file in order to remove
     unwanted tags or inject additional ones. These correspond to the two
     phases of processing.
+
+    Args:
+        keep_change_id (bool): Keep the Change-Id tag
+        insert_base_commit (bool): True to add the base commit to the end
     """
-    def __init__(self, series, is_log=False):
+    def __init__(self, series, is_log=False, keep_change_id=False,
+                 insert_base_commit=False):
         self.skip_blank = False          # True to skip a single blank line
         self.found_test = False          # Found a TEST= line
         self.lines_after_test = 0        # Number of lines found after TEST=
@@ -83,6 +92,7 @@ class PatchStream:
         self.section = []                # The current section...END section
         self.series = series             # Info about the patch series
         self.is_log = is_log             # True if indent like git log
+        self.keep_change_id = keep_change_id  # True to keep Change-Id tags
         self.in_change = None            # Name of the change list we are in
         self.change_version = 0          # Non-zero if we are in a change list
         self.change_lines = []           # Lines of the current change
@@ -98,6 +108,7 @@ class PatchStream:
         self.recent_quoted = collections.deque([], 5)
         self.recent_unquoted = queue.Queue()
         self.was_quoted = None
+        self.insert_base_commit = insert_base_commit
 
     @staticmethod
     def process_text(text, is_comment=False):
@@ -133,8 +144,8 @@ class PatchStream:
             ValueError: Warning is generated with no commit associated
         """
         if not self.commit:
-            raise ValueError('Warning outside commit: %s' % warn)
-        if warn not in self.commit.warn:
+            print('Warning outside commit: %s' % warn)
+        elif warn not in self.commit.warn:
             self.commit.warn.append(warn)
 
     def _add_to_series(self, line, name, value):
@@ -177,7 +188,7 @@ class PatchStream:
             who (str): Person who gave that rtag, e.g.
                  'Fred Bloggs <fred@bloggs.org>'
         """
-        self.commit.AddRtag(rtag_type, who)
+        self.commit.add_rtag(rtag_type, who)
 
     def _close_commit(self):
         """Save the current commit into our commit list, and reset our state"""
@@ -227,7 +238,7 @@ class PatchStream:
         elif self.in_change == 'Cover':
             self.series.AddChange(self.change_version, None, change)
         elif self.in_change == 'Commit':
-            self.commit.AddChange(self.change_version, change)
+            self.commit.add_change(self.change_version, change)
         self.change_lines = []
 
     def _finalise_snippet(self):
@@ -318,6 +329,7 @@ class PatchStream:
         leading_whitespace_match = RE_LEADING_WHITESPACE.match(line)
         diff_match = RE_DIFF.match(line)
         line_match = RE_LINE.match(line)
+        invalid_match = RE_INV_TAG.match(line)
         tag_match = None
         if self.state == STATE_PATCH_HEADER:
             tag_match = RE_TAG.match(line)
@@ -448,6 +460,8 @@ class PatchStream:
 
         # Detect Change-Id tags
         elif change_id_match:
+            if self.keep_change_id:
+                out = [line]
             value = change_id_match.group(1)
             if self.is_log:
                 if self.commit.change_id:
@@ -467,9 +481,21 @@ class PatchStream:
             elif name == 'changes':
                 self.in_change = 'Commit'
                 self.change_version = self._parse_version(value, line)
+            elif name == 'cc':
+                self.commit.add_cc(value.split(','))
+            elif name == 'added-in':
+                version = self._parse_version(value, line)
+                self.commit.add_change(version, '- New')
+                self.series.AddChange(version, None, '- %s' %
+                                      self.commit.subject)
             else:
                 self._add_warn('Line %d: Ignoring Commit-%s' %
                                (self.linenum, name))
+
+        # Detect invalid tags
+        elif invalid_match:
+            raise ValueError("Line %d: Invalid tag = '%s'" %
+                (self.linenum, line))
 
         # Detect the start of a new commit
         elif commit_match:
@@ -485,14 +511,14 @@ class PatchStream:
                     who.find(os.getenv('USER') + '@') != -1):
                 self._add_warn("Ignoring '%s'" % line)
             elif rtag_type == 'Patch-cc':
-                self.commit.AddCc(who.split(','))
+                self.commit.add_cc(who.split(','))
             else:
                 out = [line]
 
         # Suppress duplicate signoffs
         elif signoff_match:
             if (self.is_log or not self.commit or
-                    self.commit.CheckDuplicateSignoff(signoff_match.group(1))):
+                    self.commit.check_duplicate_signoff(signoff_match.group(1))):
                 out = [line]
 
         # Well that means this is an ordinary line
@@ -587,6 +613,8 @@ class PatchStream:
         # These seem like they would be nice to include.
         if 'prefix' in self.series:
             parts.append(self.series['prefix'])
+        if 'postfix' in self.series:
+            parts.append(self.series['postfix'])
         if 'version' in self.series:
             parts.append("v%s" % self.series['version'])
 
@@ -636,6 +664,13 @@ class PatchStream:
                     outfd.write(line + '\n')
                     self.blank_count = 0
         self.finalise()
+        if self.insert_base_commit:
+            if self.series.base_commit:
+                print(f'base-commit: {self.series.base_commit.hash}',
+                      file=outfd)
+            if self.series.branch:
+                print(f'branch: {self.series.branch}', file=outfd)
+
 
 def insert_tags(msg, tags_to_emit):
     """Add extra tags to a commit message
@@ -653,6 +688,7 @@ def insert_tags(msg, tags_to_emit):
     out = []
     done = False
     emit_tags = False
+    emit_blank = False
     for line in msg.splitlines():
         if not done:
             signoff_match = RE_SIGNOFF.match(line)
@@ -663,9 +699,13 @@ def insert_tags(msg, tags_to_emit):
                 out += tags_to_emit
                 emit_tags = False
                 done = True
+            emit_blank = not (signoff_match or tag_match)
+        else:
+            emit_blank = line
         out.append(line)
     if not done:
-        out.append('')
+        if emit_blank:
+            out.append('')
         out += tags_to_emit
     return '\n'.join(out)
 
@@ -682,9 +722,9 @@ def get_list(commit_range, git_dir=None, count=None):
     Returns
         str: String containing the contents of the git log
     """
-    params = gitutil.LogCmd(commit_range, reverse=True, count=count,
+    params = gitutil.log_cmd(commit_range, reverse=True, count=count,
                             git_dir=git_dir)
-    return command.RunPipe([params], capture=True).stdout
+    return command.run_one(*params, capture=True).stdout
 
 def get_metadata_for_list(commit_range, git_dir=None, count=None,
                           series=None, allow_overwrite=False):
@@ -728,8 +768,12 @@ def get_metadata(branch, start, count):
     Returns:
         Series: Object containing information about the commits.
     """
-    return get_metadata_for_list(
-        '%s~%d' % (branch if branch else 'HEAD', start), None, count)
+    top = f"{branch if branch else 'HEAD'}~{start}"
+    series = get_metadata_for_list(top, None, count)
+    series.base_commit = commit.Commit(gitutil.get_hash(f'{top}~{count}'))
+    series.branch = branch or gitutil.get_branch()
+    series.top = top
+    return series
 
 def get_metadata_for_test(text):
     """Process metadata from a file containing a git log. Used for tests
@@ -747,7 +791,8 @@ def get_metadata_for_test(text):
     pst.finalise()
     return series
 
-def fix_patch(backup_dir, fname, series, cmt):
+def fix_patch(backup_dir, fname, series, cmt, keep_change_id=False,
+              insert_base_commit=False):
     """Fix up a patch file, by adding/removing as required.
 
     We remove our tags from the patch file, insert changes lists, etc.
@@ -760,6 +805,8 @@ def fix_patch(backup_dir, fname, series, cmt):
         fname (str): Filename to patch file to process
         series (Series): Series information about this patch set
         cmt (Commit): Commit object for this patch file
+        keep_change_id (bool): Keep the Change-Id tag.
+        insert_base_commit (bool): True to add the base commit to the end
 
     Return:
         list: A list of errors, each str, or [] if all ok.
@@ -767,7 +814,8 @@ def fix_patch(backup_dir, fname, series, cmt):
     handle, tmpname = tempfile.mkstemp()
     outfd = os.fdopen(handle, 'w', encoding='utf-8')
     infd = open(fname, 'r', encoding='utf-8')
-    pst = PatchStream(series)
+    pst = PatchStream(series, keep_change_id=keep_change_id,
+                      insert_base_commit=insert_base_commit)
     pst.commit = cmt
     pst.process_stream(infd, outfd)
     infd.close()
@@ -779,7 +827,7 @@ def fix_patch(backup_dir, fname, series, cmt):
     shutil.move(tmpname, fname)
     return cmt.warn
 
-def fix_patches(series, fnames):
+def fix_patches(series, fnames, keep_change_id=False, insert_base_commit=False):
     """Fix up a list of patches identified by filenames
 
     The patch files are processed in place, and overwritten.
@@ -787,6 +835,8 @@ def fix_patches(series, fnames):
     Args:
         series (Series): The Series object
         fnames (:type: list of str): List of patch files to process
+        keep_change_id (bool): Keep the Change-Id tag.
+        insert_base_commit (bool): True to add the base commit to the end
     """
     # Current workflow creates patches, so we shouldn't need a backup
     backup_dir = None  #tempfile.mkdtemp('clean-patch')
@@ -795,7 +845,9 @@ def fix_patches(series, fnames):
         cmt = series.commits[count]
         cmt.patch = fname
         cmt.count = count
-        result = fix_patch(backup_dir, fname, series, cmt)
+        result = fix_patch(backup_dir, fname, series, cmt,
+                           keep_change_id=keep_change_id,
+                           insert_base_commit=insert_base_commit)
         if result:
             print('%d warning%s for %s:' %
                   (len(result), 's' if len(result) > 1 else '', fname))
@@ -838,4 +890,11 @@ def insert_cover_letter(fname, series, count):
             out = series.MakeChangeLog(None)
             line += '\n' + '\n'.join(out)
         fil.write(line)
+
+    # Insert the base commit and branch
+    if series.base_commit:
+        print(f'base-commit: {series.base_commit.hash}', file=fil)
+    if series.branch:
+        print(f'branch: {series.branch}', file=fil)
+
     fil.close()

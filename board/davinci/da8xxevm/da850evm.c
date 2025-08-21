@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2010 Texas Instruments Incorporated - https://www.ti.com/
  *
  * Based on da830evm.c. Original Copyrights follow:
  *
@@ -8,7 +8,7 @@
  * Copyright (C) 2007 Sergey Kubushyn <ksi@koi8.net>
  */
 
-#include <common.h>
+#include <config.h>
 #include <dm.h>
 #include <env.h>
 #include <i2c.h>
@@ -129,18 +129,11 @@ int misc_init_r(void)
 {
 	dspwake();
 
-#if defined(CONFIG_MAC_ADDR_IN_SPIFLASH) || defined(CONFIG_MAC_ADDR_IN_EEPROM)
-
-	uchar env_enetaddr[6];
-	int enetaddr_found;
+#if defined(CONFIG_MAC_ADDR_IN_SPIFLASH)
+	uchar env_enetaddr[6], buff[6];
+	int enetaddr_found, spi_mac_read;
 
 	enetaddr_found = eth_env_get_enetaddr("ethaddr", env_enetaddr);
-
-#endif
-
-#ifdef CONFIG_MAC_ADDR_IN_SPIFLASH
-	int spi_mac_read;
-	uchar buff[6];
 
 	spi_mac_read = get_mac_addr(buff);
 	buff[0] = 0;
@@ -173,34 +166,6 @@ int misc_init_r(void)
 					"with the MAC address in the environment\n");
 		printf("Default using MAC address from environment\n");
 	}
-
-#elif defined(CONFIG_MAC_ADDR_IN_EEPROM)
-	uint8_t enetaddr[8];
-	int eeprom_mac_read;
-
-	/* Read Ethernet MAC address from EEPROM */
-	eeprom_mac_read = dvevm_read_mac_address(enetaddr);
-
-	/*
-	 * MAC address not present in the environment
-	 * try and read the MAC address from EEPROM flash
-	 * and set it.
-	 */
-	if (!enetaddr_found) {
-		if (eeprom_mac_read)
-			/* Set Ethernet MAC address from EEPROM */
-			davinci_sync_env_enetaddr(enetaddr);
-	} else {
-		/*
-		 * MAC address present in environment compare it with
-		 * the MAC address in EEPROM and warn on mismatch
-		 */
-		if (eeprom_mac_read && memcmp(enetaddr, env_enetaddr, 6))
-			printf("Warning: MAC address in EEPROM don't match "
-					"with the MAC address in the environment\n");
-		printf("Default using MAC address from environment\n");
-	}
-
 #endif
 	return 0;
 }
@@ -261,12 +226,13 @@ const struct lpsc_resource lpsc[] = {
 
 const int lpsc_size = ARRAY_SIZE(lpsc);
 
-#ifndef CONFIG_DA850_EVM_MAX_CPU_CLK
-#define CONFIG_DA850_EVM_MAX_CPU_CLK	300000000
+#ifndef CFG_DA850_EVM_MAX_CPU_CLK
+#define CFG_DA850_EVM_MAX_CPU_CLK	300000000
 #endif
 
 #define REV_AM18X_EVM		0x100
 
+#ifdef CONFIG_REVISION_TAG
 /*
  * get_board_rev() - setup to pass kernel board revision information
  * Returns:
@@ -279,12 +245,12 @@ const int lpsc_size = ARRAY_SIZE(lpsc);
 u32 get_board_rev(void)
 {
 	char *s;
-	u32 maxcpuclk = CONFIG_DA850_EVM_MAX_CPU_CLK;
+	u32 maxcpuclk = CFG_DA850_EVM_MAX_CPU_CLK;
 	u32 rev = 0;
 
 	s = env_get("maxcpuclk");
 	if (s)
-		maxcpuclk = simple_strtoul(s, NULL, 10);
+		maxcpuclk = dectoul(s, NULL);
 
 	if (maxcpuclk >= 456000000)
 		rev = 3;
@@ -294,6 +260,7 @@ u32 get_board_rev(void)
 		rev = 1;
 	return rev;
 }
+#endif
 
 int board_early_init_f(void)
 {
@@ -404,20 +371,20 @@ int rmii_hw_init(void)
 	/* Set polarity to non-inverted */
 	buf[0] = 0x0;
 	buf[1] = 0x0;
-	ret = i2c_write(CONFIG_SYS_I2C_EXPANDER_ADDR, 4, 1, buf, 2);
+	ret = i2c_write(CFG_SYS_I2C_EXPANDER_ADDR, 4, 1, buf, 2);
 	if (ret) {
 		printf("\nExpander @ 0x%02x write FAILED!!!\n",
-				CONFIG_SYS_I2C_EXPANDER_ADDR);
+				CFG_SYS_I2C_EXPANDER_ADDR);
 		return ret;
 	}
 
 	/* Configure P07-P05 as outputs */
 	buf[0] = 0x1f;
 	buf[1] = 0xff;
-	ret = i2c_write(CONFIG_SYS_I2C_EXPANDER_ADDR, 6, 1, buf, 2);
+	ret = i2c_write(CFG_SYS_I2C_EXPANDER_ADDR, 6, 1, buf, 2);
 	if (ret) {
 		printf("\nExpander @ 0x%02x write FAILED!!!\n",
-				CONFIG_SYS_I2C_EXPANDER_ADDR);
+				CFG_SYS_I2C_EXPANDER_ADDR);
 	}
 
 	/* For Ethernet RMII selection
@@ -425,16 +392,16 @@ int rmii_hw_init(void)
 	 * P06(SelB)=1
 	 * P05(SelC)=1
 	 */
-	if (i2c_read(CONFIG_SYS_I2C_EXPANDER_ADDR, 2, 1, buf, 1)) {
+	if (i2c_read(CFG_SYS_I2C_EXPANDER_ADDR, 2, 1, buf, 1)) {
 		printf("\nExpander @ 0x%02x read FAILED!!!\n",
-				CONFIG_SYS_I2C_EXPANDER_ADDR);
+				CFG_SYS_I2C_EXPANDER_ADDR);
 	}
 
 	buf[0] &= 0x1f;
 	buf[0] |= (0 << 7) | (1 << 6) | (1 << 5);
-	if (i2c_write(CONFIG_SYS_I2C_EXPANDER_ADDR, 2, 1, buf, 1)) {
+	if (i2c_write(CFG_SYS_I2C_EXPANDER_ADDR, 2, 1, buf, 1)) {
 		printf("\nExpander @ 0x%02x write FAILED!!!\n",
-				CONFIG_SYS_I2C_EXPANDER_ADDR);
+				CFG_SYS_I2C_EXPANDER_ADDR);
 	}
 
 	/* Set the output as high */

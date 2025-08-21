@@ -3,7 +3,8 @@
  * Copyright (c) 2014 Google, Inc
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_I2C
+
 #include <dm.h>
 #include <errno.h>
 #include <i2c.h>
@@ -51,7 +52,7 @@ void i2c_dump_msgs(struct i2c_msg *msg, int nmsgs)
  * @offset:	Byte offset within chip
  * @offset_buf:	Place to put byte offset
  * @msg:	Message buffer
- * @return 0 if OK, -EADDRNOTAVAIL if the offset length is 0. In that case the
+ * Return: 0 if OK, -EADDRNOTAVAIL if the offset length is 0. In that case the
  * message is still set up but will not contain an offset.
  */
 static int i2c_setup_offset(struct dm_i2c_chip *chip, uint offset,
@@ -166,6 +167,9 @@ int dm_i2c_write(struct udevice *dev, uint offset, const uint8_t *buffer,
 	struct udevice *bus = dev_get_parent(dev);
 	struct dm_i2c_ops *ops = i2c_get_ops(bus);
 	struct i2c_msg msg[1];
+	uint8_t _buf[I2C_MAX_OFFSET_LEN + 64];
+	uint8_t *buf = _buf;
+	int ret;
 
 	if (!ops->xfer)
 		return -ENOSYS;
@@ -190,29 +194,20 @@ int dm_i2c_write(struct udevice *dev, uint offset, const uint8_t *buffer,
 	 * need to allow space for the offset (up to 4 bytes) and the message
 	 * itself.
 	 */
-	if (len < 64) {
-		uint8_t buf[I2C_MAX_OFFSET_LEN + len];
-
-		i2c_setup_offset(chip, offset, buf, msg);
-		msg->len += len;
-		memcpy(buf + chip->offset_len, buffer, len);
-
-		return ops->xfer(bus, msg, 1);
-	} else {
-		uint8_t *buf;
-		int ret;
-
+	if (len > sizeof(_buf) - I2C_MAX_OFFSET_LEN) {
 		buf = malloc(I2C_MAX_OFFSET_LEN + len);
 		if (!buf)
 			return -ENOMEM;
-		i2c_setup_offset(chip, offset, buf, msg);
-		msg->len += len;
-		memcpy(buf + chip->offset_len, buffer, len);
-
-		ret = ops->xfer(bus, msg, 1);
-		free(buf);
-		return ret;
 	}
+
+	i2c_setup_offset(chip, offset, buf, msg);
+	msg->len += len;
+	memcpy(buf + chip->offset_len, buffer, len);
+
+	ret = ops->xfer(bus, msg, 1);
+	if (buf != _buf)
+		free(buf);
+	return ret;
 }
 
 int dm_i2c_xfer(struct udevice *dev, struct i2c_msg *msg, int nmsgs)
@@ -245,13 +240,28 @@ int dm_i2c_reg_write(struct udevice *dev, uint offset, uint value)
 	return dm_i2c_write(dev, offset, &val, 1);
 }
 
+int dm_i2c_reg_clrset(struct udevice *dev, uint offset, u32 clr, u32 set)
+{
+	uint8_t val;
+	int ret;
+
+	ret = dm_i2c_read(dev, offset, &val, 1);
+	if (ret < 0)
+		return ret;
+
+	val &= ~clr;
+	val |= set;
+
+	return dm_i2c_write(dev, offset, &val, 1);
+}
+
 /**
  * i2c_probe_chip() - probe for a chip on a bus
  *
  * @bus:	Bus to probe
  * @chip_addr:	Chip address to probe
  * @flags:	Flags for the chip
- * @return 0 if found, -ENOSYS if the driver is invalid, -EREMOTEIO if the chip
+ * Return: 0 if found, -ENOSYS if the driver is invalid, -EREMOTEIO if the chip
  * does not respond to probe
  */
 static int i2c_probe_chip(struct udevice *bus, uint chip_addr,
@@ -263,7 +273,7 @@ static int i2c_probe_chip(struct udevice *bus, uint chip_addr,
 
 	if (ops->probe_chip) {
 		ret = ops->probe_chip(bus, chip_addr, chip_flags);
-		if (!ret || ret != -ENOSYS)
+		if (ret != -ENOSYS)
 			return ret;
 	}
 
@@ -375,6 +385,81 @@ int i2c_get_chip_for_busnum(int busnum, int chip_addr, uint offset_len,
 	}
 
 	return 0;
+}
+
+/* Find and probe I2C bus based on a chip attached to it */
+static int i2c_get_parent_bus(ofnode chip, struct udevice **devp)
+{
+	ofnode node;
+	struct udevice *dev;
+	int ret;
+
+	node = ofnode_get_parent(chip);
+	if (!ofnode_valid(node))
+		return -ENODEV;
+
+	ret = uclass_get_device_by_ofnode(UCLASS_I2C, node, &dev);
+	if (ret) {
+		*devp = NULL;
+		return ret;
+	}
+
+	*devp = dev;
+	return 0;
+}
+
+int i2c_get_chip_by_phandle(const struct udevice *parent, const char *prop_name,
+			    struct udevice **devp)
+{
+	ofnode node;
+	uint phandle;
+	struct udevice *bus, *chip;
+	char *dev_name;
+	int ret;
+
+	debug("%s: Searching I2C chip for phandle \"%s\"\n",
+	      __func__, prop_name);
+
+	dev_name = strdup(prop_name);
+	if (!dev_name) {
+		ret = -ENOMEM;
+		goto err_exit;
+	}
+
+	ret = dev_read_u32(parent, prop_name, &phandle);
+	if (ret)
+		goto err_exit;
+
+	node = ofnode_get_by_phandle(phandle);
+	if (!ofnode_valid(node)) {
+		ret = -ENODEV;
+		goto err_exit;
+	}
+
+	ret = i2c_get_parent_bus(node, &bus);
+	if (ret)
+		goto err_exit;
+
+	ret = device_bind_driver_to_node(bus, "i2c_generic_chip_drv",
+					 dev_name, node, &chip);
+	if (ret)
+		goto err_exit;
+
+	ret = device_probe(chip);
+	if (ret) {
+		device_unbind(chip);
+		goto err_exit;
+	}
+
+	debug("%s succeeded\n", __func__);
+	*devp = chip;
+	return 0;
+
+err_exit:
+	free(dev_name);
+	debug("%s failed, ret = %d\n", __func__, ret);
+	*devp = NULL;
+	return ret;
 }
 
 int dm_i2c_probe(struct udevice *bus, uint chip_addr, uint chip_flags,
@@ -497,13 +582,13 @@ static void i2c_gpio_set_pin(struct gpio_desc *pin, int bit)
 		dm_gpio_set_dir_flags(pin, GPIOD_IS_IN);
 	else
 		dm_gpio_set_dir_flags(pin, GPIOD_IS_OUT |
-					   GPIOD_ACTIVE_LOW |
 					   GPIOD_IS_OUT_ACTIVE);
 }
 
 static int i2c_gpio_get_pin(struct gpio_desc *pin)
 {
-	return dm_gpio_get_value(pin);
+	/* DTS need config GPIO_ACTIVE_LOW */
+	return !dm_gpio_get_value(pin);
 }
 
 int i2c_deblock_gpio_loop(struct gpio_desc *sda_pin,
@@ -616,7 +701,7 @@ int i2c_deblock(struct udevice *bus)
 	return ops->deblock(bus);
 }
 
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 int i2c_chip_of_to_plat(struct udevice *dev, struct dm_i2c_chip *chip)
 {
 	int addr;
@@ -638,7 +723,7 @@ int i2c_chip_of_to_plat(struct udevice *dev, struct dm_i2c_chip *chip)
 
 static int i2c_pre_probe(struct udevice *dev)
 {
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	struct dm_i2c_bus *i2c = dev_get_uclass_priv(dev);
 	unsigned int max = 0;
 	ofnode node;
@@ -661,7 +746,7 @@ static int i2c_pre_probe(struct udevice *dev)
 
 static int i2c_post_probe(struct udevice *dev)
 {
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	struct dm_i2c_bus *i2c = dev_get_uclass_priv(dev);
 
 	i2c->speed_hz = dev_read_u32_default(dev, "clock-frequency",
@@ -675,7 +760,7 @@ static int i2c_post_probe(struct udevice *dev)
 
 static int i2c_child_post_bind(struct udevice *dev)
 {
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	struct dm_i2c_chip *plat = dev_get_parent_plat(dev);
 
 	if (!dev_has_ofnode(dev))
@@ -692,7 +777,7 @@ static int i2c_post_bind(struct udevice *dev)
 
 	debug("%s: %s, seq=%d\n", __func__, dev->name, dev_seq(dev));
 
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	ret = dm_scan_fdt_dev(dev);
 #endif
 	return ret;

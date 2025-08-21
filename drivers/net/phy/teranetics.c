@@ -5,7 +5,6 @@
  * Copyright 2010-2011 Freescale Semiconductor, Inc.
  * author Andy Fleming
  */
-#include <common.h>
 #include <phy.h>
 #include <linux/delay.h>
 
@@ -90,7 +89,7 @@ int tn2020_startup(struct phy_device *phydev)
 	return 0;
 }
 
-struct phy_driver tn2020_driver = {
+U_BOOT_PHY_DRIVER(tn2020) = {
 	.name = "Teranetics TN2020",
 	.uid = PHY_UID_TN2020,
 	.mask = 0xfffffff0,
@@ -102,10 +101,3 @@ struct phy_driver tn2020_driver = {
 	.startup = &tn2020_startup,
 	.shutdown = &gen10g_shutdown,
 };
-
-int phy_teranetics_init(void)
-{
-	phy_register(&tn2020_driver);
-
-	return 0;
-}

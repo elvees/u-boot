@@ -6,7 +6,7 @@
  * Written-by: Albert ARIBAUD - 3ADEV <albert.aribaud@3adev.fr>
  */
 
-#include <common.h>
+#include <config.h>
 #include <log.h>
 #include <asm/io.h>
 #include <i2c.h>
@@ -20,12 +20,12 @@
  * Provide default speed and slave if target did not
  */
 
-#if !defined(CONFIG_SYS_I2C_LPC32XX_SPEED)
-#define CONFIG_SYS_I2C_LPC32XX_SPEED 350000
+#if !defined(CFG_SYS_I2C_LPC32XX_SPEED)
+#define CFG_SYS_I2C_LPC32XX_SPEED 350000
 #endif
 
-#if !defined(CONFIG_SYS_I2C_LPC32XX_SLAVE)
-#define CONFIG_SYS_I2C_LPC32XX_SLAVE 0
+#if !defined(CFG_SYS_I2C_LPC32XX_SLAVE)
+#define CFG_SYS_I2C_LPC32XX_SLAVE 0
 #endif
 
 /* TX register fields */
@@ -38,7 +38,6 @@
 /* Status register values */
 #define LPC32XX_I2C_STAT_TFF		0x00000400
 #define LPC32XX_I2C_STAT_RFE		0x00000200
-#define LPC32XX_I2C_STAT_DRMI		0x00000008
 #define LPC32XX_I2C_STAT_NAI		0x00000004
 #define LPC32XX_I2C_STAT_TDI		0x00000001
 
@@ -261,15 +260,15 @@ static unsigned int lpc32xx_i2c_set_bus_speed(struct i2c_adapter *adap,
 U_BOOT_I2C_ADAP_COMPLETE(lpc32xx_0, lpc32xx_i2c_init, lpc32xx_i2c_probe_chip,
 			 lpc32xx_i2c_read, lpc32xx_i2c_write,
 			 lpc32xx_i2c_set_bus_speed,
-			 CONFIG_SYS_I2C_LPC32XX_SPEED,
-			 CONFIG_SYS_I2C_LPC32XX_SLAVE,
+			 CFG_SYS_I2C_LPC32XX_SPEED,
+			 CFG_SYS_I2C_LPC32XX_SLAVE,
 			 0)
 
 U_BOOT_I2C_ADAP_COMPLETE(lpc32xx_1, lpc32xx_i2c_init, lpc32xx_i2c_probe_chip,
 			 lpc32xx_i2c_read, lpc32xx_i2c_write,
 			 lpc32xx_i2c_set_bus_speed,
-			 CONFIG_SYS_I2C_LPC32XX_SPEED,
-			 CONFIG_SYS_I2C_LPC32XX_SLAVE,
+			 CFG_SYS_I2C_LPC32XX_SPEED,
+			 CFG_SYS_I2C_LPC32XX_SLAVE,
 			 1)
 
 U_BOOT_I2C_ADAP_COMPLETE(lpc32xx_2, lpc32xx_i2c_init, NULL,
@@ -283,11 +282,7 @@ static int lpc32xx_i2c_probe(struct udevice *bus)
 {
 	struct lpc32xx_i2c_dev *dev = dev_get_plat(bus);
 
-	/*
-	 * FIXME: This is not permitted
-	 *	dev_seq(bus) = dev->index;
-	 */
-
+	dev->base = dev_read_addr_ptr(bus);
 	__i2c_init(dev->base, dev->speed, 0, dev->index);
 	return 0;
 }
@@ -353,9 +348,15 @@ static const struct dm_i2c_ops lpc32xx_i2c_ops = {
 	.set_bus_speed = lpc32xx_i2c_set_bus_speed,
 };
 
+static const struct udevice_id lpc32xx_i2c_ids[] = {
+	{ .compatible = "nxp,pnx-i2c" },
+	{ }
+};
+
 U_BOOT_DRIVER(i2c_lpc32xx) = {
-	.id                   = UCLASS_I2C,
 	.name                 = "i2c_lpc32xx",
+	.id                   = UCLASS_I2C,
+	.of_match             = lpc32xx_i2c_ids,
 	.probe                = lpc32xx_i2c_probe,
 	.ops                  = &lpc32xx_i2c_ops,
 };

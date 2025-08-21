@@ -37,12 +37,14 @@
 #define EFIAPI __attribute__((ms_abi))
 #define efi_va_list __builtin_ms_va_list
 #define efi_va_start __builtin_ms_va_start
+#define efi_va_copy __builtin_ms_va_copy
 #define efi_va_arg __builtin_va_arg
 #define efi_va_end __builtin_ms_va_end
 #else
 #define EFIAPI asmlinkage
 #define efi_va_list va_list
 #define efi_va_start va_start
+#define efi_va_copy va_copy
 #define efi_va_arg va_arg
 #define efi_va_end va_end
 #endif /* __x86_64__ */
@@ -50,11 +52,41 @@
 #define EFI32_LOADER_SIGNATURE	"EL32"
 #define EFI64_LOADER_SIGNATURE	"EL64"
 
-struct efi_device_path;
+/**
+ * struct efi_device_path - device path protocol
+ *
+ * @type:	device path type
+ * @sub_type:	device path sub-type
+ * @length:	length of the device path node including the header
+ */
+struct efi_device_path {
+	u8 type;
+	u8 sub_type;
+	u16 length;
+} __packed;
 
-typedef struct {
+/*
+ * The EFI spec defines the EFI_GUID as
+ * "128-bit buffer containing a unique identifier value. Unless otherwise specified,
+ * aligned on a 64-bit boundary".
+ * Page 163 of the UEFI specification v2.10 and
+ * EDK2 reference implementation both define EFI_GUID as
+ * struct { u32 a; u16; b; u16 c; u8 d[8]; }; which is 4-byte
+ * aligned.
+ */
+typedef struct efi_guid {
 	u8 b[16];
-} efi_guid_t __attribute__((aligned(8)));
+} efi_guid_t __attribute__((aligned(4)));
+
+static inline int guidcmp(const void *g1, const void *g2)
+{
+	return memcmp(g1, g2, sizeof(efi_guid_t));
+}
+
+static inline void *guidcpy(void *dst, const void *src)
+{
+	return memcpy(dst, src, sizeof(efi_guid_t));
+}
 
 #define EFI_BITS_PER_LONG	(sizeof(long) * 8)
 
@@ -125,8 +157,36 @@ struct efi_table_hdr {
 	u32 reserved;
 };
 
+/* Allocation types for calls to boottime->allocate_pages*/
+/**
+ * enum efi_allocate_type - address restriction for memory allocation
+ */
+enum efi_allocate_type {
+	/**
+	 * @EFI_ALLOCATE_ANY_PAGES:
+	 * Allocate any block of sufficient size. Ignore memory address.
+	 */
+	EFI_ALLOCATE_ANY_PAGES,
+	/**
+	 * @EFI_ALLOCATE_MAX_ADDRESS:
+	 * Allocate a memory block with an uppermost address less or equal
+	 * to the indicated address.
+	 */
+	EFI_ALLOCATE_MAX_ADDRESS,
+	/**
+	 * @EFI_ALLOCATE_ADDRESS:
+	 * Allocate a memory block starting at the indicated address.
+	 */
+	EFI_ALLOCATE_ADDRESS,
+	/**
+	 * @EFI_MAX_ALLOCATE_TYPE:
+	 * Value use for range checking.
+	 */
+	EFI_MAX_ALLOCATE_TYPE,
+};
+
 /* Enumeration of memory types introduced in UEFI */
-enum efi_mem_type {
+enum efi_memory_type {
 	EFI_RESERVED_MEMORY_TYPE,
 	/*
 	 * The code portions of a loaded application.
@@ -180,9 +240,13 @@ enum efi_mem_type {
 	 */
 	EFI_PAL_CODE,
 	/*
-	 * Non-volatile memory.
+	 * Byte addressable non-volatile memory.
 	 */
 	EFI_PERSISTENT_MEMORY_TYPE,
+	/*
+	 * Unaccepted memory must be accepted by boot target before usage.
+	 */
+	EFI_UNACCEPTED_MEMORY_TYPE,
 
 	EFI_MAX_MEMORY_TYPE,
 };
@@ -201,6 +265,9 @@ enum efi_mem_type {
 				((u64)0x0000000000010000ULL)	/* higher reliability */
 #define EFI_MEMORY_RO		((u64)0x0000000000020000ULL)	/* read-only */
 #define EFI_MEMORY_SP		((u64)0x0000000000040000ULL)	/* specific-purpose memory (SPM) */
+#define EFI_MEMORY_CPU_CRYPTO	((u64)0x0000000000080000ULL)	/* cryptographically protectable */
+#define EFI_MEMORY_HOT_PLUGGABLE \
+				((u64)0x0000000000100000ULL)	/* hot pluggable */
 #define EFI_MEMORY_RUNTIME	((u64)0x8000000000000000ULL)	/* range requires runtime mapping */
 #define EFI_MEM_DESC_VERSION	1
 
@@ -218,12 +285,6 @@ struct efi_mem_desc {
 };
 
 #define EFI_MEMORY_DESCRIPTOR_VERSION 1
-
-/* Allocation types for calls to boottime->allocate_pages*/
-#define EFI_ALLOCATE_ANY_PAGES		0
-#define EFI_ALLOCATE_MAX_ADDRESS	1
-#define EFI_ALLOCATE_ADDRESS		2
-#define EFI_MAX_ALLOCATE_TYPE		3
 
 /* Types and defines for Time Services */
 #define EFI_TIME_ADJUST_DAYLIGHT 0x1
@@ -294,7 +355,7 @@ struct efi_info_hdr {
  * struct efi_entry_hdr - Header for a table entry
  *
  * @type:	enum eft_entry_t
- * @size	size of entry bytes excluding header and padding
+ * @size:	size of entry bytes excluding header and padding
  * @addr:	address of this entry (0 if it follows the header )
  * @link:	size of entry including header and padding
  * @spare1:	Spare space for expansion
@@ -368,23 +429,70 @@ struct efi_entry_systable {
 };
 
 static inline struct efi_mem_desc *efi_get_next_mem_desc(
-		struct efi_entry_memmap *map, struct efi_mem_desc *desc)
+		struct efi_mem_desc *desc, int desc_size)
 {
-	return (struct efi_mem_desc *)((ulong)desc + map->desc_size);
+	return (struct efi_mem_desc *)((ulong)desc + desc_size);
 }
 
+/**
+ * struct efi_priv - Information about the environment provided by EFI
+ *
+ * @parent_image: image passed into the EFI app or stub
+ * @sys_table: Pointer to system table
+ * @boot: Pointer to boot-services table
+ * @run: Pointer to runtime-services table
+ * @memmap_key: Key returned from get_memory_map()
+ * @memmap_desc: List of memory-map records
+ * @memmap_alloc: Amount of memory allocated for memory map list
+ * @memmap_size Size of memory-map list in bytes
+ * @memmap_desc_size: Size of an individual memory-map record, in bytes
+ * @memmap_version: Memory-map version
+ *
+ * @use_pool_for_malloc: true if all allocation should go through the EFI 'pool'
+ *	methods allocate_pool() and free_pool(); false to use 'pages' methods
+ *	allocate_pages() and free_pages()
+ * @ram_base: Base address of RAM (size CONFIG_EFI_RAM_SIZE)
+ * @image_data_type: Type of the loaded image (e.g. EFI_LOADER_CODE)
+ *
+ * @info: Header of the info list, holding info collected by the stub and passed
+ *	to U-Boot
+ * @info_size: Size of the info list @info in bytes
+ * @next_hdr: Pointer to where to put the next header when adding to the list
+ */
 struct efi_priv {
 	efi_handle_t parent_image;
-	struct efi_device_path *device_path;
 	struct efi_system_table *sys_table;
 	struct efi_boot_services *boot;
 	struct efi_runtime_services *run;
+	efi_uintn_t memmap_key;
+	struct efi_mem_desc *memmap_desc;
+	efi_uintn_t memmap_alloc;
+	efi_uintn_t memmap_size;
+	efi_uintn_t memmap_desc_size;
+	u32 memmap_version;
+
+	/* app: */
 	bool use_pool_for_malloc;
 	unsigned long ram_base;
 	unsigned int image_data_type;
+
+	/* stub: */
 	struct efi_info_hdr *info;
 	unsigned int info_size;
 	void *next_hdr;
+};
+
+/*
+ * EFI attributes of the udevice handled by efi_media driver
+ *
+ * @handle: handle of the controller on which this driver is installed
+ * @blkio: block io protocol proxied by this driver
+ * @device_path: EFI path to the device
+ */
+struct efi_media_plat {
+	efi_handle_t handle;
+	struct efi_block_io *blkio;
+	struct efi_device_path *device_path;
 };
 
 /* Base address of the EFI image */
@@ -396,13 +504,14 @@ extern char _binary_u_boot_bin_start[], _binary_u_boot_bin_end[];
 /*
  * Variable Attributes
  */
-#define EFI_VARIABLE_NON_VOLATILE       0x0000000000000001
-#define EFI_VARIABLE_BOOTSERVICE_ACCESS 0x0000000000000002
-#define EFI_VARIABLE_RUNTIME_ACCESS     0x0000000000000004
-#define EFI_VARIABLE_HARDWARE_ERROR_RECORD 0x0000000000000008
-#define EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS 0x0000000000000010
-#define EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS 0x0000000000000020
-#define EFI_VARIABLE_APPEND_WRITE	0x0000000000000040
+#define EFI_VARIABLE_NON_VOLATILE				0x00000001
+#define EFI_VARIABLE_BOOTSERVICE_ACCESS				0x00000002
+#define EFI_VARIABLE_RUNTIME_ACCESS				0x00000004
+#define EFI_VARIABLE_HARDWARE_ERROR_RECORD			0x00000008
+#define EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS			0x00000010
+#define EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS	0x00000020
+#define EFI_VARIABLE_APPEND_WRITE				0x00000040
+#define EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS		0x00000080
 
 #define EFI_VARIABLE_MASK	(EFI_VARIABLE_NON_VOLATILE | \
 				EFI_VARIABLE_BOOTSERVICE_ACCESS | \
@@ -410,22 +519,50 @@ extern char _binary_u_boot_bin_start[], _binary_u_boot_bin_end[];
 				EFI_VARIABLE_HARDWARE_ERROR_RECORD | \
 				EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS | \
 				EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS | \
-				EFI_VARIABLE_APPEND_WRITE)
+				EFI_VARIABLE_APPEND_WRITE | \
+				EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS)
+
+/**
+ * efi_get_priv() - Get access to the EFI-private information
+ *
+ * This struct it used by both the stub and the app to record things about the
+ * EFI environment. It is not available in U-Boot proper after the stub has
+ * jumped there. Use efi_info_get() to obtain info in that case.
+ *
+ * Return: pointer to private info
+ */
+struct efi_priv *efi_get_priv(void);
+
+/**
+ * efi_set_priv() - Set up a pointer to the EFI-private information
+ *
+ * This is called in the stub and app to record the location of this
+ * information.
+ *
+ * @priv: New location of private data
+ */
+void efi_set_priv(struct efi_priv *priv);
 
 /**
  * efi_get_sys_table() - Get access to the main EFI system table
  *
- * @return pointer to EFI system table
+ * Returns: pointer to EFI system table
  */
-
 struct efi_system_table *efi_get_sys_table(void);
+
+/**
+ * efi_get_boot() - Get access to the EFI boot services table
+ *
+ * Returns: pointer to EFI boot services table
+ */
+struct efi_boot_services *efi_get_boot(void);
 
 /**
  * efi_get_ram_base() - Find the base of RAM
  *
  * This is used when U-Boot is built as an EFI application.
  *
- * @return the base of RAM as known to U-Boot
+ * Returns: the base of RAM as known to U-Boot
  */
 unsigned long efi_get_ram_base(void);
 
@@ -436,6 +573,7 @@ unsigned long efi_get_ram_base(void);
  * @banner:	Banner to display when starting
  * @image:	The image handle passed to efi_main()
  * @sys_table:	The EFI system table pointer passed to efi_main()
+ * Return: 0 on succcess, EFI error code on failure
  */
 int efi_init(struct efi_priv *priv, const char *banner, efi_handle_t image,
 	     struct efi_system_table *sys_table);
@@ -446,7 +584,7 @@ int efi_init(struct efi_priv *priv, const char *banner, efi_handle_t image,
  * @priv:	Pointer to private EFI structure
  * @size:	Number of bytes to allocate
  * @retp:	Return EFI status result
- * @return pointer to memory allocated, or NULL on error
+ * Returns: pointer to memory allocated, or NULL on error
  */
 void *efi_malloc(struct efi_priv *priv, int size, efi_status_t *retp);
 
@@ -477,12 +615,107 @@ void efi_putc(struct efi_priv *priv, const char ch);
 /**
  * efi_info_get() - get an entry from an EFI table
  *
+ * This function is called from U-Boot proper to read information set up by the
+ * EFI stub. It can only be used when running from the EFI stub, not when U-Boot
+ * is running as an app.
+ *
  * @type:	Entry type to search for
  * @datap:	Returns pointer to entry data
- * @sizep:	Returns pointer to entry size
- * @return 0 if OK, -ENODATA if there is no table, -ENOENT if there is no entry
+ * @sizep:	Returns entry size
+ * Return: 0 if OK, -ENODATA if there is no table, -ENOENT if there is no entry
  * of the requested type, -EPROTONOSUPPORT if the table has the wrong version
  */
 int efi_info_get(enum efi_entry_t type, void **datap, int *sizep);
+
+/**
+ * efi_store_memory_map() - Collect the memory-map info from EFI
+ *
+ * Collect the memory info and store it for later use, e.g. in calling
+ * exit_boot_services()
+ *
+ * @priv:	Pointer to private EFI structure
+ * Returns: 0 if OK, non-zero on error
+ */
+int efi_store_memory_map(struct efi_priv *priv);
+
+/**
+ * efi_call_exit_boot_services() - Handle the exit-boot-service procedure
+ *
+ * Tell EFI we don't want their boot services anymore
+ *
+ * Return: 0 if OK, non-zero on error
+ */
+int efi_call_exit_boot_services(void);
+
+/**
+ * efi_get_mmap() - Get the memory map from EFI
+ *
+ * This is used in the app. The caller must free *@descp when done
+ *
+ * @descp:	Returns allocated pointer to EFI memory map table
+ * @sizep:	Returns size of table in bytes
+ * @keyp:	Returns memory-map key
+ * @desc_sizep:	Returns size of each @desc_base record
+ * @versionp:	Returns version number of memory map
+ * Returns: 0 on success, -ve on error
+ */
+int efi_get_mmap(struct efi_mem_desc **descp, int *sizep, uint *keyp,
+		 int *desc_sizep, uint *versionp);
+
+/**
+ * efi_show_tables() - Show a list of available tables
+ *
+ * Shows the address, GUID (and name where known) for each table
+ *
+ * @systab: System table containing the list of tables
+ */
+void efi_show_tables(struct efi_system_table *systab);
+
+/**
+ * efi_get_basename() - Get the default filename to use when loading
+ *
+ * E.g. this function returns BOOTAA64.EFI for an aarch target
+ *
+ * Return: Default EFI filename
+ */
+const char *efi_get_basename(void);
+
+#ifdef CONFIG_SANDBOX
+#include <asm/state.h>
+#endif
+
+static inline bool efi_use_host_arch(void)
+{
+#ifdef CONFIG_SANDBOX
+	struct sandbox_state *state = state_get_current();
+
+	return state->native;
+#else
+	return false;
+#endif
+}
+
+/**
+ * efi_get_pxe_arch() - Get the architecture value for PXE
+ *
+ * See:
+ * http://www.iana.org/assignments/dhcpv6-parameters/dhcpv6-parameters.xml
+ *
+ * Return: Architecture value
+ */
+int efi_get_pxe_arch(void);
+
+/**
+ * fdt_efi_pmem_setup() - Pmem setup in DT and EFI memory map
+ * @fdt: Devicetree to add the pmem nodes to
+ *
+ * Iterate through all the blkmap devices, look for BLKMAP_MEM devices,
+ * and add pmem nodes corresponding to the blkmap slice to the
+ * devicetree along with removing the corresponding region from the
+ * EFI memory map.
+ *
+ * Returns: 0 on success, negative error on failure
+ */
+int fdt_efi_pmem_setup(void *fdt);
 
 #endif /* _LINUX_EFI_H */

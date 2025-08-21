@@ -13,6 +13,7 @@
 #define __ASM_ME_COMMON_H
 
 #include <linux/compiler.h>
+#include <linux/string.h>
 #include <linux/types.h>
 #include <pci.h>
 
@@ -220,7 +221,6 @@ struct me_fw_version {
 	u16 recovery_hot_fix;
 } __packed;
 
-
 #define HECI_EOP_STATUS_SUCCESS       0x0
 #define HECI_EOP_PERFORM_GLOBAL_RESET 0x1
 
@@ -325,7 +325,7 @@ void intel_me_status(struct udevice *me_dev);
  * intel_early_me_init() - Early Intel Management Engine init
  *
  * @me_dev:	Management engine PCI device
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int intel_early_me_init(struct udevice *me_dev);
 
@@ -333,7 +333,7 @@ int intel_early_me_init(struct udevice *me_dev);
  * intel_early_me_uma_size() - Get UMA size from the Intel Management Engine
  *
  * @me_dev:	Management engine PCI device
- * @return UMA size if OK, -EINVAL on error
+ * Return: UMA size if OK, -EINVAL on error
  */
 int intel_early_me_uma_size(struct udevice *me_dev);
 
@@ -343,7 +343,7 @@ int intel_early_me_uma_size(struct udevice *me_dev);
  * @dev:	Northbridge device
  * @me_dev:	Management engine PCI device
  * @status:	Status result (ME_INIT_...)
- * @return 0 to continue to boot, -EINVAL on unknown result data, -ETIMEDOUT
+ * Return: 0 to continue to boot, -EINVAL on unknown result data, -ETIMEDOUT
  * if ME did not respond
  */
 int intel_early_me_init_done(struct udevice *dev, struct udevice *me_dev,

@@ -24,9 +24,11 @@
 #ifdef CONFIG_HAVE_INTEL_ME
 	intel-descriptor {
 		filename = CONFIG_FLASH_DESCRIPTOR_FILE;
+		assume-size = <0x1000>;
 	};
 	intel-me {
 		filename = CONFIG_INTEL_ME_FILE;
+		assume-size = <0x1ff000>;
 	};
 #endif
 #ifdef CONFIG_TPL
@@ -37,21 +39,12 @@
 	u-boot-tpl-dtb {
 	};
 #endif
-	spl {
-		type = "section";
+	u-boot-spl {
+		type = "u-boot-spl";
 		offset = <CONFIG_X86_OFFSET_SPL>;
-		u-boot-spl {
-		};
-		u-boot-spl-dtb {
-		};
 	};
 	u-boot {
-		type = "section";
 		offset = <CONFIG_X86_OFFSET_U_BOOT>;
-		u-boot-nodtb {
-		};
-		u-boot-dtb {
-		};
 	};
 #elif defined(CONFIG_SPL)
 	u-boot-spl-with-ucode-ptr {
@@ -64,11 +57,7 @@
 		offset = <CONFIG_X86_OFFSET_U_BOOT>;
 	};
 #else
-# ifdef CONFIG_SPL
-	u-boot {
-		offset = <CONFIG_SYS_TEXT_BASE>;
-	};
-# elif defined(CONFIG_HAVE_MICROCODE)
+# ifdef CONFIG_HAVE_MICROCODE
 	/* If there is no SPL then we need to put microcode in U-Boot */
 	u-boot-with-ucode-ptr {
 		offset = <CONFIG_X86_OFFSET_U_BOOT>;
@@ -99,7 +88,8 @@
 #endif
 #ifdef CONFIG_HAVE_MRC
 	intel-mrc {
-		offset = <CONFIG_X86_MRC_ADDR>;
+		offset = <CFG_X86_MRC_ADDR>;
+		assume-size = <0x2fc94>;
 	};
 #endif
 #ifdef CONFIG_FSP_VERSION1
@@ -111,6 +101,7 @@
 #ifdef CONFIG_FSP_VERSION2
 	intel-descriptor {
 		filename = CONFIG_FLASH_DESCRIPTOR_FILE;
+		assume-size = <4096>;
 	};
 	intel-ifwi {
 		filename = CONFIG_IFWI_INPUT_FILE;
@@ -152,6 +143,7 @@
 	intel-vga {
 		filename = CONFIG_VGA_BIOS_FILE;
 		offset = <CONFIG_VGA_BIOS_ADDR>;
+		assume-size = <0x10000>;
 	};
 #endif
 #ifdef CONFIG_HAVE_VBT
@@ -162,7 +154,7 @@
 #endif
 #ifdef CONFIG_HAVE_REFCODE
 	intel-refcode {
-		offset = <CONFIG_X86_REFCODE_ADDR>;
+		offset = <CFG_X86_REFCODE_ADDR>;
 	};
 #endif
 #ifdef CONFIG_TPL

@@ -2,13 +2,12 @@
 /*
  * Texas Instruments CDCE913/925/937/949 clock synthesizer driver
  *
- * Copyright (C) 2019 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2019 Texas Instruments Incorporated - https://www.ti.com/
  *	Tero Kristo <t-kristo@ti.com>
  *
  * Based on Linux kernel clk-cdce925.c.
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <clk-uclass.h>
@@ -86,18 +85,12 @@ static int cdce9xx_reg_write(struct udevice *dev, u8 addr, u8 val)
 	return ret;
 }
 
-static int cdce9xx_clk_of_xlate(struct clk *clk,
-				struct ofnode_phandle_args *args)
+static int cdce9xx_clk_request(struct clk *clk)
 {
 	struct cdce9xx_clk_data *data = dev_get_priv(clk->dev);
 
-	if (args->args_count != 1)
+	if (clk->id > data->chip->num_outputs)
 		return -EINVAL;
-
-	if (args->args[0] > data->chip->num_outputs)
-		return -EINVAL;
-
-	clk->id = args->args[0];
 
 	return 0;
 }
@@ -241,7 +234,7 @@ static const struct udevice_id cdce9xx_clk_of_match[] = {
 };
 
 static const struct clk_ops cdce9xx_clk_ops = {
-	.of_xlate = cdce9xx_clk_of_xlate,
+	.request = cdce9xx_clk_request,
 	.get_rate = cdce9xx_clk_get_rate,
 	.set_rate = cdce9xx_clk_set_rate,
 };

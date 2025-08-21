@@ -15,7 +15,8 @@
 #include <linux/bitops.h>
 #include <linux/compat.h>
 #include <linux/asn1.h>
-#include <u-boot/rsa-checksum.h>
+#include <linux/printk.h>
+#include <u-boot/hash-checksum.h>
 #include <crypto/public_key.h>
 #include <crypto/pkcs7_parser.h>
 #else
@@ -65,6 +66,10 @@ static int pkcs7_digest(struct pkcs7_message *pkcs7,
 		return -ENOPKG;
 	if (!strcmp(sinfo->sig->hash_algo, "sha256"))
 		sig->digest_size = SHA256_SUM_LEN;
+	else if (!strcmp(sinfo->sig->hash_algo, "sha384"))
+		sig->digest_size = SHA384_SUM_LEN;
+	else if (!strcmp(sinfo->sig->hash_algo, "sha512"))
+		sig->digest_size = SHA512_SUM_LEN;
 	else if (!strcmp(sinfo->sig->hash_algo, "sha1"))
 		sig->digest_size = SHA1_SUM_LEN;
 	else

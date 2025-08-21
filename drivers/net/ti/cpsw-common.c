@@ -5,13 +5,13 @@
  * Copyright (C) 2016, Texas Instruments, Incorporated
  */
 
-#include <common.h>
 #include <dm.h>
 #include <fdt_support.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <cpsw.h>
 #include <dm/device_compat.h>
+#include <linux/printk.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 

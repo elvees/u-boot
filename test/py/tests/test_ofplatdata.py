@@ -2,21 +2,20 @@
 # Copyright (c) 2016 Google, Inc
 
 import pytest
-import u_boot_utils as util
+import utils
 
-@pytest.mark.boardspec('sandbox')
+@pytest.mark.boardspec('sandbox_spl')
 @pytest.mark.buildconfigspec('spl_of_platdata')
-def test_spl_devicetree(u_boot_console):
+def test_spl_devicetree(ubman):
     """Test content of spl device-tree"""
-    cons = u_boot_console
-    dtb = cons.config.build_dir + '/spl/u-boot-spl.dtb'
-    fdtgrep = cons.config.build_dir + '/tools/fdtgrep'
-    output = util.run_and_log(cons, [fdtgrep, '-l', dtb])
+    dtb = ubman.config.build_dir + '/spl/u-boot-spl.dtb'
+    fdtgrep = ubman.config.build_dir + '/tools/fdtgrep'
+    output = utils.run_and_log(ubman, [fdtgrep, '-l', dtb])
 
-    assert "u-boot,dm-pre-reloc" not in output
-    assert "u-boot,dm-pre-proper" not in output
-    assert "u-boot,dm-spl" not in output
-    assert "u-boot,dm-tpl" not in output
+    assert "bootph-all" not in output
+    assert "bootph-some-ram" not in output
+    assert "bootph-pre-ram" not in output
+    assert "bootph-pre-sram" not in output
 
     assert "spl-test5" not in output
     assert "spl-test6" not in output

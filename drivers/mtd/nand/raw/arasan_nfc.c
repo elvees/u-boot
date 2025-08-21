@@ -5,7 +5,6 @@
  * Copyright (C) 2014 - 2015 Xilinx, Inc.
  */
 
-#include <common.h>
 #include <malloc.h>
 #include <asm/io.h>
 #include <linux/delay.h>
@@ -18,6 +17,7 @@
 #include <asm/arch/sys_proto.h>
 #include <dm.h>
 #include <nand.h>
+#include <linux/printk.h>
 
 struct nand_config {
 	u32 page;
@@ -407,7 +407,6 @@ static int arasan_nand_read_page(struct mtd_info *mtd, u8 *buf, u32 size)
 
 		for (i = 0; i < pktsize/4; i++)
 			bufptr[i] = readl(&info->reg->buf_dataport);
-
 
 		bufptr += pktsize/4;
 
@@ -1230,11 +1229,16 @@ static int arasan_probe(struct udevice *dev)
 	struct nand_drv *info = &arasan->nand_ctrl;
 	struct nand_config *nand = &info->config;
 	struct mtd_info *mtd;
-	int err = -1;
+	ofnode child;
+	int ret;
+	const char *str;
 
-	info->reg = (struct nand_regs *)dev_read_addr(dev);
+	info->reg = dev_read_addr_ptr(dev);
 	mtd = nand_to_mtd(nand_chip);
 	nand_set_controller_data(nand_chip, &arasan->nand_ctrl);
+
+	ofnode_for_each_subnode(child, dev_ofnode(dev))
+		nand_set_flash_node(nand_chip, child);
 
 #ifdef CONFIG_SYS_NAND_NO_SUBPAGE_WRITE
 	nand_chip->options |= NAND_NO_SUBPAGE_WRITE;
@@ -1248,15 +1252,21 @@ static int arasan_probe(struct udevice *dev)
 	/* Buffer read/write routines */
 	nand_chip->read_buf = arasan_nand_read_buf;
 	nand_chip->write_buf = arasan_nand_write_buf;
-	nand_chip->bbt_options = NAND_BBT_USE_FLASH;
 
 	writel(0x0, &info->reg->cmd_reg);
 	writel(0x0, &info->reg->pgm_reg);
 
 	/* first scan to find the device and get the page size */
-	if (nand_scan_ident(mtd, CONFIG_SYS_NAND_MAX_CHIPS, NULL)) {
+	ret = nand_scan_ident(mtd, CONFIG_SYS_NAND_MAX_CHIPS, NULL);
+	if (ret) {
 		printf("%s: nand_scan_ident failed\n", __func__);
-		goto fail;
+		return ret;
+	}
+
+	str = ofnode_read_string(nand_chip->flash_node, "nand-ecc-mode");
+	if (!str || strcmp(str, "hw") != 0) {
+		printf("%s ecc mode is not supported\n", str);
+		return -EINVAL;
 	}
 
 	nand_chip->ecc.mode = NAND_ECC_HW;
@@ -1278,26 +1288,26 @@ static int arasan_probe(struct udevice *dev)
 		nand_chip->ecc.bytes = 0;
 		nand_chip->ecc.layout = &ondie_nand_oob_64;
 	} else {
-		if (arasan_nand_ecc_init(mtd)) {
+		ret = arasan_nand_ecc_init(mtd);
+		if (ret) {
 			printf("%s: nand_ecc_init failed\n", __func__);
-			goto fail;
+			return ret;
 		}
 	}
 
-	if (nand_scan_tail(mtd)) {
+	ret = nand_scan_tail(mtd);
+	if (ret) {
 		printf("%s: nand_scan_tail failed\n", __func__);
-		goto fail;
+		return ret;
 	}
 
-	if (nand_register(0, mtd)) {
+	ret = nand_register(0, mtd);
+	if (ret) {
 		printf("Nand Register Fail\n");
-		goto fail;
+		return ret;
 	}
 
-	return 0;
-fail:
-	free(nand);
-	return err;
+	return ret;
 }
 
 static const struct udevice_id arasan_nand_dt_ids[] = {

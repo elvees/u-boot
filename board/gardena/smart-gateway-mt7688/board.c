@@ -3,11 +3,9 @@
  * Copyright (C) 2018 Stefan Roese <sr@denx.de>
  */
 
-#include <common.h>
 #include <command.h>
 #include <env.h>
 #include <env_internal.h>
-#include <flash.h>
 #include <init.h>
 #include <led.h>
 #include <log.h>
@@ -18,7 +16,7 @@
 #include <linux/delay.h>
 #include <linux/stringify.h>
 #include <u-boot/crc.h>
-#include <uuid.h>
+#include <u-boot/uuid.h>
 #include <linux/ctype.h>
 #include <linux/io.h>
 
@@ -183,9 +181,6 @@ err_free:
 
 int board_late_init(void)
 {
-	if (IS_ENABLED(CONFIG_LED))
-		led_default_state();
-
 	factory_data_env_config();
 
 	return 0;
@@ -300,7 +295,7 @@ err_free:
 	return ret;
 }
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 U_BOOT_CMD(
 	fd_write,	1,	0,	do_fd_write,
 	"Write test factory-data values to SPI NOR",

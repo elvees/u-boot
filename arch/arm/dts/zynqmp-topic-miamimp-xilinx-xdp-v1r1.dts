@@ -19,7 +19,6 @@
 		     "topic,miamimp", "xlnx,zynqmp";
 
 	aliases {
-		gpio0 = &gpio;
 		i2c0 = &i2c0;
 		i2c1 = &i2c1;
 		mmc0 = &sdhci0;
@@ -57,17 +56,15 @@
 
 &qspi {
 	status = "okay";
-	is-dual = <1>;
 	flash@0 {
-		compatible = "st,m25p80", "n25q256a";
+		compatible = "st,m25p80", "n25q256a", "jedec,spi-nor";
 		m25p,fast-read;
 		reg = <0x0>;
-		spi-tx-bus-width = <1>;
+		spi-tx-bus-width = <4>;
 		spi-rx-bus-width = <4>;
 		spi-max-frequency = <166000000>;
 		#address-cells = <1>;
 		#size-cells = <1>;
-		is-dual = <1>;
 		partition@0 {
 			label = "qspi-boot-bin";
 			reg = <0x00000 0x60000>;
@@ -96,6 +93,9 @@
 	status = "okay";
 	non-removable;
 	disable-wp; /* We don't have a write-protect detection */
+	no-sd;
+	no-sdio;
+	cap-mmc-hw-reset;
 	bus-width = <8>;
 	xlnx,mio-bank = <0>;
 };

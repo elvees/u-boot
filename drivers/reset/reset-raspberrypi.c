@@ -4,7 +4,6 @@
  *
  * Copyright (C) 2020 Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
  */
-#include <common.h>
 #include <dm.h>
 #include <reset-uclass.h>
 #include <asm/arch/msg.h>
@@ -15,11 +14,6 @@ static int raspberrypi_reset_request(struct reset_ctl *reset_ctl)
 	if (reset_ctl->id >= RASPBERRYPI_FIRMWARE_RESET_NUM_IDS)
 		return -EINVAL;
 
-	return 0;
-}
-
-static int raspberrypi_reset_free(struct reset_ctl *reset_ctl)
-{
 	return 0;
 }
 
@@ -34,16 +28,9 @@ static int raspberrypi_reset_assert(struct reset_ctl *reset_ctl)
 	}
 }
 
-static int raspberrypi_reset_deassert(struct reset_ctl *reset_ctl)
-{
-	return 0;
-}
-
 struct reset_ops raspberrypi_reset_ops = {
 	.request = raspberrypi_reset_request,
-	.rfree = raspberrypi_reset_free,
 	.rst_assert = raspberrypi_reset_assert,
-	.rst_deassert = raspberrypi_reset_deassert,
 };
 
 static const struct udevice_id raspberrypi_reset_ids[] = {
@@ -57,4 +44,3 @@ U_BOOT_DRIVER(raspberrypi_reset) = {
 	.of_match = raspberrypi_reset_ids,
 	.ops = &raspberrypi_reset_ops,
 };
-

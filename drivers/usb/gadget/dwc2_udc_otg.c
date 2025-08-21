@@ -17,7 +17,6 @@
  * Lukasz Majewski <l.majewski@samsumg.com>
  */
 #undef DEBUG
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <generic-phy.h>
@@ -28,6 +27,7 @@
 #include <dm/devres.h>
 #include <linux/bug.h>
 #include <linux/delay.h>
+#include <linux/printk.h>
 
 #include <linux/errno.h>
 #include <linux/list.h>
@@ -232,6 +232,14 @@ static int udc_enable(struct dwc2_udc *dev)
 		    readl(&reg->gintmsk));
 
 	dev->gadget.speed = USB_SPEED_UNKNOWN;
+
+	return 0;
+}
+
+static int dwc2_gadget_pullup(struct usb_gadget *g, int is_on)
+{
+	clrsetbits_le32(&reg->dctl, SOFT_DISCONNECT,
+			is_on ? 0 : SOFT_DISCONNECT);
 
 	return 0;
 }
@@ -461,7 +469,7 @@ static void reconfig_usbd(struct dwc2_udc *dev)
 	u32 max_hw_ep;
 	int pdata_hw_ep;
 
-	debug("Reseting OTG controller\n");
+	debug("Resetting OTG controller\n");
 
 	dflt_gusbcfg =
 		0<<15		/* PHY Low Power Clock sel*/
@@ -655,6 +663,7 @@ static int dwc2_ep_enable(struct usb_ep *_ep,
 		return -ESHUTDOWN;
 	}
 
+	_ep->desc = desc;
 	ep->stopped = 0;
 	ep->desc = desc;
 	ep->pio_irqs = 0;
@@ -695,6 +704,7 @@ static int dwc2_ep_disable(struct usb_ep *_ep)
 	/* Nuke all pending requests */
 	nuke(ep, -ESHUTDOWN);
 
+	_ep->desc = NULL;
 	ep->desc = 0;
 	ep->stopped = 1;
 
@@ -803,6 +813,7 @@ static void dwc2_fifo_flush(struct usb_ep *_ep)
 }
 
 static const struct usb_gadget_ops dwc2_udc_ops = {
+	.pullup = dwc2_gadget_pullup,
 	/* current versions must always be self-powered */
 #if CONFIG_IS_ENABLED(DM_USB_GADGET)
 	.udc_start		= dwc2_gadget_start,
@@ -930,26 +941,13 @@ int dwc2_udc_handle_interrupt(void)
 	return 0;
 }
 
-#if !CONFIG_IS_ENABLED(DM_USB_GADGET)
-
-int usb_gadget_handle_interrupts(int index)
-{
-	return dwc2_udc_handle_interrupt();
-}
-
-#else /* CONFIG_IS_ENABLED(DM_USB_GADGET) */
-
+#if CONFIG_IS_ENABLED(DM_USB_GADGET)
 struct dwc2_priv_data {
 	struct clk_bulk		clks;
 	struct reset_ctl_bulk	resets;
 	struct phy_bulk phys;
 	struct udevice *usb33d_supply;
 };
-
-int dm_usb_gadget_handle_interrupts(struct udevice *dev)
-{
-	return dwc2_udc_handle_interrupt();
-}
 
 static int dwc2_phy_setup(struct udevice *dev, struct phy_bulk *phys)
 {
@@ -994,8 +992,9 @@ static int dwc2_udc_otg_of_to_plat(struct udevice *dev)
 	plat->rx_fifo_sz = dev_read_u32_default(dev, "g-rx-fifo-size", 0);
 	plat->np_tx_fifo_sz = dev_read_u32_default(dev, "g-np-tx-fifo-size", 0);
 
-	plat->tx_fifo_sz_nb =
-		dev_read_size(dev, "g-tx-fifo-size") / sizeof(u32);
+	ret = dev_read_size(dev, "g-tx-fifo-size");
+	if (ret > 0)
+		plat->tx_fifo_sz_nb = ret / sizeof(u32);
 	if (plat->tx_fifo_sz_nb > DWC2_MAX_HW_ENDPOINTS)
 		plat->tx_fifo_sz_nb = DWC2_MAX_HW_ENDPOINTS;
 	if (plat->tx_fifo_sz_nb) {
@@ -1169,6 +1168,15 @@ static int dwc2_udc_otg_remove(struct udevice *dev)
 	return dm_scan_fdt_dev(dev);
 }
 
+static int dwc2_gadget_handle_interrupts(struct udevice *dev)
+{
+	return dwc2_udc_handle_interrupt();
+}
+
+static const struct usb_gadget_generic_ops dwc2_gadget_ops = {
+	.handle_interrupts	= dwc2_gadget_handle_interrupts,
+};
+
 static const struct udevice_id dwc2_udc_otg_ids[] = {
 	{ .compatible = "snps,dwc2" },
 	{ .compatible = "brcm,bcm2835-usb" },
@@ -1181,6 +1189,7 @@ U_BOOT_DRIVER(dwc2_udc_otg) = {
 	.name	= "dwc2-udc-otg",
 	.id	= UCLASS_USB_GADGET_GENERIC,
 	.of_match = dwc2_udc_otg_ids,
+	.ops	= &dwc2_gadget_ops,
 	.of_to_plat = dwc2_udc_otg_of_to_plat,
 	.probe = dwc2_udc_otg_probe,
 	.remove = dwc2_udc_otg_remove,
@@ -1195,5 +1204,10 @@ int dwc2_udc_B_session_valid(struct udevice *dev)
 		(struct dwc2_usbotg_reg *)plat->regs_otg;
 
 	return readl(&usbotg_reg->gotgctl) & B_SESSION_VALID;
+}
+#else
+int dm_usb_gadget_handle_interrupts(struct udevice *dev)
+{
+	return dwc2_udc_handle_interrupt();
 }
 #endif /* CONFIG_IS_ENABLED(DM_USB_GADGET) */

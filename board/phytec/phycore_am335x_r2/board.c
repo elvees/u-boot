@@ -4,13 +4,13 @@
  *
  * Board functions for Phytec phyCORE-AM335x R2 (PCL060 / PCM060) based boards
  *
- * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
+ * Copyright (C) 2011, Texas Instruments, Incorporated - https://www.ti.com/
  * Copyright (C) 2013 Lars Poeschel, Lemonage Software GmbH
  * Copyright (C) 2015 Wadim Egorov, PHYTEC Messtechnik GmbH
  * Copyright (C) 2019 DENX Software Engineering GmbH
  */
 
-#include <common.h>
+#include <config.h>
 #include <init.h>
 #include <spl.h>
 #include <asm/arch/cpu.h>
@@ -26,12 +26,16 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 
 static struct ctrl_dev *cdev = (struct ctrl_dev *)CTRL_DEVICE_BASE;
 
 /* DDR RAM defines */
+#if defined(CONFIG_TARGET_PCM051)
+#define DDR_CLK_MHZ		303 /* DDR_DPLL_MULT value */
+#else
 #define DDR_CLK_MHZ		400 /* DDR_DPLL_MULT value */
+#endif
 
 #define OSC	(V_OSCK / 1000000)
 const struct dpll_params dpll_ddr = {
@@ -65,6 +69,7 @@ enum {
 	PHYCORE_R2_MT41K128M16JT_256MB,
 	PHYCORE_R2_MT41K256M16TW107IT_512MB,
 	PHYCORE_R2_MT41K512M16HA125IT_1024MB,
+	PHYCORE_R13_MT41K256M16HA125E_256MB,
 };
 
 struct am335x_sdram_timings {
@@ -127,10 +132,30 @@ static struct am335x_sdram_timings physom_timings[] = {
 			.datawrsratio0 = 0x82,
 		},
 	},
+	[PHYCORE_R13_MT41K256M16HA125E_256MB] = {
+		.ddr3_emif_reg_data = {
+			.sdram_config = MT41K256M16HA125E_EMIF_SDCFG,
+			.ref_ctrl = MT41K256M16HA125E_EMIF_SDREF,
+			.sdram_tim1 = MT41K256M16HA125E_EMIF_TIM1,
+			.sdram_tim2 = MT41K256M16HA125E_EMIF_TIM2,
+			.sdram_tim3 = MT41K256M16HA125E_EMIF_TIM3,
+			.zq_config = MT41K256M16HA125E_ZQ_CFG,
+			.emif_ddr_phy_ctlr_1 = MT41K256M16HA125E_EMIF_READ_LATENCY | PHY_EN_DYN_PWRDN,
+		},
+		.ddr3_data = {
+			.datardsratio0 = MT41K256M16HA125E_RD_DQS,
+			.datawdsratio0 = MT41K256M16HA125E_WR_DQS,
+			.datafwsratio0 = MT41K256M16HA125E_PHY_FIFO_WE,
+			.datawrsratio0 = MT41K256M16HA125E_PHY_WR_DATA,
+		},
+	},
 };
 
 void sdram_init(void)
 {
+#if defined(CONFIG_TARGET_PCM051)
+	int ram_type_index = PHYCORE_R13_MT41K256M16HA125E_256MB;
+#else
 	/* Configure memory to maximum supported size for detection */
 	int ram_type_index = PHYCORE_R2_MT41K512M16HA125IT_1024MB;
 
@@ -141,8 +166,8 @@ void sdram_init(void)
 		   0);
 
 	/* Detect memory physically present */
-	gd->ram_size = get_ram_size((void *)CONFIG_SYS_SDRAM_BASE,
-				    CONFIG_MAX_RAM_BANK_SIZE);
+	gd->ram_size = get_ram_size((void *)CFG_SYS_SDRAM_BASE,
+				    CFG_MAX_RAM_BANK_SIZE);
 
 	/* Reconfigure memory for actual detected size */
 	switch (gd->ram_size) {
@@ -157,6 +182,7 @@ void sdram_init(void)
 		ram_type_index = PHYCORE_R2_MT41K128M16JT_256MB;
 		break;
 	}
+#endif
 	config_ddr(DDR_CLK_MHZ, &ioregs,
 		   &physom_timings[ram_type_index].ddr3_data,
 		   &ddr3_cmd_ctrl_data,
@@ -243,7 +269,7 @@ void set_mux_conf_regs(void)
  */
 int board_init(void)
 {
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE + 0x100;
 	return 0;
 }
 

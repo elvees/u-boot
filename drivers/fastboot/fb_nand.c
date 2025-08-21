@@ -5,13 +5,12 @@
  */
 
 #include <config.h>
-#include <common.h>
 #include <blk.h>
-#include <flash.h>
 
 #include <fastboot.h>
 #include <image-sparse.h>
 
+#include <linux/printk.h>
 #include <linux/mtd/mtd.h>
 #include <jffs2/jffs2.h>
 #include <nand.h>

@@ -4,7 +4,7 @@
  *		      Eugen Hristev <eugen.hristev@microchip.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <debug_uart.h>
 #include <init.h>
 #include <asm/global_data.h>
@@ -18,6 +18,13 @@
 #include <asm/arch/sama5d2.h>
 
 DECLARE_GLOBAL_DATA_PTR;
+
+static void rgb_leds_init(void)
+{
+	atmel_pio4_set_pio_output(AT91_PIO_PORTB, 0, 0);	/* LED RED */
+	atmel_pio4_set_pio_output(AT91_PIO_PORTB, 1, 0);	/* LED GREEN */
+	atmel_pio4_set_pio_output(AT91_PIO_PORTA, 31, 1);	/* LED BLUE */
+}
 
 int board_late_init(void)
 {
@@ -41,24 +48,23 @@ void board_debug_uart_init(void)
 
 int board_early_init_f(void)
 {
-#ifdef CONFIG_DEBUG_UART
-	debug_uart_init();
-#endif
 	return 0;
 }
 
 int board_init(void)
 {
 	/* address of boot parameters */
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE + 0x100;
+
+	rgb_leds_init();
 
 	return 0;
 }
 
 int dram_init(void)
 {
-	gd->ram_size = get_ram_size((void *)CONFIG_SYS_SDRAM_BASE,
-				    CONFIG_SYS_SDRAM_SIZE);
+	gd->ram_size = get_ram_size((void *)CFG_SYS_SDRAM_BASE,
+				    CFG_SYS_SDRAM_SIZE);
 	return 0;
 }
 
@@ -73,7 +79,7 @@ int misc_init_r(void)
 }
 
 /* SPL */
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 
 /* must set PB25 low to enable the CAN transceivers */
 static void board_can_stdby_dis(void)
@@ -174,7 +180,7 @@ static void ddrc_conf(struct atmel_mpddrc_config *ddrc)
 		      (7 << ATMEL_MPDDRC_TPR2_TFAW_OFFSET));
 }
 
-void mem_init(void)
+void at91_mem_init(void)
 {
 	struct at91_pmc *pmc = (struct at91_pmc *)ATMEL_BASE_PMC;
 	struct atmel_mpddr *mpddrc = (struct atmel_mpddr *)ATMEL_BASE_MPDDRC;

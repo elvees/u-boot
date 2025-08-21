@@ -16,7 +16,6 @@
 
 #define LOG_CATEGORY UCLASS_GPIO
 
-#include <common.h>
 #include <dm.h>
 #include <irq.h>
 #include <log.h>
@@ -60,7 +59,7 @@
  *
  * @comm: Community to search
  * @gpio: Pad number to look up (assumed to be valid)
- * @return offset, 0 for first GPIO in community
+ * Return: offset, 0 for first GPIO in community
  */
 static size_t relative_pad_in_comm(const struct pad_community *comm,
 				   uint gpio)
@@ -75,7 +74,7 @@ static size_t relative_pad_in_comm(const struct pad_community *comm,
  *
  * @comm: Community to search
  * @relative_pad: Pad to look up
- * @return group number if found (see community_n_groups, etc.), or
+ * Return: group number if found (see community_n_groups, etc.), or
  *	-ESPIPE if no groups, or -ENOENT if not found
  */
 static int pinctrl_group_index(const struct pad_community *comm,
@@ -135,7 +134,7 @@ static u32 pinctrl_bitmask_within_group(const struct pad_community *comm,
  *
  * @pad: Pad to check
  * @devp: Returns the device for that pad
- * @return 0 if OK, -ENOTBLK if no device was found for the given pin
+ * Return: 0 if OK, -ENOTBLK if no device was found for the given pin
  */
 static int pinctrl_get_device(uint pad, struct udevice **devp)
 {
@@ -274,7 +273,7 @@ static int pinctrl_configure_itss(struct udevice *dev,
 	irq = pcr_read32(dev, PAD_CFG1_OFFSET(pad_cfg_offset));
 	irq &= PAD_CFG1_IRQ_MASK;
 	if (!irq) {
-		if (spl_phase() > PHASE_TPL)
+		if (xpl_phase() > PHASE_TPL)
 			log_err("GPIO %u doesn't support APIC routing\n",
 				cfg->pad);
 
@@ -316,7 +315,7 @@ static int pinctrl_pad_reset_config_override(const struct pad_community *comm,
 			return config_value;
 		}
 	}
-	if (spl_phase() > PHASE_TPL)
+	if (xpl_phase() > PHASE_TPL)
 		log_err("Logical-to-Chipset mapping not found\n");
 
 	return -ENOENT;
@@ -346,7 +345,7 @@ static const int mask[4] = {
  *
  * @dev: Pinctrl device containing the pad (see pinctrl_get_device())
  * @cfg: Configuration to apply
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 static int pinctrl_configure_pad(struct udevice *dev,
 				 const struct pad_config *cfg)
@@ -623,7 +622,7 @@ int intel_pinctrl_of_to_plat(struct udevice *dev,
 	struct intel_pinctrl_priv *priv = dev_get_priv(dev);
 
 	if (!comm) {
-		if (spl_phase() > PHASE_TPL)
+		if (xpl_phase() > PHASE_TPL)
 			log_err("Cannot find community for pid %d\n",
 				pplat->pid);
 		return -EDOM;

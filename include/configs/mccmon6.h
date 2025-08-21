@@ -9,47 +9,31 @@
 
 #include "mx6_common.h"
 
-#define CONFIG_SPL_LIBCOMMON_SUPPORT
-#include "imx6_spl.h"
-
-#define CONFIG_SYS_UBOOT_BASE (CONFIG_SYS_FLASH_BASE + 0x80000)
-#define CONFIG_SYS_SPL_ARGS_ADDR	0x18000000
+#define CFG_SYS_UBOOT_BASE (CFG_SYS_FLASH_BASE + 0x80000)
 
 /*
  * Below defines are set but NOT really used since we by
  * design force U-Boot run when we boot in development
  * mode from SD card (SD2)
  */
-#define CONFIG_SYS_MMCSD_RAW_MODE_ARGS_SECTOR (0x800)
-#define CONFIG_SYS_MMCSD_RAW_MODE_ARGS_SECTORS (0x80)
-#define CONFIG_SYS_MMCSD_RAW_MODE_KERNEL_SECTOR (0x1000)
-#define CONFIG_SPL_FS_LOAD_KERNEL_NAME "fitImage"
 
-/* Size of malloc() pool */
-#define CONFIG_SYS_MALLOC_LEN		(10 * SZ_1M)
-
-#define CONFIG_MXC_UART_BASE		UART1_BASE
+#define CFG_MXC_UART_BASE		UART1_BASE
 
 /* MMC Configuration */
-#define CONFIG_SYS_FSL_USDHC_NUM	2
-#define CONFIG_SYS_FSL_ESDHC_ADDR	0
+#define CFG_SYS_FSL_USDHC_NUM	2
+#define CFG_SYS_FSL_ESDHC_ADDR	0
 
 /* NOR 16-bit mode */
-#define CONFIG_SYS_FLASH_BASE           WEIM_ARB_BASE_ADDR
-#define CONFIG_SYS_FLASH_CFI_WIDTH FLASH_CFI_16BIT
-#define CONFIG_SYS_FLASH_EMPTY_INFO
-#define CONFIG_FLASH_VERIFY
+#define CFG_SYS_FLASH_BASE           WEIM_ARB_BASE_ADDR
 
 /* NOR Flash MTD */
-#define CONFIG_SYS_MAX_FLASH_BANKS_DETECT 1
-#define CONFIG_SYS_FLASH_BANKS_LIST	{ (CONFIG_SYS_FLASH_BASE) }
-#define CONFIG_SYS_FLASH_BANKS_SIZES	{ (32 * SZ_1M) }
+#define CFG_SYS_FLASH_BANKS_LIST	{ (CFG_SYS_FLASH_BASE) }
+#define CFG_SYS_FLASH_BANKS_SIZES	{ (32 * SZ_1M) }
 
 /* Ethernet Configuration */
-#define IMX_FEC_BASE			ENET_BASE_ADDR
-#define CONFIG_FEC_MXC_PHYADDR		1
+#define CFG_FEC_MXC_PHYADDR		1
 
-#define CONFIG_EXTRA_ENV_SETTINGS \
+#define CFG_EXTRA_ENV_SETTINGS \
 	"console=ttymxc0,115200 quiet\0" \
 	"fdt_high=0xffffffff\0" \
 	"initrd_high=0xffffffff\0" \
@@ -121,7 +105,6 @@
 			  "fi;" \
 		     "fi;" \
 		"fi\0" \
-	"mtdparts=" CONFIG_MTDPARTS_DEFAULT "\0" \
 	"bootdev=1\0" \
 	"bootpart=1\0" \
 	"netdev=eth0\0" \
@@ -132,7 +115,7 @@
 	"nor_img_addr=0x11000000\0" \
 	"nor_img_file=core-image-lwn-mccmon6.nor\0" \
 	"emmc_img_file=core-image-lwn-mccmon6.ext4\0" \
-	"nor_bank_start=" __stringify(CONFIG_SYS_FLASH_BASE) "\0" \
+	"nor_bank_start=" __stringify(CFG_SYS_FLASH_BASE) "\0" \
 	"nor_img_size=0x02000000\0" \
 	"factory_script_file=factory.scr\0" \
 	"factory_load_script=" \
@@ -230,14 +213,9 @@
 /* Physical Memory Map */
 #define PHYS_SDRAM			MMDC0_ARB_BASE_ADDR
 
-#define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM
-#define CONFIG_SYS_INIT_RAM_ADDR	IRAM_BASE_ADDR
-#define CONFIG_SYS_INIT_RAM_SIZE	IRAM_SIZE
-
-#define CONFIG_SYS_INIT_SP_OFFSET \
-	(CONFIG_SYS_INIT_RAM_SIZE - GENERATED_GBL_DATA_SIZE)
-#define CONFIG_SYS_INIT_SP_ADDR \
-	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
+#define CFG_SYS_SDRAM_BASE		PHYS_SDRAM
+#define CFG_SYS_INIT_RAM_ADDR	IRAM_BASE_ADDR
+#define CFG_SYS_INIT_RAM_SIZE	IRAM_SIZE
 
 /* Environment organization */
 

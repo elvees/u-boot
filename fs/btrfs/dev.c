@@ -2,10 +2,9 @@
 /*
  * BTRFS filesystem implementation for U-Boot
  *
- * 2017 Marek Behun, CZ.NIC, marek.behun@nic.cz
+ * 2017 Marek Behún, CZ.NIC, kabel@kernel.org
  */
 
-#include <common.h>
 #include <blk.h>
 #include <compiler.h>
 #include <fs_internal.h>

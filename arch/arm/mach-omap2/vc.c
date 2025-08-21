@@ -1,7 +1,7 @@
 /*
  * Voltage Controller implementation for OMAP
  *
- * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2012 Texas Instruments Incorporated - https://www.ti.com/
  *	Nishanth Menon
  *
  * This program is free software; you can redistribute it and/or modify
@@ -14,7 +14,7 @@
  * GNU General Public License for more details.
  */
 
-#include <common.h>
+#include <config.h>
 #include <asm/omap_common.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/arch/clock.h>

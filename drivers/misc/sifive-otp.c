@@ -17,13 +17,13 @@
  * Right now first 1KiB is used to store only serial number.
  */
 
-#include <common.h>
 #include <dm/device.h>
 #include <dm/read.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <misc.h>
+#include <linux/printk.h>
 
 #define BYTES_PER_FUSE		4
 

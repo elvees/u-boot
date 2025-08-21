@@ -31,6 +31,8 @@
 #include <asm/arch/dram_sun50i_h6.h>
 #elif defined(CONFIG_MACH_SUN50I_H616)
 #include <asm/arch/dram_sun50i_h616.h>
+#elif defined(CONFIG_MACH_SUNIV)
+#include <asm/arch/dram_suniv.h>
 #else
 #include <asm/arch/dram_sun4i.h>
 #endif
@@ -38,5 +40,6 @@
 unsigned long sunxi_dram_init(void);
 void mctl_await_completion(u32 *reg, u32 mask, u32 val);
 bool mctl_mem_matches(u32 offset);
+bool mctl_mem_matches_base(u32 offset, ulong base);
 
 #endif /* _SUNXI_DRAM_H */

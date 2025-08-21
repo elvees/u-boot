@@ -5,31 +5,17 @@
  *
  * cls - clear screen command
  */
-#include <common.h>
 #include <command.h>
+#include <console.h>
 #include <dm.h>
-#include <lcd.h>
-#include <video.h>
 
 static int do_video_clear(struct cmd_tbl *cmdtp, int flag, int argc,
 			  char *const argv[])
 {
-#if defined(CONFIG_DM_VIDEO)
-	struct udevice *dev;
-
-	if (uclass_first_device_err(UCLASS_VIDEO, &dev))
+	if (console_clear())
 		return CMD_RET_FAILURE;
 
-	if (video_clear(dev))
-		return CMD_RET_FAILURE;
-#elif defined(CONFIG_CFB_CONSOLE)
-	video_clear();
-#elif defined(CONFIG_LCD)
-	lcd_clear();
-#else
-	return CMD_RET_FAILURE;
-#endif
 	return CMD_RET_SUCCESS;
 }
 
-U_BOOT_CMD(cls,	1, 1, do_video_clear, "clear screen", "");
+U_BOOT_CMD(cls,	1, 0, do_video_clear, "clear screen", "");

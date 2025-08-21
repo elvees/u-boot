@@ -5,10 +5,10 @@
  * SPDX-License-Identifier:	GPL-2.0+
  */
 
-#include <common.h>
 #include <command.h>
 #include <dm.h>
 #include <env.h>
+#include <event.h>
 #include <fdt_support.h>
 #include <fsl_esdhc.h>
 #include <init.h>
@@ -49,8 +49,10 @@ int board_early_init_r(void)
 	int mc = 0;
 	int con = 0;
 
-	if (sysinfo_get(&sysinfo))
+	if (sysinfo_get(&sysinfo)) {
 		puts("Could not find sysinfo information device.\n");
+		sysinfo = NULL;
+	}
 
 	/* Initialize serdes */
 	uclass_get_device_by_phandle(UCLASS_MISC, sysinfo, "serdes", &serdes);
@@ -92,8 +94,10 @@ int checksysinfo(void)
 	int mc = 0;
 	int con = 0;
 
-	if (sysinfo_get(&sysinfo))
+	if (sysinfo_get(&sysinfo)) {
 		puts("Could not find sysinfo information device.\n");
+		sysinfo = NULL;
+	}
 
 	sysinfo_get_int(sysinfo, BOARD_MULTICHANNEL, &mc);
 	sysinfo_get_int(sysinfo, BOARD_VARIANT, &con);
@@ -120,7 +124,7 @@ static void display_osd_info(struct udevice *osd,
 	       osd_info->width, osd_info->height);
 }
 
-int last_stage_init(void)
+static int last_stage_init(void)
 {
 	int fpga_hw_rev = 0;
 	int i;
@@ -130,8 +134,10 @@ int last_stage_init(void)
 	struct udevice *tpm;
 	int ret;
 
-	if (sysinfo_get(&sysinfo))
+	if (sysinfo_get(&sysinfo)) {
 		puts("Could not find sysinfo information device.\n");
+		sysinfo = NULL;
+	}
 
 	if (sysinfo) {
 		int res = sysinfo_get_int(sysinfo, BOARD_HWVERSION,
@@ -145,8 +151,8 @@ int last_stage_init(void)
 	env_set_ulong("fpga_hw_rev", fpga_hw_rev);
 
 	ret = get_tpm(&tpm);
-	if (ret || tpm_init(tpm) || tpm_startup(tpm, TPM_ST_CLEAR) ||
-	    tpm_continue_self_test(tpm)) {
+	if (ret || tpm_init(tpm) || tpm1_startup(tpm, TPM_ST_CLEAR) ||
+	    tpm1_continue_self_test(tpm)) {
 		printf("TPM init failed\n");
 	}
 
@@ -173,6 +179,7 @@ int last_stage_init(void)
 
 	return 0;
 }
+EVENT_SPY_SIMPLE(EVT_LAST_STAGE_INIT, last_stage_init);
 
 #if defined(CONFIG_OF_BOARD_SETUP)
 int ft_board_setup(void *blob, struct bd_info *bd)

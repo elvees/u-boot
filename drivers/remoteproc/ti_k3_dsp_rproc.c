@@ -2,12 +2,11 @@
 /*
  * Texas Instruments' K3 DSP Remoteproc driver
  *
- * Copyright (C) 2018-2020 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2018-2020 Texas Instruments Incorporated - https://www.ti.com/
  *	Lokesh Vutla <lokeshvutla@ti.com>
  *	Suman Anna <s-anna@ti.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <malloc.h>
@@ -16,12 +15,14 @@
 #include <clk.h>
 #include <reset.h>
 #include <asm/io.h>
+#include <asm/system.h>
 #include <power-domain.h>
 #include <dm/device_compat.h>
 #include <linux/err.h>
 #include <linux/sizes.h>
 #include <linux/soc/ti/ti_sci_protocol.h>
 #include "ti_sci_proc.h"
+#include <mach/security.h>
 
 #define KEYSTONE_RPROC_LOCAL_ADDRESS_MASK	(SZ_16M - 1)
 
@@ -56,6 +57,9 @@ struct k3_dsp_boot_data {
  * @data:		Pointer to DSP specific boot data structure
  * @mem:		Array of available memories
  * @num_mem:		Number of available memories
+ * @cached_addr:	Cached memory address
+ * @cached_size:	Cached memory size
+ * @in_use:		flag to tell if the core is already in use.
  */
 struct k3_dsp_privdata {
 	struct reset_ctl dsp_rst;
@@ -63,6 +67,9 @@ struct k3_dsp_privdata {
 	struct k3_dsp_boot_data *data;
 	struct k3_dsp_mem *mem;
 	int num_mems;
+	void __iomem *cached_addr;
+	size_t cached_size;
+	bool in_use;
 };
 
 /*
@@ -126,7 +133,15 @@ static int k3_dsp_load(struct udevice *dev, ulong addr, ulong size)
 	struct k3_dsp_privdata *dsp = dev_get_priv(dev);
 	struct k3_dsp_boot_data *data = dsp->data;
 	u32 boot_vector;
+	void *image_addr = (void *)addr;
 	int ret;
+
+	if (dsp->in_use) {
+		dev_err(dev,
+			"Invalid op: Trying to load/start on already running core %d\n",
+			dsp->tsp.proc_id);
+		return -EINVAL;
+	}
 
 	dev_dbg(dev, "%s addr = 0x%lx, size = 0x%lx\n", __func__, addr, size);
 	ret = ti_sci_proc_request(&dsp->tsp);
@@ -140,10 +155,19 @@ static int k3_dsp_load(struct udevice *dev, ulong addr, ulong size)
 		goto proc_release;
 	}
 
+	ti_secure_image_post_process(&image_addr, &size);
+
 	ret = rproc_elf_load_image(dev, addr, size);
 	if (ret < 0) {
 		dev_err(dev, "Loading elf failed %d\n", ret);
 		goto unprepare;
+	}
+
+	if (dsp->cached_addr && IS_ENABLED(CONFIG_SYS_DISABLE_DCACHE_OPS)) {
+		dev_dbg(dev, "final flush 0x%lx to 0x%lx\n",
+			(ulong)dsp->cached_addr, dsp->cached_size);
+		__asm_invalidate_dcache_range((u64)dsp->cached_addr,
+					      (u64)dsp->cached_addr + (u64)dsp->cached_size);
 	}
 
 	boot_vector = rproc_elf_get_boot_addr(dev, addr);
@@ -195,6 +219,7 @@ static int k3_dsp_start(struct udevice *dev)
 			ti_sci_proc_power_domain_off(&dsp->tsp);
 	}
 
+	dsp->in_use = true;
 proc_release:
 	ti_sci_proc_release(&dsp->tsp);
 
@@ -207,6 +232,7 @@ static int k3_dsp_stop(struct udevice *dev)
 
 	dev_dbg(dev, "%s\n", __func__);
 
+	dsp->in_use = false;
 	ti_sci_proc_request(&dsp->tsp);
 	reset_assert(&dsp->dsp_rst);
 	ti_sci_proc_power_domain_off(&dsp->tsp);
@@ -239,7 +265,6 @@ static void *k3_dsp_da_to_va(struct udevice *dev, ulong da, ulong len)
 {
 	struct k3_dsp_privdata *dsp = dev_get_priv(dev);
 	phys_addr_t bus_addr, dev_addr;
-	void __iomem *va = NULL;
 	size_t size;
 	u32 offset;
 	int i;
@@ -249,6 +274,16 @@ static void *k3_dsp_da_to_va(struct udevice *dev, ulong da, ulong len)
 	if (len <= 0)
 		return NULL;
 
+	if (dsp->cached_addr && IS_ENABLED(CONFIG_SYS_DISABLE_DCACHE_OPS)) {
+		dev_dbg(dev, "flush 0x%lx to 0x%lx\n", (ulong)dsp->cached_addr,
+			dsp->cached_size);
+		__asm_invalidate_dcache_range((u64)dsp->cached_addr,
+					      (u64)dsp->cached_addr + (u64)dsp->cached_size);
+	}
+
+	dsp->cached_size = len;
+	dsp->cached_addr = NULL;
+
 	for (i = 0; i < dsp->num_mems; i++) {
 		bus_addr = dsp->mem[i].bus_addr;
 		dev_addr = dsp->mem[i].dev_addr;
@@ -256,19 +291,20 @@ static void *k3_dsp_da_to_va(struct udevice *dev, ulong da, ulong len)
 
 		if (da >= dev_addr && ((da + len) <= (dev_addr + size))) {
 			offset = da - dev_addr;
-			va = dsp->mem[i].cpu_addr + offset;
-			return (__force void *)va;
+			dsp->cached_addr = dsp->mem[i].cpu_addr + offset;
 		}
 
 		if (da >= bus_addr && (da + len) <= (bus_addr + size)) {
 			offset = da - bus_addr;
-			va = dsp->mem[i].cpu_addr + offset;
-			return (__force void *)va;
+			dsp->cached_addr = dsp->mem[i].cpu_addr + offset;
 		}
 	}
 
 	/* Assume it is DDR region and return da */
-	return map_physmem(da, len, MAP_NOCACHE);
+	if (!dsp->cached_addr)
+		dsp->cached_addr = map_physmem(da, len, MAP_NOCACHE);
+
+	return dsp->cached_addr;
 }
 
 static const struct dm_rproc_ops k3_dsp_ops = {
@@ -327,7 +363,9 @@ static int k3_dsp_of_get_memories(struct udevice *dev)
 
 	for (i = 0; i < dsp->num_mems; i++) {
 		/* C71 cores only have a L1P Cache, there are no L1P SRAMs */
-		if (device_is_compatible(dev, "ti,j721e-c71-dsp") &&
+		if (((device_is_compatible(dev, "ti,j721e-c71-dsp")) ||
+		    (device_is_compatible(dev, "ti,j721s2-c71-dsp")) ||
+		    (device_is_compatible(dev, "ti,am62a-c7xv-dsp"))) &&
 		    !strcmp(mem_names[i], "l1pram")) {
 			dsp->mem[i].bus_addr = FDT_ADDR_T_NONE;
 			dsp->mem[i].dev_addr = FDT_ADDR_T_NONE;
@@ -335,7 +373,14 @@ static int k3_dsp_of_get_memories(struct udevice *dev)
 			dsp->mem[i].size = 0;
 			continue;
 		}
-
+		if (device_is_compatible(dev, "ti,am62a-c7xv-dsp") &&
+		    !strcmp(mem_names[i], "l1dram")) {
+			dsp->mem[i].bus_addr = FDT_ADDR_T_NONE;
+			dsp->mem[i].dev_addr = FDT_ADDR_T_NONE;
+			dsp->mem[i].cpu_addr = NULL;
+			dsp->mem[i].size = 0;
+			continue;
+		}
 		dsp->mem[i].bus_addr = dev_read_addr_size_name(dev, mem_names[i],
 					  (fdt_addr_t *)&dsp->mem[i].size);
 		if (dsp->mem[i].bus_addr == FDT_ADDR_T_NONE) {
@@ -446,6 +491,8 @@ static const struct k3_dsp_boot_data c71_data = {
 static const struct udevice_id k3_dsp_ids[] = {
 	{ .compatible = "ti,j721e-c66-dsp", .data = (ulong)&c66_data, },
 	{ .compatible = "ti,j721e-c71-dsp", .data = (ulong)&c71_data, },
+	{ .compatible = "ti,j721s2-c71-dsp", .data = (ulong)&c71_data, },
+	{ .compatible = "ti,am62a-c7xv-dsp", .data = (ulong)&c71_data, },
 	{}
 };
 

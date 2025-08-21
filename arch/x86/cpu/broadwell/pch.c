@@ -3,7 +3,6 @@
  * Copyright (c) 2016 Google, Inc
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <pch.h>
@@ -522,7 +521,7 @@ static void serialio_init_once(bool acpi_mode)
 /**
  * pch_serialio_init() - set up serial I/O devices
  *
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 static int pch_serialio_init(void)
 {
@@ -607,7 +606,7 @@ static int broadwell_pch_probe(struct udevice *dev)
 			return broadwell_pch_early_init(dev);
 		else
 			return broadwell_pch_init(dev);
-	} else if (IS_ENABLED(CONFIG_SPL) && !IS_ENABLED(CONFIG_SPL_BUILD)) {
+	} else if (IS_ENABLED(CONFIG_SPL) && !IS_ENABLED(CONFIG_XPL_BUILD)) {
 		return broadwell_pch_init(dev);
 	} else {
 		return 0;

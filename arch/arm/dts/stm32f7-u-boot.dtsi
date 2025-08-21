@@ -3,16 +3,16 @@
 #include <dt-bindings/memory/stm32-sdram.h>
 /{
 	soc {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 
 		fmc: fmc@A0000000 {
 			compatible = "st,stm32-fmc";
-			reg = <0xA0000000 0x1000>;
+			reg = <0xa0000000 0x1000>;
 			clocks = <&rcc 0 STM32F7_AHB3_CLOCK(FMC)>;
 			pinctrl-0 = <&fmc_pins>;
 			pinctrl-names = "default";
 			status = "okay";
-			u-boot,dm-pre-reloc;
+			bootph-all;
 		};
 
 		mac: ethernet@40028000 {
@@ -46,7 +46,7 @@
 			compatible = "st,stm32f469-qspi";
 			#address-cells = <1>;
 			#size-cells = <0>;
-			reg = <0xA0001000 0x1000>, <0x90000000 0x10000000>;
+			reg = <0xa0001000 0x1000>, <0x90000000 0x10000000>;
 			reg-names = "qspi", "qspi_mm";
 			interrupts = <92>;
 			spi-max-frequency = <108000000>;
@@ -60,70 +60,70 @@
 };
 
 &clk_hse {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioa {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpiob {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioc {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpiod {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioe {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpiof {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpiog {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioh {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioi {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &pinctrl {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 
 	fmc_pins: fmc@0 {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 		pins
 		{
-		 u-boot,dm-pre-reloc;
+		 bootph-all;
 		};
 	};
 };
 
 &pwrcfg {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &rcc {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
-&timer5 {
-	u-boot,dm-pre-reloc;
+&timers5 {
+	bootph-all;
 };
 
 &usart1 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 	clocks = <&rcc 0 STM32F7_APB2_CLOCK(USART1)>;
 };

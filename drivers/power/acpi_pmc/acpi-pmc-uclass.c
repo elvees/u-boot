@@ -5,7 +5,6 @@
 
 #define LOG_CATEGORY UCLASS_ACPI_PMC
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <spl.h>
@@ -61,7 +60,7 @@ int pmc_gpe_init(struct udevice *dev)
 	 * are different and if they aren't, use the reset values.
 	 */
 	if (dw[0] == dw[1] || dw[1] == dw[2]) {
-		if (spl_phase() > PHASE_TPL)
+		if (xpl_phase() > PHASE_TPL)
 			log_info("PMC: Using default GPE route");
 		gpio_cfg = readl(upriv->gpe_cfg);
 		for (i = 0; i < upriv->gpe0_count; i++)
@@ -142,7 +141,7 @@ int pmc_prev_sleep_state(struct udevice *dev)
 	if (upriv->pm1_sts & WAK_STS) {
 		switch (acpi_sleep_from_pm1(upriv->pm1_cnt)) {
 		case ACPI_S3:
-			if (IS_ENABLED(HAVE_ACPI_RESUME))
+			if (IS_ENABLED(CONFIG_HAVE_ACPI_RESUME))
 				prev_sleep_state = ACPI_S3;
 			break;
 		case ACPI_S5:

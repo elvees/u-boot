@@ -7,12 +7,14 @@
 #ifndef __ENV_FLAGS_H__
 #define __ENV_FLAGS_H__
 
+#include <config.h>
+
 enum env_flags_vartype {
 	env_flags_vartype_string,
 	env_flags_vartype_decimal,
 	env_flags_vartype_hex,
 	env_flags_vartype_bool,
-#ifdef CONFIG_CMD_NET
+#if CONFIG_IS_ENABLED(NET) || CONFIG_IS_ENABLED(NET_LWIP)
 	env_flags_vartype_ipaddr,
 	env_flags_vartype_macaddr,
 #endif
@@ -35,11 +37,11 @@ enum env_flags_varaccess {
 #define ENV_FLAGS_VARTYPE_LOC 0
 #define ENV_FLAGS_VARACCESS_LOC 1
 
-#ifndef CONFIG_ENV_FLAGS_LIST_STATIC
-#define CONFIG_ENV_FLAGS_LIST_STATIC ""
+#ifndef CFG_ENV_FLAGS_LIST_STATIC
+#define CFG_ENV_FLAGS_LIST_STATIC ""
 #endif
 
-#ifdef CONFIG_NET
+#if CONFIG_IS_ENABLED(NET) || CONFIG_IS_ENABLED(NET_LWIP)
 #ifdef CONFIG_REGEX
 #define ETHADDR_WILDCARD "\\d*"
 #else
@@ -67,6 +69,15 @@ enum env_flags_varaccess {
 #define NET_FLAGS
 #endif
 
+#ifdef CONFIG_IPV6
+#define NET6_FLAGS \
+	"ip6addr:s," \
+	"serverip6:s," \
+	"gatewayip6:s,"
+#else
+#define NET6_FLAGS
+#endif
+
 #ifndef CONFIG_ENV_OVERWRITE
 #define SERIAL_FLAGS "serial#:so,"
 #else
@@ -76,8 +87,9 @@ enum env_flags_varaccess {
 #define ENV_FLAGS_LIST_STATIC \
 	ETHADDR_FLAGS \
 	NET_FLAGS \
+	NET6_FLAGS \
 	SERIAL_FLAGS \
-	CONFIG_ENV_FLAGS_LIST_STATIC
+	CFG_ENV_FLAGS_LIST_STATIC
 
 #ifdef CONFIG_CMD_ENV_FLAGS
 /*
@@ -111,7 +123,7 @@ enum env_flags_varaccess env_flags_parse_varaccess(const char *flags);
  */
 enum env_flags_varaccess env_flags_parse_varaccess_from_binflags(int binflags);
 
-#ifdef CONFIG_CMD_NET
+#if CONFIG_IS_ENABLED(NET) || CONFIG_IS_ENABLED(NET_LWIP)
 /*
  * Check if a string has the format of an Ethernet MAC address
  */

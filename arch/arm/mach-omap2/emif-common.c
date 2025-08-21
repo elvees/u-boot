@@ -8,7 +8,7 @@
  * Aneesh V <aneesh@ti.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <hang.h>
 #include <init.h>
 #include <log.h>
@@ -40,7 +40,7 @@ void set_lpmode_selfrefresh(u32 base)
 	readl(&emif->emif_pwr_mgmt_ctrl);
 }
 
-void force_emif_self_refresh()
+void force_emif_self_refresh(void)
 {
 	set_lpmode_selfrefresh(EMIF1_BASE);
 	if (!is_dra72x())
@@ -202,7 +202,6 @@ void emif_update_timings(u32 base, const struct emif_regs *regs)
 	}
 }
 
-#ifndef CONFIG_OMAP44XX
 static void omap5_ddr3_leveling(u32 base, const struct emif_regs *regs)
 {
 	struct emif_reg_struct *emif = (struct emif_reg_struct *)base;
@@ -389,7 +388,7 @@ static void dra7_enable_ecc(u32 base, const struct emif_regs *regs)
 		/* Set region1 memory with 0 */
 		rgn_start = (regs->emif_ecc_address_range_1 &
 			     EMIF_ECC_REG_ECC_START_ADDR_MASK) << 16;
-		rgn = rgn_start + CONFIG_SYS_SDRAM_BASE;
+		rgn = rgn_start + CFG_SYS_SDRAM_BASE;
 		size = (regs->emif_ecc_address_range_1 &
 			EMIF_ECC_REG_ECC_END_ADDR_MASK) + 0x10000 - rgn_start;
 
@@ -400,7 +399,7 @@ static void dra7_enable_ecc(u32 base, const struct emif_regs *regs)
 		/* Set region2 memory with 0 */
 		rgn_start = (regs->emif_ecc_address_range_2 &
 			     EMIF_ECC_REG_ECC_START_ADDR_MASK) << 16;
-		rgn = rgn_start + CONFIG_SYS_SDRAM_BASE;
+		rgn = rgn_start + CFG_SYS_SDRAM_BASE;
 		size = (regs->emif_ecc_address_range_2 &
 			EMIF_ECC_REG_ECC_END_ADDR_MASK) + 0x10000 - rgn_start;
 
@@ -510,7 +509,6 @@ static void ddr3_init(u32 base, const struct emif_regs *regs)
 	else
 		dra7_ddr3_init(base, regs);
 }
-#endif
 
 #ifndef CONFIG_SYS_EMIF_PRECALCULATED_TIMING_REGS
 #define print_timing_reg(reg) debug(#reg" - 0x%08x\n", (reg))
@@ -1292,10 +1290,8 @@ static void do_sdram_init(u32 base)
 		if (emif_sdram_type(regs->sdram_config) ==
 		    EMIF_SDRAM_TYPE_LPDDR2)
 			lpddr2_init(base, regs);
-#ifndef CONFIG_OMAP44XX
 		else
 			ddr3_init(base, regs);
-#endif
 	}
 #ifdef CONFIG_OMAP54XX
 	if (warm_reset() && (emif_sdram_type(regs->sdram_config) ==
@@ -1340,7 +1336,7 @@ void dmm_init(u32 base)
 
 	mapped_size = 0;
 	section_cnt = 3;
-	sys_addr = CONFIG_SYS_SDRAM_BASE;
+	sys_addr = CFG_SYS_SDRAM_BASE;
 	emif1_size = get_emif_mem_size(EMIF1_BASE);
 	emif2_size = get_emif_mem_size(EMIF2_BASE);
 	debug("emif1_size 0x%x emif2_size 0x%x\n", emif1_size, emif2_size);
@@ -1568,7 +1564,7 @@ void sdram_init(void)
 		size_prog = log_2_n_round_down(size_prog);
 		size_prog = (1 << size_prog);
 
-		size_detect = get_ram_size((long *)CONFIG_SYS_SDRAM_BASE,
+		size_detect = get_ram_size((long *)CFG_SYS_SDRAM_BASE,
 						size_prog);
 		/* Compare with the size programmed */
 		if (size_detect != size_prog) {

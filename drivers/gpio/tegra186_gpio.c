@@ -4,7 +4,6 @@
  * (based on tegra_gpio.c)
  */
 
-#include <common.h>
 #include <dm.h>
 #include <malloc.h>
 #include <errno.h>
@@ -176,8 +175,8 @@ static int tegra186_gpio_bind(struct udevice *parent)
 	if (parent_plat)
 		return 0;
 
-	regs = (uint32_t *)devfdt_get_addr_name(parent, "gpio");
-	if (regs == (uint32_t *)FDT_ADDR_T_NONE)
+	regs = dev_read_addr_name_ptr(parent, "gpio");
+	if (!regs)
 		return -EINVAL;
 
 	for (port = 0; port < ctlr_data->port_count; port++) {

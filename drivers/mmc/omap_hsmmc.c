@@ -23,7 +23,6 @@
  */
 
 #include <config.h>
-#include <common.h>
 #include <cpu_func.h>
 #include <log.h>
 #include <malloc.h>
@@ -31,7 +30,7 @@
 #include <mmc.h>
 #include <part.h>
 #include <i2c.h>
-#if defined(CONFIG_OMAP54XX) || defined(CONFIG_OMAP44XX)
+#if defined(CONFIG_OMAP54XX)
 #include <palmas.h>
 #endif
 #include <asm/cache.h>
@@ -42,7 +41,7 @@
 #include <asm/arch/mux_dra7xx.h>
 #include <asm/arch/dra7xx_iodelay.h>
 #endif
-#if !defined(CONFIG_SOC_KEYSTONE)
+#if !defined(CONFIG_ARCH_KEYSTONE)
 #include <asm/gpio.h>
 #include <asm/arch/sys_proto.h>
 #endif
@@ -60,8 +59,8 @@
 DECLARE_GLOBAL_DATA_PTR;
 
 /* simplify defines to OMAP_HSMMC_USE_GPIO */
-#if (defined(CONFIG_OMAP_GPIO) && !defined(CONFIG_SPL_BUILD)) || \
-	(defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_GPIO_SUPPORT))
+#if (defined(CONFIG_OMAP_GPIO) && !defined(CONFIG_XPL_BUILD)) || \
+	(defined(CONFIG_XPL_BUILD) && defined(CONFIG_SPL_GPIO))
 #define OMAP_HSMMC_USE_GPIO
 #else
 #undef OMAP_HSMMC_USE_GPIO
@@ -271,8 +270,7 @@ static unsigned char mmc_board_init(struct mmc *mmc)
 		&prcm_base->iclken1_core);
 #endif
 
-#if (defined(CONFIG_OMAP54XX) || defined(CONFIG_OMAP44XX)) &&\
-	!CONFIG_IS_ENABLED(DM_REGULATOR)
+#if defined(CONFIG_OMAP54XX) && !CONFIG_IS_ENABLED(DM_REGULATOR)
 	/* PBIAS config needed for MMC1 only */
 	if (mmc_get_blk_desc(mmc)->devnum == 0)
 		vmmc_pbias_config(LDO_VOLT_3V3);
@@ -542,8 +540,7 @@ static int omap_hsmmc_set_signal_voltage(struct mmc *mmc)
 
 #if CONFIG_IS_ENABLED(DM_REGULATOR)
 	return omap_hsmmc_set_io_regulator(mmc, mv);
-#elif (defined(CONFIG_OMAP54XX) || defined(CONFIG_OMAP44XX)) && \
-	defined(CONFIG_PALMAS_POWER)
+#elif defined(CONFIG_OMAP54XX) && defined(CONFIG_PALMAS_POWER)
 	if (mmc_get_blk_desc(mmc)->devnum == 0)
 		vmmc_pbias_config(palmas_ldo_volt);
 	return 0;
@@ -577,7 +574,7 @@ static uint32_t omap_hsmmc_set_capabilities(struct mmc *mmc)
 	return val;
 }
 
-#ifdef MMC_SUPPORTS_TUNING
+#if CONFIG_IS_ENABLED(MMC_SUPPORTS_TUNING)
 static void omap_hsmmc_disable_tuning(struct mmc *mmc)
 {
 	struct hsmmc *mmc_base;
@@ -644,7 +641,7 @@ static int omap_hsmmc_execute_tuning(struct udevice *dev, uint opcode)
 	      ((mmc->selected_mode == UHS_SDR50) && (val & CAPA2_TSDR50))))
 		return 0;
 
-	ret = uclass_first_device(UCLASS_THERMAL, &thermal_dev);
+	ret = uclass_first_device_err(UCLASS_THERMAL, &thermal_dev);
 	if (ret) {
 		printf("Couldn't get thermal device for tuning\n");
 		return ret;
@@ -666,7 +663,7 @@ static int omap_hsmmc_execute_tuning(struct udevice *dev, uint opcode)
 	while (phase_delay <= MAX_PHASE_DELAY) {
 		omap_hsmmc_set_dll(mmc, phase_delay);
 
-		cur_match = !mmc_send_tuning(mmc, opcode, NULL);
+		cur_match = !mmc_send_tuning(mmc, opcode);
 
 		if (cur_match) {
 			if (prev_match) {
@@ -731,7 +728,7 @@ static int omap_hsmmc_execute_tuning(struct udevice *dev, uint opcode)
 	 */
 	for (i = 3; i <= 10; i++) {
 		omap_hsmmc_set_dll(mmc, phase_delay + i);
-		if (mmc_send_tuning(mmc, opcode, NULL)) {
+		if (mmc_send_tuning(mmc, opcode)) {
 			if (temperature < 10000)
 				phase_delay += i + 6;
 			else if (temperature < 20000)
@@ -749,7 +746,7 @@ static int omap_hsmmc_execute_tuning(struct udevice *dev, uint opcode)
 
 	for (i = 2; i >= -10; i--) {
 		omap_hsmmc_set_dll(mmc, phase_delay + i);
-		if (mmc_send_tuning(mmc, opcode, NULL)) {
+		if (mmc_send_tuning(mmc, opcode)) {
 			if (temperature < 10000)
 				phase_delay += i + 12;
 			else if (temperature < 20000)
@@ -783,6 +780,14 @@ tuning_error:
 	return ret;
 }
 #endif
+
+static void omap_hsmmc_send_init_stream(struct udevice *dev)
+{
+	struct omap_hsmmc_data *priv = dev_get_priv(dev);
+	struct hsmmc *mmc_base = priv->base_addr;
+
+	mmc_init_stream(mmc_base);
+}
 #endif
 
 static void mmc_enable_irq(struct mmc *mmc, struct mmc_cmd *cmd)
@@ -906,8 +911,7 @@ static void mmc_reset_controller_fsm(struct hsmmc *mmc_base, u32 bit)
 	 * 3. Wait until the SRC (SRD) bit returns to 0x0
 	 *    (reset procedure is completed).
 	 */
-#if defined(CONFIG_OMAP44XX) || defined(CONFIG_OMAP54XX) || \
-	defined(CONFIG_AM33XX) || defined(CONFIG_AM43XX)
+#if defined(CONFIG_OMAP54XX) || defined(CONFIG_AM33XX) || defined(CONFIG_AM43XX)
 	if (!(readl(&mmc_base->sysctl) & bit)) {
 		start = get_timer(0);
 		while (!(readl(&mmc_base->sysctl) & bit)) {
@@ -1518,10 +1522,11 @@ static const struct dm_mmc_ops omap_hsmmc_ops = {
 	.get_cd		= omap_hsmmc_getcd,
 	.get_wp		= omap_hsmmc_getwp,
 #endif
-#ifdef MMC_SUPPORTS_TUNING
-	.execute_tuning = omap_hsmmc_execute_tuning,
+#if CONFIG_IS_ENABLED(MMC_SUPPORTS_TUNING)
+	.execute_tuning    = omap_hsmmc_execute_tuning,
 #endif
-	.wait_dat0	= omap_hsmmc_wait_dat0,
+	.send_init_stream  = omap_hsmmc_send_init_stream,
+	.wait_dat0	   = omap_hsmmc_wait_dat0,
 };
 #else
 static const struct mmc_ops omap_hsmmc_ops = {
@@ -1557,9 +1562,9 @@ int omap_mmc_init(int dev_index, uint host_caps_mask, uint f_max, int cd_gpio,
 #ifdef OMAP_HSMMC2_BASE
 	case 1:
 		priv->base_addr = (struct hsmmc *)OMAP_HSMMC2_BASE;
-#if (defined(CONFIG_OMAP44XX) || defined(CONFIG_OMAP54XX) || \
+#if (defined(CONFIG_OMAP54XX) || \
 	defined(CONFIG_DRA7XX) || defined(CONFIG_AM33XX) || \
-	defined(CONFIG_AM43XX) || defined(CONFIG_SOC_KEYSTONE)) && \
+	defined(CONFIG_AM43XX) || defined(CONFIG_ARCH_KEYSTONE)) && \
 		defined(CONFIG_HSMMC2_8BIT)
 		/* Enable 8-bit interface for eMMC on OMAP4/5 or DRA7XX */
 		host_caps_val |= MMC_MODE_8BIT;
@@ -1891,7 +1896,7 @@ static int omap_hsmmc_get_pinctrl_state(struct mmc *mmc)
 }
 #endif
 
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 #ifdef CONFIG_OMAP54XX
 __weak const struct mmc_platform_fixups *platform_fixups_mmc(uint32_t addr)
 {
@@ -2009,7 +2014,7 @@ static int omap_hsmmc_probe(struct udevice *dev)
 	return omap_hsmmc_init_setup(mmc);
 }
 
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 
 static const struct omap_mmc_of_data dra7_mmc_of_data = {
 	.controller_flags = OMAP_HSMMC_REQUIRE_IODELAY,
@@ -2019,6 +2024,7 @@ static const struct udevice_id omap_hsmmc_ids[] = {
 	{ .compatible = "ti,omap3-hsmmc" },
 	{ .compatible = "ti,omap4-hsmmc" },
 	{ .compatible = "ti,am33xx-hsmmc" },
+	{ .compatible = "ti,am335-sdhci" },
 	{ .compatible = "ti,dra7-hsmmc", .data = (ulong)&dra7_mmc_of_data },
 	{ }
 };
@@ -2027,7 +2033,7 @@ static const struct udevice_id omap_hsmmc_ids[] = {
 U_BOOT_DRIVER(omap_hsmmc) = {
 	.name	= "omap_hsmmc",
 	.id	= UCLASS_MMC,
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	.of_match = omap_hsmmc_ids,
 	.of_to_plat = omap_hsmmc_of_to_plat,
 	.plat_auto	= sizeof(struct omap_hsmmc_plat),

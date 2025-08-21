@@ -40,28 +40,60 @@
 #define MXC_CPU_IMX8MNL		0x8e /* dummy ID */
 #define MXC_CPU_IMX8MNDL		0x8f /* dummy ID */
 #define MXC_CPU_IMX8MNSL		0x181 /* dummy ID */
-#define MXC_CPU_IMX8MP		0x182/* dummy ID */
-#define MXC_CPU_IMX8MP6		0x184 /* dummy ID */
-#define MXC_CPU_IMX8MPL		0x186 /* dummy ID */
-#define MXC_CPU_IMX8MPD		0x187 /* dummy ID */
+#define MXC_CPU_IMX8MNUQ		0x182 /* dummy ID */
+#define MXC_CPU_IMX8MNUD		0x183 /* dummy ID */
+#define MXC_CPU_IMX8MNUS		0x184 /* dummy ID */
+#define MXC_CPU_IMX8MP		0x185/* dummy ID */
+#define MXC_CPU_IMX8MP6		0x186 /* dummy ID */
+#define MXC_CPU_IMX8MPL		0x187 /* dummy ID */
+#define MXC_CPU_IMX8MPD		0x188 /* dummy ID */
+#define MXC_CPU_IMX8MPUL	0x189 /* dummy ID */
 #define MXC_CPU_IMX8QXP_A0	0x90 /* dummy ID */
 #define MXC_CPU_IMX8QM		0x91 /* dummy ID */
 #define MXC_CPU_IMX8QXP		0x92 /* dummy ID */
+
+#define MXC_CPU_IMX8ULP		0xA1 /* dummy ID */
+
+#define MXC_CPU_IMXRT1020	0xB4 /* dummy ID */
+#define MXC_CPU_IMXRT1050	0xB6 /* dummy ID */
+#define MXC_CPU_IMXRT1170	0xBA /* dummy ID */
+
 #define MXC_CPU_MX7ULP		0xE1 /* Temporally hard code */
 #define MXC_CPU_VF610		0xF6 /* dummy ID */
+#define MXC_CPU_IMX93		0xC1 /* dummy ID */
+#define MXC_CPU_IMX9351		0xC2 /* dummy ID */
+#define MXC_CPU_IMX9332		0xC3 /* dummy ID */
+#define MXC_CPU_IMX9331		0xC4 /* dummy ID */
+#define MXC_CPU_IMX9322		0xC5 /* dummy ID */
+#define MXC_CPU_IMX9321		0xC6 /* dummy ID */
+#define MXC_CPU_IMX9312		0xC7 /* dummy ID */
+#define MXC_CPU_IMX9311		0xC8 /* dummy ID */
+#define MXC_CPU_IMX9302		0xC9 /* dummy ID */
+#define MXC_CPU_IMX9301		0xCA /* dummy ID */
+
+#define MXC_CPU_IMX91		0xCB /* dummy ID */
+#define MXC_CPU_IMX9121		0xCC /* dummy ID */
+#define MXC_CPU_IMX9111		0xCD /* dummy ID */
+#define MXC_CPU_IMX9101		0xCE /* dummy ID */
+
+#define MXC_CPU_IMX95		0x1C1 /* dummy ID */
 
 #define MXC_SOC_MX6		0x60
 #define MXC_SOC_MX7		0x70
 #define MXC_SOC_IMX8M		0x80
 #define MXC_SOC_IMX8		0x90 /* dummy */
+#define MXC_SOC_IMXRT		0xB0 /* dummy */
 #define MXC_SOC_MX7ULP		0xE0 /* dummy */
+#define MXC_SOC_IMX9		0xC0 /* dummy */
 
 #define CHIP_REV_1_0            0x10
 #define CHIP_REV_1_1            0x11
 #define CHIP_REV_1_2            0x12
+#define CHIP_REV_1_3            0x13
 #define CHIP_REV_1_5            0x15
 #define CHIP_REV_2_0            0x20
 #define CHIP_REV_2_1            0x21
+#define CHIP_REV_2_2            0x22
 #define CHIP_REV_2_5            0x25
 #define CHIP_REV_3_0            0x30
 

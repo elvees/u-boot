@@ -5,7 +5,6 @@
 
 #define LOG_CATEGORY UCLASS_I2C
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <i2c.h>
@@ -19,6 +18,8 @@
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/io.h>
+#include <linux/printk.h>
+#include <linux/time.h>
 
 /* STM32 I2C registers */
 struct stm32_i2c_regs {
@@ -45,6 +46,8 @@ struct stm32_i2c_regs {
 
 /* STM32 I2C control 1 */
 #define STM32_I2C_CR1_ANFOFF			BIT(12)
+#define STM32_I2C_CR1_DNF_MASK			GENMASK(11, 8)
+#define STM32_I2C_CR1_DNF(n)			(((n) & 0xf) << 8)
 #define STM32_I2C_CR1_ERRIE			BIT(7)
 #define STM32_I2C_CR1_TCIE			BIT(6)
 #define STM32_I2C_CR1_STOPIE			BIT(5)
@@ -55,7 +58,6 @@ struct stm32_i2c_regs {
 #define STM32_I2C_CR1_PE			BIT(0)
 
 /* STM32 I2C control 2 */
-#define STM32_I2C_CR2_AUTOEND			BIT(25)
 #define STM32_I2C_CR2_RELOAD			BIT(24)
 #define STM32_I2C_CR2_NBYTES_MASK		GENMASK(23, 16)
 #define STM32_I2C_CR2_NBYTES(n)			((n & 0xff) << 16)
@@ -105,10 +107,8 @@ struct stm32_i2c_regs {
 
 #define STM32_I2C_MAX_LEN			0xff
 
-#define STM32_I2C_DNF_DEFAULT			0
-#define STM32_I2C_DNF_MAX			16
+#define STM32_I2C_DNF_MAX			15
 
-#define STM32_I2C_ANALOG_FILTER_ENABLE	1
 #define STM32_I2C_ANALOG_FILTER_DELAY_MIN	50	/* ns */
 #define STM32_I2C_ANALOG_FILTER_DELAY_MAX	260	/* ns */
 
@@ -120,8 +120,6 @@ struct stm32_i2c_regs {
 #define STM32_SDADEL_MAX			BIT(4)
 #define STM32_SCLH_MAX				BIT(8)
 #define STM32_SCLL_MAX				BIT(8)
-
-#define STM32_NSEC_PER_SEC			1000000000L
 
 /**
  * struct stm32_i2c_spec - private i2c specification timing
@@ -156,9 +154,8 @@ struct stm32_i2c_spec {
  * @clock_src: I2C clock source frequency (Hz)
  * @rise_time: Rise time (ns)
  * @fall_time: Fall time (ns)
- * @dnf: Digital filter coefficient (0-16)
+ * @dnf: value of digital filter to apply
  * @analog_filter: Analog filter delay (On/Off)
- * @fmp_clr_offset: Fast Mode Plus clear register offset from set register
  */
 struct stm32_i2c_setup {
 	u32 speed_freq;
@@ -167,6 +164,13 @@ struct stm32_i2c_setup {
 	u32 fall_time;
 	u8 dnf;
 	bool analog_filter;
+};
+
+/**
+ * struct stm32_i2c_data - driver data for I2C configuration by compatible
+ * @fmp_clr_offset: Fast Mode Plus clear register offset from set register
+ */
+struct stm32_i2c_data {
 	u32 fmp_clr_offset;
 };
 
@@ -197,16 +201,18 @@ struct stm32_i2c_timings {
  * @regmap_sreg: register address for setting Fast Mode Plus bits
  * @regmap_creg: register address for clearing Fast Mode Plus bits
  * @regmap_mask: mask for Fast Mode Plus bits
+ * @dnf_dt: value of digital filter requested via dt
  */
 struct stm32_i2c_priv {
 	struct stm32_i2c_regs *regs;
 	struct clk clk;
-	struct stm32_i2c_setup *setup;
+	struct stm32_i2c_setup setup;
 	u32 speed;
 	struct regmap *regmap;
 	u32 regmap_sreg;
 	u32 regmap_creg;
 	u32 regmap_mask;
+	u32 dnf_dt;
 };
 
 static const struct stm32_i2c_spec i2c_specs[] = {
@@ -251,19 +257,16 @@ static const struct stm32_i2c_spec i2c_specs[] = {
 	},
 };
 
-static const struct stm32_i2c_setup stm32f7_setup = {
-	.rise_time = STM32_I2C_RISE_TIME_DEFAULT,
-	.fall_time = STM32_I2C_FALL_TIME_DEFAULT,
-	.dnf = STM32_I2C_DNF_DEFAULT,
-	.analog_filter = STM32_I2C_ANALOG_FILTER_ENABLE,
+static const struct stm32_i2c_data stm32f7_data = {
+	.fmp_clr_offset = 0x00,
 };
 
-static const struct stm32_i2c_setup stm32mp15_setup = {
-	.rise_time = STM32_I2C_RISE_TIME_DEFAULT,
-	.fall_time = STM32_I2C_FALL_TIME_DEFAULT,
-	.dnf = STM32_I2C_DNF_DEFAULT,
-	.analog_filter = STM32_I2C_ANALOG_FILTER_ENABLE,
+static const struct stm32_i2c_data stm32mp15_data = {
 	.fmp_clr_offset = 0x40,
+};
+
+static const struct stm32_i2c_data stm32mp13_data = {
+	.fmp_clr_offset = 0x4,
 };
 
 static int stm32_i2c_check_device_busy(struct stm32_i2c_priv *i2c_priv)
@@ -278,7 +281,7 @@ static int stm32_i2c_check_device_busy(struct stm32_i2c_priv *i2c_priv)
 }
 
 static void stm32_i2c_message_start(struct stm32_i2c_priv *i2c_priv,
-				    struct i2c_msg *msg, bool stop)
+				    struct i2c_msg *msg)
 {
 	struct stm32_i2c_regs *regs = i2c_priv->regs;
 	u32 cr2 = readl(&regs->cr2);
@@ -299,9 +302,8 @@ static void stm32_i2c_message_start(struct stm32_i2c_priv *i2c_priv,
 		cr2 |= STM32_I2C_CR2_SADD7(msg->addr);
 	}
 
-	/* Set nb bytes to transfer and reload or autoend bits */
-	cr2 &= ~(STM32_I2C_CR2_NBYTES_MASK | STM32_I2C_CR2_RELOAD |
-		 STM32_I2C_CR2_AUTOEND);
+	/* Set nb bytes to transfer and reload (if needed) */
+	cr2 &= ~(STM32_I2C_CR2_NBYTES_MASK | STM32_I2C_CR2_RELOAD);
 	if (msg->len > STM32_I2C_MAX_LEN) {
 		cr2 |= STM32_I2C_CR2_NBYTES(STM32_I2C_MAX_LEN);
 		cr2 |= STM32_I2C_CR2_RELOAD;
@@ -322,7 +324,7 @@ static void stm32_i2c_message_start(struct stm32_i2c_priv *i2c_priv,
  */
 
 static void stm32_i2c_handle_reload(struct stm32_i2c_priv *i2c_priv,
-				    struct i2c_msg *msg, bool stop)
+				    struct i2c_msg *msg)
 {
 	struct stm32_i2c_regs *regs = i2c_priv->regs;
 	u32 cr2 = readl(&regs->cr2);
@@ -408,7 +410,7 @@ static int stm32_i2c_check_end_of_message(struct stm32_i2c_priv *i2c_priv)
 		setbits_le32(&regs->icr, STM32_I2C_ICR_STOPCF);
 
 		/* Clear control register 2 */
-		setbits_le32(&regs->cr2, STM32_I2C_CR2_RESET_MASK);
+		clrbits_le32(&regs->cr2, STM32_I2C_CR2_RESET_MASK);
 	}
 
 	return ret;
@@ -428,7 +430,7 @@ static int stm32_i2c_message_xfer(struct stm32_i2c_priv *i2c_priv,
 	/* Add errors */
 	mask |= STM32_I2C_ISR_ERRORS;
 
-	stm32_i2c_message_start(i2c_priv, msg, stop);
+	stm32_i2c_message_start(i2c_priv, msg);
 
 	while (msg->len) {
 		/*
@@ -466,7 +468,7 @@ static int stm32_i2c_message_xfer(struct stm32_i2c_priv *i2c_priv,
 			mask = msg->flags & I2C_M_RD ? STM32_I2C_ISR_RXNE :
 			       STM32_I2C_ISR_TXIS | STM32_I2C_ISR_NACKF;
 
-			stm32_i2c_handle_reload(i2c_priv, msg, stop);
+			stm32_i2c_handle_reload(i2c_priv, msg);
 		} else if (!bytes_to_rw) {
 			/* Wait until TC flag is set */
 			mask = STM32_I2C_ISR_TC;
@@ -480,9 +482,9 @@ static int stm32_i2c_message_xfer(struct stm32_i2c_priv *i2c_priv,
 		}
 	}
 
-	/* End of transfer, send stop condition */
-	mask = STM32_I2C_CR2_STOP;
-	setbits_le32(&regs->cr2, mask);
+	/* End of transfer, send stop condition if appropriate */
+	if (!ret && !(status & (STM32_I2C_ISR_NACKF | STM32_I2C_ISR_ERRORS)))
+		setbits_le32(&regs->cr2, STM32_I2C_CR2_STOP);
 
 	return stm32_i2c_check_end_of_message(i2c_priv);
 }
@@ -506,14 +508,13 @@ static int stm32_i2c_xfer(struct udevice *bus, struct i2c_msg *msg,
 	return 0;
 }
 
-static int stm32_i2c_compute_solutions(struct stm32_i2c_setup *setup,
+static int stm32_i2c_compute_solutions(u32 i2cclk,
+				       struct stm32_i2c_setup *setup,
 				       const struct stm32_i2c_spec *specs,
 				       struct list_head *solutions)
 {
 	struct stm32_i2c_timings *v;
 	u32 p_prev = STM32_PRESC_MAX;
-	u32 i2cclk = DIV_ROUND_CLOSEST(STM32_NSEC_PER_SEC,
-				       setup->clock_src);
 	u32 af_delay_min, af_delay_max;
 	u16 p, l, a;
 	int sdadel_min, sdadel_max, scldel_min;
@@ -581,17 +582,16 @@ static int stm32_i2c_compute_solutions(struct stm32_i2c_setup *setup,
 	return ret;
 }
 
-static int stm32_i2c_choose_solution(struct stm32_i2c_setup *setup,
+static int stm32_i2c_choose_solution(u32 i2cclk,
+				     struct stm32_i2c_setup *setup,
 				     const struct stm32_i2c_spec *specs,
 				     struct list_head *solutions,
 				     struct stm32_i2c_timings *s)
 {
 	struct stm32_i2c_timings *v;
-	u32 i2cbus = DIV_ROUND_CLOSEST(STM32_NSEC_PER_SEC,
+	u32 i2cbus = DIV_ROUND_CLOSEST(NSEC_PER_SEC,
 				       setup->speed_freq);
 	u32 clk_error_prev = i2cbus;
-	u32 i2cclk = DIV_ROUND_CLOSEST(STM32_NSEC_PER_SEC,
-				       setup->clock_src);
 	u32 clk_min, clk_max;
 	u32 af_delay_min;
 	u32 dnf_delay;
@@ -605,8 +605,8 @@ static int stm32_i2c_choose_solution(struct stm32_i2c_setup *setup,
 	dnf_delay = setup->dnf * i2cclk;
 
 	tsync = af_delay_min + dnf_delay + (2 * i2cclk);
-	clk_max = STM32_NSEC_PER_SEC / specs->rate_min;
-	clk_min = STM32_NSEC_PER_SEC / specs->rate_max;
+	clk_max = NSEC_PER_SEC / specs->rate_min;
+	clk_min = NSEC_PER_SEC / specs->rate_max;
 
 	/*
 	 * Among Prescaler possibilities discovered above figures out SCL Low
@@ -678,12 +678,13 @@ static const struct stm32_i2c_spec *get_specs(u32 rate)
 }
 
 static int stm32_i2c_compute_timing(struct stm32_i2c_priv *i2c_priv,
-				    struct stm32_i2c_setup *setup,
 				    struct stm32_i2c_timings *output)
 {
+	struct stm32_i2c_setup *setup = &i2c_priv->setup;
 	const struct stm32_i2c_spec *specs;
 	struct stm32_i2c_timings *v, *_v;
 	struct list_head solutions;
+	u32 i2cclk = DIV_ROUND_CLOSEST(NSEC_PER_SEC, setup->clock_src);
 	int ret;
 
 	specs = get_specs(setup->speed_freq);
@@ -701,6 +702,8 @@ static int stm32_i2c_compute_timing(struct stm32_i2c_priv *i2c_priv,
 		return -EINVAL;
 	}
 
+	/*  Analog and Digital Filters */
+	setup->dnf = DIV_ROUND_CLOSEST(i2c_priv->dnf_dt, i2cclk);
 	if (setup->dnf > STM32_I2C_DNF_MAX) {
 		log_err("DNF out of bound %d/%d\n",
 			setup->dnf, STM32_I2C_DNF_MAX);
@@ -708,11 +711,11 @@ static int stm32_i2c_compute_timing(struct stm32_i2c_priv *i2c_priv,
 	}
 
 	INIT_LIST_HEAD(&solutions);
-	ret = stm32_i2c_compute_solutions(setup, specs, &solutions);
+	ret = stm32_i2c_compute_solutions(i2cclk, setup, specs, &solutions);
 	if (ret)
 		goto exit;
 
-	ret = stm32_i2c_choose_solution(setup, specs, &solutions, output);
+	ret = stm32_i2c_choose_solution(i2cclk, setup, specs, &solutions, output);
 	if (ret)
 		goto exit;
 
@@ -745,7 +748,7 @@ static u32 get_lower_rate(u32 rate)
 static int stm32_i2c_setup_timing(struct stm32_i2c_priv *i2c_priv,
 				  struct stm32_i2c_timings *timing)
 {
-	struct stm32_i2c_setup *setup = i2c_priv->setup;
+	struct stm32_i2c_setup *setup = &i2c_priv->setup;
 	int ret = 0;
 
 	setup->speed_freq = i2c_priv->speed;
@@ -757,7 +760,7 @@ static int stm32_i2c_setup_timing(struct stm32_i2c_priv *i2c_priv,
 	}
 
 	do {
-		ret = stm32_i2c_compute_timing(i2c_priv, setup, timing);
+		ret = stm32_i2c_compute_timing(i2c_priv, timing);
 		if (ret) {
 			log_debug("failed to compute I2C timings.\n");
 			if (setup->speed_freq > I2C_SPEED_STANDARD_RATE) {
@@ -839,10 +842,15 @@ static int stm32_i2c_hw_config(struct stm32_i2c_priv *i2c_priv)
 	writel(timing, &regs->timingr);
 
 	/* Enable I2C */
-	if (i2c_priv->setup->analog_filter)
+	if (i2c_priv->setup.analog_filter)
 		clrbits_le32(&regs->cr1, STM32_I2C_CR1_ANFOFF);
 	else
 		setbits_le32(&regs->cr1, STM32_I2C_CR1_ANFOFF);
+
+	/* Program the Digital Filter */
+	clrsetbits_le32(&regs->cr1, STM32_I2C_CR1_DNF_MASK,
+			STM32_I2C_CR1_DNF(i2c_priv->setup.dnf));
+
 	setbits_le32(&regs->cr1, STM32_I2C_CR1_PE);
 
 	return 0;
@@ -881,7 +889,7 @@ static int stm32_i2c_probe(struct udevice *dev)
 
 	ret = clk_enable(&i2c_priv->clk);
 	if (ret)
-		goto clk_free;
+		return ret;
 
 	ret = reset_get_by_index(dev, 0, &reset_ctl);
 	if (ret)
@@ -895,29 +903,33 @@ static int stm32_i2c_probe(struct udevice *dev)
 
 clk_disable:
 	clk_disable(&i2c_priv->clk);
-clk_free:
-	clk_free(&i2c_priv->clk);
 
 	return ret;
 }
 
 static int stm32_of_to_plat(struct udevice *dev)
 {
+	const struct stm32_i2c_data *data;
 	struct stm32_i2c_priv *i2c_priv = dev_get_priv(dev);
-	u32 rise_time, fall_time;
 	int ret;
 
-	i2c_priv->setup = (struct stm32_i2c_setup *)dev_get_driver_data(dev);
-	if (!i2c_priv->setup)
+	data = (const struct stm32_i2c_data *)dev_get_driver_data(dev);
+	if (!data)
 		return -EINVAL;
 
-	rise_time = dev_read_u32_default(dev, "i2c-scl-rising-time-ns", 0);
-	if (rise_time)
-		i2c_priv->setup->rise_time = rise_time;
+	i2c_priv->setup.rise_time = dev_read_u32_default(dev,
+							 "i2c-scl-rising-time-ns",
+							 STM32_I2C_RISE_TIME_DEFAULT);
 
-	fall_time = dev_read_u32_default(dev, "i2c-scl-falling-time-ns", 0);
-	if (fall_time)
-		i2c_priv->setup->fall_time = fall_time;
+	i2c_priv->setup.fall_time = dev_read_u32_default(dev,
+							 "i2c-scl-falling-time-ns",
+							 STM32_I2C_FALL_TIME_DEFAULT);
+
+	i2c_priv->dnf_dt = dev_read_u32_default(dev, "i2c-digital-filter-width-ns", 0);
+	if (!dev_read_bool(dev, "i2c-digital-filter"))
+		i2c_priv->dnf_dt = 0;
+
+	i2c_priv->setup.analog_filter = dev_read_bool(dev, "i2c-analog-filter");
 
 	/* Optional */
 	i2c_priv->regmap = syscon_regmap_lookup_by_phandle(dev,
@@ -930,8 +942,7 @@ static int stm32_of_to_plat(struct udevice *dev)
 			return ret;
 
 		i2c_priv->regmap_sreg = fmp[1];
-		i2c_priv->regmap_creg = fmp[1] +
-					i2c_priv->setup->fmp_clr_offset;
+		i2c_priv->regmap_creg = fmp[1] + data->fmp_clr_offset;
 		i2c_priv->regmap_mask = fmp[2];
 	}
 
@@ -944,8 +955,9 @@ static const struct dm_i2c_ops stm32_i2c_ops = {
 };
 
 static const struct udevice_id stm32_i2c_of_match[] = {
-	{ .compatible = "st,stm32f7-i2c", .data = (ulong)&stm32f7_setup },
-	{ .compatible = "st,stm32mp15-i2c", .data = (ulong)&stm32mp15_setup },
+	{ .compatible = "st,stm32f7-i2c", .data = (ulong)&stm32f7_data },
+	{ .compatible = "st,stm32mp15-i2c", .data = (ulong)&stm32mp15_data },
+	{ .compatible = "st,stm32mp13-i2c", .data = (ulong)&stm32mp13_data },
 	{}
 };
 

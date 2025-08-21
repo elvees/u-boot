@@ -4,14 +4,16 @@
  * Copyright 2019 NXP
  */
 
-#include <common.h>
-#include <asm/io.h>
-#include <malloc.h>
+#define LOG_CATEGORY UCLASS_CLK
+
+#include <clk.h>
 #include <clk-uclass.h>
+#include <log.h>
+#include <malloc.h>
+#include <asm/io.h>
 #include <dm/device.h>
 #include <dm/devres.h>
 #include <linux/clk-provider.h>
-#include <clk.h>
 #include <linux/err.h>
 
 #include "clk.h"
@@ -37,10 +39,10 @@ static int clk_composite_set_parent(struct clk *clk, struct clk *parent)
 	const struct clk_ops *mux_ops = composite->mux_ops;
 	struct clk *mux = composite->mux;
 
-	if (mux && mux_ops)
-		return mux_ops->set_parent(mux, parent);
-	else
-		return -ENOTSUPP;
+	if (!mux || !mux_ops)
+		return -ENOSYS;
+
+	return mux_ops->set_parent(mux, parent);
 }
 
 static unsigned long clk_composite_recalc_rate(struct clk *clk)
@@ -63,7 +65,7 @@ static ulong clk_composite_set_rate(struct clk *clk, unsigned long rate)
 	const struct clk_ops *rate_ops = composite->rate_ops;
 	struct clk *clk_rate = composite->rate;
 
-	if (rate && rate_ops)
+	if (rate && rate_ops && rate_ops->set_rate)
 		return rate_ops->set_rate(clk_rate, rate);
 	else
 		return clk_get_rate(clk);
@@ -95,7 +97,7 @@ static int clk_composite_disable(struct clk *clk)
 		return 0;
 }
 
-struct clk *clk_register_composite(struct device *dev, const char *name,
+struct clk *clk_register_composite(struct udevice *dev, const char *name,
 				   const char * const *parent_names,
 				   int num_parents, struct clk *mux,
 				   const struct clk_ops *mux_ops,
@@ -147,11 +149,13 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
 	clk = &composite->clk;
 	clk->flags = flags;
 	ret = clk_register(clk, UBOOT_DM_CLK_COMPOSITE, name,
-			   parent_names[clk_composite_get_parent(clk)]);
+		clk_resolve_parent_clk(dev, parent_names[clk_composite_get_parent(clk)]));
 	if (ret) {
 		clk = ERR_PTR(ret);
 		goto err;
 	}
+
+	composite->dev = dev;
 
 	if (composite->mux)
 		composite->mux->dev = clk->dev;

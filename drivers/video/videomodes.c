@@ -7,8 +7,7 @@
 
 /************************************************************************
   Get Parameters for the video mode:
-  The default video mode can be defined in CONFIG_SYS_DEFAULT_VIDEO_MODE.
-  If undefined, default video mode is set to 0x301
+  The default video mode is set to 0x301
   Parameters can be set via the variable "videomode" in the environment.
   2 diferent ways are possible:
   "videomode=301"   - 301 is a hexadecimal number describing the VESA
@@ -56,7 +55,6 @@
 		      "myvideo" and setting the variable "videomode=myvideo"..
 ****************************************************************************/
 
-#include <common.h>
 #include <edid.h>
 #include <env.h>
 #include <errno.h>
@@ -384,7 +382,7 @@ int video_get_option_int(const char *options, const char *name, int def)
  * @param t		The EDID detailed timing to be converted
  * @param mode		Returns the converted timing
  *
- * @return 0 on success, or a negative errno on error
+ * Return: 0 on success, or a negative errno on error
  */
 int video_edid_dtd_to_ctfb_res_modes(struct edid_detailed_timing *t,
 				     struct ctfb_res_modes *mode)

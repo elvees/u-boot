@@ -3,7 +3,6 @@
  * Copyright (C) 2017 Theobroma Systems Design und Consulting GmbH
  */
 
-#include <common.h>
 #include <bootstage.h>
 #include <dm.h>
 #include <init.h>
@@ -20,7 +19,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #if CONFIG_IS_ENABLED(OF_PLATDATA)
 struct rockchip_timer_plat {
-	struct dtd_rockchip_rk3368_timer dtd;
+	struct dtd_rockchip_rk3288_timer dtd;
 };
 #endif
 
@@ -55,8 +54,7 @@ ulong timer_get_boot_us(void)
 		/* The timer is available */
 		rate = timer_get_rate(gd->timer);
 		timer_get_count(gd->timer, &ticks);
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
-	} else if (ret == -EAGAIN) {
+	} else if (CONFIG_IS_ENABLED(OF_REAL) && ret == -EAGAIN) {
 		/* We have been called so early that the DM is not ready,... */
 		ofnode node = offset_to_ofnode(-1);
 		struct rk_timer *timer = NULL;
@@ -79,7 +77,6 @@ ulong timer_get_boot_us(void)
 			debug("%s: could not read clock-frequency\n", __func__);
 			return 0;
 		}
-#endif
 	} else {
 		return 0;
 	}
@@ -100,13 +97,13 @@ static u64 rockchip_timer_get_count(struct udevice *dev)
 
 static int rockchip_clk_of_to_plat(struct udevice *dev)
 {
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
-	struct rockchip_timer_priv *priv = dev_get_priv(dev);
+	if (CONFIG_IS_ENABLED(OF_REAL)) {
+		struct rockchip_timer_priv *priv = dev_get_priv(dev);
 
-	priv->timer = dev_read_addr_ptr(dev);
-	if (!priv->timer)
-		return -ENOENT;
-#endif
+		priv->timer = dev_read_addr_ptr(dev);
+		if (!priv->timer)
+			return -ENOENT;
+	}
 
 	return 0;
 }
@@ -154,14 +151,12 @@ static const struct timer_ops rockchip_timer_ops = {
 };
 
 static const struct udevice_id rockchip_timer_ids[] = {
-	{ .compatible = "rockchip,rk3188-timer" },
 	{ .compatible = "rockchip,rk3288-timer" },
-	{ .compatible = "rockchip,rk3368-timer" },
 	{}
 };
 
-U_BOOT_DRIVER(rockchip_rk3368_timer) = {
-	.name	= "rockchip_rk3368_timer",
+U_BOOT_DRIVER(rockchip_rk3288_timer) = {
+	.name	= "rockchip_rk3288_timer",
 	.id	= UCLASS_TIMER,
 	.of_match = rockchip_timer_ids,
 	.probe = rockchip_timer_probe,

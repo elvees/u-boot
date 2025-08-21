@@ -5,13 +5,13 @@
 
 #define pr_fmt(fmt) "as3722: " fmt
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <fdtdec.h>
 #include <i2c.h>
 #include <log.h>
 #include <dm/lists.h>
+#include <linux/printk.h>
 #include <power/as3722.h>
 #include <power/pmic.h>
 

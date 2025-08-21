@@ -2,11 +2,10 @@
 /*
  * Test for the SOC uclass
  *
- * (C) Copyright 2020 - Texas Instruments Incorporated - http://www.ti.com/
+ * (C) Copyright 2020 - Texas Instruments Incorporated - https://www.ti.com/
  *	Dave Gerlach <d-gerlach@ti.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <dm/test.h>
 #include <dm/uclass-internal.h>
@@ -116,5 +115,4 @@ static int dm_test_soc(struct unit_test_state *uts)
 
 	return 0;
 }
-
-DM_TEST(dm_test_soc, UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_soc, UTF_SCAN_FDT);

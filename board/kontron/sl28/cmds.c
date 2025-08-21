@@ -5,10 +5,11 @@
  * Copyright (c) 2020 Kontron Europe GmbH
  */
 
-#include <common.h>
 #include <command.h>
 #include <i2c.h>
+#include <vsprintf.h>
 #include <linux/delay.h>
+#include <linux/errno.h>
 
 #define CPLD_I2C_ADDR 0x4a
 #define REG_UFM_CTRL 0x02
@@ -138,7 +139,7 @@ static int do_sl28_nvm(struct cmd_tbl *cmdtp, int flag, int argc,
 		return CMD_RET_FAILURE;
 
 	if (argc > 1) {
-		nvm = simple_strtoul(argv[1], &endp, 16);
+		nvm = hextoul(argv[1], &endp);
 		if (*endp != '\0') {
 			printf("ERROR: argument is not a valid number\n");
 			ret = -EINVAL;
@@ -171,8 +172,8 @@ out:
 	return CMD_RET_FAILURE;
 }
 
-static char sl28_help_text[] =
-	"nvm [<hex>] - display/set the 16 non-volatile bits\n";
+U_BOOT_LONGHELP(sl28,
+	"nvm [<hex>] - display/set the 16 non-volatile bits\n");
 
 U_BOOT_CMD_WITH_SUBCMDS(sl28, "SMARC-sAL28 specific", sl28_help_text,
 			U_BOOT_SUBCMD_MKENT(nvm, 2, 1, do_sl28_nvm));

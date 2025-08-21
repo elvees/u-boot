@@ -3,14 +3,13 @@
  * (C) Copyright 2019 Rockchip Electronics Co., Ltd
  */
 #include <init.h>
-#include <asm/io.h>
 #include <asm/arch-rockchip/bootrom.h>
 #include <asm/arch-rockchip/grf_rk322x.h>
 #include <asm/arch-rockchip/hardware.h>
 
 const char * const boot_devices[BROM_LAST_BOOTSOURCE + 1] = {
-	[BROM_BOOTSOURCE_EMMC] = "/dwmmc@30020000",
-	[BROM_BOOTSOURCE_SD] = "/dwmmc@30000000",
+	[BROM_BOOTSOURCE_EMMC] = "/mmc@30020000",
+	[BROM_BOOTSOURCE_SD] = "/mmc@30000000",
 };
 
 #ifdef CONFIG_DEBUG_UART_BOARD_INIT
@@ -52,7 +51,7 @@ void board_debug_uart_init(void)
 
 int arch_cpu_init(void)
 {
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 #define SGRF_BASE	0x10150000
 	static struct rk322x_sgrf * const sgrf = (void *)SGRF_BASE;
 

@@ -3,7 +3,6 @@
  * Copyright (C) 2015-2016 Wills Wang <wills.wang@live.com>
  */
 
-#include <common.h>
 #include <clock_legacy.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
@@ -61,7 +60,6 @@ int get_clocks(void)
 	div = ((ctrl >> QCA953X_PLL_CLK_CTRL_CPU_POST_DIV_SHIFT)
 			& QCA953X_PLL_CLK_CTRL_CPU_POST_DIV_MASK) + 1;
 	gd->cpu_clk = pll / div;
-
 
 	val = readl(regs + QCA953X_PLL_DDR_CONFIG_REG);
 	/* VCOOUT = XTAL * DIV_INT */

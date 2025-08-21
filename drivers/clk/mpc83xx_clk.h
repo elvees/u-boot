@@ -317,11 +317,11 @@ static inline u32 get_pci_sync_in(immap_t *im)
 	u8 clkin_div;
 
 	clkin_div = (get_spmr(im) & SPMR_CKID) >> SPMR_CKID_SHIFT;
-	return CONFIG_SYS_CLK_FREQ / (1 + clkin_div);
+	return get_board_sys_clk() / (1 + clkin_div);
 }
 
 /**
- * get_csb_clk() - Read the CSB (Coheren System Bus) clock speed
+ * get_csb_clk() - Read the CSB (Coherent System Bus) clock speed
  * @im: Pointer to the MPC83xx main register map in question
  *
  * Return: The CSB clock speed value as a 32-bit number.
@@ -331,7 +331,7 @@ static inline u32 get_csb_clk(immap_t *im)
 	u8 spmf;
 
 	spmf = (get_spmr(im) & SPMR_SPMF) >> SPMR_SPMF_SHIFT;
-	return CONFIG_SYS_CLK_FREQ * spmf;
+	return get_board_sys_clk() * spmf;
 }
 
 /**

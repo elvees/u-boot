@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2016 Freescale Semiconductor, Inc.
+ * Copyright 2021 NXP
  */
 
-#include <common.h>
+#include <config.h>
 #include <clock_legacy.h>
 #include <fdt_support.h>
 #include <init.h>
@@ -17,6 +18,7 @@
 
 #include <asm/arch/ls102xa_devdis.h>
 #include <asm/arch/ls102xa_soc.h>
+#include <asm/sections.h>
 #include <fsl_csu.h>
 #include <fsl_immap.h>
 #include <netdev.h>
@@ -31,13 +33,12 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define DDR_SIZE		0x40000000
 
-
 int checkboard(void)
 {
 	puts("Board: LS1021AIOT\n");
 
 #ifndef CONFIG_QSPI_BOOT
-	struct ccsr_gur *dcfg = (struct ccsr_gur *)CONFIG_SYS_FSL_GUTS_ADDR;
+	struct ccsr_gur *dcfg = (struct ccsr_gur *)CFG_SYS_FSL_GUTS_ADDR;
 	u32 cpldrev;
 
 	cpldrev = in_be32(&dcfg->gpporcr1);
@@ -50,7 +51,7 @@ int checkboard(void)
 
 void ddrmc_init(void)
 {
-	struct ccsr_ddr *ddr = (struct ccsr_ddr *)CONFIG_SYS_FSL_DDR_ADDR;
+	struct ccsr_ddr *ddr = (struct ccsr_ddr *)CFG_SYS_FSL_DDR_ADDR;
 	u32 temp_sdram_cfg, tmp;
 
 	out_be32(&ddr->sdram_cfg, DDR_SDRAM_CFG);
@@ -98,7 +99,7 @@ void ddrmc_init(void)
 
 int dram_init(void)
 {
-#if (!defined(CONFIG_SPL) || defined(CONFIG_SPL_BUILD))
+#if (!defined(CONFIG_SPL) || defined(CONFIG_XPL_BUILD))
 	ddrmc_init();
 #endif
 
@@ -108,47 +109,9 @@ int dram_init(void)
 	return 0;
 }
 
-#ifdef CONFIG_TSEC_ENET
-int board_eth_init(struct bd_info *bis)
-{
-	struct fsl_pq_mdio_info mdio_info;
-	struct tsec_info_struct tsec_info[4];
-	int num = 0;
-
-#ifdef CONFIG_TSEC1
-	SET_STD_TSEC_INFO(tsec_info[num], 1);
-	if (is_serdes_configured(SGMII_TSEC1)) {
-		puts("eTSEC1 is in sgmii mode.\n");
-		tsec_info[num].flags |= TSEC_SGMII;
-	}
-	num++;
-#endif
-#ifdef CONFIG_TSEC2
-	SET_STD_TSEC_INFO(tsec_info[num], 2);
-	if (is_serdes_configured(SGMII_TSEC2)) {
-		puts("eTSEC2 is in sgmii mode.\n");
-		tsec_info[num].flags |= TSEC_SGMII;
-	}
-	num++;
-#endif
-	if (!num) {
-		printf("No TSECs initialized\n");
-		return 0;
-	}
-
-	mdio_info.regs = (struct tsec_mii_mng *)CONFIG_SYS_MDIO_BASE_ADDR;
-	mdio_info.name = DEFAULT_MII_NAME;
-	fsl_pq_mdio_init(bis, &mdio_info);
-
-	tsec_eth_init(bis, tsec_info, num);
-
-	return pci_eth_init(bis);
-}
-#endif
-
 int board_early_init_f(void)
 {
-	struct ccsr_scfg *scfg = (struct ccsr_scfg *)CONFIG_SYS_FSL_SCFG_ADDR;
+	struct ccsr_scfg *scfg = (struct ccsr_scfg *)CFG_SYS_FSL_SCFG_ADDR;
 
 #ifdef CONFIG_TSEC_ENET
 	/* clear BD & FR bits for BE BD's and frame data */
@@ -162,7 +125,7 @@ int board_early_init_f(void)
 	return 0;
 }
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 void board_init_f(ulong dummy)
 {
 	/* Clear the BSS */
@@ -209,10 +172,7 @@ int misc_init_r(void)
 	device_disable(devdis_tbl, ARRAY_SIZE(devdis_tbl));
 
 #endif
-
-#ifdef CONFIG_FSL_CAAM
-	return sec_init();
-#endif
+	return 0;
 }
 #endif
 

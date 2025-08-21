@@ -5,8 +5,8 @@
  * Graeme Russ, graeme.russ@gmail.com.
  */
 
-#include <common.h>
 #include <cpu_func.h>
+#include <event.h>
 #include <fdtdec.h>
 #include <init.h>
 #include <usb.h>
@@ -14,14 +14,20 @@
 #include <asm/io.h>
 #include <asm/msr.h>
 #include <asm/mtrr.h>
-#include <asm/arch/sysinfo.h>
+#include <asm/cb_sysinfo.h>
 #include <asm/arch/timestamp.h>
-
-DECLARE_GLOBAL_DATA_PTR;
+#include <dm/ofnode.h>
 
 int arch_cpu_init(void)
 {
-	int ret = get_coreboot_info(&lib_sysinfo);
+	int ret;
+
+	ret = IS_ENABLED(CONFIG_X86_64) ? x86_cpu_reinit_f() :
+		x86_cpu_init_f();
+	if (ret)
+		return ret;
+
+	ret = get_coreboot_info(&lib_sysinfo);
 	if (ret != 0) {
 		printf("Failed to parse coreboot tables.\n");
 		return ret;
@@ -29,18 +35,7 @@ int arch_cpu_init(void)
 
 	timestamp_init();
 
-	return IS_ENABLED(CONFIG_X86_RUN_64BIT) ? x86_cpu_reinit_f() :
-		 x86_cpu_init_f();
-}
-
-int checkcpu(void)
-{
 	return 0;
-}
-
-int print_cpuinfo(void)
-{
-	return default_print_cpuinfo();
 }
 
 static void board_final_init(void)
@@ -65,7 +60,7 @@ static void board_final_init(void)
 		mtrr_close(&state, true);
 	}
 
-	if (!fdtdec_get_config_bool(gd->fdt_blob, "u-boot,no-apm-finalize")) {
+	if (!ofnode_conf_read_bool("u-boot,no-apm-finalize")) {
 		/*
 		 * Issue SMI to coreboot to lock down ME and registers
 		 * when allowed via device tree
@@ -75,13 +70,15 @@ static void board_final_init(void)
 	}
 }
 
-int last_stage_init(void)
+static int last_stage_init(void)
 {
-	/* start usb so that usb keyboard can be used as input device */
-	if (CONFIG_IS_ENABLED(USB_KEYBOARD))
-		usb_init();
+	timestamp_add_to_bootstage();
+
+	if (IS_ENABLED(CONFIG_XPL_BUILD))
+		return 0;
 
 	board_final_init();
 
 	return 0;
 }
+EVENT_SPY_SIMPLE(EVT_LAST_STAGE_INIT, last_stage_init);

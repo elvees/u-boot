@@ -11,7 +11,6 @@
  */
 
 #define LOG_CATEGORY UCLASS_SPI
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <dm/device_compat.h>
@@ -111,6 +110,9 @@
 #define SR_TX_ERR			BIT(5)
 #define SR_DCOL				BIT(6)
 
+/* Bit field in RISR */
+#define RISR_INT_RXOI			BIT(3)
+
 #define RX_TIMEOUT			1000		/* timeout in ms */
 
 struct dw_spi_plat {
@@ -193,6 +195,20 @@ static int dw_spi_apb_init(struct udevice *bus, struct dw_spi_priv *priv)
 	return 0;
 }
 
+static int dw_spi_apb_k210_init(struct udevice *bus, struct dw_spi_priv *priv)
+{
+	/*
+	 * The Canaan Kendryte K210 SoC DW apb_ssi v4 spi controller is
+	 * documented to have a 32 word deep TX and RX FIFO, which
+	 * spi_hw_init() detects. However, when the RX FIFO is filled up to
+	 * 32 entries (RXFLR = 32), an RX FIFO overrun error occurs. Avoid
+	 * this problem by force setting fifo_len to 31.
+	 */
+	priv->fifo_len = 31;
+
+	return dw_spi_apb_init(bus, priv);
+}
+
 static int dw_spi_dwc_init(struct udevice *bus, struct dw_spi_priv *priv)
 {
 	priv->max_xfer = 32;
@@ -202,7 +218,7 @@ static int dw_spi_dwc_init(struct udevice *bus, struct dw_spi_priv *priv)
 
 static int request_gpio_cs(struct udevice *bus)
 {
-#if CONFIG_IS_ENABLED(DM_GPIO) && !defined(CONFIG_SPL_BUILD)
+#if CONFIG_IS_ENABLED(DM_GPIO) && !defined(CONFIG_XPL_BUILD)
 	struct dw_spi_priv *priv = dev_get_priv(bus);
 	int ret;
 
@@ -251,7 +267,7 @@ static int dw_spi_of_to_plat(struct udevice *bus)
 static void spi_hw_init(struct udevice *bus, struct dw_spi_priv *priv)
 {
 	dw_write(priv, DW_SPI_SSIENR, 0);
-	dw_write(priv, DW_SPI_IMR, 0xff);
+	dw_write(priv, DW_SPI_IMR, 0);
 	dw_write(priv, DW_SPI_SSIENR, 1);
 
 	/*
@@ -301,7 +317,6 @@ __weak int dw_spi_get_clk(struct udevice *bus, ulong *rate)
 
 err_rate:
 	clk_disable(&priv->clk);
-	clk_free(&priv->clk);
 
 	return -EINVAL;
 }
@@ -522,7 +537,7 @@ static int poll_transfer(struct dw_spi_priv *priv)
  */
 __weak void external_cs_manage(struct udevice *dev, bool on)
 {
-#if CONFIG_IS_ENABLED(DM_GPIO) && !defined(CONFIG_SPL_BUILD)
+#if CONFIG_IS_ENABLED(DM_GPIO) && !defined(CONFIG_XPL_BUILD)
 	struct dw_spi_priv *priv = dev_get_priv(dev->parent);
 
 	if (!dm_gpio_is_valid(&priv->cs_gpio))
@@ -615,6 +630,116 @@ static int dw_spi_xfer(struct udevice *dev, unsigned int bitlen,
 	return ret;
 }
 
+/*
+ * This function is necessary for reading SPI flash with the native CS
+ * c.f. https://lkml.org/lkml/2015/12/23/132
+ */
+static int dw_spi_exec_op(struct spi_slave *slave, const struct spi_mem_op *op)
+{
+	bool read = op->data.dir == SPI_MEM_DATA_IN;
+	int pos, i, ret = 0;
+	struct udevice *bus = slave->dev->parent;
+	struct dw_spi_priv *priv = dev_get_priv(bus);
+	u8 op_len = op->cmd.nbytes + op->addr.nbytes + op->dummy.nbytes;
+	u8 op_buf[op_len];
+	u32 cr0, sts;
+
+	if (read)
+		priv->tmode = CTRLR0_TMOD_EPROMREAD;
+	else
+		priv->tmode = CTRLR0_TMOD_TO;
+
+	cr0 = priv->update_cr0(priv);
+	dev_dbg(bus, "cr0=%08x buf=%p len=%u [bytes]\n", cr0, op->data.buf.in,
+		op->data.nbytes);
+
+	dw_write(priv, DW_SPI_SSIENR, 0);
+	dw_write(priv, DW_SPI_CTRLR0, cr0);
+	if (read)
+		dw_write(priv, DW_SPI_CTRLR1, op->data.nbytes - 1);
+	dw_write(priv, DW_SPI_SSIENR, 1);
+
+	/* From spi_mem_exec_op */
+	pos = 0;
+	op_buf[pos++] = op->cmd.opcode;
+	if (op->addr.nbytes) {
+		for (i = 0; i < op->addr.nbytes; i++)
+			op_buf[pos + i] = op->addr.val >>
+				(8 * (op->addr.nbytes - i - 1));
+
+		pos += op->addr.nbytes;
+	}
+	if (op->dummy.nbytes)
+		memset(op_buf + pos, 0xff, op->dummy.nbytes);
+
+	external_cs_manage(slave->dev, false);
+
+	priv->tx = &op_buf;
+	priv->tx_end = priv->tx + op_len;
+	priv->rx = NULL;
+	priv->rx_end = NULL;
+	while (priv->tx != priv->tx_end)
+		dw_writer(priv);
+
+	/*
+	 * XXX: The following are tight loops! Enabling debug messages may cause
+	 * them to fail because we are not reading/writing the fifo fast enough.
+	 */
+	if (read) {
+		void *prev_rx = priv->rx = op->data.buf.in;
+		priv->rx_end = priv->rx + op->data.nbytes;
+
+		dw_write(priv, DW_SPI_SER, 1 << spi_chip_select(slave->dev));
+		while (priv->rx != priv->rx_end) {
+			dw_reader(priv);
+			if (prev_rx == priv->rx) {
+				sts = dw_read(priv, DW_SPI_RISR);
+				if (sts & RISR_INT_RXOI) {
+					dev_err(bus, "FIFO overflow on Rx\n");
+					return -EIO;
+				}
+			}
+			prev_rx = priv->rx;
+		}
+	} else {
+		u32 val;
+
+		priv->tx = op->data.buf.out;
+		priv->tx_end = priv->tx + op->data.nbytes;
+
+		/* Fill up the write fifo before starting the transfer */
+		dw_writer(priv);
+		dw_write(priv, DW_SPI_SER, 1 << spi_chip_select(slave->dev));
+		while (priv->tx != priv->tx_end)
+			dw_writer(priv);
+
+		if (readl_poll_timeout(priv->regs + DW_SPI_SR, val,
+				       (val & SR_TF_EMPT) && !(val & SR_BUSY),
+				       RX_TIMEOUT * 1000)) {
+			ret = -ETIMEDOUT;
+		}
+	}
+
+	dw_write(priv, DW_SPI_SER, 0);
+	external_cs_manage(slave->dev, true);
+
+	dev_dbg(bus, "%u bytes xfered\n", op->data.nbytes);
+	return ret;
+}
+
+/* The size of ctrl1 limits data transfers to 64K */
+static int dw_spi_adjust_op_size(struct spi_slave *slave, struct spi_mem_op *op)
+{
+	op->data.nbytes = min(op->data.nbytes, (unsigned int)SZ_64K);
+
+	return 0;
+}
+
+static const struct spi_controller_mem_ops dw_spi_mem_ops = {
+	.exec_op = dw_spi_exec_op,
+	.adjust_op_size = dw_spi_adjust_op_size,
+};
+
 static int dw_spi_set_speed(struct udevice *bus, uint speed)
 {
 	struct dw_spi_plat *plat = dev_get_plat(bus);
@@ -669,10 +794,6 @@ static int dw_spi_remove(struct udevice *bus)
 	ret = clk_disable(&priv->clk);
 	if (ret)
 		return ret;
-
-	ret = clk_free(&priv->clk);
-	if (ret)
-		return ret;
 #endif
 	return 0;
 }
@@ -709,8 +830,8 @@ static const struct udevice_id dw_spi_ids[] = {
 	 */
 	{ .compatible = "altr,socfpga-spi", .data = (ulong)dw_spi_apb_init },
 	{ .compatible = "altr,socfpga-arria10-spi", .data = (ulong)dw_spi_apb_init },
-	{ .compatible = "canaan,kendryte-k210-spi", .data = (ulong)dw_spi_apb_init },
-	{ .compatible = "canaan,kendryte-k210-ssi", .data = (ulong)dw_spi_dwc_init },
+	{ .compatible = "canaan,k210-spi", .data = (ulong)dw_spi_apb_k210_init},
+	{ .compatible = "canaan,k210-ssi", .data = (ulong)dw_spi_dwc_init },
 	{ .compatible = "intel,stratix10-spi", .data = (ulong)dw_spi_apb_init },
 	{ .compatible = "intel,agilex-spi", .data = (ulong)dw_spi_apb_init },
 	{ .compatible = "mscc,ocelot-spi", .data = (ulong)dw_spi_apb_init },

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
+ * Copyright (C) 2024 Tony Dinh <mibodhi@gmail.com>
  * Copyright (C) 2014 Stefan Roese <sr@denx.de>
  */
 
@@ -15,28 +16,8 @@
  * for DDR ECC byte filling in the SPL before loading the main
  * U-Boot into it.
  */
-#define CONFIG_SYS_TCLK		250000000	/* 250MHz */
 
-/* I2C */
-#define CONFIG_SYS_I2C
-#define CONFIG_SYS_I2C_MVTWSI
-#define CONFIG_I2C_MVTWSI_BASE0		MVEBU_TWSI_BASE
-#define CONFIG_SYS_I2C_SLAVE		0x0
-#define CONFIG_SYS_I2C_SPEED		100000
-
-/* PCIe support */
-#ifndef CONFIG_SPL_BUILD
-#define CONFIG_PCI_SCAN_SHOW
-#endif
-
-/* USB/EHCI/XHCI configuration */
-#define CONFIG_EHCI_IS_TDI
-
-/*
- * mv-common.h should be defined after CMD configs since it used them
- * to enable certain macros
- */
-#include "mv-common.h"
+#define CFG_I2C_MVTWSI_BASE0		MVEBU_TWSI_BASE
 
 /*
  * Memory layout while starting into the bin_hdr via the
@@ -51,33 +32,54 @@
  * L2 cache thus cannot be used.
  */
 
-/* SPL */
-/* Defines for SPL */
-#define CONFIG_SPL_MAX_SIZE		((128 << 10) - 0x4030)
+/* Keep device tree and initrd in lower memory so the kernel can access them */
+#define RELOCATION_LIMITS_ENV_SETTINGS  \
+	"fdt_high=0x10000000\0"         \
+	"initrd_high=0x10000000\0"
 
-#define CONFIG_SPL_BSS_START_ADDR	(0x40000000 + (128 << 10))
-#define CONFIG_SPL_BSS_MAX_SIZE		(16 << 10)
+/*
+ * mv-common.h should be defined after CMD configs since it used them
+ * to enable certain macros
+ */
+#include "mv-common.h"
 
-#ifdef CONFIG_SPL_BUILD
-#define CONFIG_SYS_MALLOC_SIMPLE
-#endif
+#ifndef CONFIG_XPL_BUILD
 
-#define CONFIG_SPL_STACK		(0x40000000 + ((192 - 16) << 10))
-#define CONFIG_SPL_BOOTROM_SAVE		(CONFIG_SPL_STACK + 4)
+#define KERNEL_ADDR_R	__stringify(0x1000000)
+#define FDT_ADDR_R	__stringify(0x2000000)
+#define RAMDISK_ADDR_R	__stringify(0x2200000)
+#define SCRIPT_ADDR_R	__stringify(0x1800000)
+#define PXEFILE_ADDR_R	__stringify(0x1900000)
 
-#if defined(CONFIG_MVEBU_SPL_BOOT_DEVICE_SPI)
-/* SPL related SPI defines */
-#define CONFIG_SYS_U_BOOT_OFFS		CONFIG_SYS_SPI_U_BOOT_OFFS
-#endif
+#define EXTRA_ENV_SETTINGS_LEGACY \
+	"bootargs_legacy=console=ttyS0,115200 ip=off initrd=0x8000040,8M " \
+		"root=/dev/md0 rw syno_hw_version=DS414r1 ihd_num=4 netif_num=2 " \
+		"flash_size=8 SataLedSpecial=1 HddHotplug=1\0" \
+	"bootcmd_legacy=sf probe; sf read ${loadaddr} 0xd0000 0x2d0000; " \
+		"sf read ${ramdisk_addr_r} 0x3a0000 0x430000; " \
+		"setenv bootargs $bootargs_legacy; " \
+		"bootm ${loadaddr} ${ramdisk_addr_r}\0"	\
+	"usb0Mode=host\0usb1Mode=host\0usb2Mode=device\0" \
+	"ethmtu=1500\0eth1mtu=1500\0" \
+	"update_uboot=sf probe; dhcp; "	\
+		"mw.b ${loadaddr} 0x0 0xd0000; " \
+		"tftpboot ${loadaddr} u-boot-with-spl.kwb; " \
+		"sf update ${loadaddr} 0x0 0xd0000\0"
 
-/* DS414 bus width is 32bits */
-#define CONFIG_DDR_32BIT
+#define LOAD_ADDRESS_ENV_SETTINGS \
+	"kernel_addr_r=" KERNEL_ADDR_R "\0" \
+	"fdt_addr_r=" FDT_ADDR_R "\0" \
+	"ramdisk_addr_r=" RAMDISK_ADDR_R "\0" \
+	"scriptaddr=" SCRIPT_ADDR_R "\0" \
+	"pxefile_addr_r=" PXEFILE_ADDR_R "\0"
 
-/* Default Environment */
-#define CONFIG_BOOTCOMMAND	"sf read ${loadaddr} 0xd0000 0x700000; bootm"
-#define CONFIG_LOADADDR		0x80000
+#define CFG_EXTRA_ENV_SETTINGS \
+	RELOCATION_LIMITS_ENV_SETTINGS \
+	LOAD_ADDRESS_ENV_SETTINGS \
+	EXTRA_ENV_SETTINGS_LEGACY \
+	"fdtfile=" CONFIG_DEFAULT_DEVICE_TREE ".dtb\0" \
+	"console=ttyS0,115200\0"
 
-/* increase autoneg timeout, my NIC sucks */
-#define PHY_ANEG_TIMEOUT	16000
+#endif /* CONFIG_XPL_BUILD */
 
 #endif /* _CONFIG_SYNOLOGY_DS414_H */

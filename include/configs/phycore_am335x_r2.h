@@ -4,7 +4,7 @@
  *
  * Phytec phyCORE-AM335x R2 (PCL060 / PCM060) boards information header
  *
- * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
+ * Copyright (C) 2011, Texas Instruments, Incorporated - https://www.ti.com/
  * Copyright (C) 2013 Lars Poeschel, Lemonage Software GmbH
  * Copyright (C) 2019 DENX Software Engineering GmbH
  */
@@ -14,12 +14,8 @@
 
 #include <configs/ti_am335x_common.h>
 
-#define CONFIG_MACH_TYPE		MACH_TYPE_SBC_PHYCORE_AM335X
-
 #ifdef CONFIG_MTD_RAW_NAND
 #define NANDARGS \
-	"mtdids=" CONFIG_MTDIDS_DEFAULT "\0" \
-	"mtdparts=" CONFIG_MTDPARTS_DEFAULT "\0" \
 	"nandargs=setenv bootargs console=${console} " \
 		"${optargs} " \
 		"root=${nandroot} " \
@@ -63,10 +59,10 @@
 	func(NAND, nand, 0)
 
 #include <config_distro_bootcmd.h>
-#include <environment/ti/dfu.h>
-#include <environment/ti/mmc.h>
+#include <env/ti/dfu.h>
+#include <env/ti/mmc.h>
 
-#define CONFIG_EXTRA_ENV_SETTINGS \
+#define CFG_EXTRA_ENV_SETTINGS \
 	DEFAULT_MMC_TI_ARGS \
 	DEFAULT_LINUX_BOOT_ENV \
 	"bootfile=zImage\0" \
@@ -83,19 +79,10 @@
 #define V_OSCK				25000000  /* Clock output from T2 */
 #define V_SCLK				V_OSCK
 
-#define CONFIG_POWER_TPS65910
-
 #ifdef CONFIG_MTD_RAW_NAND
 /* NAND: device related configs */
-#define CONFIG_SYS_NAND_5_ADDR_CYCLE
-#define CONFIG_SYS_NAND_PAGE_COUNT	(CONFIG_SYS_NAND_BLOCK_SIZE / \
-					 CONFIG_SYS_NAND_PAGE_SIZE)
-#define CONFIG_SYS_NAND_PAGE_SIZE	2048
-#define CONFIG_SYS_NAND_OOBSIZE		64
-#define CONFIG_SYS_NAND_BLOCK_SIZE	(128 * 1024)
 /* NAND: driver related configs */
-#define CONFIG_SYS_NAND_BAD_BLOCK_POS	NAND_LARGE_BADBLOCK_POS
-#define CONFIG_SYS_NAND_ECCPOS		{ 2, 3, 4, 5, 6, 7, 8, 9, \
+#define CFG_SYS_NAND_ECCPOS		{ 2, 3, 4, 5, 6, 7, 8, 9, \
 					 10, 11, 12, 13, 14, 15, 16, 17, \
 					 18, 19, 20, 21, 22, 23, 24, 25, \
 					 26, 27, 28, 29, 30, 31, 32, 33, \
@@ -103,23 +90,9 @@
 					 42, 43, 44, 45, 46, 47, 48, 49, \
 					 50, 51, 52, 53, 54, 55, 56, 57, }
 
-#define CONFIG_SYS_NAND_ECCSIZE		512
-#define CONFIG_SYS_NAND_ECCBYTES	14
-#define CONFIG_SYS_NAND_ONFI_DETECTION
-#define CONFIG_NAND_OMAP_ECCSCHEME	OMAP_ECC_BCH8_CODE_HW
+#define CFG_SYS_NAND_ECCSIZE		512
+#define CFG_SYS_NAND_ECCBYTES	14
 
-/* NAND: SPL related configs */
-#ifdef CONFIG_SPL_OS_BOOT
-#define CONFIG_SYS_NAND_SPL_KERNEL_OFFS	0x00200000 /* kernel offset */
-#endif
 #endif /* !CONFIG_MTD_RAW_NAND */
-
-/* CPU */
-
-#ifdef CONFIG_SPI_BOOT
-#define CONFIG_SYS_SPI_U_BOOT_SIZE	0x40000
-#elif defined(CONFIG_ENV_IS_IN_NAND)
-#define CONFIG_SYS_ENV_SECT_SIZE	CONFIG_SYS_NAND_BLOCK_SIZE
-#endif
 
 #endif	/* ! __CONFIG_PHYCORE_AM335x_R2_H */

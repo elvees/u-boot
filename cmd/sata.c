@@ -9,7 +9,6 @@
  *		Dave Liu <daveliu@freescale.com>
  */
 
-#include <common.h>
 #include <ahci.h>
 #include <blk.h>
 #include <dm.h>
@@ -27,7 +26,7 @@ int sata_remove(int devnum)
 	struct udevice *dev;
 	int rc;
 
-	blk_unbind_all(IF_TYPE_SATA);
+	blk_unbind_all(UCLASS_AHCI);
 
 	rc = uclass_find_device(UCLASS_AHCI, devnum, &dev);
 	if (!rc && !dev)
@@ -88,7 +87,7 @@ static int do_sata(struct cmd_tbl *cmdtp, int flag, int argc,
 		int devnum = 0;
 
 		if (argc == 3)
-			devnum = (int)simple_strtoul(argv[2], NULL, 10);
+			devnum = (int)dectoul(argv[2], NULL);
 		if (!strcmp(argv[1], "stop"))
 			return sata_remove(devnum);
 
@@ -111,7 +110,7 @@ static int do_sata(struct cmd_tbl *cmdtp, int flag, int argc,
 		sata_curr_device = 0;
 	}
 
-	return blk_common_cmd(argc, argv, IF_TYPE_SATA, &sata_curr_device);
+	return blk_common_cmd(argc, argv, UCLASS_AHCI, &sata_curr_device);
 }
 
 U_BOOT_CMD(

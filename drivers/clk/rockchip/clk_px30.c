@@ -3,7 +3,6 @@
  * (C) Copyright 2017 Rockchip Electronics Co., Ltd
  */
 
-#include <common.h>
 #include <bitfield.h>
 #include <clk-uclass.h>
 #include <dm.h>
@@ -15,7 +14,6 @@
 #include <asm/arch-rockchip/cru_px30.h>
 #include <asm/arch-rockchip/hardware.h>
 #include <asm/global_data.h>
-#include <asm/io.h>
 #include <dm/device-internal.h>
 #include <dm/lists.h>
 #include <dt-bindings/clock/px30-cru.h>
@@ -581,6 +579,32 @@ static ulong px30_mmc_set_clk(struct px30_clk_priv *priv,
 	return px30_mmc_get_clk(priv, clk_id);
 }
 
+static ulong px30_sfc_get_clk(struct px30_clk_priv *priv, uint clk_id)
+{
+	struct px30_cru *cru = priv->cru;
+	u32 div, con;
+
+	con = readl(&cru->clksel_con[22]);
+	div = (con & SFC_DIV_CON_MASK) >> SFC_DIV_CON_SHIFT;
+
+	return DIV_TO_RATE(priv->gpll_hz, div);
+}
+
+static ulong px30_sfc_set_clk(struct px30_clk_priv *priv,
+			      ulong clk_id, ulong set_rate)
+{
+	struct px30_cru *cru = priv->cru;
+	int src_clk_div;
+
+	src_clk_div = DIV_ROUND_UP(priv->gpll_hz, set_rate);
+	rk_clrsetreg(&cru->clksel_con[22],
+		     SFC_PLL_SEL_MASK | SFC_DIV_CON_MASK,
+		     0 << SFC_PLL_SEL_SHIFT |
+		     (src_clk_div - 1) << SFC_DIV_CON_SHIFT);
+
+	return px30_sfc_get_clk(priv, clk_id);
+}
+
 static ulong px30_pwm_get_clk(struct px30_clk_priv *priv, ulong clk_id)
 {
 	struct px30_cru *cru = priv->cru;
@@ -965,7 +989,7 @@ static ulong px30_peri_set_clk(struct px30_clk_priv *priv, ulong clk_id,
 	return px30_peri_get_clk(priv, clk_id);
 }
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 static ulong px30_crypto_get_clk(struct px30_clk_priv *priv, ulong clk_id)
 {
 	struct px30_cru *cru = priv->cru;
@@ -1192,6 +1216,9 @@ static ulong px30_clk_get_rate(struct clk *clk)
 	case SCLK_EMMC_SAMPLE:
 		rate = px30_mmc_get_clk(priv, clk->id);
 		break;
+	case SCLK_SFC:
+		rate = px30_sfc_get_clk(priv, clk->id);
+		break;
 	case SCLK_I2C0:
 	case SCLK_I2C1:
 	case SCLK_I2C2:
@@ -1234,7 +1261,7 @@ static ulong px30_clk_get_rate(struct clk *clk)
 	case HCLK_PERI_PRE:
 		rate = px30_peri_get_clk(priv, clk->id);
 		break;
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 	case SCLK_CRYPTO:
 	case SCLK_CRYPTO_APK:
 		rate = px30_crypto_get_clk(priv, clk->id);
@@ -1262,6 +1289,9 @@ static ulong px30_clk_set_rate(struct clk *clk, ulong rate)
 	case PLL_NPLL:
 		ret = px30_clk_set_pll_rate(priv, NPLL, rate);
 		break;
+	case PLL_CPLL:
+		ret = px30_clk_set_pll_rate(priv, CPLL, rate);
+		break;
 	case ARMCLK:
 		ret = px30_armclk_set_clk(priv, rate);
 		break;
@@ -1270,6 +1300,9 @@ static ulong px30_clk_set_rate(struct clk *clk, ulong rate)
 	case SCLK_SDMMC:
 	case SCLK_EMMC:
 		ret = px30_mmc_set_clk(priv, clk->id, rate);
+		break;
+	case SCLK_SFC:
+		ret = px30_sfc_set_clk(priv, clk->id, rate);
 		break;
 	case SCLK_I2C0:
 	case SCLK_I2C1:
@@ -1312,7 +1345,7 @@ static ulong px30_clk_set_rate(struct clk *clk, ulong rate)
 	case HCLK_PERI_PRE:
 		ret = px30_peri_set_clk(priv, clk->id, rate);
 		break;
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 	case SCLK_CRYPTO:
 	case SCLK_CRYPTO_APK:
 		ret = px30_crypto_set_clk(priv, clk->id, rate);
@@ -1335,7 +1368,7 @@ static ulong px30_clk_set_rate(struct clk *clk, ulong rate)
 	return ret;
 }
 
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 static int px30_gmac_set_parent(struct clk *clk, struct clk *parent)
 {
 	struct px30_clk_priv *priv = dev_get_priv(clk->dev);
@@ -1368,14 +1401,20 @@ static int px30_clk_enable(struct clk *clk)
 {
 	switch (clk->id) {
 	case HCLK_HOST:
+	case HCLK_OTG:
+	case HCLK_SFC:
 	case SCLK_GMAC:
 	case SCLK_GMAC_RX_TX:
 	case SCLK_MAC_REF:
 	case SCLK_MAC_REFOUT:
+	case SCLK_SFC:
 	case ACLK_GMAC:
 	case PCLK_GMAC:
 	case SCLK_GMAC_RMII:
 		/* Required to successfully probe the Designware GMAC driver */
+		return 0;
+	case PCLK_WDT_NS:
+		/* Required to successfully probe the Designware watchdog driver */
 		return 0;
 	}
 
@@ -1386,7 +1425,7 @@ static int px30_clk_enable(struct clk *clk)
 static struct clk_ops px30_clk_ops = {
 	.get_rate = px30_clk_get_rate,
 	.set_rate = px30_clk_set_rate,
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	.set_parent = px30_clk_set_parent,
 #endif
 	.enable = px30_clk_enable,
@@ -1467,7 +1506,7 @@ static int px30_clk_bind(struct udevice *dev)
 	ret = offsetof(struct px30_cru, softrst_con[0]);
 	ret = rockchip_reset_bind(dev, ret, 12);
 	if (ret)
-		debug("Warning: software reset driver bind faile\n");
+		debug("Warning: software reset driver bind failed\n");
 #endif
 
 	return 0;
@@ -1549,6 +1588,105 @@ static ulong px30_pmuclk_set_gpll_rate(struct px30_pmuclk_priv *priv, ulong hz)
 	return priv->gpll_hz;
 }
 
+static ulong px30_pmu_uart0_get_clk(struct px30_pmuclk_priv *priv)
+{
+	struct px30_pmucru *pmucru = priv->pmucru;
+	u32 clk_div_con;
+	u32 clk_pll_sel;
+	ulong pll_rate;
+	u32 clk_sel;
+	ulong clk;
+	u32 con;
+
+	con = readl(&pmucru->pmu_clksel_con[3]);
+	clk_div_con = bitfield_extract_by_mask(con, UART0_DIV_CON_MASK);
+	clk_pll_sel = bitfield_extract_by_mask(con, UART0_PLL_SEL_MASK);
+
+	switch (clk_pll_sel) {
+	case UART0_PLL_SEL_GPLL:
+		pll_rate = px30_pmuclk_get_gpll_rate(priv);
+		break;
+	case UART0_PLL_SEL_24M:
+		pll_rate = OSC_HZ;
+		break;
+	case UART0_PLL_SEL_480M:
+	case UART0_PLL_SEL_NPLL:
+		/* usbphy480M and NPLL clocks, generated by CRU, are not supported yet */
+	default:
+		return -ENOENT;
+	}
+
+	clk = DIV_TO_RATE(pll_rate, clk_div_con);
+	con = readl(&pmucru->pmu_clksel_con[4]);
+	clk_sel = bitfield_extract_by_mask(con, UART0_CLK_SEL_MASK);
+
+	switch (clk_sel) {
+	case UART0_CLK_SEL_UART0:
+		return clk;
+	case UART0_CLK_SEL_UART0_NP5:{
+			u32 clk_divnp5_div_con;
+
+			clk_divnp5_div_con =
+			    bitfield_extract_by_mask(con, UART0_DIVNP5_MASK);
+			return 2 * (u64) clk / (2 * clk_divnp5_div_con + 3);
+		}
+	case UART0_CLK_SEL_UART0_FRAC:{
+			u32 fracdiv, n, m;
+
+			fracdiv = readl(&pmucru->pmu_clksel_con[5]);
+			n = bitfield_extract_by_mask(fracdiv,
+						     CLK_UART_FRAC_NUMERATOR_MASK);
+			m = bitfield_extract_by_mask(fracdiv,
+						     CLK_UART_FRAC_DENOMINATOR_MASK);
+			return (u64) clk * n / m;
+		}
+	default:
+		return -ENOENT;
+	}
+}
+
+static ulong px30_pmu_uart0_set_clk(struct px30_pmuclk_priv *priv, ulong rate)
+{
+	struct px30_pmucru *pmucru = priv->pmucru;
+	ulong m = 0, n = 0;
+	ulong gpll_rate;
+	u32 clk_div_con;
+	u32 clk_pll_sel;
+	u32 clk_sel;
+
+	gpll_rate = px30_pmuclk_get_gpll_rate(priv);
+	if (gpll_rate % rate == 0) {
+		clk_pll_sel = UART0_PLL_SEL_GPLL;
+		clk_sel = UART0_CLK_SEL_UART0;
+		clk_div_con = DIV_ROUND_UP(priv->gpll_hz, rate);
+	} else if (rate == OSC_HZ) {
+		clk_pll_sel = UART0_PLL_SEL_24M;
+		clk_sel = UART0_CLK_SEL_UART0;
+		clk_div_con = 1;
+	} else {
+		clk_pll_sel = UART0_PLL_SEL_GPLL;
+		clk_sel = UART0_CLK_SEL_UART0_FRAC;
+		clk_div_con = 1;
+		rational_best_approximation(rate, priv->gpll_hz,
+					    GENMASK(16 - 1, 0),
+					    GENMASK(16 - 1, 0), &m, &n);
+	}
+
+	rk_clrsetreg(&pmucru->pmu_clksel_con[3],
+		     UART0_PLL_SEL_MASK | UART0_DIV_CON_MASK,
+		     clk_pll_sel << UART0_PLL_SEL_SHIFT | (clk_div_con - 1));
+	rk_clrsetreg(&pmucru->pmu_clksel_con[4], UART0_CLK_SEL_MASK,
+		     clk_sel << UART0_CLK_SEL_SHIFT);
+	if (m && n) {
+		u32 fracdiv;
+
+		fracdiv = m << CLK_UART_FRAC_NUMERATOR_SHIFT | n;
+		writel(fracdiv, &pmucru->pmu_clksel_con[5]);
+	}
+
+	return px30_pmu_uart0_get_clk(priv);
+}
+
 static ulong px30_pmuclk_get_rate(struct clk *clk)
 {
 	struct px30_pmuclk_priv *priv = dev_get_priv(clk->dev);
@@ -1561,6 +1699,9 @@ static ulong px30_pmuclk_get_rate(struct clk *clk)
 		break;
 	case PCLK_PMU_PRE:
 		rate = px30_pclk_pmu_get_pmuclk(priv);
+		break;
+	case SCLK_UART0_PMU:
+		rate = px30_pmu_uart0_get_clk(priv);
 		break;
 	default:
 		return -ENOENT;
@@ -1581,6 +1722,9 @@ static ulong px30_pmuclk_set_rate(struct clk *clk, ulong rate)
 		break;
 	case PCLK_PMU_PRE:
 		ret = px30_pclk_pmu_set_pmuclk(priv, rate);
+		break;
+	case SCLK_UART0_PMU:
+		ret = px30_pmu_uart0_set_clk(priv, rate);
 		break;
 	default:
 		return -ENOENT;

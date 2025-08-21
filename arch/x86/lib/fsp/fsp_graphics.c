@@ -5,11 +5,10 @@
 
 #define LOG_CATEGORY UCLASS_VIDEO
 
-#include <common.h>
 #include <dm.h>
 #include <init.h>
 #include <log.h>
-#include <vbe.h>
+#include <vesa.h>
 #include <video.h>
 #include <acpi/acpi_table.h>
 #include <asm/fsp/fsp_support.h>
@@ -87,7 +86,7 @@ static int fsp_video_probe(struct udevice *dev)
 	int ret;
 
 	if (!ll_boot_init())
-		return 0;
+		return -ENODEV;
 
 	printf("Video: ");
 
@@ -104,14 +103,12 @@ static int fsp_video_probe(struct udevice *dev)
 	 * For IGD, it seems to be always on BAR2.
 	 */
 	vesa->phys_base_ptr = dm_pci_read_bar32(dev, 2);
-	gd->fb_base = vesa->phys_base_ptr;
 
-	ret = vbe_setup_video_priv(vesa, uc_priv, plat);
+	ret = vesa_setup_video_priv(vesa, vesa->phys_base_ptr, uc_priv, plat);
 	if (ret)
 		goto err;
 
-	mtrr_add_request(MTRR_TYPE_WRCOMB, vesa->phys_base_ptr, 256 << 20);
-	mtrr_commit(true);
+	mtrr_set_next_var(MTRR_TYPE_WRCOMB, vesa->phys_base_ptr, 256 << 20);
 
 	printf("%dx%dx%d @ %x\n", uc_priv->xsize, uc_priv->ysize,
 	       vesa->bits_per_pixel, vesa->phys_base_ptr);

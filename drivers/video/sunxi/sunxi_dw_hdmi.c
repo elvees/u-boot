@@ -5,22 +5,26 @@
  * (C) Copyright 2017 Jernej Skrabec <jernej.skrabec@siol.net>
  */
 
-#include <common.h>
+#include <clk.h>
 #include <display.h>
 #include <dm.h>
 #include <dw_hdmi.h>
 #include <edid.h>
 #include <log.h>
+#include <reset.h>
 #include <time.h>
 #include <asm/io.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/lcdc.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
+#include <power/regulator.h>
 
 struct sunxi_dw_hdmi_priv {
 	struct dw_hdmi hdmi;
-	int mux;
+	struct reset_ctl_bulk resets;
+	struct clk_bulk clocks;
+	struct udevice *hvcc;
 };
 
 struct sunxi_hdmi_phy {
@@ -57,10 +61,10 @@ static int sunxi_dw_hdmi_get_divider(uint clock)
 		return 1;
 }
 
-static void sunxi_dw_hdmi_phy_init(void)
+static void sunxi_dw_hdmi_phy_init(struct dw_hdmi *hdmi)
 {
 	struct sunxi_hdmi_phy * const phy =
-		(struct sunxi_hdmi_phy *)(SUNXI_HDMI_BASE + HDMI_PHY_OFFS);
+		(struct sunxi_hdmi_phy *)(hdmi->ioaddr + HDMI_PHY_OFFS);
 	unsigned long tmo;
 	u32 tmp;
 
@@ -114,32 +118,10 @@ static void sunxi_dw_hdmi_phy_init(void)
 	writel(0x42494E47, &phy->unscramble);
 }
 
-static int sunxi_dw_hdmi_get_plug_in_status(void)
+static void sunxi_dw_hdmi_phy_set(struct dw_hdmi *hdmi, uint clock, int phy_div)
 {
 	struct sunxi_hdmi_phy * const phy =
-		(struct sunxi_hdmi_phy *)(SUNXI_HDMI_BASE + HDMI_PHY_OFFS);
-
-	return !!(readl(&phy->status) & (1 << 19));
-}
-
-static int sunxi_dw_hdmi_wait_for_hpd(void)
-{
-	ulong start;
-
-	start = get_timer(0);
-	do {
-		if (sunxi_dw_hdmi_get_plug_in_status())
-			return 0;
-		udelay(100);
-	} while (get_timer(start) < 300);
-
-	return -1;
-}
-
-static void sunxi_dw_hdmi_phy_set(uint clock, int phy_div)
-{
-	struct sunxi_hdmi_phy * const phy =
-		(struct sunxi_hdmi_phy *)(SUNXI_HDMI_BASE + HDMI_PHY_OFFS);
+		(struct sunxi_hdmi_phy *)(hdmi->ioaddr + HDMI_PHY_OFFS);
 	int div = sunxi_dw_hdmi_get_divider(clock);
 	u32 tmp;
 
@@ -293,7 +275,7 @@ static int sunxi_dw_hdmi_phy_cfg(struct dw_hdmi *hdmi, uint mpixelclock)
 	int phy_div;
 
 	sunxi_dw_hdmi_pll_set(mpixelclock / 1000, &phy_div);
-	sunxi_dw_hdmi_phy_set(mpixelclock, phy_div);
+	sunxi_dw_hdmi_phy_set(hdmi, mpixelclock, phy_div);
 
 	return 0;
 }
@@ -305,19 +287,26 @@ static int sunxi_dw_hdmi_read_edid(struct udevice *dev, u8 *buf, int buf_size)
 	return dw_hdmi_read_edid(&priv->hdmi, buf, buf_size);
 }
 
+static bool sunxi_dw_hdmi_mode_valid(struct udevice *dev,
+				     const struct display_timing *timing)
+{
+	return timing->pixelclock.typ <= 297000000;
+}
+
 static int sunxi_dw_hdmi_enable(struct udevice *dev, int panel_bpp,
 				const struct display_timing *edid)
 {
-	struct sunxi_hdmi_phy * const phy =
-		(struct sunxi_hdmi_phy *)(SUNXI_HDMI_BASE + HDMI_PHY_OFFS);
 	struct sunxi_dw_hdmi_priv *priv = dev_get_priv(dev);
+	struct sunxi_hdmi_phy * const phy =
+		(struct sunxi_hdmi_phy *)(priv->hdmi.ioaddr + HDMI_PHY_OFFS);
+	struct display_plat *uc_plat = dev_get_uclass_plat(dev);
 	int ret;
 
 	ret = dw_hdmi_enable(&priv->hdmi, edid);
 	if (ret)
 		return ret;
 
-	sunxi_dw_hdmi_lcdc_init(priv->mux, edid, panel_bpp);
+	sunxi_dw_hdmi_lcdc_init(uc_plat->source_id, edid, panel_bpp);
 
 	if (edid->flags & DISPLAY_FLAGS_VSYNC_LOW)
 		setbits_le32(&phy->pol, 0x200);
@@ -332,7 +321,7 @@ static int sunxi_dw_hdmi_enable(struct udevice *dev, int panel_bpp,
 	 * again or othwerwise BSP driver won't work. Dummy read is
 	 * needed or otherwise last write doesn't get written correctly.
 	 */
-	(void)readb(SUNXI_HDMI_BASE);
+	(void)readb(priv->hdmi.ioaddr);
 	writel(0, &phy->unscramble);
 
 	return 0;
@@ -340,11 +329,13 @@ static int sunxi_dw_hdmi_enable(struct udevice *dev, int panel_bpp,
 
 static int sunxi_dw_hdmi_probe(struct udevice *dev)
 {
-	struct display_plat *uc_plat = dev_get_uclass_plat(dev);
 	struct sunxi_dw_hdmi_priv *priv = dev_get_priv(dev);
 	struct sunxi_ccm_reg * const ccm =
 		(struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
 	int ret;
+
+	if (priv->hvcc)
+		regulator_set_enable(priv->hvcc, true);
 
 	/* Set pll3 to 297 MHz */
 	clock_set_pll3(297000000);
@@ -353,34 +344,55 @@ static int sunxi_dw_hdmi_probe(struct udevice *dev)
 	clrsetbits_le32(&ccm->hdmi_clk_cfg, CCM_HDMI_CTRL_PLL_MASK,
 			CCM_HDMI_CTRL_PLL3);
 
-	/* Set ahb gating to pass */
-	setbits_le32(&ccm->ahb_reset1_cfg, 1 << AHB_RESET_OFFSET_HDMI);
+	/* This reset is referenced from the PHY devicetree node. */
 	setbits_le32(&ccm->ahb_reset1_cfg, 1 << AHB_RESET_OFFSET_HDMI2);
-	setbits_le32(&ccm->ahb_gate1, 1 << AHB_GATE_OFFSET_HDMI);
-	setbits_le32(&ccm->hdmi_slow_clk_cfg, CCM_HDMI_SLOW_CTRL_DDC_GATE);
 
-	/* Clock on */
-	setbits_le32(&ccm->hdmi_clk_cfg, CCM_HDMI_CTRL_GATE);
+	ret = reset_deassert_bulk(&priv->resets);
+	if (ret)
+		return ret;
 
-	sunxi_dw_hdmi_phy_init();
+	ret = clk_enable_bulk(&priv->clocks);
+	if (ret)
+		return ret;
 
-	ret = sunxi_dw_hdmi_wait_for_hpd();
-	if (ret < 0) {
-		debug("hdmi can not get hpd signal\n");
-		return -1;
-	}
+	sunxi_dw_hdmi_phy_init(&priv->hdmi);
 
-	priv->hdmi.ioaddr = SUNXI_HDMI_BASE;
-	priv->hdmi.i2c_clk_high = 0xd8;
-	priv->hdmi.i2c_clk_low = 0xfe;
-	priv->hdmi.reg_io_width = 1;
-	priv->hdmi.phy_set = sunxi_dw_hdmi_phy_cfg;
-	priv->mux = uc_plat->source_id;
-
-	uclass_get_device_by_phandle(UCLASS_I2C, dev, "ddc-i2c-bus",
-				     &priv->hdmi.ddc_bus);
+	ret = dw_hdmi_detect_hpd(&priv->hdmi);
+	if (ret < 0)
+		return ret;
 
 	dw_hdmi_init(&priv->hdmi);
+
+	return 0;
+}
+
+static const struct dw_hdmi_phy_ops dw_hdmi_sunxi_phy_ops = {
+	.phy_set = sunxi_dw_hdmi_phy_cfg,
+};
+
+static int sunxi_dw_hdmi_of_to_plat(struct udevice *dev)
+{
+	struct sunxi_dw_hdmi_priv *priv = dev_get_priv(dev);
+	struct dw_hdmi *hdmi = &priv->hdmi;
+	int ret;
+
+	hdmi->ioaddr = (ulong)dev_read_addr(dev);
+	hdmi->i2c_clk_high = 0xd8;
+	hdmi->i2c_clk_low = 0xfe;
+	hdmi->reg_io_width = 1;
+	hdmi->ops = &dw_hdmi_sunxi_phy_ops;
+
+	ret = reset_get_bulk(dev, &priv->resets);
+	if (ret)
+		return ret;
+
+	ret = clk_get_bulk(dev, &priv->clocks);
+	if (ret)
+		return ret;
+
+	ret = device_get_supply_regulator(dev, "hvcc-supply", &priv->hvcc);
+	if (ret)
+		priv->hvcc = NULL;
 
 	return 0;
 }
@@ -388,16 +400,20 @@ static int sunxi_dw_hdmi_probe(struct udevice *dev)
 static const struct dm_display_ops sunxi_dw_hdmi_ops = {
 	.read_edid = sunxi_dw_hdmi_read_edid,
 	.enable = sunxi_dw_hdmi_enable,
+	.mode_valid = sunxi_dw_hdmi_mode_valid,
+};
+
+static const struct udevice_id sunxi_dw_hdmi_ids[] = {
+	{ .compatible = "allwinner,sun8i-a83t-dw-hdmi" },
+	{ }
 };
 
 U_BOOT_DRIVER(sunxi_dw_hdmi) = {
-	.name	= "sunxi_dw_hdmi",
-	.id	= UCLASS_DISPLAY,
-	.ops	= &sunxi_dw_hdmi_ops,
-	.probe	= sunxi_dw_hdmi_probe,
+	.name		= "sunxi_dw_hdmi",
+	.id		= UCLASS_DISPLAY,
+	.of_match	= sunxi_dw_hdmi_ids,
+	.probe		= sunxi_dw_hdmi_probe,
+	.of_to_plat	= sunxi_dw_hdmi_of_to_plat,
 	.priv_auto	= sizeof(struct sunxi_dw_hdmi_priv),
-};
-
-U_BOOT_DRVINFO(sunxi_dw_hdmi) = {
-	.name = "sunxi_dw_hdmi"
+	.ops		= &sunxi_dw_hdmi_ops,
 };

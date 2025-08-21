@@ -3,7 +3,6 @@
  * (C) Copyright 2013-2016 Freescale Semiconductor, Inc.
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <watchdog.h>
@@ -69,7 +68,6 @@ static int _linflex_serial_getc(struct linflex_fsl *base)
 static int _linflex_serial_putc(struct linflex_fsl *base, const char c)
 {
 	__raw_writeb(c, &base->bdrl);
-
 
 	if (!(__raw_readb(&base->uartsr) & UARTSR_DTF))
 		return -EAGAIN;
@@ -198,17 +196,16 @@ U_BOOT_DRIVER(serial_linflex) = {
 
 #include <debug_uart.h>
 
-
 static inline void _debug_uart_init(void)
 {
-	struct linflex_fsl *base = (struct linflex_fsl *)CONFIG_DEBUG_UART_BASE;
+	struct linflex_fsl *base = (struct linflex_fsl *)CONFIG_VAL(DEBUG_UART_BASE);
 
 	linflex_serial_init_internal(base);
 }
 
 static inline void _debug_uart_putc(int ch)
 {
-	struct linflex_fsl *base = (struct linflex_fsl *)CONFIG_DEBUG_UART_BASE;
+	struct linflex_fsl *base = (struct linflex_fsl *)CONFIG_VAL(DEBUG_UART_BASE);
 
 	/* XXX: Is this OK? Should this use the non-DM version? */
 	_linflex_serial_putc(base, ch);

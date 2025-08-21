@@ -125,7 +125,6 @@
  */
 #define CP0_TX39_CACHE	$7
 
-
 /* Generic EntryLo bit definitions */
 #define ENTRYLO_G		(_ULCAST_(1) << 0)
 #define ENTRYLO_V		(_ULCAST_(1) << 1)
@@ -987,7 +986,6 @@
 #define CP1_FENR	$28
 #define CP1_STATUS	$31
 
-
 /*
  * Bits in the MIPS32/64 coprocessor 1 (FPU) revision register.
  */
@@ -1101,7 +1099,6 @@
 #define FPU_CSR_RZ	0x1	/* towards zero */
 #define FPU_CSR_RU	0x2	/* towards +Infinity */
 #define FPU_CSR_RD	0x3	/* towards -Infinity */
-
 
 #ifndef __ASSEMBLY__
 
@@ -1261,7 +1258,6 @@ static inline void tlbinvf(void)
 		".set pop");
 }
 
-
 /*
  * Functions to access the R10000 performance counters.	 These are basically
  * mfc0 and mtc0 instructions from and to coprocessor register with a 5-bit
@@ -1306,7 +1302,6 @@ do {								\
 	:							\
 	: "r" (val), "i" (counter));				\
 } while (0)
-
 
 /*
  * Macros to access the system control coprocessor
@@ -2307,8 +2302,8 @@ do {									\
 	"	.set " MIPS_ISA_LEVEL "				\n"	\
 	"	.set dsp					\n"	\
 	"	mflo %0, $ac0					\n"	\
-	"	.set pop					\n" 	\
-	: "=r" (mflo0)); 						\
+	"	.set pop					\n"	\
+	: "=r" (mflo0));						\
 	mflo0;								\
 })
 
@@ -2320,8 +2315,8 @@ do {									\
 	"	.set " MIPS_ISA_LEVEL "				\n"	\
 	"	.set dsp					\n"	\
 	"	mflo %0, $ac1					\n"	\
-	"	.set pop					\n" 	\
-	: "=r" (mflo1)); 						\
+	"	.set pop					\n"	\
+	: "=r" (mflo1));						\
 	mflo1;								\
 })
 
@@ -2333,8 +2328,8 @@ do {									\
 	"	.set " MIPS_ISA_LEVEL "				\n"	\
 	"	.set dsp					\n"	\
 	"	mflo %0, $ac2					\n"	\
-	"	.set pop					\n" 	\
-	: "=r" (mflo2)); 						\
+	"	.set pop					\n"	\
+	: "=r" (mflo2));						\
 	mflo2;								\
 })
 
@@ -2346,8 +2341,8 @@ do {									\
 	"	.set " MIPS_ISA_LEVEL "				\n"	\
 	"	.set dsp					\n"	\
 	"	mflo %0, $ac3					\n"	\
-	"	.set pop					\n" 	\
-	: "=r" (mflo3)); 						\
+	"	.set pop					\n"	\
+	: "=r" (mflo3));						\
 	mflo3;								\
 })
 
@@ -2359,8 +2354,8 @@ do {									\
 	"	.set " MIPS_ISA_LEVEL "				\n"	\
 	"	.set dsp					\n"	\
 	"	mfhi %0, $ac0					\n"	\
-	"	.set pop					\n" 	\
-	: "=r" (mfhi0)); 						\
+	"	.set pop					\n"	\
+	: "=r" (mfhi0));						\
 	mfhi0;								\
 })
 
@@ -2372,8 +2367,8 @@ do {									\
 	"	.set " MIPS_ISA_LEVEL "				\n"	\
 	"	.set dsp					\n"	\
 	"	mfhi %0, $ac1					\n"	\
-	"	.set pop					\n" 	\
-	: "=r" (mfhi1)); 						\
+	"	.set pop					\n"	\
+	: "=r" (mfhi1));						\
 	mfhi1;								\
 })
 
@@ -2385,8 +2380,8 @@ do {									\
 	"	.set " MIPS_ISA_LEVEL "				\n"	\
 	"	.set dsp					\n"	\
 	"	mfhi %0, $ac2					\n"	\
-	"	.set pop					\n" 	\
-	: "=r" (mfhi2)); 						\
+	"	.set pop					\n"	\
+	: "=r" (mfhi2));						\
 	mfhi2;								\
 })
 
@@ -2398,11 +2393,10 @@ do {									\
 	"	.set " MIPS_ISA_LEVEL "				\n"	\
 	"	.set dsp					\n"	\
 	"	mfhi %0, $ac3					\n"	\
-	"	.set pop					\n" 	\
-	: "=r" (mfhi3)); 						\
+	"	.set pop					\n"	\
+	: "=r" (mfhi3));						\
 	mfhi3;								\
 })
-
 
 #define mtlo0(x)							\
 ({									\

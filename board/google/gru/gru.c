@@ -3,11 +3,11 @@
  * Copyright 2018 Google
  */
 
-#include <common.h>
 #include <dm.h>
 #include <init.h>
+#include <asm/arch-rockchip/clock.h>
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 /* provided to defeat compiler optimisation in board_init_f() */
 void gru_dummy_function(int i)
 {
@@ -15,7 +15,7 @@ void gru_dummy_function(int i)
 
 int board_early_init_f(void)
 {
-# ifdef CONFIG_TARGET_CHROMEBOOK_BOB
+# if defined(CONFIG_TARGET_CHROMEBOOK_BOB) || defined(CONFIG_TARGET_CHROMEBOOK_KEVIN)
 	int sum, i;
 
 	/*
@@ -33,7 +33,7 @@ int board_early_init_f(void)
 }
 #endif
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 int board_early_init_r(void)
 {
 	struct udevice *clk;

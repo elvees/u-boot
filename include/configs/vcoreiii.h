@@ -10,44 +10,22 @@
 
 /* Onboard devices */
 
-#define CONFIG_SYS_MALLOC_LEN		0x1F0000
-#define CONFIG_SYS_LOAD_ADDR		0x00100000
-#define CONFIG_SYS_INIT_SP_OFFSET       0x400000
+#define CFG_SYS_INIT_SP_OFFSET       0x400000
 
-#if defined(CONFIG_SOC_LUTON) || defined(CONFIG_SOC_SERVAL)
-#define CPU_CLOCK_RATE			416666666 /* Clock for the MIPS core */
-#define CONFIG_SYS_MIPS_TIMER_FREQ	208333333
-#else
-#define CPU_CLOCK_RATE			500000000 /* Clock for the MIPS core */
-#define CONFIG_SYS_MIPS_TIMER_FREQ	(CPU_CLOCK_RATE / 2)
-#endif
-#define CONFIG_SYS_NS16550_CLK		CONFIG_SYS_MIPS_TIMER_FREQ
+#define CFG_SYS_NS16550_CLK		CONFIG_SYS_MIPS_TIMER_FREQ
 
-#define CONFIG_SYS_SDRAM_BASE		0x80000000
+#define CFG_SYS_SDRAM_BASE		0x80000000
 #if defined(CONFIG_DDRTYPE_H5TQ1G63BFA) || defined(CONFIG_DDRTYPE_MT47H128M8HQ)
-#define CONFIG_SYS_SDRAM_SIZE		(128 * SZ_1M)
+#define CFG_SYS_SDRAM_SIZE		(128 * SZ_1M)
 #elif defined(CONFIG_DDRTYPE_MT41J128M16HA) || defined(CONFIG_DDRTYPE_MT41K128M16JT)
-#define CONFIG_SYS_SDRAM_SIZE		(256 * SZ_1M)
+#define CFG_SYS_SDRAM_SIZE		(256 * SZ_1M)
 #elif defined(CONFIG_DDRTYPE_H5TQ4G63MFR) || defined(CONFIG_DDRTYPE_MT41K256M16)
-#define CONFIG_SYS_SDRAM_SIZE		(512 * SZ_1M)
+#define CFG_SYS_SDRAM_SIZE		(512 * SZ_1M)
 #else
 #error Unknown DDR size - please add!
 #endif
 
-#define CONFIG_SYS_MONITOR_BASE         CONFIG_SYS_TEXT_BASE
-
-#if defined(CONFIG_MTDIDS_DEFAULT) && defined(CONFIG_MTDPARTS_DEFAULT)
-#define VCOREIII_DEFAULT_MTD_ENV		    \
-	"mtdparts="CONFIG_MTDPARTS_DEFAULT"\0"	    \
-	"mtdids="CONFIG_MTDIDS_DEFAULT"\0"
-#else
-#define VCOREIII_DEFAULT_MTD_ENV    /* Go away */
-#endif
-
-#define CONFIG_SYS_BOOTM_LEN      (16 << 20)      /* Increase max gunzip size */
-
-#define CONFIG_EXTRA_ENV_SETTINGS					\
-	VCOREIII_DEFAULT_MTD_ENV					\
+#define CFG_EXTRA_ENV_SETTINGS					\
 	"loadaddr=0x81000000\0"						\
 	"spi_image_off=0x00100000\0"					\
 	"console=ttyS0,115200\0"					\

@@ -6,8 +6,8 @@
  */
 #include <cpu_func.h>
 #include <asm/cache.h>
+#include <linux/errno.h>
 #include <linux/types.h>
-#include <common.h>
 #include <asm/armv7.h>
 #include <asm/utils.h>
 
@@ -176,9 +176,6 @@ void mmu_page_table_flush(unsigned long start, unsigned long stop)
 {
 }
 
-void arm_init_domains(void)
-{
-}
 #endif /* #if !CONFIG_IS_ENABLED(SYS_DCACHE_OFF) */
 
 #if !CONFIG_IS_ENABLED(SYS_ICACHE_OFF)
@@ -213,3 +210,8 @@ __weak void v7_outer_cache_flush_all(void) {}
 __weak void v7_outer_cache_inval_all(void) {}
 __weak void v7_outer_cache_flush_range(u32 start, u32 end) {}
 __weak void v7_outer_cache_inval_range(u32 start, u32 end) {}
+
+int __weak pgprot_set_attrs(phys_addr_t addr, size_t size, enum pgprot_attrs perm)
+{
+	return -ENOSYS;
+}

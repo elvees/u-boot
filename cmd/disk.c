@@ -3,7 +3,6 @@
  * (C) Copyright 2000-2011
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  */
-#include <common.h>
 #include <bootstage.h>
 #include <command.h>
 #include <cpu_func.h>
@@ -20,7 +19,7 @@ int common_diskboot(struct cmd_tbl *cmdtp, const char *intf, int argc,
 	ulong cnt;
 	struct disk_partition info;
 #if defined(CONFIG_LEGACY_IMAGE_FORMAT)
-	image_header_t *hdr;
+	struct legacy_img_hdr *hdr;
 #endif
 	struct blk_desc *dev_desc;
 
@@ -36,12 +35,12 @@ int common_diskboot(struct cmd_tbl *cmdtp, const char *intf, int argc,
 	bootstage_mark(BOOTSTAGE_ID_IDE_ADDR);
 
 	if (argc > 1)
-		addr = simple_strtoul(argv[1], NULL, 16);
+		addr = hextoul(argv[1], NULL);
 
 	bootstage_mark(BOOTSTAGE_ID_IDE_BOOT_DEVICE);
 
-	part = blk_get_device_part_str(intf, (argc == 3) ? argv[2] : NULL,
-					&dev_desc, &info, 1);
+	part = blk_get_device_part_str(intf, cmd_arg2(argc, argv),
+				       &dev_desc, &info, 1);
 	if (part < 0) {
 		bootstage_error(BOOTSTAGE_ID_IDE_TYPE);
 		return 1;
@@ -68,7 +67,7 @@ int common_diskboot(struct cmd_tbl *cmdtp, const char *intf, int argc,
 	switch (genimg_get_format((void *) addr)) {
 #if defined(CONFIG_LEGACY_IMAGE_FORMAT)
 	case IMAGE_FORMAT_LEGACY:
-		hdr = (image_header_t *) addr;
+		hdr = (struct legacy_img_hdr *)addr;
 
 		bootstage_mark(BOOTSTAGE_ID_IDE_FORMAT);
 

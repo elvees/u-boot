@@ -10,7 +10,6 @@
 
 #define LOG_CATEGORY UCLASS_SPI
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <malloc.h>
@@ -23,10 +22,6 @@
 #include <asm/state.h>
 #include <dm/acpi.h>
 #include <dm/device-internal.h>
-
-#ifndef CONFIG_SPI_IDLE_VAL
-# define CONFIG_SPI_IDLE_VAL 0xFF
-#endif
 
 /**
  * struct sandbox_spi_priv - Sandbox SPI private data

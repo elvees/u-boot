@@ -2,18 +2,16 @@
 /*
  * Board specific initialization for AM654 EVM
  *
- * Copyright (C) 2017-2018 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2017-2018 Texas Instruments Incorporated - https://www.ti.com/
  *	Lokesh Vutla <lokeshvutla@ti.com>
  *
  */
 
-#include <common.h>
 #include <dm.h>
 #include <fdt_support.h>
 #include <image.h>
 #include <init.h>
 #include <net.h>
-#include <asm/arch/sys_proto.h>
 #include <asm/arch/hardware.h>
 #include <asm/global_data.h>
 #include <asm/gpio.h>
@@ -21,9 +19,11 @@
 #include <asm/omap_common.h>
 #include <env.h>
 #include <spl.h>
-#include <asm/arch/sys_proto.h>
+#include <linux/printk.h>
+#include <asm/arch/k3-ddr.h>
 
 #include "../common/board_detect.h"
+#include "../common/fdt_ops.h"
 
 #define board_is_am65x_base_board()	board_ti_is("AM6-COMPROCEVM")
 
@@ -50,18 +50,7 @@ int board_init(void)
 	return 0;
 }
 
-int dram_init(void)
-{
-#ifdef CONFIG_PHYS_64BIT
-	gd->ram_size = 0x100000000;
-#else
-	gd->ram_size = 0x80000000;
-#endif
-
-	return 0;
-}
-
-ulong board_get_usable_ram_top(ulong total_size)
+phys_addr_t board_get_usable_ram_top(phys_size_t total_size)
 {
 #ifdef CONFIG_PHYS_64BIT
 	/* Limit RAM used by U-Boot to the DDR low region */
@@ -72,63 +61,22 @@ ulong board_get_usable_ram_top(ulong total_size)
 	return gd->ram_top;
 }
 
-int dram_init_banksize(void)
-{
-	/* Bank 0 declares the memory available in the DDR low region */
-	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
-	gd->bd->bi_dram[0].size = 0x80000000;
-	gd->ram_size = 0x80000000;
-
-#ifdef CONFIG_PHYS_64BIT
-	/* Bank 1 declares the memory available in the DDR high region */
-	gd->bd->bi_dram[1].start = CONFIG_SYS_SDRAM_BASE1;
-	gd->bd->bi_dram[1].size = 0x80000000;
-	gd->ram_size = 0x100000000;
-#endif
-
-	return 0;
-}
-
 #ifdef CONFIG_SPL_LOAD_FIT
 int board_fit_config_name_match(const char *name)
 {
-#ifdef CONFIG_TARGET_AM654_A53_EVM
-	if (!strcmp(name, "k3-am654-base-board"))
+	if (IS_ENABLED(CONFIG_TI_ICSSG_PRUETH) &&
+	    strcmp(name, "k3-am654-icssg2") == 0)
 		return 0;
-#endif
+
+	if (IS_ENABLED(CONFIG_TARGET_AM654_A53_EVM) &&
+	    strcmp(name, "k3-am654-base-board") == 0)
+		return 0;
 
 	return -1;
 }
 #endif
 
-#if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)
-int ft_board_setup(void *blob, struct bd_info *bd)
-{
-	int ret;
-
-	ret = fdt_fixup_msmc_ram(blob, "/bus@100000", "sram@70000000");
-	if (ret < 0)
-		ret = fdt_fixup_msmc_ram(blob, "/interconnect@100000",
-					 "sram@70000000");
-	if (ret) {
-		printf("%s: fixing up msmc ram failed %d\n", __func__, ret);
-		return ret;
-	}
-
-#if defined(CONFIG_TI_SECURE_DEVICE)
-	/* Make Crypto HW reserved for secure world use */
-	ret = fdt_disable_node(blob, "/bus@100000/crypto@4e00000");
-	if (ret < 0)
-		ret = fdt_disable_node(blob,
-				       "/interconnect@100000/crypto@4E00000");
-	if (ret)
-		printf("%s: disabling SA2UL failed %d\n", __func__, ret);
-#endif
-
-	return 0;
-}
-#endif
-
+#ifdef CONFIG_TI_I2C_BOARD_DETECT
 int do_board_detect(void)
 {
 	int ret;
@@ -170,6 +118,7 @@ static void setup_board_eeprom_env(void)
 
 invalid_eeprom:
 	set_board_info_env_am6(name);
+	ti_set_fdt_env(NULL, NULL);
 }
 
 static int init_daughtercard_det_gpio(char *gpio_name, struct gpio_desc *desc)
@@ -353,23 +302,26 @@ static int probe_daughtercards(void)
 
 	return 0;
 }
+#endif
 
 int board_late_init(void)
 {
-	struct ti_am6_eeprom *ep = TI_AM6_EEPROM_DATA;
+	if (IS_ENABLED(CONFIG_TI_I2C_BOARD_DETECT)) {
+		struct ti_am6_eeprom *ep = TI_AM6_EEPROM_DATA;
 
-	setup_board_eeprom_env();
+		setup_board_eeprom_env();
 
-	/*
-	 * The first MAC address for ethernet a.k.a. ethernet0 comes from
-	 * efuse populated via the am654 gigabit eth switch subsystem driver.
-	 * All the other ones are populated via EEPROM, hence continue with
-	 * an index of 1.
-	 */
-	board_ti_am6_set_ethaddr(1, ep->mac_addr_cnt);
+		/*
+		 * The first MAC address for ethernet a.k.a. ethernet0 comes from
+		 * efuse populated via the am654 gigabit eth switch subsystem driver.
+		 * All the other ones are populated via EEPROM, hence continue with
+		 * an index of 1.
+		 */
+		board_ti_am6_set_ethaddr(1, ep->mac_addr_cnt);
 
-	/* Check for and probe any plugged-in daughtercards */
-	probe_daughtercards();
+		/* Check for and probe any plugged-in daughtercards */
+		probe_daughtercards();
+	}
 
 	return 0;
 }

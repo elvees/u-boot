@@ -180,114 +180,118 @@ static const struct mtk_pin_desc mt7629_pins[] = {
  */
 
 /* WF 5G */
-static int mt7629_wf0_5g_pins[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, };
-static int mt7629_wf0_5g_funcs[] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, };
+static const int mt7629_wf0_5g_pins[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, };
+static const int mt7629_wf0_5g_funcs[] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, };
 
 /* LED for EPHY */
-static int mt7629_ephy_leds_pins[] = { 12, 13, 14, 15, 16, 17, 18, };
-static int mt7629_ephy_leds_funcs[] = { 1, 1, 1, 1, 1, 1, 1, };
-static int mt7629_ephy_led0_pins[] = { 12, };
-static int mt7629_ephy_led0_funcs[] = { 1, };
-static int mt7629_ephy_led1_pins[] = { 13, };
-static int mt7629_ephy_led1_funcs[] = { 1, };
-static int mt7629_ephy_led2_pins[] = { 14, };
-static int mt7629_ephy_led2_funcs[] = { 1, };
-static int mt7629_ephy_led3_pins[] = { 15, };
-static int mt7629_ephy_led3_funcs[] = { 1, };
-static int mt7629_ephy_led4_pins[] = { 16, };
-static int mt7629_ephy_led4_funcs[] = { 1, };
-static int mt7629_wf2g_led_pins[] = { 17, };
-static int mt7629_wf2g_led_funcs[] = { 1, };
-static int mt7629_wf5g_led_pins[] = { 18, };
-static int mt7629_wf5g_led_funcs[] = { 1, };
+static const int mt7629_ephy_leds_pins[] = { 12, 13, 14, 15, 16, 17, 18, };
+static const int mt7629_ephy_leds_funcs[] = { 1, 1, 1, 1, 1, 1, 1, };
+static const int mt7629_ephy_led0_pins[] = { 12, };
+static const int mt7629_ephy_led0_funcs[] = { 1, };
+static const int mt7629_ephy_led1_pins[] = { 13, };
+static const int mt7629_ephy_led1_funcs[] = { 1, };
+static const int mt7629_ephy_led2_pins[] = { 14, };
+static const int mt7629_ephy_led2_funcs[] = { 1, };
+static const int mt7629_ephy_led3_pins[] = { 15, };
+static const int mt7629_ephy_led3_funcs[] = { 1, };
+static const int mt7629_ephy_led4_pins[] = { 16, };
+static const int mt7629_ephy_led4_funcs[] = { 1, };
+static const int mt7629_wf2g_led_pins[] = { 17, };
+static const int mt7629_wf2g_led_funcs[] = { 1, };
+static const int mt7629_wf5g_led_pins[] = { 18, };
+static const int mt7629_wf5g_led_funcs[] = { 1, };
+
+/* LED for EPHY used as JTAG */
+static const int mt7629_ephy_leds_jtag_pins[] = { 12, 13, 14, 15, 16, };
+static const int mt7629_ephy_leds_jtag_funcs[] = { 7, 7, 7, 7, 7, };
 
 /* Watchdog */
-static int mt7629_watchdog_pins[] = { 11, };
-static int mt7629_watchdog_funcs[] = { 1, };
+static const int mt7629_watchdog_pins[] = { 11, };
+static const int mt7629_watchdog_funcs[] = { 1, };
 
 /* LED for GPHY */
-static int mt7629_gphy_leds_0_pins[] = { 21, 22, 23, };
-static int mt7629_gphy_leds_0_funcs[] = { 2, 2, 2, };
-static int mt7629_gphy_led1_0_pins[] = { 21, };
-static int mt7629_gphy_led1_0_funcs[] = { 2, };
-static int mt7629_gphy_led2_0_pins[] = { 22, };
-static int mt7629_gphy_led2_0_funcs[] = { 2, };
-static int mt7629_gphy_led3_0_pins[] = { 23, };
-static int mt7629_gphy_led3_0_funcs[] = { 2, };
-static int mt7629_gphy_leds_1_pins[] = { 57, 58, 59, };
-static int mt7629_gphy_leds_1_funcs[] = { 1, 1, 1, };
-static int mt7629_gphy_led1_1_pins[] = { 57, };
-static int mt7629_gphy_led1_1_funcs[] = { 1, };
-static int mt7629_gphy_led2_1_pins[] = { 58, };
-static int mt7629_gphy_led2_1_funcs[] = { 1, };
-static int mt7629_gphy_led3_1_pins[] = { 59, };
-static int mt7629_gphy_led3_1_funcs[] = { 1, };
+static const int mt7629_gphy_leds_0_pins[] = { 21, 22, 23, };
+static const int mt7629_gphy_leds_0_funcs[] = { 2, 2, 2, };
+static const int mt7629_gphy_led1_0_pins[] = { 21, };
+static const int mt7629_gphy_led1_0_funcs[] = { 2, };
+static const int mt7629_gphy_led2_0_pins[] = { 22, };
+static const int mt7629_gphy_led2_0_funcs[] = { 2, };
+static const int mt7629_gphy_led3_0_pins[] = { 23, };
+static const int mt7629_gphy_led3_0_funcs[] = { 2, };
+static const int mt7629_gphy_leds_1_pins[] = { 57, 58, 59, };
+static const int mt7629_gphy_leds_1_funcs[] = { 1, 1, 1, };
+static const int mt7629_gphy_led1_1_pins[] = { 57, };
+static const int mt7629_gphy_led1_1_funcs[] = { 1, };
+static const int mt7629_gphy_led2_1_pins[] = { 58, };
+static const int mt7629_gphy_led2_1_funcs[] = { 1, };
+static const int mt7629_gphy_led3_1_pins[] = { 59, };
+static const int mt7629_gphy_led3_1_funcs[] = { 1, };
 
 /* I2C */
-static int mt7629_i2c_0_pins[] = { 19, 20, };
-static int mt7629_i2c_0_funcs[] = { 1, 1, };
-static int mt7629_i2c_1_pins[] = { 53, 54, };
-static int mt7629_i2c_1_funcs[] = { 1, 1, };
+static const int mt7629_i2c_0_pins[] = { 19, 20, };
+static const int mt7629_i2c_0_funcs[] = { 1, 1, };
+static const int mt7629_i2c_1_pins[] = { 53, 54, };
+static const int mt7629_i2c_1_funcs[] = { 1, 1, };
 
 /* SPI */
-static int mt7629_spi_0_pins[] = { 21, 22, 23, 24, };
-static int mt7629_spi_0_funcs[] = { 1, 1, 1, 1, };
-static int mt7629_spi_1_pins[] = { 62, 63, 64, 65, };
-static int mt7629_spi_1_funcs[] = { 1, 1, 1, 1, };
-static int mt7629_spi_wp_pins[] = { 66, };
-static int mt7629_spi_wp_funcs[] = { 1, };
-static int mt7629_spi_hold_pins[] = { 67, };
-static int mt7629_spi_hold_funcs[] = { 1, };
+static const int mt7629_spi_0_pins[] = { 21, 22, 23, 24, };
+static const int mt7629_spi_0_funcs[] = { 1, 1, 1, 1, };
+static const int mt7629_spi_1_pins[] = { 62, 63, 64, 65, };
+static const int mt7629_spi_1_funcs[] = { 1, 1, 1, 1, };
+static const int mt7629_spi_wp_pins[] = { 66, };
+static const int mt7629_spi_wp_funcs[] = { 1, };
+static const int mt7629_spi_hold_pins[] = { 67, };
+static const int mt7629_spi_hold_funcs[] = { 1, };
 
 /* UART */
-static int mt7629_uart1_0_txd_rxd_pins[] = { 25, 26, };
-static int mt7629_uart1_0_txd_rxd_funcs[] = { 1, 1, };
-static int mt7629_uart1_1_txd_rxd_pins[] = { 53, 54, };
-static int mt7629_uart1_1_txd_rxd_funcs[] = { 2, 2, };
-static int mt7629_uart2_0_txd_rxd_pins[] = { 29, 30, };
-static int mt7629_uart2_0_txd_rxd_funcs[] = { 1, 1, };
-static int mt7629_uart2_1_txd_rxd_pins[] = { 57, 58, };
-static int mt7629_uart2_1_txd_rxd_funcs[] = { 2, 2, };
-static int mt7629_uart1_0_cts_rts_pins[] = { 27, 28, };
-static int mt7629_uart1_0_cts_rts_funcs[] = { 1, 1, };
-static int mt7629_uart1_1_cts_rts_pins[] = { 55, 56, };
-static int mt7629_uart1_1_cts_rts_funcs[] = { 2, 2, };
-static int mt7629_uart2_0_cts_rts_pins[] = { 31, 32, };
-static int mt7629_uart2_0_cts_rts_funcs[] = { 1, 1, };
-static int mt7629_uart2_1_cts_rts_pins[] = { 59, 60, };
-static int mt7629_uart2_1_cts_rts_funcs[] = { 2, 2, };
-static int mt7629_uart0_txd_rxd_pins[] = { 68, 69, };
-static int mt7629_uart0_txd_rxd_funcs[] = { 1, 1, };
+static const int mt7629_uart1_0_txd_rxd_pins[] = { 25, 26, };
+static const int mt7629_uart1_0_txd_rxd_funcs[] = { 1, 1, };
+static const int mt7629_uart1_1_txd_rxd_pins[] = { 53, 54, };
+static const int mt7629_uart1_1_txd_rxd_funcs[] = { 2, 2, };
+static const int mt7629_uart2_0_txd_rxd_pins[] = { 29, 30, };
+static const int mt7629_uart2_0_txd_rxd_funcs[] = { 1, 1, };
+static const int mt7629_uart2_1_txd_rxd_pins[] = { 57, 58, };
+static const int mt7629_uart2_1_txd_rxd_funcs[] = { 2, 2, };
+static const int mt7629_uart1_0_cts_rts_pins[] = { 27, 28, };
+static const int mt7629_uart1_0_cts_rts_funcs[] = { 1, 1, };
+static const int mt7629_uart1_1_cts_rts_pins[] = { 55, 56, };
+static const int mt7629_uart1_1_cts_rts_funcs[] = { 2, 2, };
+static const int mt7629_uart2_0_cts_rts_pins[] = { 31, 32, };
+static const int mt7629_uart2_0_cts_rts_funcs[] = { 1, 1, };
+static const int mt7629_uart2_1_cts_rts_pins[] = { 59, 60, };
+static const int mt7629_uart2_1_cts_rts_funcs[] = { 2, 2, };
+static const int mt7629_uart0_txd_rxd_pins[] = { 68, 69, };
+static const int mt7629_uart0_txd_rxd_funcs[] = { 1, 1, };
 
 /* MDC/MDIO */
-static int mt7629_mdc_mdio_pins[] = { 49, 50, };
-static int mt7629_mdc_mdio_funcs[] = { 1, 1, };
+static const int mt7629_mdc_mdio_pins[] = { 49, 50, };
+static const int mt7629_mdc_mdio_funcs[] = { 1, 1, };
 
 /* PCIE */
-static int mt7629_pcie_pereset_pins[] = { 51, };
-static int mt7629_pcie_pereset_funcs[] = { 1, };
-static int mt7629_pcie_wake_pins[] = { 55, };
-static int mt7629_pcie_wake_funcs[] = { 1, };
-static int mt7629_pcie_clkreq_pins[] = { 56, };
-static int mt7629_pcie_clkreq_funcs[] = { 1, };
+static const int mt7629_pcie_pereset_pins[] = { 51, };
+static const int mt7629_pcie_pereset_funcs[] = { 1, };
+static const int mt7629_pcie_wake_pins[] = { 55, };
+static const int mt7629_pcie_wake_funcs[] = { 1, };
+static const int mt7629_pcie_clkreq_pins[] = { 56, };
+static const int mt7629_pcie_clkreq_funcs[] = { 1, };
 
 /* PWM */
-static int mt7629_pwm_0_pins[] = { 52, };
-static int mt7629_pwm_0_funcs[] = { 1, };
-static int mt7629_pwm_1_pins[] = { 61, };
-static int mt7629_pwm_1_funcs[] = { 2, };
+static const int mt7629_pwm_0_pins[] = { 52, };
+static const int mt7629_pwm_0_funcs[] = { 1, };
+static const int mt7629_pwm_1_pins[] = { 61, };
+static const int mt7629_pwm_1_funcs[] = { 2, };
 
 /* WF 2G */
-static int mt7629_wf0_2g_pins[] = { 70, 71, 72, 73, 74, 75, 76, 77, 78, };
-static int mt7629_wf0_2g_funcs[] = { 1, 1, 1, 1, 1, 1, 1, 1, };
+static const int mt7629_wf0_2g_pins[] = { 70, 71, 72, 73, 74, 75, 76, 77, 78, };
+static const int mt7629_wf0_2g_funcs[] = { 1, 1, 1, 1, 1, 1, 1, 1, };
 
 /* SNFI */
-static int mt7629_snfi_pins[] = { 62, 63, 64, 65, 66, 67 };
-static int mt7629_snfi_funcs[] = { 2, 2, 2, 2, 2, 2 };
+static const int mt7629_snfi_pins[] = { 62, 63, 64, 65, 66, 67 };
+static const int mt7629_snfi_funcs[] = { 2, 2, 2, 2, 2, 2 };
 
 /* SPI NOR */
-static int mt7629_snor_pins[] = { 62, 63, 64, 65, 66, 67 };
-static int mt7629_snor_funcs[] = { 1, 1, 1, 1, 1, 1 };
+static const int mt7629_snor_pins[] = { 62, 63, 64, 65, 66, 67 };
+static const int mt7629_snor_funcs[] = { 1, 1, 1, 1, 1, 1 };
 
 static const struct mtk_group_desc mt7629_groups[] = {
 	PINCTRL_PIN_GROUP("wf0_5g", mt7629_wf0_5g),
@@ -297,6 +301,7 @@ static const struct mtk_group_desc mt7629_groups[] = {
 	PINCTRL_PIN_GROUP("ephy_led2", mt7629_ephy_led2),
 	PINCTRL_PIN_GROUP("ephy_led3", mt7629_ephy_led3),
 	PINCTRL_PIN_GROUP("ephy_led4", mt7629_ephy_led4),
+	PINCTRL_PIN_GROUP("ephy_leds_jtag", mt7629_ephy_leds_jtag),
 	PINCTRL_PIN_GROUP("wf2g_led", mt7629_wf2g_led),
 	PINCTRL_PIN_GROUP("wf5g_led", mt7629_wf5g_led),
 	PINCTRL_PIN_GROUP("watchdog", mt7629_watchdog),
@@ -364,6 +369,7 @@ static const char *const mt7629_uart_groups[] = { "uart1_0_txd_rxd",
 static const char *const mt7629_wdt_groups[] = { "watchdog", };
 static const char *const mt7629_wifi_groups[] = { "wf0_5g", "wf0_2g", };
 static const char *const mt7629_flash_groups[] = { "snfi", "spi_nor" };
+static const char *const mt7629_jtag_groups[] = { "ephy_leds_jtag" };
 
 static const struct mtk_function_desc mt7629_functions[] = {
 	{"eth",	mt7629_ethernet_groups, ARRAY_SIZE(mt7629_ethernet_groups)},
@@ -376,9 +382,10 @@ static const struct mtk_function_desc mt7629_functions[] = {
 	{"watchdog", mt7629_wdt_groups, ARRAY_SIZE(mt7629_wdt_groups)},
 	{"wifi", mt7629_wifi_groups, ARRAY_SIZE(mt7629_wifi_groups)},
 	{"flash", mt7629_flash_groups, ARRAY_SIZE(mt7629_flash_groups)},
+	{"jtag", mt7629_jtag_groups, ARRAY_SIZE(mt7629_jtag_groups)},
 };
 
-static struct mtk_pinctrl_soc mt7629_data = {
+static const struct mtk_pinctrl_soc mt7629_data = {
 	.name = "mt7629_pinctrl",
 	.reg_cal = mt7629_reg_cals,
 	.pins = mt7629_pins,
@@ -406,6 +413,7 @@ U_BOOT_DRIVER(mt7629_pinctrl) = {
 	.id = UCLASS_PINCTRL,
 	.of_match = mt7629_pctrl_match,
 	.ops = &mtk_pinctrl_ops,
+	.bind = mtk_pinctrl_common_bind,
 	.probe = mtk_pinctrl_mt7629_probe,
 	.priv_auto	= sizeof(struct mtk_pinctrl_priv),
 };

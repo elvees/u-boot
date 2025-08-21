@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2013 Freescale Semiconductor, Inc.
+ * Copyright 2021 NXP
  */
 
-#include <common.h>
+#include <config.h>
 #include <i2c.h>
 #include <hwconfig.h>
 #include <init.h>
@@ -83,6 +84,7 @@ found:
 	/* optimize cpo for erratum A-009942 */
 	popts->cpo_sample = 0x59;
 #else
+	popts->cpo_sample = 0x54;
 	popts->half_strength_driver_enable = 0;
 #endif
 	/*
@@ -113,7 +115,7 @@ found:
 #if defined(CONFIG_DEEP_SLEEP)
 void board_mem_sleep_setup(void)
 {
-	void __iomem *cpld_base = (void *)CONFIG_SYS_CPLD_BASE;
+	void __iomem *cpld_base = (void *)CFG_SYS_CPLD_BASE;
 
 	/* does not provide HW signals for power management */
 	clrbits_8(cpld_base + 0x17, 0x40);
@@ -127,7 +129,7 @@ int dram_init(void)
 {
 	phys_size_t dram_size;
 
-#if defined(CONFIG_SPL_BUILD) || !defined(CONFIG_RAMBOOT_PBL)
+#if defined(CONFIG_XPL_BUILD) || !defined(CONFIG_RAMBOOT_PBL)
 	puts("Initializing....using SPD\n");
 	dram_size = fsl_ddr_sdram();
 #else
@@ -136,7 +138,7 @@ int dram_init(void)
 	dram_size = setup_ddr_tlbs(dram_size / 0x100000);
 	dram_size *= 0x100000;
 
-#if defined(CONFIG_DEEP_SLEEP) && !defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_DEEP_SLEEP) && !defined(CONFIG_XPL_BUILD)
 	fsl_dp_resume();
 #endif
 

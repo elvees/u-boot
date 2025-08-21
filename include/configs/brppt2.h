@@ -13,33 +13,19 @@
 
 /* -- i.mx6 specifica -- */
 #ifndef CONFIG_SYS_L2CACHE_OFF
-#define CONFIG_SYS_L2_PL310
-#define CONFIG_SYS_PL310_BASE		L2_PL310_BASE
+#define CFG_SYS_PL310_BASE		L2_PL310_BASE
 #endif /* !CONFIG_SYS_L2CACHE_OFF */
 
-#define CONFIG_BOARD_POSTCLK_INIT
-#define CONFIG_MXC_GPT_HCLK
-
-#define CONFIG_LOADADDR			0x10700000
-#define CONFIG_SYS_LOAD_ADDR		CONFIG_LOADADDR
-
 /* MMC */
-#define CONFIG_FSL_USDHC
 
 /* Boot */
-#define CONFIG_CMDLINE_TAG
-#define CONFIG_SETUP_MEMORY_TAGS
-#define CONFIG_INITRD_TAG
-#define CONFIG_MACH_TYPE		0xFFFFFFFF
 
 /* misc */
-#define CONFIG_SYS_MALLOC_LEN		(10 * 1024 * 1024)
 
 /* Environment */
 
-#define CONFIG_EXTRA_ENV_SETTINGS \
+#define CFG_EXTRA_ENV_SETTINGS \
 BUR_COMMON_ENV \
-"autoload=0\0" \
 "cfgaddr=0x106F0000\0" \
 "scraddr=0x10700000\0" \
 "loadaddr=0x10800000\0" \
@@ -78,7 +64,6 @@ BUR_COMMON_ENV \
 " do echo \"### booting ${target} ###\"; run b_${target};" \
 " if test ${b_break} = 1; then; exit; fi; done\0" \
 "loaddev=mmc 0\0" \
-"altbootcmd=setenv b_mode 0; run b_default;\0" \
 "bootlimit=1\0" \
 "net2nor=sf probe && dhcp &&" \
 " tftp ${loadaddr} SPL && sf erase 0 +${filesize} &&" \
@@ -88,27 +73,8 @@ BUR_COMMON_ENV \
 
 /* RAM */
 #define PHYS_SDRAM_1			MMDC0_ARB_BASE_ADDR
-#define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM_1
-#define CONFIG_SYS_INIT_RAM_ADDR	IRAM_BASE_ADDR
-#define CONFIG_SYS_INIT_RAM_SIZE	IRAM_SIZE
-#define CONFIG_SYS_INIT_SP_OFFSET \
-	(CONFIG_SYS_INIT_RAM_SIZE - GENERATED_GBL_DATA_SIZE)
-#define CONFIG_SYS_INIT_SP_ADDR \
-	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
+#define CFG_SYS_SDRAM_BASE		PHYS_SDRAM_1
+#define CFG_SYS_INIT_RAM_ADDR	IRAM_BASE_ADDR
+#define CFG_SYS_INIT_RAM_SIZE	IRAM_SIZE
 
-/* Ethernet */
-#define CONFIG_MII
-#define CONFIG_FEC_XCV_TYPE		RGMII
-#define CONFIG_FEC_FIXED_SPEED		_1000BASET
-#define CONFIG_ARP_TIMEOUT		1500UL
-
-/* USB Configs */
-#define CONFIG_EHCI_HCD_INIT_AFTER_RESET
-#define CONFIG_MXC_USB_PORTSC		(PORT_PTS_UTMI | PORT_PTS_PTW)
-
-/* SPL */
-#ifdef CONFIG_SPL
-#include "imx6_spl.h"
-
-#endif	/* CONFIG_SPL */
 #endif	/* __CONFIG_BRPP2_IMX6_H */

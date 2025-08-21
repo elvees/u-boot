@@ -11,6 +11,7 @@
  * is used to align DMA buffers.
  */
 #ifndef __ASSEMBLY__
+#include <linux/kernel.h>
 #include <asm/cache.h>
 #include <malloc.h>
 
@@ -103,7 +104,7 @@
  *
  * @size:	Minimum number of bytes to allocate
  *
- * @return pointer to new memory region, or NULL if there is no more memory
+ * Return: pointer to new memory region, or NULL if there is no more memory
  * available.
  */
 static inline void *malloc_cache_aligned(size_t size)

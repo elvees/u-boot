@@ -4,7 +4,7 @@
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  */
 
-#include <common.h>
+#include <clock_legacy.h>
 #include <bootstage.h>
 #include <dm.h>
 #include <errno.h>
@@ -17,28 +17,29 @@
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <linux/delay.h>
+#include <uthread.h>
 
-#ifndef CONFIG_WD_PERIOD
-# define CONFIG_WD_PERIOD	(10 * 1000 * 1000)	/* 10 seconds default */
+#ifndef CFG_WD_PERIOD
+# define CFG_WD_PERIOD	(10 * 1000 * 1000)	/* 10 seconds default */
 #endif
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#ifdef CONFIG_SYS_TIMER_RATE
+#ifdef CFG_SYS_TIMER_RATE
 /* Returns tick rate in ticks per second */
 ulong notrace get_tbclk(void)
 {
-	return CONFIG_SYS_TIMER_RATE;
+	return CFG_SYS_TIMER_RATE;
 }
 #endif
 
-#ifdef CONFIG_SYS_TIMER_COUNTER
+#ifdef CFG_SYS_TIMER_COUNTER
 unsigned long notrace timer_read_counter(void)
 {
 #ifdef CONFIG_SYS_TIMER_COUNTS_DOWN
-	return ~readl(CONFIG_SYS_TIMER_COUNTER);
+	return ~readl(CFG_SYS_TIMER_COUNTER);
 #else
-	return readl(CONFIG_SYS_TIMER_COUNTER);
+	return readl(CFG_SYS_TIMER_COUNTER);
 #endif
 }
 
@@ -46,12 +47,15 @@ ulong timer_get_boot_us(void)
 {
 	ulong count = timer_read_counter();
 
-#if CONFIG_SYS_TIMER_RATE == 1000000
-	return count;
-#elif CONFIG_SYS_TIMER_RATE > 1000000
-	return lldiv(count, CONFIG_SYS_TIMER_RATE / 1000000);
-#elif defined(CONFIG_SYS_TIMER_RATE)
-	return (unsigned long long)count * 1000000 / CONFIG_SYS_TIMER_RATE;
+#ifdef CFG_SYS_TIMER_RATE
+	const ulong timer_rate = CFG_SYS_TIMER_RATE;
+
+	if (timer_rate == 1000000)
+		return count;
+	else if (timer_rate > 1000000)
+		return lldiv(count, timer_rate / 1000000);
+	else
+		return (unsigned long long)count * 1000000 / timer_rate;
 #else
 	/* Assume the counter is in microseconds */
 	return count;
@@ -59,22 +63,21 @@ ulong timer_get_boot_us(void)
 }
 
 #else
-extern unsigned long __weak timer_read_counter(void);
+extern unsigned long timer_read_counter(void);
 #endif
 
 #if CONFIG_IS_ENABLED(TIMER)
 ulong notrace get_tbclk(void)
 {
 	if (!gd->timer) {
-#ifdef CONFIG_TIMER_EARLY
-		return timer_early_get_rate();
-#else
 		int ret;
+
+		if (IS_ENABLED(CONFIG_TIMER_EARLY))
+			return timer_early_get_rate();
 
 		ret = dm_timer_init();
 		if (ret)
 			return ret;
-#endif
 	}
 
 	return timer_get_rate(gd->timer);
@@ -86,20 +89,19 @@ uint64_t notrace get_ticks(void)
 	int ret;
 
 	if (!gd->timer) {
-#ifdef CONFIG_TIMER_EARLY
-		return timer_early_get_count();
-#else
 		int ret;
+
+		if (IS_ENABLED(CONFIG_TIMER_EARLY))
+			return timer_early_get_count();
 
 		ret = dm_timer_init();
 		if (ret)
 			panic("Could not initialize timer (err %d)\n", ret);
-#endif
 	}
 
 	ret = timer_get_count(gd->timer, &count);
 	if (ret) {
-		if (spl_phase() > PHASE_TPL)
+		if (xpl_phase() > PHASE_TPL)
 			panic("Could not read count from timer (err %d)\n",
 			      ret);
 		else
@@ -194,9 +196,15 @@ void udelay(unsigned long usec)
 	ulong kv;
 
 	do {
-		WATCHDOG_RESET();
-		kv = usec > CONFIG_WD_PERIOD ? CONFIG_WD_PERIOD : usec;
-		__udelay(kv);
+		schedule();
+		kv = usec > CFG_WD_PERIOD ? CFG_WD_PERIOD : usec;
+		if (CONFIG_IS_ENABLED(UTHREAD)) {
+			ulong t0 = timer_get_us();
+			while (timer_get_us() - t0 < kv)
+				uthread_schedule();
+		} else {
+			__udelay(kv);
+		}
 		usec -= kv;
 	} while(usec);
 }

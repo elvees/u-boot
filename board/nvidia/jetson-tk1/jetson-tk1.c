@@ -4,9 +4,9 @@
  * NVIDIA Corporation <www.nvidia.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
+#include <linux/printk.h>
 #include <power/as3722.h>
 #include <power/pmic.h>
 

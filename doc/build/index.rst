@@ -9,4 +9,9 @@ Build U-Boot
    source
    gcc
    clang
+   reproducible
+   docker
    tools
+   buildman
+   documentation
+   gen_compile_commands

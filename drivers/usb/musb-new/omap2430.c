@@ -8,7 +8,6 @@
  *
  * This file is part of the Inventra Controller Driver for Linux.
  */
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <serial.h>
@@ -16,12 +15,12 @@
 #include <dm/device_compat.h>
 #include <dm/lists.h>
 #include <linux/err.h>
+#include <linux/printk.h>
 #include <linux/usb/otg.h>
 #include <asm/global_data.h>
 #include <asm/omap_common.h>
 #include <asm/omap_musb.h>
 #include <twl4030.h>
-#include <twl6030.h>
 #include "linux-compat.h"
 #include "musb_core.h"
 #include "omap2430.h"
@@ -45,7 +44,6 @@ static inline void omap2430_low_level_init(struct musb *musb)
 	l &= ~ENABLEFORCE;	/* disable MSTANDBY */
 	musb_writel(musb->mregs, OTG_FORCESTDBY, l);
 }
-
 
 static int omap2430_musb_init(struct musb *musb)
 {
@@ -105,17 +103,6 @@ static int omap2430_musb_enable(struct musb *musb)
 				__PRETTY_FUNCTION__);
 	}
 #endif
-
-#ifdef CONFIG_TWL6030_POWER
-	twl6030_usb_device_settings();
-#endif
-
-#ifdef CONFIG_OMAP44XX
-	u32 *usbotghs_control = (u32 *)((*ctrl)->control_usbotghs_ctrl);
-	*usbotghs_control = USBOTGHS_CONTROL_AVALID |
-		USBOTGHS_CONTROL_VBUSVALID | USBOTGHS_CONTROL_IDDIG;
-#endif
-
 	return 0;
 }
 
@@ -214,37 +201,45 @@ static int omap2430_musb_of_to_plat(struct udevice *dev)
 
 static int omap2430_musb_probe(struct udevice *dev)
 {
-#ifdef CONFIG_USB_MUSB_HOST
-	struct musb_host_data *host = dev_get_priv(dev);
-#else
-	struct musb *musbp;
-#endif
 	struct omap2430_musb_plat *plat = dev_get_plat(dev);
-	struct usb_bus_priv *priv = dev_get_uclass_priv(dev);
 	struct omap_musb_board_data *otg_board_data;
 	int ret = 0;
 	void *base = dev_read_addr_ptr(dev);
-
-	priv->desc_before_addr = true;
+	struct musb *musbp;
 
 	otg_board_data = &plat->otg_board_data;
 
-#ifdef CONFIG_USB_MUSB_HOST
-	host->host = musb_init_controller(&plat->plat,
-					  (struct device *)otg_board_data,
-					  plat->base);
-	if (!host->host) {
-		return -EIO;
+	if (IS_ENABLED(CONFIG_USB_MUSB_HOST)) {
+		struct musb_host_data *host = dev_get_priv(dev);
+		struct usb_bus_priv *priv = dev_get_uclass_priv(dev);
+
+		priv->desc_before_addr = true;
+
+		host->host = musb_init_controller(&plat->plat,
+						  (struct device *)otg_board_data,
+						  plat->base);
+		if (!host->host)
+			return -EIO;
+
+		return musb_lowlevel_init(host);
+	} else if (CONFIG_IS_ENABLED(DM_USB_GADGET)) {
+		struct musb_host_data *host = dev_get_priv(dev);
+
+		host->host = musb_init_controller(&plat->plat,
+						  (struct device *)otg_board_data,
+						  plat->base);
+		if (!host->host)
+			return -EIO;
+
+		return usb_add_gadget_udc((struct device *)otg_board_data, &host->host->g);
 	}
 
-	ret = musb_lowlevel_init(host);
-#else
 	musbp = musb_register(&plat->plat, (struct device *)otg_board_data,
 			      plat->base);
 	if (IS_ERR_OR_NULL(musbp))
 		return -EINVAL;
-#endif
-	return ret;
+
+	return 0;
 }
 
 static int omap2430_musb_remove(struct udevice *dev)
@@ -255,6 +250,21 @@ static int omap2430_musb_remove(struct udevice *dev)
 
 	return 0;
 }
+
+#ifndef CONFIG_USB_MUSB_HOST
+static int omap2340_gadget_handle_interrupts(struct udevice *dev)
+{
+	struct musb_host_data *host = dev_get_priv(dev);
+
+	host->host->isr(0, host->host);
+
+	return 0;
+}
+
+static const struct usb_gadget_generic_ops omap2340_gadget_ops = {
+	.handle_interrupts	= omap2340_gadget_handle_interrupts,
+};
+#endif
 
 static const struct udevice_id omap2430_musb_ids[] = {
 	{ .compatible = "ti,omap3-musb" },
@@ -268,6 +278,7 @@ U_BOOT_DRIVER(omap2430_musb) = {
 	.id		= UCLASS_USB,
 #else
 	.id		= UCLASS_USB_GADGET_GENERIC,
+	.ops		= &omap2340_gadget_ops,
 #endif
 	.of_match = omap2430_musb_ids,
 	.of_to_plat = omap2430_musb_of_to_plat,

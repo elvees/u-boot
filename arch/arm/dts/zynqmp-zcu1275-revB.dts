@@ -2,10 +2,10 @@
 /*
  * dts file for Xilinx ZynqMP ZCU1275 RevB
  *
- * (C) Copyright 2018 - 2020, Xilinx, Inc.
+ * (C) Copyright 2018 - 2021, Xilinx, Inc.
  *
- * Michal Simek <michal.simek@xilinx.com>
- * Siva Durga Prasad Paladugu <sivadur@xilinx.com>
+ * Michal Simek <michal.simek@amd.com>
+ * Siva Durga Prasad Paladugu <siva.durga.prasad.paladugu@amd.com>
  */
 
 /dts-v1/;
@@ -43,6 +43,7 @@
 
 &gem1 {
 	status = "okay";
+	phy-mode = "rgmii-id";
 	mdio {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -62,6 +63,10 @@
 			txd3-skew-ps = <900>; /* Skew control of TXD3 pad input */
 		};
 	};
+};
+
+&gpio {
+	status = "okay";
 };
 
 &qspi {

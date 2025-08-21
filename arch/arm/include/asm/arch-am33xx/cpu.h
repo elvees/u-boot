@@ -4,7 +4,7 @@
  *
  * AM33xx specific header file
  *
- * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
+ * Copyright (C) 2011, Texas Instruments, Incorporated - https://www.ti.com/
  */
 
 #ifndef _AM33XX_CPU_H
@@ -408,7 +408,7 @@ struct cm_dpll {
 	unsigned int resv1;
 	unsigned int clktimer2clk;	/* offset 0x04 */
 	unsigned int resv2[11];
-	unsigned int clkselmacclk;	/* offset 0x34 */ 
+	unsigned int clkselmacclk;	/* offset 0x34 */
 };
 #endif /* CONFIG_AM43XX */
 

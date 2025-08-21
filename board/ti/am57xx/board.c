@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com
+ * Copyright (C) 2014 Texas Instruments Incorporated - https://www.ti.com
  *
  * Author: Felipe Balbi <balbi@ti.com>
  *
  * Based on board/ti/dra7xx/evm.c
  */
 
-#include <common.h>
+#include <config.h>
 #include <env.h>
 #include <fastboot.h>
 #include <fdt_support.h>
-#include <image.h>
 #include <init.h>
 #include <malloc.h>
 #include <net.h>
@@ -22,7 +21,6 @@
 #include <errno.h>
 #include <asm/global_data.h>
 #include <asm/omap_common.h>
-#include <asm/omap_sec_common.h>
 #include <asm/emif.h>
 #include <asm/gpio.h>
 #include <asm/arch/gpio.h>
@@ -43,6 +41,7 @@
 #include <hang.h>
 
 #include "../common/board_detect.h"
+#include "../common/cape_detect.h"
 #include "mux_data.h"
 
 #ifdef CONFIG_SUPPORT_EMMC_BOOT
@@ -143,13 +142,13 @@ static const struct emif_regs beagle_x15_emif1_ddr3_532mhz_emif_regs = {
 	.read_idle_ctrl			= 0x00050000,
 	.zq_config			= 0x5007190b,
 	.temp_alert_config		= 0x00000000,
-	.emif_ddr_phy_ctlr_1_init 	= 0x0024400b,
+	.emif_ddr_phy_ctlr_1_init	= 0x0024400b,
 	.emif_ddr_phy_ctlr_1		= 0x0e24400b,
-	.emif_ddr_ext_phy_ctrl_1 	= 0x10040100,
-	.emif_ddr_ext_phy_ctrl_2 	= 0x00910091,
-	.emif_ddr_ext_phy_ctrl_3 	= 0x00950095,
-	.emif_ddr_ext_phy_ctrl_4 	= 0x009b009b,
-	.emif_ddr_ext_phy_ctrl_5 	= 0x009e009e,
+	.emif_ddr_ext_phy_ctrl_1	= 0x10040100,
+	.emif_ddr_ext_phy_ctrl_2	= 0x00910091,
+	.emif_ddr_ext_phy_ctrl_3	= 0x00950095,
+	.emif_ddr_ext_phy_ctrl_4	= 0x009b009b,
+	.emif_ddr_ext_phy_ctrl_5	= 0x009e009e,
 	.emif_rd_wr_lvl_rmp_win		= 0x00000000,
 	.emif_rd_wr_lvl_rmp_ctl		= 0x80000000,
 	.emif_rd_wr_lvl_ctl		= 0x00000000,
@@ -207,13 +206,13 @@ static const struct emif_regs beagle_x15_emif2_ddr3_532mhz_emif_regs = {
 	.read_idle_ctrl			= 0x00050000,
 	.zq_config			= 0x5007190b,
 	.temp_alert_config		= 0x00000000,
-	.emif_ddr_phy_ctlr_1_init 	= 0x0024400b,
+	.emif_ddr_phy_ctlr_1_init	= 0x0024400b,
 	.emif_ddr_phy_ctlr_1		= 0x0e24400b,
-	.emif_ddr_ext_phy_ctrl_1 	= 0x10040100,
-	.emif_ddr_ext_phy_ctrl_2 	= 0x00910091,
-	.emif_ddr_ext_phy_ctrl_3 	= 0x00950095,
-	.emif_ddr_ext_phy_ctrl_4 	= 0x009b009b,
-	.emif_ddr_ext_phy_ctrl_5 	= 0x009e009e,
+	.emif_ddr_ext_phy_ctrl_1	= 0x10040100,
+	.emif_ddr_ext_phy_ctrl_2	= 0x00910091,
+	.emif_ddr_ext_phy_ctrl_3	= 0x00950095,
+	.emif_ddr_ext_phy_ctrl_4	= 0x009b009b,
+	.emif_ddr_ext_phy_ctrl_5	= 0x009e009e,
 	.emif_rd_wr_lvl_rmp_win		= 0x00000000,
 	.emif_rd_wr_lvl_rmp_ctl		= 0x80000000,
 	.emif_rd_wr_lvl_ctl		= 0x00000000,
@@ -516,8 +515,7 @@ int get_voltrail_opp(int rail_offset)
 	return opp;
 }
 
-
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 /* No env to setup for SPL */
 static inline void setup_board_eeprom_env(void) { }
 
@@ -540,7 +538,7 @@ void do_board_detect(void)
 #endif
 }
 
-#else	/* CONFIG_SPL_BUILD */
+#else	/* CONFIG_XPL_BUILD */
 
 /* Override function to read eeprom information: actual i2c read done by SPL*/
 void do_board_detect(void)
@@ -618,7 +616,7 @@ invalid_eeprom:
 	set_board_info_env(name);
 }
 
-#endif	/* CONFIG_SPL_BUILD */
+#endif	/* CONFIG_XPL_BUILD */
 
 void vcores_init(void)
 {
@@ -660,7 +658,7 @@ bool am571x_idk_needs_lcd(void)
 int board_init(void)
 {
 	gpmc_init();
-	gd->bd->bi_boot_params = (CONFIG_SYS_SDRAM_BASE + 0x100);
+	gd->bd->bi_boot_params = (CFG_SYS_SDRAM_BASE + 0x100);
 
 	return 0;
 }
@@ -785,7 +783,7 @@ int board_late_init(void)
 	if (board_is_bbai())
 		env_set("console", "ttyS0,115200n8");
 
-#if !defined(CONFIG_SPL_BUILD)
+#if !defined(CONFIG_XPL_BUILD)
 	board_ti_set_ethaddr(2);
 #endif
 
@@ -937,7 +935,7 @@ const struct mmc_platform_fixups *platform_fixups_mmc(uint32_t addr)
 }
 #endif
 
-#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_OS_BOOT)
+#if defined(CONFIG_XPL_BUILD) && defined(CONFIG_SPL_OS_BOOT)
 int spl_start_uboot(void)
 {
 	/* break into full u-boot on 'c' */
@@ -1173,7 +1171,7 @@ int board_fit_config_name_match(const char *name)
 }
 #endif
 
-#if CONFIG_IS_ENABLED(FASTBOOT) && !CONFIG_IS_ENABLED(ENV_IS_NOWHERE)
+#if IS_ENABLED(CONFIG_FASTBOOT) && !CONFIG_IS_ENABLED(ENV_IS_NOWHERE)
 int fastboot_set_reboot_flag(enum fastboot_reboot_reason reason)
 {
 	if (reason != FASTBOOT_REBOOT_REASON_BOOTLOADER)
@@ -1195,18 +1193,4 @@ static int board_bootmode_has_emmc(void)
 
 	return 0;
 }
-#endif
-
-#ifdef CONFIG_TI_SECURE_DEVICE
-void board_fit_image_post_process(void **p_image, size_t *p_size)
-{
-	secure_boot_verify_image(p_image, p_size);
-}
-
-void board_tee_image_process(ulong tee_image, size_t tee_size)
-{
-	secure_tee_install((u32)tee_image);
-}
-
-U_BOOT_FIT_LOADABLE_HANDLER(IH_TYPE_TEE, board_tee_image_process);
 #endif

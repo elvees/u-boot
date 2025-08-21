@@ -585,7 +585,6 @@ struct esdc_regs {
 #define GET_PLL_MFI(x)		(((x) >> 10) & 0xf)
 #define GET_PLL_MFN(x)		(((x) >> 0) & 0x3ff)
 
-
 #define WEIM_ESDCTL0	0xB8001000
 #define WEIM_ESDCFG0	0xB8001004
 #define WEIM_ESDCTL1	0xB8001008
@@ -597,6 +596,18 @@ struct esdc_regs {
 #define UART3_BASE	0x5000C000
 #define UART4_BASE	0x43FB0000
 #define UART5_BASE	0x43FB4000
+
+#define UART_BASE_ADDR(n)	(			\
+	!!sizeof(struct {				\
+		static_assert((n) >= 1 && (n) <= 5);	\
+		int pad;				\
+		}) * (					\
+	(n) == 1 ? UART1_BASE :				\
+	(n) == 2 ? UART2_BASE :				\
+	(n) == 3 ? UART3_BASE :				\
+	(n) == 4 ? UART4_BASE :				\
+	UART5_BASE_ADDR)				\
+	)
 
 #define I2C1_BASE_ADDR          0x43f80000
 #define I2C1_CLK_OFFSET		26
@@ -765,7 +776,6 @@ struct esdc_regs {
 #define MUX_CTL_NFC_ALE		0xD6
 #define MUX_CTL_NFC_CLE		0xD7
 
-
 #define MUX_CTL_CAPTURE		0x150
 #define MUX_CTL_COMPARE		0x151
 
@@ -887,9 +897,9 @@ struct esdc_regs {
  * Generic timer support
  */
 #ifdef CONFIG_MX31_CLK32
-#define	CONFIG_SYS_TIMER_RATE	CONFIG_MX31_CLK32
+#define	CFG_SYS_TIMER_RATE	CONFIG_MX31_CLK32
 #else
-#define	CONFIG_SYS_TIMER_RATE	32768
+#define	CFG_SYS_TIMER_RATE	32768
 #endif
 
 #endif /* __ASM_ARCH_MX31_IMX_REGS_H */

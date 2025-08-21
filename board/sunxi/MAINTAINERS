@@ -132,6 +132,11 @@ M:	Paul Kocialkowski <contact@paulk.fr>
 S:	Maintained
 F:	configs/Ampe_A76_defconfig
 
+ANBERNIC RG35XX-2024
+M:	Chris Morgan <macromorgan@hotmail.com>
+S:	Maintained
+F:	configs/anbernic_rg35xx_h700_defconfig
+
 BANANAPI M1 PLUS
 M:	Jagan Teki <jagan@amarulasolutions.com>
 S:	Maintained
@@ -211,6 +216,11 @@ M:	Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
 S:	Maintained
 F:	configs/emlid_neutis_n5_devboard_defconfig
 
+LCTECH PI F1C200S
+M:	Andre Przywara <andre.przywara@arm.com>
+S:	Maintained
+F:	configs/lctech_pi_f1c200s_defconfig
+
 GEMEI-G9 TABLET
 M:	Priit Laes <plaes@plaes.org>
 S:	Maintained
@@ -230,6 +240,11 @@ ICnova-A20-SWAC BOARD
 M:	Stefan Roese <sr@denx.de>
 S:	Maintained
 F:	configs/icnova-a20-swac_defconfig
+
+ICnova-A20-ADB4006 BOARD
+M:	Ludwig Kormann <ludwig.kormann@ict42.de>
+S:	Maintained
+F:	configs/icnova-a20-adb4006_defconfig
 
 ITEAD IBOX BOARD
 M:	Marcus Cooper <codekipper@gmail.com>
@@ -266,6 +281,11 @@ M:	Icenowy Zheng <icenowy@aosc.xyz>
 S:	Maintained
 F:	configs/LicheePi_Zero_defconfig
 
+LICHEEPI NANO BOARD
+M:	Icenowy Zheng <icenowy@aosc.xyz>
+S:	Maintained
+F:	configs/licheepi_nano_defconfig
+
 LINKSPRITE-PCDUINO BOARD
 M:	Zoltan Herpai <wigyori@uid0.hu>
 S:	Maintained
@@ -280,6 +300,11 @@ MARSBOARD-A10 BOARD
 M:	Aleksei Mamlin <mamlinav@gmail.com>
 S:	Maintained
 F:	configs/Marsboard_A10_defconfig
+
+MANGOPI MQ-R BOARD
+M:	Andre Przywara <andre.przywara@arm.com>
+S:	Maintained
+F:	configs/mangopi_mq_r_defconfig
 
 MELE I7 BOARD
 M:	Marcus Cooper <codekipper@gmail.com>
@@ -328,6 +353,11 @@ M:	Chen-Yu Tsai <wens@csie.org>
 S:	Maintained
 F:	configs/libretech_all_h5_cc_h5_defconfig
 
+NANOPI DUO2 BOARD
+M:	Chuanhong Guo <gch981213@gmail.com>
+S:	Maintained
+F:	configs/nanopi_duo2_defconfig
+
 NANOPI-M1 BOARD
 M:	Mylène Josserand <mylene.josserand@free-electrons.com>
 S:	Maintained
@@ -357,6 +387,11 @@ NANOPI-NEO-AIR BOARD
 M:	Jelle van der Waa <jelle@vdwaa.nl>
 S:	Maintained
 F:	configs/nanopi_neo_air_defconfig
+
+NANOPI-R1S-H5 BOARD
+M:	Chukun Pan <amadeus@jmu.edu.cn>
+S:	Maintained
+F:	configs/nanopi_r1s_h5_defconfig
 
 NANOPI-A64 BOARD
 M:	Jagan Teki <jagan@amarulasolutions.com>
@@ -430,6 +465,16 @@ M:	Jernej Skrabec <jernej.skrabec@siol.net>
 S:	Maintained
 F:	configs/orangepi_zero2_defconfig
 
+ORANGEPI ZERO 2W BOARD
+M:	Andre Przywara <andre.przywara@arm.com>
+S:	Maintained
+F:	configs/orangepi_zero2w_defconfig
+
+ORANGEPI ZERO 3 BOARD
+M:	Andre Przywara <andre.przywara@arm.com>
+S:	Maintained
+F:	configs/orangepi_zero3_defconfig
+
 ORANGEPI PC 2 BOARD
 M:	Andre Przywara <andre.przywara@arm.com>
 S:	Maintained
@@ -471,6 +516,11 @@ M:	Samuel Holland <samuel@sholland.org>
 S:	Maintained
 F:	configs/pinephone_defconfig
 
+PINETAB BOARD
+M:	Arnaud Ferraris <arnaud.ferraris@collabora.com>
+S:	Maintained
+F:	configs/pinetab_defconfig
+
 R16 EVB PARROT BOARD
 M:	Quentin Schulz <quentin.schulz@free-electrons.com>
 S:	Maintained
@@ -504,6 +554,12 @@ S:	Maintained
 F:	configs/Sunchip_CX-A99_defconfig
 W:	https://linux-sunxi.org/Sunchip_CX-A99
 
+TANIX TX1 BOARD
+M:	Andre Przywara <andre.przywara@arm.com>
+S:	Maintained
+F:	configs/tanix_tx1_defconfig
+W:	https://linux-sunxi.org/Tanix_TX1
+
 TANIX TX6 BOARD
 M:	Jernej Skrabec <jernej.skrabec@siol.net>
 S:	Maintained
@@ -515,10 +571,20 @@ M:	Maxime Ripard <mripard@kernel.org>
 S:	Maintained
 F:	configs/tbs_a711_defconfig
 
+TRANSPEED 8K618-T BOARD
+M:	Nick Alilovic <nickalilovic@gmail.com>
+S:	Maintained
+F:	configs/transpeed-8k618-t_defconfig
+
 WEXLER-TAB7200 BOARD
 M:	Aleksei Mamlin <mamlinav@gmail.com>
 S:	Maintained
 F:	configs/Wexler_TAB7200_defconfig
+
+X96 MATE TV BOX
+M:	Andre Przywara <andre.przywara@arm.com>
+S:	Maintained
+F:	configs/x96_mate_defconfig
 
 YONES TOPTECH BD1078 BOARD
 M:	Paul Kocialkowski <contact@paulk.fr>
@@ -529,3 +595,9 @@ YONES TOPTECH BS1078 V2 BOARD
 M:	Peter Korsgaard <peter@korsgaard.com>
 S:	Maintained
 F:	configs/Yones_Toptech_BS1078_V2_defconfig
+
+ZEROPI BOARD
+M:	Yu-Tung Chang <mtwget@gmail.com>
+S:	Maintained
+F:	configs/zeropi_defconfig
+F:	arch/arm/dts/sun8i-h3-zeropi.dts

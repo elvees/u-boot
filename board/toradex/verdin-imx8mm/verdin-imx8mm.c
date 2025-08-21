@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2020 Toradex
+ * Copyright 2020-2021 Toradex
  */
 
-#include <common.h>
+#include <config.h>
 #include <init.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
+#include <hang.h>
 #include <i2c.h>
+#include <micrel.h>
 #include <miiphy.h>
 #include <netdev.h>
-#include <micrel.h>
 
 #include "../common/tdx-cfg-block.h"
 
@@ -34,70 +35,6 @@ static int setup_fec(void)
 	/* Use 125M anatop REF_CLK1 for ENET1, not from external */
 	clrsetbits_le32(&gpr->gpr[1], 0x2000, 0);
 
-	return 0;
-}
-
-int board_phy_config(struct phy_device *phydev)
-{
-	int tmp;
-
-	switch (ksz9xx1_phy_get_id(phydev) & MII_KSZ9x31_SILICON_REV_MASK) {
-	case PHY_ID_KSZ9031:
-		/*
-		 * The PHY adds 1.2ns for the RXC and 0ns for TXC clock by
-		 * default. The MAC and the layout don't add a skew between
-		 * clock and data.
-		 * Add 0.3ns for the RXC path and 0.96 + 0.42 ns (1.38 ns) for
-		 * the TXC path to get the required clock skews.
-		 */
-		/* control data pad skew - devaddr = 0x02, register = 0x04 */
-		ksz9031_phy_extended_write(phydev, 0x02,
-					   MII_KSZ9031_EXT_RGMII_CTRL_SIG_SKEW,
-					   MII_KSZ9031_MOD_DATA_NO_POST_INC,
-					   0x0070);
-		/* rx data pad skew - devaddr = 0x02, register = 0x05 */
-		ksz9031_phy_extended_write(phydev, 0x02,
-					   MII_KSZ9031_EXT_RGMII_RX_DATA_SKEW,
-					   MII_KSZ9031_MOD_DATA_NO_POST_INC,
-					   0x7777);
-		/* tx data pad skew - devaddr = 0x02, register = 0x06 */
-		ksz9031_phy_extended_write(phydev, 0x02,
-					   MII_KSZ9031_EXT_RGMII_TX_DATA_SKEW,
-					   MII_KSZ9031_MOD_DATA_NO_POST_INC,
-					   0x0000);
-		/* gtx and rx clock pad skew - devaddr = 0x02,register = 0x08 */
-		ksz9031_phy_extended_write(phydev, 0x02,
-					   MII_KSZ9031_EXT_RGMII_CLOCK_SKEW,
-					   MII_KSZ9031_MOD_DATA_NO_POST_INC,
-					   0x03f4);
-		break;
-	case PHY_ID_KSZ9131:
-	default:
-		/* read rxc dll control - devaddr = 0x2, register = 0x4c */
-		tmp = ksz9031_phy_extended_read(phydev, 0x02,
-					MII_KSZ9131_EXT_RGMII_2NS_SKEW_RXDLL,
-					MII_KSZ9031_MOD_DATA_NO_POST_INC);
-		/* disable rxdll bypass (enable 2ns skew delay on RXC) */
-		tmp &= ~MII_KSZ9131_RXTXDLL_BYPASS;
-		/* rxc data pad skew 2ns - devaddr = 0x02, register = 0x4c */
-		tmp = ksz9031_phy_extended_write(phydev, 0x02,
-					MII_KSZ9131_EXT_RGMII_2NS_SKEW_RXDLL,
-					MII_KSZ9031_MOD_DATA_NO_POST_INC, tmp);
-		/* read txc dll control - devaddr = 0x02, register = 0x4d */
-		tmp = ksz9031_phy_extended_read(phydev, 0x02,
-					MII_KSZ9131_EXT_RGMII_2NS_SKEW_TXDLL,
-					MII_KSZ9031_MOD_DATA_NO_POST_INC);
-		/* disable txdll bypass (enable 2ns skew delay on TXC) */
-		tmp &= ~MII_KSZ9131_RXTXDLL_BYPASS;
-		/* rxc data pad skew 2ns - devaddr = 0x02, register = 0x4d */
-		tmp = ksz9031_phy_extended_write(phydev, 0x02,
-					MII_KSZ9131_EXT_RGMII_2NS_SKEW_TXDLL,
-					MII_KSZ9031_MOD_DATA_NO_POST_INC, tmp);
-		break;
-	}
-
-	if (phydev->drv->config)
-		phydev->drv->config(phydev);
 	return 0;
 }
 #endif
@@ -146,31 +83,26 @@ static void select_dt_from_module_version(void)
 		 * device tree.
 		 */
 		is_wifi = (tdx_hw_tag.prodid == VERDIN_IMX8MMQ_WIFI_BT_IT) ||
-			  (tdx_hw_tag.prodid == VERDIN_IMX8MMDL_WIFI_BT_IT);
+			  (tdx_hw_tag.prodid == VERDIN_IMX8MMDL_WIFI_BT_IT) ||
+			  (tdx_hw_tag.prodid == VERDIN_IMX8MMQ_WIFI_BT_IT_NO_CAN) ||
+			  (tdx_hw_tag.prodid == VERDIN_IMX8MMQ_4G_WIFI_BT_ET);
 	}
 
 	switch (get_pcb_revision()) {
 	case PCB_VERSION_1_0:
-		printf("Detected a V1.0 module\n");
-		if (is_wifi)
-			strncpy(&variant[0], "wifi", sizeof(variant));
-		else
-			strncpy(&variant[0], "nonwifi", sizeof(variant));
-		break;
+		printf("Detected a V1.0 module which is no longer supported in this BSP version\n");
+		hang();
 	default:
 		if (is_wifi)
-			strncpy(&variant[0], "wifi-v1.1", sizeof(variant));
+			strlcpy(&variant[0], "wifi", sizeof(variant));
 		else
-			strncpy(&variant[0], "nonwifi-v1.1", sizeof(variant));
+			strlcpy(&variant[0], "nonwifi", sizeof(variant));
 		break;
 	}
 
 	if (strcmp(variant, env_variant)) {
 		printf("Setting variant to %s\n", variant);
 		env_set("variant", variant);
-
-		if (IS_ENABLED(CONFIG_ENV_IS_NOWHERE))
-			env_save();
 	}
 }
 
@@ -186,7 +118,7 @@ int board_phys_sdram_size(phys_size_t *size)
 	if (!size)
 		return -EINVAL;
 
-	*size = get_ram_size((void *)PHYS_SDRAM, PHYS_SDRAM_SIZE);
+	*size = get_ram_size((void *)PHYS_SDRAM, PHYS_SDRAM_SIZE + PHYS_SDRAM_2_SIZE);
 
 	return 0;
 }
@@ -194,6 +126,35 @@ int board_phys_sdram_size(phys_size_t *size)
 #if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)
 int ft_board_setup(void *blob, struct bd_info *bd)
 {
-	return 0;
+	const char *canoscpath = "/oscillator";
+	int freq = 40000000;	/* 40 MHz is used on most variants */
+	int canoscoff, ret;
+
+	canoscoff = fdt_path_offset(blob, canoscpath);
+	if (canoscoff < 0)	/* No CAN oscillator found. */
+		goto exit;
+
+	/*
+	 * The following "prodid" (PID4 in Toradex naming) use
+	 * a 20MHz CAN oscillator:
+	 * - 0055, V1.1A, V1.1B, V1.1C and V1.1D
+	 * - 0059, V1.1A and V1.1B
+	 */
+	if ((tdx_hw_tag.ver_major == 1 && tdx_hw_tag.ver_minor == 1) &&
+	    ((tdx_hw_tag.prodid == VERDIN_IMX8MMQ_IT &&
+	      tdx_hw_tag.ver_assembly <= 1) ||	/* 0059 rev. A or B */
+	     (tdx_hw_tag.prodid == VERDIN_IMX8MMQ_WIFI_BT_IT &&
+	      tdx_hw_tag.ver_assembly <= 3))) {	/* 0055 rev. A/B/C/D */
+		freq = 20000000;
+	}
+
+	ret = fdt_setprop_u32(blob, canoscoff, "clock-frequency", freq);
+	if (ret < 0) {
+		printf("Failed to set CAN oscillator clock-frequency, ret=%d\n",
+		       ret);
+	}
+
+exit:
+	return ft_common_board_setup(blob, bd);
 }
 #endif

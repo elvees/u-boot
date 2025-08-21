@@ -23,13 +23,22 @@ extern char __kprobes_text_start[], __kprobes_text_end[];
 extern char __entry_text_start[], __entry_text_end[];
 extern char __initdata_begin[], __initdata_end[];
 extern char __start_rodata[], __end_rodata[];
+extern char __start_data[], __end_data[];
 extern char __efi_helloworld_begin[];
 extern char __efi_helloworld_end[];
 extern char __efi_var_file_begin[];
 extern char __efi_var_file_end[];
+extern char __efi_capsule_sig_begin[];
+extern char __efi_capsule_sig_end[];
+
+/* Private data used by of-platdata devices/uclasses */
+extern char __priv_data_start[], __priv_data_end[];
 
 /* Start and end of .ctors section - used for constructor calls. */
 extern char __ctors_start[], __ctors_end[];
+
+extern char __efi_runtime_rel_start[], __efi_runtime_rel_stop[];
+extern char __efi_runtime_start[], __efi_runtime_stop[];
 
 /* function descriptor handling (if any).  Override
  * in asm/sections.h */
@@ -57,9 +66,17 @@ static inline int arch_is_kernel_data(unsigned long addr)
 
 /* Start of U-Boot text region */
 extern char __text_start[];
+extern char __text_end[];
 
-/* This marks the end of the text region which must be relocated */
-extern char __image_copy_end[];
+/* This marks the text region which must be relocated */
+extern char __image_copy_start[], __image_copy_end[];
+
+/* This marks the rcode region used for SPL relocation */
+extern char _rcode_start[], _rcode_end[];
+
+extern char __bss_end[];
+extern char __rel_dyn_start[], __rel_dyn_end[];
+extern char _image_binary_end[];
 
 /*
  * This is the U-Boot entry point - prior to relocation it should be same
@@ -67,30 +84,17 @@ extern char __image_copy_end[];
  */
 extern void _start(void);
 
-/*
- * ARM defines its symbols as char[]. Other arches define them as ulongs.
- */
-#ifdef CONFIG_ARM
-
-extern char __bss_start[];
-extern char __bss_end[];
-extern char __image_copy_start[];
-extern char __image_copy_end[];
-extern char _image_binary_end[];
-extern char __rel_dyn_start[];
-extern char __rel_dyn_end[];
-
-#else /* don't use offsets: */
-
-/* Exports from the Linker Script */
-extern ulong __data_end;
-extern ulong __rel_dyn_start;
-extern ulong __rel_dyn_end;
-extern ulong __bss_end;
-extern ulong _image_binary_end;
-
-extern ulong _TEXT_BASE;	/* code start */
-
+#ifndef USE_HOSTCC
+#if CONFIG_IS_ENABLED(RELOC_LOADER)
+#define __rcode __section(".text.rcode")
+#define __rdata __section(".text.rdata")
+#else
+#define __rcode
+#define __rdata
+#endif
+#else
+#define __rcode
+#define __rdata
 #endif
 
 #endif /* _ASM_GENERIC_SECTIONS_H_ */

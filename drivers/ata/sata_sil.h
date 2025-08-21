@@ -21,11 +21,7 @@ struct sil_sata {
 	u16		pio;
 	u16		mwdma;
 	u16		udma;
-#ifdef CONFIG_DM_PCI
 	struct udevice	*devno;
-#else
-	pci_dev_t	devno;
-#endif
 	int		wcache;
 	int		flush;
 	int		flush_ext;
@@ -216,12 +212,10 @@ enum {
 	CMD_ERR		= 0x21,
 };
 
-#if CONFIG_IS_ENABLED(BLK)
 #define ATA_MAX_PORTS		32
 struct sil_sata_priv {
 	int		port_num;
 	struct sil_sata	*sil_sata_desc[ATA_MAX_PORTS];
 };
-#endif
 
 #endif

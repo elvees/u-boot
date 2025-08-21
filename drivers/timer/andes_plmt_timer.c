@@ -8,7 +8,6 @@
  * associated with timer tick.
  */
 
-#include <common.h>
 #include <dm.h>
 #include <timer.h>
 #include <asm/io.h>
@@ -56,7 +55,7 @@ static int andes_plmt_probe(struct udevice *dev)
 }
 
 static const struct udevice_id andes_plmt_ids[] = {
-	{ .compatible = "riscv,plmt0" },
+	{ .compatible = "andestech,plmt0" },
 	{ }
 };
 

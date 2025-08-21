@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Renesas RCar Gen2 CPG MSSR driver
+ * Renesas R-Car Gen2 CPG MSSR driver
  *
  * Copyright (C) 2017 Marek Vasut <marek.vasut@gmail.com>
  *
@@ -10,28 +10,21 @@
  * Copyright (C) 2016 Glider bvba
  */
 
-#include <common.h>
 #include <clk-uclass.h>
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
+#include <linux/clk-provider.h>
 
 #include <dt-bindings/clock/renesas-cpg-mssr.h>
 
 #include "renesas-cpg-mssr.h"
 #include "rcar-gen2-cpg.h"
 
-#define CPG_RST_MODEMR		0x0060
-
 #define CPG_PLL0CR		0x00d8
 #define CPG_SDCKCR		0x0074
-
-struct clk_div_table {
-	u8	val;
-	u8	div;
-};
 
 /* SDHI divisors */
 static const struct clk_div_table cpg_sdh_div_table[] = {
@@ -63,14 +56,14 @@ static int gen2_clk_enable(struct clk *clk)
 {
 	struct gen2_clk_priv *priv = dev_get_priv(clk->dev);
 
-	return renesas_clk_endisable(clk, priv->base, true);
+	return renesas_clk_endisable(clk, priv->base, priv->info, true);
 }
 
 static int gen2_clk_disable(struct clk *clk)
 {
 	struct gen2_clk_priv *priv = dev_get_priv(clk->dev);
 
-	return renesas_clk_endisable(clk, priv->base, false);
+	return renesas_clk_endisable(clk, priv->base, priv->info, false);
 }
 
 static ulong gen2_clk_get_rate(struct clk *clk)
@@ -258,7 +251,7 @@ static ulong gen2_clk_set_rate(struct clk *clk, ulong rate)
 static int gen2_clk_of_xlate(struct clk *clk, struct ofnode_phandle_args *args)
 {
 	if (args->args_count != 2) {
-		debug("Invaild args_count: %d\n", args->args_count);
+		debug("Invalid args_count: %d\n", args->args_count);
 		return -EINVAL;
 	}
 
@@ -304,6 +297,15 @@ int gen2_clk_probe(struct udevice *dev)
 		(struct rcar_gen2_cpg_pll_config *)info->get_pll_config(cpg_mode);
 	if (!priv->cpg_pll_config->extal_div)
 		return -EINVAL;
+
+	if (info->reg_layout == CLK_REG_LAYOUT_RCAR_GEN2_AND_GEN3) {
+		priv->info->status_regs = mstpsr;
+		priv->info->control_regs = smstpcr;
+		priv->info->reset_regs = srcr;
+		priv->info->reset_clear_regs = srstclr;
+	} else {
+		return -EINVAL;
+	}
 
 	ret = clk_get_by_name(dev, "extal", &priv->clk_extal);
 	if (ret < 0)

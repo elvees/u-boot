@@ -7,7 +7,6 @@
  * (C) Copyright 2015      Vishnu Patekar <vishnupatekar0510@gmail.com>
  * (C) Copyright 2015      Hans de Goede <hdegoede@redhat.com>
  */
-#include <common.h>
 #include <errno.h>
 #include <init.h>
 #include <asm/io.h>
@@ -126,8 +125,8 @@ static void auto_set_timing_para(struct dram_para *para)
 	u32 tdinit3	= (1 * CONFIG_DRAM_CLK) + 1;		/* 1us */
 
 	u8 twtp		= tcwl + 2 + twr;	/* WL + BL / 2 + tWR */
-	u8 twr2rd	= tcwl + 2 + twtr; 	/* WL + BL / 2 + tWTR */
-	u8 trd2wr	= tcl + 2 + 1 - tcwl; 	/* RL + BL / 2 + 2 - WL */
+	u8 twr2rd	= tcwl + 2 + twtr;	/* WL + BL / 2 + tWTR */
+	u8 trd2wr	= tcl + 2 + 1 - tcwl;	/* RL + BL / 2 + 2 - WL */
 
 	/* Set work mode register */
 	mctl_set_cr(para);

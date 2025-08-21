@@ -3,8 +3,8 @@
  * Copyright Altera Corporation (C) 2012-2015
  */
 
-#include <common.h>
 #include <log.h>
+#include <linux/string.h>
 #include <asm/io.h>
 #include <asm/arch/sdram.h>
 #include <errno.h>
@@ -688,7 +688,6 @@ static void scc_mgr_apply_group_dm_out1_delay(struct socfpga_sdrseq *seq,
 		scc_mgr_load_dm(i);
 	}
 }
-
 
 /* apply and load delay on both DQS and OCT out1 */
 static void scc_mgr_apply_group_dqs_io_and_oct_out1(struct socfpga_sdrseq *seq,
@@ -2580,7 +2579,6 @@ static int rw_mgr_mem_calibrate_vfifo_center(struct socfpga_sdrseq *seq,
 			 &sticky_bit_chk,
 			 left_edge, right_edge, use_read_test);
 
-
 	/* Search for the right edge of the window for each bit */
 	ret = search_right_edge(seq, 0, rank_bgn, rw_group, rw_group,
 				start_dqs, start_dqs_en,
@@ -2770,7 +2768,7 @@ rw_mgr_mem_calibrate_dqs_enable_calibration(struct socfpga_sdrseq *seq,
 	ret = rw_mgr_mem_calibrate_vfifo_find_dqs_en_phase(seq, rw_group);
 
 	debug_cond(DLEVEL >= 1,
-		   "%s:%d: g=%u found=%u; Reseting delay chain to zero\n",
+		   "%s:%d: g=%u found=%u; Resetting delay chain to zero\n",
 		   __func__, __LINE__, rw_group, !ret);
 
 	for (r = 0; r < seq->rwcfg->mem_number_of_ranks;
@@ -3714,7 +3712,7 @@ static void debug_mem_calibrate(struct socfpga_sdrseq *seq, int pass)
 	u32 debug_info;
 
 	if (pass) {
-		debug("%s: CALIBRATION PASSED\n", __FILE__);
+		debug(KBUILD_BASENAME ": CALIBRATION PASSED\n");
 
 		seq->gbl.fom_in /= 2;
 		seq->gbl.fom_out /= 2;
@@ -3733,7 +3731,7 @@ static void debug_mem_calibrate(struct socfpga_sdrseq *seq, int pass)
 		writel(debug_info, &phy_mgr_cfg->cal_debug_info);
 		writel(PHY_MGR_CAL_SUCCESS, &phy_mgr_cfg->cal_status);
 	} else {
-		debug("%s: CALIBRATION FAILED\n", __FILE__);
+		debug(KBUILD_BASENAME ": CALIBRATION FAILED\n");
 
 		debug_info = seq->gbl.error_stage;
 		debug_info |= seq->gbl.error_substage << 8;
@@ -3750,7 +3748,7 @@ static void debug_mem_calibrate(struct socfpga_sdrseq *seq, int pass)
 		writel(debug_info, &sdr_reg_file->failing_stage);
 	}
 
-	debug("%s: Calibration complete\n", __FILE__);
+	debug(KBUILD_BASENAME ": Calibration complete\n");
 }
 
 /**
@@ -3934,7 +3932,7 @@ int sdram_calibration_full(struct socfpga_sdr *sdr)
 
 	initialize_tracking(&seq);
 
-	debug("%s: Preparing to start memory calibration\n", __FILE__);
+	debug(KBUILD_BASENAME ": Preparing to start memory calibration\n");
 
 	debug("%s:%d\n", __func__, __LINE__);
 	debug_cond(DLEVEL >= 1,

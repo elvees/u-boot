@@ -4,7 +4,6 @@
  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <dm/device_compat.h>
 #include <linux/bitops.h>
@@ -32,6 +31,9 @@ static int uniphier_pinctrl_get_pins_count(struct udevice *dev)
 	struct uniphier_pinctrl_priv *priv = dev_get_priv(dev);
 	const struct uniphier_pinctrl_pin *pins = priv->socdata->pins;
 	int pins_count = priv->socdata->pins_count;
+
+	if (WARN_ON(!pins_count))
+		return 0; /* no table of pins */
 
 	/*
 	 * We do not list all pins in the pin table to save memory footprint.

@@ -6,7 +6,6 @@
 /dts-v1/;
 
 #include "fsl-imx8qxp.dtsi"
-#include "fsl-imx8qxp-colibri-u-boot.dtsi"
 
 / {
 	model = "Toradex Colibri iMX8X";
@@ -126,6 +125,14 @@
 				SC_P_QSPI0A_SS0_B_LSIO_GPIO3_IO14	0x00000020 /*  77 */
 				SC_P_QSPI0A_SS1_B_LSIO_GPIO3_IO15	0x00000020 /*  89 */
 				SC_P_QSPI0A_SCLK_LSIO_GPIO3_IO16	0x00000020 /*  93 */
+			>;
+		};
+
+		/* On Module I2C */
+		pinctrl_i2c0: i2c0grp {
+			fsl,pins = <
+				SC_P_MIPI_CSI0_GPIO0_00_ADMA_I2C0_SCL	0x06000021
+				SC_P_MIPI_CSI0_GPIO0_01_ADMA_I2C0_SDA	0x06000021
 			>;
 		};
 
@@ -295,6 +302,23 @@
 			max-speed = <100>;
 			reg = <2>;
 		};
+	};
+};
+
+&i2c0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	clock-frequency = <100000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c0>;
+	status = "okay";
+
+	/* GPIO expander */
+	gpio_expander_43: gpio-expander@43 {
+		compatible = "fcs,fxl6408";
+		gpio-controller;
+		#gpio-cells = <2>;
+		reg = <0x43>;
 	};
 };
 

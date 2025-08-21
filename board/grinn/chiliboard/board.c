@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
+ * Copyright (C) 2011, Texas Instruments, Incorporated - https://www.ti.com/
  * Copyright (C) 2017, Grinn - http://grinn-global.com/
  */
 
-#include <common.h>
+#include <config.h>
 #include <init.h>
 #include <net.h>
 #include <asm/arch/chilisom.h>
@@ -30,7 +30,7 @@ DECLARE_GLOBAL_DATA_PTR;
 static __maybe_unused struct ctrl_dev *cdev =
 	(struct ctrl_dev *)CTRL_DEVICE_BASE;
 
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT)
 static struct module_pin_mux uart0_pin_mux[] = {
 	{OFFSET(uart0_rxd), (MODE(0) | PULLUP_EN | RXACTIVE)},	/* UART0_RXD */
 	{OFFSET(uart0_txd), (MODE(0) | PULLUDEN)},		/* UART0_TXD */
@@ -69,9 +69,7 @@ static void enable_board_pin_mux(void)
 	configure_module_pin_mux(rmii1_pin_mux);
 	configure_module_pin_mux(mmc0_pin_mux);
 }
-#endif /* CONFIG_SKIP_LOWLEVEL_INIT */
 
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
 void set_uart_mux_conf(void)
 {
 	configure_module_pin_mux(uart0_pin_mux);
@@ -82,11 +80,11 @@ void set_mux_conf_regs(void)
 	enable_board_pin_mux();
 }
 
-void am33xx_spl_board_init(void)
+void spl_board_init(void)
 {
 	chilisom_spl_board_init();
 }
-#endif
+#endif /* CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT) */
 
 /*
  * Basic board specific setup.  Pinmux has been handled already.
@@ -97,7 +95,7 @@ int board_init(void)
 	hw_watchdog_init();
 #endif
 
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE + 0x100;
 	gpmc_init();
 
 	return 0;
@@ -106,7 +104,7 @@ int board_init(void)
 #ifdef CONFIG_BOARD_LATE_INIT
 int board_late_init(void)
 {
-#if !defined(CONFIG_SPL_BUILD)
+#if !defined(CONFIG_XPL_BUILD)
 	uint8_t mac_addr[6];
 	uint32_t mac_hi, mac_lo;
 

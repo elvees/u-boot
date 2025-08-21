@@ -6,7 +6,6 @@
  * arch/x86/kernel/tsc_msr.c and arch/x86/kernel/tsc.c
  */
 
-#include <common.h>
 #include <bootstage.h>
 #include <dm.h>
 #include <log.h>
@@ -84,7 +83,7 @@ static unsigned long cpu_mhz_from_cpuid(void)
 	if (cpuid_eax(0) < 0x16)
 		return 0;
 
-	return cpuid_eax(0x16);
+	return cpuid_eax(0x15);
 }
 
 /*
@@ -300,10 +299,19 @@ static unsigned long __maybe_unused quick_pit_calibrate(void)
 			if (!pit_expect_msb(0xff-i, &delta, &d2))
 				break;
 
+			delta -= tsc;
+
+			/*
+			 * Extrapolate the error and fail fast if the error will
+			 * never be below 500 ppm.
+			 */
+			if (i == 1 &&
+			    d1 + d2 >= (delta * MAX_QUICK_PIT_ITERATIONS) >> 11)
+				return 0;
+
 			/*
 			 * Iterate until the error is less than 500 ppm
 			 */
-			delta -= tsc;
 			if (d1+d2 >= delta >> 11)
 				continue;
 
@@ -404,6 +412,19 @@ static void tsc_timer_ensure_setup(bool early)
 	if (!gd->arch.clock_rate) {
 		unsigned long fast_calibrate;
 
+		/* deal with this being called before x86_cpu_init_f() */
+		if (!gd->arch.x86_vendor)
+			x86_get_identity_for_timer();
+
+		/**
+		 * There is no obvious way to obtain this information from EFI
+		 * boot services. This value was measured on a Framework Laptop
+		 * which has a 12th Gen Intel Core
+		 */
+		if (IS_ENABLED(CONFIG_EFI_APP)) {
+			fast_calibrate = 2750;
+			goto done;
+		}
 		fast_calibrate = native_calibrate_tsc();
 		if (fast_calibrate)
 			goto done;
@@ -425,12 +446,14 @@ static void tsc_timer_ensure_setup(bool early)
 			goto done;
 
 		if (early)
-			fast_calibrate = CONFIG_X86_TSC_TIMER_EARLY_FREQ;
+			gd->arch.clock_rate = CONFIG_X86_TSC_TIMER_FREQ;
 		else
 			return;
 
 done:
-		gd->arch.clock_rate = fast_calibrate * 1000000;
+		fast_calibrate = min(fast_calibrate, 4000UL);
+		if (!gd->arch.clock_rate)
+			gd->arch.clock_rate = fast_calibrate * 1000000;
 	}
 	gd->arch.tsc_inited = true;
 }
@@ -478,7 +501,7 @@ static const struct timer_ops tsc_timer_ops = {
 	.get_count = tsc_timer_get_count,
 };
 
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 static const struct udevice_id tsc_timer_ids[] = {
 	{ .compatible = "x86,tsc-timer", },
 	{ }

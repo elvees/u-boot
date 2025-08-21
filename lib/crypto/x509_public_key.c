@@ -7,19 +7,19 @@
 
 #define pr_fmt(fmt) "X.509: "fmt
 #ifdef __UBOOT__
-#include <common.h>
 #include <image.h>
 #include <dm/devres.h>
 #include <linux/compat.h>
 #include <linux/err.h>
 #include <linux/errno.h>
+#include <linux/printk.h>
 #else
 #include <linux/module.h>
 #endif
 #include <linux/kernel.h>
 #ifdef __UBOOT__
 #include <crypto/x509_parser.h>
-#include <u-boot/rsa-checksum.h>
+#include <u-boot/hash-checksum.h>
 #else
 #include <linux/slab.h>
 #include <keys/asymmetric-subtype.h>
@@ -29,6 +29,8 @@
 #include "asymmetric_keys.h"
 #include "x509_parser.h"
 #endif
+
+#if !CONFIG_IS_ENABLED(MBEDTLS_LIB_X509)
 
 /*
  * Set up the signature parameters in an X.509 certificate.  This involves
@@ -71,6 +73,10 @@ int x509_get_sig_params(struct x509_certificate *cert)
 		return -ENOPKG;
 	if (!strcmp(sig->hash_algo, "sha256"))
 		sig->digest_size = SHA256_SUM_LEN;
+	else if (!strcmp(sig->hash_algo, "sha384"))
+		sig->digest_size = SHA384_SUM_LEN;
+	else if (!strcmp(sig->hash_algo, "sha512"))
+		sig->digest_size = SHA512_SUM_LEN;
 	else if (!strcmp(sig->hash_algo, "sha1"))
 		sig->digest_size = SHA1_SUM_LEN;
 	else
@@ -135,61 +141,7 @@ error:
 	return ret;
 }
 
-/*
- * Check for self-signedness in an X.509 cert and if found, check the signature
- * immediately if we can.
- */
-int x509_check_for_self_signed(struct x509_certificate *cert)
-{
-	int ret = 0;
-
-	pr_devel("==>%s()\n", __func__);
-
-	if (cert->raw_subject_size != cert->raw_issuer_size ||
-	    memcmp(cert->raw_subject, cert->raw_issuer,
-		   cert->raw_issuer_size) != 0)
-		goto not_self_signed;
-
-	if (cert->sig->auth_ids[0] || cert->sig->auth_ids[1]) {
-		/* If the AKID is present it may have one or two parts.  If
-		 * both are supplied, both must match.
-		 */
-		bool a = asymmetric_key_id_same(cert->skid, cert->sig->auth_ids[1]);
-		bool b = asymmetric_key_id_same(cert->id, cert->sig->auth_ids[0]);
-
-		if (!a && !b)
-			goto not_self_signed;
-
-		ret = -EKEYREJECTED;
-		if (((a && !b) || (b && !a)) &&
-		    cert->sig->auth_ids[0] && cert->sig->auth_ids[1])
-			goto out;
-	}
-
-	ret = -EKEYREJECTED;
-	if (strcmp(cert->pub->pkey_algo, cert->sig->pkey_algo) != 0)
-		goto out;
-
-	ret = public_key_verify_signature(cert->pub, cert->sig);
-	if (ret < 0) {
-		if (ret == -ENOPKG) {
-			cert->unsupported_sig = true;
-			ret = 0;
-		}
-		goto out;
-	}
-
-	pr_devel("Cert Self-signature verified");
-	cert->self_signed = true;
-
-out:
-	pr_devel("<==%s() = %d\n", __func__, ret);
-	return ret;
-
-not_self_signed:
-	pr_devel("<==%s() = 0 [not]\n", __func__);
-	return 0;
-}
+#endif /* !CONFIG_IS_ENABLED(MBEDTLS_LIB_X509) */
 
 #ifndef __UBOOT__
 /*

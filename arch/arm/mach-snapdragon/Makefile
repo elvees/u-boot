@@ -2,13 +2,6 @@
 #
 # (C) Copyright 2015 Mateusz Kulikowski <mateusz.kulikowski@gmail.com>
 
-obj-$(CONFIG_TARGET_DRAGONBOARD820C) += clock-apq8096.o
-obj-$(CONFIG_TARGET_DRAGONBOARD820C) += sysmap-apq8096.o
-obj-$(CONFIG_TARGET_DRAGONBOARD410C) += clock-apq8016.o
-obj-$(CONFIG_TARGET_DRAGONBOARD410C) += sysmap-apq8016.o
-obj-y += misc.o
-obj-y += clock-snapdragon.o
-obj-y += dram.o
-obj-y += pinctrl-snapdragon.o
-obj-y += pinctrl-apq8016.o
-obj-y += pinctrl-apq8096.o
+obj-y += board.o
+obj-$(CONFIG_EFI_HAVE_CAPSULE_SUPPORT) += capsule_update.o
+obj-$(CONFIG_OF_LIVE) += of_fixup.o

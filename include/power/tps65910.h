@@ -3,7 +3,7 @@
  * (C) Copyright 2011-2013
  * Texas Instruments, <www.ti.com>
  *
- * For more details, please see the TRM at http://www.ti.com/product/tps65910
+ * For more details, please see the TRM at https://www.ti.com/product/tps65910
  */
 #ifndef __POWER_TPS65910_H__
 #define __POWER_TPS65910_H__
@@ -50,7 +50,6 @@ enum {
 #define TPS65910_REG_ST_ON_HI_POW			(0x1)
 #define TPS65910_REG_ST_OFF_1				(0x2)
 #define TPS65910_REG_ST_ON_LOW_POW			(0x3)
-
 
 /* VDD2 & VDD1 voltage selection register. (VDD2_OP_REG & VDD1_OP_REG) */
 #define TPS65910_OP_REG_SEL				(0x7F)

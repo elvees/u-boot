@@ -7,7 +7,6 @@
  * Some code taken from coreboot cpulib.c
  */
 
-#include <common.h>
 #include <cpu.h>
 #include <dm.h>
 #include <errno.h>
@@ -61,11 +60,9 @@ int cpu_common_init(void)
 	/* Early chipset init required before RAM init can work */
 	uclass_first_device(UCLASS_NORTHBRIDGE, &dev);
 
-	ret = uclass_first_device(UCLASS_LPC, &lpc);
+	ret = uclass_first_device_err(UCLASS_LPC, &lpc);
 	if (ret)
 		return ret;
-	if (!lpc)
-		return -ENODEV;
 
 	/* Cause the SATA device to do its early init */
 	uclass_first_device(UCLASS_AHCI, &dev);

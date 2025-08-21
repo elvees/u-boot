@@ -9,7 +9,6 @@
 #include <asm/arch/ddr.h>
 #include <asm/arch/reg-fields-ddr.h>
 #include <asm/arch/regs.h>
-#include <common.h>
 
 #define REFRESH_NUM_DUR_TRAIN       1
 

@@ -15,7 +15,7 @@ config SYS_CPU
 config SYS_CONFIG_NAME
 	default "sipeed-maix"
 
-config SYS_TEXT_BASE
+config TEXT_BASE
 	default 0x80000000
 
 config DEFAULT_DEVICE_TREE
@@ -34,11 +34,9 @@ config BOARD_SPECIFIC_OPTIONS
 	imply SMP
 	imply DM_SERIAL
 	imply SIFIVE_SERIAL
-	imply SIFIVE_CLINT
+	imply RISCV_ACLINT
 	imply POWER_DOMAIN
 	imply SIMPLE_PM_BUS
-	imply CLK_CCF
-	imply CLK_COMPOSITE_CCF
 	imply CLK_K210
 	imply DM_RESET
 	imply RESET_SYSCON
@@ -69,4 +67,6 @@ config BOARD_SPECIFIC_OPTIONS
 	imply EFI_PARTITION
 	imply CMD_PART
 	imply CMD_FS_GENERIC
+	imply WDT
+	imply DESIGNWARE_WATCHDOG
 endif

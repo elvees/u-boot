@@ -7,10 +7,11 @@
  * TsiChung Liew (Tsi-Chung.Liew@freescale.com)
  */
 
-#include <common.h>
+#include <config.h>
 #include <flash.h>
 #include <init.h>
 #include <irq_func.h>
+#include <time.h>
 
 #include <asm/immap.h>
 
@@ -42,7 +43,7 @@ ulong flash_init(void)
 	ulong size = 0;
 	ulong fbase = 0;
 
-	fbase = (ulong) CONFIG_SYS_FLASH_BASE;
+	fbase = (ulong) CFG_SYS_FLASH_BASE;
 	flash_get_size((FPWV *) fbase, &flash_info[0]);
 	flash_get_offsets((ulong) fbase, &flash_info[0]);
 	fbase += flash_info[0].size;
@@ -64,14 +65,14 @@ int flash_get_offsets(ulong base, flash_info_t * info)
 
 		info->start[0] = base;
 		info->protect[0] = 0;
-		for (i = 1; i < CONFIG_SYS_SST_SECT; i++) {
+		for (i = 1; i < CFG_SYS_SST_SECT; i++) {
 			info->start[i] = info->start[i - 1]
-						+ CONFIG_SYS_SST_SECTSZ;
+						+ CFG_SYS_SST_SECTSZ;
 			info->protect[i] = 0;
 		}
 	}
 
-	return ERR_OK;
+	return FL_ERR_OK;
 }
 
 void flash_print_info(flash_info_t * info)
@@ -96,24 +97,8 @@ void flash_print_info(flash_info_t * info)
 		return;
 	}
 
-	if (info->size > 0x100000) {
-		int remainder;
-
-		printf("  Size: %ld", info->size >> 20);
-
-		remainder = (info->size % 0x100000);
-		if (remainder) {
-			remainder >>= 10;
-			remainder = (int)((float)
-					  (((float)remainder / (float)1024) *
-					   10000));
-			printf(".%d ", remainder);
-		}
-
-		printf("MB in %d Sectors\n", info->sector_count);
-	} else
-		printf("  Size: %ld KB in %d Sectors\n",
-		       info->size >> 10, info->sector_count);
+	printf("  Size: %ld KB in %d Sectors\n",
+	       info->size >> 10, info->sector_count);
 
 	printf("  Sector Start Addresses:");
 	for (i = 0; i < info->sector_count; ++i) {
@@ -162,8 +147,8 @@ ulong flash_get_size(FPWV * addr, flash_info_t * info)
 
 	info->sector_count = 0;
 	info->size = 0;
-	info->sector_count = CONFIG_SYS_SST_SECT;
-	info->size = CONFIG_SYS_SST_SECT * CONFIG_SYS_SST_SECTSZ;
+	info->sector_count = CFG_SYS_SST_SECT;
+	info->size = CFG_SYS_SST_SECT * CFG_SYS_SST_SECTSZ;
 
 	/* reset ID mode */
 	*addr = (FPWV) 0x00F000F0;
@@ -222,7 +207,7 @@ int flash_erase(flash_info_t * info, int s_first, int s_last)
 
 	start = get_timer(0);
 
-	if ((s_last - s_first) == (CONFIG_SYS_SST_SECT - 1)) {
+	if ((s_last - s_first) == (CFG_SYS_SST_SECT - 1)) {
 		if (prot == 0) {
 			addr = (FPWV *) info->start[0];
 
@@ -242,7 +227,8 @@ int flash_erase(flash_info_t * info, int s_first, int s_last)
 					count = 0;
 				}
 
-				if (get_timer(start) > CONFIG_SYS_FLASH_ERASE_TOUT) {
+				/* check timeout, 1000ms */
+				if (get_timer(start) > 1000) {
 					printf("Timeout\n");
 					*addr = 0x00F0;	/* reset to read mode */
 
@@ -258,7 +244,7 @@ int flash_erase(flash_info_t * info, int s_first, int s_last)
 				enable_interrupts();
 
 			return 0;
-		} else if (prot == CONFIG_SYS_SST_SECT) {
+		} else if (prot == CFG_SYS_SST_SECT) {
 			return 1;
 		}
 	}
@@ -281,7 +267,7 @@ int flash_erase(flash_info_t * info, int s_first, int s_last)
 
 					flag = disable_interrupts();
 
-					base = (FPWV *) (CONFIG_SYS_FLASH_BASE);	/* First sector */
+					base = (FPWV *) (CFG_SYS_FLASH_BASE);	/* First sector */
 
 					base[FLASH_CYCLE1] = 0x00AA;	/* unlock */
 					base[FLASH_CYCLE2] = 0x0055;	/* unlock */
@@ -294,8 +280,8 @@ int flash_erase(flash_info_t * info, int s_first, int s_last)
 						enable_interrupts();
 
 					while ((*addr & 0x0080) != 0x0080) {
-						if (get_timer(start) >
-						    CONFIG_SYS_FLASH_ERASE_TOUT) {
+						/* check timeout, 1000ms */
+						if (get_timer(start) > 1000) {
 							printf("Timeout\n");
 							*addr = 0x00F0;	/* reset to read mode */
 
@@ -383,9 +369,9 @@ int write_buff(flash_info_t * info, uchar * src, ulong addr, ulong cnt)
 	}
 
 	if (cnt == 0)
-		return ERR_OK;
+		return FL_ERR_OK;
 
-	return ERR_OK;
+	return FL_ERR_OK;
 }
 
 /*-----------------------------------------------------------------------
@@ -410,7 +396,7 @@ int write_word(flash_info_t * info, FPWV * dest, u16 data)
 		return (2);
 	}
 
-	base = (FPWV *) (CONFIG_SYS_FLASH_BASE);
+	base = (FPWV *) (CFG_SYS_FLASH_BASE);
 
 	/* Disable interrupts which might cause a timeout here */
 	flag = disable_interrupts();
@@ -430,7 +416,8 @@ int write_word(flash_info_t * info, FPWV * dest, u16 data)
 	/* data polling for D7 */
 	while (res == 0
 	       && (*dest & (u8) 0x00800080) != (data & (u8) 0x00800080)) {
-		if (get_timer(start) > CONFIG_SYS_FLASH_WRITE_TOUT) {
+		/* check timeout, 500ms */
+		if (get_timer(start) > 500) {
 			*dest = (u8) 0x00F000F0;	/* reset bank */
 			res = 1;
 		}

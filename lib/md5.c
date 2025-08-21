@@ -28,7 +28,6 @@
 #include "compiler.h"
 
 #ifndef USE_HOSTCC
-#include <common.h>
 #include <watchdog.h>
 #endif /* USE_HOSTCC */
 #include <u-boot/md5.h>
@@ -55,8 +54,8 @@ byteReverse(unsigned char *buf, unsigned longs)
  * Start MD5 accumulation.  Set bit count to 0 and buffer to mysterious
  * initialization constants.
  */
-static void
-MD5Init(struct MD5Context *ctx)
+void
+MD5Init(MD5Context *ctx)
 {
 	ctx->buf[0] = 0x67452301;
 	ctx->buf[1] = 0xefcdab89;
@@ -71,8 +70,8 @@ MD5Init(struct MD5Context *ctx)
  * Update context to reflect the concatenation of another buffer full
  * of bytes.
  */
-static void
-MD5Update(struct MD5Context *ctx, unsigned char const *buf, unsigned len)
+void
+MD5Update(MD5Context *ctx, unsigned char const *buf, unsigned int len)
 {
 	register __u32 t;
 
@@ -120,8 +119,8 @@ MD5Update(struct MD5Context *ctx, unsigned char const *buf, unsigned len)
  * Final wrapup - pad to 64-byte boundary with the bit pattern
  * 1 0* (64-bit count of bits processed, MSB-first)
  */
-static void
-MD5Final(unsigned char digest[16], struct MD5Context *ctx)
+void
+MD5Final(unsigned char digest[16], MD5Context *ctx)
 {
 	unsigned int count;
 	unsigned char *p;
@@ -264,38 +263,25 @@ MD5Transform(__u32 buf[4], __u32 const in[16])
 }
 
 /*
- * Calculate and store in 'output' the MD5 digest of 'len' bytes at
- * 'input'. 'output' must have enough space to hold 16 bytes.
- */
-void
-md5 (unsigned char *input, int len, unsigned char output[16])
-{
-	struct MD5Context context;
-
-	MD5Init(&context);
-	MD5Update(&context, input, len);
-	MD5Final(output, &context);
-}
-
-
-/*
  * Calculate and store in 'output' the MD5 digest of 'len' bytes at 'input'.
  * 'output' must have enough space to hold 16 bytes. If 'chunk' Trigger the
  * watchdog every 'chunk_sz' bytes of input processed.
  */
 void
-md5_wd (unsigned char *input, int len, unsigned char output[16],
+md5_wd(const unsigned char *input, unsigned int len, unsigned char output[16],
 	unsigned int chunk_sz)
 {
-	struct MD5Context context;
-#if defined(CONFIG_HW_WATCHDOG) || defined(CONFIG_WATCHDOG)
-	unsigned char *end, *curr;
+	MD5Context context;
+#if !defined(USE_HOSTCC) && \
+    (defined(CONFIG_HW_WATCHDOG) || defined(CONFIG_WATCHDOG))
+	const unsigned char *end, *curr;
 	int chunk;
 #endif
 
 	MD5Init(&context);
 
-#if defined(CONFIG_HW_WATCHDOG) || defined(CONFIG_WATCHDOG)
+#if !defined(USE_HOSTCC) && \
+    (defined(CONFIG_HW_WATCHDOG) || defined(CONFIG_WATCHDOG))
 	curr = input;
 	end = input + len;
 	while (curr < end) {
@@ -304,7 +290,7 @@ md5_wd (unsigned char *input, int len, unsigned char output[16],
 			chunk = chunk_sz;
 		MD5Update(&context, curr, chunk);
 		curr += chunk;
-		WATCHDOG_RESET ();
+		schedule();
 	}
 #else
 	MD5Update(&context, input, len);

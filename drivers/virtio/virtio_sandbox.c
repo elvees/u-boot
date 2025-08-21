@@ -5,7 +5,6 @@
  * VirtIO Sandbox transport driver, for testing purpose only
  */
 
-#include <common.h>
 #include <dm.h>
 #include <virtio_types.h>
 #include <virtio.h>
@@ -160,21 +159,10 @@ static int virtio_sandbox_probe(struct udevice *udev)
 	struct virtio_dev_priv *uc_priv = dev_get_uclass_priv(udev);
 
 	/* fake some information for testing */
-	priv->device_features = VIRTIO_F_VERSION_1;
-	uc_priv->device = VIRTIO_ID_BLOCK;
+	priv->device_features = BIT_ULL(VIRTIO_F_VERSION_1);
+	uc_priv->device = dev_read_u32_default(udev, "virtio-type",
+					       VIRTIO_ID_RNG);
 	uc_priv->vendor = ('u' << 24) | ('b' << 16) | ('o' << 8) | 't';
-
-	return 0;
-}
-
-/* check virtio device driver's remove routine was called to reset the device */
-static int virtio_sandbox_child_post_remove(struct udevice *vdev)
-{
-	u8 status;
-
-	virtio_get_status(vdev, &status);
-	if (status)
-		panic("virtio device was not reset\n");
 
 	return 0;
 }
@@ -203,7 +191,6 @@ U_BOOT_DRIVER(virtio_sandbox1) = {
 	.of_match = virtio_sandbox1_ids,
 	.ops	= &virtio_sandbox1_ops,
 	.probe	= virtio_sandbox_probe,
-	.child_post_remove = virtio_sandbox_child_post_remove,
 	.priv_auto	= sizeof(struct virtio_sandbox_priv),
 };
 

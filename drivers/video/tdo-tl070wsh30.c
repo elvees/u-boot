@@ -3,7 +3,6 @@
  * Copyright (C) 2020 BayLibre, SAS
  * Author: Neil Armstrong <narmstrong@baylibre.com>
  */
-#include <common.h>
 #include <backlight.h>
 #include <dm.h>
 #include <mipi_dsi.h>
@@ -75,7 +74,7 @@ static int tl070wsh30_panel_of_to_plat(struct udevice *dev)
 	struct tl070wsh30_panel_priv *priv = dev_get_priv(dev);
 	int ret;
 
-	if (IS_ENABLED(CONFIG_DM_REGULATOR)) {
+	if (CONFIG_IS_ENABLED(DM_REGULATOR)) {
 		ret =  device_get_supply_regulator(dev, "power-supply",
 						   &priv->reg);
 		if (ret && ret != -ENOENT) {
@@ -108,7 +107,7 @@ static int tl070wsh30_panel_probe(struct udevice *dev)
 	struct mipi_dsi_panel_plat *plat = dev_get_plat(dev);
 	int ret;
 
-	if (IS_ENABLED(CONFIG_DM_REGULATOR) && priv->reg) {
+	if (CONFIG_IS_ENABLED(DM_REGULATOR) && priv->reg) {
 		ret = regulator_set_enable(priv->reg, true);
 		if (ret)
 			return ret;
@@ -118,7 +117,7 @@ static int tl070wsh30_panel_probe(struct udevice *dev)
 
 	/* reset panel */
 	dm_gpio_set_value(&priv->reset, true);
-	
+
 	mdelay(10);
 
 	dm_gpio_set_value(&priv->reset, false);

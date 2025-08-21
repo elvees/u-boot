@@ -5,7 +5,7 @@
  * Copyright (C) 2013-2017, ISEE 2007 SL - http://www.isee.biz/
  */
 
-#include <common.h>
+#include <config.h>
 #include <env.h>
 #include <errno.h>
 #include <init.h>
@@ -37,7 +37,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 /* GPIO0_27 and GPIO0_26 are used to read board revision from IGEP003x boards
  * and control IGEP0034 green and red LEDs.
- * U-boot configures these pins as input pullup to detect board revision:
+ * U-Boot configures these pins as input pullup to detect board revision:
  * IGEP0034-LITE = 0b00
  * IGEP0034 (FULL) = 0b01
  * IGEP0033 = 0b1X
@@ -68,7 +68,7 @@ static int get_board_revision(void)
 	return revision;
 }
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 /* PN H5TQ4G63AFR is equivalent to MT41K256M16HA125*/
 static const struct ddr_data ddr3_igep0034_data = {
 	.datardsratio0 = MT41K256M16HA125E_RD_DQS,
@@ -185,7 +185,7 @@ int spl_start_uboot(void)
  */
 int board_init(void)
 {
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE + 0x100;
 
 	gpmc_init();
 

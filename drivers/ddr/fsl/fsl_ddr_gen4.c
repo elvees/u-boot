@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2014-2020 Freescale Semiconductor, Inc.
+ * Copyright 2021 NXP
  */
 
-#include <common.h>
+#include <config.h>
 #include <env.h>
 #include <log.h>
 #include <asm/io.h>
@@ -57,7 +58,8 @@ void fsl_ddr_set_memctl_regs(const fsl_ddr_cfg_regs_t *regs,
 	struct ccsr_ddr __iomem *ddr;
 	u32 temp32;
 	u32 total_gb_size_per_controller;
-	int timeout;
+	int timeout = 0;
+	int ddr_freq_for_timeout = 0;
 	int mod_bnds = 0;
 
 #ifdef CONFIG_SYS_FSL_ERRATUM_A008511
@@ -84,16 +86,16 @@ void fsl_ddr_set_memctl_regs(const fsl_ddr_cfg_regs_t *regs,
 #endif
 	switch (ctrl_num) {
 	case 0:
-		ddr = (void *)CONFIG_SYS_FSL_DDR_ADDR;
+		ddr = (void *)CFG_SYS_FSL_DDR_ADDR;
 		break;
-#if defined(CONFIG_SYS_FSL_DDR2_ADDR) && (CONFIG_SYS_NUM_DDR_CTLRS > 1)
+#if defined(CFG_SYS_FSL_DDR2_ADDR) && (CONFIG_SYS_NUM_DDR_CTLRS > 1)
 	case 1:
-		ddr = (void *)CONFIG_SYS_FSL_DDR2_ADDR;
+		ddr = (void *)CFG_SYS_FSL_DDR2_ADDR;
 		break;
 #endif
-#if defined(CONFIG_SYS_FSL_DDR3_ADDR) && (CONFIG_SYS_NUM_DDR_CTLRS > 2)
+#if defined(CFG_SYS_FSL_DDR3_ADDR) && (CONFIG_SYS_NUM_DDR_CTLRS > 2)
 	case 2:
-		ddr = (void *)CONFIG_SYS_FSL_DDR3_ADDR;
+		ddr = (void *)CFG_SYS_FSL_DDR3_ADDR;
 		break;
 #endif
 #if defined(CONFIG_SYS_FSL_DDR4_ADDR) && (CONFIG_SYS_NUM_DDR_CTLRS > 3)
@@ -228,7 +230,7 @@ void fsl_ddr_set_memctl_regs(const fsl_ddr_cfg_regs_t *regs,
 	if (is_warm_boot()) {
 		ddr_out32(&ddr->sdram_cfg_2,
 			  regs->ddr_sdram_cfg_2 & ~SDRAM_CFG2_D_INIT);
-		ddr_out32(&ddr->init_addr, CONFIG_SYS_SDRAM_BASE);
+		ddr_out32(&ddr->init_addr, CFG_SYS_SDRAM_BASE);
 		ddr_out32(&ddr->init_ext_addr, DDR_INIT_ADDR_EXT_UIA);
 
 		/* DRAM VRef will not be trained */
@@ -511,8 +513,14 @@ step2:
 	 */
 	bus_width = 3 - ((ddr_in32(&ddr->sdram_cfg) & SDRAM_CFG_DBW_MASK)
 			>> SDRAM_CFG_DBW_SHIFT);
-	timeout = ((total_gb_size_per_controller << (6 - bus_width)) * 100 /
-		(get_ddr_freq(ctrl_num) >> 20)) << 2;
+	ddr_freq_for_timeout = (get_ddr_freq(ctrl_num) >> 20) << 2;
+	if (ddr_freq_for_timeout) {
+		timeout = ((total_gb_size_per_controller <<
+				       (6 - bus_width)) * 100 /
+				ddr_freq_for_timeout);
+	} else {
+		debug("Error in getting timeout.\n");
+	}
 	total_gb_size_per_controller >>= 4;	/* shift down to gb size */
 	debug("total %d GB\n", total_gb_size_per_controller);
 	debug("Need to wait up to %d * 10ms\n", timeout);

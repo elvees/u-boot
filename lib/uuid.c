@@ -1,67 +1,43 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2011 Calxeda, Inc.
+ * Copyright 2022-2023 Arm Limited and/or its affiliates <open-source-office@arm.com>
+ *
+ * Authors:
+ *   Abdellatif El Khlifi <abdellatif.elkhlifi@arm.com>
  */
 
-#include <common.h>
+#ifndef USE_HOSTCC
 #include <command.h>
+#include <efi_api.h>
 #include <env.h>
 #include <rand.h>
 #include <time.h>
-#include <uuid.h>
-#include <linux/ctype.h>
-#include <errno.h>
-#include <common.h>
 #include <asm/io.h>
 #include <part_efi.h>
 #include <malloc.h>
 #include <dm/uclass.h>
 #include <rng.h>
+#include <linux/ctype.h>
+#include <hexdump.h>
+#else
+#include <stdarg.h>
+#include <stdint.h>
+#include <eficapsule.h>
+#include <ctype.h>
+#endif
+#include <linux/types.h>
+#include <errno.h>
+#include <linux/kconfig.h>
+#include <u-boot/uuid.h>
+#include <u-boot/sha1.h>
 
-/*
- * UUID - Universally Unique IDentifier - 128 bits unique number.
- *        There are 5 versions and one variant of UUID defined by RFC4122
- *        specification. A UUID contains a set of fields. The set varies
- *        depending on the version of the UUID, as shown below:
- *        - time, MAC address(v1),
- *        - user ID(v2),
- *        - MD5 of name or URL(v3),
- *        - random data(v4),
- *        - SHA-1 of name or URL(v5),
- *
- * Layout of UUID:
- * timestamp - 60-bit: time_low, time_mid, time_hi_and_version
- * version   - 4 bit (bit 4 through 7 of the time_hi_and_version)
- * clock seq - 14 bit: clock_seq_hi_and_reserved, clock_seq_low
- * variant:  - bit 6 and 7 of clock_seq_hi_and_reserved
- * node      - 48 bit
- *
- * source: https://www.ietf.org/rfc/rfc4122.txt
- *
- * UUID binary format (16 bytes):
- *
- * 4B-2B-2B-2B-6B (big endian - network byte order)
- *
- * UUID string is 36 length of characters (36 bytes):
- *
- * 0        9    14   19   24
- * xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
- *    be     be   be   be       be
- *
- * where x is a hexadecimal character. Fields are separated by '-'s.
- * When converting to a binary UUID, le means the field should be converted
- * to little endian and be means it should be converted to big endian.
- *
- * UUID is also used as GUID (Globally Unique Identifier) with the same binary
- * format but it differs in string format like below.
- *
- * GUID:
- * 0        9    14   19   24
- * xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
- *    le     le   le   be       be
- *
- * GUID is used e.g. in GPT (GUID Partition Table) as a partiions unique id.
- */
+#ifdef USE_HOSTCC
+/* polyfill hextoul to avoid pulling in strto.c */
+#define hextoul(cp, endp) strtoul(cp, endp, 16)
+#define hextoull(cp, endp) strtoull(cp, endp, 16)
+#endif
+
 int uuid_str_valid(const char *uuid)
 {
 	int i, valid;
@@ -86,34 +62,244 @@ int uuid_str_valid(const char *uuid)
 	return 1;
 }
 
-#ifdef CONFIG_PARTITION_TYPE_GUID
+/*
+ * Array of string (short and long) for known GUID of GPT partition type
+ * at least one string must be present, @type or @description
+ *
+ * @type        : short name for the parameter 'type' of gpt command (max size UUID_STR_LEN = 36,
+ *                no space), also used as fallback description when the next field is absent
+ * @description : long description associated to type GUID, used for %pUs
+ * @guid        : known type GUID value
+ */
 static const struct {
-	const char *string;
+	const char *type;
+	const char *description;
 	efi_guid_t guid;
 } list_guid[] = {
-	{"system",	PARTITION_SYSTEM_GUID},
-	{"mbr",		LEGACY_MBR_PARTITION_GUID},
-	{"msft",	PARTITION_MSFT_RESERVED_GUID},
-	{"data",	PARTITION_BASIC_DATA_GUID},
-	{"linux",	PARTITION_LINUX_FILE_SYSTEM_DATA_GUID},
-	{"raid",	PARTITION_LINUX_RAID_GUID},
-	{"swap",	PARTITION_LINUX_SWAP_GUID},
-	{"lvm",		PARTITION_LINUX_LVM_GUID},
-	{"u-boot-env",	PARTITION_U_BOOT_ENVIRONMENT},
+#ifndef USE_HOSTCC
+#if CONFIG_IS_ENABLED(EFI_PARTITION)
+	{"mbr",		NULL,	LEGACY_MBR_PARTITION_GUID},
+	{"msft",	NULL,	PARTITION_MSFT_RESERVED_GUID},
+	{"data",	NULL,	PARTITION_BASIC_DATA_GUID},
+	{"linux",	NULL,	PARTITION_LINUX_FILE_SYSTEM_DATA_GUID},
+	{"raid",	NULL,	PARTITION_LINUX_RAID_GUID},
+	{"swap",	NULL,	PARTITION_LINUX_SWAP_GUID},
+	{"lvm",		NULL,	PARTITION_LINUX_LVM_GUID},
+	{"u-boot-env",	NULL,	PARTITION_U_BOOT_ENVIRONMENT},
+	{"cros-kern",	NULL,	PARTITION_CROS_KERNEL},
+	{"cros-root",	NULL,	PARTITION_CROS_ROOT},
+	{"cros-fw",	NULL,	PARTITION_CROS_FIRMWARE},
+	{"cros-rsrv",	NULL,	PARTITION_CROS_RESERVED},
+	{
+		"system", "EFI System Partition",
+		PARTITION_SYSTEM_GUID,
+	},
+#if defined(CONFIG_CMD_EFIDEBUG) || defined(CONFIG_EFI)
+	{
+		NULL, "Device Path",
+		PARTITION_SYSTEM_GUID,
+	},
+	{
+		NULL, "Device Path",
+		EFI_DEVICE_PATH_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Device Path To Text",
+		EFI_DEVICE_PATH_TO_TEXT_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Device Path Utilities",
+		EFI_DEVICE_PATH_UTILITIES_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Unicode Collation 2",
+		EFI_UNICODE_COLLATION_PROTOCOL2_GUID,
+	},
+	{
+		NULL, "Driver Binding",
+		EFI_DRIVER_BINDING_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Simple Text Input",
+		EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Simple Text Input Ex",
+		EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Simple Text Output",
+		EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Block IO",
+		EFI_BLOCK_IO_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Disk IO",
+		EFI_DISK_IO_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Simple File System",
+		EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Loaded Image",
+		EFI_LOADED_IMAGE_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Loaded Image Device Path",
+		EFI_LOADED_IMAGE_DEVICE_PATH_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Graphics Output",
+		EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID,
+	},
+	{
+		NULL, "HII String",
+		EFI_HII_STRING_PROTOCOL_GUID,
+	},
+	{
+		NULL, "HII Database",
+		EFI_HII_DATABASE_PROTOCOL_GUID,
+	},
+	{
+		NULL, "HII Config Access",
+		EFI_HII_CONFIG_ACCESS_PROTOCOL_GUID,
+	},
+	{
+		NULL, "HII Config Routing",
+		EFI_HII_CONFIG_ROUTING_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Load File",
+		EFI_LOAD_FILE_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Load File2",
+		EFI_LOAD_FILE2_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Random Number Generator",
+		EFI_RNG_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Simple Network",
+		EFI_SIMPLE_NETWORK_PROTOCOL_GUID,
+	},
+	{
+		NULL, "PXE Base Code",
+		EFI_PXE_BASE_CODE_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Device-Tree Fixup",
+		EFI_DT_FIXUP_PROTOCOL_GUID,
+	},
+	{
+		NULL, "TCG2",
+		EFI_TCG2_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Firmware Management",
+		EFI_FIRMWARE_MANAGEMENT_PROTOCOL_GUID
+	},
+#if IS_ENABLED(CONFIG_EFI_HTTP_PROTOCOL)
+	{
+		NULL, "HTTP",
+		EFI_HTTP_PROTOCOL_GUID,
+	},
+	{
+		NULL, "HTTP Service Binding",
+		EFI_HTTP_SERVICE_BINDING_PROTOCOL_GUID,
+	},
+	{
+		NULL, "IPv4 Config2",
+		EFI_IP4_CONFIG2_PROTOCOL_GUID,
+	},
+#endif
+	/* Configuration table GUIDs */
+	{
+		NULL, "ACPI table",
+		EFI_ACPI_TABLE_GUID,
+	},
+	{
+		NULL, "EFI System Resource Table",
+		EFI_SYSTEM_RESOURCE_TABLE_GUID,
+	},
+	{
+		NULL, "device tree",
+		EFI_FDT_GUID,
+	},
+	{
+		NULL, "SMBIOS table",
+		SMBIOS_TABLE_GUID,
+	},
+	{
+		NULL, "SMBIOS3 table",
+		SMBIOS3_TABLE_GUID,
+	},
+	{
+		NULL, "Runtime properties",
+		EFI_RT_PROPERTIES_TABLE_GUID,
+	},
+	{
+		NULL, "TCG2 Final Events Table",
+		EFI_TCG2_FINAL_EVENTS_TABLE_GUID,
+	},
+	{
+		NULL, "EFI Conformance Profiles Table",
+		EFI_CONFORMANCE_PROFILES_TABLE_GUID,
+	},
+#ifdef CONFIG_EFI_RISCV_BOOT_PROTOCOL
+	{
+		NULL, "RISC-V Boot",
+		RISCV_EFI_BOOT_PROTOCOL_GUID,
+	},
+#endif
+#endif /* CONFIG_CMD_EFIDEBUG */
+#ifdef CONFIG_CMD_NVEDIT_EFI
+	/* signature database */
+	{
+		"EFI_GLOBAL_VARIABLE_GUID", NULL,
+		EFI_GLOBAL_VARIABLE_GUID,
+	},
+	{
+		"EFI_IMAGE_SECURITY_DATABASE_GUID", NULL,
+		EFI_IMAGE_SECURITY_DATABASE_GUID,
+	},
+	/* certificate types */
+	{
+		"EFI_CERT_SHA256_GUID", NULL,
+		EFI_CERT_SHA256_GUID,
+	},
+	{
+		"EFI_CERT_X509_GUID", NULL,
+		EFI_CERT_X509_GUID,
+	},
+	{
+		"EFI_CERT_TYPE_PKCS7_GUID", NULL,
+		EFI_CERT_TYPE_PKCS7_GUID,
+	},
+#endif
+#if defined(CONFIG_CMD_EFIDEBUG) || defined(CONFIG_EFI)
+	{ "EFI_LZMA_COMPRESSED", NULL, EFI_LZMA_COMPRESSED },
+	{ "EFI_DXE_SERVICES", NULL, EFI_DXE_SERVICES },
+	{ "EFI_HOB_LIST", NULL, EFI_HOB_LIST },
+	{ "EFI_MEMORY_TYPE", NULL, EFI_MEMORY_TYPE },
+	{ "EFI_MEM_STATUS_CODE_REC", NULL, EFI_MEM_STATUS_CODE_REC },
+	{ "EFI_GUID_EFI_ACPI1", NULL, EFI_GUID_EFI_ACPI1 },
+#endif
+#endif /* EFI_PARTITION */
+#endif /* !USE_HOSTCC */
 };
 
-/*
- * uuid_guid_get_bin() - this function get GUID bin for string
- *
- * @param guid_str - pointer to partition type string
- * @param guid_bin - pointer to allocated array for big endian output [16B]
- */
 int uuid_guid_get_bin(const char *guid_str, unsigned char *guid_bin)
 {
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(list_guid); i++) {
-		if (!strcmp(list_guid[i].string, guid_str)) {
+		if (list_guid[i].type &&
+		    !strcmp(list_guid[i].type, guid_str)) {
 			memcpy(guid_bin, &list_guid[i].guid, 16);
 			return 0;
 		}
@@ -121,33 +307,20 @@ int uuid_guid_get_bin(const char *guid_str, unsigned char *guid_bin)
 	return -ENODEV;
 }
 
-/*
- * uuid_guid_get_str() - this function get string for GUID.
- *
- * @param guid_bin - pointer to string with partition type guid [16B]
- *
- * Returns NULL if the type GUID is not known.
- */
 const char *uuid_guid_get_str(const unsigned char *guid_bin)
 {
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(list_guid); i++) {
 		if (!memcmp(list_guid[i].guid.b, guid_bin, 16)) {
-			return list_guid[i].string;
+			if (list_guid[i].description)
+				return list_guid[i].description;
+			return list_guid[i].type;
 		}
 	}
 	return NULL;
 }
-#endif
 
-/*
- * uuid_str_to_bin() - convert string UUID or GUID to big endian binary data.
- *
- * @param uuid_str - pointer to UUID or GUID string [37B] or GUID shorcut
- * @param uuid_bin - pointer to allocated array for big endian output [16B]
- * @str_format     - UUID string format: 0 - UUID; 1 - GUID
- */
 int uuid_str_to_bin(const char *uuid_str, unsigned char *uuid_bin,
 		    int str_format)
 {
@@ -156,58 +329,76 @@ int uuid_str_to_bin(const char *uuid_str, unsigned char *uuid_bin,
 	uint64_t tmp64;
 
 	if (!uuid_str_valid(uuid_str)) {
-#ifdef CONFIG_PARTITION_TYPE_GUID
-		if (!uuid_guid_get_bin(uuid_str, uuid_bin))
+		if (IS_ENABLED(CONFIG_PARTITION_TYPE_GUID) &&
+		    !uuid_guid_get_bin(uuid_str, uuid_bin))
 			return 0;
-#endif
 		return -EINVAL;
 	}
 
 	if (str_format == UUID_STR_FORMAT_STD) {
-		tmp32 = cpu_to_be32(simple_strtoul(uuid_str, NULL, 16));
+		tmp32 = cpu_to_be32(hextoul(uuid_str, NULL));
 		memcpy(uuid_bin, &tmp32, 4);
 
-		tmp16 = cpu_to_be16(simple_strtoul(uuid_str + 9, NULL, 16));
+		tmp16 = cpu_to_be16(hextoul(uuid_str + 9, NULL));
 		memcpy(uuid_bin + 4, &tmp16, 2);
 
-		tmp16 = cpu_to_be16(simple_strtoul(uuid_str + 14, NULL, 16));
+		tmp16 = cpu_to_be16(hextoul(uuid_str + 14, NULL));
 		memcpy(uuid_bin + 6, &tmp16, 2);
 	} else {
-		tmp32 = cpu_to_le32(simple_strtoul(uuid_str, NULL, 16));
+		tmp32 = cpu_to_le32(hextoul(uuid_str, NULL));
 		memcpy(uuid_bin, &tmp32, 4);
 
-		tmp16 = cpu_to_le16(simple_strtoul(uuid_str + 9, NULL, 16));
+		tmp16 = cpu_to_le16(hextoul(uuid_str + 9, NULL));
 		memcpy(uuid_bin + 4, &tmp16, 2);
 
-		tmp16 = cpu_to_le16(simple_strtoul(uuid_str + 14, NULL, 16));
+		tmp16 = cpu_to_le16(hextoul(uuid_str + 14, NULL));
 		memcpy(uuid_bin + 6, &tmp16, 2);
 	}
 
-	tmp16 = cpu_to_be16(simple_strtoul(uuid_str + 19, NULL, 16));
+	tmp16 = cpu_to_be16(hextoul(uuid_str + 19, NULL));
 	memcpy(uuid_bin + 8, &tmp16, 2);
 
-	tmp64 = cpu_to_be64(simple_strtoull(uuid_str + 24, NULL, 16));
+	tmp64 = cpu_to_be64(hextoull(uuid_str + 24, NULL));
 	memcpy(uuid_bin + 10, (char *)&tmp64 + 2, 6);
 
 	return 0;
 }
 
-/*
- * uuid_bin_to_str() - convert big endian binary data to string UUID or GUID.
- *
- * @param uuid_bin:	pointer to binary data of UUID (big endian) [16B]
- * @param uuid_str:	pointer to allocated array for output string [37B]
- * @str_format:		bit 0: 0 - UUID; 1 - GUID
- *			bit 1: 0 - lower case; 2 - upper case
- */
+int uuid_str_to_le_bin(const char *uuid_str, unsigned char *uuid_bin)
+{
+	uint16_t tmp16;
+	uint32_t tmp32;
+	uint64_t tmp64;
+
+	if (!uuid_str_valid(uuid_str) || !uuid_bin)
+		return -EINVAL;
+
+	tmp32 = cpu_to_le32(hextoul(uuid_str, NULL));
+	memcpy(uuid_bin, &tmp32, 4);
+
+	tmp16 = cpu_to_le16(hextoul(uuid_str + 9, NULL));
+	memcpy(uuid_bin + 4, &tmp16, 2);
+
+	tmp16 = cpu_to_le16(hextoul(uuid_str + 14, NULL));
+	memcpy(uuid_bin + 6, &tmp16, 2);
+
+	tmp16 = cpu_to_le16(hextoul(uuid_str + 19, NULL));
+	memcpy(uuid_bin + 8, &tmp16, 2);
+
+	tmp64 = cpu_to_le64(hextoull(uuid_str + 24, NULL));
+	memcpy(uuid_bin + 10, &tmp64, 6);
+
+	return 0;
+}
+
 void uuid_bin_to_str(const unsigned char *uuid_bin, char *uuid_str,
 		     int str_format)
 {
-	const u8 uuid_char_order[UUID_BIN_LEN] = {0, 1, 2, 3, 4, 5, 6, 7, 8,
+	const uint8_t uuid_char_order[UUID_BIN_LEN] = {0, 1, 2, 3, 4, 5, 6, 7, 8,
 						  9, 10, 11, 12, 13, 14, 15};
-	const u8 guid_char_order[UUID_BIN_LEN] = {3, 2, 1, 0, 5, 4, 7, 6, 8,
+	const uint8_t guid_char_order[UUID_BIN_LEN] = {3, 2, 1, 0, 5, 4, 7, 6, 8,
 						  9, 10, 11, 12, 13, 14, 15};
-	const u8 *char_order;
+	const uint8_t *char_order;
 	const char *format;
 	int i;
 
@@ -239,13 +430,57 @@ void uuid_bin_to_str(const unsigned char *uuid_bin, char *uuid_str,
 	}
 }
 
-/*
- * gen_rand_uuid() - this function generates a random binary UUID version 4.
- *                   In this version all fields beside 4 bits of version and
- *                   2 bits of variant are randomly generated.
- *
- * @param uuid_bin - pointer to allocated array [16B]. Output is in big endian.
-*/
+static void configure_uuid(struct uuid *uuid, unsigned char version)
+{
+	uint16_t tmp;
+
+	/* Configure variant/version bits */
+	tmp = be16_to_cpu(uuid->time_hi_and_version);
+	tmp = (tmp & ~UUID_VERSION_MASK) | (version << UUID_VERSION_SHIFT);
+	uuid->time_hi_and_version = cpu_to_be16(tmp);
+
+	uuid->clock_seq_hi_and_reserved &= ~UUID_VARIANT_MASK;
+	uuid->clock_seq_hi_and_reserved |= (UUID_VARIANT << UUID_VARIANT_SHIFT);
+}
+
+void gen_v5_guid(const struct uuid *namespace, struct efi_guid *guid, ...)
+{
+	sha1_context ctx;
+	va_list args;
+	const uint8_t *data;
+	uint32_t *tmp32;
+	uint16_t *tmp16;
+	uint8_t hash[SHA1_SUM_LEN];
+
+	sha1_starts(&ctx);
+	/* Hash the namespace UUID as salt */
+	sha1_update(&ctx, (unsigned char *)namespace, UUID_BIN_LEN);
+	va_start(args, guid);
+
+	while ((data = va_arg(args, const uint8_t *))) {
+		unsigned int len = va_arg(args, size_t);
+
+		sha1_update(&ctx, data, len);
+	}
+
+	va_end(args);
+	sha1_finish(&ctx, hash);
+
+	/* Truncate the hash into output UUID, it is already big endian */
+	memcpy(guid, hash, sizeof(*guid));
+
+	configure_uuid((struct uuid *)guid, 5);
+
+	/* Make little endian */
+	tmp32 = (uint32_t *)&guid->b[0];
+	*tmp32 = cpu_to_le32(be32_to_cpu(*tmp32));
+	tmp16 = (uint16_t *)&guid->b[4];
+	*tmp16 = cpu_to_le16(be16_to_cpu(*tmp16));
+	tmp16 = (uint16_t *)&guid->b[6];
+	*tmp16 = cpu_to_le16(be16_to_cpu(*tmp16));
+}
+
+#ifndef USE_HOSTCC
 #if defined(CONFIG_RANDOM_UUID) || defined(CONFIG_CMD_UUID)
 void gen_rand_uuid(unsigned char *uuid_bin)
 {
@@ -255,9 +490,9 @@ void gen_rand_uuid(unsigned char *uuid_bin)
 	struct udevice *devp;
 	u32 randv = 0;
 
-	if (IS_ENABLED(CONFIG_DM_RNG)) {
+	if (CONFIG_IS_ENABLED(DM_RNG)) {
 		ret = uclass_get_device(UCLASS_RNG, 0, &devp);
-		if (ret) {
+		if (!ret) {
 			ret = dm_rng_read(devp, &randv, sizeof(randv));
 			if (ret < 0)
 				randv = 0;
@@ -272,24 +507,11 @@ void gen_rand_uuid(unsigned char *uuid_bin)
 	for (i = 0; i < 4; i++)
 		ptr[i] = rand();
 
-	clrsetbits_be16(&uuid->time_hi_and_version,
-			UUID_VERSION_MASK,
-			UUID_VERSION << UUID_VERSION_SHIFT);
-
-	clrsetbits_8(&uuid->clock_seq_hi_and_reserved,
-		     UUID_VARIANT_MASK,
-		     UUID_VARIANT << UUID_VARIANT_SHIFT);
+	configure_uuid(uuid, UUID_VERSION);
 
 	memcpy(uuid_bin, uuid, 16);
 }
 
-/*
- * gen_rand_uuid_str() - this function generates UUID v4 (random) in two string
- *                       formats UUID or GUID.
- *
- * @param uuid_str - pointer to allocated array [37B].
- * @param          - uuid output type: UUID - 0, GUID - 1
- */
 void gen_rand_uuid_str(char *uuid_str, int str_format)
 {
 	unsigned char uuid_bin[UUID_BIN_LEN];
@@ -301,7 +523,7 @@ void gen_rand_uuid_str(char *uuid_str, int str_format)
 	uuid_bin_to_str(uuid_bin, uuid_str, str_format);
 }
 
-#if !defined(CONFIG_SPL_BUILD) && defined(CONFIG_CMD_UUID)
+#if !defined(CONFIG_XPL_BUILD) && defined(CONFIG_CMD_UUID)
 int do_uuid(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	char uuid[UUID_STR_LEN + 1];
@@ -342,3 +564,4 @@ U_BOOT_CMD(guid, CONFIG_SYS_MAXARGS, 1, do_uuid,
 );
 #endif /* CONFIG_CMD_UUID */
 #endif /* CONFIG_RANDOM_UUID || CONFIG_CMD_UUID */
+#endif /* !USE_HOSTCC */

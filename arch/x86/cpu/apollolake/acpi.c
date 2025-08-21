@@ -10,7 +10,6 @@
 
 #define LOG_CATEGORY LOGC_ACPI
 
-#include <common.h>
 #include <cpu.h>
 #include <dm.h>
 #include <log.h>
@@ -129,8 +128,10 @@ int arch_madt_sci_irq_polarity(int sci)
 	return MP_IRQ_POLARITY_LOW;
 }
 
-void fill_fadt(struct acpi_fadt *fadt)
+void acpi_fill_fadt(struct acpi_fadt *fadt)
 {
+	intel_acpi_fill_fadt(fadt);
+
 	fadt->pm_tmr_blk = IOMAP_ACPI_BASE + PM1_TMR;
 
 	fadt->p_lvl2_lat = ACPI_FADT_C2_NOT_SUPPORTED;
@@ -144,17 +145,8 @@ void fill_fadt(struct acpi_fadt *fadt)
 	fadt->x_pm_tmr_blk.space_id = 1;
 	fadt->x_pm_tmr_blk.bit_width = fadt->pm_tmr_len * 8;
 	fadt->x_pm_tmr_blk.addrl = IOMAP_ACPI_BASE + PM1_TMR;
-}
 
-void acpi_create_fadt(struct acpi_fadt *fadt, struct acpi_facs *facs,
-		      void *dsdt)
-{
-	struct acpi_table_header *header = &fadt->header;
-
-	acpi_fadt_common(fadt, facs, dsdt);
-	intel_acpi_fill_fadt(fadt);
-	fill_fadt(fadt);
-	header->checksum = table_compute_checksum(fadt, header->length);
+	fadt->preferred_pm_profile = ACPI_PM_MOBILE;
 }
 
 int apl_acpi_fill_dmar(struct acpi_ctx *ctx)

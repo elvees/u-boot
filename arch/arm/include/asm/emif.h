@@ -583,7 +583,7 @@
 	(DMM_SDRC_MAP_EMIF1_AND_EMIF2 << EMIF_SDRC_MAP_SHIFT) |\
 	(DMM_SDRC_ADDR_SPC_SDRAM << EMIF_SDRC_ADDRSPC_SHIFT) |\
 	(DMM_SDRC_INTL_128B << EMIF_SDRC_INTL_SHIFT) |\
-	(CONFIG_SYS_SDRAM_BASE << EMIF_SYS_ADDR_SHIFT))
+	(CFG_SYS_SDRAM_BASE << EMIF_SYS_ADDR_SHIFT))
 
 #define DMM_LISA_MAP_EMIF1_ONLY_BASE_VAL	(\
 	(DMM_SDRC_MAP_EMIF1_ONLY << EMIF_SDRC_MAP_SHIFT)|\
@@ -880,7 +880,6 @@ struct dmm_lisa_map_regs {
 #define RL_FINAL	6
 #endif
 
-
 /* Interleaving policies at EMIF level- between banks and Chip Selects */
 #define EMIF_INTERLEAVING_POLICY_MAX_INTERLEAVING	0
 #define EMIF_INTERLEAVING_POLICY_NO_BANK_INTERLEAVING	3
@@ -912,7 +911,6 @@ struct dmm_lisa_map_regs {
  * 50us - or maximum value will do
  */
 #define READ_IDLE_INTERVAL_NORMAL	(50*1000)
-
 
 /*
  * Unless voltage is changing due to DVFS one ZQCS command every 50ms should
@@ -960,7 +958,6 @@ struct dmm_lisa_map_regs {
 #define REG_CS_TIM		0x0
 #define REG_SR_TIM		0xF
 #define REG_PD_TIM		0xF
-
 
 /* EMIF_PWR_MGMT_CTRL register */
 #define EMIF_PWR_MGMT_CTRL (\

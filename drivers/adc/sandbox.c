@@ -3,11 +3,11 @@
  * Copyright (C) 2015 Samsung Electronics
  * Przemyslaw Marczak <p.marczak@samsung.com>
  */
-#include <common.h>
 #include <errno.h>
 #include <dm.h>
 #include <adc.h>
 #include <sandbox-adc.h>
+#include <linux/printk.h>
 
 /**
  * struct sandbox_adc_priv - sandbox ADC device's operation status and data

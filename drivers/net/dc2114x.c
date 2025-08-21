@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
 
-#include <common.h>
 #include <asm/io.h>
+#include <cpu_func.h>
 #include <dm.h>
 #include <malloc.h>
 #include <net.h>
@@ -73,16 +73,20 @@
 
 #define POLL_DEMAND	1
 
-#if defined(CONFIG_DM_ETH)
-#define phys_to_bus(dev, a)	dm_pci_phys_to_mem((dev), (a))
-#elif defined(CONFIG_E500)
-#define phys_to_bus(dev, a)	(a)
+#if CONFIG_IS_ENABLED(TULIP_SUPPORT_NON_PCI)
+#define phys_to_bus(dev, a)	virt_to_phys((volatile const void *)(a))
 #else
-#define phys_to_bus(dev, a)	pci_phys_to_mem((dev), (a))
+#define phys_to_bus(dev, a)	dm_pci_phys_to_mem((dev), (a))
+#endif
+
+/* Number of TX descriptors   */
+#if CONFIG_IS_ENABLED(TULIP_MULTIPLE_TX_DESC)
+#define NUM_TX_DESC 4
+#else
+#define NUM_TX_DESC 1
 #endif
 
 #define NUM_RX_DESC PKTBUFSRX
-#define NUM_TX_DESC 1			/* Number of TX descriptors   */
 #define RX_BUFF_SZ  PKTSIZE_ALIGN
 
 #define TOUT_LOOP   1000000
@@ -96,19 +100,22 @@ struct de4x5_desc {
 	u32 next;
 };
 
+/* Assigned for network card's ring buffer:
+ * Some CPU might treat these memories as cached, and changes to these memories
+ * won't immediately be visible to each other. It is necessary to ensure that
+ * these memories between the CPU and the network card are marked as uncached.
+ */
+static struct de4x5_desc rx_ring[NUM_RX_DESC] __aligned(32);
+static struct de4x5_desc tx_ring[NUM_TX_DESC] __aligned(32);
+
 struct dc2114x_priv {
-	struct de4x5_desc rx_ring[NUM_RX_DESC] __aligned(32);
-	struct de4x5_desc tx_ring[NUM_TX_DESC] __aligned(32);
+	struct de4x5_desc *rx_ring; /* Must be uncached to CPU */
+	struct de4x5_desc *tx_ring; /* Must be uncached to CPU */
 	int rx_new;	/* RX descriptor ring pointer */
 	int tx_new;	/* TX descriptor ring pointer */
 	char rx_ring_size;
 	char tx_ring_size;
-#ifdef CONFIG_DM_ETH
 	struct udevice		*devno;
-#else
-	struct eth_device	dev;
-	pci_dev_t		devno;
-#endif
 	char			*name;
 	void __iomem		*iobase;
 	u8			*enetaddr;
@@ -283,7 +290,12 @@ static int read_srom(struct dc2114x_priv *priv, u_long ioaddr, int index)
 
 static void send_setup_frame(struct dc2114x_priv *priv)
 {
-	char setup_frame[SETUP_FRAME_LEN];
+	/* We are writing setup frame and these changes should be visible to the
+	 * network card immediately. So let's directly read/write through the
+	 * uncached window.
+	 */
+	char __setup_frame[SETUP_FRAME_LEN] __aligned(32);
+	char *setup_frame = (char *)map_physmem((phys_addr_t)virt_to_phys(__setup_frame), 0, MAP_NOCACHE);
 	char *pa = &setup_frame[0];
 	int i;
 
@@ -304,8 +316,13 @@ static void send_setup_frame(struct dc2114x_priv *priv)
 	}
 
 	priv->tx_ring[priv->tx_new].buf = cpu_to_le32(phys_to_bus(priv->devno,
-						      (u32)&setup_frame[0]));
+						      (phys_addr_t)&setup_frame[0]));
+#if CONFIG_IS_ENABLED(TULIP_MULTIPLE_TX_DESC)
+	priv->tx_ring[priv->tx_new].des1 = cpu_to_le32(TD_SET | SETUP_FRAME_LEN);
+	priv->tx_ring[priv->tx_ring_size - 1].des1 |= cpu_to_le32(TD_TER);
+#else
 	priv->tx_ring[priv->tx_new].des1 = cpu_to_le32(TD_TER | TD_SET | SETUP_FRAME_LEN);
+#endif
 	priv->tx_ring[priv->tx_new].status = cpu_to_le32(T_OWN);
 
 	dc2114x_outl(priv, POLL_DEMAND, DE4X5_TPD);
@@ -319,7 +336,7 @@ static void send_setup_frame(struct dc2114x_priv *priv)
 	}
 
 	if (le32_to_cpu(priv->tx_ring[priv->tx_new].status) != 0x7FFFFFFF) {
-		printf("TX error status2 = 0x%08X\n",
+		debug("TX error status2 = 0x%08X\n",
 		       le32_to_cpu(priv->tx_ring[priv->tx_new].status));
 	}
 
@@ -344,9 +361,17 @@ static int dc21x4x_send_common(struct dc2114x_priv *priv, void *packet, int leng
 		goto done;
 	}
 
+	/* Packet should be visible to the network card */
+	flush_dcache_range((phys_addr_t)packet, (phys_addr_t)(packet + RX_BUFF_SZ));
+
 	priv->tx_ring[priv->tx_new].buf = cpu_to_le32(phys_to_bus(priv->devno,
-						      (u32)packet));
+						      (phys_addr_t)packet));
+#if CONFIG_IS_ENABLED(TULIP_MULTIPLE_TX_DESC)
+	priv->tx_ring[priv->tx_new].des1 = cpu_to_le32(TD_LS | TD_FS | length);
+	priv->tx_ring[priv->tx_ring_size - 1].des1 |= cpu_to_le32(TD_TER);
+#else
 	priv->tx_ring[priv->tx_new].des1 = cpu_to_le32(TD_TER | TD_LS | TD_FS | length);
+#endif
 	priv->tx_ring[priv->tx_new].status = cpu_to_le32(T_OWN);
 
 	dc2114x_outl(priv, POLL_DEMAND, DE4X5_TPD);
@@ -361,7 +386,9 @@ static int dc21x4x_send_common(struct dc2114x_priv *priv, void *packet, int leng
 
 	if (le32_to_cpu(priv->tx_ring[priv->tx_new].status) & TD_ES) {
 		priv->tx_ring[priv->tx_new].status = 0x0;
+#if !CONFIG_IS_ENABLED(TULIP_IGNORE_TX_NO_CARRIER)
 		goto done;
+#endif
 	}
 
 	status = length;
@@ -410,13 +437,22 @@ static int dc21x4x_init_common(struct dc2114x_priv *priv)
 		return -1;
 	}
 
-	dc2114x_outl(priv, OMR_SDP | OMR_PS | OMR_PM, DE4X5_OMR);
+	/* 2024-07:
+	 * Remove the OMR_PM flag and choose 16 perfect filtering mode since in
+	 * modern networks there're plenty of multicasts and set ORM_PM flag will
+	 * increase the dc2114x's workload and ask the U-Boot to handle packets
+	 * not related to itself. And most of the time, U-Boot does not need this
+	 * feature.
+	 *
+	 * A better way: let user to decide whether to have this flag.
+	 */
+	dc2114x_outl(priv, OMR_SDP | OMR_PS, DE4X5_OMR);
 
 	for (i = 0; i < NUM_RX_DESC; i++) {
 		priv->rx_ring[i].status = cpu_to_le32(R_OWN);
 		priv->rx_ring[i].des1 = cpu_to_le32(RX_BUFF_SZ);
 		priv->rx_ring[i].buf = cpu_to_le32(phys_to_bus(priv->devno,
-					     (u32)net_rx_packets[i]));
+					     (phys_addr_t)net_rx_packets[i]));
 		priv->rx_ring[i].next = 0;
 	}
 
@@ -435,9 +471,9 @@ static int dc21x4x_init_common(struct dc2114x_priv *priv)
 	priv->tx_ring[priv->tx_ring_size - 1].des1 |= cpu_to_le32(TD_TER);
 
 	/* Tell the adapter where the TX/RX rings are located. */
-	dc2114x_outl(priv, phys_to_bus(priv->devno, (u32)&priv->rx_ring),
+	dc2114x_outl(priv, phys_to_bus(priv->devno, (phys_addr_t)priv->rx_ring),
 		     DE4X5_RRBA);
-	dc2114x_outl(priv, phys_to_bus(priv->devno, (u32)&priv->tx_ring),
+	dc2114x_outl(priv, phys_to_bus(priv->devno, (phys_addr_t)priv->tx_ring),
 		     DE4X5_TRBA);
 
 	start_de4x5(priv);
@@ -473,165 +509,32 @@ static void read_hw_addr(struct dc2114x_priv *priv)
 	}
 }
 
+#if !CONFIG_IS_ENABLED(TULIP_SUPPORT_NON_PCI)
 static struct pci_device_id supported[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_TULIP_FAST) },
 	{ PCI_DEVICE(PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21142) },
 	{ }
 };
+#endif
 
-#ifndef CONFIG_DM_ETH
-static int dc21x4x_init(struct eth_device *dev, struct bd_info *bis)
-{
-	struct dc2114x_priv *priv =
-		container_of(dev, struct dc2114x_priv, dev);
-
-	/* Ensure we're not sleeping. */
-	pci_write_config_byte(priv->devno, PCI_CFDA_PSM, WAKEUP);
-
-	return dc21x4x_init_common(priv);
-}
-
-static void dc21x4x_halt(struct eth_device *dev)
-{
-	struct dc2114x_priv *priv =
-		container_of(dev, struct dc2114x_priv, dev);
-
-	dc21x4x_halt_common(priv);
-
-	pci_write_config_byte(priv->devno, PCI_CFDA_PSM, SLEEP);
-}
-
-static int dc21x4x_send(struct eth_device *dev, void *packet, int length)
-{
-	struct dc2114x_priv *priv =
-		container_of(dev, struct dc2114x_priv, dev);
-
-	return dc21x4x_send_common(priv, packet, length);
-}
-
-static int dc21x4x_recv(struct eth_device *dev)
-{
-	struct dc2114x_priv *priv =
-		container_of(dev, struct dc2114x_priv, dev);
-	int length = 0;
-	int ret;
-
-	while (true) {
-		ret = dc21x4x_recv_check(priv);
-		if (!ret)
-			break;
-
-		if (ret > 0) {
-			length = ret;
-			/* Pass the packet up to the protocol layers */
-			net_process_received_packet
-				(net_rx_packets[priv->rx_new], length - 4);
-		}
-
-		/*
-		 * Change buffer ownership for this frame,
-		 * back to the adapter.
-		 */
-		if (ret != -EAGAIN)
-			priv->rx_ring[priv->rx_new].status = cpu_to_le32(R_OWN);
-
-		/* Update entry information. */
-		priv->rx_new = (priv->rx_new + 1) % priv->rx_ring_size;
-	}
-
-	return length;
-}
-
-int dc21x4x_initialize(struct bd_info *bis)
-{
-	struct dc2114x_priv *priv;
-	struct eth_device *dev;
-	unsigned short status;
-	unsigned char timer;
-	unsigned int iobase;
-	int card_number = 0;
-	pci_dev_t devbusfn;
-	int idx = 0;
-
-	while (1) {
-		devbusfn = pci_find_devices(supported, idx++);
-		if (devbusfn == -1)
-			break;
-
-		pci_read_config_word(devbusfn, PCI_COMMAND, &status);
-		status |= PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER;
-		pci_write_config_word(devbusfn, PCI_COMMAND, status);
-
-		pci_read_config_word(devbusfn, PCI_COMMAND, &status);
-		if (!(status & PCI_COMMAND_MEMORY)) {
-			printf("Error: Can not enable MEMORY access.\n");
-			continue;
-		}
-
-		if (!(status & PCI_COMMAND_MASTER)) {
-			printf("Error: Can not enable Bus Mastering.\n");
-			continue;
-		}
-
-		/* Check the latency timer for values >= 0x60. */
-		pci_read_config_byte(devbusfn, PCI_LATENCY_TIMER, &timer);
-
-		if (timer < 0x60) {
-			pci_write_config_byte(devbusfn, PCI_LATENCY_TIMER,
-					      0x60);
-		}
-
-		/* read BAR for memory space access */
-		pci_read_config_dword(devbusfn, PCI_BASE_ADDRESS_1, &iobase);
-		iobase &= PCI_BASE_ADDRESS_MEM_MASK;
-		debug("dc21x4x: DEC 21142 PCI Device @0x%x\n", iobase);
-
-		priv = memalign(32, sizeof(*priv));
-		if (!priv) {
-			printf("Can not allocalte memory of dc21x4x\n");
-			break;
-		}
-		memset(priv, 0, sizeof(*priv));
-
-		dev = &priv->dev;
-
-		sprintf(dev->name, "dc21x4x#%d", card_number);
-		priv->devno = devbusfn;
-		priv->name = dev->name;
-		priv->enetaddr = dev->enetaddr;
-
-		dev->iobase = pci_mem_to_phys(devbusfn, iobase);
-		dev->priv = (void *)devbusfn;
-		dev->init = dc21x4x_init;
-		dev->halt = dc21x4x_halt;
-		dev->send = dc21x4x_send;
-		dev->recv = dc21x4x_recv;
-
-		/* Ensure we're not sleeping. */
-		pci_write_config_byte(devbusfn, PCI_CFDA_PSM, WAKEUP);
-
-		udelay(10 * 1000);
-
-		read_hw_addr(priv);
-
-		eth_register(dev);
-
-		card_number++;
-	}
-
-	return card_number;
-}
-
-#else	/* DM_ETH */
 static int dc2114x_start(struct udevice *dev)
 {
-	struct eth_pdata *plat = dev_get_plat(dev);
 	struct dc2114x_priv *priv = dev_get_priv(dev);
+	int rval;
 
-	memcpy(priv->enetaddr, plat->enetaddr, sizeof(plat->enetaddr));
+	if (!priv->enetaddr) {
+		rval = eth_env_get_enetaddr("ethaddr", priv->enetaddr);
 
+		if (!rval) {
+			printf("dc2114x: Err: please set a valid MAC address\n");
+			return -EINVAL;
+		}
+	}
+
+#if !CONFIG_IS_ENABLED(TULIP_SUPPORT_NON_PCI)
 	/* Ensure we're not sleeping. */
 	dm_pci_write_config8(dev, PCI_CFDA_PSM, WAKEUP);
+#endif
 
 	return dc21x4x_init_common(priv);
 }
@@ -641,8 +544,9 @@ static void dc2114x_stop(struct udevice *dev)
 	struct dc2114x_priv *priv = dev_get_priv(dev);
 
 	dc21x4x_halt_common(priv);
-
+#if !CONFIG_IS_ENABLED(TULIP_SUPPORT_NON_PCI)
 	dm_pci_write_config8(dev, PCI_CFDA_PSM, SLEEP);
+#endif
 }
 
 static int dc2114x_send(struct udevice *dev, void *packet, int length)
@@ -671,7 +575,8 @@ static int dc2114x_recv(struct udevice *dev, int flags, uchar **packetp)
 	if (!ret)
 		return 0;
 
-	*packetp = net_rx_packets[priv->rx_new];
+	invalidate_dcache_range((phys_addr_t)net_rx_packets[priv->rx_new], (phys_addr_t)(net_rx_packets[priv->rx_new] + RX_BUFF_SZ));
+	*packetp = (uchar *)net_rx_packets[priv->rx_new];
 
 	return ret - 4;
 }
@@ -699,7 +604,7 @@ static int dc2114x_read_rom_hwaddr(struct udevice *dev)
 
 static int dc2114x_bind(struct udevice *dev)
 {
-	static int card_number;
+	static int card_number = 0;
 	char name[16];
 
 	sprintf(name, "dc2114x#%u", card_number++);
@@ -711,6 +616,8 @@ static int dc2114x_probe(struct udevice *dev)
 {
 	struct eth_pdata *plat = dev_get_plat(dev);
 	struct dc2114x_priv *priv = dev_get_priv(dev);
+
+#if !CONFIG_IS_ENABLED(TULIP_SUPPORT_NON_PCI)
 	u16 command, status;
 	u32 iobase;
 
@@ -718,9 +625,6 @@ static int dc2114x_probe(struct udevice *dev)
 	iobase &= ~0xf;
 
 	debug("dc2114x: DEC 2114x PCI Device @0x%x\n", iobase);
-
-	priv->devno = dev;
-	priv->enetaddr = plat->enetaddr;
 	priv->iobase = (void __iomem *)dm_pci_mem_to_phys(dev, iobase);
 
 	command = PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER;
@@ -732,9 +636,28 @@ static int dc2114x_probe(struct udevice *dev)
 	}
 
 	dm_pci_write_config8(dev, PCI_LATENCY_TIMER, 0x60);
+#endif
+
+	priv->devno = dev;
+	priv->enetaddr = plat->enetaddr;
+	priv->rx_ring = (struct de4x5_desc *)map_physmem((phys_addr_t)virt_to_phys(rx_ring), 0, MAP_NOCACHE);
+	priv->tx_ring = (struct de4x5_desc *)map_physmem((phys_addr_t)virt_to_phys(tx_ring), 0, MAP_NOCACHE);
 
 	return 0;
 }
+
+#if CONFIG_IS_ENABLED(TULIP_SUPPORT_NON_PCI)
+static int dc2114x_of_to_plat(struct udevice *dev)
+{
+	struct eth_pdata *plat = dev_get_plat(dev);
+	struct dc2114x_priv *priv = dev_get_priv(dev);
+
+	plat->iobase = (phys_addr_t)map_physmem((phys_addr_t)devfdt_get_addr(dev), 0, MAP_NOCACHE);
+	priv->iobase = (void *)plat->iobase;
+
+	return 0;
+}
+#endif
 
 static const struct eth_ops dc2114x_ops = {
 	.start		= dc2114x_start,
@@ -745,9 +668,23 @@ static const struct eth_ops dc2114x_ops = {
 	.read_rom_hwaddr = dc2114x_read_rom_hwaddr,
 };
 
+#if CONFIG_IS_ENABLED(TULIP_SUPPORT_NON_PCI)
+static const struct udevice_id dc2114x_eth_ids[] = {
+	{ .compatible = "dec,dmfe" },
+	{ .compatible = "tulip,dmfe" },
+	{ .compatible = "dec,dc2114x" },
+	{ .compatible = "tulip,dc2114x" },
+	{ }
+};
+#endif
+
 U_BOOT_DRIVER(eth_dc2114x) = {
 	.name	= "eth_dc2114x",
 	.id	= UCLASS_ETH,
+#if CONFIG_IS_ENABLED(TULIP_SUPPORT_NON_PCI)
+	.of_match	= dc2114x_eth_ids,
+	.of_to_plat	= dc2114x_of_to_plat,
+#endif
 	.bind	= dc2114x_bind,
 	.probe	= dc2114x_probe,
 	.ops	= &dc2114x_ops,
@@ -755,5 +692,6 @@ U_BOOT_DRIVER(eth_dc2114x) = {
 	.plat_auto	= sizeof(struct eth_pdata),
 };
 
+#if !CONFIG_IS_ENABLED(TULIP_SUPPORT_NON_PCI)
 U_BOOT_PCI_DEVICE(eth_dc2114x, supported);
 #endif

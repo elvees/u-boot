@@ -7,10 +7,9 @@
  * Based on ti/evm/evm.c
  *
  * Copyright (C) 2010
- * Texas Instruments Incorporated - http://www.ti.com/
+ * Texas Instruments Incorporated - https://www.ti.com/
  */
 
-#include <common.h>
 #include <dm.h>
 #include <init.h>
 #include <net.h>
@@ -40,7 +39,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define CPGMACSS_SW_RST		(1 << 1)
 #define PHY_GPIO		30
 
-#if defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_XPL_BUILD)
 #if defined(CONFIG_SPL_OS_BOOT)
 int spl_start_uboot(void)
 {
@@ -117,16 +116,9 @@ static void am3517_evm_musb_init(void)
  */
 int misc_init_r(void)
 {
-	u32 reset;
-
 	omap_die_id_display();
 
 	am3517_evm_musb_init();
-
-	/* ensure that the Ethernet module is out of reset */
-	reset = readl(AM3517_IP_SW_RESET);
-	reset &= (~CPGMACSS_SW_RST);
-	writel(reset, AM3517_IP_SW_RESET);
 
 	return 0;
 }
@@ -141,7 +133,6 @@ void set_muxconf_regs(void)
 {
 	MUX_AM3517EVM();
 }
-
 
 #if defined(CONFIG_USB_ETHER) && defined(CONFIG_USB_MUSB_GADGET)
 int board_eth_init(struct bd_info *bis)

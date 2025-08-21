@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2017 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2017 Texas Instruments Incorporated - https://www.ti.com/
  * Written by Jean-Jacques Hiblot  <jjhiblot@ti.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <dm/device.h>
 #include <generic-phy.h>
@@ -16,6 +15,7 @@
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/err.h>
+#include <linux/printk.h>
 
 /* PLLCTRL Registers */
 #define PLL_STATUS              0x00000004

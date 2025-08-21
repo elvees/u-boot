@@ -8,7 +8,6 @@
  * Copyright (c) 2005, Grzegorz Milos, gm281@cam.ac.uk,Intel Research Cambridge
  * Copyright (c) 2020, EPAM Systems Inc.
  */
-#include <common.h>
 #include <cpu_func.h>
 #include <log.h>
 #include <memalign.h>
@@ -144,6 +143,36 @@ struct shared_info *map_shared_info(void *p)
 	return HYPERVISOR_shared_info;
 }
 
+void unmap_shared_info(void)
+{
+	xen_pfn_t shared_info_pfn = virt_to_pfn(HYPERVISOR_shared_info);
+	struct xen_remove_from_physmap xrfp = {0};
+	struct xen_memory_reservation reservation = {0};
+	xen_ulong_t nr_exts = 1;
+
+	xrfp.domid = DOMID_SELF;
+	xrfp.gpfn = shared_info_pfn;
+	if (HYPERVISOR_memory_op(XENMEM_remove_from_physmap, &xrfp) != 0)
+		panic("Failed to unmap HYPERVISOR_shared_info\n");
+
+	/*
+	 * After removing from physmap there will be a hole in address space on
+	 * HYPERVISOR_shared_info address, so to free memory allocated with
+	 * memalign and prevent exceptions during access to this page we need to
+	 * fill this 4KB hole with XENMEM_populate_physmap before jumping to Linux.
+	 */
+	reservation.domid = DOMID_SELF;
+	reservation.extent_order = 0;
+	reservation.address_bits = 0;
+	set_xen_guest_handle(reservation.extent_start, &shared_info_pfn);
+	reservation.nr_extents = nr_exts;
+	if (HYPERVISOR_memory_op(XENMEM_populate_physmap, &reservation) != nr_exts)
+		panic("Failed to populate memory on HYPERVISOR_shared_info addr\n");
+
+	/* Now we can return this to memory allocator */
+	free(HYPERVISOR_shared_info);
+}
+
 void do_hypervisor_callback(struct pt_regs *regs)
 {
 	unsigned long l1, l2, l1i, l2i;
@@ -234,7 +263,14 @@ void clear_evtchn(uint32_t port)
 
 int xen_init(void)
 {
+	int el = current_el();
+
 	debug("%s\n", __func__);
+
+	if (el != 1) {
+		puts("XEN:\tnot running from EL1\n");
+		return 0;
+	}
 
 	map_shared_info(NULL);
 	init_events();
@@ -251,4 +287,5 @@ void xen_fini(void)
 	fini_gnttab();
 	fini_xenbus();
 	fini_events();
+	unmap_shared_info();
 }

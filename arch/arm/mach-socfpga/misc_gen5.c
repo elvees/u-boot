@@ -3,7 +3,7 @@
  *  Copyright (C) 2012-2017 Altera Corporation <www.altera.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <cpu_func.h>
 #include <init.h>
 #include <asm/global_data.h>
@@ -31,7 +31,7 @@
 DECLARE_GLOBAL_DATA_PTR;
 
 static struct pl310_regs *const pl310 =
-	(struct pl310_regs *)CONFIG_SYS_PL310_BASE;
+	(struct pl310_regs *)CFG_SYS_PL310_BASE;
 static struct nic301_registers *nic301_regs =
 	(struct nic301_registers *)SOCFPGA_L3REGS_ADDRESS;
 static struct scu_registers *scu_regs =
@@ -213,7 +213,7 @@ int arch_early_init_r(void)
 	return 0;
 }
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 static struct socfpga_sdr_ctrl *sdr_ctrl =
 	(struct socfpga_sdr_ctrl *)SDR_CTRLGRP_ADDRESS;
 

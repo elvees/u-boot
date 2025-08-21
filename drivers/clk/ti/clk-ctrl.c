@@ -5,7 +5,6 @@
  * Copyright (C) 2020 Dario Binacchi <dariobin@libero.it>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <dm/device_compat.h>
 #include <clk-uclass.h>
@@ -44,7 +43,7 @@ static int clk_ti_ctrl_disable(struct clk *clk)
 	offs = priv->offs[0].start + clk->id;
 	err = clk_ti_ctrl_check_offs(clk, offs);
 	if (err) {
-		dev_err(clk->dev, "invalid offset: 0x%lx\n", offs);
+		dev_err(clk->dev, "invalid offset: 0x%llx\n", (fdt64_t)offs);
 		return err;
 	}
 
@@ -64,7 +63,7 @@ static int clk_ti_ctrl_enable(struct clk *clk)
 	offs = priv->offs[0].start + clk->id;
 	err = clk_ti_ctrl_check_offs(clk, offs);
 	if (err) {
-		dev_err(clk->dev, "invalid offset: 0x%lx\n", offs);
+		dev_err(clk->dev, "invalid offset: 0x%llx\n", (fdt64_t)offs);
 		return err;
 	}
 
@@ -83,7 +82,7 @@ static int clk_ti_ctrl_of_xlate(struct clk *clk,
 				struct ofnode_phandle_args *args)
 {
 	if (args->args_count != 2) {
-		dev_err(clk->dev, "invaild args_count: %d\n", args->args_count);
+		dev_err(clk->dev, "invalid args_count: %d\n", args->args_count);
 		return -EINVAL;
 	}
 
@@ -125,8 +124,9 @@ static int clk_ti_ctrl_of_to_plat(struct udevice *dev)
 		}
 
 		priv->offs[i].end = priv->offs[i].start + fdt_size;
-		dev_dbg(dev, "start=0x%08lx, end=0x%08lx\n",
-			priv->offs[i].start, priv->offs[i].end);
+		dev_dbg(dev, "start=0x%016llx, end=0x%016llx\n",
+			(fdt64_t)priv->offs[i].start,
+			(fdt64_t)priv->offs[i].end);
 	}
 
 	return 0;

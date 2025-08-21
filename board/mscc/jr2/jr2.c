@@ -3,7 +3,7 @@
  * Copyright (c) 2018 Microsemi Corporation
  */
 
-#include <common.h>
+#include <config.h>
 #include <image.h>
 #include <init.h>
 #include <asm/io.h>
@@ -28,11 +28,7 @@ int board_early_init_r(void)
 			ICPU_GENERAL_CTRL_IF_SI_OWNER(2));
 
 	/* Address of boot parameters */
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE;
-
-	/* LED setup */
-	if (IS_ENABLED(CONFIG_LED))
-		led_default_state();
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE;
 
 	return 0;
 }

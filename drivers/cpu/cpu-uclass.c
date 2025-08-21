@@ -4,7 +4,8 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_CPU
+
 #include <cpu.h>
 #include <dm.h>
 #include <errno.h>
@@ -12,28 +13,19 @@
 #include <dm/lists.h>
 #include <dm/root.h>
 #include <linux/err.h>
+#include <relocate.h>
+
+DECLARE_GLOBAL_DATA_PTR;
 
 int cpu_probe_all(void)
 {
-	struct udevice *cpu;
-	int ret;
+	int ret = uclass_probe_all(UCLASS_CPU);
 
-	ret = uclass_first_device(UCLASS_CPU, &cpu);
 	if (ret) {
-		debug("%s: No CPU found (err = %d)\n", __func__, ret);
-		return ret;
+		debug("%s: Error while probing CPUs (err = %d %s)\n",
+		      __func__, ret, errno_str(ret));
 	}
-
-	while (cpu) {
-		ret = uclass_next_device(&cpu);
-		if (ret) {
-			debug("%s: Error while probing CPU (err = %d)\n",
-			      __func__, ret);
-			return ret;
-		}
-	}
-
-	return 0;
+	return ret;
 }
 
 int cpu_is_current(struct udevice *cpu)
@@ -110,6 +102,16 @@ int cpu_get_vendor(const struct udevice *dev, char *buf, int size)
 		return -ENOSYS;
 
 	return ops->get_vendor(dev, buf, size);
+}
+
+int cpu_release_core(const struct udevice *dev, phys_addr_t addr)
+{
+	struct cpu_ops *ops = cpu_get_ops(dev);
+
+	if (!ops->release_core)
+		return -ENOSYS;
+
+	return ops->release_core(dev, addr);
 }
 
 U_BOOT_DRIVER(cpu_bus) = {

@@ -4,7 +4,6 @@
  *		      Wenyou Yang <wenyou.yang@microchip.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <env.h>
 #include <w1.h>
@@ -47,7 +46,7 @@ void at91_pda_detect(void)
 			break;
 		}
 	}
-	pda = simple_strtoul((const char *)buf, NULL, 10);
+	pda = dectoul((const char *)buf, NULL);
 
 	switch (pda) {
 	case 7000:

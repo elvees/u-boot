@@ -6,7 +6,6 @@
  * Author: Neil Armstrong <narmstrong@baylibre.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <malloc.h>
@@ -44,16 +43,6 @@ struct meson_gx_pwrc_vpu_priv {
 	struct reset_ctl_bulk resets;
 	struct clk_bulk clks;
 };
-
-static int meson_pwrc_vpu_request(struct power_domain *power_domain)
-{
-	return 0;
-}
-
-static int meson_pwrc_vpu_free(struct power_domain *power_domain)
-{
-	return 0;
-}
 
 static int meson_gx_pwrc_vpu_on(struct power_domain *power_domain)
 {
@@ -274,10 +263,8 @@ static int meson_pwrc_vpu_of_xlate(struct power_domain *power_domain,
 }
 
 struct power_domain_ops meson_gx_pwrc_vpu_ops = {
-	.rfree = meson_pwrc_vpu_free,
 	.off = meson_pwrc_vpu_off,
 	.on = meson_pwrc_vpu_on,
-	.request = meson_pwrc_vpu_request,
 	.of_xlate = meson_pwrc_vpu_of_xlate,
 };
 

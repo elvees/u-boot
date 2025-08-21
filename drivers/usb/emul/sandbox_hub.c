@@ -4,7 +4,6 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <usb.h>
@@ -220,13 +219,9 @@ static int sandbox_hub_submit_control_msg(struct udevice *bus,
 				udev->status = 0;
 				udev->act_len = sizeof(*hubsts);
 				return 0;
+			    }
 			}
-			default:
-				debug("%s: rx ctl requesttype=%x, request=%x\n",
-				      __func__, setup->requesttype,
-				      setup->request);
-				break;
-			}
+			break;
 		case USB_RT_PORT | USB_DIR_IN:
 			switch (setup->request) {
 			case USB_REQ_GET_STATUS: {
@@ -239,13 +234,12 @@ static int sandbox_hub_submit_control_msg(struct udevice *bus,
 				udev->status = 0;
 				udev->act_len = sizeof(*portsts);
 				return 0;
+			    }
 			}
-			}
-		default:
-			debug("%s: rx ctl requesttype=%x, request=%x\n",
-			      __func__, setup->requesttype, setup->request);
 			break;
 		}
+		debug("%s: rx ctl requesttype=%x, request=%x\n",
+		      __func__, setup->requesttype, setup->request);
 	} else if (pipe == usb_sndctrlpipe(udev, 0)) {
 		switch (setup->requesttype) {
 		case USB_RT_PORT:
@@ -263,7 +257,7 @@ static int sandbox_hub_submit_control_msg(struct udevice *bus,
 					debug("  ** Invalid feature\n");
 				}
 				return ret;
-			}
+			    }
 			case USB_REQ_CLEAR_FEATURE: {
 				int port;
 
@@ -279,18 +273,11 @@ static int sandbox_hub_submit_control_msg(struct udevice *bus,
 				}
 				udev->status = 0;
 				return 0;
+			    }
 			}
-			default:
-				debug("%s: tx ctl requesttype=%x, request=%x\n",
-				      __func__, setup->requesttype,
-				      setup->request);
-				break;
-			}
-		default:
-			debug("%s: tx ctl requesttype=%x, request=%x\n",
-			      __func__, setup->requesttype, setup->request);
-			break;
 		}
+		debug("%s: tx ctl requesttype=%x, request=%x\n",
+		      __func__, setup->requesttype, setup->request);
 	}
 	debug("pipe=%lx\n", pipe);
 

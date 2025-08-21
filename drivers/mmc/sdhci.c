@@ -7,7 +7,6 @@
  * Murray.Jensen@cmst.csiro.au, 27-Jan-01.
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <errno.h>
@@ -15,10 +14,12 @@
 #include <malloc.h>
 #include <mmc.h>
 #include <sdhci.h>
+#include <time.h>
 #include <asm/cache.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
+#include <linux/printk.h>
 #include <phys2bus.h>
 #include <power/regulator.h>
 
@@ -31,8 +32,7 @@ static void sdhci_reset(struct sdhci_host *host, u8 mask)
 	sdhci_writeb(host, mask, SDHCI_SOFTWARE_RESET);
 	while (sdhci_readb(host, SDHCI_SOFTWARE_RESET) & mask) {
 		if (timeout == 0) {
-			printf("%s: Reset 0x%x never completed.\n",
-			       __func__, (int)mask);
+			log_warning("Reset %#x never completed\n", mask);
 			return;
 		}
 		timeout--;
@@ -70,7 +70,7 @@ static void sdhci_transfer_pio(struct sdhci_host *host, struct mmc_data *data)
 	}
 }
 
-#if (defined(CONFIG_MMC_SDHCI_SDMA) || CONFIG_IS_ENABLED(MMC_SDHCI_ADMA))
+#if (CONFIG_IS_ENABLED(MMC_SDHCI_SDMA) || CONFIG_IS_ENABLED(MMC_SDHCI_ADMA))
 static void sdhci_prepare_dma(struct sdhci_host *host, struct mmc_data *data,
 			      int *is_aligned, int trans_bytes)
 {
@@ -110,7 +110,7 @@ static void sdhci_prepare_dma(struct sdhci_host *host, struct mmc_data *data,
 	}
 #if CONFIG_IS_ENABLED(MMC_SDHCI_ADMA)
 	else if (host->flags & (USE_ADMA | USE_ADMA64)) {
-		sdhci_prepare_adma_table(host->adma_desc_table, data,
+		sdhci_prepare_adma_table(host, host->adma_desc_table, data,
 					 host->start_addr);
 
 		sdhci_writel(host, lower_32_bits(host->adma_addr),
@@ -138,8 +138,7 @@ static int sdhci_transfer_data(struct sdhci_host *host, struct mmc_data *data)
 	do {
 		stat = sdhci_readl(host, SDHCI_INT_STATUS);
 		if (stat & SDHCI_INT_ERROR) {
-			pr_debug("%s: Error detected in status(0x%X)!\n",
-				 __func__, stat);
+			log_debug("Error detected in status(%#x)!\n", stat);
 			return -EIO;
 		}
 		if (!transfer_done && (stat & rdy)) {
@@ -172,14 +171,16 @@ static int sdhci_transfer_data(struct sdhci_host *host, struct mmc_data *data)
 		if (timeout-- > 0)
 			udelay(10);
 		else {
-			printf("%s: Transfer data timeout\n", __func__);
+			log_err("Transfer data timeout\n");
 			return -ETIMEDOUT;
 		}
 	} while (!(stat & SDHCI_INT_DATA_END));
 
-#if (defined(CONFIG_MMC_SDHCI_SDMA) || CONFIG_IS_ENABLED(MMC_SDHCI_ADMA))
-	dma_unmap_single(host->start_addr, data->blocks * data->blocksize,
-			 mmc_get_dma_dir(data));
+#if (CONFIG_IS_ENABLED(MMC_SDHCI_SDMA) || CONFIG_IS_ENABLED(MMC_SDHCI_ADMA))
+	if (host->flags & USE_DMA) {
+		dma_unmap_single(host->start_addr, data->blocks * data->blocksize,
+				 mmc_get_dma_dir(data));
+	}
 #endif
 
 	return 0;
@@ -211,7 +212,7 @@ static int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 	unsigned int stat = 0;
 	int ret = 0;
 	int trans_bytes = 0, is_aligned = 1;
-	u32 mask, flags, mode;
+	u32 mask, flags, mode = 0;
 	unsigned int time = 0;
 	int mmc_dev = mmc_get_blk_desc(mmc)->devnum;
 	ulong start = get_timer(0);
@@ -231,13 +232,13 @@ static int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 
 	while (sdhci_readl(host, SDHCI_PRESENT_STATE) & mask) {
 		if (time >= cmd_timeout) {
-			printf("%s: MMC: %d busy ", __func__, mmc_dev);
+			log_warning("mmc%d busy ", mmc_dev);
 			if (2 * cmd_timeout <= SDHCI_CMD_MAX_TIMEOUT) {
 				cmd_timeout += cmd_timeout;
-				printf("timeout increasing to: %u ms.\n",
-				       cmd_timeout);
+				log_warning("timeout increasing to: %u ms\n",
+					    cmd_timeout);
 			} else {
-				puts("timeout.\n");
+				log_warning("timeout\n");
 				return -ECOMM;
 			}
 		}
@@ -258,8 +259,7 @@ static int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 		flags = SDHCI_CMD_RESP_LONG;
 	else if (cmd->resp_type & MMC_RSP_BUSY) {
 		flags = SDHCI_CMD_RESP_SHORT_BUSY;
-		if (data)
-			mask |= SDHCI_INT_DATA_END;
+		mask |= SDHCI_INT_DATA_END;
 	} else
 		flags = SDHCI_CMD_RESP_SHORT;
 
@@ -274,10 +274,12 @@ static int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 	/* Set Transfer mode regarding to data flag */
 	if (data) {
 		sdhci_writeb(host, 0xe, SDHCI_TIMEOUT_CONTROL);
-		mode = SDHCI_TRNS_BLK_CNT_EN;
+
+		if (!(host->quirks & SDHCI_QUIRK_SUPPORT_SINGLE))
+			mode = SDHCI_TRNS_BLK_CNT_EN;
 		trans_bytes = data->blocks * data->blocksize;
 		if (data->blocks > 1)
-			mode |= SDHCI_TRNS_MULTI;
+			mode |= SDHCI_TRNS_MULTI | SDHCI_TRNS_BLK_CNT_EN;
 
 		if (data->flags == MMC_DATA_READ)
 			mode |= SDHCI_TRNS_READ;
@@ -304,14 +306,19 @@ static int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 		if (stat & SDHCI_INT_ERROR)
 			break;
 
-		if (get_timer(start) >= SDHCI_READ_STATUS_TIMEOUT) {
-			if (host->quirks & SDHCI_QUIRK_BROKEN_R1B) {
+		if (host->quirks & SDHCI_QUIRK_BROKEN_R1B &&
+		    cmd->resp_type & MMC_RSP_BUSY && !data) {
+			unsigned int state =
+				sdhci_readl(host, SDHCI_PRESENT_STATE);
+
+			if (!(state & SDHCI_DAT_ACTIVE))
 				return 0;
-			} else {
-				printf("%s: Timeout for status update!\n",
-				       __func__);
-				return -ETIMEDOUT;
-			}
+		}
+
+		if (get_timer(start) >= SDHCI_READ_STATUS_TIMEOUT) {
+			log_warning("Timeout for status update: %08x %08x\n",
+				    stat, mask);
+			return -ETIMEDOUT;
 		}
 	} while ((stat & mask) != mask);
 
@@ -344,14 +351,14 @@ static int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 		return -ECOMM;
 }
 
-#if defined(CONFIG_DM_MMC) && defined(MMC_SUPPORTS_TUNING)
+#if defined(CONFIG_DM_MMC) && CONFIG_IS_ENABLED(MMC_SUPPORTS_TUNING)
 static int sdhci_execute_tuning(struct udevice *dev, uint opcode)
 {
 	int err;
 	struct mmc *mmc = mmc_get_mmc_dev(dev);
 	struct sdhci_host *host = mmc->priv;
 
-	debug("%s\n", __func__);
+	log_debug("sdhci tuning\n");
 
 	if (host->ops && host->ops->platform_execute_tuning) {
 		err = host->ops->platform_execute_tuning(mmc, opcode);
@@ -366,14 +373,14 @@ int sdhci_set_clock(struct mmc *mmc, unsigned int clock)
 {
 	struct sdhci_host *host = mmc->priv;
 	unsigned int div, clk = 0, timeout;
+	int ret;
 
 	/* Wait max 20 ms */
 	timeout = 200;
 	while (sdhci_readl(host, SDHCI_PRESENT_STATE) &
 			   (SDHCI_CMD_INHIBIT | SDHCI_DATA_INHIBIT)) {
 		if (timeout == 0) {
-			printf("%s: Timeout to wait cmd & data inhibit\n",
-			       __func__);
+			log_err("Timeout waiting for cmd & data inhibit\n");
 			return -EBUSY;
 		}
 
@@ -386,8 +393,21 @@ int sdhci_set_clock(struct mmc *mmc, unsigned int clock)
 	if (clock == 0)
 		return 0;
 
-	if (host->ops && host->ops->set_delay)
-		host->ops->set_delay(host);
+	if (host->ops && host->ops->set_delay) {
+		ret = host->ops->set_delay(host);
+		if (ret) {
+			log_err("Error while setting tap delay\n");
+			return ret;
+		}
+	}
+
+	if (host->ops && host->ops->config_dll) {
+		ret = host->ops->config_dll(host, clock, false);
+		if (ret) {
+			log_err("Error configuring dll\n");
+			return ret;
+		}
+	}
 
 	if (SDHCI_GET_VERSION(host) >= SDHCI_SPEC_300) {
 		/*
@@ -432,6 +452,14 @@ int sdhci_set_clock(struct mmc *mmc, unsigned int clock)
 	if (host->ops && host->ops->set_clock)
 		host->ops->set_clock(host, div);
 
+	if (host->ops && host->ops->config_dll) {
+		ret = host->ops->config_dll(host, clock, true);
+		if (ret) {
+			log_err("Error while configuring dll\n");
+			return ret;
+		}
+	}
+
 	clk |= (div & SDHCI_DIV_MASK) << SDHCI_DIVIDER_SHIFT;
 	clk |= ((div & SDHCI_DIV_HI_MASK) >> SDHCI_DIV_MASK_LEN)
 		<< SDHCI_DIVIDER_HI_SHIFT;
@@ -443,8 +471,7 @@ int sdhci_set_clock(struct mmc *mmc, unsigned int clock)
 	while (!((clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL))
 		& SDHCI_CLOCK_INT_STABLE)) {
 		if (timeout == 0) {
-			printf("%s: Internal clock never stabilised.\n",
-			       __func__);
+			log_err("Internal clock never stabilised.\n");
 			return -EBUSY;
 		}
 		timeout--;
@@ -495,6 +522,10 @@ void sdhci_set_uhs_timing(struct sdhci_host *host)
 	reg &= ~SDHCI_CTRL_UHS_MASK;
 
 	switch (mmc->selected_mode) {
+	case UHS_SDR25:
+	case MMC_HS:
+		reg |= SDHCI_CTRL_UHS_SDR25;
+		break;
 	case UHS_SDR50:
 	case MMC_HS_52:
 		reg |= SDHCI_CTRL_UHS_SDR50;
@@ -507,6 +538,10 @@ void sdhci_set_uhs_timing(struct sdhci_host *host)
 	case MMC_HS_200:
 		reg |= SDHCI_CTRL_UHS_SDR104;
 		break;
+	case MMC_HS_400:
+	case MMC_HS_400_ES:
+		reg |= SDHCI_CTRL_HS400;
+		break;
 	default:
 		reg |= SDHCI_CTRL_UHS_SDR12;
 	}
@@ -514,7 +549,7 @@ void sdhci_set_uhs_timing(struct sdhci_host *host)
 	sdhci_writew(host, reg, SDHCI_HOST_CONTROL2);
 }
 
-static void sdhci_set_voltage(struct sdhci_host *host)
+void sdhci_set_voltage(struct sdhci_host *host)
 {
 	if (IS_ENABLED(CONFIG_MMC_IO_VOLTAGE)) {
 		struct mmc *mmc = (struct mmc *)host->mmc;
@@ -655,9 +690,11 @@ static int sdhci_set_ios(struct mmc *mmc)
 	if (!no_hispd_bit) {
 		if (mmc->selected_mode == MMC_HS ||
 		    mmc->selected_mode == SD_HS ||
+		    mmc->selected_mode == MMC_HS_52 ||
 		    mmc->selected_mode == MMC_DDR_52 ||
 		    mmc->selected_mode == MMC_HS_200 ||
 		    mmc->selected_mode == MMC_HS_400 ||
+		    mmc->selected_mode == MMC_HS_400_ES ||
 		    mmc->selected_mode == UHS_SDR25 ||
 		    mmc->selected_mode == UHS_SDR50 ||
 		    mmc->selected_mode == UHS_SDR104 ||
@@ -699,8 +736,7 @@ static int sdhci_init(struct mmc *mmc)
 	if (host->quirks & SDHCI_QUIRK_32BIT_DMA_ADDR) {
 		host->align_buffer = memalign(8, 512 * 1024);
 		if (!host->align_buffer) {
-			printf("%s: Aligned buffer alloc failed!!!\n",
-			       __func__);
+			log_err("Aligned buffer alloc failed\n");
 			return -ENOMEM;
 		}
 	}
@@ -772,13 +808,49 @@ static int sdhci_get_cd(struct udevice *dev)
 		return value;
 }
 
+static int sdhci_wait_dat0(struct udevice *dev, int state,
+			   int timeout_us)
+{
+	int tmp;
+	struct mmc *mmc = mmc_get_mmc_dev(dev);
+	struct sdhci_host *host = mmc->priv;
+	unsigned long timeout = timer_get_us() + timeout_us;
+
+	// readx_poll_timeout is unsuitable because sdhci_readl accepts
+	// two arguments
+	do {
+		tmp = sdhci_readl(host, SDHCI_PRESENT_STATE);
+		if (!!(tmp & SDHCI_DATA_0_LVL_MASK) == !!state)
+			return 0;
+	} while (!timeout_us || !time_after(timer_get_us(), timeout));
+
+	return -ETIMEDOUT;
+}
+
+#if CONFIG_IS_ENABLED(MMC_HS400_ES_SUPPORT)
+static int sdhci_set_enhanced_strobe(struct udevice *dev)
+{
+	struct mmc *mmc = mmc_get_mmc_dev(dev);
+	struct sdhci_host *host = mmc->priv;
+
+	if (host->ops && host->ops->set_enhanced_strobe)
+		return host->ops->set_enhanced_strobe(host);
+
+	return -ENOTSUPP;
+}
+#endif
+
 const struct dm_mmc_ops sdhci_ops = {
 	.send_cmd	= sdhci_send_command,
 	.set_ios	= sdhci_set_ios,
 	.get_cd		= sdhci_get_cd,
 	.deferred_probe	= sdhci_deferred_probe,
-#ifdef MMC_SUPPORTS_TUNING
+#if CONFIG_IS_ENABLED(MMC_SUPPORTS_TUNING)
 	.execute_tuning	= sdhci_execute_tuning,
+#endif
+	.wait_dat0	= sdhci_wait_dat0,
+#if CONFIG_IS_ENABLED(MMC_HS400_ES_SUPPORT)
+	.set_enhanced_strobe = sdhci_set_enhanced_strobe,
 #endif
 };
 #else
@@ -806,30 +878,29 @@ int sdhci_setup_cfg(struct mmc_config *cfg, struct sdhci_host *host,
 #else
 	caps = sdhci_readl(host, SDHCI_CAPABILITIES);
 #endif
-	debug("%s, caps: 0x%x\n", __func__, caps);
+	log_debug("caps: %#x\n", caps);
 
-#ifdef CONFIG_MMC_SDHCI_SDMA
+#if CONFIG_IS_ENABLED(MMC_SDHCI_SDMA)
 	if ((caps & SDHCI_CAN_DO_SDMA)) {
 		host->flags |= USE_SDMA;
 	} else {
-		debug("%s: Your controller doesn't support SDMA!!\n",
-		      __func__);
+		log_debug("Controller doesn't support SDMA\n");
 	}
 #endif
 #if CONFIG_IS_ENABLED(MMC_SDHCI_ADMA)
 	if (!(caps & SDHCI_CAN_DO_ADMA2)) {
-		printf("%s: Your controller doesn't support SDMA!!\n",
-		       __func__);
+		log_err("Controller doesn't support ADMA\n");
 		return -EINVAL;
 	}
-	host->adma_desc_table = sdhci_adma_init();
-	host->adma_addr = (dma_addr_t)host->adma_desc_table;
+	if (!host->adma_desc_table) {
+		host->adma_desc_table = sdhci_adma_init();
+		host->adma_addr = virt_to_phys(host->adma_desc_table);
+	}
 
-#ifdef CONFIG_DMA_ADDR_T_64BIT
-	host->flags |= USE_ADMA64;
-#else
-	host->flags |= USE_ADMA;
-#endif
+	if (IS_ENABLED(CONFIG_MMC_SDHCI_ADMA_64BIT))
+		host->flags |= USE_ADMA64;
+	else
+		host->flags |= USE_ADMA;
 #endif
 	if (host->quirks & SDHCI_QUIRK_REG32_RW)
 		host->version =
@@ -851,9 +922,18 @@ int sdhci_setup_cfg(struct mmc_config *cfg, struct sdhci_host *host,
 #else
 		caps_1 = sdhci_readl(host, SDHCI_CAPABILITIES_1);
 #endif
-		debug("%s, caps_1: 0x%x\n", __func__, caps_1);
+		log_debug("caps_1: %#x\n", caps_1);
 		host->clk_mul = (caps_1 & SDHCI_CLOCK_MUL_MASK) >>
 				SDHCI_CLOCK_MUL_SHIFT;
+
+		/*
+		 * In case the value in Clock Multiplier is 0, then programmable
+		 * clock mode is not supported, otherwise the actual clock
+		 * multiplier is one more than the value of Clock Multiplier
+		 * in the Capabilities Register.
+		 */
+		if (host->clk_mul)
+			host->clk_mul += 1;
 	}
 
 	if (host->max_clk == 0) {
@@ -868,8 +948,7 @@ int sdhci_setup_cfg(struct mmc_config *cfg, struct sdhci_host *host,
 			host->max_clk *= host->clk_mul;
 	}
 	if (host->max_clk == 0) {
-		printf("%s: Hardware doesn't specify base clock frequency\n",
-		       __func__);
+		log_err("Hardware doesn't specify base clock frequency\n");
 		return -EINVAL;
 	}
 	if (f_max && (f_max < host->max_clk))
@@ -931,6 +1010,10 @@ int sdhci_setup_cfg(struct mmc_config *cfg, struct sdhci_host *host,
 		cfg->host_caps |= MMC_CAP(UHS_SDR50);
 	}
 
+	if ((host->quirks & SDHCI_QUIRK_CAPS_BIT63_FOR_HS400) &&
+	    (caps_1 & SDHCI_SUPPORT_HS400))
+		cfg->host_caps |= MMC_CAP(MMC_HS_400);
+
 	if (caps_1 & SDHCI_SUPPORT_DDR50)
 		cfg->host_caps |= MMC_CAP(UHS_DDR50);
 
@@ -958,7 +1041,7 @@ int add_sdhci(struct sdhci_host *host, u32 f_max, u32 f_min)
 
 	host->mmc = mmc_create(&host->cfg, host);
 	if (host->mmc == NULL) {
-		printf("%s: mmc create fail!\n", __func__);
+		log_err("mmc create fail\n");
 		return -ENOMEM;
 	}
 

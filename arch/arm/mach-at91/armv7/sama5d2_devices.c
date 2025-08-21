@@ -4,7 +4,6 @@
  *		      Wenyou Yang <wenyou.yang@atmel.com>
  */
 
-#include <common.h>
 #include <asm/io.h>
 #include <asm/arch/clk.h>
 #include <asm/arch/sama5d2.h>
@@ -46,6 +45,8 @@ char *get_cpu_name(void)
 			return "SAMA5D28-CU";
 		case ARCH_EXID_SAMA5D28CN:
 			return "SAMA5D28-CN";
+		case ARCH_EXID_SAMA5D29CN:
+			return "SAMA5D29-CN";
 		}
 	}
 

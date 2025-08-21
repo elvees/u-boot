@@ -4,7 +4,6 @@
  * Mario Six, Guntermann & Drunck GmbH, mario.six@gdsys.cc
  */
 
-#include <common.h>
 #include <clk-uclass.h>
 #include <clock_legacy.h>
 #include <command.h>
@@ -346,8 +345,10 @@ static int mpc83xx_clk_probe(struct udevice *dev)
 
 	type = dev_get_driver_data(dev);
 
+#ifdef CONFIG_FSL_ESDHC
 	if (mpc83xx_has_sdhc(type))
 		gd->arch.sdhc_clk = priv->speed[MPC83XX_CLK_SDHC];
+#endif
 
 	gd->arch.core_clk = priv->speed[MPC83XX_CLK_CORE];
 	gd->arch.i2c1_clk = priv->speed[MPC83XX_CLK_I2C1];
@@ -357,10 +358,15 @@ static int mpc83xx_clk_probe(struct udevice *dev)
 	gd->mem_clk = priv->speed[MPC83XX_CLK_MEM];
 
 	if (mpc83xx_has_pci(type))
-		gd->pci_clk = priv->speed[MPC83XX_CLK_PCI];
+		gd->arch.pci_clk = priv->speed[MPC83XX_CLK_PCI];
 
 	gd->cpu_clk = priv->speed[MPC83XX_CLK_CORE];
 	gd->bus_clk = priv->speed[MPC83XX_CLK_CSB];
+
+#ifdef CONFIG_QE
+	gd->arch.qe_clk = priv->speed[MPC83XX_CLK_QE];
+	gd->arch.brg_clk = priv->speed[MPC83XX_CLK_BRG];
+#endif
 
 	return 0;
 }

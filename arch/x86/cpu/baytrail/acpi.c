@@ -3,10 +3,10 @@
  * Copyright (C) 2016, Bin Meng <bmeng.cn@gmail.com>
  */
 
-#include <common.h>
 #include <cpu.h>
 #include <dm.h>
 #include <log.h>
+#include <mapmem.h>
 #include <acpi/acpi_s3.h>
 #include <acpi/acpi_table.h>
 #include <asm/io.h>
@@ -15,20 +15,15 @@
 #include <asm/arch/iomap.h>
 #include <dm/uclass-internal.h>
 
-void acpi_create_fadt(struct acpi_fadt *fadt, struct acpi_facs *facs,
-		      void *dsdt)
+void acpi_fill_fadt(struct acpi_fadt *fadt)
 {
-	struct acpi_table_header *header = &(fadt->header);
+	struct acpi_table_header *header;
+
+	header = &fadt->header;
 	u16 pmbase = ACPI_BASE_ADDRESS;
 
-	memset((void *)fadt, 0, sizeof(struct acpi_fadt));
-
-	acpi_fill_header(header, "FACP");
-	header->length = sizeof(struct acpi_fadt);
 	header->revision = 4;
 
-	fadt->firmware_ctrl = (u32)facs;
-	fadt->dsdt = (u32)dsdt;
 	fadt->preferred_pm_profile = ACPI_PM_MOBILE;
 	fadt->sci_int = 9;
 	fadt->smi_cmd = 0;
@@ -74,11 +69,6 @@ void acpi_create_fadt(struct acpi_fadt *fadt, struct acpi_facs *facs,
 	fadt->reset_reg.addrl = IO_PORT_RESET;
 	fadt->reset_reg.addrh = 0;
 	fadt->reset_value = SYS_RST | RST_CPU | FULL_RST;
-
-	fadt->x_firmware_ctl_l = (u32)facs;
-	fadt->x_firmware_ctl_h = 0;
-	fadt->x_dsdt_l = (u32)dsdt;
-	fadt->x_dsdt_h = 0;
 
 	fadt->x_pm1a_evt_blk.space_id = ACPI_ADDRESS_SPACE_IO;
 	fadt->x_pm1a_evt_blk.bit_width = fadt->pm1_evt_len * 8;
@@ -135,8 +125,6 @@ void acpi_create_fadt(struct acpi_fadt *fadt, struct acpi_facs *facs,
 	fadt->x_gpe1_blk.access_size = 0;
 	fadt->x_gpe1_blk.addrl = 0x0;
 	fadt->x_gpe1_blk.addrh = 0x0;
-
-	header->checksum = table_compute_checksum(fadt, header->length);
 }
 
 int acpi_create_gnvs(struct acpi_global_nvs *gnvs)

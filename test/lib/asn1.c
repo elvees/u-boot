@@ -6,7 +6,6 @@
  * Unit test for asn1 compiler and asn1 decoder function via various parsers
  */
 
-#include <common.h>
 #include <command.h>
 #include <test/lib.h>
 #include <test/test.h>
@@ -120,7 +119,7 @@ static int lib_asn1_x509(struct unit_test_state *uts)
 
 	cert = x509_cert_parse(cert_data, cert_data_len);
 
-	ut_assertf(cert != NULL, "decoding failed\n");
+	ut_assertf(!IS_ERR(cert), "decoding failed\n");
 	ut_assertf(!strcmp(cert->subject, "Linaro: Tester"),
 		   "subject doesn't match\n");
 	ut_assertf(!strcmp(cert->issuer, "Linaro: Tester"),
@@ -136,7 +135,6 @@ static int lib_asn1_x509(struct unit_test_state *uts)
 
 	return CMD_RET_SUCCESS;
 }
-
 LIB_TEST(lib_asn1_x509, 0);
 #endif /* CONFIG_X509_CERTIFICATE_PARSER */
 
@@ -313,7 +311,7 @@ static int lib_asn1_pkcs7(struct unit_test_state *uts)
 
 	pkcs7 = pkcs7_parse_message(image_pk7, image_pk7_len);
 
-	ut_assertf(pkcs7 != NULL, "decoding failed\n");
+	ut_assertf(!IS_ERR(pkcs7), "decoding failed\n");
 	ut_assertf(pkcs7->data_len == 104, "signature size doesn't match\n");
 	ut_assertf(pkcs7->signed_infos != NULL, "sign-info doesn't exist\n");
 	ut_assertf(pkcs7->signed_infos->msgdigest_len == 32,
@@ -325,7 +323,6 @@ static int lib_asn1_pkcs7(struct unit_test_state *uts)
 
 	return CMD_RET_SUCCESS;
 }
-
 LIB_TEST(lib_asn1_pkcs7, 0);
 #endif /* CONFIG_PKCS7_MESSAGE_PARSER */
 
@@ -387,6 +384,5 @@ static int lib_asn1_pkey(struct unit_test_state *uts)
 
 	return CMD_RET_SUCCESS;
 }
-
 LIB_TEST(lib_asn1_pkey, 0);
 #endif /* CONFIG_RSA_PUBLIC_KEY_PARSER */

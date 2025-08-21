@@ -5,7 +5,6 @@
  * Copyright (C) 2015  Phil Sutter <phil@nwl.cc>
  */
 
-#include <common.h>
 #include <command.h>
 #include <div64.h>
 #include <env.h>
@@ -17,12 +16,9 @@
 #include <asm/io.h>
 #include "../drivers/ddr/marvell/axp/ddr3_init.h"
 
-#define ETHADDR_MAX		4
-#define SYNO_SN_TAG		"SN="
-#define SYNO_CHKSUM_TAG		"CHK="
+#include "cmd_syno.h"
 
-
-static int do_syno_populate(int argc, char *const argv[])
+int do_syno_populate(int argc, char *const argv[])
 {
 	unsigned int bus = CONFIG_SF_DEFAULT_BUS;
 	unsigned int cs = CONFIG_SF_DEFAULT_CS;
@@ -57,7 +53,7 @@ static int do_syno_populate(int argc, char *const argv[])
 		goto out_unmap;
 	}
 
-	for (n = 0; n < ETHADDR_MAX; n++) {
+	for (n = 0; n < SYNO_ETHADDR_MAX; n++) {
 		char ethaddr[ETH_ALEN];
 		int i, sum = 0;
 		unsigned char csum = 0;

@@ -5,7 +5,7 @@
  * (C) 2007,2008 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
  */
 
-#include <common.h>
+#include <config.h>
 #include <dm.h>
 #include <pci.h>
 #include <asm/processor.h>
@@ -74,33 +74,13 @@
 #define p4_in(addr)	(*addr)
 #define p4_out(data, addr) (*addr) = (data)
 
-static int sh7751_pci_addr_valid(pci_dev_t d, uint offset)
-{
-	if (PCI_FUNC(d))
-		return -EINVAL;
-
-	return 0;
-}
-
-static u32 get_bus_address(const struct udevice *dev, pci_dev_t bdf, u32 offset)
-{
-	return BIT(31) | (PCI_DEV(bdf) << 8) | (offset & ~3);
-}
-
 static int sh7751_pci_read_config(const struct udevice *dev, pci_dev_t bdf,
 				  uint offset, ulong *value,
 				  enum pci_size_t size)
 {
 	u32 addr, reg;
-	int ret;
 
-	ret = sh7751_pci_addr_valid(bdf, offset);
-	if (ret) {
-		*value = pci_get_ff(size);
-		return 0;
-	}
-
-	addr = get_bus_address(dev, bdf, offset);
+	addr = PCI_CONF1_ADDRESS(PCI_BUS(bdf), PCI_DEV(bdf), PCI_FUNC(bdf), offset);
 	p4_out(addr, SH7751_PCIPAR);
 	reg = p4_in(SH7751_PCIPDR);
 	*value = pci_conv_32_to_size(reg, offset, size);
@@ -113,13 +93,8 @@ static int sh7751_pci_write_config(struct udevice *dev, pci_dev_t bdf,
 				      enum pci_size_t size)
 {
 	u32 addr, reg, old;
-	int ret;
 
-	ret = sh7751_pci_addr_valid(bdf, offset);
-	if (ret)
-		return ret;
-
-	addr = get_bus_address(dev, bdf, offset);
+	addr = PCI_CONF1_ADDRESS(PCI_BUS(bdf), PCI_DEV(bdf), PCI_FUNC(bdf), offset);
 	p4_out(addr, SH7751_PCIPAR);
 	old = p4_in(SH7751_PCIPDR);
 	reg = pci_conv_size_to_32(old, value, offset, size);
@@ -183,9 +158,9 @@ static int sh7751_pci_probe(struct udevice *dev)
 
 	/* Set up target memory mappings (for external DMA access) */
 	/* Map both P0 and P2 range to Area 3 RAM for ease of use */
-	p4_out(CONFIG_SYS_SDRAM_SIZE - 0x100000, SH7751_PCILSR0);
-	p4_out(CONFIG_SYS_SDRAM_BASE & 0x1FF00000, SH7751_PCILAR0);
-	p4_out(CONFIG_SYS_SDRAM_BASE & 0xFFF00000, SH7751_PCICONF5);
+	p4_out(CFG_SYS_SDRAM_SIZE - 0x100000, SH7751_PCILSR0);
+	p4_out(CFG_SYS_SDRAM_BASE & 0x1FF00000, SH7751_PCILAR0);
+	p4_out(CFG_SYS_SDRAM_BASE & 0xFFF00000, SH7751_PCICONF5);
 
 	p4_out(0, SH7751_PCILSR1);
 	p4_out(0, SH7751_PCILAR1);

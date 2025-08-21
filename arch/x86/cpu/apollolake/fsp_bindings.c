@@ -3,7 +3,6 @@
  * Copyright 2020 B&R Industrial Automation GmbH - http://www.br-automation.com
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <asm/arch/fsp_bindings.h>
@@ -44,7 +43,7 @@ static void read_u8_prop(ofnode node, char *name, size_t count, u8 *dst)
  *         Set to 0 if the property is expected to be a scalar
  * @dst:   Pointer to destination of where to save the value(s) read
  *         from devicetree
- * @return 0 on success, -ve on error
+ * Return: 0 on success, -ve on error
  */
 static int read_u16_prop(ofnode node, char *name, size_t count, u16 *dst)
 {
@@ -196,7 +195,7 @@ static void read_swizzle_prop(ofnode node, char *name, size_t count, u8 *dst)
  * @fsp_bindings: Binding describing which devicetree properties should
  *                be stored where in the FSP configuration structure
  *                The end of the list is declared by a NULL pointer in propname
- * @return 0 on success, -ve on error
+ * Return: 0 on success, -ve on error
  *
  * This function reads the configuration for FSP from the provided
  * devicetree node and saves it in the FSP configuration structure.
@@ -248,7 +247,7 @@ static int fsp_update_config_from_dtb(ofnode node, u8 *cfg,
 	return 0;
 }
 
-#if defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_XPL_BUILD)
 const struct fsp_binding fsp_m_bindings[] = {
 	{
 	.type = FSP_UINT32,
@@ -654,7 +653,7 @@ int fsp_m_update_config_from_dtb(ofnode node, struct fsp_m_config *cfg)
 }
 #endif
 
-#if !defined(CONFIG_SPL_BUILD) && !defined(CONFIG_TPL_BUILD)
+#if !defined(CONFIG_XPL_BUILD) && !defined(CONFIG_TPL_BUILD)
 const struct fsp_binding fsp_s_bindings[] = {
 	{
 	.type = FSP_UINT8,

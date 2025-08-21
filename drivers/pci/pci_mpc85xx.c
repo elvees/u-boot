@@ -4,9 +4,7 @@
  * Heiko Schocher, DENX Software Engineering, hs@denx.de.
  *
  */
-#include <common.h>
 #include <asm/bitops.h>
-#include <asm/cpm_85xx.h>
 #include <pci.h>
 #include <dm.h>
 #include <asm/fsl_law.h>
@@ -23,10 +21,33 @@ static int mpc85xx_pci_dm_read_config(const struct udevice *dev, pci_dev_t bdf,
 	struct mpc85xx_pci_priv *priv = dev_get_priv(dev);
 	u32 addr;
 
-	addr = bdf | (offset & 0xfc) | ((offset & 0xf00) << 16) | 0x80000000;
+	if (offset > 0xff) {
+		*value = pci_get_ff(size);
+		return 0;
+	}
+
+	/* Skip mpc85xx PCI controller's ATMU inbound registers */
+	if (PCI_BUS(bdf) == 0 && PCI_DEV(bdf) == 0 && PCI_FUNC(bdf) == 0 &&
+	    (offset & ~3) >= PCI_BASE_ADDRESS_0 && (offset & ~3) <= PCI_BASE_ADDRESS_5) {
+		*value = 0;
+		return 0;
+	}
+
+	addr = PCI_CONF1_ADDRESS(PCI_BUS(bdf), PCI_DEV(bdf), PCI_FUNC(bdf), offset);
 	out_be32(priv->cfg_addr, addr);
 	sync();
-	*value = pci_conv_32_to_size(in_le32(priv->cfg_data), offset, size);
+
+	switch (size) {
+	case PCI_SIZE_8:
+		*value = in_8(priv->cfg_data + (offset & 3));
+		break;
+	case PCI_SIZE_16:
+		*value = in_le16(priv->cfg_data + (offset & 2));
+		break;
+	case PCI_SIZE_32:
+		*value = in_le32(priv->cfg_data);
+		break;
+	}
 
 	return 0;
 }
@@ -38,10 +59,30 @@ static int mpc85xx_pci_dm_write_config(struct udevice *dev, pci_dev_t bdf,
 	struct mpc85xx_pci_priv *priv = dev_get_priv(dev);
 	u32 addr;
 
-	addr = bdf | (offset & 0xfc) | ((offset & 0xf00) << 16) | 0x80000000;
+	if (offset > 0xff)
+		return 0;
+
+	/* Skip mpc85xx PCI controller's ATMU inbound registers */
+	if (PCI_BUS(bdf) == 0 && PCI_DEV(bdf) == 0 && PCI_FUNC(bdf) == 0 &&
+	    (offset & ~3) >= PCI_BASE_ADDRESS_0 && (offset & ~3) <= PCI_BASE_ADDRESS_5)
+		return 0;
+
+	addr = PCI_CONF1_ADDRESS(PCI_BUS(bdf), PCI_DEV(bdf), PCI_FUNC(bdf), offset);
 	out_be32(priv->cfg_addr, addr);
 	sync();
-	out_le32(priv->cfg_data, pci_conv_size_to_32(0, value, offset, size));
+
+	switch (size) {
+	case PCI_SIZE_8:
+		out_8(priv->cfg_data + (offset & 3), value);
+		break;
+	case PCI_SIZE_16:
+		out_le16(priv->cfg_data + (offset & 2), value);
+		break;
+	case PCI_SIZE_32:
+		out_le32(priv->cfg_data, value);
+		break;
+	}
+	sync();
 
 	return 0;
 }

@@ -6,9 +6,7 @@
  * Donghwa Lee <dh09.lee@samsung.com>
  */
 
-#include <common.h>
 #include <env.h>
-#include <lcd.h>
 #include <log.h>
 #include <asm/io.h>
 #include <asm/gpio.h>
@@ -41,16 +39,7 @@ u32 get_board_rev(void)
 }
 #endif
 
-static void check_hw_revision(void);
 struct dwc2_plat_otg_data s5pc210_otg_data;
-
-int exynos_init(void)
-{
-	check_hw_revision();
-	printf("HW Revision:\t0x%x\n", board_rev);
-
-	return 0;
-}
 
 #if !CONFIG_IS_ENABLED(DM_I2C) /* TODO(maintainer): Convert to driver model */
 static void trats_low_power_mode(void)
@@ -216,6 +205,11 @@ static void check_hw_revision(void)
 	board_rev |= hwrev;
 }
 
+void exynos_init(void)
+{
+	check_hw_revision();
+	printf("HW Revision:\t0x%x\n", board_rev);
+}
 
 #ifdef CONFIG_USB_GADGET
 static int s5pc210_phy_control(int on)
@@ -403,16 +397,6 @@ int exynos_early_init_f(void)
 	return 0;
 }
 
-void exynos_reset_lcd(void)
-{
-	gpio_request(EXYNOS4_GPIO_Y45, "lcd_reset");
-	gpio_direction_output(EXYNOS4_GPIO_Y45, 1);
-	udelay(10000);
-	gpio_direction_output(EXYNOS4_GPIO_Y45, 0);
-	udelay(10000);
-	gpio_direction_output(EXYNOS4_GPIO_Y45, 1);
-}
-
 int lcd_power(void)
 {
 #if !CONFIG_IS_ENABLED(DM_I2C) /* TODO(maintainer): Convert to driver model */
@@ -460,16 +444,3 @@ int mipi_power(void)
 #endif
 	return 0;
 }
-
-#ifdef CONFIG_LCD
-void exynos_lcd_misc_init(vidinfo_t *vid)
-{
-#ifdef CONFIG_TIZEN
-	get_tizen_logo_info(vid);
-#endif
-#ifdef CONFIG_S6E8AX0
-	s6e8ax0_init();
-	env_set("lcdinfo", "lcd=s6e8ax0");
-#endif
-}
-#endif

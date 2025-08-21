@@ -5,21 +5,17 @@
  */
 
 #include <config.h>
-#include <common.h>
 #include <errno.h>
 #include <asm/io.h>
 #include <asm/arch/clk.h>
+#include <asm/arch/pwm.h>
 #include <i2c.h>
-#include <pwm.h>
+#include <linux/time.h>
 
 #include <irq_func.h>
 
 #include <asm/arch/nexell.h>
 #include <asm/arch/nx_gpio.h>
-
-#ifndef NSEC_PER_SEC
-#define NSEC_PER_SEC	1000000000L
-#endif
 
 #define SAMPLE_BPS		9600
 #define SAMPLE_IN_US	101		/* (1000000 / BPS) */
@@ -102,7 +98,7 @@ static int onewire_init_timer(void)
 	/* range: 1080~1970 */
 	period_ns -= 1525;
 
-	return pwm_config(PWM_CH, period_ns >> 1, period_ns);
+	return s5p_pwm_config(PWM_CH, period_ns >> 1, period_ns);
 }
 
 static void wait_one_tick(void)

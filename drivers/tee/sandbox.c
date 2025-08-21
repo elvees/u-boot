@@ -2,18 +2,19 @@
 /*
  * Copyright (C) 2018 Linaro Limited
  */
-#include <common.h>
+
 #include <dm.h>
 #include <sandboxtee.h>
 #include <tee.h>
 #include <tee/optee_ta_avb.h>
 #include <tee/optee_ta_rpc_test.h>
+#include <tee/optee_ta_scp03.h>
 
 #include "optee/optee_msg.h"
 #include "optee/optee_private.h"
 
 /*
- * The sandbox tee driver tries to emulate a generic Trusted Exectution
+ * The sandbox tee driver tries to emulate a generic Trusted Execution
  * Environment (TEE) with the Trusted Applications (TA) OPTEE_TA_AVB and
  * OPTEE_TA_RPC_TEST available.
  */
@@ -22,7 +23,7 @@ static const u32 pstorage_max = 16;
 /**
  * struct ta_entry - TA entries
  * @uuid:		UUID of an emulated TA
- * @open_session	Called when a session is openened to the TA
+ * @open_session	Called when a session is opened to the TA
  * @invoke_func		Called when a function in the TA is to be invoked
  *
  * This struct is used to register TAs in this sandbox emulation of a TEE.
@@ -68,6 +69,7 @@ void *optee_alloc_and_init_page_list(void *buf, ulong len,
 	return NULL;
 }
 
+#if defined(CONFIG_OPTEE_TA_SCP03) || defined(CONFIG_OPTEE_TA_AVB)
 static u32 get_attr(uint n, uint num_params, struct tee_param *params)
 {
 	if (n >= num_params)
@@ -79,7 +81,7 @@ static u32 get_attr(uint n, uint num_params, struct tee_param *params)
 static u32 check_params(u8 p0, u8 p1, u8 p2, u8 p3, uint num_params,
 			struct tee_param *params)
 {
-	u8 p[] = { p0, p1, p2, p3};
+	u8 p[] = { p0, p1, p2, p3 };
 	uint n;
 
 	for (n = 0; n < ARRAY_SIZE(p); n++)
@@ -97,6 +99,57 @@ bad_params:
 
 	return TEE_ERROR_BAD_PARAMETERS;
 }
+#endif
+
+#ifdef CONFIG_OPTEE_TA_SCP03
+static u32 pta_scp03_open_session(struct udevice *dev, uint num_params,
+				  struct tee_param *params)
+{
+	/*
+	 * We don't expect additional parameters when opening a session to
+	 * this TA.
+	 */
+	return check_params(TEE_PARAM_ATTR_TYPE_NONE, TEE_PARAM_ATTR_TYPE_NONE,
+			    TEE_PARAM_ATTR_TYPE_NONE, TEE_PARAM_ATTR_TYPE_NONE,
+			    num_params, params);
+}
+
+static u32 pta_scp03_invoke_func(struct udevice *dev, u32 func, uint num_params,
+				 struct tee_param *params)
+{
+	u32 res;
+	static bool enabled;
+	static bool provisioned;
+
+	switch (func) {
+	case PTA_CMD_ENABLE_SCP03:
+		res = check_params(TEE_PARAM_ATTR_TYPE_VALUE_INPUT,
+				   TEE_PARAM_ATTR_TYPE_NONE,
+				   TEE_PARAM_ATTR_TYPE_NONE,
+				   TEE_PARAM_ATTR_TYPE_NONE,
+				   num_params, params);
+		if (res)
+			return res;
+
+		/* If SCP03 was not enabled, enable it */
+		if (!enabled)
+			enabled = true;
+
+		/* If SCP03 was not provisioned, provision new keys */
+		if (params[0].u.value.a && !provisioned)
+			provisioned = true;
+
+		/*
+		 * Either way, we assume both operations succeeded and that
+		 * the communication channel has now been established
+		 */
+
+		return TEE_SUCCESS;
+	default:
+		return TEE_ERROR_NOT_SUPPORTED;
+	}
+}
+#endif
 
 #ifdef CONFIG_OPTEE_TA_AVB
 static u32 ta_avb_open_session(struct udevice *dev, uint num_params,
@@ -121,7 +174,7 @@ static u32 ta_avb_invoke_func(struct udevice *dev, u32 func, uint num_params,
 	uint slot;
 	u64 val;
 	char *value;
-	u32 value_sz;
+	u32 value_sz, tmp_sz;
 
 	switch (func) {
 	case TA_AVB_CMD_READ_ROLLBACK_INDEX:
@@ -214,8 +267,12 @@ static u32 ta_avb_invoke_func(struct udevice *dev, u32 func, uint num_params,
 		if (!ep)
 			return TEE_ERROR_ITEM_NOT_FOUND;
 
-		value_sz = strlen(ep->data) + 1;
-		memcpy(value, ep->data, value_sz);
+		tmp_sz = strlen(ep->data) + 1;
+		if (value_sz < tmp_sz)
+			return TEE_ERROR_SHORT_BUFFER;
+
+		memcpy(value, ep->data, tmp_sz);
+		params[1].u.memref.size = tmp_sz;
 
 		return TEE_SUCCESS;
 	case TA_AVB_CMD_WRITE_PERSIST_VALUE:
@@ -355,6 +412,12 @@ static const struct ta_entry ta_entries[] = {
 	{ .uuid = TA_RPC_TEST_UUID,
 	  .open_session = ta_rpc_test_open_session,
 	  .invoke_func = ta_rpc_test_invoke_func,
+	},
+#endif
+#ifdef CONFIG_OPTEE_TA_SCP03
+	{ .uuid = PTA_SCP03_UUID,
+	  .open_session = pta_scp03_open_session,
+	  .invoke_func = pta_scp03_invoke_func,
 	},
 #endif
 };

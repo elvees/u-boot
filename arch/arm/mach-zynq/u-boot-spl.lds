@@ -18,9 +18,9 @@ ENTRY(_start)
 SECTIONS
 {
 	. = ALIGN(4);
+	__image_copy_start = ADDR(.text);
 	.text :
 	{
-		__image_copy_start = .;
 		*(.vectors)
 		CPUDIR/start.o (.text*)
 		*(.text*)
@@ -37,8 +37,8 @@ SECTIONS
 	} > .sram
 
 	. = ALIGN(4);
-	.u_boot_list : {
-		KEEP(*(SORT(.u_boot_list*)));
+	__u_boot_list : {
+		KEEP(*(SORT(__u_boot_list*)));
 	} > .sram
 
 	. = ALIGN(4);

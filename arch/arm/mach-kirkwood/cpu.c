@@ -5,7 +5,6 @@
  * Written-by: Prafulla Wadaskar <prafulla@marvell.com>
  */
 
-#include <common.h>
 #include <command.h>
 #include <cpu_func.h>
 #include <env.h>
@@ -19,7 +18,7 @@
 #include <asm/arch/soc.h>
 #include <mvebu_mmc.h>
 
-void reset_cpu(unsigned long ignored)
+void reset_cpu(void)
 {
 	struct kwcpu_registers *cpureg =
 	    (struct kwcpu_registers *)KW_CPU_REG_BASE;
@@ -52,13 +51,13 @@ unsigned int kw_winctrl_calcsize(unsigned int sizeval)
 	return (0x0000ffff & j);
 }
 
-static struct mbus_win windows[] = {
+static const struct mbus_win windows[] = {
 	/* Window 0: PCIE MEM address space */
-	{ KW_DEFADR_PCI_MEM, 1024 * 1024 * 256,
+	{ KW_DEFADR_PCI_MEM, KW_DEFADR_PCI_MEM_SIZE,
 	  KWCPU_TARGET_PCIE, KWCPU_ATTR_PCIE_MEM },
 
 	/* Window 1: PCIE IO address space */
-	{ KW_DEFADR_PCI_IO, 1024 * 64,
+	{ KW_DEFADR_PCI_IO, KW_DEFADR_PCI_IO_SIZE,
 	  KWCPU_TARGET_PCIE, KWCPU_ATTR_PCIE_IO },
 
 	/* Window 2: NAND Flash address space */
@@ -125,7 +124,7 @@ static void kw_sysrst_check(void)
 		return;
 
 	/* read sysrstdelay value */
-	sysrst_dly = (u32) simple_strtoul(s, NULL, 10);
+	sysrst_dly = (u32)dectoul(s, NULL);
 
 	/* read SysRst Length counter register (bits 28:0) */
 	sysrst_cnt = (0x1fffffff & readl(KW_REG_SYSRST_CNT));
@@ -188,9 +187,6 @@ int arch_cpu_init(void)
 	u32 reg;
 	struct kwcpu_registers *cpureg =
 		(struct kwcpu_registers *)KW_CPU_REG_BASE;
-
-	/* Linux expects the internal registers to be at 0xf1000000 */
-	writel(KW_REGS_PHY_BASE, KW_OFFSET_REG);
 
 	/* Enable and invalidate L2 cache in write through mode */
 	writel(readl(&cpureg->l2_cfg) | 0x18, &cpureg->l2_cfg);
@@ -278,11 +274,3 @@ int cpu_eth_init(struct bd_info *bis)
 	return 0;
 }
 #endif
-
-#ifdef CONFIG_MVEBU_MMC
-int board_mmc_init(struct bd_info *bis)
-{
-	mvebu_mmc_init(bis);
-	return 0;
-}
-#endif /* CONFIG_MVEBU_MMC */

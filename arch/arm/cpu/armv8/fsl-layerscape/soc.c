@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2014-2015 Freescale Semiconductor
- * Copyright 2019-2020 NXP
+ * Copyright 2019-2021 NXP
  */
 
-#include <common.h>
+#include <config.h>
 #include <clock_legacy.h>
 #include <cpu_func.h>
 #include <env.h>
@@ -41,26 +41,36 @@ DECLARE_GLOBAL_DATA_PTR;
 #endif
 
 #ifdef CONFIG_GIC_V3_ITS
+#define PENDTABLE_MAX_SZ	ALIGN(BIT(ITS_MAX_LPI_NRBITS), SZ_64K)
+#define PROPTABLE_MAX_SZ	ALIGN(BIT(ITS_MAX_LPI_NRBITS) / 8, SZ_64K)
+#define GIC_LPI_SIZE		ALIGN(cpu_numcores() * PENDTABLE_MAX_SZ + \
+				PROPTABLE_MAX_SZ, SZ_1M)
+static int fdt_add_resv_mem_gic_rd_tables(void *blob, u64 base, size_t size)
+{
+	int err;
+	struct fdt_memory gic_rd_tables;
+
+	gic_rd_tables.start = base;
+	gic_rd_tables.end = base + size - 1;
+	err = fdtdec_add_reserved_memory(blob, "gic-rd-tables", &gic_rd_tables,
+					 NULL, 0, NULL, 0);
+	if (err < 0)
+		debug("%s: failed to add reserved memory: %d\n", __func__, err);
+
+	return err;
+}
+
 int ls_gic_rd_tables_init(void *blob)
 {
-	struct fdt_memory lpi_base;
-	fdt_addr_t addr;
-	fdt_size_t size;
-	int offset, ret;
+	u64 gic_lpi_base;
+	int ret;
 
-	offset = fdt_path_offset(gd->fdt_blob, "/syscon@0x80000000");
-	addr = fdtdec_get_addr_size_auto_noparent(gd->fdt_blob, offset, "reg",
-						  0, &size, false);
-
-	lpi_base.start = addr;
-	lpi_base.end = addr + size - 1;
-	ret = fdtdec_add_reserved_memory(blob, "lpi_rd_table", &lpi_base, NULL, false);
-	if (ret) {
-		debug("%s: failed to add reserved memory\n", __func__);
+	gic_lpi_base = ALIGN(gd->arch.resv_ram - GIC_LPI_SIZE, SZ_64K);
+	ret = fdt_add_resv_mem_gic_rd_tables(blob, gic_lpi_base, GIC_LPI_SIZE);
+	if (ret)
 		return ret;
-	}
 
-	ret = gic_lpi_tables_init();
+	ret = gic_lpi_tables_init(gic_lpi_base, cpu_numcores());
 	if (ret)
 		debug("%s: failed to init gic-lpi-tables\n", __func__);
 
@@ -70,7 +80,7 @@ int ls_gic_rd_tables_init(void *blob)
 
 bool soc_has_dp_ddr(void)
 {
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	u32 svr = gur_in32(&gur->svr);
 
 	/* LS2085A, LS2088A, LS2048A has DP_DDR */
@@ -84,7 +94,7 @@ bool soc_has_dp_ddr(void)
 
 bool soc_has_aiop(void)
 {
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	u32 svr = gur_in32(&gur->svr);
 
 	/* LS2085A has AIOP */
@@ -196,6 +206,9 @@ static void erratum_a008997(void)
 
 static void erratum_a009007(void)
 {
+	if (!IS_ENABLED(CONFIG_SYS_FSL_ERRATUM_A009007))
+		return;
+
 #if defined(CONFIG_ARCH_LS1043A) || defined(CONFIG_ARCH_LS1046A) || \
 	defined(CONFIG_ARCH_LS1012A)
 	void __iomem *usb_phy = (void __iomem *)SCFG_USB_PHY1;
@@ -218,7 +231,7 @@ static void erratum_a009007(void)
 }
 
 #if defined(CONFIG_FSL_LSCH3)
-static void erratum_a050106(void)
+static void erratum_a050204(void)
 {
 #if defined(CONFIG_ARCH_LX2160A) || defined(CONFIG_ARCH_LX2162A)
 	void __iomem *dcsr = (void __iomem *)DCSR_BASE;
@@ -236,13 +249,13 @@ static void erratum_a008336(void)
 #ifdef CONFIG_SYS_FSL_ERRATUM_A008336
 	u32 *eddrtqcr1;
 
-#ifdef CONFIG_SYS_FSL_DCSR_DDR_ADDR
-	eddrtqcr1 = (void *)CONFIG_SYS_FSL_DCSR_DDR_ADDR + 0x800;
+#ifdef CFG_SYS_FSL_DCSR_DDR_ADDR
+	eddrtqcr1 = (void *)CFG_SYS_FSL_DCSR_DDR_ADDR + 0x800;
 	if (fsl_ddr_get_version(0) == 0x50200)
 		out_le32(eddrtqcr1, 0x63b30002);
 #endif
-#ifdef CONFIG_SYS_FSL_DCSR_DDR2_ADDR
-	eddrtqcr1 = (void *)CONFIG_SYS_FSL_DCSR_DDR2_ADDR + 0x800;
+#ifdef CFG_SYS_FSL_DCSR_DDR2_ADDR
+	eddrtqcr1 = (void *)CFG_SYS_FSL_DCSR_DDR2_ADDR + 0x800;
 	if (fsl_ddr_get_version(0) == 0x50200)
 		out_le32(eddrtqcr1, 0x63b30002);
 #endif
@@ -258,8 +271,8 @@ static void erratum_a008514(void)
 #ifdef CONFIG_SYS_FSL_ERRATUM_A008514
 	u32 *eddrtqcr1;
 
-#ifdef CONFIG_SYS_FSL_DCSR_DDR3_ADDR
-	eddrtqcr1 = (void *)CONFIG_SYS_FSL_DCSR_DDR3_ADDR + 0x800;
+#ifdef CFG_SYS_FSL_DCSR_DDR3_ADDR
+	eddrtqcr1 = (void *)CFG_SYS_FSL_DCSR_DDR3_ADDR + 0x800;
 	out_le32(eddrtqcr1, 0x63b20002);
 #endif
 #endif
@@ -277,7 +290,7 @@ static unsigned long get_internval_val_mhz(void)
 	ulong interval_mhz = get_bus_freq(0) / (1000 * 1000);
 
 	if (interval)
-		interval_mhz = simple_strtoul(interval, NULL, 10);
+		interval_mhz = dectoul(interval, NULL);
 
 	return interval_mhz;
 }
@@ -329,7 +342,7 @@ static void erratum_rcw_src(void)
 #ifdef CONFIG_SYS_FSL_ERRATUM_A009203
 static void erratum_a009203(void)
 {
-#ifdef CONFIG_SYS_I2C
+#if CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
 	u8 __iomem *ptr;
 #ifdef I2C1_BASE_ADDR
 	ptr = (u8 __iomem *)(I2C1_BASE_ADDR + I2C_DEBUG_REG);
@@ -378,7 +391,7 @@ void fsl_lsch3_early_init_f(void)
 	erratum_a009798();
 	erratum_a008997();
 	erratum_a009007();
-	erratum_a050106();
+	erratum_a050204();
 #ifdef CONFIG_CHAIN_OF_TRUST
 	/* In case of Secure Boot, the IBR configures the SMMU
 	* to allow only Secure transactions.
@@ -399,7 +412,7 @@ void fsl_lsch3_early_init_f(void)
 /* Get VDD in the unit mV from voltage ID */
 int get_core_volt_from_fuse(void)
 {
-	struct ccsr_gur *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	int vdd;
 	u32 fusesr;
 	u8 vid;
@@ -449,7 +462,7 @@ int get_core_volt_from_fuse(void)
 static void erratum_a009660(void)
 {
 #ifdef CONFIG_SYS_FSL_ERRATUM_A009660
-	u32 *eddrtqcr1 = (void *)CONFIG_SYS_FSL_SCFG_ADDR + 0x20c;
+	u32 *eddrtqcr1 = (void *)CFG_SYS_FSL_SCFG_ADDR + 0x20c;
 	out_be32(eddrtqcr1, 0x63b20042);
 #endif
 }
@@ -460,7 +473,7 @@ static void erratum_a008850_early(void)
 	/* part 1 of 2 */
 	struct ccsr_cci400 __iomem *cci = (void *)(CONFIG_SYS_IMMR +
 						CONFIG_SYS_CCI400_OFFSET);
-	struct ccsr_ddr __iomem *ddr = (void *)CONFIG_SYS_FSL_DDR_ADDR;
+	struct ccsr_ddr __iomem *ddr = (void *)CFG_SYS_FSL_DDR_ADDR;
 
 	/* Skip if running at lower exception level */
 	if (current_el() < 3)
@@ -480,7 +493,7 @@ void erratum_a008850_post(void)
 	/* part 2 of 2 */
 	struct ccsr_cci400 __iomem *cci = (void *)(CONFIG_SYS_IMMR +
 						CONFIG_SYS_CCI400_OFFSET);
-	struct ccsr_ddr __iomem *ddr = (void *)CONFIG_SYS_FSL_DDR_ADDR;
+	struct ccsr_ddr __iomem *ddr = (void *)CFG_SYS_FSL_DDR_ADDR;
 	u32 tmp;
 
 	/* Skip if running at lower exception level */
@@ -513,21 +526,21 @@ void erratum_a010315(void)
 static void erratum_a010539(void)
 {
 #if defined(CONFIG_SYS_FSL_ERRATUM_A010539) && defined(CONFIG_QSPI_BOOT)
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	u32 porsr1;
 
 	porsr1 = in_be32(&gur->porsr1);
 	porsr1 &= ~FSL_CHASSIS2_CCSR_PORSR1_RCW_MASK;
-	out_be32((void *)(CONFIG_SYS_DCSR_DCFG_ADDR + DCFG_DCSR_PORCR1),
+	out_be32((void *)(CFG_SYS_DCSR_DCFG_ADDR + DCFG_DCSR_PORCR1),
 		 porsr1);
-	out_be32((void *)(CONFIG_SYS_FSL_SCFG_ADDR + 0x1a8), 0xffffffff);
+	out_be32((void *)(CFG_SYS_FSL_SCFG_ADDR + 0x1a8), 0xffffffff);
 #endif
 }
 
 /* Get VDD in the unit mV from voltage ID */
 int get_core_volt_from_fuse(void)
 {
-	struct ccsr_gur *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	int vdd;
 	u32 fusesr;
 	u8 vid;
@@ -562,11 +575,6 @@ int get_core_volt_from_fuse(void)
 	return vdd;
 }
 
-__weak int board_switch_core_volt(u32 vdd)
-{
-	return 0;
-}
-
 static int setup_core_volt(u32 vdd)
 {
 	return board_setup_core_volt(vdd);
@@ -575,7 +583,7 @@ static int setup_core_volt(u32 vdd)
 #ifdef CONFIG_SYS_FSL_DDR
 static void ddr_enable_0v9_volt(bool en)
 {
-	struct ccsr_ddr __iomem *ddr = (void *)CONFIG_SYS_FSL_DDR_ADDR;
+	struct ccsr_ddr __iomem *ddr = (void *)CFG_SYS_FSL_DDR_ADDR;
 	u32 tmp;
 
 	tmp = ddr_in32(&ddr->ddr_cdr1);
@@ -616,7 +624,7 @@ int setup_chip_volt(void)
 #ifdef CONFIG_FSL_PFE
 void init_pfe_scfg_dcfg_regs(void)
 {
-	struct ccsr_scfg *scfg = (struct ccsr_scfg *)CONFIG_SYS_FSL_SCFG_ADDR;
+	struct ccsr_scfg *scfg = (struct ccsr_scfg *)CFG_SYS_FSL_SCFG_ADDR;
 	u32 ecccr2;
 
 	out_be32(&scfg->pfeasbcr,
@@ -630,8 +638,8 @@ void init_pfe_scfg_dcfg_regs(void)
 	out_be32(&scfg->rd_qos1, (unsigned int)(SCFG_RD_QOS1_PFE1_QOS
 		 | SCFG_RD_QOS1_PFE2_QOS));
 
-	ecccr2 = in_be32(CONFIG_SYS_DCSR_DCFG_ADDR + DCFG_DCSR_ECCCR2);
-	out_be32((void *)CONFIG_SYS_DCSR_DCFG_ADDR + DCFG_DCSR_ECCCR2,
+	ecccr2 = in_be32(CFG_SYS_DCSR_DCFG_ADDR + DCFG_DCSR_ECCCR2);
+	out_be32((void *)CFG_SYS_DCSR_DCFG_ADDR + DCFG_DCSR_ECCCR2,
 		 ecccr2 | (unsigned int)DISABLE_PFE_ECC);
 }
 #endif
@@ -640,7 +648,7 @@ void fsl_lsch2_early_init_f(void)
 {
 	struct ccsr_cci400 *cci = (struct ccsr_cci400 *)(CONFIG_SYS_IMMR +
 					CONFIG_SYS_CCI400_OFFSET);
-	struct ccsr_scfg *scfg = (struct ccsr_scfg *)CONFIG_SYS_FSL_SCFG_ADDR;
+	struct ccsr_scfg *scfg = (struct ccsr_scfg *)CFG_SYS_FSL_SCFG_ADDR;
 #if defined(CONFIG_FSL_QSPI) && defined(CONFIG_TFABOOT)
 	enum boot_src src;
 #endif
@@ -669,7 +677,7 @@ void fsl_lsch2_early_init_f(void)
 			SCFG_SNPCNFGCR_USB1WRSNP | SCFG_SNPCNFGCR_USB2RDSNP |
 			SCFG_SNPCNFGCR_USB2WRSNP | SCFG_SNPCNFGCR_USB3RDSNP |
 			SCFG_SNPCNFGCR_USB3WRSNP | SCFG_SNPCNFGCR_SATARDSNP |
-			SCFG_SNPCNFGCR_SATAWRSNP);
+			SCFG_SNPCNFGCR_SATAWRSNP | SCFG_SNPCNFGCR_EDMASNP);
 #elif defined(CONFIG_ARCH_LS1012A)
 	setbits_be32(&scfg->snpcnfgcr, SCFG_SNPCNFGCR_SECRDSNP |
 			SCFG_SNPCNFGCR_SECWRSNP | SCFG_SNPCNFGCR_USB1RDSNP |
@@ -797,11 +805,13 @@ int qspi_ahb_init(void)
 #ifdef CONFIG_TFABOOT
 #define MAX_BOOTCMD_SIZE	512
 
-int fsl_setenv_bootcmd(void)
+__weak int fsl_setenv_bootcmd(void)
 {
 	int ret;
 	enum boot_src src = get_boot_src();
 	char bootcmd_str[MAX_BOOTCMD_SIZE];
+
+	bootcmd_str[0] = 0;
 
 	switch (src) {
 #ifdef IFC_NOR_BOOTCOMMAND
@@ -850,6 +860,9 @@ int fsl_setenv_bootcmd(void)
 #endif
 		break;
 	}
+
+	if (!bootcmd_str[0])
+		return 0;
 
 	ret = env_set("bootcmd", bootcmd_str);
 	if (ret) {
@@ -919,25 +932,23 @@ __weak int fsl_board_late_init(void)
 #define DWC3_GSBUSCFG0_CACHETYPE(n)        (((n) & 0xffff)            \
 	<< DWC3_GSBUSCFG0_CACHETYPE_SHIFT)
 
-void enable_dwc3_snooping(void)
+static void enable_dwc3_snooping(void)
 {
-	int ret;
-	u32 val;
-	struct udevice *bus;
-	struct uclass *uc;
+	static const char * const compatibles[] = {
+	    "fsl,layerscape-dwc3",
+	    "fsl,ls1028a-dwc3",
+	};
 	fdt_addr_t dwc3_base;
+	ofnode node;
+	u32 val;
+	int i;
 
-	ret = uclass_get(UCLASS_USB, &uc);
-	if (ret)
-		return;
-
-	uclass_foreach_dev(bus, uc) {
-		if (!strcmp(bus->driver->of_match->compatible, "fsl,layerscape-dwc3")) {
-			dwc3_base = devfdt_get_addr(bus);
-			if (dwc3_base == FDT_ADDR_T_NONE) {
-				dev_err(bus, "dwc3 regs missing\n");
+	for (i = 0; i < ARRAY_SIZE(compatibles); i++) {
+		ofnode_for_each_compatible_node(node, compatibles[i]) {
+			dwc3_base = ofnode_get_addr(node);
+			if (dwc3_base == FDT_ADDR_T_NONE)
 				continue;
-			}
+
 			val = in_le32(dwc3_base + DWC3_GSBUSCFG0);
 			val &= ~DWC3_GSBUSCFG0_CACHETYPE(~0);
 			val |= DWC3_GSBUSCFG0_CACHETYPE(0x2222);
@@ -953,12 +964,15 @@ int board_late_init(void)
 #endif
 #ifdef CONFIG_TFABOOT
 	/*
-	 * Set bootcmd and mcinitcmd if they don't exist in the environment.
+	 * Set bootcmd and mcinitcmd if "fsl_bootcmd_mcinitcmd_set" does
+	 * not exists in env
 	 */
-	if (!env_get("bootcmd"))
+	if (env_get_yesno("fsl_bootcmd_mcinitcmd_set") <= 0) {
+		// Set bootcmd and mcinitcmd as per boot source
 		fsl_setenv_bootcmd();
-	if (!env_get("mcinitcmd"))
 		fsl_setenv_mcinitcmd();
+		env_set("fsl_bootcmd_mcinitcmd_set", "y");
+	}
 #endif
 #ifdef CONFIG_QSPI_AHB_INIT
 	qspi_ahb_init();

@@ -4,9 +4,9 @@
  * (C) Copyright 2014 - 2016 Cadence Design Systems Inc.
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <asm/cache.h>
+#include <linux/errno.h>
 
 /*
  * We currently run always with caches enabled when running from memory.
@@ -57,4 +57,9 @@ void invalidate_dcache_all(void)
 void invalidate_icache_all(void)
 {
 	__invalidate_icache_all();
+}
+
+int __weak pgprot_set_attrs(phys_addr_t addr, size_t size, enum pgprot_attrs perm)
+{
+	return -ENOSYS;
 }

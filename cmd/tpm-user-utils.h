@@ -20,7 +20,10 @@ int get_tpm(struct udevice **devp);
 int do_tpm_device(struct cmd_tbl *cmdtp, int flag, int argc,
 		  char *const argv[]);
 int do_tpm_init(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[]);
+int do_tpm_autostart(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[]);
 int do_tpm_info(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[]);
+int do_tpm_report_state(struct cmd_tbl *cmdtp, int flag, int argc,
+			char *const argv[]);
 int do_tpm(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[]);
 
 #endif /* __TPM_USER_UTILS_H */

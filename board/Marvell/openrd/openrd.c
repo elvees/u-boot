@@ -10,7 +10,6 @@
  * Written-by: Prafulla Wadaskar <prafulla@marvell.com>
  */
 
-#include <common.h>
 #include <init.h>
 #include <miiphy.h>
 #include <net.h>
@@ -140,7 +139,7 @@ void mv_phy_init(char *name)
 	/* reset the phy */
 	miiphy_reset(name, devadr);
 
-	printf(PHY_NO" Initialized on %s\n", name);
+	printf("Initialized on %s\n", name);
 }
 
 void reset_phy(void)

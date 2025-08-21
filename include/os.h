@@ -17,32 +17,39 @@ struct rtc_time;
 struct sandbox_state;
 
 /**
- * Access to the OS read() system call
+ * os_printf() - print directly to OS console
+ *
+ * @format: format string
+ */
+int os_printf(const char *format, ...);
+
+/**
+ * os_read() - access the OS read() system call
  *
  * @fd:		File descriptor as returned by os_open()
  * @buf:	Buffer to place data
  * @count:	Number of bytes to read
- * Return:	number of bytes read, or -1 on error
+ * Return:	number of bytes read, or -errno on error
  */
 ssize_t os_read(int fd, void *buf, size_t count);
 
 /**
- * Access to the OS write() system call
+ * os_write() - access the OS write() system call
  *
  * @fd:		File descriptor as returned by os_open()
  * @buf:	Buffer containing data to write
  * @count:	Number of bytes to write
- * Return:	number of bytes written, or -1 on error
+ * Return:	number of bytes written, or -errno on error
  */
 ssize_t os_write(int fd, const void *buf, size_t count);
 
 /**
- * Access to the OS lseek() system call
+ * os_lseek() - access the OS lseek() system call
  *
  * @fd:		File descriptor as returned by os_open()
  * @offset:	File offset (based on whence)
  * @whence:	Position offset is relative to (see below)
- * Return:	new file offset
+ * Return:	new file offset, or -errno on error
  */
 off_t os_lseek(int fd, off_t offset, int whence);
 
@@ -52,7 +59,15 @@ off_t os_lseek(int fd, off_t offset, int whence);
 #define OS_SEEK_END	2
 
 /**
- * Access to the OS open() system call
+ * os_filesize() - Calculate the size of a file
+ *
+ * @fd:		File descriptor as returned by os_open()
+ * Return:	file size or negative error code
+ */
+off_t os_filesize(int fd);
+
+/**
+ * os_open() - access the OS open() system call
  *
  * @pathname:	Pathname of file to open
  * @flags:	Flags, like OS_O_RDONLY, OS_O_RDWR
@@ -83,6 +98,29 @@ int os_close(int fd);
  */
 int os_unlink(const char *pathname);
 
+/** os_persistent_fname() - Find the path to a test file
+ *
+ * @buf: Buffer to hold path
+ * @maxsize: Maximum size of buffer
+ * @fname: Leaf filename to find
+ * Returns: 0 on success, -ENOENT if file is not found, -ENOSPC if the buffer is
+ * too small
+ */
+int os_persistent_file(char *buf, int maxsize, const char *fname);
+
+/**
+ * os_mktemp() - Create a temporary file
+ * @fname: The template to use for the file name. This must end with 6 Xs. It
+ *         will be modified to the opened filename on success.
+ * @size: The size of the file
+ *
+ * Create a temporary file using @fname as a template, unlink it, and truncate
+ * it to @size.
+ *
+ * Return: A file descriptor, or negative errno on error
+ */
+int os_mktemp(char *fname, off_t size);
+
 /**
  * os_exit() - access to the OS exit() system call
  *
@@ -94,6 +132,27 @@ int os_unlink(const char *pathname);
 void os_exit(int exit_code) __attribute__((noreturn));
 
 /**
+ * os_alarm() - access to the OS alarm() system call
+ *
+ * @seconds: number of seconds before the signal is sent
+ * Returns: number of seconds remaining until any previously scheduled alarm was
+ * due to be delivered; 0 if there was no previously scheduled alarm
+ */
+unsigned int os_alarm(unsigned int seconds);
+
+/**
+ * os_set_alarm_handler() - set handler for SIGALRM
+ *
+ * @handler:   The handler function. Pass NULL for SIG_DFL.
+ */
+void os_set_alarm_handler(void (*handler)(int));
+
+/**
+ * os_raise_sigalrm() - do raise(SIGALRM)
+ */
+void os_raise_sigalrm(void);
+
+/**
  * os_tty_raw() - put tty into raw mode to mimic serial console better
  *
  * @fd:		File descriptor of stdin (normally 0)
@@ -103,7 +162,7 @@ void os_exit(int exit_code) __attribute__((noreturn));
 void os_tty_raw(int fd, bool allow_sigs);
 
 /**
- * os_fs_restore() - restore the tty to its original mode
+ * os_fd_restore() - restore the tty to its original mode
  *
  * Call this to restore the original terminal mode, after it has been changed
  * by os_tty_raw(). This is an internal function.
@@ -114,7 +173,7 @@ void os_fd_restore(void);
  * os_malloc() - aquires some memory from the underlying os.
  *
  * @length:	Number of bytes to be allocated
- * Return:	Pointer to length bytes or NULL on error
+ * Return:	Pointer to length bytes or NULL if @length is 0 or on error
  */
 void *os_malloc(size_t length);
 
@@ -123,9 +182,22 @@ void *os_malloc(size_t length);
  *
  * This returns the memory to the OS.
  *
- * @ptr:	Pointer to memory block to free
+ * @ptr:	Pointer to memory block to free. If this is NULL then this
+ *		function does nothing
  */
 void os_free(void *ptr);
+
+/**
+ * os_realloc() - reallocate memory
+ *
+ * This follows the semantics of realloc(), so can perform an os_malloc() or
+ * os_free() depending on @ptr and @length.
+ *
+ * @ptr:	pointer to previously allocated memory of NULL
+ * @length:	number of bytes to allocate
+ * Return:	pointer to reallocated memory or NULL if @length is 0
+ */
+void *os_realloc(void *ptr, size_t length);
 
 /**
  * os_usleep() - access to the usleep function of the os
@@ -135,14 +207,14 @@ void os_free(void *ptr);
 void os_usleep(unsigned long usec);
 
 /**
- * Gets a monotonic increasing number of nano seconds from the OS
+ * os_get_nsec() - get monotonically increasing number of nano seconds from OS
  *
- * Return:	a monotonic increasing time scaled in nano seconds
+ * Return:	a monotoniccally increasing time scaled in nano seconds
  */
 uint64_t os_get_nsec(void);
 
 /**
- * Parse arguments and update sandbox state.
+ * os_parse_args() - parse arguments and update sandbox state.
  *
  * @state:	sandbox state to update
  * @argc:	argument count
@@ -245,7 +317,7 @@ const char *os_dirent_get_typename(enum os_dirent_t type);
  * @size:	size of file is returned if no error
  * Return:	0 on success or -1 if an error ocurred
  */
-int os_get_filesize(const char *fname, loff_t *size);
+int os_get_filesize(const char *fname, long long *size);
 
 /**
  * os_putc() - write a character to the controlling OS terminal
@@ -266,6 +338,14 @@ void os_putc(int ch);
  * @str:	string to write (note that \n is not appended)
  */
 void os_puts(const char *str);
+
+/**
+ * os_flush() - flush controlling OS terminal
+ *
+ * This bypasses the U-Boot console support and flushes directly the OS
+ * stdout file descriptor.
+ */
+void os_flush(void);
 
 /**
  * os_write_ram_buf() - write the sandbox RAM buffer to a existing file
@@ -313,9 +393,13 @@ int os_jump_to_image(const void *dest, int size);
  *
  * @fname:	place to put full path to U-Boot
  * @maxlen:	maximum size of @fname
+ * @use_img:	select the 'u-boot.img' file instead of the 'u-boot' ELF file
+ * @cur_prefix:	prefix of current executable, e.g. "spl" or "tpl"
+ * @next_prefix: prefix of executable to find, e.g. "spl" or ""
  * Return:	0 if OK, -NOSPC if the filename is too large, -ENOENT if not found
  */
-int os_find_u_boot(char *fname, int maxlen);
+int os_find_u_boot(char *fname, int maxlen, bool use_img,
+		   const char *cur_prefix, const char *next_prefix);
 
 /**
  * os_spl_to_uboot() - Run U-Boot proper
@@ -380,6 +464,28 @@ int os_write_file(const char *name, const void *buf, int size);
  * Return:	0 if OK, -ve on error
  */
 int os_read_file(const char *name, void **bufp, int *sizep);
+
+/**
+ * os_map_file() - Map a file from the host filesystem into memory
+ *
+ * This can be useful when to provide a backing store for an emulated device
+ *
+ * @pathname:	File pathname to map
+ * @os_flags:	Flags, like OS_O_RDONLY, OS_O_RDWR
+ * @bufp:	Returns buffer containing the file
+ * @sizep:	Returns size of data
+ * Return:	0 if OK, -ve on error
+ */
+int os_map_file(const char *pathname, int os_flags, void **bufp, int *sizep);
+
+/**
+ * os_unmap() - Unmap a file previously mapped
+ *
+ * @buf: Mapped address
+ * @size: Size in bytes
+ * Return:	0 if OK, -ve on error
+ */
+int os_unmap(void *buf, int size);
 
 /*
  * os_find_text_base() - Find the text section in this running process

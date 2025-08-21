@@ -5,7 +5,6 @@
  * Author: Weijie Gao <weijie.gao@mediatek.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <malloc.h>
 #include <dm/pinctrl.h>
@@ -13,8 +12,8 @@
 
 #include "pinctrl-mtmips-common.h"
 
-static void mtmips_pinctrl_reg_set(struct mtmips_pinctrl_priv *priv,
-				   u32 reg, u32 shift, u32 mask, u32 value)
+void mtmips_pinctrl_reg_set(struct mtmips_pinctrl_priv *priv,
+			    u32 reg, u32 shift, u32 mask, u32 value)
 {
 	u32 val;
 

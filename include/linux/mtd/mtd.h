@@ -25,6 +25,8 @@
 #if IS_ENABLED(CONFIG_DM)
 #include <dm/device.h>
 #endif
+#include <dm/ofnode.h>
+#include <blk.h>
 
 #define MAX_MTD_DEVICES 32
 #endif
@@ -51,7 +53,6 @@ struct erase_info {
 	u_long retries;
 	unsigned dev;
 	unsigned cell;
-	void (*callback) (struct erase_info *self);
 	u_long priv;
 	u_char state;
 	struct erase_info *next;
@@ -122,7 +123,7 @@ struct mtd_oob_region {
  * @ecc: function returning an ECC region in the OOB area.
  *	 Should return -ERANGE if %section exceeds the total number of
  *	 ECC sections.
- * @free: function returning a free region in the OOB area.
+ * @rfree: function returning a free region in the OOB area.
  *	  Should return -ERANGE if %section exceeds the total number of
  *	  free sections.
  */
@@ -153,7 +154,7 @@ struct mtd_info {
 	uint32_t flags;
 	uint64_t size;	 // Total size of the MTD
 
-	/* "Major" erase size for the device. Naïve users may take this
+	/* "Major" erase size for the device. Naive users may take this
 	 * to be the only erase size available, or may use the more detailed
 	 * information below if they desire
 	 */
@@ -306,6 +307,7 @@ struct mtd_info {
 	struct device dev;
 #else
 	struct udevice *dev;
+	ofnode flash_node;
 #endif
 	int usecount;
 
@@ -337,7 +339,7 @@ static inline void mtd_set_ofnode(struct mtd_info *mtd, ofnode node)
 	dev_set_ofnode(mtd->dev, node);
 }
 
-static inline const ofnode mtd_get_ofnode(struct mtd_info *mtd)
+static inline ofnode mtd_get_ofnode(struct mtd_info *mtd)
 {
 	return dev_ofnode(mtd->dev);
 }
@@ -410,6 +412,30 @@ int mtd_write(struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen,
 	      const u_char *buf);
 int mtd_panic_write(struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen,
 		    const u_char *buf);
+
+#if CONFIG_IS_ENABLED(MTD_BLOCK)
+static inline struct mtd_info *blk_desc_to_mtd(struct blk_desc *bdesc)
+{
+	void *priv = dev_get_priv(bdesc->bdev);
+
+	if (!priv)
+		return NULL;
+
+	return *((struct mtd_info **)priv);
+}
+
+int mtd_bind(struct udevice *dev, struct mtd_info **mtd);
+#else
+static inline struct mtd_info *blk_desc_to_mtd(struct blk_desc *bdesc)
+{
+	return NULL;
+}
+
+static inline int mtd_bind(struct udevice *dev, struct mtd_info **mtd)
+{
+	return -EOPNOTSUPP;
+}
+#endif
 
 int mtd_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops);
 int mtd_write_oob(struct mtd_info *mtd, loff_t to, struct mtd_oob_ops *ops);
@@ -521,7 +547,6 @@ extern void __put_mtd_device(struct mtd_info *mtd);
 extern struct mtd_info *get_mtd_device_nm(const char *name);
 extern void put_mtd_device(struct mtd_info *mtd);
 
-
 #ifndef __UBOOT__
 struct mtd_notifier {
 	void (*add)(struct mtd_info *mtd);
@@ -529,21 +554,10 @@ struct mtd_notifier {
 	struct list_head list;
 };
 
-
 extern void register_mtd_user (struct mtd_notifier *new);
 extern int unregister_mtd_user (struct mtd_notifier *old);
 #endif
 void *mtd_kmalloc_up_to(const struct mtd_info *mtd, size_t *size);
-
-#ifdef CONFIG_MTD_PARTITIONS
-void mtd_erase_callback(struct erase_info *instr);
-#else
-static inline void mtd_erase_callback(struct erase_info *instr)
-{
-	if (instr->callback)
-		instr->callback(instr);
-}
-#endif
 
 static inline int mtd_is_bitflip(int err) {
 	return err == -EUCLEAN;
@@ -561,8 +575,20 @@ unsigned mtd_mmap_capabilities(struct mtd_info *mtd);
 
 #ifdef __UBOOT__
 /* drivers/mtd/mtdcore.h */
+#if CONFIG_IS_ENABLED(MTD)
 int add_mtd_device(struct mtd_info *mtd);
 int del_mtd_device(struct mtd_info *mtd);
+#else
+static inline int add_mtd_device(struct mtd_info *mtd)
+{
+	return -ENOSYS;
+}
+
+static inline int del_mtd_device(struct mtd_info *mtd)
+{
+	return -ENOSYS;
+}
+#endif
 
 #ifdef CONFIG_MTD_PARTITIONS
 int add_mtd_partitions(struct mtd_info *, const struct mtd_partition *, int);
@@ -576,6 +602,16 @@ static inline int add_mtd_partitions(struct mtd_info *mtd,
 }
 
 static inline int del_mtd_partitions(struct mtd_info *mtd)
+{
+	return 0;
+}
+#endif
+
+#if defined(CONFIG_MTD_PARTITIONS) && CONFIG_IS_ENABLED(DM) && \
+    CONFIG_IS_ENABLED(OF_CONTROL)
+int add_mtd_partitions_of(struct mtd_info *master);
+#else
+static inline int add_mtd_partitions_of(struct mtd_info *master)
 {
 	return 0;
 }

@@ -4,7 +4,6 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <i2c.h>
 #include <rtc.h>
@@ -79,6 +78,18 @@ struct acpi_ops sandbox_rtc_acpi_ops = {
 };
 #endif
 
+static int sandbox_rtc_bind(struct udevice *dev)
+{
+#if CONFIG_IS_ENABLED(PLATDATA)
+	struct sandbox_i2c_rtc_plat_data *plat = dev_get_plat(dev);
+
+	/* Set up the emul_idx for i2c_emul_find() */
+	i2c_emul_set_idx(dev, plat->dtplat.sandbox_emul->idx);
+#endif
+
+	return 0;
+}
+
 static const struct rtc_ops sandbox_rtc_ops = {
 	.get = sandbox_rtc_get,
 	.set = sandbox_rtc_set,
@@ -97,5 +108,6 @@ U_BOOT_DRIVER(sandbox_rtc) = {
 	.id	= UCLASS_RTC,
 	.of_match = sandbox_rtc_ids,
 	.ops	= &sandbox_rtc_ops,
+	.bind	= sandbox_rtc_bind,
 	ACPI_OPS_PTR(&sandbox_rtc_acpi_ops)
 };

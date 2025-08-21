@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2015 Freescale Semiconductor
+ * Copyright 2021 NXP
  */
-#include <common.h>
+#include <config.h>
+#include <clock_legacy.h>
+#include <display_options.h>
 #include <env.h>
 #include <init.h>
 #include <malloc.h>
@@ -20,10 +23,8 @@
 #include <rtc.h>
 #include <asm/arch/soc.h>
 #include <hwconfig.h>
-#include <fsl_sec.h>
-#include <asm/arch/ppa.h>
 #include <asm/arch-fsl-layerscape/fsl_icid.h>
-
+#include "../common/i2c_mux.h"
 
 #include "../common/qixis.h"
 #include "ls2080aqds_qixis.h"
@@ -161,27 +162,6 @@ unsigned long get_board_ddr_clk(void)
 	return 66666666;
 }
 
-int select_i2c_ch_pca9547(u8 ch)
-{
-	int ret;
-#if CONFIG_IS_ENABLED(DM_I2C)
-	struct udevice *dev;
-
-	ret = i2c_get_chip_for_busnum(0, I2C_MUX_PCA_ADDR_PRI, 1, &dev);
-	if (!ret)
-		ret = dm_i2c_write(dev, 0, &ch, 1);
-
-#else
-	ret = i2c_write(I2C_MUX_PCA_ADDR_PRI, 0, 1, &ch, 1);
-#endif
-	if (ret) {
-		puts("PCA: failed to select proper channel\n");
-		return ret;
-	}
-
-	return 0;
-}
-
 int config_board_mux(int ctrl_type)
 {
 	u8 reg5;
@@ -232,28 +212,17 @@ int board_init(void)
 			     FSL_QIXIS_BRDCFG9_QSPI);
 #endif
 
-#ifdef CONFIG_ENV_IS_NOWHERE
-	gd->env_addr = (ulong)&default_environment[0];
-#endif
-	select_i2c_ch_pca9547(I2C_MUX_CH_DEFAULT);
+	select_i2c_ch_pca9547(I2C_MUX_CH_DEFAULT, 0);
 
 #ifdef CONFIG_RTC_ENABLE_32KHZ_OUTPUT
 #if CONFIG_IS_ENABLED(DM_I2C)
-	rtc_enable_32khz_output(0, CONFIG_SYS_I2C_RTC_ADDR);
+	rtc_enable_32khz_output(0, CFG_SYS_I2C_RTC_ADDR);
 #else
 	rtc_enable_32khz_output();
 #endif
 #endif
 
-#ifdef CONFIG_FSL_CAAM
-	sec_init();
-#endif
-
-#ifdef CONFIG_FSL_LS_PPA
-	ppa_init();
-#endif
-
-#if !defined(CONFIG_SYS_EARLY_PCI_INIT) && defined(CONFIG_DM_ETH)
+#if !defined(CONFIG_SYS_EARLY_PCI_INIT)
 	pci_init();
 #endif
 
@@ -262,7 +231,7 @@ int board_init(void)
 
 int board_early_init_f(void)
 {
-#ifdef CONFIG_SYS_I2C_EARLY_INIT
+#if defined(CONFIG_SYS_I2C_EARLY_INIT)
 	i2c_early_init_f();
 #endif
 	fsl_lsch3_early_init_f();
@@ -295,7 +264,7 @@ void detail_board_ddr_info(void)
 #endif
 }
 
-#if defined(CONFIG_FSL_MC_ENET) && !defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_FSL_MC_ENET) && !defined(CONFIG_XPL_BUILD)
 void fdt_fixup_board_enet(void *fdt)
 {
 	int offset;
@@ -354,8 +323,9 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 
 	fsl_fdt_fixup_dr_usb(blob, bd);
 
-#if defined(CONFIG_FSL_MC_ENET) && !defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_FSL_MC_ENET) && !defined(CONFIG_XPL_BUILD)
 	fdt_fixup_board_enet(blob);
+	fdt_reserve_mc_mem(blob, 0x300);
 #endif
 
 	fdt_fixup_icid(blob);

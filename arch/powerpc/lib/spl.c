@@ -2,7 +2,6 @@
 /*
  * Copyright 2012 Stefan Roese <sr@denx.de>
  */
-#include <common.h>
 #include <config.h>
 #include <log.h>
 #include <spl.h>
@@ -23,7 +22,7 @@ void __noreturn jump_to_image_linux(struct spl_image_info *spl_image)
 	image_entry_arg_t image_entry =
 		(image_entry_arg_t)spl_image->entry_point;
 
-	image_entry(spl_image->arg, 0, 0, EPAPR_MAGIC, CONFIG_SYS_BOOTMAPSZ,
+	image_entry(spl_image->arg, 0, 0, EPAPR_MAGIC, CFG_SYS_BOOTMAPSZ,
 		    0, 0);
 }
 #endif /* CONFIG_SPL_OS_BOOT */

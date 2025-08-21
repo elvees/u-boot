@@ -4,9 +4,10 @@
  * Terry Lv <r65388@freescale.com>
  */
 
-#include <common.h>
 #include <ahci.h>
 #include <blk.h>
+#include <bootdev.h>
+#include <clk.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <dwc_ahsata.h>
@@ -19,9 +20,11 @@
 #include <sata.h>
 #include <asm/cache.h>
 #include <asm/io.h>
+#if IS_ENABLED(CONFIG_ARCH_MX5) || IS_ENABLED(CONFIG_ARCH_MX6)
 #include <asm/arch/clock.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/mach-imx/sata.h>
+#endif
 #include <linux/bitops.h>
 #include <linux/ctype.h>
 #include <linux/delay.h>
@@ -116,13 +119,12 @@ static int ahci_setup_oobr(struct ahci_uc_priv *uc_priv, int clk)
 	return 0;
 }
 
-static int ahci_host_init(struct ahci_uc_priv *uc_priv)
+static int ahci_host_init(struct ahci_uc_priv *uc_priv, int clk)
 {
 	u32 tmp, cap_save, num_ports;
 	int i, j, timeout = 1000;
 	struct sata_port_regs *port_mmio = NULL;
 	struct sata_host_regs *host_mmio = uc_priv->mmio_base;
-	int clk = mxc_get_clock(MXC_SATA_CLK);
 
 	cap_save = readl(&host_mmio->cap);
 	cap_save |= SATA_HOST_CAP_SSS;
@@ -330,6 +332,7 @@ static int ahci_fill_sg(struct ahci_uc_priv *uc_priv, u8 port,
 {
 	struct ahci_ioports *pp = &uc_priv->port[port];
 	struct ahci_sg *ahci_sg = pp->cmd_tbl_sg;
+	phys_addr_t pa = virt_to_phys(buf);
 	u32 sg_count, max_bytes;
 	int i;
 
@@ -341,9 +344,8 @@ static int ahci_fill_sg(struct ahci_uc_priv *uc_priv, u8 port,
 	}
 
 	for (i = 0; i < sg_count; i++) {
-		ahci_sg->addr =
-			cpu_to_le32((u32)buf + i * max_bytes);
-		ahci_sg->addr_hi = 0;
+		ahci_sg->addr = cpu_to_le32(lower_32_bits(pa));
+		ahci_sg->addr_hi = cpu_to_le32(upper_32_bits(pa));
 		ahci_sg->flags_size = cpu_to_le32(0x3fffff &
 					(buf_len < max_bytes
 					? (buf_len - 1)
@@ -359,14 +361,14 @@ static void ahci_fill_cmd_slot(struct ahci_ioports *pp, u32 cmd_slot, u32 opts)
 {
 	struct ahci_cmd_hdr *cmd_hdr = (struct ahci_cmd_hdr *)(pp->cmd_slot +
 					AHCI_CMD_SLOT_SZ * cmd_slot);
+	phys_addr_t pa = virt_to_phys(pp->cmd_tbl);
 
 	memset(cmd_hdr, 0, AHCI_CMD_SLOT_SZ);
 	cmd_hdr->opts = cpu_to_le32(opts);
 	cmd_hdr->status = 0;
-	pp->cmd_slot->tbl_addr = cpu_to_le32((u32)pp->cmd_tbl & 0xffffffff);
+	pp->cmd_slot->tbl_addr = cpu_to_le32(lower_32_bits(pa));
 #ifdef CONFIG_PHYS_64BIT
-	pp->cmd_slot->tbl_addr_hi =
-	    cpu_to_le32((u32)(((pp->cmd_tbl) >> 16) >> 16));
+	pp->cmd_slot->tbl_addr_hi = cpu_to_le32(upper_32_bits(pa));
 #endif
 }
 
@@ -404,7 +406,7 @@ static int ahci_exec_ata_cmd(struct ahci_uc_priv *uc_priv, u8 port,
 	}
 	ahci_fill_cmd_slot(pp, cmd_slot, opts);
 
-	flush_cache((int)(pp->cmd_slot), AHCI_PORT_PRIV_DMA_SZ);
+	flush_cache((ulong)(pp->cmd_slot), AHCI_PORT_PRIV_DMA_SZ);
 	writel_with_flush(1 << cmd_slot, &port_mmio->ci);
 
 	if (waiting_for_cmd_completed((u8 *)&port_mmio->ci, 10000,
@@ -412,8 +414,8 @@ static int ahci_exec_ata_cmd(struct ahci_uc_priv *uc_priv, u8 port,
 		printf("timeout exit!\n");
 		return -1;
 	}
-	invalidate_dcache_range((int)(pp->cmd_slot),
-				(int)(pp->cmd_slot)+AHCI_PORT_PRIV_DMA_SZ);
+	invalidate_dcache_range((ulong)(pp->cmd_slot),
+				(ulong)(pp->cmd_slot) + AHCI_PORT_PRIV_DMA_SZ);
 	debug("ahci_exec_ata_cmd: %d byte transferred.\n",
 	      pp->cmd_slot->status);
 	if (!is_write)
@@ -441,8 +443,9 @@ static int ahci_port_start(struct ahci_uc_priv *uc_priv, u8 port)
 {
 	struct ahci_ioports *pp = &uc_priv->port[port];
 	struct sata_port_regs *port_mmio = pp->port_mmio;
+	phys_addr_t dma_addr;
 	u32 port_status;
-	u32 mem;
+	void *mem;
 	int timeout = 10000000;
 
 	debug("Enter start port: %d\n", port);
@@ -453,22 +456,20 @@ static int ahci_port_start(struct ahci_uc_priv *uc_priv, u8 port)
 		return -1;
 	}
 
-	mem = (u32)malloc(AHCI_PORT_PRIV_DMA_SZ + 1024);
+	mem = memalign(2048, AHCI_PORT_PRIV_DMA_SZ);
 	if (!mem) {
 		printf("No mem for table!\n");
 		return -ENOMEM;
 	}
 
-	mem = (mem + 0x400) & (~0x3ff);	/* Aligned to 1024-bytes */
-	memset((u8 *)mem, 0, AHCI_PORT_PRIV_DMA_SZ);
+	memset(mem, 0, AHCI_PORT_PRIV_DMA_SZ);
 
 	/*
 	 * First item in chunk of DMA memory: 32-slot command table,
 	 * 32 bytes each in size
 	 */
 	pp->cmd_slot = (struct ahci_cmd_hdr *)mem;
-	debug("cmd_slot = 0x%x\n", (unsigned int) pp->cmd_slot);
-	mem += (AHCI_CMD_SLOT_SZ * DWC_AHSATA_MAX_CMD_SLOTS);
+	mem += AHCI_CMD_SLOT_SZ * AHCI_MAX_CMD_SLOT;
 
 	/*
 	 * Second item: Received-FIS area, 256-Byte aligned
@@ -481,14 +482,19 @@ static int ahci_port_start(struct ahci_uc_priv *uc_priv, u8 port)
 	 * and its scatter-gather table
 	 */
 	pp->cmd_tbl = mem;
-	debug("cmd_tbl_dma = 0x%lx\n", pp->cmd_tbl);
-
 	mem += AHCI_CMD_TBL_HDR;
+	pp->cmd_tbl_sg = (struct ahci_sg *)mem;
 
 	writel_with_flush(0x00004444, &port_mmio->dmacr);
-	pp->cmd_tbl_sg = (struct ahci_sg *)mem;
-	writel_with_flush((u32)pp->cmd_slot, &port_mmio->clb);
-	writel_with_flush(pp->rx_fis, &port_mmio->fb);
+	dma_addr = virt_to_phys(pp->cmd_slot);
+	debug("cmd_slot_dma = 0x%08llx\n", (u64)dma_addr);
+	writel_with_flush(lower_32_bits(dma_addr), &port_mmio->clb);
+	writel_with_flush(upper_32_bits(dma_addr), &port_mmio->clbu);
+	dma_addr = virt_to_phys(pp->cmd_slot);
+	debug("rx_fis_slot_dma = 0x%08llx\n", (u64)dma_addr);
+	writel_with_flush(lower_32_bits(dma_addr), &port_mmio->fb);
+	writel_with_flush(upper_32_bits(dma_addr), &port_mmio->fbu);
+
 
 	/* Enable FRE */
 	writel_with_flush((SATA_PORT_CMD_FRE | readl(&port_mmio->cmd)),
@@ -844,138 +850,6 @@ static ulong sata_write_common(struct ahci_uc_priv *uc_priv,
 	return rc;
 }
 
-#if !CONFIG_IS_ENABLED(AHCI)
-static int ahci_init_one(int pdev)
-{
-	int rc;
-	struct ahci_uc_priv *uc_priv = NULL;
-
-	uc_priv = malloc(sizeof(struct ahci_uc_priv));
-	if (!uc_priv)
-		return -ENOMEM;
-
-	memset(uc_priv, 0, sizeof(struct ahci_uc_priv));
-	uc_priv->dev = pdev;
-
-	uc_priv->host_flags = ATA_FLAG_SATA
-				| ATA_FLAG_NO_LEGACY
-				| ATA_FLAG_MMIO
-				| ATA_FLAG_PIO_DMA
-				| ATA_FLAG_NO_ATAPI;
-
-	uc_priv->mmio_base = (void __iomem *)CONFIG_DWC_AHSATA_BASE_ADDR;
-
-	/* initialize adapter */
-	rc = ahci_host_init(uc_priv);
-	if (rc)
-		goto err_out;
-
-	ahci_print_info(uc_priv);
-
-	/* Save the uc_private struct to block device struct */
-	sata_dev_desc[pdev].priv = uc_priv;
-
-	return 0;
-
-err_out:
-	if (uc_priv)
-		free(uc_priv);
-	return rc;
-}
-
-int init_sata(int dev)
-{
-	struct ahci_uc_priv *uc_priv = NULL;
-
-#if defined(CONFIG_MX6)
-	if (!is_mx6dq() && !is_mx6dqp())
-		return 1;
-#endif
-	if (dev < 0 || dev > (CONFIG_SYS_SATA_MAX_DEVICE - 1)) {
-		printf("The sata index %d is out of ranges\n\r", dev);
-		return -1;
-	}
-
-	ahci_init_one(dev);
-
-	uc_priv = sata_dev_desc[dev].priv;
-
-	return dwc_ahci_start_ports(uc_priv) ? 1 : 0;
-}
-
-int reset_sata(int dev)
-{
-	struct ahci_uc_priv *uc_priv;
-	struct sata_host_regs *host_mmio;
-
-	if (dev < 0 || dev > (CONFIG_SYS_SATA_MAX_DEVICE - 1)) {
-		printf("The sata index %d is out of ranges\n\r", dev);
-		return -1;
-	}
-
-	uc_priv = sata_dev_desc[dev].priv;
-	if (NULL == uc_priv)
-		/* not initialized, so nothing to reset */
-		return 0;
-
-	host_mmio = uc_priv->mmio_base;
-	setbits_le32(&host_mmio->ghc, SATA_HOST_GHC_HR);
-	while (readl(&host_mmio->ghc) & SATA_HOST_GHC_HR)
-		udelay(100);
-
-	free(uc_priv);
-	memset(&sata_dev_desc[dev], 0, sizeof(struct blk_desc));
-
-	return 0;
-}
-
-int sata_port_status(int dev, int port)
-{
-	struct sata_port_regs *port_mmio;
-	struct ahci_uc_priv *uc_priv = NULL;
-
-	if (dev < 0 || dev > (CONFIG_SYS_SATA_MAX_DEVICE - 1))
-		return -EINVAL;
-
-	if (sata_dev_desc[dev].priv == NULL)
-		return -ENODEV;
-
-	uc_priv = sata_dev_desc[dev].priv;
-	port_mmio = uc_priv->port[port].port_mmio;
-
-	return readl(&port_mmio->ssts) & SATA_PORT_SSTS_DET_MASK;
-}
-
-/*
- * SATA interface between low level driver and command layer
- */
-ulong sata_read(int dev, ulong blknr, lbaint_t blkcnt, void *buffer)
-{
-	struct ahci_uc_priv *uc_priv = sata_dev_desc[dev].priv;
-
-	return sata_read_common(uc_priv, &sata_dev_desc[dev], blknr, blkcnt,
-				buffer);
-}
-
-ulong sata_write(int dev, ulong blknr, lbaint_t blkcnt, const void *buffer)
-{
-	struct ahci_uc_priv *uc_priv = sata_dev_desc[dev].priv;
-
-	return sata_write_common(uc_priv, &sata_dev_desc[dev], blknr, blkcnt,
-				 buffer);
-}
-
-int scan_sata(int dev)
-{
-	struct ahci_uc_priv *uc_priv = sata_dev_desc[dev].priv;
-	struct blk_desc *pdev = &sata_dev_desc[dev];
-
-	return dwc_ahsata_scan_common(uc_priv, pdev);
-}
-#endif /* CONFIG_IS_ENABLED(AHCI) */
-
-#if CONFIG_IS_ENABLED(AHCI)
-
 int dwc_ahsata_port_status(struct udevice *dev, int port)
 {
 	struct ahci_uc_priv *uc_priv = dev_get_uclass_priv(dev);
@@ -1012,7 +886,8 @@ int dwc_ahsata_scan(struct udevice *dev)
 	device_find_first_child(dev, &blk);
 	if (!blk) {
 		ret = blk_create_devicef(dev, "dwc_ahsata_blk", "blk",
-					 IF_TYPE_SATA, -1, 512, 0, &blk);
+					 UCLASS_AHCI, -1, DEFAULT_BLKSZ,
+					 0, &blk);
 		if (ret) {
 			debug("Can't create device\n");
 			return ret;
@@ -1026,23 +901,56 @@ int dwc_ahsata_scan(struct udevice *dev)
 		return ret;
 	}
 
+	ret = blk_probe_or_unbind(dev);
+	if (ret < 0)
+		/* TODO: undo create */
+		return log_msg_ret("pro", ret);
+
+	ret = bootdev_setup_for_sibling_blk(blk, "sata_bootdev");
+	if (ret)
+		return log_msg_ret("bd", ret);
+
 	return 0;
 }
 
 int dwc_ahsata_probe(struct udevice *dev)
 {
 	struct ahci_uc_priv *uc_priv = dev_get_uclass_priv(dev);
+	struct clk_bulk clk_bulk __maybe_unused;
+	struct clk clk __maybe_unused;
+	int sataclk;
 	int ret;
 
-#if defined(CONFIG_MX6)
+#if IS_ENABLED(CONFIG_MX6)
 	setup_sata();
 #endif
+#if IS_ENABLED(CONFIG_MX5) || IS_ENABLED(CONFIG_MX6)
+	sataclk = mxc_get_clock(MXC_SATA_CLK);
+#else
+	ret = clk_get_bulk(dev, &clk_bulk);
+	if (ret)
+		return ret;
+
+	ret = clk_enable_bulk(&clk_bulk);
+	if (ret)
+		return ret;
+
+	ret	= clk_get_by_name(dev, "sata", &clk);
+	if (ret)
+		return ret;
+
+	sataclk = clk_get_rate(&clk);
+#endif
+	if (IS_ERR_VALUE(sataclk)) {
+		log_err("Unable to get SATA clock rate\n");
+		return -EINVAL;
+	}
 	uc_priv->host_flags = ATA_FLAG_SATA | ATA_FLAG_NO_LEGACY |
 			ATA_FLAG_MMIO | ATA_FLAG_PIO_DMA | ATA_FLAG_NO_ATAPI;
-	uc_priv->mmio_base = (void __iomem *)dev_read_addr(dev);
+	uc_priv->mmio_base = dev_read_addr_ptr(dev);
 
 	/* initialize adapter */
-	ret = ahci_host_init(uc_priv);
+	ret = ahci_host_init(uc_priv, sataclk);
 	if (ret)
 		return ret;
 
@@ -1084,7 +992,6 @@ U_BOOT_DRIVER(dwc_ahsata_blk) = {
 	.ops		= &dwc_ahsata_blk_ops,
 };
 
-#if CONFIG_IS_ENABLED(DWC_AHSATA_AHCI)
 struct ahci_ops dwc_ahsata_ahci_ops = {
 	.port_status = dwc_ahsata_port_status,
 	.reset       = dwc_ahsata_bus_reset,
@@ -1092,7 +999,9 @@ struct ahci_ops dwc_ahsata_ahci_ops = {
 };
 
 static const struct udevice_id dwc_ahsata_ahci_ids[] = {
+	{ .compatible = "fsl,imx53-ahci" },
 	{ .compatible = "fsl,imx6q-ahci" },
+	{ .compatible = "fsl,imx6qp-ahci" },
 	{ }
 };
 
@@ -1103,5 +1012,3 @@ U_BOOT_DRIVER(dwc_ahsata_ahci) = {
 	.ops      = &dwc_ahsata_ahci_ops,
 	.probe    = dwc_ahsata_probe,
 };
-#endif
-#endif

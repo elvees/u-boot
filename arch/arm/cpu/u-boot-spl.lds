@@ -14,9 +14,9 @@ SECTIONS
 	. = 0x00000000;
 
 	. = ALIGN(4);
+	__image_copy_start = ADDR(.text);
 	.text :
 	{
-		__image_copy_start = .;
 		*(.vectors)
 		CPUDIR/start.o (.text*)
 		*(.text*)
@@ -32,8 +32,8 @@ SECTIONS
 	}
 
 	. = ALIGN(4);
-	.u_boot_list : {
-		KEEP(*(SORT(.u_boot_list*)));
+	__u_boot_list : {
+		KEEP(*(SORT(__u_boot_list*)));
 	}
 
 	. = ALIGN(4);
@@ -53,12 +53,8 @@ SECTIONS
 		__rel_dyn_end = .;
 	}
 
-	.end :
-	{
-		*(.__end)
-	}
-
 	_image_binary_end = .;
+	_end = .;
 
 	.bss __rel_dyn_start (OVERLAY) : {
 		__bss_start = .;

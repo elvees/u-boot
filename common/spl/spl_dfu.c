@@ -5,7 +5,6 @@
  *
  * Ravi B <ravibabu@ti.com>
  */
-#include <common.h>
 #include <env.h>
 #include <spl.h>
 #include <linux/compiler.h>
@@ -15,6 +14,7 @@
 #include <g_dnl.h>
 #include <usb.h>
 #include <dfu.h>
+#include <linux/printk.h>
 
 static int run_dfu(int usb_index, char *interface, char *devstring)
 {

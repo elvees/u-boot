@@ -4,7 +4,7 @@
  *		      Bo Shen <voice.shen@atmel.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <hang.h>
 #include <init.h>
 #include <log.h>
@@ -124,7 +124,7 @@ void board_init_f(ulong dummy)
 	/* PMC configuration */
 	at91_pmc_init();
 
-	at91_clock_init(CONFIG_SYS_AT91_MAIN_CLOCK);
+	at91_clock_init(CFG_SYS_AT91_MAIN_CLOCK);
 
 	matrix_init();
 
@@ -134,7 +134,7 @@ void board_init_f(ulong dummy)
 
 	board_early_init_f();
 
-	mem_init();
+	at91_mem_init();
 
 	ret = spl_init();
 	if (ret) {

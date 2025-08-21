@@ -3,7 +3,6 @@
  * Copyright (C) 2018 Xilinx, Inc. (Michal Simek)
  */
 
-#include <common.h>
 #include <bootstage.h>
 #include <dm.h>
 #include <errno.h>
@@ -97,6 +96,17 @@ static int cadence_ttc_of_to_plat(struct udevice *dev)
 	return 0;
 }
 
+static int cadence_ttc_bind(struct udevice *dev)
+{
+	const char *cells;
+
+	cells = dev_read_prop(dev, "#pwm-cells", NULL);
+	if (cells)
+		return -ENODEV;
+
+	return 0;
+}
+
 static const struct timer_ops cadence_ttc_ops = {
 	.get_count = cadence_ttc_get_count,
 };
@@ -114,4 +124,5 @@ U_BOOT_DRIVER(cadence_ttc) = {
 	.priv_auto	= sizeof(struct cadence_ttc_priv),
 	.probe = cadence_ttc_probe,
 	.ops = &cadence_ttc_ops,
+	.bind = cadence_ttc_bind,
 };

@@ -17,10 +17,6 @@
 #include <config.h>
 #include <linux/linkage.h>
 
-#ifndef CONFIG_SYS_PHY_UBOOT_BASE
-#define CONFIG_SYS_PHY_UBOOT_BASE	CONFIG_SYS_UBOOT_BASE
-#endif
-
 /*
  *************************************************************************
  *
@@ -69,7 +65,7 @@ cpu_init_crit:
 	 * When booting from NAND - it has definitely been a reset, so, no need
 	 * to flush caches and disable the MMU
 	 */
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 	/*
 	 * flush v4 I/D caches
 	 */
@@ -88,7 +84,7 @@ cpu_init_crit:
 
 	/* Prepare to disable the MMU */
 	adr	r2, mmu_disable_phys
-	sub	r2, r2, #(CONFIG_SYS_PHY_UBOOT_BASE - CONFIG_SYS_TEXT_BASE)
+	sub	r2, r2, #(CFG_SYS_UBOOT_BASE - CONFIG_TEXT_BASE)
 	b	mmu_disable
 
 	.align 5

@@ -9,13 +9,13 @@
 
 #define pr_fmt(fmt)	"nand-bbt: " fmt
 
-#include <common.h>
 #include <dm/devres.h>
 #include <linux/bitops.h>
 #include <linux/mtd/nand.h>
 #ifndef __UBOOT__
 #include <linux/slab.h>
 #endif
+#include <linux/printk.h>
 
 /**
  * nanddev_bbt_init() - Initialize the BBT (Bad Block Table)

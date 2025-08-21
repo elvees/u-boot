@@ -7,6 +7,8 @@
 #ifndef _ASM_ARCH_BOOTROM_H
 #define _ASM_ARCH_BOOTROM_H
 
+#include <linux/types.h>
+
 /*
  * Saved Stack pointer address.
  * Access might be needed in some special cases.
@@ -43,11 +45,14 @@ void back_to_bootrom(enum rockchip_bootrom_cmd brom_cmd);
  * Boot-device identifiers as used by the BROM
  */
 enum {
+	BROM_BOOTSOURCE_UNKNOWN = 0,
 	BROM_BOOTSOURCE_NAND = 1,
 	BROM_BOOTSOURCE_EMMC = 2,
 	BROM_BOOTSOURCE_SPINOR = 3,
 	BROM_BOOTSOURCE_SPINAND = 4,
 	BROM_BOOTSOURCE_SD = 5,
+	BROM_BOOTSOURCE_I2C = 8,
+	BROM_BOOTSOURCE_SPI = 9,
 	BROM_BOOTSOURCE_USB = 10,
 	BROM_LAST_BOOTSOURCE = BROM_BOOTSOURCE_USB
 };
@@ -57,6 +62,6 @@ extern const char * const boot_devices[BROM_LAST_BOOTSOURCE + 1];
 /**
  * Locations of the boot-device identifier in SRAM
  */
-#define BROM_BOOTSOURCE_ID_ADDR   (CONFIG_IRAM_BASE + 0x10)
+#define BROM_BOOTSOURCE_ID_ADDR   (CFG_IRAM_BASE + 0x10)
 
 #endif

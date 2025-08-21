@@ -3,7 +3,6 @@
  * (C) Copyright 2012-2016 Stephen Warren
  */
 
-#include <common.h>
 #include <config.h>
 #include <dm.h>
 #include <env.h>
@@ -11,7 +10,6 @@
 #include <fdt_support.h>
 #include <fdt_simplefb.h>
 #include <init.h>
-#include <lcd.h>
 #include <memalign.h>
 #include <mmc.h>
 #include <asm/gpio.h>
@@ -25,6 +23,11 @@
 #endif
 #include <watchdog.h>
 #include <dm/pinctrl.h>
+#include <dm/ofnode.h>
+#include <acpi/acpi_table.h>
+#include <acpi/acpigen.h>
+#include <dm/lists.h>
+#include <tables_csum.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -65,6 +68,19 @@ struct msg_get_clock_rate {
 	u32 end_tag;
 };
 
+struct efi_fw_image fw_images[] = {
+	{
+		.fw_name = u"RPI_UBOOT",
+		.image_index = 1,
+	},
+};
+
+struct efi_capsule_update_info update_info = {
+	.dfu_string = "mmc 0=u-boot.bin fat 0 1",
+	.num_images = ARRAY_SIZE(fw_images),
+	.images = fw_images,
+};
+
 #ifdef CONFIG_ARM64
 #define DTB_DIR "broadcom/"
 #else
@@ -72,7 +88,7 @@ struct msg_get_clock_rate {
 #endif
 
 /*
- * https://www.raspberrypi.org/documentation/hardware/raspberrypi/revision-codes/README.md
+ * https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#raspberry-pi-revision-codes
  */
 struct rpi_model {
 	const char *name;
@@ -157,6 +173,11 @@ static const struct rpi_model rpi_models_new_scheme[] = {
 		DTB_DIR "bcm2711-rpi-4-b.dtb",
 		true,
 	},
+	[0x12] = {
+		"Zero 2 W",
+		DTB_DIR "bcm2837-rpi-zero-2-w.dtb",
+		false,
+	},
 	[0x13] = {
 		"400",
 		DTB_DIR "bcm2711-rpi-400.dtb",
@@ -165,6 +186,26 @@ static const struct rpi_model rpi_models_new_scheme[] = {
 	[0x14] = {
 		"Compute Module 4",
 		DTB_DIR "bcm2711-rpi-cm4.dtb",
+		true,
+	},
+	[0x17] = {
+		"5 Model B",
+		DTB_DIR "bcm2712-rpi-5-b.dtb",
+		true,
+	},
+	[0x18] = {
+		"Compute Module 5",
+		DTB_DIR "bcm2712-rpi-cm5-cm5io.dtb",
+		true,
+	},
+	[0x19] = {
+		"500",
+		DTB_DIR "bcm2712-rpi-500.dtb",
+		true,
+	},
+	[0x1A] = {
+		"Compute Module 5 Lite",
+		DTB_DIR "bcm2712-rpi-cm5l-cm5io.dtb",
 		true,
 	},
 };
@@ -318,9 +359,6 @@ static void set_fdtfile(void)
  */
 static void set_fdt_addr(void)
 {
-	if (env_get("fdt_addr"))
-		return;
-
 	if (fdt_magic(fw_dtb_pointer) != FDT_MAGIC)
 		return;
 
@@ -330,7 +368,7 @@ static void set_fdt_addr(void)
 /*
  * Prevent relocation from stomping on a firmware provided FDT blob.
  */
-unsigned long board_get_usable_ram_top(unsigned long total_size)
+phys_addr_t board_get_usable_ram_top(phys_size_t total_size)
 {
 	if ((gd->ram_top - fw_dtb_pointer) > SZ_64M)
 		return gd->ram_top;
@@ -373,7 +411,7 @@ static void set_board_info(void)
 
 	snprintf(s, sizeof(s), "0x%X", revision);
 	env_set("board_revision", s);
-	snprintf(s, sizeof(s), "%d", rev_scheme);
+	snprintf(s, sizeof(s), "%u", rev_scheme);
 	env_set("board_rev_scheme", s);
 	/* Can't rename this to board_rev_type since it's an ABI for scripts */
 	snprintf(s, sizeof(s), "0x%X", rev_type);
@@ -419,21 +457,33 @@ int misc_init_r(void)
 	return 0;
 }
 
-static void get_board_rev(void)
+static void get_board_revision(void)
 {
 	ALLOC_CACHE_ALIGN_BUFFER(struct msg_get_board_rev, msg, 1);
 	int ret;
 	const struct rpi_model *models;
 	uint32_t models_count;
+	ofnode node;
 
 	BCM2835_MBOX_INIT_HDR(msg);
 	BCM2835_MBOX_INIT_TAG(&msg->get_board_rev, GET_BOARD_REV);
 
 	ret = bcm2835_mbox_call_prop(BCM2835_MBOX_PROP_CHAN, &msg->hdr);
 	if (ret) {
-		printf("bcm2835: Could not query board revision\n");
 		/* Ignore error; not critical */
-		return;
+		node = ofnode_path("/system");
+		if (!ofnode_valid(node)) {
+			printf("bcm2835: Could not find /system node\n");
+			return;
+		}
+
+		ret = ofnode_read_u32(node, "linux,revision", &revision);
+		if (ret) {
+			printf("bcm2835: Could not find linux,revision\n");
+			return;
+		}
+	} else {
+		revision = msg->get_board_rev.body.resp.rev;
 	}
 
 	/*
@@ -447,7 +497,6 @@ static void get_board_rev(void)
 	 * http://www.raspberrypi.org/forums/viewtopic.php?f=63&t=98367&start=250
 	 * http://www.raspberrypi.org/forums/viewtopic.php?f=31&t=20594
 	 */
-	revision = msg->get_board_rev.body.resp.rev;
 	if (revision & 0x800000) {
 		rev_scheme = 1;
 		rev_type = (revision >> 4) & 0xff;
@@ -474,11 +523,7 @@ static void get_board_rev(void)
 
 int board_init(void)
 {
-#ifdef CONFIG_HW_WATCHDOG
-	hw_watchdog_init();
-#endif
-
-	get_board_rev();
+	get_board_revision();
 
 	gd->bd->bi_boot_params = 0x100;
 
@@ -488,21 +533,90 @@ int board_init(void)
 /*
  * If the firmware passed a device tree use it for U-Boot.
  */
-void *board_fdt_blob_setup(void)
+int board_fdt_blob_setup(void **fdtp)
 {
 	if (fdt_magic(fw_dtb_pointer) != FDT_MAGIC)
-		return NULL;
-	return (void *)fw_dtb_pointer;
+		return -ENXIO;
+
+	*fdtp = (void *)fw_dtb_pointer;
+
+	return 0;
+}
+
+int copy_property(void *dst, void *src, char *path, char *property)
+{
+	int dst_offset, src_offset;
+	const fdt32_t *prop;
+	int len;
+
+	src_offset = fdt_path_offset(src, path);
+	dst_offset = fdt_path_offset(dst, path);
+
+	if (src_offset < 0 || dst_offset < 0)
+		return -1;
+
+	prop = fdt_getprop(src, src_offset, property, &len);
+	if (!prop)
+		return -1;
+
+	return fdt_setprop(dst, dst_offset, property, prop, len);
+}
+
+/* Copy tweaks from the firmware dtb to the loaded dtb */
+void  update_fdt_from_fw(void *fdt, void *fw_fdt)
+{
+	/* Using dtb from firmware directly; leave it alone */
+	if (fdt == fw_fdt)
+		return;
+
+	/* The firmware provides a more precise model; so copy that */
+	copy_property(fdt, fw_fdt, "/", "model");
+
+	/* memory reserve as suggested by the firmware */
+	copy_property(fdt, fw_fdt, "/", "memreserve");
+
+	/* copy the CMA memory setting from the firmware DT to linux */
+	copy_property(fdt, fw_fdt, "/reserved-memory/linux,cma", "size");
+
+	/* Adjust dma-ranges for the SD card and PCI bus as they can depend on
+	 * the SoC revision
+	 */
+	copy_property(fdt, fw_fdt, "emmc2bus", "dma-ranges");
+	copy_property(fdt, fw_fdt, "pcie0", "dma-ranges");
+
+	/* Bootloader configuration template exposes as nvmem */
+	if (copy_property(fdt, fw_fdt, "blconfig", "reg") == 0)
+		copy_property(fdt, fw_fdt, "blconfig", "status");
+
+	/* kernel address randomisation seed as provided by the firmware */
+	copy_property(fdt, fw_fdt, "/chosen", "kaslr-seed");
+
+	/* warnings from the firmware (if any) */
+	copy_property(fdt, fw_fdt, "/chosen", "user-warnings");
+
+	/* address of the PHY device as provided by the firmware  */
+	copy_property(fdt, fw_fdt, "ethernet0/mdio@e14/ethernet-phy@1", "reg");
+
+	/* Bluetooth device address as provided by the firmware */
+	copy_property(fdt, fw_fdt, "/soc/serial@7e201000/bluetooth", "local-bd-address");
+
+	/* copy uart clk as provided by the firmware */
+	copy_property(fdt, fw_fdt, "/clocks/clk-uart", "clock-frequency");
 }
 
 int ft_board_setup(void *blob, struct bd_info *bd)
 {
-	/*
-	 * For now, we simply always add the simplefb DT node. Later, we
-	 * should be more intelligent, and e.g. only do this if no enabled DT
-	 * node exists for the "real" graphics driver.
-	 */
-	lcd_dt_simplefb_add_node(blob);
+	int node;
+
+	update_fdt_from_fw(blob, (void *)fw_dtb_pointer);
+
+	if (CONFIG_IS_ENABLED(FDT_SIMPLEFB)) {
+		node = fdt_node_offset_by_compatible(blob, -1, "simple-framebuffer");
+		if (node < 0)
+			fdt_simplefb_add_node(blob);
+		else
+			fdt_simplefb_enable_and_mem_rsv(blob);
+	}
 
 #ifdef CONFIG_EFI_LOADER
 	/* Reserve the spin table */
@@ -512,3 +626,181 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 
 	return 0;
 }
+
+#if CONFIG_IS_ENABLED(GENERATE_ACPI_TABLE)
+static bool is_rpi4(void)
+{
+	return of_machine_is_compatible("brcm,bcm2711") ||
+	       of_machine_is_compatible("brcm,bcm2712");
+}
+
+static bool is_rpi3(void)
+{
+	return of_machine_is_compatible("brcm,bcm2837");
+}
+
+static int acpi_rpi_board_fill_ssdt(struct acpi_ctx *ctx)
+{
+	int node, ret, uart_in_use, mini_clock_rate;
+	bool enabled;
+	struct udevice *dev;
+	struct {
+		const char *fdt_compatible;
+		const char *acpi_scope;
+		bool on_rpi4;
+		bool on_rpi3;
+		u32 mmio_address;
+	} map[] = {
+		{"brcm,bcm2711-pcie", "\\_SB.PCI0", true, false},
+		{"brcm,bcm2711-emmc2", "\\_SB.GDV1.SDC3", true, false},
+		{"brcm,bcm2835-pwm", "\\_SB.GDV0.PWM0", true, true},
+		{"brcm,bcm2711-genet-v5",  "\\_SB.ETH0", true, false},
+		{"brcm,bcm2711-thermal", "\\_SB.EC00", true, true},
+		{"brcm,bcm2835-sdhci", "\\_SB.SDC1", true, true},
+		{"brcm,bcm2835-sdhost", "\\_SB.SDC2", false, true},
+		{"brcm,bcm2835-mbox", "\\_SB.GDV0.RPIQ", true, true},
+		{"brcm,bcm2835-i2c", "\\_SB.GDV0.I2C1", true, true, 0xfe205000},
+		{"brcm,bcm2835-i2c", "\\_SB.GDV0.I2C2", true, true, 0xfe804000},
+		{"brcm,bcm2835-spi", "\\_SB.GDV0.SPI0", true, true},
+		{"brcm,bcm2835-aux-spi", "\\_SB.GDV0.SPI1", true, true, 0xfe215080},
+		{"arm,pl011", "\\_SB.URT0", true, true},
+		{"brcm,bcm2835-aux-uart", "\\_SB.URTM", true, true},
+		{ /* Sentinel */ }
+	};
+
+	/* Device enable */
+	for (int i = 0; map[i].fdt_compatible; i++) {
+		if ((is_rpi4() && !map[i].on_rpi4) ||
+		    (is_rpi3() && !map[i].on_rpi3)) {
+			enabled = false;
+		} else {
+			node = fdt_node_offset_by_compatible(gd->fdt_blob, -1,
+							     map[i].fdt_compatible);
+			while (node != -FDT_ERR_NOTFOUND && map[i].mmio_address) {
+				struct fdt_resource r;
+
+				ret = fdt_get_resource(gd->fdt_blob, node, "reg", 0, &r);
+				if (ret) {
+					node = -FDT_ERR_NOTFOUND;
+					break;
+				}
+
+				if (r.start == map[i].mmio_address)
+					break;
+
+				node = fdt_node_offset_by_compatible(gd->fdt_blob, node,
+								     map[i].fdt_compatible);
+			}
+
+			enabled = (node > 0) ? fdtdec_get_is_enabled(gd->fdt_blob, node) : 0;
+		}
+		acpigen_write_scope(ctx, map[i].acpi_scope);
+		acpigen_write_name_integer(ctx, "_STA", enabled ? 0xf : 0);
+		acpigen_pop_len(ctx);
+	}
+
+	/* GPIO quirks */
+	node = fdt_node_offset_by_compatible(gd->fdt_blob, -1, "brcm,bcm2835-gpio");
+	if (node <= 0)
+		node = fdt_node_offset_by_compatible(gd->fdt_blob, -1, "brcm,bcm2711-gpio");
+
+	acpigen_write_scope(ctx, "\\_SB.GDV0.GPI0");
+	enabled = (node > 0) ? fdtdec_get_is_enabled(gd->fdt_blob, node) : 0;
+	acpigen_write_name_integer(ctx, "_STA", enabled ? 0xf : 0);
+	acpigen_pop_len(ctx);
+
+	if (is_rpi4()) {
+		/* eMMC quirks */
+		node = fdt_node_offset_by_compatible(gd->fdt_blob, -1, "brcm,bcm2711-emmc2");
+		if (node) {
+			phys_addr_t cpu;
+			dma_addr_t bus;
+			u64 size;
+
+			ret = fdt_get_dma_range(gd->fdt_blob, node, &cpu, &bus, &size);
+
+			acpigen_write_scope(ctx, "\\_SB.GDV1");
+			acpigen_write_method_serialized(ctx, "_DMA", 0);
+			acpigen_emit_byte(ctx, RETURN_OP);
+
+			if (!ret && bus != cpu)		/* Translated DMA range */
+				acpigen_emit_namestring(ctx, "\\_SB.GDV1.DMTR");
+			else if (!ret && bus == cpu)	/* Non translated DMA */
+				acpigen_emit_namestring(ctx, "\\_SB.GDV1.DMNT");
+			else	/* Silicon revisions older than C0: Translated DMA range */
+				acpigen_emit_namestring(ctx, "\\_SB.GDV1.DMTR");
+			acpigen_pop_len(ctx);
+		}
+	}
+
+	/* Serial */
+	uart_in_use = ~0;
+	mini_clock_rate = 0x1000000;
+
+	ret = uclass_get_device_by_driver(UCLASS_SERIAL,
+					  DM_DRIVER_GET(bcm283x_pl011_uart),
+					  &dev);
+	if (!ret)
+		uart_in_use = 0;
+
+	ret = uclass_get_device_by_driver(UCLASS_SERIAL,
+					  DM_DRIVER_GET(serial_bcm283x_mu),
+					  &dev);
+	if (!ret) {
+		if (uart_in_use == 0)
+			log_err("Invalid config: PL011 and MiniUART are both enabled.");
+		else
+			uart_in_use = 1;
+
+		mini_clock_rate = dev_read_u32_default(dev, "clock", 0x1000000);
+	}
+	if (uart_in_use > 1)
+		log_err("No working serial: PL011 and MiniUART are both disabled.");
+
+	acpigen_write_scope(ctx, "\\_SB.BTH0");
+	acpigen_write_name_integer(ctx, "URIU", uart_in_use);
+	acpigen_pop_len(ctx);
+
+	acpigen_write_scope(ctx, "\\_SB.URTM");
+	acpigen_write_name_integer(ctx, "MUCR", mini_clock_rate);
+	acpigen_pop_len(ctx);
+
+	return 0;
+}
+
+static int rpi_acpi_write_ssdt(struct acpi_ctx *ctx, const struct acpi_writer *entry)
+{
+	struct acpi_table_header *ssdt;
+	int ret;
+
+	ssdt = ctx->current;
+	memset(ssdt, '\0', sizeof(struct acpi_table_header));
+
+	acpi_fill_header(ssdt, "SSDT");
+	ssdt->revision = acpi_get_table_revision(ACPITAB_SSDT);
+	ssdt->creator_revision = 1;
+	ssdt->length = sizeof(struct acpi_table_header);
+
+	acpi_inc(ctx, sizeof(struct acpi_table_header));
+
+	ret = acpi_rpi_board_fill_ssdt(ctx);
+	if (ret) {
+		ctx->current = ssdt;
+		return log_msg_ret("fill", ret);
+	}
+
+	/* (Re)calculate length and checksum */
+	ssdt->length = ctx->current - (void *)ssdt;
+	acpi_update_checksum(ssdt);
+	log_debug("SSDT at %p, length %x\n", ssdt, ssdt->length);
+
+	/* Drop the table if it is empty */
+	if (ssdt->length == sizeof(struct acpi_table_header))
+		return log_msg_ret("fill", -ENOENT);
+	acpi_add_table(ctx, ssdt);
+
+	return 0;
+}
+
+ACPI_WRITER(5ssdt, "SSDT", rpi_acpi_write_ssdt, 0);
+#endif

@@ -3,12 +3,12 @@
  * (C) Copyright 2019 Rockchip Electronics Co., Ltd.
  */
 
-#include <common.h>
+#include <config.h>
 #include <dm.h>
 #include <ram.h>
 #include <syscon.h>
-#include <asm/arch/grf_rk3308.h>
 #include <asm/arch-rockchip/clock.h>
+#include <asm/arch-rockchip/grf_rk3308.h>
 #include <asm/arch-rockchip/sdram.h>
 
 struct dram_info {
@@ -21,7 +21,7 @@ static int rk3308_dmc_probe(struct udevice *dev)
 	struct dram_info *priv = dev_get_priv(dev);
 
 	priv->grf = syscon_get_first_range(ROCKCHIP_SYSCON_GRF);
-	priv->info.base = CONFIG_SYS_SDRAM_BASE;
+	priv->info.base = CFG_SYS_SDRAM_BASE;
 	priv->info.size = rockchip_sdram_size((phys_addr_t)&priv->grf->os_reg2);
 
 	return 0;

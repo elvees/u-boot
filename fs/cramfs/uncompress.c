@@ -20,9 +20,10 @@
  * then is used by multiple filesystems.
  */
 
-#include <common.h>
+#include <stdio.h>
 #include <malloc.h>
 #include <watchdog.h>
+#include <u-boot/schedule.h>
 #include <u-boot/zlib.h>
 
 static z_stream stream;
@@ -62,7 +63,7 @@ int cramfs_uncompress_init (void)
 	stream.avail_in = 0;
 
 #if defined(CONFIG_HW_WATCHDOG) || defined(CONFIG_WATCHDOG)
-	stream.outcb = (cb_func) WATCHDOG_RESET;
+	stream.outcb = (cb_func)schedule;
 #else
 	stream.outcb = Z_NULL;
 #endif /* CONFIG_HW_WATCHDOG */

@@ -14,7 +14,6 @@
  * Marius Groeger <mgroeger@sysgo.de>
  */
 
-#include <common.h>
 #include <log.h>
 #include <relocate.h>
 #include <asm/global_data.h>
@@ -26,19 +25,20 @@ DECLARE_GLOBAL_DATA_PTR;
 
 int copy_uboot_to_ram(void)
 {
-	size_t len = (uintptr_t)&__data_end - (uintptr_t)&__text_start;
+	size_t len = (uintptr_t)__data_end - (uintptr_t)__text_start;
 
 	if (gd->flags & GD_FLG_SKIP_RELOC)
 		return 0;
-	memcpy((void *)gd->relocaddr, (void *)&__text_start, len);
+	memcpy((void *)gd->relocaddr, (void *)__text_start, len);
 
 	return 0;
 }
 
+#ifndef CONFIG_EFI_APP
 int clear_bss(void)
 {
-	ulong dst_addr = (ulong)&__bss_start + gd->reloc_off;
-	size_t len = (uintptr_t)&__bss_end - (uintptr_t)&__bss_start;
+	ulong dst_addr = (ulong)__bss_start + gd->reloc_off;
+	size_t len = (uintptr_t)__bss_end - (uintptr_t)__bss_start;
 
 	if (gd->flags & GD_FLG_SKIP_RELOC)
 		return 0;
@@ -46,6 +46,7 @@ int clear_bss(void)
 
 	return 0;
 }
+#endif
 
 #if CONFIG_IS_ENABLED(X86_64)
 static void do_elf_reloc_fixups64(unsigned int text_base, uintptr_t size,
@@ -148,22 +149,22 @@ static void do_elf_reloc_fixups32(unsigned int text_base, uintptr_t size,
  */
 int do_elf_reloc_fixups(void)
 {
-	void *re_src = (void *)(&__rel_dyn_start);
-	void *re_end = (void *)(&__rel_dyn_end);
+	void *re_src = (void *)__rel_dyn_start;
+	void *re_end = (void *)__rel_dyn_end;
 	uint text_base;
 
 	/* The size of the region of u-boot that runs out of RAM. */
-	uintptr_t size = (uintptr_t)&__bss_end - (uintptr_t)&__text_start;
+	uintptr_t size = (uintptr_t)__bss_end - (uintptr_t)__text_start;
 
 	if (gd->flags & GD_FLG_SKIP_RELOC)
 		return 0;
 	if (re_src == re_end)
 		panic("No relocation data");
 
-#ifdef CONFIG_SYS_TEXT_BASE
-	text_base = CONFIG_SYS_TEXT_BASE;
+#ifdef CONFIG_TEXT_BASE
+	text_base = CONFIG_TEXT_BASE;
 #else
-	panic("No CONFIG_SYS_TEXT_BASE");
+	panic("No CONFIG_TEXT_BASE");
 #endif
 #if CONFIG_IS_ENABLED(X86_64)
 	do_elf_reloc_fixups64(text_base, size, re_src, re_end);

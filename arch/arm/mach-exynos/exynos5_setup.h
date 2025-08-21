@@ -8,7 +8,7 @@
 #ifndef _SMDK5250_SETUP_H
 #define _SMDK5250_SETUP_H
 
-#include <config.h>
+#include <linux/types.h>
 #include <asm/arch/dmc.h>
 
 #define NOT_AVAILABLE		0
@@ -685,7 +685,6 @@
 #define PWM_RATIO		8
 #define CLK_DIV_PERIC3_VAL	(PWM_RATIO << 0)
 
-
 /* CLK_DIV_PERIC4 */
 #define CLK_DIV_PERIC4_VAL	NOT_AVAILABLE
 
@@ -710,7 +709,6 @@
 /* MPLL_CON1 */
 #define MPLL_CON1_VAL   (0x0020F300)
 
-
 /* CPLL_CON1 */
 #define CPLL_CON1_VAL	0x0020f300
 
@@ -719,7 +717,6 @@
 
 /* GPLL_CON1 */
 #define GPLL_CON1_VAL	(NOT_AVAILABLE)
-
 
 /* EPLL_CON1, CON2 */
 #define EPLL_CON1_VAL	0x00000000
@@ -749,7 +746,6 @@
 #define CLK_SRC_ISP_VAL		0x33366000
 #define CLK_DIV_ISP0_VAL	0x13131300
 #define CLK_DIV_ISP1_VAL	0xbb110202
-
 
 /* CLK_FSYS */
 #define CLK_SRC_FSYS0_VAL              0x33033300
@@ -898,7 +894,7 @@ enum {
  *
  * @param mem          Memory timings for this memory type.
  * @param reset         Reset DDR PHY during initialization.
- * @return 0 if ok, SETUP_ERR_... if there is a problem
+ * Return: 0 if ok, SETUP_ERR_... if there is a problem
  */
 int ddr3_mem_ctrl_init(struct mem_timings *mem, int reset);
 
@@ -913,7 +909,7 @@ void lpddr3_mem_ctrl_init(void);
  * @param phy1_con16	Register address for dmc_phy1->phy_con16
  * @param phy0_con17	Register address for dmc_phy0->phy_con17
  * @param phy1_con17	Register address for dmc_phy1->phy_con17
- * @return 0 if ok, -1 on error
+ * Return: 0 if ok, -1 on error
  */
 int dmc_config_zq(struct mem_timings *mem, uint32_t *phy0_con16,
 			uint32_t *phy1_con16, uint32_t *phy0_con17,

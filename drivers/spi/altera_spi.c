@@ -6,7 +6,6 @@
  * Copyright (c) 2005-2008 Analog Devices Inc.
  * Copyright (C) 2010 Thomas Chou <thomas@wytron.com.tw>
  */
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
@@ -19,9 +18,7 @@
 #define ALTERA_SPI_STATUS_RRDY_MSK	BIT(7)
 #define ALTERA_SPI_CONTROL_SSO_MSK	BIT(10)
 
-#ifndef CONFIG_ALTERA_SPI_IDLE_VAL
-#define CONFIG_ALTERA_SPI_IDLE_VAL	0xff
-#endif
+#define ALTERA_SPI_IDLE_VAL		0xff
 
 struct altera_spi_regs {
 	u32	rxdata;
@@ -98,7 +95,7 @@ static int altera_spi_xfer(struct udevice *dev, unsigned int bitlen,
 	uint32_t reg, data, start;
 
 	debug("%s: bus:%i cs:%i bitlen:%i bytes:%i flags:%lx\n", __func__,
-	      dev_seq(bus), slave_plat->cs, bitlen, bytes, flags);
+	      dev_seq(bus), slave_plat->cs[0], bitlen, bytes, flags);
 
 	if (bitlen == 0)
 		goto done;
@@ -113,13 +110,13 @@ static int altera_spi_xfer(struct udevice *dev, unsigned int bitlen,
 		readl(&regs->rxdata);
 
 	if (flags & SPI_XFER_BEGIN)
-		spi_cs_activate(dev, slave_plat->cs);
+		spi_cs_activate(dev, slave_plat->cs[0]);
 
 	while (bytes--) {
 		if (txp)
 			data = *txp++;
 		else
-			data = CONFIG_ALTERA_SPI_IDLE_VAL;
+			data = ALTERA_SPI_IDLE_VAL;
 
 		debug("%s: tx:%x ", __func__, data);
 		writel(data, &regs->txdata);

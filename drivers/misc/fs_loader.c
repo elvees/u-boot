@@ -3,7 +3,9 @@
  * Copyright (C) 2018-2019 Intel Corporation <www.intel.com>
  *
  */
-#include <common.h>
+
+#define LOG_CATEGORY UCLASS_FS_FIRMWARE_LOADER
+
 #include <dm.h>
 #include <env.h>
 #include <errno.h>
@@ -12,10 +14,16 @@
 #include <fs_loader.h>
 #include <log.h>
 #include <asm/global_data.h>
+#include <dm/device-internal.h>
+#include <dm/root.h>
 #include <linux/string.h>
 #include <mapmem.h>
 #include <malloc.h>
 #include <spl.h>
+
+#ifdef CONFIG_CMD_UBIFS
+#include <ubi_uboot.h>
+#endif
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -289,6 +297,31 @@ U_BOOT_DRIVER(fs_loader) = {
 	.plat_auto	= sizeof(struct device_plat),
 	.priv_auto	= sizeof(struct firmware),
 };
+
+static struct device_plat default_plat = { 0 };
+
+int get_fs_loader(struct udevice **dev)
+{
+	int ret;
+	ofnode node = ofnode_get_chosen_node("firmware-loader");
+
+	if (ofnode_valid(node))
+		return uclass_get_device_by_ofnode(UCLASS_FS_FIRMWARE_LOADER,
+						   node, dev);
+
+	/* Try the first device if none was chosen */
+	ret = uclass_first_device_err(UCLASS_FS_FIRMWARE_LOADER, dev);
+	if (ret != -ENODEV)
+		return ret;
+
+	/* Just create a new device */
+	ret = device_bind(dm_root(), DM_DRIVER_REF(fs_loader), "default-loader",
+			  &default_plat, ofnode_null(), dev);
+	if (ret)
+		return ret;
+
+	return device_probe(*dev);
+}
 
 UCLASS_DRIVER(fs_loader) = {
 	.id		= UCLASS_FS_FIRMWARE_LOADER,

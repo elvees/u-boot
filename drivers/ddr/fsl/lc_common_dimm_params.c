@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright 2008-2016 Freescale Semiconductor, Inc.
- * Copyright 2017-2018 NXP Semiconductor
+ * Copyright 2017-2021 NXP Semiconductor
  */
 
-#include <common.h>
 #include <fsl_ddr_sdram.h>
 #include <log.h>
 #include <asm/bitops.h>
@@ -23,7 +22,7 @@ compute_cas_latency(const unsigned int ctrl_num,
 	unsigned int caslat_actual;
 	unsigned int retry = 16;
 	unsigned int tmp = ~0;
-	const unsigned int mclk_ps = get_memory_clk_period_ps(ctrl_num);
+	unsigned int mclk_ps = get_memory_clk_period_ps(ctrl_num);
 #ifdef CONFIG_SYS_FSL_DDR3
 	const unsigned int taamax = 20000;
 #else
@@ -36,6 +35,12 @@ compute_cas_latency(const unsigned int ctrl_num,
 			tmp &= dimm_params[i].caslat_x;
 	}
 	common_caslat = tmp;
+
+	if (!mclk_ps) {
+		printf("DDR clock (MCLK cycle was 0 ps), So setting it to slowest DIMM(s) (tCKmin %u ps).\n",
+		       outpdimm->tckmin_x_ps);
+		mclk_ps = outpdimm->tckmin_x_ps;
+	}
 
 	/* validate if the memory clk is in the range of dimms */
 	if (mclk_ps < outpdimm->tckmin_x_ps) {
@@ -185,7 +190,6 @@ compute_cas_latency(const unsigned int ctrl_num,
 	debug("lowest common SPD-defined CAS latency = %u\n",
 	      lowest_good_caslat);
 	outpdimm->lowest_common_spd_caslat = lowest_good_caslat;
-
 
 	/*
 	 * Compute a common 'de-rated' CAS latency.
@@ -405,17 +409,20 @@ compute_lowest_common_dimm_parameters(const unsigned int ctrl_num,
 		if (dimm_params[i].n_ranks) {
 			if (dimm_params[i].registered_dimm) {
 				temp1 = 1;
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 				printf("Detected RDIMM %s\n",
 					dimm_params[i].mpart);
 #endif
 			} else {
 				temp2 = 1;
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 				printf("Detected UDIMM %s\n",
 					dimm_params[i].mpart);
 #endif
 			}
+#ifndef CONFIG_XPL_BUILD
+			puts("       ");
+#endif
 		}
 	}
 

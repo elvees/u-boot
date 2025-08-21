@@ -4,7 +4,6 @@
  * Author: Neil Armstrong <narmstrong@baylibre.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <env.h>
 #include <init.h>
@@ -20,15 +19,13 @@
 
 int misc_init_r(void)
 {
-	u8 mac_addr[MAC_ADDR_LEN];
+	u8 mac_addr[MAC_ADDR_LEN + 1];
 	char efuse_mac_addr[EFUSE_MAC_SIZE], tmp[3];
 	ssize_t len;
 
 	if (IS_ENABLED(CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG) &&
 	    meson_get_soc_rev(tmp, sizeof(tmp)) > 0)
 		env_set("soc_rev", tmp);
-
-	meson_eth_init(PHY_INTERFACE_MODE_RGMII, 0);
 
 	if (!eth_env_get_enetaddr("ethaddr", mac_addr)) {
 		len = meson_sm_read_efuse(EFUSE_MAC_OFFSET,
@@ -41,8 +38,9 @@ int misc_init_r(void)
 			tmp[0] = efuse_mac_addr[i * 2];
 			tmp[1] = efuse_mac_addr[i * 2 + 1];
 			tmp[2] = '\0';
-			mac_addr[i] = simple_strtoul(tmp, NULL, 16);
+			mac_addr[i] = hextoul(tmp, NULL);
 		}
+		mac_addr[MAC_ADDR_LEN] = '\0';
 
 		if (is_valid_ethaddr(mac_addr))
 			eth_env_set_enetaddr("ethaddr", mac_addr);

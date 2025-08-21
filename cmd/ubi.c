@@ -11,10 +11,10 @@
  * published by the Free Software Foundation.
  */
 
-#include <common.h>
 #include <command.h>
 #include <env.h>
 #include <exports.h>
+#include <led.h>
 #include <malloc.h>
 #include <memalign.h>
 #include <mtd.h>
@@ -27,6 +27,7 @@
 #include <ubi_uboot.h>
 #include <linux/errno.h>
 #include <jffs2/load_kernel.h>
+#include <linux/log2.h>
 
 #undef ubi_msg
 #define ubi_msg(fmt, ...) printf("UBI: " fmt "\n", ##__VA_ARGS__)
@@ -80,6 +81,70 @@ static int ubi_info(int layout)
 		display_volume_info(ubi);
 	else
 		display_ubi_info(ubi);
+
+	return 0;
+}
+
+static int ubi_list(const char *var, int numeric)
+{
+	size_t namelen, len, size;
+	char *str, *str2;
+	int i;
+
+	if (!var) {
+		for (i = 0; i < (ubi->vtbl_slots + 1); i++) {
+			if (!ubi->volumes[i])
+				continue;
+			if (ubi->volumes[i]->vol_id >= UBI_INTERNAL_VOL_START)
+				continue;
+			printf("%d: %s\n",
+			       ubi->volumes[i]->vol_id,
+			       ubi->volumes[i]->name);
+		}
+		return 0;
+	}
+
+	len = 0;
+	size = 16;
+	str = malloc(size);
+	if (!str)
+		return 1;
+
+	for (i = 0; i < (ubi->vtbl_slots + 1); i++) {
+		if (!ubi->volumes[i])
+			continue;
+		if (ubi->volumes[i]->vol_id >= UBI_INTERNAL_VOL_START)
+			continue;
+
+		if (numeric)
+			namelen = 10; /* strlen(stringify(INT_MAX)) */
+		else
+			namelen = strlen(ubi->volumes[i]->name);
+
+		if (len + namelen + 1 > size) {
+			size = roundup_pow_of_two(len + namelen + 1) * 2;
+			str2 = realloc(str, size);
+			if (!str2) {
+				free(str);
+				return 1;
+			}
+			str = str2;
+		}
+
+		if (len)
+			str[len++] = ' ';
+
+		if (numeric) {
+			len += sprintf(str + len, "%d", ubi->volumes[i]->vol_id) + 1;
+		} else {
+			memcpy(str + len, ubi->volumes[i]->name, namelen);
+			len += namelen;
+			str[len] = 0;
+		}
+	}
+
+	env_set(var, str);
+	free(str);
 
 	return 0;
 }
@@ -184,7 +249,7 @@ static int ubi_create_vol(char *volume, int64_t size, int dynamic, int vol_id,
 
 static struct ubi_volume *ubi_find_volume(char *volume)
 {
-	struct ubi_volume *vol = NULL;
+	struct ubi_volume *vol;
 	int i;
 
 	for (i = 0; i < ubi->vtbl_slots; i++) {
@@ -291,12 +356,17 @@ static int ubi_rename_vol(char *oldname, char *newname)
 
 static int ubi_volume_continue_write(char *volume, void *buf, size_t size)
 {
-	int err = 1;
+	int err;
 	struct ubi_volume *vol;
 
 	vol = ubi_find_volume(volume);
 	if (vol == NULL)
 		return ENODEV;
+
+	if (!vol->updating) {
+		printf("UBI volume update was not initiated\n");
+		return EINVAL;
+	}
 
 	err = ubi_more_update_data(ubi, vol, buf, size);
 	if (err < 0) {
@@ -327,8 +397,8 @@ static int ubi_volume_continue_write(char *volume, void *buf, size_t size)
 int ubi_volume_begin_write(char *volume, void *buf, size_t size,
 	size_t full_size)
 {
-	int err = 1;
-	int rsvd_bytes = 0;
+	int err;
+	int rsvd_bytes;
 	struct ubi_volume *vol;
 
 	vol = ubi_find_volume(volume);
@@ -347,21 +417,99 @@ int ubi_volume_begin_write(char *volume, void *buf, size_t size,
 		return -err;
 	}
 
+	/* The volume is just wiped out */
+	if (!full_size)
+		return 0;
+
 	return ubi_volume_continue_write(volume, buf, size);
 }
 
-int ubi_volume_write(char *volume, void *buf, size_t size)
+static int ubi_volume_offset_write(char *volume, void *buf, loff_t offset,
+				   size_t size)
 {
-	return ubi_volume_begin_write(volume, buf, size, size);
+	int len, tbuf_size, ret;
+	u64 lnum;
+	struct ubi_volume *vol;
+	loff_t off = offset;
+	void *tbuf;
+
+	vol = ubi_find_volume(volume);
+	if (!vol)
+		return -ENODEV;
+
+	if (size > vol->reserved_pebs * (ubi->leb_size - vol->data_pad))
+		return -EINVAL;
+
+	tbuf_size = vol->usable_leb_size;
+	tbuf = malloc_cache_aligned(tbuf_size);
+	if (!tbuf)
+		return -ENOMEM;
+
+	lnum = off;
+	off = do_div(lnum, vol->usable_leb_size);
+
+	do {
+		struct ubi_volume_desc desc = {
+			.vol = vol,
+			.mode = UBI_READWRITE,
+		};
+
+		len = size > tbuf_size ? tbuf_size : size;
+		if (off + len >= vol->usable_leb_size)
+			len = vol->usable_leb_size - off;
+
+		ret = ubi_read(&desc, (int)lnum, tbuf, 0, tbuf_size);
+		if (ret) {
+			pr_err("Failed to read leb %lld (%d)\n", lnum, ret);
+			goto exit;
+		}
+
+		memcpy(tbuf + off, buf, len);
+
+		ret = ubi_leb_change(&desc, (int)lnum, tbuf, tbuf_size);
+		if (ret) {
+			pr_err("Failed to write leb %lld (%d)\n", lnum, ret);
+			goto exit;
+		}
+
+		off += len;
+		if (off >= vol->usable_leb_size) {
+			lnum++;
+			off -= vol->usable_leb_size;
+		}
+
+		buf += len;
+		size -= len;
+	} while (size);
+
+exit:
+	free(tbuf);
+	return ret;
 }
 
-int ubi_volume_read(char *volume, char *buf, size_t size)
+int ubi_volume_write(char *volume, void *buf, loff_t offset, size_t size)
+{
+	int ret;
+
+	led_activity_blink();
+
+	if (!offset)
+		ret = ubi_volume_begin_write(volume, buf, size, size);
+	else
+		ret = ubi_volume_offset_write(volume, buf, offset, size);
+
+	led_activity_off();
+
+	return ret;
+}
+
+int ubi_volume_read(char *volume, char *buf, loff_t offset, size_t size)
 {
 	int err, lnum, off, len, tbuf_size;
 	void *tbuf;
 	unsigned long long tmp;
 	struct ubi_volume *vol;
-	loff_t offp = 0;
+	loff_t offp = offset;
 	size_t len_read;
 
 	vol = ubi_find_volume(volume);
@@ -509,7 +657,12 @@ static int ubi_detach(void)
 int ubi_part(char *part_name, const char *vid_header_offset)
 {
 	struct mtd_info *mtd;
-	int err = 0;
+	int err;
+
+	if (ubi && ubi->mtd && !strcmp(ubi->mtd->name, part_name)) {
+		printf("UBI partition '%s' already selected\n", part_name);
+		return 0;
+	}
 
 	ubi_detach();
 
@@ -535,7 +688,7 @@ int ubi_part(char *part_name, const char *vid_header_offset)
 
 static int do_ubi(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
-	int64_t size = 0;
+	int64_t size;
 	ulong addr = 0;
 	bool skipcheck = false;
 
@@ -579,6 +732,21 @@ static int do_ubi(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		if (argc > 2 && !strncmp(argv[2], "l", 1))
 			layout = 1;
 		return ubi_info(layout);
+	}
+
+	if (strcmp(argv[1], "list") == 0) {
+		int numeric = 0;
+		if (argc >= 3 && argv[2][0] == '-') {
+			if (strcmp(argv[2], "-numeric") == 0)
+				numeric = 1;
+			else
+				return CMD_RET_USAGE;
+		}
+		if (!numeric && argc != 2 && argc != 3)
+			return CMD_RET_USAGE;
+		if (numeric && argc != 3 && argc != 4)
+			return CMD_RET_USAGE;
+		return ubi_list(argv[numeric ? 3 : 2], numeric);
 	}
 
 	if (strcmp(argv[1], "check") == 0) {
@@ -661,8 +829,8 @@ static int do_ubi(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 			return 1;
 		}
 
-		addr = simple_strtoul(argv[2], NULL, 16);
-		size = simple_strtoul(argv[4], NULL, 16);
+		addr = hextoul(argv[2], NULL);
+		size = hextoul(argv[4], NULL);
 
 		if (strlen(argv[1]) == 10 &&
 		    strncmp(argv[1] + 5, ".part", 5) == 0) {
@@ -671,12 +839,12 @@ static int do_ubi(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 						(void *)addr, size);
 			} else {
 				size_t full_size;
-				full_size = simple_strtoul(argv[5], NULL, 16);
+				full_size = hextoul(argv[5], NULL);
 				ret = ubi_volume_begin_write(argv[3],
 						(void *)addr, size, full_size);
 			}
 		} else {
-			ret = ubi_volume_write(argv[3], (void *)addr, size);
+			ret = ubi_volume_write(argv[3], (void *)addr, 0, size);
 		}
 		if (!ret) {
 			printf("%lld bytes written to volume %s\n", size,
@@ -691,18 +859,18 @@ static int do_ubi(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 
 		/* E.g., read volume size */
 		if (argc == 5) {
-			size = simple_strtoul(argv[4], NULL, 16);
+			size = hextoul(argv[4], NULL);
 			argc--;
 		}
 
 		/* E.g., read volume */
 		if (argc == 4) {
-			addr = simple_strtoul(argv[2], NULL, 16);
+			addr = hextoul(argv[2], NULL);
 			argc--;
 		}
 
 		if (argc == 3) {
-			return ubi_volume_read(argv[3], (char *)addr, size);
+			return ubi_volume_read(argv[3], (char *)addr, 0, size);
 		}
 	}
 
@@ -720,6 +888,11 @@ U_BOOT_CMD(
 		" header offset)\n"
 	"ubi info [l[ayout]]"
 		" - Display volume and ubi layout information\n"
+	"ubi list [flags]"
+		" - print the list of volumes\n"
+	"ubi list [flags] <varname>"
+		" - set environment variable to the list of volumes"
+		" (flags can be -numeric)\n"
 	"ubi check volumename"
 		" - check if volumename exists\n"
 	"ubi create[vol] volume [size] [type] [id] [--skipcheck]\n"

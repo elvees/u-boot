@@ -4,7 +4,6 @@
  * Author: Neil Armstrong <narmstrong@baylibre.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <adc.h>
 #include <env.h>
@@ -48,7 +47,7 @@ static struct meson_odroid_boards {
 	/* OdroidN2 rev 2019,2,7 */
 	{ MESON_SOC_ID_G12B, 330 * 4, 350 * 4, "n2" },
 	/* OdroidN2plus rev 2019,11,20 */
-	{ MESON_SOC_ID_G12B, 410 * 4, 430 * 4, "n2_plus" },
+	{ MESON_SOC_ID_G12B, 410 * 4, 430 * 4, "n2-plus" },
 	/* OdroidC4 rev 2020,01,29 */
 	{ MESON_SOC_ID_SM1,   80 * 4, 100 * 4, "c4" },
 	/* OdroidHC4 rev 2019,12,10 */
@@ -107,15 +106,13 @@ static int odroid_detect_variant(void)
 
 int misc_init_r(void)
 {
-	u8 mac_addr[MAC_ADDR_LEN];
+	u8 mac_addr[MAC_ADDR_LEN + 1];
 	char efuse_mac_addr[EFUSE_MAC_SIZE], tmp[3];
 	ssize_t len;
 
 	if (IS_ENABLED(CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG) &&
 	    meson_get_soc_rev(tmp, sizeof(tmp)) > 0)
 		env_set("soc_rev", tmp);
-
-	meson_eth_init(PHY_INTERFACE_MODE_RGMII, 0);
 
 	if (!eth_env_get_enetaddr("ethaddr", mac_addr)) {
 		len = meson_sm_read_efuse(EFUSE_MAC_OFFSET,
@@ -128,8 +125,9 @@ int misc_init_r(void)
 			tmp[0] = efuse_mac_addr[i * 2];
 			tmp[1] = efuse_mac_addr[i * 2 + 1];
 			tmp[2] = '\0';
-			mac_addr[i] = simple_strtoul(tmp, NULL, 16);
+			mac_addr[i] = hextoul(tmp, NULL);
 		}
+		mac_addr[MAC_ADDR_LEN] = '\0';
 
 		if (is_valid_ethaddr(mac_addr))
 			eth_env_set_enetaddr("ethaddr", mac_addr);

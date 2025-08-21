@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
-#include <common.h>
 #include <fs_internal.h>
-#include <uuid.h>
+#include <log.h>
+#include <u-boot/uuid.h>
 #include <memalign.h>
 #include "kernel-shared/btrfs_tree.h"
 #include "common/rbtree-utils.h"
@@ -69,7 +69,6 @@ static int check_tree_block(struct btrfs_fs_info *fs_info,
 						    btrfs_header_fsid(),
 						    BTRFS_FSID_SIZE);
 
-
 		if (fsid_match) {
 			ret = 0;
 			break;
@@ -126,6 +125,8 @@ int btrfs_csum_data(u16 csum_type, const u8 *data, u8 *out, size_t len)
 		return hash_xxhash(data, len, out);
 	case BTRFS_CSUM_TYPE_SHA256:
 		return hash_sha256(data, len, out);
+	case BTRFS_CSUM_TYPE_BLAKE2:
+		return hash_blake2(data, len, out);
 	default:
 		printf("Unknown csum type %d\n", csum_type);
 		return -EINVAL;
@@ -291,7 +292,7 @@ error_out:
 int btrfs_read_dev_super(struct blk_desc *desc, struct disk_partition *part,
 			 struct btrfs_super_block *sb)
 {
-	char tmp[BTRFS_SUPER_INFO_SIZE];
+	ALLOC_CACHE_ALIGN_BUFFER(char, tmp, BTRFS_SUPER_INFO_SIZE);
 	struct btrfs_super_block *buf = (struct btrfs_super_block *)tmp;
 	int ret;
 
@@ -538,34 +539,39 @@ struct extent_buffer* read_tree_block(struct btrfs_fs_info *fs_info, u64 bytenr,
 int read_extent_data(struct btrfs_fs_info *fs_info, char *data, u64 logical,
 		     u64 *len, int mirror)
 {
-	u64 offset = 0;
+	u64 orig_len = *len;
+	u64 cur = logical;
 	struct btrfs_multi_bio *multi = NULL;
 	struct btrfs_device *device;
 	int ret = 0;
-	u64 max_len = *len;
 
-	ret = btrfs_map_block(fs_info, READ, logical, len, &multi, mirror,
-			      NULL);
-	if (ret) {
-		fprintf(stderr, "Couldn't map the block %llu\n",
-				logical + offset);
-		goto err;
-	}
-	device = multi->stripes[0].dev;
+	while (cur < logical + orig_len) {
+		u64 cur_len = logical + orig_len - cur;
 
-	if (*len > max_len)
-		*len = max_len;
-	if (!device->desc || !device->part) {
-		ret = -EIO;
-		goto err;
-	}
-
-	ret = __btrfs_devread(device->desc, device->part, data, *len,
-			      multi->stripes[0].physical);
-	if (ret != *len)
-		ret = -EIO;
-	else
+		ret = btrfs_map_block(fs_info, READ, cur, &cur_len, &multi,
+				      mirror, NULL);
+		if (ret) {
+			error("Couldn't map the block %llu", cur);
+			goto err;
+		}
+		device = multi->stripes[0].dev;
+		if (!device->desc || !device->part) {
+			error("devid %llu is missing", device->devid);
+			ret = -EIO;
+			goto err;
+		}
+		ret = __btrfs_devread(device->desc, device->part,
+				data + (cur - logical), cur_len,
+				multi->stripes[0].physical);
+		if (ret != cur_len) {
+			error("read failed on devid %llu physical %llu",
+			      device->devid, multi->stripes[0].physical);
+			ret = -EIO;
+			goto err;
+		}
+		cur += cur_len;
 		ret = 0;
+	}
 err:
 	kfree(multi);
 	return ret;
@@ -780,8 +786,6 @@ struct btrfs_fs_info *btrfs_new_fs_info(void)
 	fs_info->fs_root_tree = RB_ROOT;
 	cache_tree_init(&fs_info->mapping_tree.cache_tree);
 
-	mutex_init(&fs_info->fs_mutex);
-
 	return fs_info;
 free_all:
 	btrfs_free_fs_info(fs_info);
@@ -802,6 +806,30 @@ static int setup_root_or_create_block(struct btrfs_fs_info *fs_info,
 	}
 
 	return 0;
+}
+
+static int get_default_subvolume(struct btrfs_fs_info *fs_info,
+				 struct btrfs_key *key_ret)
+{
+	struct btrfs_root *root = fs_info->tree_root;
+	struct btrfs_dir_item *dir_item;
+	struct btrfs_path path;
+	int ret = 0;
+
+	btrfs_init_path(&path);
+
+	dir_item = btrfs_lookup_dir_item(NULL, root, &path,
+					 BTRFS_ROOT_TREE_DIR_OBJECTID,
+					 "default", 7, 0);
+	if (IS_ERR(dir_item)) {
+		ret = PTR_ERR(dir_item);
+		goto out;
+	}
+
+	btrfs_dir_item_key_to_cpu(path.nodes[0], dir_item, key_ret);
+out:
+	btrfs_release_path(&path);
+	return ret;
 }
 
 int btrfs_setup_all_roots(struct btrfs_fs_info *fs_info)
@@ -833,9 +861,17 @@ int btrfs_setup_all_roots(struct btrfs_fs_info *fs_info)
 
 	fs_info->last_trans_committed = generation;
 
-	key.objectid = BTRFS_FS_TREE_OBJECTID;
-	key.type = BTRFS_ROOT_ITEM_KEY;
-	key.offset = (u64)-1;
+	ret = get_default_subvolume(fs_info, &key);
+	if (ret) {
+		/*
+		 * The default dir item isn't there. Linux kernel behaviour is
+		 * to silently use the top-level subvolume in this case.
+		 */
+		key.objectid = BTRFS_FS_TREE_OBJECTID;
+		key.type = BTRFS_ROOT_ITEM_KEY;
+		key.offset = (u64)-1;
+	}
+
 	fs_info->fs_root = btrfs_read_fs_root(fs_info, &key);
 
 	if (IS_ERR(fs_info->fs_root))
@@ -878,15 +914,19 @@ static int btrfs_scan_fs_devices(struct blk_desc *desc,
 
 	if (round_up(BTRFS_SUPER_INFO_SIZE + BTRFS_SUPER_INFO_OFFSET,
 		     desc->blksz) > (part->size << desc->log2blksz)) {
-		error("superblock end %u is larger than device size " LBAFU,
-				BTRFS_SUPER_INFO_SIZE + BTRFS_SUPER_INFO_OFFSET,
-				part->size << desc->log2blksz);
+		log_debug("superblock end %u is larger than device size " LBAFU,
+			  BTRFS_SUPER_INFO_SIZE + BTRFS_SUPER_INFO_OFFSET,
+			  part->size << desc->log2blksz);
 		return -EINVAL;
 	}
 
 	ret = btrfs_scan_one_device(desc, part, fs_devices, &total_devs);
 	if (ret) {
-		fprintf(stderr, "No valid Btrfs found\n");
+		/*
+		 * Avoid showing this when probing for a possible Btrfs
+		 *
+		 * fprintf(stderr, "No valid Btrfs found\n");
+		 */
 		return ret;
 	}
 	return 0;
@@ -975,7 +1015,7 @@ struct btrfs_fs_info *open_ctree_fs_info(struct blk_desc *desc,
 	disk_super = fs_info->super_copy;
 	ret = btrfs_read_dev_super(desc, part, disk_super);
 	if (ret) {
-		printk("No valid btrfs found\n");
+		debug("No valid btrfs found\n");
 		goto out_devices;
 	}
 

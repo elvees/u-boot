@@ -8,6 +8,7 @@
 #include <log.h>
 #include <malloc.h>
 #include <dm/device.h>
+#include <linux/printk.h>
 
 #include "clk-lib.h"
 
@@ -54,8 +55,6 @@ int soc_clk_ctl(const char *name, ulong *rate, enum clk_ctl_ops ctl)
 	}
 
 	priv_rate = clk_get_rate(&clk);
-
-	clk_free(&clk);
 
 	mhz_rate = ceil(priv_rate, HZ_IN_MHZ);
 

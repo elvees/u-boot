@@ -121,7 +121,7 @@ struct acpi_cstate {
  *
  * @percent: Percent of the core CPU operating frequency that will be
  *	available when this throttling state is invoked
- * @power: Throttling state’s maximum power dissipation (mw)
+ * @power: Throttling state's maximum power dissipation (mw)
  * @latency: Worst-case latency (uS) that the CPU is unavailable during a
  *	transition from any throttling state to this throttling state
  * @control: Value to be written to the Processor Control Register
@@ -140,7 +140,7 @@ struct acpi_tstate {
  * acpigen_get_current() - Get the current ACPI code output pointer
  *
  * @ctx: ACPI context pointer
- * @return output pointer
+ * Return: output pointer
  */
 u8 *acpigen_get_current(struct acpi_ctx *ctx);
 
@@ -428,7 +428,7 @@ void acpigen_write_scope(struct acpi_ctx *ctx, const char *scope);
  *
  * @ctx: ACPI context pointer
  * @uuid: UUID to write in the form aabbccdd-eeff-gghh-iijj-kkllmmnnoopp
- * @return 0 if OK, -EINVAL if the format is incorrect
+ * Return: 0 if OK, -EINVAL if the format is incorrect
  */
 int acpigen_write_uuid(struct acpi_ctx *ctx, const char *uuid);
 
@@ -833,6 +833,7 @@ void acpigen_write_dsm_end(struct acpi_ctx *ctx);
  *
  * This emits a Processor package header with the required information. The
  * caller must complete the information and call acpigen_pop_len() at the end
+ * Deprecated since ACPI 6.0.
  *
  * @ctx: ACPI context pointer
  * @cpuindex: CPU number
@@ -841,6 +842,17 @@ void acpigen_write_dsm_end(struct acpi_ctx *ctx);
  */
 void acpigen_write_processor(struct acpi_ctx *ctx, uint cpuindex,
 			     u32 pblock_addr, uint pblock_len);
+
+/**
+ * acpigen_write_processor_device() - Write a Processor device
+ *
+ * Write a device with _HID ACPI0007 identifying a processor.
+ * Replacement for the Processor OpCode.
+ *
+ * @ctx: ACPI context pointer
+ * @cpuindex: CPU number
+ */
+void acpigen_write_processor_device(struct acpi_ctx *ctx, uint cpuindex);
 
 /**
  * acpigen_write_processor_package() - Write a package containing the processors
@@ -920,7 +932,7 @@ void acpigen_write_pss_package(struct acpi_ctx *ctx, uint corefreq, uint power,
  * @ctx: ACPI context pointer
  * @domain: Dependency domain number to which this P state entry belongs
  * @numprocs: Number of processors belonging to the domain for this logical
- *	processor’s P-states
+ *	processor's P-states
  * @coordtype: Coordination type
  */
 void acpigen_write_psd_package(struct acpi_ctx *ctx, uint domain, uint numprocs,
@@ -972,7 +984,7 @@ void acpigen_write_tss_package(struct acpi_ctx *ctx,
  * @ctx: ACPI context pointer
  * @domain: dependency domain number to which this T state entry belongs
  * @numprocs: Number of processors belonging to the domain for this logical
- *	processor’s T-states
+ *	processor's T-states
  * @coordtype: Coordination type
  */
 void acpigen_write_tsd_package(struct acpi_ctx *ctx, uint domain, uint numprocs,

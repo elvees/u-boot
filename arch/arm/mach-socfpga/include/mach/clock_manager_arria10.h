@@ -62,15 +62,12 @@
 #define CLKMGR_INTER				CLKMGR_A10_INTER
 #define CLKMGR_PERPLL_EN			CLKMGR_A10_PERPLL_EN
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 int cm_basic_init(const void *blob);
 #endif
 
 #include <linux/bitops.h>
 unsigned int cm_get_l4_sp_clk_hz(void);
-unsigned long cm_get_mpu_clk_hz(void);
-
-unsigned int cm_get_qspi_controller_clk_hz(void);
 
 #endif /* __ASSEMBLY__ */
 

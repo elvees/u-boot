@@ -4,7 +4,7 @@
  *  Marcel Ziswiler <marcel@ziswiler.com>
  */
 
-#include <common.h>
+#include <env.h>
 #include <init.h>
 #include <log.h>
 #include <asm/arch/gp_padctrl.h>
@@ -16,6 +16,7 @@
 #include <asm/io.h>
 #include <dm.h>
 #include <i2c.h>
+#include <fdt_support.h>
 #include <pci_tegra.h>
 #include <linux/delay.h>
 #include "../common/tdx-common.h"
@@ -43,17 +44,27 @@ int arch_misc_init(void)
 	return 0;
 }
 
-int checkboard(void)
-{
-	printf("Model: Toradex Apalis T30 %dGB\n",
-	       (gd->ram_size == 0x40000000) ? 1 : 2);
-
-	return 0;
-}
-
 #if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)
 int ft_board_setup(void *blob, struct bd_info *bd)
 {
+	u8 enetaddr[6];
+
+	/* MAC addr */
+	if (eth_env_get_enetaddr("ethaddr", enetaddr)) {
+		int err = fdt_find_and_setprop(blob,
+					       "/pcie@3000/pci@3,0/ethernet@0,0",
+					       "local-mac-address", enetaddr, 6, 0);
+
+		/* Older device trees might have used a different node name */
+		if (err < 0)
+			err = fdt_find_and_setprop(blob,
+						   "/pcie@3000/pci@3,0/pcie@0",
+						   "local-mac-address", enetaddr, 6, 0);
+
+		if (err >= 0)
+			puts("   MAC address updated...\n");
+	}
+
 	return ft_common_board_setup(blob, bd);
 }
 #endif

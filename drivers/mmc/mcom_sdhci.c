@@ -5,7 +5,6 @@
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
-#include <common.h>
 #include <dm.h>
 #include <linux/bitfield.h>
 
@@ -45,7 +44,7 @@ static int arasan_sdhci_get_cd(struct sdhci_host *host)
 	return 0;
 }
 
-static void arasan_sdhci_set_tapdelay(struct sdhci_host *host)
+static int arasan_sdhci_set_tapdelay(struct sdhci_host *host)
 {
 	struct mmc *mmc = host->mmc;
 	struct udevice *dev = mmc->dev;
@@ -137,6 +136,8 @@ static void arasan_sdhci_set_tapdelay(struct sdhci_host *host)
 		reg &= ~SDMMC_INIT_CONFIG_OTAPDLYENA;
 		sdhci_writel(host, reg, SDMMC_INIT_CONFIG_1);
 	}
+
+	return 0;
 }
 
 static const struct sdhci_ops arasan_sdhci_ops = {

@@ -62,6 +62,7 @@
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/err.h>
+#include <linux/printk.h>
 #include <linux/usb/gadget.h>
 #include <linux/compat.h>
 #include <linux/iopoll.h>
@@ -81,6 +82,9 @@
 static int __cdns3_gadget_ep_queue(struct usb_ep *ep,
 				   struct usb_request *request,
 				   gfp_t gfp_flags);
+
+static void cdns3_gadget_udc_set_speed(struct usb_gadget *gadget,
+				       enum usb_device_speed speed);
 
 /**
  * cdns3_set_register_bit - set bit in given register.
@@ -961,6 +965,12 @@ int cdns3_ep_run_transfer(struct cdns3_endpoint *priv_ep,
 	if (priv_dev->dev_ver <= DEV_VER_V2)
 		cdns3_wa1_tray_restore_cycle_bit(priv_dev, priv_ep);
 
+	/* Flush TRBs */
+	flush_dcache_range((unsigned long)priv_ep->trb_pool,
+			   (unsigned long)priv_ep->trb_pool +
+			   ROUND(sizeof(struct cdns3_trb) * priv_ep->num_trbs,
+				 CONFIG_SYS_CACHELINE_SIZE));
+
 	trace_cdns3_prepare_trb(priv_ep, priv_req->trb);
 
 	/*
@@ -1148,6 +1158,13 @@ static void cdns3_transfer_completed(struct cdns3_device *priv_dev,
 		cdns3_select_ep(priv_dev,
 				priv_ep->endpoint.desc->bEndpointAddress);
 #endif
+
+		/* Invalidate TRBs */
+		invalidate_dcache_range((unsigned long)priv_ep->trb_pool,
+					(unsigned long)priv_ep->trb_pool +
+					ROUND(sizeof(struct cdns3_trb) *
+					      priv_ep->num_trbs,
+					      CONFIG_SYS_CACHELINE_SIZE));
 
 		if (!cdns3_request_handled(priv_ep, priv_req))
 			goto prepare_next_td;
@@ -1620,6 +1637,14 @@ void cdns3_ep_config(struct cdns3_endpoint *priv_ep)
 	else
 		priv_ep->trb_burst_size = 16;
 
+	/*
+	 * The Endpoint is configured to handle a maximum packet size of
+	 * max_packet_size. Hence, set priv_ep->endpoint.maxpacket to
+	 * max_packet_size. This is necessary to ensure that the TD_SIZE
+	 * is calculated correctly in cdns3_ep_run_transfer().
+	 */
+	priv_ep->endpoint.maxpacket = max_packet_size;
+
 	ret = cdns3_ep_onchip_buffer_reserve(priv_dev, buffering + 1,
 					     !!priv_ep->dir);
 	if (ret) {
@@ -1659,7 +1684,7 @@ cdns3_endpoint *cdns3_find_available_ep(struct cdns3_device *priv_dev,
 		/* ep name pattern likes epXin or epXout */
 		char c[2] = {ep->name[2], '\0'};
 
-		num = simple_strtoul(c, NULL, 10);
+		num = dectoul(c, NULL);
 
 		priv_ep = ep_to_cdns3_ep(ep);
 		if (cdns3_ep_dir_is_correct(desc, priv_ep)) {
@@ -2321,6 +2346,9 @@ static void cdns3_gadget_config(struct cdns3_device *priv_dev)
 	writel(USB_IEN_INIT, &regs->usb_ien);
 	writel(USB_CONF_CLK2OFFDS | USB_CONF_L1DS, &regs->usb_conf);
 
+	/* Set the Fast access bit */
+	writel(PUSB_PWR_FST_REG_ACCESS, &priv_dev->regs->usb_pwr);
+
 	cdns3_configure_dmult(priv_dev, NULL);
 
 	cdns3_gadget_pullup(&priv_dev->gadget, 1);
@@ -2341,6 +2369,7 @@ static int cdns3_gadget_udc_start(struct usb_gadget *gadget,
 
 	spin_lock_irqsave(&priv_dev->lock, flags);
 	priv_dev->gadget_driver = driver;
+	cdns3_gadget_udc_set_speed(gadget, gadget->max_speed);
 	cdns3_gadget_config(priv_dev);
 	spin_unlock_irqrestore(&priv_dev->lock, flags);
 	return 0;
@@ -2378,6 +2407,7 @@ static int cdns3_gadget_udc_stop(struct usb_gadget *gadget)
 
 	/* disable interrupt for device */
 	writel(0, &priv_dev->regs->usb_ien);
+	writel(0, &priv_dev->regs->usb_pwr);
 	writel(USB_CONF_DEVDS, &priv_dev->regs->usb_conf);
 
 	return ret;
@@ -2746,19 +2776,10 @@ int cdns3_gadget_init(struct cdns3 *cdns)
  *
  * Handles ep0 and gadget interrupt
  */
-static void cdns3_gadget_uboot_handle_interrupt(struct cdns3 *cdns)
+void cdns3_gadget_uboot_handle_interrupt(struct cdns3 *cdns)
 {
 	int ret = cdns3_device_irq_handler(0, cdns);
 
 	if (ret == IRQ_WAKE_THREAD)
 		cdns3_device_thread_irq_handler(0, cdns);
-}
-
-int dm_usb_gadget_handle_interrupts(struct udevice *dev)
-{
-	struct cdns3 *cdns = dev_get_priv(dev);
-
-	cdns3_gadget_uboot_handle_interrupt(cdns);
-
-	return 0;
 }

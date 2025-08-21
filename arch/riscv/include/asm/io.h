@@ -7,8 +7,6 @@
 #ifndef __ASM_RISCV_IO_H
 #define __ASM_RISCV_IO_H
 
-#ifdef __KERNEL__
-
 #include <linux/types.h>
 #include <asm/barrier.h>
 #include <asm/byteorder.h>
@@ -17,42 +15,15 @@ static inline void sync(void)
 {
 }
 
-#ifdef CONFIG_ARCH_MAP_SYSMEM
-static inline void *map_sysmem(phys_addr_t paddr, unsigned long len)
-{
-	if (paddr < PHYS_SDRAM_0_SIZE + PHYS_SDRAM_1_SIZE)
-		paddr = paddr | 0x40000000;
-	return (void *)(uintptr_t)paddr;
-}
+#define __arch_getb(a)			(*(volatile unsigned char *)(a))
+#define __arch_getw(a)			(*(volatile unsigned short *)(a))
+#define __arch_getl(a)			(*(volatile unsigned int *)(a))
+#define __arch_getq(a)			(*(volatile unsigned long long *)(a))
 
-static inline void *unmap_sysmem(const void *vaddr)
-{
-	phys_addr_t paddr = (phys_addr_t)vaddr;
-
-	paddr = paddr & ~0x40000000;
-	return (void *)(uintptr_t)paddr;
-}
-
-static inline phys_addr_t map_to_sysmem(const void *ptr)
-{
-	return (phys_addr_t)(uintptr_t)ptr;
-}
-#endif
-
-/*
- * Generic virtual read/write.  Note that we don't support half-word
- * read/writes.  We define __arch_*[bl] here, and leave __arch_*w
- * to the architecture specific code.
- */
-#define __arch_getb(a)			(*(unsigned char *)(a))
-#define __arch_getw(a)			(*(unsigned short *)(a))
-#define __arch_getl(a)			(*(unsigned int *)(a))
-#define __arch_getq(a)			(*(unsigned long long *)(a))
-
-#define __arch_putb(v, a)		(*(unsigned char *)(a) = (v))
-#define __arch_putw(v, a)		(*(unsigned short *)(a) = (v))
-#define __arch_putl(v, a)		(*(unsigned int *)(a) = (v))
-#define __arch_putq(v, a)		(*(unsigned long long *)(a) = (v))
+#define __arch_putb(v, a)		(*(volatile unsigned char *)(a) = (v))
+#define __arch_putw(v, a)		(*(volatile unsigned short *)(a) = (v))
+#define __arch_putl(v, a)		(*(volatile unsigned int *)(a) = (v))
+#define __arch_putq(v, a)		(*(volatile unsigned long long *)(a) = (v))
 
 #define __raw_writeb(v, a)		__arch_putb(v, a)
 #define __raw_writew(v, a)		__arch_putw(v, a)
@@ -63,6 +34,10 @@ static inline phys_addr_t map_to_sysmem(const void *ptr)
 #define __raw_readw(a)			__arch_getw(a)
 #define __raw_readl(a)			__arch_getl(a)
 #define __raw_readq(a)			__arch_getq(a)
+
+/* adding for cadence_qspi_apb.c */
+#define memcpy_fromio(a, c, l)		memcpy((a), (c), (l))
+#define memcpy_toio(c, a, l)		memcpy((c), (a), (l))
 
 #define dmb()		mb()
 #define __iormb()	rmb()
@@ -205,7 +180,7 @@ static inline u64 readq(const volatile void __iomem *addr)
  *  IO port access primitives
  *  -------------------------
  *
- * The NDS32 doesn't have special IO access instructions just like ARM;
+ * The RISC-V doesn't have special IO access instructions just like ARM;
  * all IO is memory mapped.
  * Note that these are defined to perform little endian accesses
  * only.  Their primary purpose is to access PCI and ISA peripherals.
@@ -243,7 +218,8 @@ static inline u64 readq(const volatile void __iomem *addr)
 #define insw(p, d, l)			readsw(__io(p), d, l)
 #define insl(p, d, l)			readsl(__io(p), d, l)
 
-static inline void readsb(unsigned int *addr, void *data, int bytelen)
+static inline void readsb(const volatile void __iomem *addr, void *data,
+			  unsigned int bytelen)
 {
 	unsigned char *ptr;
 	unsigned char *ptr2;
@@ -258,7 +234,8 @@ static inline void readsb(unsigned int *addr, void *data, int bytelen)
 	}
 }
 
-static inline void readsw(unsigned int *addr, void *data, int wordlen)
+static inline void readsw(const volatile void __iomem *addr, void *data,
+			  unsigned int wordlen)
 {
 	unsigned short *ptr;
 	unsigned short *ptr2;
@@ -273,7 +250,8 @@ static inline void readsw(unsigned int *addr, void *data, int wordlen)
 	}
 }
 
-static inline void readsl(unsigned int *addr, void *data, int longlen)
+static inline void readsl(const volatile void __iomem *addr, void *data,
+			  unsigned int longlen)
 {
 	unsigned int *ptr;
 	unsigned int *ptr2;
@@ -288,7 +266,8 @@ static inline void readsl(unsigned int *addr, void *data, int longlen)
 	}
 }
 
-static inline void writesb(unsigned int *addr, const void *data, int bytelen)
+static inline void writesb(volatile void __iomem *addr, const void *data,
+			   unsigned int bytelen)
 {
 	unsigned char *ptr;
 	unsigned char *ptr2;
@@ -303,7 +282,8 @@ static inline void writesb(unsigned int *addr, const void *data, int bytelen)
 	}
 }
 
-static inline void writesw(unsigned int *addr, const void *data, int wordlen)
+static inline void writesw(volatile void __iomem *addr, const void *data,
+			   unsigned int wordlen)
 {
 	unsigned short *ptr;
 	unsigned short *ptr2;
@@ -318,7 +298,8 @@ static inline void writesw(unsigned int *addr, const void *data, int wordlen)
 	}
 }
 
-static inline void writesl(unsigned int *addr, const void *data, int longlen)
+static inline void writesl(volatile void __iomem *addr, const void *data,
+			   unsigned int longlen)
 {
 	unsigned int *ptr;
 	unsigned int *ptr2;
@@ -332,6 +313,14 @@ static inline void writesl(unsigned int *addr, const void *data, int longlen)
 		longlen--;
 	}
 }
+
+#define readsb readsb
+#define readsw readsw
+#define readsl readsl
+#define writesb writesb
+#define writesw writesw
+#define writesl writesl
+
 #endif
 
 #define outb_p(val, port)		outb((val), (port))
@@ -349,113 +338,49 @@ static inline void writesl(unsigned int *addr, const void *data, int longlen)
 #define insl_p(port, to, len)		insl(port, to, len)
 
 /*
- * DMA-consistent mapping functions.  These allocate/free a region of
- * uncached, unwrite-buffered mapped memory space for use with DMA
- * devices.  This is the "generic" version.  The PCI specific version
- * is in pci.h
+ * Unordered I/O memory access primitives.  These are even more relaxed than
+ * the relaxed versions, as they don't even order accesses between successive
+ * operations to the I/O regions.
  */
+#define readb_cpu(c)		({ u8  __r = __raw_readb(c); __r; })
+#define readw_cpu(c)		({ u16 __r = le16_to_cpu((__force __le16)__raw_readw(c)); __r; })
+#define readl_cpu(c)		({ u32 __r = le32_to_cpu((__force __le32)__raw_readl(c)); __r; })
+
+#define writeb_cpu(v, c)	((void)__raw_writeb((v), (c)))
+#define writew_cpu(v, c)	((void)__raw_writew((__force u16)cpu_to_le16(v), (c)))
+#define writel_cpu(v, c)	((void)__raw_writel((__force u32)cpu_to_le32(v), (c)))
+
+#ifdef CONFIG_64BIT
+#define readq_cpu(c)		({ u64 __r = le64_to_cpu((__force __le64)__raw_readq(c)); __r; })
+#define writeq_cpu(v, c)	((void)__raw_writeq((__force u64)cpu_to_le64(v), (c)))
+#endif
 
 /*
- * String version of IO memory access ops:
+ * Relaxed I/O memory access primitives. These follow the Device memory
+ * ordering rules but do not guarantee any ordering relative to Normal memory
+ * accesses.  These are defined to order the indicated access (either a read or
+ * write) with all other I/O memory accesses to the same peripheral. Since the
+ * platform specification defines that all I/O regions are strongly ordered on
+ * channel 0, no explicit fences are required to enforce this ordering.
  */
+/* FIXME: These are now the same as asm-generic */
+#define __io_rbr()		do {} while (0)
+#define __io_rar()		do {} while (0)
+#define __io_rbw()		do {} while (0)
+#define __io_raw()		do {} while (0)
 
-/*
- * If this architecture has PCI memory IO, then define the read/write
- * macros.  These should only be used with the cookie passed from
- * ioremap.
- */
-#ifdef __mem_pci
+#define readb_relaxed(c)	({ u8  __v; __io_rbr(); __v = readb_cpu(c); __io_rar(); __v; })
+#define readw_relaxed(c)	({ u16 __v; __io_rbr(); __v = readw_cpu(c); __io_rar(); __v; })
+#define readl_relaxed(c)	({ u32 __v; __io_rbr(); __v = readl_cpu(c); __io_rar(); __v; })
 
-#define readb(c) ({ unsigned int __v = \
-			__raw_readb(__mem_pci(c)); __v; })
-#define readw(c) ({ unsigned int __v = \
-			le16_to_cpu(__raw_readw(__mem_pci(c))); __v; })
-#define readl(c) ({ unsigned int __v = \
-			le32_to_cpu(__raw_readl(__mem_pci(c))); __v; })
+#define writeb_relaxed(v, c)	({ __io_rbw(); writeb_cpu((v), (c)); __io_raw(); })
+#define writew_relaxed(v, c)	({ __io_rbw(); writew_cpu((v), (c)); __io_raw(); })
+#define writel_relaxed(v, c)	({ __io_rbw(); writel_cpu((v), (c)); __io_raw(); })
 
-#define writeb(v, c)		__raw_writeb(v, __mem_pci(c))
-#define writew(v, c)		__raw_writew(cpu_to_le16(v), __mem_pci(c))
-#define writel(v, c)		__raw_writel(cpu_to_le32(v), __mem_pci(c))
-
-#define memset_io(c, v, l)	_memset_io(__mem_pci(c), (v), (l))
-#define memcpy_fromio(a, c, l)	_memcpy_fromio((a), __mem_pci(c), (l))
-#define memcpy_toio(c, a, l)	_memcpy_toio(__mem_pci(c), (a), (l))
-
-#define eth_io_copy_and_sum(s, c, l, b) \
-	eth_copy_and_sum((s), __mem_pci(c), (l), (b))
-
-static inline int check_signature(ulong io_addr, const uchar *s, int len)
-{
-	int retval = 0;
-
-	do {
-		if (readb(io_addr) != *s)
-			goto out;
-		io_addr++;
-		s++;
-		len--;
-	} while (len);
-	retval = 1;
-out:
-	return retval;
-}
-#endif	/* __mem_pci */
-
-/*
- * If this architecture has ISA IO, then define the isa_read/isa_write
- * macros.
- */
-#ifdef __mem_isa
-
-#define isa_readb(addr)			__raw_readb(__mem_isa(addr))
-#define isa_readw(addr)			__raw_readw(__mem_isa(addr))
-#define isa_readl(addr)			__raw_readl(__mem_isa(addr))
-#define isa_writeb(val, addr)		__raw_writeb(val, __mem_isa(addr))
-#define isa_writew(val, addr)		__raw_writew(val, __mem_isa(addr))
-#define isa_writel(val, addr)		__raw_writel(val, __mem_isa(addr))
-#define isa_memset_io(a, b, c)		_memset_io(__mem_isa(a), (b), (c))
-#define isa_memcpy_fromio(a, b, c)	_memcpy_fromio((a), __mem_isa(b), (c))
-#define isa_memcpy_toio(a, b, c)	_memcpy_toio(__mem_isa((a)), (b), (c))
-
-#define isa_eth_io_copy_and_sum(a, b, c, d) \
-	eth_copy_and_sum((a), __mem_isa(b), (c), (d))
-
-static inline int
-isa_check_signature(ulong io_addr, const uchar *s, int len)
-{
-	int retval = 0;
-
-	do {
-		if (isa_readb(io_addr) != *s)
-			goto out;
-		io_addr++;
-		s++;
-		len--;
-	} while (len);
-	retval = 1;
-out:
-	return retval;
-}
-
-#else	/* __mem_isa */
-
-#define isa_readb(addr)			(__readwrite_bug("isa_readb"), 0)
-#define isa_readw(addr)			(__readwrite_bug("isa_readw"), 0)
-#define isa_readl(addr)			(__readwrite_bug("isa_readl"), 0)
-#define isa_writeb(val, addr)		__readwrite_bug("isa_writeb")
-#define isa_writew(val, addr)		__readwrite_bug("isa_writew")
-#define isa_writel(val, addr)		__readwrite_bug("isa_writel")
-#define isa_memset_io(a, b, c)		__readwrite_bug("isa_memset_io")
-#define isa_memcpy_fromio(a, b, c)	__readwrite_bug("isa_memcpy_fromio")
-#define isa_memcpy_toio(a, b, c)	__readwrite_bug("isa_memcpy_toio")
-
-#define isa_eth_io_copy_and_sum(a, b, c, d) \
-	__readwrite_bug("isa_eth_io_copy_and_sum")
-
-#define isa_check_signature(io, sig, len)	(0)
-
-#endif	/* __mem_isa */
-#endif	/* __KERNEL__ */
+#ifdef CONFIG_64BIT
+#define readq_relaxed(c)	({ u64 __v; __io_rbr(); __v = readq_cpu(c); __io_rar(); __v; })
+#define writeq_relaxed(v, c)	({ __io_rbw(); writeq_cpu((v), (c)); __io_raw(); })
+#endif
 
 #include <asm-generic/io.h>
 

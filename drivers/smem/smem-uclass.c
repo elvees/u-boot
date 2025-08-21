@@ -3,7 +3,8 @@
  * Copyright (c) 2018 Ramon Fried <ramon.fried@gmail.com>
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_SMEM
+
 #include <dm.h>
 #include <smem.h>
 

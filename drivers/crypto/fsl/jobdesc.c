@@ -4,10 +4,11 @@
  * Basic job descriptor construction
  *
  * Copyright 2014 Freescale Semiconductor, Inc.
+ * Copyright 2018 NXP
  *
  */
 
-#include <common.h>
+#include <config.h>
 #include <cpu_func.h>
 #include <fsl_sec.h>
 #include "desc_constr.h"
@@ -15,18 +16,19 @@
 #include "rsa_caam.h"
 #include <asm/cache.h>
 
-#if defined(CONFIG_MX6) || defined(CONFIG_MX7)
+#if defined(CONFIG_MX6) || defined(CONFIG_MX7) || defined(CONFIG_MX7ULP) || \
+		defined(CONFIG_IMX8M)
 /*!
  * Secure memory run command
  *
  * @param   sec_mem_cmd  Secure memory command register
- * @return  cmd_status  Secure memory command status register
+ * Return:  cmd_status  Secure memory command status register
  */
 uint32_t secmem_set_cmd(uint32_t sec_mem_cmd)
 {
 	uint32_t temp_reg;
 
-	ccsr_sec_t *sec = (void *)CONFIG_SYS_FSL_SEC_ADDR;
+	ccsr_sec_t *sec = (void *)CFG_SYS_FSL_SEC_ADDR;
 	uint32_t sm_vid = SM_VERSION(sec_in32(&sec->smvid));
 	uint32_t jr_id = 0;
 
@@ -50,13 +52,13 @@ uint32_t secmem_set_cmd(uint32_t sec_mem_cmd)
  *
  * @param   page  Number of the page to allocate.
  * @param   partition  Number of the partition to allocate.
- * @return  0 on success, ERROR_IN_PAGE_ALLOC otherwise
+ * Return:  0 on success, ERROR_IN_PAGE_ALLOC otherwise
  */
 int caam_page_alloc(uint8_t page_num, uint8_t partition_num)
 {
 	uint32_t temp_reg;
 
-	ccsr_sec_t *sec = (void *)CONFIG_SYS_FSL_SEC_ADDR;
+	ccsr_sec_t *sec = (void *)CFG_SYS_FSL_SEC_ADDR;
 	uint32_t sm_vid = SM_VERSION(sec_in32(&sec->smvid));
 	uint32_t jr_id = 0;
 
@@ -114,7 +116,7 @@ int caam_page_alloc(uint8_t page_num, uint8_t partition_num)
 int inline_cnstr_jobdesc_blob_dek(uint32_t *desc, const uint8_t *plain_txt,
 				       uint8_t *dek_blob, uint32_t in_sz)
 {
-	ccsr_sec_t *sec = (void *)CONFIG_SYS_FSL_SEC_ADDR;
+	ccsr_sec_t *sec = (void *)CFG_SYS_FSL_SEC_ADDR;
 	uint32_t sm_vid = SM_VERSION(sec_in32(&sec->smvid));
 	uint32_t jr_id = 0;
 
@@ -163,9 +165,9 @@ int inline_cnstr_jobdesc_blob_dek(uint32_t *desc, const uint8_t *plain_txt,
 
 	append_u32(desc, aad_w2);
 
-	append_cmd_ptr(desc, (dma_addr_t)SEC_MEM_PAGE1, in_sz, CMD_SEQ_IN_PTR);
+	append_cmd_ptr(desc, (caam_dma_addr_t)SEC_MEM_PAGE1, in_sz, CMD_SEQ_IN_PTR);
 
-	append_cmd_ptr(desc, (dma_addr_t)dek_blob + 8, out_sz, CMD_SEQ_OUT_PTR);
+	append_cmd_ptr(desc, (caam_dma_addr_t)(ulong)(dek_blob + 8), out_sz, CMD_SEQ_OUT_PTR);
 
 	append_operation(desc, OP_TYPE_ENCAP_PROTOCOL | OP_PCLID_BLOB |
 						OP_PCLID_SECMEM);
@@ -181,7 +183,7 @@ void inline_cnstr_jobdesc_hash(uint32_t *desc,
 	/* SHA 256 , output is of length 32 words */
 	uint32_t storelen = alg_size;
 	u32 options;
-	dma_addr_t dma_addr_in, dma_addr_out;
+	caam_dma_addr_t dma_addr_in, dma_addr_out;
 
 	dma_addr_in = virt_to_phys((void *)msg);
 	dma_addr_out = virt_to_phys((void *)digest);
@@ -205,12 +207,12 @@ void inline_cnstr_jobdesc_hash(uint32_t *desc,
 	append_store(desc, dma_addr_out, storelen,
 		     LDST_CLASS_2_CCB | LDST_SRCDST_BYTE_CONTEXT);
 }
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 void inline_cnstr_jobdesc_blob_encap(uint32_t *desc, uint8_t *key_idnfr,
 				     uint8_t *plain_txt, uint8_t *enc_blob,
 				     uint32_t in_sz)
 {
-	dma_addr_t dma_addr_key_idnfr, dma_addr_in, dma_addr_out;
+	caam_dma_addr_t dma_addr_key_idnfr, dma_addr_in, dma_addr_out;
 	uint32_t key_sz = KEY_IDNFR_SZ_BYTES;
 	/* output blob will have 32 bytes key blob in beginning and
 	 * 16 byte HMAC identifier at end of data blob */
@@ -235,7 +237,7 @@ void inline_cnstr_jobdesc_blob_decap(uint32_t *desc, uint8_t *key_idnfr,
 				     uint8_t *enc_blob, uint8_t *plain_txt,
 				     uint32_t out_sz)
 {
-	dma_addr_t dma_addr_key_idnfr, dma_addr_in, dma_addr_out;
+	caam_dma_addr_t dma_addr_key_idnfr, dma_addr_in, dma_addr_out;
 	uint32_t key_sz = KEY_IDNFR_SZ_BYTES;
 	uint32_t in_sz = out_sz + KEY_BLOB_SIZE + MAC_SIZE;
 
@@ -298,7 +300,7 @@ void inline_cnstr_jobdesc_rng_deinstantiation(u32 *desc, int handle)
 
 void inline_cnstr_jobdesc_rng(u32 *desc, void *data_out, u32 size)
 {
-	dma_addr_t dma_data_out = virt_to_phys(data_out);
+	caam_dma_addr_t dma_data_out = virt_to_phys(data_out);
 
 	init_job_desc(desc, 0);
 	append_operation(desc, OP_ALG_ALGSEL_RNG | OP_TYPE_CLASS1_ALG |
@@ -311,7 +313,7 @@ void inline_cnstr_jobdesc_pkha_rsaexp(uint32_t *desc,
 				      struct pk_in_params *pkin, uint8_t *out,
 				      uint32_t out_siz)
 {
-	dma_addr_t dma_addr_e, dma_addr_a, dma_addr_n, dma_addr_out;
+	caam_dma_addr_t dma_addr_e, dma_addr_a, dma_addr_n, dma_addr_out;
 
 	dma_addr_e = virt_to_phys((void *)pkin->e);
 	dma_addr_a = virt_to_phys((void *)pkin->a);

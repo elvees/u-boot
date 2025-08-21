@@ -24,10 +24,14 @@ Depending on the build targets further packages maybe needed
 .. code-block:: bash
 
     sudo apt-get install bc bison build-essential coccinelle \
-      device-tree-compiler dfu-util efitools flex gdisk liblz4-tool \
-      libguestfs-tools libncurses-dev libpython3-dev libsdl2-dev libssl-dev \
-      lzma-alone openssl python3 python3-coverage python3-pyelftools \
-      python3-pytest python3-sphinxcontrib.apidoc python3-sphinx-rtd-theme swig
+      device-tree-compiler dfu-util efitools flex gdisk graphviz imagemagick \
+      libgnutls28-dev libguestfs-tools libncurses-dev \
+      libpython3-dev libsdl2-dev libssl-dev lz4 lzma lzma-alone openssl \
+      pkg-config python3 python3-asteval python3-coverage python3-filelock \
+      python3-pkg-resources python3-pycryptodome python3-pyelftools \
+      python3-pytest python3-pytest-xdist python3-sphinxcontrib.apidoc \
+      python3-sphinx-rtd-theme python3-subunit python3-testtools \
+      python3-venv swig uuid-dev
 
 SUSE based
 ~~~~~~~~~~
@@ -48,6 +52,22 @@ Depending on the build targets further packages maybe needed.
 
     zypper install bc bison flex gcc libopenssl-devel libSDL2-devel make \
       ncurses-devel python3-devel python3-pytest swig
+
+Alpine Linux
+~~~~~~~~~~~~
+
+For building U-Boot on Alpine Linux at least the following packages are needed:
+
+.. code-block:: bash
+
+    apk add alpine-sdk bc bison dtc flex gnutls-dev linux-headers ncurses-dev \
+      openssl-dev py3-elftools py3-setuptools python3-dev swig util-linux-dev
+
+Depending on the build target further packages may be needed:
+
+* sandbox with lcd: sdl2-dev
+* riscv64 S-mode targets: opensbi
+* some arm64 targets: arm-trusted-firmware
 
 Prerequisites
 -------------
@@ -98,6 +118,34 @@ Assuming cross compiling on Debian for ARMv8 this would be
 
     CROSS_COMPILE=aarch64-linux-gnu- make
 
+Out-of-tree building
+~~~~~~~~~~~~~~~~~~~~
+
+By default building is performed locally and the objects are saved in the source
+directory. To build out-of-tree use one of the two methods below:
+
+Add O= parameter to the make command line:
+
+.. code-block:: bash
+
+    make O=/tmp/build distclean
+    make O=/tmp/build NAME_defconfig
+    make O=/tmp/build
+
+Use environment variable KBUILD_OUTPUT:
+
+.. code-block:: bash
+
+    export KBUILD_OUTPUT=/tmp/build
+    make distclean
+    make NAME_defconfig
+    make
+
+.. note::
+
+    The command line "O=" parameter overrides the KBUILD_OUTPUT environment
+    variable.
+
 Build parameters
 ~~~~~~~~~~~~~~~~
 
@@ -117,6 +165,44 @@ Further important build parameters are
 
 * O=<dir> - generate all output files in directory <dir>, including .config
 * V=1 - verbose build
+
+Devicetree compiler
+~~~~~~~~~~~~~~~~~~~
+
+Boards that use `CONFIG_OF_CONTROL` (i.e. almost all of them) need the
+devicetree compiler (dtc). Those with `CONFIG_PYLIBFDT` need pylibfdt, a Python
+library for accessing devicetree data. Suitable versions of these are included
+in the U-Boot tree in `scripts/dtc` and built automatically as needed.
+
+To use the system versions of these, use the DTC parameter, for example
+
+.. code-block:: bash
+
+    DTC=/usr/bin/dtc make
+
+In this case, dtc and pylibfdt are not built. The build checks that the version
+of dtc is new enough. It also makes sure that pylibfdt is present, if needed
+(see `scripts_dtc` in the Makefile).
+
+Note that the :doc:`tools` are always built with the included version of libfdt
+so it is not possible to build U-Boot tools with a system libfdt, at present.
+
+Link-time optimisation (LTO)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+U-Boot supports link-time optimisation which can reduce the size of the final
+U-Boot binaries, particularly with SPL.
+
+At present this can be enabled by ARM boards by adding `CONFIG_LTO=y` into the
+defconfig file. Other architectures are not supported. LTO is enabled by default
+for sandbox.
+
+This does incur a link-time penalty of several seconds. For faster incremental
+builds during development, you can disable it by setting `NO_LTO` to `1`.
+
+.. code-block:: bash
+
+    NO_LTO=1 make
 
 Other build targets
 ~~~~~~~~~~~~~~~~~~~

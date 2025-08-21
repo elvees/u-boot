@@ -4,7 +4,7 @@
  * Copyright 2020 NXP
  */
 
-#include <common.h>
+#include <config.h>
 #include <command.h>
 #include <env.h>
 #include <hang.h>
@@ -83,21 +83,73 @@ struct cpld_data {
 #define CPLD_FXS_LED	0x0F
 #define CPLD_SYS_RST	0x00
 
+void board_reset_prepare(void)
+{
+	/*
+	 * During reset preparation, turn off external watchdog.
+	 * This ensures that external watchdog does not trigger
+	 * another reset or possible infinite reset loop.
+	 */
+	struct cpld_data *cpld_data = (void *)(CFG_SYS_CPLD_BASE);
+	out_8(&cpld_data->wd_cfg, CPLD_WD_CFG);
+	in_8(&cpld_data->wd_cfg); /* Read back to sync write */
+}
+
+void board_reset_last(void)
+{
+	struct cpld_data *cpld_data = (void *)(CFG_SYS_CPLD_BASE);
+	out_8(&cpld_data->system_rst, 1);
+}
+
 void board_cpld_init(void)
 {
-	struct cpld_data *cpld_data = (void *)(CONFIG_SYS_CPLD_BASE);
+	struct cpld_data *cpld_data = (void *)(CFG_SYS_CPLD_BASE);
+	u8 prev_wd_cfg = in_8(&cpld_data->wd_cfg);
 
 	out_8(&cpld_data->wd_cfg, CPLD_WD_CFG);
 	out_8(&cpld_data->status_led, CPLD_STATUS_LED);
 	out_8(&cpld_data->fxo_led, CPLD_FXO_LED);
 	out_8(&cpld_data->fxs_led, CPLD_FXS_LED);
+
+	/*
+	 * CPLD's system reset register on P1/P2 RDB boards is not autocleared
+	 * after flipping it. If this register is set to one then CPLD triggers
+	 * reset of CPU in few ms.
+	 *
+	 * CPLD does not trigger reset of CPU for 100ms after the last reset.
+	 *
+	 * This means that trying to reset board via CPLD system reset register
+	 * cause reboot loop. To prevent this reboot loop, the only workaround
+	 * is to try to clear CPLD's system reset register as early as possible
+	 * and it has to be done in 100ms since the last start of reset.
+	 */
 	out_8(&cpld_data->system_rst, CPLD_SYS_RST);
+
+	/*
+	 * If watchdog timer was already set to non-disabled value then it means
+	 * that watchdog timer was already activated, has already expired and
+	 * caused CPU reset. If this happened then due to CPLD firmware bug,
+	 * writing to wd_cfg register has no effect and therefore it is not
+	 * possible to reactivate watchdog timer again. Also if CPU was reset
+	 * via watchdog then some peripherals like i2c do not work. Watchdog and
+	 * i2c start working again after CPU reset via non-watchdog method.
+	 *
+	 * So in case watchdog timer register in CPLD was already enabled then
+	 * disable it in CPLD and reset CPU which cause new boot. Watchdog timer
+	 * is disabled few lines above, after reading CPLD previous value.
+	 * This logic (disabling timer before reset) prevents reboot loop.
+	 */
+	if (prev_wd_cfg != CPLD_WD_CFG) {
+		eieio();
+		do_reset(NULL, 0, 0, NULL);
+		while (1); /* do_reset() does not occur immediately */
+	}
 }
 
 void board_gpio_init(void)
 {
 #ifdef CONFIG_QE
-	ccsr_gur_t *gur = (void *)(CONFIG_SYS_MPC85xx_GUTS_ADDR);
+	ccsr_gur_t *gur = (void *)(CFG_SYS_MPC85xx_GUTS_ADDR);
 	par_io_t *par_io = (par_io_t *) &(gur->qe_par_io);
 
 	/* Enable VSC7385 switch */
@@ -107,7 +159,7 @@ void board_gpio_init(void)
 	setbits_be32(&par_io[GPIO_SLIC_PORT].cpdat, GPIO_SLIC_DATA);
 #else
 
-	ccsr_gpio_t *pgpio = (void *)(CONFIG_SYS_MPC85xx_GPIO_ADDR);
+	ccsr_gpio_t *pgpio = (void *)(CFG_SYS_MPC85xx_GPIO_ADDR);
 
 	/*
 	 * GPIO10 DDR Reset, open drain
@@ -135,7 +187,7 @@ void board_gpio_init(void)
 	setbits_be32(&pgpio->gpdat, 0x00080000);
 #endif
 
-#ifdef CONFIG_SLIC
+#ifdef CFG_SLIC
 	/* reset SLIC */
 	setbits_be32(&pgpio->gpdir, 0x00040000);
 	setbits_be32(&pgpio->gpdat, 0x00040000);
@@ -145,14 +197,18 @@ void board_gpio_init(void)
 
 int board_early_init_f(void)
 {
-	ccsr_gur_t *gur = (void *)(CONFIG_SYS_MPC85xx_GUTS_ADDR);
+	ccsr_gur_t *gur = (void *)(CFG_SYS_MPC85xx_GUTS_ADDR);
 
-	setbits_be32(&gur->pmuxcr,
-			(MPC85xx_PMUXCR_SDHC_CD | MPC85xx_PMUXCR_SDHC_WP));
+	setbits_be32(&gur->pmuxcr, MPC85xx_PMUXCR_SDHC_CD);
+#ifndef SDHC_WP_IS_GPIO
+	setbits_be32(&gur->pmuxcr, MPC85xx_PMUXCR_SDHC_WP);
+#endif
 	clrbits_be32(&gur->sdhcdcr, SDHCDCR_CD_INV);
 
 	clrbits_be32(&gur->pmuxcr, MPC85xx_PMUXCR_SD_DATA);
+#if defined(CONFIG_TARGET_P1020RDB_PD) || defined(CONFIG_TARGET_P1020RDB_PC)
 	setbits_be32(&gur->pmuxcr, MPC85xx_PMUXCR_TDM_ENA);
+#endif
 
 	board_gpio_init();
 	board_cpld_init();
@@ -160,14 +216,27 @@ int board_early_init_f(void)
 	return 0;
 }
 
-int checkboard(void)
+#if defined(CONFIG_TARGET_P1020RDB_PC)
+#define BOARD_NAME "P1020RDB-PC"
+#elif defined(CONFIG_TARGET_P1020RDB_PD)
+#define BOARD_NAME "P1020RDB-PD"
+#elif defined(CONFIG_TARGET_P2020RDB)
+#define BOARD_NAME "P2020RDB-PC"
+#endif
+
+int checkboard_p1_p2(void)
 {
-	struct cpld_data *cpld_data = (void *)(CONFIG_SYS_CPLD_BASE);
-	ccsr_gur_t *gur = (void *)(CONFIG_SYS_MPC85xx_GUTS_ADDR);
-	u8 in, out, io_config, val;
+	struct cpld_data *cpld_data = (void *)(CFG_SYS_CPLD_BASE);
+	ccsr_gur_t *gur = (void *)(CFG_SYS_MPC85xx_GUTS_ADDR);
+	u8 in, out, invert, io_config, val;
 	int bus_num = CONFIG_SYS_SPD_BUS_NUM;
 
-	printf("Board: %s CPLD: V%d.%d PCBA: V%d.0\n", CONFIG_BOARDNAME,
+	/* FIXME: This should just use the model from the device tree or similar */
+#ifdef BOARD_NAME
+	printf("Board: %s ", BOARD_NAME);
+#endif
+
+	printf("CPLD: V%d.%d PCBA: V%d.0\n",
 		in_8(&cpld_data->cpld_rev_major) & 0x0F,
 		in_8(&cpld_data->cpld_rev_minor) & 0x0F,
 		in_8(&cpld_data->pcba_rev) & 0x0F);
@@ -177,16 +246,17 @@ int checkboard(void)
 	struct udevice *dev;
 	int ret;
 
-	ret = i2c_get_chip_for_busnum(bus_num, CONFIG_SYS_I2C_PCA9557_ADDR,
+	ret = i2c_get_chip_for_busnum(bus_num, CFG_SYS_I2C_PCA9557_ADDR,
 				      1, &dev);
 	if (ret) {
 		printf("%s: Cannot find udev for a bus %d\n", __func__,
 		       bus_num);
-		return -ENXIO;
+		return 0; /* Don't want to hang() on this error */
 	}
 
 	if (dm_i2c_read(dev, 0, &in, 1) < 0 ||
 	    dm_i2c_read(dev, 1, &out, 1) < 0 ||
+	    dm_i2c_read(dev, 2, &invert, 1) < 0 ||
 	    dm_i2c_read(dev, 3, &io_config, 1) < 0) {
 		printf("Error reading i2c boot information!\n");
 		return 0; /* Don't want to hang() on this error */
@@ -194,19 +264,27 @@ int checkboard(void)
 	#else /* Non DM I2C support - will be removed */
 	i2c_set_bus_num(bus_num);
 
-	if (i2c_read(CONFIG_SYS_I2C_PCA9557_ADDR, 0, 1, &in, 1) < 0 ||
-	    i2c_read(CONFIG_SYS_I2C_PCA9557_ADDR, 1, 1, &out, 1) < 0 ||
-	    i2c_read(CONFIG_SYS_I2C_PCA9557_ADDR, 3, 1, &io_config, 1) < 0) {
+	if (i2c_read(CFG_SYS_I2C_PCA9557_ADDR, 0, 1, &in, 1) < 0 ||
+	    i2c_read(CFG_SYS_I2C_PCA9557_ADDR, 1, 1, &out, 1) < 0 ||
+	    i2c_read(CFG_SYS_I2C_PCA9557_ADDR, 2, 1, &invert, 1) < 0 ||
+	    i2c_read(CFG_SYS_I2C_PCA9557_ADDR, 3, 1, &io_config, 1) < 0) {
 		printf("Error reading i2c boot information!\n");
 		return 0; /* Don't want to hang() on this error */
 	}
 	#endif
 
-	val = (in & io_config) | (out & (~io_config));
+	val = ((in ^ invert) & io_config) | (out & (~io_config));
 
 	puts("rom_loc: ");
-	if ((val & (~__SW_BOOT_MASK)) == __SW_BOOT_SD) {
+	if (0) {
+#ifdef __SW_BOOT_SD
+	} else if ((val & (~__SW_BOOT_MASK)) == __SW_BOOT_SD) {
 		puts("sd");
+#endif
+#ifdef __SW_BOOT_SD2
+	} else if ((val & (~__SW_BOOT_MASK)) == __SW_BOOT_SD2) {
+		puts("sd");
+#endif
 #ifdef __SW_BOOT_SPI
 	} else if ((val & (~__SW_BOOT_MASK)) == __SW_BOOT_SPI) {
 		puts("spi");
@@ -239,16 +317,16 @@ int checkboard(void)
 	return 0;
 }
 
-#if defined(CONFIG_PCI) && !defined(CONFIG_DM_PCI)
-void pci_init_board(void)
+#if !defined(CONFIG_TARGET_TURRIS_1X)
+int checkboard(void)
 {
-	fsl_pcie_init_board(0);
+	return checkboard_p1_p2();
 }
 #endif
 
 int board_early_init_r(void)
 {
-	const unsigned int flashbase = CONFIG_SYS_FLASH_BASE;
+	const unsigned int flashbase = CFG_SYS_FLASH_BASE;
 	int flash_esel = find_tlb_idx((void *)flashbase, 1);
 #ifdef CONFIG_VSC7385_ENET
 	unsigned int vscfw_addr;
@@ -273,7 +351,7 @@ int board_early_init_r(void)
 		disable_tlb(flash_esel);
 	}
 
-	set_tlb(1, flashbase, CONFIG_SYS_FLASH_BASE_PHYS, /* tlb, epn, rpn */
+	set_tlb(1, flashbase, CFG_SYS_FLASH_BASE_PHYS, /* tlb, epn, rpn */
 		MAS3_SX|MAS3_SW|MAS3_SR, MAS2_I|MAS2_G,/* perms, wimge */
 		0, flash_esel, BOOKE_PAGESZ_64M, 1);/* ts, esel, tsize, iprot */
 
@@ -281,10 +359,10 @@ int board_early_init_r(void)
 	/* If a VSC7385 microcode image is present, then upload it. */
 	tmp = env_get("vscfw_addr");
 	if (tmp) {
-		vscfw_addr = simple_strtoul(tmp, NULL, 16);
+		vscfw_addr = hextoul(tmp, NULL);
 		printf("uploading VSC7385 microcode from %x\n", vscfw_addr);
 		if (vsc7385_upload_firmware((void *)vscfw_addr,
-					    CONFIG_VSC7385_IMAGE_SIZE))
+					    CFG_VSC7385_IMAGE_SIZE))
 			puts("Failure uploading VSC7385 microcode.\n");
 	} else {
 		puts("No address specified for VSC7385 microcode.\n");
@@ -293,53 +371,23 @@ int board_early_init_r(void)
 	return 0;
 }
 
-#ifndef CONFIG_DM_ETH
-int board_eth_init(struct bd_info *bis)
+__weak void p1_p2_rdb_pc_fix_fdt_model(void *blob) {}
+
+#if defined(CONFIG_OF_BOARD_SETUP) || defined(CONFIG_OF_BOARD_FIXUP)
+static void fix_max6370_watchdog(void *blob)
 {
-	struct fsl_pq_mdio_info mdio_info;
-	struct tsec_info_struct tsec_info[4];
-	ccsr_gur_t *gur __attribute__((unused)) =
-		(void *)(CONFIG_SYS_MPC85xx_GUTS_ADDR);
-	int num = 0;
+	int off = fdt_node_offset_by_compatible(blob, -1, "maxim,max6370");
+	ccsr_gpio_t *pgpio = (void *)(CFG_SYS_MPC85xx_GPIO_ADDR);
+	u32 gpioval = in_be32(&pgpio->gpdat);
 
-#ifdef CONFIG_TSEC1
-	SET_STD_TSEC_INFO(tsec_info[num], 1);
-	num++;
-#endif
-#ifdef CONFIG_TSEC2
-	SET_STD_TSEC_INFO(tsec_info[num], 2);
-	if (is_serdes_configured(SGMII_TSEC2)) {
-		printf("eTSEC2 is in sgmii mode.\n");
-		tsec_info[num].flags |= TSEC_SGMII;
-	}
-	num++;
-#endif
-#ifdef CONFIG_TSEC3
-	SET_STD_TSEC_INFO(tsec_info[num], 3);
-	num++;
-#endif
-
-	if (!num) {
-		printf("No TSECs initialized\n");
-		return 0;
-	}
-
-	mdio_info.regs = TSEC_GET_MDIO_REGS_BASE(1);
-	mdio_info.name = DEFAULT_MII_NAME;
-
-	fsl_pq_mdio_init(bis, &mdio_info);
-
-	tsec_eth_init(bis, tsec_info, num);
-
-#if defined(CONFIG_UEC_ETH)
-	/*  QE0 and QE3 need to be exposed for UCC1 and UCC5 Eth mode */
-	setbits_be32(&gur->pmuxcr, MPC85xx_PMUXCR_QE0);
-	setbits_be32(&gur->pmuxcr, MPC85xx_PMUXCR_QE3);
-
-	uec_standard_init(bis);
-#endif
-
-	return pci_eth_init(bis);
+	/*
+	 * Delete watchdog max6370 node in load_default mode (detected by
+	 * GPIO7 - LOAD_DEFAULT_N) because CPLD in load_default mode ignores
+	 * watchdog reset signal. CPLD in load_default mode does not reset
+	 * board when watchdog triggers reset signal.
+	 */
+	if (!(gpioval & BIT(31-7)) && off >= 0)
+		fdt_del_node(blob, off);
 }
 #endif
 
@@ -351,9 +399,9 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 #if defined(CONFIG_TARGET_P1020RDB_PD) || defined(CONFIG_TARGET_P1020RDB_PC)
 	const char *soc_usb_compat = "fsl-usb2-dr";
 	int usb_err, usb1_off, usb2_off;
-#endif
 #if defined(CONFIG_SDCARD) || defined(CONFIG_SPIFLASH)
 	int err;
+#endif
 #endif
 
 	ft_cpu_setup(blob, bd);
@@ -363,19 +411,19 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 
 	fdt_fixup_memory(blob, (u64)base, (u64)size);
 
-#if !defined(CONFIG_DM_PCI)
-	FT_FSL_PCI_SETUP;
-#endif
-
 #ifdef CONFIG_QE
 	do_fixup_by_compat(blob, "fsl,qe", "status", "okay",
 			sizeof("okay"), 0);
 #endif
 
+	p1_p2_rdb_pc_fix_fdt_model(blob);
+	fix_max6370_watchdog(blob);
+
 #if defined(CONFIG_HAS_FSL_DR_USB)
 	fsl_fdt_fixup_dr_usb(blob, bd);
 #endif
 
+#if defined(CONFIG_TARGET_P1020RDB_PD) || defined(CONFIG_TARGET_P1020RDB_PC)
 #if defined(CONFIG_SDCARD) || defined(CONFIG_SPIFLASH)
 	/* Delete eLBC node as it is muxed with USB2 controller */
 	if (hwconfig("usb2")) {
@@ -397,7 +445,6 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 	}
 #endif
 
-#if defined(CONFIG_TARGET_P1020RDB_PD) || defined(CONFIG_TARGET_P1020RDB_PC)
 /* Delete USB2 node as it is muxed with eLBC */
 	usb1_off = fdt_node_offset_by_compatible(blob, -1,
 		soc_usb_compat);
@@ -420,6 +467,15 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 	}
 #endif
 
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_OF_BOARD_FIXUP
+int board_fix_fdt(void *blob)
+{
+	p1_p2_rdb_pc_fix_fdt_model(blob);
+	fix_max6370_watchdog(blob);
 	return 0;
 }
 #endif

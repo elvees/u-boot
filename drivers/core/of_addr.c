@@ -6,20 +6,20 @@
  * Copyright (c) 2017 Google, Inc
  */
 
-#include <common.h>
 #include <log.h>
 #include <linux/bug.h>
 #include <linux/libfdt.h>
 #include <dm/of_access.h>
 #include <dm/of_addr.h>
+#include <dm/util.h>
 #include <linux/err.h>
 #include <linux/ioport.h>
+#include <linux/printk.h>
 
 /* Max address size we deal with */
 #define OF_MAX_ADDR_CELLS	4
 #define OF_CHECK_ADDR_COUNT(na)	((na) > 0 && (na) <= OF_MAX_ADDR_CELLS)
-#define OF_CHECK_COUNTS(na, ns)	(OF_CHECK_ADDR_COUNT(na) && \
-				 ((ns) > 0 || gd_size_cells_0()))
+#define OF_CHECK_COUNTS(na, ns)	(OF_CHECK_ADDR_COUNT(na) && (ns) > 0)
 
 static struct of_bus *of_match_bus(struct device_node *np);
 
@@ -27,7 +27,7 @@ static struct of_bus *of_match_bus(struct device_node *np);
 #ifdef DEBUG
 static void of_dump_addr(const char *s, const __be32 *addr, int na)
 {
-	debug("%s", s);
+	pr_debug("%s", s);
 	while (na--)
 		pr_cont(" %08x", be32_to_cpu(*(addr++)));
 	pr_cont("\n");
@@ -66,9 +66,9 @@ static u64 of_bus_default_map(__be32 *addr, const __be32 *range,
 	s  = of_read_number(range + na + pna, ns);
 	da = of_read_number(addr, na);
 
-	debug("default map, cp=%llx, s=%llx, da=%llx\n",
-	      (unsigned long long)cp, (unsigned long long)s,
-	      (unsigned long long)da);
+	log_debug("default map, cp=%llx, s=%llx, da=%llx\n",
+		  (unsigned long long)cp, (unsigned long long)s,
+		  (unsigned long long)da);
 
 	if (da < cp || da >= (cp + s))
 		return OF_BAD_ADDR;
@@ -119,11 +119,6 @@ static struct of_bus *of_match_bus(struct device_node *np)
 	return NULL;
 }
 
-static void dev_count_cells(const struct device_node *np, int *nap, int *nsp)
-{
-	of_bus_default_count_cells(np, nap, nsp);
-}
-
 const __be32 *of_get_address(const struct device_node *dev, int index,
 			     u64 *size, unsigned int *flags)
 {
@@ -137,7 +132,6 @@ const __be32 *of_get_address(const struct device_node *dev, int index,
 	parent = of_get_parent(dev);
 	if (parent == NULL)
 		return NULL;
-	dev_count_cells(dev, &na, &ns);
 	bus = of_match_bus(parent);
 	bus->count_cells(dev, &na, &ns);
 	of_node_put(parent);
@@ -162,6 +156,11 @@ const __be32 *of_get_address(const struct device_node *dev, int index,
 	return NULL;
 }
 EXPORT_SYMBOL(of_get_address);
+
+static int of_empty_ranges_quirk(const struct device_node *np)
+{
+	return false;
+}
 
 static int of_translate_one(const struct device_node *parent,
 			    struct of_bus *bus, struct of_bus *pbus,
@@ -188,17 +187,24 @@ static int of_translate_one(const struct device_node *parent,
 	 *
 	 * As far as we know, this damage only exists on Apple machines, so
 	 * This code is only enabled on powerpc. --gcl
+	 *
+	 * This quirk also applies for 'dma-ranges' which frequently exist in
+	 * child nodes without 'dma-ranges' in the parent nodes. --RobH
 	 */
-
 	ranges = of_get_property(parent, rprop, &rlen);
+	if (ranges == NULL && !of_empty_ranges_quirk(parent) &&
+	    strcmp(rprop, "dma-ranges")) {
+		dm_warn("no ranges; cannot translate\n");
+		return 1;
+	}
 	if (ranges == NULL || rlen == 0) {
 		offset = of_read_number(addr, na);
 		memset(addr, 0, pna * 4);
-		debug("empty ranges; 1:1 translation\n");
+		log_debug("empty ranges; 1:1 translation\n");
 		goto finish;
 	}
 
-	debug("walking ranges...\n");
+	log_debug("walking ranges...\n");
 
 	/* Now walk through the ranges */
 	rlen /= 4;
@@ -209,14 +215,14 @@ static int of_translate_one(const struct device_node *parent,
 			break;
 	}
 	if (offset == OF_BAD_ADDR) {
-		debug("not found !\n");
+		dm_warn("not found !\n");
 		return 1;
 	}
 	memcpy(addr, ranges + na, 4 * pna);
 
  finish:
 	of_dump_addr("parent translation for:", addr, pna);
-	debug("with offset: %llx\n", (unsigned long long)offset);
+	log_debug("with offset: %llx\n", (unsigned long long)offset);
 
 	/* Translate it into parent bus space */
 	return pbus->translate(addr, offset, pna);
@@ -241,7 +247,7 @@ static u64 __of_translate_address(const struct device_node *dev,
 	int na, ns, pna, pns;
 	u64 result = OF_BAD_ADDR;
 
-	debug("** translation for device %s **\n", of_node_full_name(dev));
+	log_debug("** translation for device %s **\n", of_node_full_name(dev));
 
 	/* Increase refcount at current level */
 	(void)of_node_get(dev);
@@ -255,13 +261,13 @@ static u64 __of_translate_address(const struct device_node *dev,
 	/* Count address cells & copy address locally */
 	bus->count_cells(dev, &na, &ns);
 	if (!OF_CHECK_COUNTS(na, ns)) {
-		debug("Bad cell count for %s\n", of_node_full_name(dev));
+		dm_warn("Bad cell count for %s\n", of_node_full_name(dev));
 		goto bail;
 	}
 	memcpy(addr, in_addr, na * 4);
 
-	debug("bus is %s (na=%d, ns=%d) on %s\n", bus->name, na, ns,
-	      of_node_full_name(parent));
+	log_debug("bus is %s (na=%d, ns=%d) on %s\n", bus->name, na, ns,
+		  of_node_full_name(parent));
 	of_dump_addr("translating address:", addr, na);
 
 	/* Translate */
@@ -273,7 +279,7 @@ static u64 __of_translate_address(const struct device_node *dev,
 
 		/* If root, we have finished */
 		if (parent == NULL) {
-			debug("reached root node\n");
+			log_debug("reached root node\n");
 			result = of_read_number(addr, na);
 			break;
 		}
@@ -282,13 +288,13 @@ static u64 __of_translate_address(const struct device_node *dev,
 		pbus = of_match_bus(parent);
 		pbus->count_cells(dev, &pna, &pns);
 		if (!OF_CHECK_COUNTS(pna, pns)) {
-			debug("Bad cell count for %s\n",
-			      of_node_full_name(dev));
+			dm_warn("Bad cell count for %s\n",
+				of_node_full_name(dev));
 			break;
 		}
 
-		debug("parent bus is %s (na=%d, ns=%d) on %s\n", pbus->name,
-		      pna, pns, of_node_full_name(parent));
+		log_debug("parent bus is %s (na=%d, ns=%d) on %s\n", pbus->name,
+			  pna, pns, of_node_full_name(parent));
 
 		/* Apply bus translation */
 		if (of_translate_one(dev, bus, pbus, addr, na, ns, pna, rprop))
@@ -353,8 +359,8 @@ int of_get_dma_range(const struct device_node *dev, phys_addr_t *cpu,
 	}
 
 	if (!dev || !ranges) {
-		debug("no dma-ranges found for node %s\n",
-		      of_node_full_name(dev));
+		dm_warn("no dma-ranges found for node %s\n",
+			of_node_full_name(dev));
 		ret = -ENOENT;
 		goto out;
 	}
@@ -362,7 +368,7 @@ int of_get_dma_range(const struct device_node *dev, phys_addr_t *cpu,
 	/* switch to that node */
 	parent = of_get_parent(dev);
 	if (!parent) {
-		printf("Found dma-ranges in root node, shoudln't happen\n");
+		printf("Found dma-ranges in root node, shouldn't happen\n");
 		ret = -EINVAL;
 		goto out;
 	}
@@ -372,7 +378,7 @@ int of_get_dma_range(const struct device_node *dev, phys_addr_t *cpu,
 	bus_node->count_cells(dev, &na, &ns);
 	if (!OF_CHECK_COUNTS(na, ns)) {
 		printf("Bad cell count for %s\n", of_node_full_name(dev));
-		return -EINVAL;
+		ret = -EINVAL;
 		goto out_parent;
 	}
 
@@ -380,7 +386,7 @@ int of_get_dma_range(const struct device_node *dev, phys_addr_t *cpu,
 	bus_node->count_cells(parent, &pna, &pns);
 	if (!OF_CHECK_COUNTS(pna, pns)) {
 		printf("Bad cell count for %s\n", of_node_full_name(parent));
-		return -EINVAL;
+		ret = -EINVAL;
 		goto out_parent;
 	}
 
@@ -394,7 +400,6 @@ out:
 	of_node_put(dev);
 	return ret;
 }
-
 
 static int __of_address_to_resource(const struct device_node *dev,
 		const __be32 *addrp, u64 size, unsigned int flags,

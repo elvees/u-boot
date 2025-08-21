@@ -10,7 +10,7 @@ M:	Konstantin Porotchkin <kostap@marvell.com>
 S:	Maintained
 F:	configs/mvebu_espressobin-88f3720_defconfig
 
-uDPU BOARD
-M:	Vladimir Vid <vladimir.vid@sartura.hr>
+ESPRESSOBin Ultra BOARD
+M:	Ben Schneider <ben@bens.haus>
 S:	Maintained
-F:	configs/uDPU_defconfig
+F:	configs/mvebu_espressobin_ultra-88f3720_defconfig

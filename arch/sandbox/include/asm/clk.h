@@ -6,7 +6,9 @@
 #ifndef __SANDBOX_CLK_H
 #define __SANDBOX_CLK_H
 
-#include <common.h>
+#include <clk.h>
+#include <dt-structs.h>
+#include <linux/clk-provider.h>
 
 struct udevice;
 
@@ -36,6 +38,7 @@ enum sandbox_clk_test_id {
 	SANDBOX_CLK_TEST_ID_FIXED,
 	SANDBOX_CLK_TEST_ID_SPI,
 	SANDBOX_CLK_TEST_ID_I2C,
+	SANDBOX_CLK_TEST_ID_I2C_ROOT,
 	SANDBOX_CLK_TEST_ID_DEVM1,
 	SANDBOX_CLK_TEST_ID_DEVM2,
 	SANDBOX_CLK_TEST_ID_DEVM_NULL,
@@ -44,6 +47,27 @@ enum sandbox_clk_test_id {
 };
 
 #define SANDBOX_CLK_TEST_NON_DEVM_COUNT SANDBOX_CLK_TEST_ID_DEVM1
+
+struct sandbox_clk_priv {
+	bool probed;
+	ulong rate[SANDBOX_CLK_ID_COUNT];
+	bool enabled[SANDBOX_CLK_ID_COUNT];
+	bool requested[SANDBOX_CLK_ID_COUNT];
+};
+
+struct sandbox_clk_test {
+	struct clk clks[SANDBOX_CLK_TEST_NON_DEVM_COUNT];
+	struct clk *clkps[SANDBOX_CLK_TEST_ID_COUNT];
+	struct clk_bulk bulk;
+};
+
+/* Platform data for the sandbox fixed-rate clock driver */
+struct sandbox_clk_fixed_rate_plat {
+#if CONFIG_IS_ENABLED(OF_PLATDATA)
+	struct dtd_sandbox_fixed_clock dtplat;
+#endif
+	struct clk_fixed_rate fixed;
+};
 
 /**
  * sandbox_clk_query_rate - Query the current rate of a sandbox clock.
@@ -157,14 +181,6 @@ int sandbox_clk_test_disable(struct udevice *dev, int id);
  * @return:	0 if OK, or a negative error code.
  */
 int sandbox_clk_test_disable_bulk(struct udevice *dev);
-/**
- * sandbox_clk_test_free - Ask the sandbox clock test device to free its
- * clocks.
- *
- * @dev:	The sandbox clock test (client) device.
- * @return:	0 if OK, or a negative error code.
- */
-int sandbox_clk_test_free(struct udevice *dev);
 /**
  * sandbox_clk_test_release_bulk - Ask the sandbox clock test device to release
  * all clocks in it's clock bulk struct.

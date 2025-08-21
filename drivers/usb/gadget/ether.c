@@ -7,13 +7,13 @@
  * Copyright (C) 2008 Nokia Corporation
  */
 
-#include <common.h>
 #include <console.h>
 #include <env.h>
 #include <log.h>
 #include <part.h>
 #include <linux/errno.h>
 #include <linux/netdevice.h>
+#include <linux/printk.h>
 #include <linux/usb/ch9.h>
 #include <linux/usb/cdc.h>
 #include <linux/usb/gadget.h>
@@ -22,8 +22,8 @@
 #include <malloc.h>
 #include <memalign.h>
 #include <linux/ctype.h>
+#include <version.h>
 
-#include "gadget_chips.h"
 #include "rndis.h"
 
 #include <dm.h>
@@ -34,7 +34,6 @@
 #define USB_NET_NAME "usb_ether"
 
 extern struct platform_data brd;
-
 
 unsigned packet_received, packet_sent;
 
@@ -109,11 +108,7 @@ struct eth_dev {
 
 	struct usb_request	*tx_req, *rx_req;
 
-#ifndef CONFIG_DM_ETH
-	struct eth_device	*net;
-#else
 	struct udevice		*net;
-#endif
 	struct net_device_stats	stats;
 	unsigned int		tx_qlen;
 
@@ -140,11 +135,7 @@ struct eth_dev {
 /*-------------------------------------------------------------------------*/
 struct ether_priv {
 	struct eth_dev ethdev;
-#ifndef CONFIG_DM_ETH
-	struct eth_device netdev;
-#else
 	struct udevice *netdev;
-#endif
 	struct usb_gadget_driver eth_driver;
 };
 
@@ -280,7 +271,6 @@ static char *iSerialNumber;
 static char dev_addr[18];
 
 static char host_addr[18];
-
 
 /*-------------------------------------------------------------------------*/
 
@@ -814,7 +804,6 @@ static const struct usb_descriptor_header *hs_rndis_function[] = {
 };
 #endif
 
-
 /* maxpacket and other transfer characteristics vary by speed. */
 static inline struct usb_endpoint_descriptor *
 ep_desc(struct usb_gadget *g, struct usb_endpoint_descriptor *hs,
@@ -1048,13 +1037,6 @@ static int eth_set_config(struct eth_dev *dev, unsigned number,
 	int			result = 0;
 	struct usb_gadget	*gadget = dev->gadget;
 
-	if (gadget_is_sa1100(gadget)
-			&& dev->config
-			&& dev->tx_qlen != 0) {
-		/* tx fifo is full, but we can't clear it...*/
-		pr_err("can't change configurations");
-		return -ESPIPE;
-	}
 	eth_reset_config(dev);
 
 	switch (number) {
@@ -1325,24 +1307,6 @@ eth_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		if (!cdc_active(dev) && wIndex != 0)
 			break;
 
-		/*
-		 * PXA hardware partially handles SET_INTERFACE;
-		 * we need to kluge around that interference.
-		 */
-		if (gadget_is_pxa(gadget)) {
-			value = eth_set_config(dev, DEV_CONFIG_VALUE,
-						GFP_ATOMIC);
-			/*
-			 * PXA25x driver use non-CDC ethernet gadget.
-			 * But only _CDC and _RNDIS code can signalize
-			 * that network is working. So we signalize it
-			 * here.
-			 */
-			dev->network_started = 1;
-			debug("USB network up!\n");
-			goto done_set_intf;
-		}
-
 #ifdef CONFIG_USB_ETH_CDC
 		switch (wIndex) {
 		case 0:		/* control/master intf */
@@ -1386,8 +1350,6 @@ eth_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		 */
 		debug("set_interface ignored!\n");
 #endif /* CONFIG_USB_ETH_CDC */
-
-done_set_intf:
 		break;
 	case USB_REQ_GET_INTERFACE:
 		if (ctrl->bRequestType != (USB_DIR_IN|USB_RECIP_INTERFACE)
@@ -1854,22 +1816,14 @@ static void rndis_control_ack_complete(struct usb_ep *ep,
 
 static char rndis_resp_buf[8] __attribute__((aligned(sizeof(__le32))));
 
-#ifndef CONFIG_DM_ETH
-static int rndis_control_ack(struct eth_device *net)
-#else
 static int rndis_control_ack(struct udevice *net)
-#endif
 {
 	struct ether_priv *priv;
 	struct eth_dev *dev;
 	int length;
 	struct usb_request *resp;
 
-#ifndef CONFIG_DM_ETH
-	priv = (struct ether_priv *)net->priv;
-#else
 	priv = dev_get_priv(net);
-#endif
 	dev = &priv->ethdev;
 	resp = dev->stat_req;
 
@@ -1923,8 +1877,10 @@ static void eth_start(struct eth_dev *dev, gfp_t gfp_flags)
 	}
 }
 
-static int eth_stop(struct eth_dev *dev)
+static int eth_stop(struct udevice *udev)
 {
+	struct ether_priv *priv = dev_get_priv(udev);
+	struct eth_dev *dev = &priv->ethdev;
 #ifdef RNDIS_COMPLETE_SIGNAL_DISCONNECT
 	unsigned long ts;
 	unsigned long timeout = CONFIG_SYS_HZ; /* 1 sec to stop RNDIS */
@@ -1938,7 +1894,7 @@ static int eth_stop(struct eth_dev *dev)
 		/* Wait until host receives OID_GEN_MEDIA_CONNECT_STATUS */
 		ts = get_timer(0);
 		while (get_timer(ts) < timeout)
-			usb_gadget_handle_interrupts(0);
+			dm_usb_gadget_handle_interrupts(udev->parent);
 #endif
 
 		rndis_uninit(dev->rndis_config);
@@ -2016,9 +1972,7 @@ static int eth_bind(struct usb_gadget *gadget)
 	int			status = -ENOMEM;
 	int			gcnum;
 	u8			tmp[7];
-#ifdef CONFIG_DM_ETH
 	struct eth_pdata	*pdata = dev_get_plat(l_priv->netdev);
-#endif
 
 	/* these flags are only ever cleared; compiler take note */
 #ifndef	CONFIG_USB_ETH_CDC
@@ -2032,39 +1986,15 @@ static int eth_bind(struct usb_gadget *gadget)
 	 * standard protocol is _strongly_ preferred for interop purposes.
 	 * (By everyone except Microsoft.)
 	 */
-	if (gadget_is_pxa(gadget)) {
-		/* pxa doesn't support altsettings */
-		cdc = 0;
-	} else if (gadget_is_musbhdrc(gadget)) {
+
+	if (IS_ENABLED(CONFIG_USB_MUSB_GADGET) &&
+	    !strcmp("musb-hdrc", gadget->name)) {
 		/* reduce tx dma overhead by avoiding special cases */
 		zlp = 0;
-	} else if (gadget_is_sh(gadget)) {
-		/* sh doesn't support multiple interfaces or configs */
-		cdc = 0;
-		rndis = 0;
-	} else if (gadget_is_sa1100(gadget)) {
-		/* hardware can't write zlps */
-		zlp = 0;
-		/*
-		 * sa1100 CAN do CDC, without status endpoint ... we use
-		 * non-CDC to be compatible with ARM Linux-2.4 "usb-eth".
-		 */
-		cdc = 0;
 	}
 
-	gcnum = usb_gadget_controller_number(gadget);
-	if (gcnum >= 0)
-		device_desc.bcdDevice = cpu_to_le16(0x0300 + gcnum);
-	else {
-		/*
-		 * can't assume CDC works.  don't want to default to
-		 * anything less functional on CDC-capable hardware,
-		 * so we fail in this case.
-		 */
-		pr_err("controller '%s' not recognized",
-			gadget->name);
-		return -ENODEV;
-	}
+	gcnum = (U_BOOT_VERSION_NUM << 4) | U_BOOT_VERSION_NUM_PATCH;
+	device_desc.bcdDevice = cpu_to_le16(gcnum);
 
 	/*
 	 * If there's an RNDIS configuration, that's what Windows wants to
@@ -2204,13 +2134,8 @@ autoconf_fail:
 #endif
 	}
 
-
 	/* network device setup */
-#ifndef CONFIG_DM_ETH
-	dev->net = &l_priv->netdev;
-#else
 	dev->net = l_priv->netdev;
-#endif
 
 	dev->cdc = cdc;
 	dev->zlp = zlp;
@@ -2227,13 +2152,8 @@ autoconf_fail:
 	 * host side code for the SAFE thing cares -- its original BLAN
 	 * thing didn't, Sharp never assigned those addresses on Zaurii.
 	 */
-#ifndef CONFIG_DM_ETH
-	get_ether_addr(dev_addr, dev->net->enetaddr);
-	memcpy(tmp, dev->net->enetaddr, sizeof(dev->net->enetaddr));
-#else
 	get_ether_addr(dev_addr, pdata->enetaddr);
 	memcpy(tmp, pdata->enetaddr, sizeof(pdata->enetaddr));
-#endif
 
 	get_ether_addr(host_addr, dev->host_mac);
 
@@ -2294,11 +2214,7 @@ autoconf_fail:
 		status_ep ? " STATUS " : "",
 		status_ep ? status_ep->name : ""
 		);
-#ifndef CONFIG_DM_ETH
-	printf("MAC %pM\n", dev->net->enetaddr);
-#else
 	printf("MAC %pM\n", pdata->enetaddr);
-#endif
 
 	if (cdc || rndis)
 		printf("HOST MAC %02x:%02x:%02x:%02x:%02x:%02x\n",
@@ -2342,55 +2258,15 @@ fail:
 }
 
 /*-------------------------------------------------------------------------*/
-static void _usb_eth_halt(struct ether_priv *priv);
+static void usb_eth_stop(struct udevice *dev);
 
-static int _usb_eth_init(struct ether_priv *priv)
+static int usb_eth_start(struct udevice *udev)
 {
+	struct ether_priv *priv = dev_get_priv(udev);
 	struct eth_dev *dev = &priv->ethdev;
 	struct usb_gadget *gadget;
 	unsigned long ts;
-	int ret;
 	unsigned long timeout = USB_CONNECT_TIMEOUT;
-
-	ret = usb_gadget_initialize(0);
-	if (ret)
-		return ret;
-
-	/* Configure default mac-addresses for the USB ethernet device */
-#ifdef CONFIG_USBNET_DEV_ADDR
-	strlcpy(dev_addr, CONFIG_USBNET_DEV_ADDR, sizeof(dev_addr));
-#endif
-#ifdef CONFIG_USBNET_HOST_ADDR
-	strlcpy(host_addr, CONFIG_USBNET_HOST_ADDR, sizeof(host_addr));
-#endif
-	/* Check if the user overruled the MAC addresses */
-	if (env_get("usbnet_devaddr"))
-		strlcpy(dev_addr, env_get("usbnet_devaddr"),
-			sizeof(dev_addr));
-
-	if (env_get("usbnet_hostaddr"))
-		strlcpy(host_addr, env_get("usbnet_hostaddr"),
-			sizeof(host_addr));
-
-	if (!is_eth_addr_valid(dev_addr)) {
-		pr_err("Need valid 'usbnet_devaddr' to be set");
-		goto fail;
-	}
-	if (!is_eth_addr_valid(host_addr)) {
-		pr_err("Need valid 'usbnet_hostaddr' to be set");
-		goto fail;
-	}
-
-	priv->eth_driver.speed		= DEVSPEED;
-	priv->eth_driver.bind		= eth_bind;
-	priv->eth_driver.unbind		= eth_unbind;
-	priv->eth_driver.setup		= eth_setup;
-	priv->eth_driver.reset		= eth_disconnect;
-	priv->eth_driver.disconnect	= eth_disconnect;
-	priv->eth_driver.suspend	= eth_suspend;
-	priv->eth_driver.resume		= eth_resume;
-	if (usb_gadget_register_driver(&priv->eth_driver) < 0)
-		goto fail;
 
 	dev->network_started = 0;
 
@@ -2401,8 +2277,7 @@ static int _usb_eth_init(struct ether_priv *priv)
 	usb_gadget_connect(gadget);
 
 	if (env_get("cdc_connect_timeout"))
-		timeout = simple_strtoul(env_get("cdc_connect_timeout"),
-						NULL, 10) * CONFIG_SYS_HZ;
+		timeout = dectoul(env_get("cdc_connect_timeout"), NULL) * CONFIG_SYS_HZ;
 	ts = get_timer(0);
 	while (!dev->network_started) {
 		/* Handle control-c and timeouts */
@@ -2410,19 +2285,20 @@ static int _usb_eth_init(struct ether_priv *priv)
 			pr_err("The remote end did not respond in time.");
 			goto fail;
 		}
-		usb_gadget_handle_interrupts(0);
+		dm_usb_gadget_handle_interrupts(udev->parent);
 	}
 
 	packet_received = 0;
 	rx_submit(dev, dev->rx_req, 0);
 	return 0;
 fail:
-	_usb_eth_halt(priv);
+	usb_eth_stop(udev);
 	return -1;
 }
 
-static int _usb_eth_send(struct ether_priv *priv, void *packet, int length)
+static int usb_eth_send(struct udevice *udev, void *packet, int length)
 {
+	struct ether_priv *priv = dev_get_priv(udev);
 	int			retval;
 	void			*rndis_pkt = NULL;
 	struct eth_dev		*dev = &priv->ethdev;
@@ -2479,7 +2355,7 @@ static int _usb_eth_send(struct ether_priv *priv, void *packet, int length)
 			printf("timeout sending packets to usb ethernet\n");
 			return -1;
 		}
-		usb_gadget_handle_interrupts(0);
+		dm_usb_gadget_handle_interrupts(udev->parent);
 	}
 	free(rndis_pkt);
 
@@ -2489,15 +2365,9 @@ drop:
 	return -ENOMEM;
 }
 
-static int _usb_eth_recv(struct ether_priv *priv)
+static void usb_eth_stop(struct udevice *udev)
 {
-	usb_gadget_handle_interrupts(0);
-
-	return 0;
-}
-
-static void _usb_eth_halt(struct ether_priv *priv)
-{
+	struct ether_priv *priv = dev_get_priv(udev);
 	struct eth_dev *dev = &priv->ethdev;
 
 	/* If the gadget not registered, simple return */
@@ -2515,110 +2385,23 @@ static void _usb_eth_halt(struct ether_priv *priv)
 	 * 2) 'pullup' callback in your UDC driver can be improved to perform
 	 * this deinitialization.
 	 */
-	eth_stop(dev);
+	eth_stop(udev);
 
 	usb_gadget_disconnect(dev->gadget);
 
 	/* Clear pending interrupt */
 	if (dev->network_started) {
-		usb_gadget_handle_interrupts(0);
+		dm_usb_gadget_handle_interrupts(udev->parent);
 		dev->network_started = 0;
 	}
-
-	usb_gadget_unregister_driver(&priv->eth_driver);
-	usb_gadget_release(0);
-}
-
-#ifndef CONFIG_DM_ETH
-static int usb_eth_init(struct eth_device *netdev, struct bd_info *bd)
-{
-	struct ether_priv *priv = (struct ether_priv *)netdev->priv;
-
-	return _usb_eth_init(priv);
-}
-
-static int usb_eth_send(struct eth_device *netdev, void *packet, int length)
-{
-	struct ether_priv	*priv = (struct ether_priv *)netdev->priv;
-
-	return _usb_eth_send(priv, packet, length);
-}
-
-static int usb_eth_recv(struct eth_device *netdev)
-{
-	struct ether_priv *priv = (struct ether_priv *)netdev->priv;
-	struct eth_dev *dev = &priv->ethdev;
-	int ret;
-
-	ret = _usb_eth_recv(priv);
-	if (ret) {
-		pr_err("error packet receive\n");
-		return ret;
-	}
-
-	if (!packet_received)
-		return 0;
-
-	if (dev->rx_req) {
-		net_process_received_packet(net_rx_packets[0],
-					    dev->rx_req->length);
-	} else {
-		pr_err("dev->rx_req invalid");
-	}
-	packet_received = 0;
-	rx_submit(dev, dev->rx_req, 0);
-
-	return 0;
-}
-
-void usb_eth_halt(struct eth_device *netdev)
-{
-	struct ether_priv *priv = (struct ether_priv *)netdev->priv;
-
-	_usb_eth_halt(priv);
-}
-
-int usb_eth_initialize(struct bd_info *bi)
-{
-	struct eth_device *netdev = &l_priv->netdev;
-
-	strlcpy(netdev->name, USB_NET_NAME, sizeof(netdev->name));
-
-	netdev->init = usb_eth_init;
-	netdev->send = usb_eth_send;
-	netdev->recv = usb_eth_recv;
-	netdev->halt = usb_eth_halt;
-	netdev->priv = l_priv;
-
-	eth_register(netdev);
-	return 0;
-}
-#else
-static int usb_eth_start(struct udevice *dev)
-{
-	struct ether_priv *priv = dev_get_priv(dev);
-
-	return _usb_eth_init(priv);
-}
-
-static int usb_eth_send(struct udevice *dev, void *packet, int length)
-{
-	struct ether_priv *priv = dev_get_priv(dev);
-
-	return _usb_eth_send(priv, packet, length);
 }
 
 static int usb_eth_recv(struct udevice *dev, int flags, uchar **packetp)
 {
 	struct ether_priv *priv = dev_get_priv(dev);
 	struct eth_dev *ethdev = &priv->ethdev;
-	int ret;
 
-	ret = _usb_eth_recv(priv);
-	if (ret) {
-		pr_err("error packet receive\n");
-		return ret;
-	}
+	dm_usb_gadget_handle_interrupts(dev->parent);
 
 	if (packet_received) {
 		if (ethdev->rx_req) {
@@ -2644,27 +2427,6 @@ static int usb_eth_free_pkt(struct udevice *dev, uchar *packet,
 	return rx_submit(ethdev, ethdev->rx_req, 0);
 }
 
-static void usb_eth_stop(struct udevice *dev)
-{
-	struct ether_priv *priv = dev_get_priv(dev);
-
-	_usb_eth_halt(priv);
-}
-
-static int usb_eth_probe(struct udevice *dev)
-{
-	struct ether_priv *priv = dev_get_priv(dev);
-	struct eth_pdata *pdata = dev_get_plat(dev);
-
-	priv->netdev = dev;
-	l_priv = priv;
-
-	get_ether_addr(CONFIG_USBNET_DEVADDR, pdata->enetaddr);
-	eth_env_set_enetaddr("usbnet_devaddr", pdata->enetaddr);
-
-	return 0;
-}
-
 static const struct eth_ops usb_eth_ops = {
 	.start		= usb_eth_start,
 	.send		= usb_eth_send,
@@ -2675,21 +2437,83 @@ static const struct eth_ops usb_eth_ops = {
 
 int usb_ether_init(void)
 {
-	struct udevice *dev;
 	struct udevice *usb_dev;
 	int ret;
 
-	ret = uclass_first_device(UCLASS_USB_GADGET_GENERIC, &usb_dev);
-	if (!usb_dev || ret) {
+	uclass_first_device(UCLASS_USB_GADGET_GENERIC, &usb_dev);
+	if (!usb_dev) {
 		pr_err("No USB device found\n");
-		return ret;
+		return -ENODEV;
 	}
 
-	ret = device_bind_driver(usb_dev, "usb_ether", "usb_ether", &dev);
-	if (!dev || ret) {
+	ret = device_bind_driver(usb_dev, "usb_ether", "usb_ether", NULL);
+	if (ret) {
 		pr_err("usb - not able to bind usb_ether device\n");
 		return ret;
 	}
+
+	return 0;
+}
+
+static int usb_eth_probe(struct udevice *dev)
+{
+	struct ether_priv *priv = dev_get_priv(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
+
+	priv->netdev = dev;
+	l_priv = priv;
+
+	get_ether_addr(CONFIG_USBNET_DEV_ADDR, pdata->enetaddr);
+	eth_env_set_enetaddr("usbnet_devaddr", pdata->enetaddr);
+
+	/* Configure default mac-addresses for the USB ethernet device */
+#ifdef CONFIG_USBNET_DEV_ADDR
+	strlcpy(dev_addr, CONFIG_USBNET_DEV_ADDR, sizeof(dev_addr));
+#endif
+#ifdef CONFIG_USBNET_HOST_ADDR
+	strlcpy(host_addr, CONFIG_USBNET_HOST_ADDR, sizeof(host_addr));
+#endif
+	/* Check if the user overruled the MAC addresses */
+	if (env_get("usbnet_devaddr"))
+		strlcpy(dev_addr, env_get("usbnet_devaddr"),
+			sizeof(dev_addr));
+
+	if (env_get("usbnet_hostaddr"))
+		strlcpy(host_addr, env_get("usbnet_hostaddr"),
+			sizeof(host_addr));
+
+	if (!is_eth_addr_valid(dev_addr)) {
+		pr_err("Need valid 'usbnet_devaddr' to be set");
+		return -EINVAL;
+	}
+	if (!is_eth_addr_valid(host_addr)) {
+		pr_err("Need valid 'usbnet_hostaddr' to be set");
+		return -EINVAL;
+	}
+
+	priv->eth_driver.speed		= DEVSPEED;
+	priv->eth_driver.bind		= eth_bind;
+	priv->eth_driver.unbind		= eth_unbind;
+	priv->eth_driver.setup		= eth_setup;
+	priv->eth_driver.reset		= eth_disconnect;
+	priv->eth_driver.disconnect	= eth_disconnect;
+	priv->eth_driver.suspend	= eth_suspend;
+	priv->eth_driver.resume		= eth_resume;
+	return usb_gadget_register_driver(&priv->eth_driver);
+}
+
+static int usb_eth_remove(struct udevice *dev)
+{
+	struct ether_priv *priv = dev_get_priv(dev);
+
+	usb_gadget_unregister_driver(&priv->eth_driver);
+
+	return 0;
+}
+
+static int usb_eth_unbind(struct udevice *dev)
+{
+	udc_device_put(dev->parent);
 
 	return 0;
 }
@@ -2698,9 +2522,10 @@ U_BOOT_DRIVER(eth_usb) = {
 	.name	= "usb_ether",
 	.id	= UCLASS_ETH,
 	.probe	= usb_eth_probe,
+	.remove	= usb_eth_remove,
+	.unbind	= usb_eth_unbind,
 	.ops	= &usb_eth_ops,
 	.priv_auto	= sizeof(struct ether_priv),
 	.plat_auto	= sizeof(struct eth_pdata),
 	.flags = DM_FLAG_ALLOC_PRIV_DMA,
 };
-#endif /* CONFIG_DM_ETH */

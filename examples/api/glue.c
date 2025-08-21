@@ -3,7 +3,6 @@
  * (C) Copyright 2007-2008 Semihalf, Rafal Jaworowski <raj@semihalf.com>
  */
 
-#include <common.h>
 #include <env.h>
 #include <linux/types.h>
 #include <api_public.h>
@@ -42,8 +41,8 @@ static int valid_sig(struct api_signature *sig)
 int api_search_sig(struct api_signature **sig)
 {
 	unsigned char *sp;
-	uint32_t search_start = 0;
-	uint32_t search_end = 0;
+	uintptr_t search_start = 0;
+	uintptr_t search_end = 0;
 
 	if (sig == NULL)
 		return 0;
@@ -153,7 +152,6 @@ unsigned long ub_get_timer(unsigned long base)
 
 	return cur;
 }
-
 
 /****************************************************************************
  *
@@ -365,11 +363,6 @@ const char * ub_env_enum(const char *last)
 
 	env = NULL;
 
-	/*
-	 * It's OK to pass only the name piece as last (and not the whole
-	 * 'name=val' string), since the API_ENUM_ENV call uses env_match()
-	 * internally, which handles such case
-	 */
 	if (!syscall(API_ENV_ENUM, NULL, last, &env))
 		return NULL;
 

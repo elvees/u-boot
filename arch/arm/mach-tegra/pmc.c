@@ -3,7 +3,6 @@
  * Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <log.h>
 #include <asm/global_data.h>
@@ -83,13 +82,4 @@ void tegra_pmc_writel(u32 value, unsigned long offset)
 #endif
 
 	writel(value, NV_PA_PMC_BASE + offset);
-}
-
-void reset_cpu(ulong addr)
-{
-	u32 value;
-
-	value = tegra_pmc_readl(PMC_CNTRL);
-	value |= PMC_CNTRL_MAIN_RST;
-	tegra_pmc_writel(value, PMC_CNTRL);
 }

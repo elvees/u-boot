@@ -4,7 +4,7 @@
  * Copyright 2017 NXP
  */
 
-#include <common.h>
+#include <config.h>
 #include <dm.h>
 #include <asm/io.h>
 #include <netdev.h>
@@ -133,7 +133,7 @@ int pfe_eth_board_init(struct udevice *dev)
 	struct mii_dev *bus;
 	static const char *mdio_name;
 	struct pfe_mdio_info mac_mdio_info;
-	struct ccsr_gur __iomem *gur = (void *)CONFIG_SYS_FSL_GUTS_ADDR;
+	struct ccsr_gur __iomem *gur = (void *)CFG_SYS_FSL_GUTS_ADDR;
 	u8 data8;
 	struct pfe_eth_dev *priv = dev_get_priv(dev);
 
@@ -244,7 +244,7 @@ int pfe_eth_board_init(struct udevice *dev)
 		bus = miiphy_get_dev_by_name(mdio_name);
 		pfe_set_mdio(1, bus);
 		pfe_set_phy_address_mode(1, CONFIG_PFE_SGMII_2500_PHY2_ADDR,
-					 PHY_INTERFACE_MODE_SGMII_2500);
+					 PHY_INTERFACE_MODE_2500BASEX);
 
 		data8 = QIXIS_READ(brdcfg[12]);
 		data8 |= 0x20;
@@ -263,7 +263,7 @@ int pfe_eth_board_init(struct udevice *dev)
 		pfe_set_mdio(0, bus);
 		pfe_set_phy_address_mode(0,
 					 CONFIG_PFE_SGMII_2500_PHY1_ADDR,
-					 PHY_INTERFACE_MODE_SGMII_2500);
+					 PHY_INTERFACE_MODE_2500BASEX);
 	}
 		break;
 

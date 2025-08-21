@@ -6,6 +6,7 @@
 # object inclusion implicitly depends on it
 
 obj-y += efi_uclass.o
-ifeq ($(CONFIG_BLK)$(CONFIG_PARTITIONS),yy)
+ifeq ($(CONFIG_PARTITIONS),y)
 obj-y += efi_block_device.o
 endif
+obj-$(CONFIG_SYSRESET_SBI) += efi_reset_riscv.o

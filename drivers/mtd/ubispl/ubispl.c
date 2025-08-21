@@ -7,7 +7,6 @@
  * Copyright (c) International Business Machines Corp., 2006
  */
 
-#include <common.h>
 #include <errno.h>
 #include <linux/bug.h>
 #include <u-boot/crc.h>
@@ -114,7 +113,7 @@ static int vtbl_check(struct ubi_scan_info *ubi,
 
 		crc = crc32(UBI_CRC32_INIT, &vtbl[i], UBI_VTBL_RECORD_SIZE_CRC);
 		if (be32_to_cpu(vtbl[i].crc) != crc) {
-			ubi_err("bad CRC at record %u: %#08x, not %#08x",
+			ubi_err("bad CRC at record %u: #%08x, not #%08x",
 				i, crc, be32_to_cpu(vtbl[i].crc));
 			ubi_dump_vtbl_record(&vtbl[i], i);
 			return 1;
@@ -953,7 +952,7 @@ retry:
 	 * Check, if the total number of blocks is correct
 	 */
 	if (be32_to_cpu(vh->used_ebs) != last) {
-		ubi_dbg("Block count missmatch.");
+		ubi_dbg("Block count mismatch.");
 		ubi_dbg("vh->used_ebs: %d nrblocks: %d",
 			be32_to_cpu(vh->used_ebs), last);
 		generic_set_bit(pnum, ubi->corrupt);

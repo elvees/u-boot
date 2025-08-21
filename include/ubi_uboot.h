@@ -14,7 +14,6 @@
 #ifndef __UBOOT_UBI_H
 #define __UBOOT_UBI_H
 
-#include <common.h>
 #include <compiler.h>
 #include <linux/compat.h>
 #include <malloc.h>
@@ -34,28 +33,6 @@
 
 #include <linux/errno.h>
 
-/* configurable */
-#define CONFIG_MTD_UBI_BEB_RESERVE	1
-
-/* debug options (Linux: drivers/mtd/ubi/Kconfig.debug) */
-#undef CONFIG_MTD_UBI_DEBUG
-#undef CONFIG_MTD_UBI_DEBUG_PARANOID
-#undef CONFIG_MTD_UBI_DEBUG_MSG
-#undef CONFIG_MTD_UBI_DEBUG_MSG_EBA
-#undef CONFIG_MTD_UBI_DEBUG_MSG_WL
-#undef CONFIG_MTD_UBI_DEBUG_MSG_IO
-#undef CONFIG_MTD_UBI_DEBUG_MSG_BLD
-
-#undef CONFIG_MTD_UBI_BLOCK
-
-/* ubi_init() disables returning error codes when built into the Linux
- * kernel so that it doesn't hang the Linux kernel boot process.  Since
- * the U-Boot driver code depends on getting valid error codes from this
- * function we just tell the UBI layer that we are building as a module
- * (which only enables the additional error reporting).
- */
-#define CONFIG_MTD_UBI_MODULE
-
 /* build.c */
 #define get_device(...)
 #define put_device(...)
@@ -71,11 +48,20 @@ extern int ubi_mtd_param_parse(const char *val, struct kernel_param *kp);
 extern int ubi_init(void);
 extern void ubi_exit(void);
 extern int ubi_part(char *part_name, const char *vid_header_offset);
-extern int ubi_volume_write(char *volume, void *buf, size_t size);
-extern int ubi_volume_read(char *volume, char *buf, size_t size);
+extern int ubi_volume_write(char *volume, void *buf, loff_t offset, size_t size);
+extern int ubi_volume_read(char *volume, char *buf, loff_t offset, size_t size);
 
 extern struct ubi_device *ubi_devices[];
 int cmd_ubifs_mount(char *vol_name);
 int cmd_ubifs_umount(void);
+
+#if IS_ENABLED(CONFIG_UBI_BLOCK)
+int ubi_bind(struct udevice *dev);
+#else
+static inline int ubi_bind(struct udevice *dev)
+{
+	return -EOPNOTSUPP;
+}
+#endif
 
 #endif

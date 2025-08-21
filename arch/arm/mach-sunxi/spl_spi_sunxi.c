@@ -3,15 +3,16 @@
  * Copyright (C) 2016 Siarhei Siamashka <siarhei.siamashka@gmail.com>
  */
 
-#include <common.h>
 #include <image.h>
 #include <log.h>
 #include <spl.h>
+#include <asm/arch/spl.h>
 #include <asm/gpio.h>
 #include <asm/io.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/libfdt.h>
+#include <sunxi_gpio.h>
 
 #ifdef CONFIG_SPL_OS_BOOT
 #error CONFIG_SPL_OS_BOOT is not supported yet
@@ -71,43 +72,61 @@
 #define SUN6I_CTL_ENABLE            BIT(0)
 #define SUN6I_CTL_MASTER            BIT(1)
 #define SUN6I_CTL_SRST              BIT(31)
+#define SUN6I_TCR_SDM               BIT(13)
 #define SUN6I_TCR_XCH               BIT(31)
 
 /*****************************************************************************/
 
-#define CCM_AHB_GATING0             (0x01C20000 + 0x60)
-#define CCM_H6_SPI_BGR_REG          (0x03001000 + 0x96c)
-#ifdef CONFIG_MACH_SUN50I_H6
-#define CCM_SPI0_CLK                (0x03001000 + 0x940)
+#if IS_ENABLED(CONFIG_SUN50I_GEN_H6)
+#define CCM_BASE                    0x03001000
+#elif IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2)
+#define CCM_BASE                    0x02001000
 #else
-#define CCM_SPI0_CLK                (0x01C20000 + 0xA0)
+#define CCM_BASE                    0x01C20000
 #endif
-#define SUN6I_BUS_SOFT_RST_REG0     (0x01C20000 + 0x2C0)
+
+#define CCM_AHB_GATING0             (CCM_BASE + 0x60)
+#define CCM_H6_SPI_BGR_REG          (CCM_BASE + 0x96c)
+#if IS_ENABLED(CONFIG_SUN50I_GEN_H6) || IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2)
+#define CCM_SPI0_CLK                (CCM_BASE + 0x940)
+#else
+#define CCM_SPI0_CLK                (CCM_BASE + 0xA0)
+#endif
+#define SUN6I_BUS_SOFT_RST_REG0     (CCM_BASE + 0x2C0)
 
 #define AHB_RESET_SPI0_SHIFT        20
 #define AHB_GATE_OFFSET_SPI0        20
 
 #define SPI0_CLK_DIV_BY_2           0x1000
 #define SPI0_CLK_DIV_BY_4           0x1001
+#define SPI0_CLK_DIV_BY_32          0x100f
 
 /*****************************************************************************/
 
 /*
  * Allwinner A10/A20 SoCs were using pins PC0,PC1,PC2,PC23 for booting
  * from SPI Flash, everything else is using pins PC0,PC1,PC2,PC3.
- * The H6 uses PC0, PC2, PC3, PC5.
+ * The H6 uses PC0, PC2, PC3, PC5, the H616 PC0, PC2, PC3, PC4.
  */
 static void spi0_pinmux_setup(unsigned int pin_function)
 {
-	/* All chips use PC0 and PC2. */
-	sunxi_gpio_set_cfgpin(SUNXI_GPC(0), pin_function);
+	/* All chips use PC2. And all chips use PC0, except R528/T113 */
+	if (!IS_ENABLED(CONFIG_MACH_SUN8I_R528))
+		sunxi_gpio_set_cfgpin(SUNXI_GPC(0), pin_function);
+
 	sunxi_gpio_set_cfgpin(SUNXI_GPC(2), pin_function);
 
-	/* All chips except H6 use PC1, and only H6 uses PC5. */
-	if (!IS_ENABLED(CONFIG_MACH_SUN50I_H6))
+	/* All chips except H6/H616/R528/T113 use PC1. */
+	if (!IS_ENABLED(CONFIG_SUN50I_GEN_H6) &&
+	    !IS_ENABLED(CONFIG_MACH_SUN8I_R528))
 		sunxi_gpio_set_cfgpin(SUNXI_GPC(1), pin_function);
-	else
+
+	if (IS_ENABLED(CONFIG_MACH_SUN50I_H6) ||
+	    IS_ENABLED(CONFIG_MACH_SUN8I_R528))
 		sunxi_gpio_set_cfgpin(SUNXI_GPC(5), pin_function);
+	if (IS_ENABLED(CONFIG_MACH_SUN50I_H616) ||
+	    IS_ENABLED(CONFIG_MACH_SUN8I_R528))
+		sunxi_gpio_set_cfgpin(SUNXI_GPC(4), pin_function);
 
 	/* Older generations use PC23 for CS, newer ones use PC3. */
 	if (IS_ENABLED(CONFIG_MACH_SUN4I) || IS_ENABLED(CONFIG_MACH_SUN7I) ||
@@ -120,7 +139,9 @@ static void spi0_pinmux_setup(unsigned int pin_function)
 static bool is_sun6i_gen_spi(void)
 {
 	return IS_ENABLED(CONFIG_SUNXI_GEN_SUN6I) ||
-	       IS_ENABLED(CONFIG_MACH_SUN50I_H6);
+	       IS_ENABLED(CONFIG_SUN50I_GEN_H6) ||
+	       IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2) ||
+	       IS_ENABLED(CONFIG_MACH_SUN8I_V3S);
 }
 
 static uintptr_t spi0_base_address(void)
@@ -128,10 +149,14 @@ static uintptr_t spi0_base_address(void)
 	if (IS_ENABLED(CONFIG_MACH_SUN8I_R40))
 		return 0x01C05000;
 
-	if (IS_ENABLED(CONFIG_MACH_SUN50I_H6))
+	if (IS_ENABLED(CONFIG_SUN50I_GEN_H6))
 		return 0x05010000;
 
-	if (!is_sun6i_gen_spi())
+	if (IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2))
+		return 0x04025000;
+
+	if (!is_sun6i_gen_spi() ||
+	    IS_ENABLED(CONFIG_MACH_SUNIV))
 		return 0x01C05000;
 
 	return 0x01C68000;
@@ -145,21 +170,33 @@ static void spi0_enable_clock(void)
 	uintptr_t base = spi0_base_address();
 
 	/* Deassert SPI0 reset on SUN6I */
-	if (IS_ENABLED(CONFIG_MACH_SUN50I_H6))
+	if (IS_ENABLED(CONFIG_SUN50I_GEN_H6) ||
+	    IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2))
 		setbits_le32(CCM_H6_SPI_BGR_REG, (1U << 16) | 0x1);
 	else if (is_sun6i_gen_spi())
 		setbits_le32(SUN6I_BUS_SOFT_RST_REG0,
 			     (1 << AHB_RESET_SPI0_SHIFT));
 
 	/* Open the SPI0 gate */
-	if (!IS_ENABLED(CONFIG_MACH_SUN50I_H6))
+	if (!IS_ENABLED(CONFIG_SUN50I_GEN_H6) &&
+	    !IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2))
 		setbits_le32(CCM_AHB_GATING0, (1 << AHB_GATE_OFFSET_SPI0));
 
-	/* Divide by 4 */
-	writel(SPI0_CLK_DIV_BY_4, base + (is_sun6i_gen_spi() ?
-				  SUN6I_SPI0_CCTL : SUN4I_SPI0_CCTL));
-	/* 24MHz from OSC24M */
-	writel((1 << 31), CCM_SPI0_CLK);
+	if (IS_ENABLED(CONFIG_MACH_SUNIV)) {
+		/* Divide by 32, clock source is AHB clock 200MHz */
+		writel(SPI0_CLK_DIV_BY_32, base + SUN6I_SPI0_CCTL);
+	} else {
+		/* New SoCs do not have a clock divider inside */
+		if (!IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2)) {
+			/* Divide by 4 */
+			writel(SPI0_CLK_DIV_BY_4,
+			       base + (is_sun6i_gen_spi() ? SUN6I_SPI0_CCTL :
+			       SUN4I_SPI0_CCTL));
+		}
+
+		/* 24MHz from OSC24M */
+		writel((1 << 31), CCM_SPI0_CLK);
+	}
 
 	if (is_sun6i_gen_spi()) {
 		/* Enable SPI in the master mode and do a soft reset */
@@ -168,6 +205,14 @@ static void spi0_enable_clock(void)
 		/* Wait for completion */
 		while (readl(base + SUN6I_SPI0_GCR) & SUN6I_CTL_SRST)
 			;
+
+		/*
+		 * For new SoCs we should configure sample mode depending on
+		 * input clock. As 24MHz from OSC24M is used, we could use
+		 * normal sample mode by setting SDM bit in the TCR register
+		 */
+		if (IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2))
+			setbits_le32(base + SUN6I_SPI0_TCR, SUN6I_TCR_SDM);
 	} else {
 		/* Enable SPI in the master mode and reset FIFO */
 		setbits_le32(base + SUN4I_SPI0_CTL, SUN4I_CTL_MASTER |
@@ -190,14 +235,17 @@ static void spi0_disable_clock(void)
 					     SUN4I_CTL_ENABLE);
 
 	/* Disable the SPI0 clock */
-	writel(0, CCM_SPI0_CLK);
+	if (!IS_ENABLED(CONFIG_MACH_SUNIV))
+		writel(0, CCM_SPI0_CLK);
 
 	/* Close the SPI0 gate */
-	if (!IS_ENABLED(CONFIG_MACH_SUN50I_H6))
+	if (!IS_ENABLED(CONFIG_SUN50I_GEN_H6) &&
+	    !IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2))
 		clrbits_le32(CCM_AHB_GATING0, (1 << AHB_GATE_OFFSET_SPI0));
 
 	/* Assert SPI0 reset on SUN6I */
-	if (IS_ENABLED(CONFIG_MACH_SUN50I_H6))
+	if (IS_ENABLED(CONFIG_SUN50I_GEN_H6) ||
+	    IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2))
 		clrbits_le32(CCM_H6_SPI_BGR_REG, (1U << 16) | 0x1);
 	else if (is_sun6i_gen_spi())
 		clrbits_le32(SUN6I_BUS_SOFT_RST_REG0,
@@ -209,8 +257,11 @@ static void spi0_init(void)
 	unsigned int pin_function = SUNXI_GPC_SPI0;
 
 	if (IS_ENABLED(CONFIG_MACH_SUN50I) ||
-	    IS_ENABLED(CONFIG_MACH_SUN50I_H6))
+	    IS_ENABLED(CONFIG_SUN50I_GEN_H6))
 		pin_function = SUN50I_GPC_SPI0;
+	else if (IS_ENABLED(CONFIG_MACH_SUNIV) ||
+		 IS_ENABLED(CONFIG_MACH_SUN8I_R528))
+		pin_function = SUNIV_GPC_SPI0;
 
 	spi0_pinmux_setup(pin_function);
 	spi0_enable_clock();
@@ -324,32 +375,31 @@ static int spl_spi_load_image(struct spl_image_info *spl_image,
 			      struct spl_boot_device *bootdev)
 {
 	int ret = 0;
-	struct image_header *header;
-	header = (struct image_header *)(CONFIG_SYS_TEXT_BASE);
+	struct legacy_img_hdr *header;
+	uint32_t load_offset = sunxi_get_spl_size();
+
+	header = (struct legacy_img_hdr *)CONFIG_TEXT_BASE;
+	load_offset = max_t(uint32_t, load_offset, CONFIG_SYS_SPI_U_BOOT_OFFS);
 
 	spi0_init();
 
-	spi0_read_data((void *)header, CONFIG_SYS_SPI_U_BOOT_OFFS, 0x40);
+	spi0_read_data((void *)header, load_offset, 0x40);
 
         if (IS_ENABLED(CONFIG_SPL_LOAD_FIT) &&
 		image_get_magic(header) == FDT_MAGIC) {
 		struct spl_load_info load;
 
 		debug("Found FIT image\n");
-		load.dev = NULL;
-		load.priv = NULL;
-		load.filename = NULL;
-		load.bl_len = 1;
-		load.read = spi_load_read;
+		spl_load_init(&load, spi_load_read, NULL, 1);
 		ret = spl_load_simple_fit(spl_image, &load,
-					  CONFIG_SYS_SPI_U_BOOT_OFFS, header);
+					  load_offset, header);
 	} else {
-		ret = spl_parse_image_header(spl_image, header);
+		ret = spl_parse_image_header(spl_image, bootdev, header);
 		if (ret)
 			return ret;
 
 		spi0_read_data((void *)spl_image->load_addr,
-			       CONFIG_SYS_SPI_U_BOOT_OFFS, spl_image->size);
+			       load_offset, spl_image->size);
 	}
 
 	spi0_deinit();

@@ -3,7 +3,7 @@
  * Copyright (C) 2016 Stefan Roese <sr@denx.de>
  */
 
-#include <common.h>
+#include <config.h>
 #include <asm/arch/cpu.h>
 #include <asm/arch/soc.h>
 #include <asm/global_data.h>
@@ -38,7 +38,7 @@ int a8k_dram_init_banksize(void)
 	 */
 	phys_size_t max_bank0_size = SZ_4G - SZ_1G;
 
-	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
+	gd->bd->bi_dram[0].start = CFG_SYS_SDRAM_BASE;
 	if (gd->ram_size <= max_bank0_size) {
 		gd->bd->bi_dram[0].size = gd->ram_size;
 		return 0;

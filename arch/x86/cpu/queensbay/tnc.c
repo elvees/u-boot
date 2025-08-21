@@ -3,7 +3,6 @@
  * Copyright (C) 2014, Bin Meng <bmeng.cn@gmail.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <init.h>
 #include <dm/device-internal.h>
@@ -18,19 +17,17 @@
 
 static int __maybe_unused disable_igd(void)
 {
-	struct udevice *igd, *sdvo;
+	struct udevice *igd = NULL;
+	struct udevice *sdvo = NULL;
 	int ret;
 
-	ret = dm_pci_bus_find_bdf(TNC_IGD, &igd);
-	if (ret)
-		return ret;
-	if (!igd)
-		return 0;
-
-	ret = dm_pci_bus_find_bdf(TNC_SDVO, &sdvo);
-	if (ret)
-		return ret;
-	if (!sdvo)
+	/*
+	 * In case the IGD and SDVO devices were already in disabled state,
+	 * we should return and not proceed any further.
+	 */
+	dm_pci_bus_find_bdf(TNC_IGD, &igd);
+	dm_pci_bus_find_bdf(TNC_SDVO, &sdvo);
+	if (!igd || !sdvo)
 		return 0;
 
 	/*

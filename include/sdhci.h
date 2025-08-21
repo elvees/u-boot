@@ -11,6 +11,7 @@
 
 #include <linux/bitops.h>
 #include <linux/types.h>
+#include <linux/kernel.h>
 #include <asm/io.h>
 #include <mmc.h>
 #include <asm/gpio.h>
@@ -57,6 +58,7 @@
 #define SDHCI_PRESENT_STATE	0x24
 #define  SDHCI_CMD_INHIBIT	BIT(0)
 #define  SDHCI_DATA_INHIBIT	BIT(1)
+#define  SDHCI_DAT_ACTIVE	BIT(2)
 #define  SDHCI_DOING_WRITE	BIT(8)
 #define  SDHCI_DOING_READ	BIT(9)
 #define  SDHCI_SPACE_AVAILABLE	BIT(10)
@@ -65,6 +67,8 @@
 #define  SDHCI_CARD_STATE_STABLE	BIT(17)
 #define  SDHCI_CARD_DETECT_PIN_LEVEL	BIT(18)
 #define  SDHCI_WRITE_PROTECT	BIT(19)
+#define  SDHCI_DATA_LVL_MASK	0x00F00000
+#define   SDHCI_DATA_0_LVL_MASK BIT(20)
 
 #define SDHCI_HOST_CONTROL	0x28
 #define  SDHCI_CTRL_LED		BIT(0)
@@ -187,6 +191,7 @@
 #define  SDHCI_SUPPORT_SDR50	0x00000001
 #define  SDHCI_SUPPORT_SDR104	0x00000002
 #define  SDHCI_SUPPORT_DDR50	0x00000004
+#define  SDHCI_SUPPORT_HS400	BIT(31)
 #define  SDHCI_USE_SDR50_TUNING	0x00002000
 
 #define  SDHCI_CLOCK_MUL_MASK	0x00FF0000
@@ -245,6 +250,9 @@
 #define SDHCI_QUIRK_WAIT_SEND_CMD	(1 << 6)
 #define SDHCI_QUIRK_USE_WIDE8		(1 << 8)
 #define SDHCI_QUIRK_NO_1_8_V		(1 << 9)
+#define SDHCI_QUIRK_SUPPORT_SINGLE	(1 << 10)
+/* Capability register bit-63 indicates HS400 support */
+#define SDHCI_QUIRK_CAPS_BIT63_FOR_HS400	BIT(11)
 
 /* to make gcc happy */
 struct sdhci_host;
@@ -268,18 +276,37 @@ struct sdhci_ops {
 	int	(*set_ios_post)(struct sdhci_host *host);
 	void	(*set_clock)(struct sdhci_host *host, u32 div);
 	int (*platform_execute_tuning)(struct mmc *host, u8 opcode);
-	void (*set_delay)(struct sdhci_host *host);
+	int (*set_delay)(struct sdhci_host *host);
+	/* Callback function to set DLL clock configuration */
+	int (*config_dll)(struct sdhci_host *host, u32 clock, bool enable);
 	int	(*deferred_probe)(struct sdhci_host *host);
+
+	/**
+	 * set_enhanced_strobe() - Set HS400 Enhanced Strobe config
+	 *
+	 * This is called after setting the card speed and mode to
+	 * HS400 ES, and should set any host-specific configuration
+	 * necessary for it.
+	 *
+	 * @host: SDHCI host structure
+	 * Return: 0 if successful, -ve on error
+	 */
+	int	(*set_enhanced_strobe)(struct sdhci_host *host);
+
+#ifdef CONFIG_MMC_SDHCI_ADMA_HELPERS
+	void	(*adma_write_desc)(struct sdhci_host *host, void **desc,
+				   dma_addr_t addr, int len, bool end);
+#endif
 };
 
 #define ADMA_MAX_LEN	65532
-#ifdef CONFIG_DMA_ADDR_T_64BIT
-#define ADMA_DESC_LEN	16
+#ifdef CONFIG_MMC_SDHCI_ADMA_64BIT
+#define ADMA_DESC_LEN	12
 #else
 #define ADMA_DESC_LEN	8
 #endif
-#define ADMA_TABLE_NO_ENTRIES (CONFIG_SYS_MMC_MAX_BLK_COUNT * \
-			       MMC_MAX_BLOCK_LEN) / ADMA_MAX_LEN
+#define ADMA_TABLE_NO_ENTRIES DIV_ROUND_UP(CONFIG_SYS_MMC_MAX_BLK_COUNT * \
+			      MMC_MAX_BLOCK_LEN, ADMA_MAX_LEN)
 
 #define ADMA_TABLE_SZ (ADMA_TABLE_NO_ENTRIES * ADMA_DESC_LEN)
 
@@ -298,7 +325,7 @@ struct sdhci_adma_desc {
 	u8 reserved;
 	u16 len;
 	u32 addr_lo;
-#ifdef CONFIG_DMA_ADDR_T_64BIT
+#ifdef CONFIG_MMC_SDHCI_ADMA_64BIT
 	u32 addr_hi;
 #endif
 } __packed;
@@ -468,7 +495,7 @@ int sdhci_setup_cfg(struct mmc_config *cfg, struct sdhci_host *host,
  * @cfg:	Empty configuration structure (generally &plat->cfg). This is
  *		normally all zeroes at this point. The only purpose of passing
  *		this in is to set mmc->cfg to it.
- * @return 0 if OK, -ve if the block device could not be created
+ * Return: 0 if OK, -ve if the block device could not be created
  */
 int sdhci_bind(struct udevice *dev, struct mmc *mmc, struct mmc_config *cfg);
 #else
@@ -481,7 +508,7 @@ int sdhci_bind(struct udevice *dev, struct mmc *mmc, struct mmc_config *cfg);
  * @host:	SDHCI host structure
  * @f_max:	Maximum supported clock frequency in HZ (0 for default)
  * @f_min:	Minimum supported clock frequency in HZ (0 for default)
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int add_sdhci(struct sdhci_host *host, u32 f_max, u32 f_min);
 #endif /* !CONFIG_BLK */
@@ -491,6 +518,7 @@ void sdhci_set_uhs_timing(struct sdhci_host *host);
 /* Export the operations to drivers */
 int sdhci_probe(struct udevice *dev);
 int sdhci_set_clock(struct mmc *mmc, unsigned int clock);
+void sdhci_set_voltage(struct sdhci_host *host);
 
 /**
  * sdhci_set_control_reg - Set control registers
@@ -505,8 +533,11 @@ extern const struct dm_mmc_ops sdhci_ops;
 #else
 #endif
 
+void sdhci_adma_write_desc(struct sdhci_host *host, void **next_desc,
+			   dma_addr_t addr, int len, bool end);
 struct sdhci_adma_desc *sdhci_adma_init(void);
-void sdhci_prepare_adma_table(struct sdhci_adma_desc *table,
-			      struct mmc_data *data, dma_addr_t addr);
+void sdhci_prepare_adma_table(struct sdhci_host *host,
+			      struct sdhci_adma_desc *table,
+			      struct mmc_data *data, dma_addr_t start_addr);
 
 #endif /* __SDHCI_HW_H */

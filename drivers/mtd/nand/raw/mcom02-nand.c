@@ -8,11 +8,11 @@
  */
 
 #include <asm/io.h>
-#include <common.h>
 #include <dm.h>
 #include <fdtdec.h>
 #include <nand.h>
 #include <linux/errno.h>
+#include <linux/mtd/rawnand.h>
 
 /* Register offsets */
 #define PKT_OFST			0x00

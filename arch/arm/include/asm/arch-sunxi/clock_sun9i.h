@@ -12,6 +12,13 @@
 #include <linux/bitops.h>
 #endif
 
+#define CCU_MMC0_CLK_CFG	0x410
+#define CCU_MMC1_CLK_CFG	0x414
+#define CCU_MMC2_CLK_CFG	0x418
+#define CCU_MMC3_CLK_CFG	0x41c
+#define CCU_AHB_GATE0		0x580
+#define CCU_AHB_RESET0_CFG	0x5a0
+
 struct sunxi_ccm_reg {
 	u32 pll1_c0_cfg;	/* 0x00 c0cpu# pll configuration */
 	u32 pll2_c1_cfg;	/* 0x04 c1cpu# pll configuration */
@@ -217,13 +224,9 @@ struct sunxi_ccm_reg {
 #define APB1_RESET_TWI_SHIFT		0
 #define APB1_RESET_TWI_MASK		(0xf << APB1_RESET_TWI_SHIFT)
 
-
 #ifndef __ASSEMBLY__
 void clock_set_pll1(unsigned int clk);
-void clock_set_pll2(unsigned int clk);
-void clock_set_pll4(unsigned int clk);
 void clock_set_pll6(unsigned int clk);
-void clock_set_pll12(unsigned int clk);
 unsigned int clock_get_pll4_periph0(void);
 #endif
 

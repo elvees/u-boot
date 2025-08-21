@@ -7,7 +7,6 @@
 // Some parts are based on drivers/spi/spi-mtk-nor.c of linux version
 
 #include <clk.h>
-#include <common.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <dm/device.h>
@@ -470,7 +469,7 @@ static int mtk_snor_probe(struct udevice *bus)
 	int ret;
 	u32 reg;
 
-	priv->base = (void __iomem *)devfdt_get_addr(bus);
+	priv->base = devfdt_get_addr_ptr(bus);
 	if (!priv->base)
 		return -EINVAL;
 

@@ -5,7 +5,7 @@
 
 #include <linux/errno.h>
 #include <fs_internal.h>
-#include <uuid.h>
+#include <u-boot/uuid.h>
 
 /* Provide a compatibility layer to make code syncing easier */
 
@@ -46,7 +46,7 @@
 /*
  * Read data from device specified by @desc and @part
  *
- * U-boot equivalent of pread().
+ * U-Boot equivalent of pread().
  *
  * Return the bytes of data read.
  * Return <0 for error.

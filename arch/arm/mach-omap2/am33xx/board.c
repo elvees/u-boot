@@ -4,13 +4,14 @@
  *
  * Common board functions for AM33XX based boards
  *
- * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
+ * Copyright (C) 2011, Texas Instruments, Incorporated - https://www.ti.com/
  */
 
-#include <common.h>
+#include <config.h>
 #include <dm.h>
 #include <debug_uart.h>
 #include <errno.h>
+#include <event.h>
 #include <init.h>
 #include <net.h>
 #include <ns16550.h>
@@ -23,7 +24,11 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/gpio.h>
 #include <asm/arch/i2c.h>
+#if IS_ENABLED(CONFIG_TARGET_AM335X_GUARDIAN)
+#include <asm/arch/mem-guardian.h>
+#else
 #include <asm/arch/mem.h>
+#endif
 #include <asm/arch/mmc_host_def.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/global_data.h>
@@ -37,6 +42,7 @@
 #include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/compiler.h>
+#include <linux/printk.h>
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
 #include <linux/usb/musb.h>
@@ -61,20 +67,20 @@ DECLARE_GLOBAL_DATA_PTR;
 
 int dram_init(void)
 {
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT)
 	sdram_init();
 #endif
 
 	/* dram_init must store complete ramsize in gd->ram_size */
 	gd->ram_size = get_ram_size(
-			(void *)CONFIG_SYS_SDRAM_BASE,
-			CONFIG_MAX_RAM_BANK_SIZE);
+			(void *)CFG_SYS_SDRAM_BASE,
+			CFG_MAX_RAM_BANK_SIZE);
 	return 0;
 }
 
 int dram_init_banksize(void)
 {
-	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
+	gd->bd->bi_dram[0].start = CFG_SYS_SDRAM_BASE;
 	gd->bd->bi_dram[0].size = gd->ram_size;
 
 	return 0;
@@ -82,29 +88,29 @@ int dram_init_banksize(void)
 
 #if !CONFIG_IS_ENABLED(OF_CONTROL)
 static const struct ns16550_plat am33xx_serial[] = {
-	{ .base = CONFIG_SYS_NS16550_COM1, .reg_shift = 2,
-	  .clock = CONFIG_SYS_NS16550_CLK, .fcr = UART_FCR_DEFVAL, },
-# ifdef CONFIG_SYS_NS16550_COM2
-	{ .base = CONFIG_SYS_NS16550_COM2, .reg_shift = 2,
-	  .clock = CONFIG_SYS_NS16550_CLK, .fcr = UART_FCR_DEFVAL, },
-#  ifdef CONFIG_SYS_NS16550_COM3
-	{ .base = CONFIG_SYS_NS16550_COM3, .reg_shift = 2,
-	  .clock = CONFIG_SYS_NS16550_CLK, .fcr = UART_FCR_DEFVAL, },
-	{ .base = CONFIG_SYS_NS16550_COM4, .reg_shift = 2,
-	  .clock = CONFIG_SYS_NS16550_CLK, .fcr = UART_FCR_DEFVAL, },
-	{ .base = CONFIG_SYS_NS16550_COM5, .reg_shift = 2,
-	  .clock = CONFIG_SYS_NS16550_CLK, .fcr = UART_FCR_DEFVAL, },
-	{ .base = CONFIG_SYS_NS16550_COM6, .reg_shift = 2,
-	  .clock = CONFIG_SYS_NS16550_CLK, .fcr = UART_FCR_DEFVAL, },
+	{ .base = CFG_SYS_NS16550_COM1, .reg_shift = 2,
+	  .clock = CFG_SYS_NS16550_CLK, .fcr = UART_FCR_DEFVAL, },
+# ifdef CFG_SYS_NS16550_COM2
+	{ .base = CFG_SYS_NS16550_COM2, .reg_shift = 2,
+	  .clock = CFG_SYS_NS16550_CLK, .fcr = UART_FCR_DEFVAL, },
+#  ifdef CFG_SYS_NS16550_COM3
+	{ .base = CFG_SYS_NS16550_COM3, .reg_shift = 2,
+	  .clock = CFG_SYS_NS16550_CLK, .fcr = UART_FCR_DEFVAL, },
+	{ .base = CFG_SYS_NS16550_COM4, .reg_shift = 2,
+	  .clock = CFG_SYS_NS16550_CLK, .fcr = UART_FCR_DEFVAL, },
+	{ .base = CFG_SYS_NS16550_COM5, .reg_shift = 2,
+	  .clock = CFG_SYS_NS16550_CLK, .fcr = UART_FCR_DEFVAL, },
+	{ .base = CFG_SYS_NS16550_COM6, .reg_shift = 2,
+	  .clock = CFG_SYS_NS16550_CLK, .fcr = UART_FCR_DEFVAL, },
 #  endif
 # endif
 };
 
 U_BOOT_DRVINFOS(am33xx_uarts) = {
 	{ "ns16550_serial", &am33xx_serial[0] },
-#  ifdef CONFIG_SYS_NS16550_COM2
+#  ifdef CFG_SYS_NS16550_COM2
 	{ "ns16550_serial", &am33xx_serial[1] },
-#   ifdef CONFIG_SYS_NS16550_COM3
+#   ifdef CFG_SYS_NS16550_COM3
 	{ "ns16550_serial", &am33xx_serial[2] },
 	{ "ns16550_serial", &am33xx_serial[3] },
 	{ "ns16550_serial", &am33xx_serial[4] },
@@ -202,10 +208,8 @@ int cpu_mmc_init(struct bd_info *bis)
 #define RTC_BOARD_TYPE_SHIFT	16
 
 /* AM33XX has two MUSB controllers which can be host or gadget */
-#if (defined(CONFIG_USB_MUSB_GADGET) || defined(CONFIG_USB_MUSB_HOST)) && \
-	(defined(CONFIG_AM335X_USB0) || defined(CONFIG_AM335X_USB1)) && \
-	(!CONFIG_IS_ENABLED(DM_USB) || !CONFIG_IS_ENABLED(OF_CONTROL)) && \
-	(!defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_MUSB_NEW_SUPPORT))
+#if (defined(CONFIG_AM335X_USB0) || defined(CONFIG_AM335X_USB1)) && \
+	defined(CONFIG_XPL_BUILD)
 
 static struct musb_hdrc_config musb_config = {
 	.multipoint     = 1,
@@ -214,7 +218,7 @@ static struct musb_hdrc_config musb_config = {
 	.ram_bits       = 12,
 };
 
-#if CONFIG_IS_ENABLED(DM_USB) && !CONFIG_IS_ENABLED(OF_CONTROL)
+#ifdef CONFIG_AM335X_USB0
 static struct ti_musb_plat usb0 = {
 	.base = (void *)USB0_OTG_BASE,
 	.ctrl_mod_base = &((struct ctrl_dev *)CTRL_DEVICE_BASE)->usb_ctrl0,
@@ -224,7 +228,9 @@ static struct ti_musb_plat usb0 = {
 		.platform_ops	= &musb_dsps_ops,
 		},
 };
+#endif
 
+#ifdef CONFIG_AM335X_USB1
 static struct ti_musb_plat usb1 = {
 	.base = (void *)USB1_OTG_BASE,
 	.ctrl_mod_base = &((struct ctrl_dev *)CTRL_DEVICE_BASE)->usb_ctrl1,
@@ -234,16 +240,17 @@ static struct ti_musb_plat usb1 = {
 		.platform_ops	= &musb_dsps_ops,
 		},
 };
+#endif
 
 U_BOOT_DRVINFOS(am33xx_usbs) = {
-#if CONFIG_AM335X_USB0_MODE == MUSB_PERIPHERAL
+#ifdef CONFIG_AM335X_USB0_PERIPHERAL
 	{ "ti-musb-peripheral", &usb0 },
-#elif CONFIG_AM335X_USB0_MODE == MUSB_HOST
+#elif defined(CONFIG_AM335X_USB0_HOST)
 	{ "ti-musb-host", &usb0 },
 #endif
-#if CONFIG_AM335X_USB1_MODE == MUSB_PERIPHERAL
+#ifdef CONFIG_AM335X_USB1_PERIPHERAL
 	{ "ti-musb-peripheral", &usb1 },
-#elif CONFIG_AM335X_USB1_MODE == MUSB_HOST
+#elif defined(CONFIG_AM335X_USB1_HOST)
 	{ "ti-musb-host", &usb1 },
 #endif
 };
@@ -252,77 +259,6 @@ int arch_misc_init(void)
 {
 	return 0;
 }
-#else
-static struct ctrl_dev *cdev = (struct ctrl_dev *)CTRL_DEVICE_BASE;
-
-/* USB 2.0 PHY Control */
-#define CM_PHY_PWRDN			(1 << 0)
-#define CM_PHY_OTG_PWRDN		(1 << 1)
-#define OTGVDET_EN			(1 << 19)
-#define OTGSESSENDEN			(1 << 20)
-
-static void am33xx_usb_set_phy_power(u8 on, u32 *reg_addr)
-{
-	if (on) {
-		clrsetbits_le32(reg_addr, CM_PHY_PWRDN | CM_PHY_OTG_PWRDN,
-				OTGVDET_EN | OTGSESSENDEN);
-	} else {
-		clrsetbits_le32(reg_addr, 0, CM_PHY_PWRDN | CM_PHY_OTG_PWRDN);
-	}
-}
-
-#ifdef CONFIG_AM335X_USB0
-static void am33xx_otg0_set_phy_power(struct udevice *dev, u8 on)
-{
-	am33xx_usb_set_phy_power(on, &cdev->usb_ctrl0);
-}
-
-struct omap_musb_board_data otg0_board_data = {
-	.set_phy_power = am33xx_otg0_set_phy_power,
-};
-
-static struct musb_hdrc_platform_data otg0_plat = {
-	.mode           = CONFIG_AM335X_USB0_MODE,
-	.config         = &musb_config,
-	.power          = 50,
-	.platform_ops	= &musb_dsps_ops,
-	.board_data	= &otg0_board_data,
-};
-#endif
-
-#ifdef CONFIG_AM335X_USB1
-static void am33xx_otg1_set_phy_power(struct udevice *dev, u8 on)
-{
-	am33xx_usb_set_phy_power(on, &cdev->usb_ctrl1);
-}
-
-struct omap_musb_board_data otg1_board_data = {
-	.set_phy_power = am33xx_otg1_set_phy_power,
-};
-
-static struct musb_hdrc_platform_data otg1_plat = {
-	.mode           = CONFIG_AM335X_USB1_MODE,
-	.config         = &musb_config,
-	.power          = 50,
-	.platform_ops	= &musb_dsps_ops,
-	.board_data	= &otg1_board_data,
-};
-#endif
-
-int arch_misc_init(void)
-{
-#ifdef CONFIG_AM335X_USB0
-	musb_register(&otg0_plat, &otg0_board_data,
-		(void *)USB0_OTG_BASE);
-#endif
-#ifdef CONFIG_AM335X_USB1
-	musb_register(&otg1_plat, &otg1_board_data,
-		(void *)USB1_OTG_BASE);
-#endif
-	return 0;
-}
-#endif
-
 #else	/* CONFIG_USB_MUSB_* && CONFIG_AM335X_USB* && !CONFIG_DM_USB */
 
 int arch_misc_init(void)
@@ -330,16 +266,12 @@ int arch_misc_init(void)
 	struct udevice *dev;
 	int ret;
 
-	ret = uclass_first_device(UCLASS_MISC, &dev);
-	if (ret || !dev)
+	ret = uclass_first_device_err(UCLASS_MISC, &dev);
+	if (ret)
 		return ret;
 
 #if defined(CONFIG_DM_ETH) && defined(CONFIG_USB_ETHER)
-	ret = usb_ether_init();
-	if (ret) {
-		pr_err("USB ether init failed\n");
-		return ret;
-	}
+	usb_ether_init();
 #endif
 
 	return 0;
@@ -347,10 +279,10 @@ int arch_misc_init(void)
 
 #endif /* CONFIG_USB_MUSB_* && CONFIG_AM335X_USB* && !CONFIG_DM_USB */
 
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT)
 
 #if defined(CONFIG_SPL_AM33XX_ENABLE_RTC32K_OSC) || \
-	(defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_RTC_DDR_SUPPORT))
+	(defined(CONFIG_XPL_BUILD) && defined(CONFIG_SPL_RTC_DDR_SUPPORT))
 static void rtc32k_unlock(struct davinci_rtc *rtc)
 {
 	/*
@@ -363,7 +295,7 @@ static void rtc32k_unlock(struct davinci_rtc *rtc)
 }
 #endif
 
-#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_RTC_DDR_SUPPORT)
+#if defined(CONFIG_XPL_BUILD) && defined(CONFIG_SPL_RTC_DDR_SUPPORT)
 /*
  * Write contents of the RTC_SCRATCH1 register based on board type
  * Two things are passed
@@ -399,18 +331,10 @@ int board_early_init_f(void)
 {
 	set_mux_conf_regs();
 	prcm_init();
-#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_RTC_DDR_SUPPORT)
+#if defined(CONFIG_XPL_BUILD) && defined(CONFIG_SPL_RTC_DDR_SUPPORT)
 	update_rtc_magic();
 #endif
 	return 0;
-}
-
-/*
- * This function is the place to do per-board things such as ramp up the
- * MPU clock frequency.
- */
-__weak void am33xx_spl_board_init(void)
-{
 }
 
 #if defined(CONFIG_SPL_AM33XX_ENABLE_RTC32K_OSC)
@@ -455,7 +379,7 @@ static void watchdog_disable(void)
 		;
 }
 
-#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_RTC_DDR_SUPPORT)
+#if defined(CONFIG_XPL_BUILD) && defined(CONFIG_SPL_RTC_DDR_SUPPORT)
 /*
  * Check if we are executing rtc-only + DDR mode, and resume from it if needed
  */
@@ -531,7 +455,7 @@ am43xx_wait:
 
 void s_init(void)
 {
-#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_RTC_DDR_SUPPORT)
+#if defined(CONFIG_XPL_BUILD) && defined(CONFIG_SPL_RTC_DDR_SUPPORT)
 	rtc_only();
 #endif
 }
@@ -550,7 +474,7 @@ void early_system_init(void)
 	set_uart_mux_conf();
 	setup_early_clocks();
 	uart_soft_reset();
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 	/*
 	 * Save the boot parameters passed from romcode.
 	 * We cannot delay the saving further than this,
@@ -558,11 +482,8 @@ void early_system_init(void)
 	 */
 	save_omap_boot_params();
 #endif
-#ifdef CONFIG_DEBUG_UART_OMAP
-	debug_uart_init();
-#endif
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 	spl_early_init();
 #endif
 
@@ -576,7 +497,7 @@ void early_system_init(void)
 #endif
 }
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 void board_init_f(ulong dummy)
 {
 	hw_data_init();
@@ -585,18 +506,34 @@ void board_init_f(ulong dummy)
 	sdram_init();
 	/* dram_init must store complete ramsize in gd->ram_size */
 	gd->ram_size = get_ram_size(
-			(void *)CONFIG_SYS_SDRAM_BASE,
-			CONFIG_MAX_RAM_BANK_SIZE);
+			(void *)CFG_SYS_SDRAM_BASE,
+			CFG_MAX_RAM_BANK_SIZE);
 }
 #endif
 
 #endif
 
-int arch_cpu_init_dm(void)
+static int am33xx_dm_post_init(void)
 {
 	hw_data_init();
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT)
 	early_system_init();
 #endif
 	return 0;
 }
+EVENT_SPY_SIMPLE(EVT_DM_POST_INIT_F, am33xx_dm_post_init);
+
+#ifdef CONFIG_DEBUG_UART_BOARD_INIT
+void board_debug_uart_init(void)
+{
+	if (xpl_is_first_phase()) {
+		hw_data_init();
+		set_uart_mux_conf();
+		setup_early_clocks();
+		uart_soft_reset();
+
+		/* avoid uart gibberish by allowing the clocks to settle */
+		mdelay(50);
+	}
+}
+#endif

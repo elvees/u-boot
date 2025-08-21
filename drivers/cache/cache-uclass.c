@@ -3,7 +3,8 @@
  * Copyright (C) 2019 Intel Corporation <www.intel.com>
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_CACHE
+
 #include <cache.h>
 #include <dm.h>
 

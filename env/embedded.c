@@ -4,7 +4,9 @@
  * Erik Theisen,  Wave 7 Optics, etheisen@mindspring.com.
  */
 
+#ifdef USE_HOSTCC
 #include <linux/kconfig.h>
+#endif
 
 #ifndef __ASSEMBLY__
 #define	__ASSEMBLY__			/* Dirty trick to get only #defines */
@@ -27,7 +29,7 @@
  * Generate embedded environment table
  * inside U-Boot image, if needed.
  */
-#if defined(ENV_IS_EMBEDDED) || defined(CONFIG_BUILD_ENVCRC)
+#if defined(ENV_IS_EMBEDDED)
 /*
  * Put the environment in the .text section when we are building
  * U-Boot proper.  The host based program "tools/envcrc" does not need
@@ -66,6 +68,7 @@
 #endif
 
 #define DEFAULT_ENV_INSTANCE_EMBEDDED
+#include <config.h>
 #include <env_default.h>
 
 #ifdef CONFIG_ENV_ADDR_REDUND
@@ -91,6 +94,6 @@ unsigned long env_size __UBOOT_ENV_SECTION__(env_size) = sizeof(env_t);
 /*
  * Add in absolutes.
  */
-GEN_ABS(env_offset, (CONFIG_ENV_ADDR - CONFIG_SYS_FLASH_BASE));
+GEN_ABS(env_offset, (CONFIG_ENV_ADDR - CFG_SYS_FLASH_BASE));
 
 #endif /* ENV_IS_EMBEDDED */

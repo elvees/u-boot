@@ -15,7 +15,7 @@
  * DENX Software Engineering GmbH
  */
 
-#include <common.h>
+#include <config.h>
 #include <dm.h>
 #include <init.h>
 #include <net.h>
@@ -42,8 +42,8 @@ DECLARE_GLOBAL_DATA_PTR;
 
 static void smartweb_request_gpio(void)
 {
-	gpio_request(CONFIG_SYS_NAND_ENABLE_PIN, "nand ena");
-	gpio_request(CONFIG_SYS_NAND_READY_PIN, "nand rdy");
+	gpio_request(CFG_SYS_NAND_ENABLE_PIN, "nand ena");
+	gpio_request(CFG_SYS_NAND_READY_PIN, "nand rdy");
 	gpio_request(AT91_PIN_PA26, "ena PHY");
 }
 
@@ -72,10 +72,10 @@ static void smartweb_nand_hw_init(void)
 		&smc->cs[3].mode);
 
 	/* Configure RDY/BSY */
-	at91_set_gpio_input(CONFIG_SYS_NAND_READY_PIN, 1);
+	at91_set_gpio_input(CFG_SYS_NAND_READY_PIN, 1);
 
 	/* Enable NandFlash */
-	at91_set_gpio_output(CONFIG_SYS_NAND_ENABLE_PIN, 1);
+	at91_set_gpio_output(CFG_SYS_NAND_ENABLE_PIN, 1);
 }
 
 static void smartweb_macb_hw_init(void)
@@ -167,7 +167,7 @@ int board_init(void)
 #endif
 
 	/* Adress of boot parameters */
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE + 0x100;
 
 	smartweb_nand_hw_init();
 	smartweb_macb_hw_init();
@@ -177,8 +177,8 @@ int board_init(void)
 int dram_init(void)
 {
 	gd->ram_size = get_ram_size(
-		(void *)CONFIG_SYS_SDRAM_BASE,
-		CONFIG_SYS_SDRAM_SIZE);
+		(void *)CFG_SYS_SDRAM_BASE,
+		CFG_SYS_SDRAM_SIZE);
 	return 0;
 }
 
@@ -191,7 +191,7 @@ int board_eth_init(struct bd_info *bis)
 #endif /* CONFIG_MACB */
 #endif
 
-#if defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_XPL_BUILD)
 #include <spl.h>
 #include <nand.h>
 #include <spi_flash.h>
@@ -238,7 +238,7 @@ void at91_spl_board_init(void)
 			 | AT91_SDRAMC_TRP_VAL(2) | AT91_SDRAMC_TRCD_VAL(2) \
 			 | AT91_SDRAMC_TRAS_VAL(5) | AT91_SDRAMC_TXSR_VAL(8))
 
-void mem_init(void)
+void at91_mem_init(void)
 {
 	struct at91_matrix *ma = (struct at91_matrix *)ATMEL_BASE_MATRIX;
 	struct at91_port *port = (struct at91_port *)ATMEL_BASE_PIOC;
@@ -246,7 +246,7 @@ void mem_init(void)
 
 	setting.cr = SDRAM_BASE_CONF;
 	setting.mdr = AT91_SDRAMC_MD_SDRAM;
-	setting.tr = (CONFIG_SYS_MASTER_CLOCK * 7) / 1000000;
+	setting.tr = (CFG_SYS_MASTER_CLOCK * 7) / 1000000;
 
 	/*
 	 * I write here directly in this register, because this

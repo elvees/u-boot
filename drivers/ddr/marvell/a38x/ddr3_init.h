@@ -9,7 +9,6 @@
 #include "ddr_ml_wrapper.h"
 #include "mv_ddr_plat.h"
 
-#include "seq_exec.h"
 #include "ddr3_logging_def.h"
 #include "ddr3_training_hw_algo.h"
 #include "ddr3_training_ip.h"
@@ -46,15 +45,46 @@ enum log_level  {
 #define MISL_PHY_ODT_N_OFFS	0x0
 
 /* Globals */
-extern u8 debug_training, debug_calibration, debug_ddr4_centralization,
-	debug_tap_tuning, debug_dm_tuning;
+#if defined(CONFIG_DDR_IMMUTABLE_DEBUG_SETTINGS)
+static const u8 is_reg_dump = 0;
+static const u8 debug_training_static = DEBUG_LEVEL_ERROR;
+static const u8 debug_training = DEBUG_LEVEL_ERROR;
+static const u8 debug_leveling = DEBUG_LEVEL_ERROR;
+static const u8 debug_centralization = DEBUG_LEVEL_ERROR;
+static const u8 debug_training_ip = DEBUG_LEVEL_ERROR;
+static const u8 debug_training_bist = DEBUG_LEVEL_ERROR;
+static const u8 debug_training_hw_alg = DEBUG_LEVEL_ERROR;
+static const u8 debug_training_access = DEBUG_LEVEL_ERROR;
+static const u8 debug_training_device = DEBUG_LEVEL_ERROR;
+static const u8 debug_pbs = DEBUG_LEVEL_ERROR;
+
+static const u8 debug_tap_tuning = DEBUG_LEVEL_ERROR;
+static const u8 debug_calibration = DEBUG_LEVEL_ERROR;
+static const u8 debug_ddr4_centralization = DEBUG_LEVEL_ERROR;
+static const u8 debug_dm_tuning = DEBUG_LEVEL_ERROR;
+#else /* !CONFIG_DDR_IMMUTABLE_DEBUG_SETTINGS */
 extern u8 is_reg_dump;
+extern u8 debug_training_static;
+extern u8 debug_training;
+extern u8 debug_leveling;
+extern u8 debug_centralization;
+extern u8 debug_training_ip;
+extern u8 debug_training_bist;
+extern u8 debug_training_hw_alg;
+extern u8 debug_training_access;
+extern u8 debug_training_device;
+extern u8 debug_pbs;
+
+extern u8 debug_tap_tuning;
+extern u8 debug_calibration;
+extern u8 debug_ddr4_centralization;
+extern u8 debug_dm_tuning;
+#endif /* !CONFIG_DDR_IMMUTABLE_DEBUG_SETTINGS */
+
 extern u8 generic_init_controller;
 /* list of allowed frequency listed in order of enum mv_ddr_freq */
 extern u32 is_pll_old;
 extern struct pattern_info pattern_table[];
-extern u8 debug_centralization, debug_training_ip, debug_training_bist,
-	debug_pbs, debug_training_static, debug_leveling;
 extern struct hws_tip_config_func_db config_func_info[];
 extern u8 twr_mask_table[];
 extern u8 cl_mask_table[];
@@ -77,7 +107,6 @@ extern u32 g_rtt_nom;
 extern u32 g_rtt_wr;
 extern u32 g_rtt_park;
 
-extern u8 debug_training_access;
 extern u32 first_active_if;
 extern u32 delay_enable, ck_delay, ca_delay;
 extern u32 mask_tune_func;
@@ -117,14 +146,11 @@ extern u32 clamp_tbl[];
 extern u32 freq_mask[MAX_DEVICE_NUM][MV_DDR_FREQ_LAST];
 
 extern u32 maxt_poll_tries;
-extern u32 is_bist_reset_bit;
 
 extern u8 vref_window_size[MAX_INTERFACE_NUM][MAX_BUS_NUM];
 extern u32 effective_cs;
 extern int ddr3_tip_centr_skip_min_win_check;
 extern u32 *dq_map_table;
-
-extern u8 debug_training_hw_alg;
 
 extern u32 start_xsb_offset;
 extern u32 odt_config;
@@ -137,6 +163,10 @@ extern u32 dfs_low_freq;
 extern u32 nominal_avs;
 extern u32 extension_avs;
 
+#if defined(CONFIG_DDR4)
+/* if 1, SSTL & POD have same Vref and workaround is required */
+extern u8 vref_calibration_wa;
+#endif /* CONFIG_DDR4 */
 
 /* Prototypes */
 int ddr3_init(void);
@@ -152,6 +182,13 @@ void ddr3_new_tip_ecc_scrub(void);
 int ddr3_tip_reg_write(u32 dev_num, u32 reg_addr, u32 data);
 int ddr3_tip_reg_read(u32 dev_num, u32 reg_addr, u32 *data, u32 reg_mask);
 int ddr3_silicon_get_ddr_target_freq(u32 *ddr_freq);
+#if defined(CONFIG_DDR4)
+int mv_ddr4_mode_regs_init(u8 dev_num);
+int mv_ddr4_sdram_config(u32 dev_num);
+int mv_ddr4_phy_config(u32 dev_num);
+int mv_ddr4_calibration_adjust(u32 dev_num, u8 vref_en, u8 pod_only);
+int mv_ddr4_training_main_flow(u32 dev_num);
+#endif /* CONFIG_DDR4 */
 
 int print_adll(u32 dev_num, u32 adll[MAX_INTERFACE_NUM * MAX_BUS_NUM]);
 int print_ph(u32 dev_num, u32 adll[MAX_INTERFACE_NUM * MAX_BUS_NUM]);
@@ -188,5 +225,8 @@ unsigned int mv_ddr_misl_phy_drv_ctrl_p_get(void);
 unsigned int mv_ddr_misl_phy_drv_ctrl_n_get(void);
 unsigned int mv_ddr_misl_phy_odt_p_get(void);
 unsigned int mv_ddr_misl_phy_odt_n_get(void);
+#if defined(CONFIG_DDR4)
+void refresh(void);
+#endif
 
 #endif /* _DDR3_INIT_H */

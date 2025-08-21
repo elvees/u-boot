@@ -8,12 +8,10 @@
  *                      Remy Bohmer <linux@bohmer.net>
  */
 
-#include <common.h>
 #include <linux/usb/ch9.h>
 #include <linux/errno.h>
 #include <linux/usb/gadget.h>
 #include <asm/unaligned.h>
-#include "gadget_chips.h"
 
 #define isdigit(c)      ('0' <= (c) && (c) <= '9')
 
@@ -25,7 +23,6 @@ static unsigned epnum;
 /* more than 15 configurable endpoints */
 static unsigned in_epnum;
 #endif
-
 
 /*
  * This should work with endpoints from controller drivers sharing the
@@ -78,12 +75,6 @@ static int ep_matches(
 				 * except the toggle-quirky iso-synch kind
 				 */
 				if ('s' == tmp[2])	/* == "-iso" */
-					return 0;
-				/* for now, avoid PXA "interrupt-in";
-				 * it's documented as never using DATA1.
-				 */
-				if (gadget_is_pxa(gadget)
-						&& 'i' == tmp[1])
 					return 0;
 				break;
 			case USB_ENDPOINT_XFER_BULK:
@@ -144,7 +135,7 @@ static int ep_matches(
 
 	/* report address */
 	if (isdigit(ep->name[2])) {
-		u8	num = simple_strtoul(&ep->name[2], NULL, 10);
+		u8	num = dectoul(&ep->name[2], NULL);
 		desc->bEndpointAddress |= num;
 #ifdef	MANY_ENDPOINTS
 	} else if (desc->bEndpointAddress & USB_DIR_IN) {
@@ -172,18 +163,6 @@ static int ep_matches(
 		return gadget->ops->ep_conf(gadget, ep, desc);
 
 	return 1;
-}
-
-static struct usb_ep *
-find_ep(struct usb_gadget *gadget, const char *name)
-{
-	struct usb_ep	*ep;
-
-	list_for_each_entry(ep, &gadget->ep_list, ep_list) {
-		if (0 == strcmp(ep->name, name))
-			return ep;
-	}
-	return NULL;
 }
 
 /**
@@ -221,75 +200,13 @@ struct usb_ep *usb_ep_autoconfig(
 	struct usb_endpoint_descriptor	*desc
 )
 {
-	struct usb_ep	*ep = NULL;
-	u8		type;
+	struct usb_ep *ep;
 
-	type = desc->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK;
-
-	/* First, apply chip-specific "best usage" knowledge.
-	 * This might make a good usb_gadget_ops hook ...
-	 */
-	if (gadget_is_net2280(gadget) && type == USB_ENDPOINT_XFER_INT) {
-		/* ep-e, ep-f are PIO with only 64 byte fifos */
-		ep = find_ep(gadget, "ep-e");
-		if (ep && ep_matches(gadget, ep, desc))
-			return ep;
-		ep = find_ep(gadget, "ep-f");
-		if (ep && ep_matches(gadget, ep, desc))
-			return ep;
-
-	} else if (gadget_is_goku(gadget)) {
-		if (USB_ENDPOINT_XFER_INT == type) {
-			/* single buffering is enough */
-			ep = find_ep(gadget, "ep3-bulk");
-			if (ep && ep_matches(gadget, ep, desc))
-				return ep;
-		} else if (USB_ENDPOINT_XFER_BULK == type
-				&& (USB_DIR_IN & desc->bEndpointAddress)) {
-			/* DMA may be available */
-			ep = find_ep(gadget, "ep2-bulk");
-			if (ep && ep_matches(gadget, ep, desc))
-				return ep;
-		}
-
-	} else if (gadget_is_sh(gadget) && USB_ENDPOINT_XFER_INT == type) {
-		/* single buffering is enough; maybe 8 byte fifo is too */
-		ep = find_ep(gadget, "ep3in-bulk");
-		if (ep && ep_matches(gadget, ep, desc))
-			return ep;
-
-	} else if (gadget_is_mq11xx(gadget) && USB_ENDPOINT_XFER_INT == type) {
-		ep = find_ep(gadget, "ep1-bulk");
-		if (ep && ep_matches(gadget, ep, desc))
-			return ep;
-#ifndef CONFIG_SPL_BUILD
-	} else if (gadget_is_dwc3(gadget)) {
-		const char *name = NULL;
-		/*
-		 * First try standard, common configuration: ep1in-bulk,
-		 * ep2out-bulk, ep3in-int to match other udc drivers to avoid
-		 * confusion in already deployed software (endpoint numbers
-		 * hardcoded in userspace software/drivers)
-		 */
-		if ((desc->bEndpointAddress & USB_DIR_IN) &&
-		    type == USB_ENDPOINT_XFER_BULK)
-			name = "ep1in";
-		else if ((desc->bEndpointAddress & USB_DIR_IN) == 0 &&
-			 type == USB_ENDPOINT_XFER_BULK)
-			name = "ep2out";
-		else if ((desc->bEndpointAddress & USB_DIR_IN) &&
-			 type == USB_ENDPOINT_XFER_INT)
-			name = "ep3in";
-
-		if (name)
-			ep = find_ep(gadget, name);
-		if (ep && ep_matches(gadget, ep, desc))
-			return ep;
-#endif
-	}
-
-	if (gadget->ops->match_ep)
+	if (gadget->ops->match_ep) {
 		ep = gadget->ops->match_ep(gadget, desc, NULL);
+		if (ep && ep_matches(gadget, ep, desc))
+			return ep;
+	}
 
 	/* Second, look at endpoints until an unclaimed one looks usable */
 	list_for_each_entry(ep, &gadget->ep_list, ep_list) {

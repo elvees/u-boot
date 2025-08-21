@@ -8,7 +8,6 @@
  * MDIO Commands
  */
 
-#include <common.h>
 #include <command.h>
 #include <dm.h>
 #include <miiphy.h>
@@ -254,7 +253,7 @@ static int do_mdio(struct cmd_tbl *cmdtp, int flag, int argc,
 	switch (op[0]) {
 	case 'w':
 		if (pos > 1)
-			data = simple_strtoul(argv[pos--], NULL, 16);
+			data = hextoul(argv[pos--], NULL);
 		/* Intentional fall-through - Get reg for read and write */
 	case 'r':
 		if (pos > 1)

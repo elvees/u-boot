@@ -9,7 +9,6 @@
  * Based on drivers/clk/at91/sama7g5.c from Linux.
  */
 
-#include <common.h>
 #include <clk-uclass.h>
 #include <dm.h>
 #include <dt-bindings/clk/at91.h>
@@ -44,7 +43,8 @@
  * @ID_PLL_ETH_FRAC:		Ethernet PLL fractional clock identifier
  * @ID_PLL_ETH_DIV:		Ethernet PLL divider clock identifier
 
- * @ID_MCK0:			MCK0 clock identifier
+ * @ID_MCK0_PRES:		MCK0 PRES clock identifier
+ * @ID_MCK0_DIV:		MCK0 DIV clock identifier
  * @ID_MCK1:			MCK1 clock identifier
  * @ID_MCK2:			MCK2 clock identifier
  * @ID_MCK3:			MCK3 clock identifier
@@ -95,7 +95,7 @@ enum pmc_clk_ids {
 	ID_PLL_ETH_FRAC		= 20,
 	ID_PLL_ETH_DIV		= 21,
 
-	ID_MCK0			= 22,
+	ID_MCK0_DIV		= 22,
 	ID_MCK1			= 23,
 	ID_MCK2			= 24,
 	ID_MCK3			= 25,
@@ -120,6 +120,8 @@ enum pmc_clk_ids {
 	ID_PCK5			= 41,
 	ID_PCK6			= 42,
 	ID_PCK7			= 43,
+
+	ID_MCK0_PRES		= 44,
 
 	ID_MAX,
 };
@@ -147,7 +149,8 @@ static const char *clk_names[] = {
 	[ID_PLL_AUDIO_DIVPMC]	= "audiopll_divpmcck",
 	[ID_PLL_AUDIO_DIVIO]	= "audiopll_diviock",
 	[ID_PLL_ETH_DIV]	= "ethpll_divpmcck",
-	[ID_MCK0]		= "mck0",
+	[ID_MCK0_DIV]		= "mck0_div",
+	[ID_MCK0_PRES]		= "mck0_pres",
 };
 
 /* Fractional PLL output range. */
@@ -504,7 +507,7 @@ static const struct {
 	struct clk_range r;
 	u8 id;
 } sama7g5_periphck[] = {
-	{ .n = "pioA_clk",	.p = "mck0", .id = 11, },
+	{ .n = "pioA_clk",	.p = "mck0_div", .id = 11, },
 	{ .n = "sfr_clk",	.p = "mck1", .id = 19, },
 	{ .n = "hsmc_clk",	.p = "mck1", .id = 21, },
 	{ .n = "xdmac0_clk",	.p = "mck1", .id = 22, },
@@ -514,7 +517,7 @@ static const struct {
 	{ .n = "aes_clk",	.p = "mck1", .id = 27, },
 	{ .n = "tzaesbasc_clk",	.p = "mck1", .id = 28, },
 	{ .n = "asrc_clk",	.p = "mck1", .id = 30, .r = { .max = 200000000, }, },
-	{ .n = "cpkcc_clk",	.p = "mck0", .id = 32, },
+	{ .n = "cpkcc_clk",	.p = "mck0_div", .id = 32, },
 	{ .n = "csi_clk",	.p = "mck3", .id = 33, .r = { .max = 266000000, }, },
 	{ .n = "csi2dc_clk",	.p = "mck3", .id = 34, .r = { .max = 266000000, }, },
 	{ .n = "eic_clk",	.p = "mck1", .id = 37, },
@@ -1066,19 +1069,8 @@ static const struct {
 	},
 };
 
-/**
- * Clock setup description
- * @cid:	clock id corresponding to clock subsystem
- * @pid:	parent clock id corresponding to clock subsystem
- * @rate:	clock rate
- * @prate:	parent rate
- */
-static const struct pmc_clk_setup {
-	unsigned int cid;
-	unsigned int pid;
-	unsigned long rate;
-	unsigned long prate;
-} sama7g5_clk_setup[] = {
+/* Clock setup description */
+static const struct pmc_clk_setup sama7g5_clk_setup[] = {
 	{
 		.cid = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_PLL_ETH_FRAC),
 		.rate = 625000000,
@@ -1110,20 +1102,20 @@ static const struct pmc_clk_setup {
 
 static int sama7g5_clk_probe(struct udevice *dev)
 {
-	void __iomem *base = (void *)devfdt_get_addr(dev);
+	void __iomem *base = devfdt_get_addr_ptr(dev);
 	unsigned int *clkmuxallocs[SAMA7G5_MAX_MUX_ALLOCS];
 	unsigned int *muxallocs[SAMA7G5_MAX_MUX_ALLOCS];
 	const char *p[10];
 	unsigned int cm[10], m[10], *tmpclkmux, *tmpmux;
-	struct clk clk, *c, *parent;
+	struct clk clk, *c;
 	bool main_osc_bypass;
 	int ret, muxallocindex = 0, clkmuxallocindex = 0, i, j;
 
 	if (IS_ERR(base))
 		return PTR_ERR(base);
 
-	memset(muxallocs,    0, ARRAY_SIZE(muxallocs));
-	memset(clkmuxallocs, 0, ARRAY_SIZE(clkmuxallocs));
+	memset(muxallocs,    0, sizeof(muxallocs));
+	memset(clkmuxallocs, 0, sizeof(clkmuxallocs));
 
 	ret = clk_get_by_index(dev, 0, &clk);
 	if (ret)
@@ -1210,7 +1202,7 @@ static int sama7g5_clk_probe(struct udevice *dev)
 			sama7g5_plls[i].c));
 	}
 
-	/* Register MCK0 clock. */
+	/* Register MCK0_PRES clock. */
 	p[0] = clk_names[ID_MD_SLCK];
 	p[1] = clk_names[ID_MAINCK];
 	p[2] = clk_names[ID_PLL_CPU_DIV];
@@ -1221,15 +1213,19 @@ static int sama7g5_clk_probe(struct udevice *dev)
 	cm[3] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_PLL_SYS_DIV);
 	prepare_mux_table(clkmuxallocs, clkmuxallocindex, tmpclkmux, cm, 2,
 			  fail);
-	clk_dm(AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_MCK0),
-		at91_clk_register_master(base, clk_names[ID_MCK0], p,
+	clk_dm(AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_MCK0_PRES),
+		at91_clk_register_master_pres(base, clk_names[ID_MCK0_PRES], p,
 		4, &mck0_layout, &mck0_characteristics, tmpclkmux));
+
+	clk_dm(AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_MCK0_DIV),
+		at91_clk_register_master_div(base, clk_names[ID_MCK0_DIV],
+		clk_names[ID_MCK0_PRES], &mck0_layout, &mck0_characteristics));
 
 	/* Register MCK1-4 clocks. */
 	p[0] = clk_names[ID_MD_SLCK];
 	p[1] = clk_names[ID_TD_SLCK];
 	p[2] = clk_names[ID_MAINCK];
-	p[3] = clk_names[ID_MCK0];
+	p[3] = clk_names[ID_MCK0_DIV];
 	m[0] = 0;
 	m[1] = 1;
 	m[2] = 2;
@@ -1237,7 +1233,7 @@ static int sama7g5_clk_probe(struct udevice *dev)
 	cm[0] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_MD_SLCK);
 	cm[1] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_TD_SLCK);
 	cm[2] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_MAINCK);
-	cm[3] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_MCK0);
+	cm[3] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_MCK0_DIV);
 	for (i = 0; i < ARRAY_SIZE(sama7g5_mckx); i++) {
 		for (j = 0; j < sama7g5_mckx[i].ep_count; j++) {
 			p[4 + j] = sama7g5_mckx[i].ep[j];
@@ -1267,7 +1263,7 @@ static int sama7g5_clk_probe(struct udevice *dev)
 	p[0] = clk_names[ID_MD_SLCK];
 	p[1] = clk_names[ID_TD_SLCK];
 	p[2] = clk_names[ID_MAINCK];
-	p[3] = clk_names[ID_MCK0];
+	p[3] = clk_names[ID_MCK0_DIV];
 	p[4] = clk_names[ID_PLL_SYS_DIV];
 	p[5] = clk_names[ID_PLL_DDR_DIV];
 	p[6] = clk_names[ID_PLL_IMG_DIV];
@@ -1277,7 +1273,7 @@ static int sama7g5_clk_probe(struct udevice *dev)
 	cm[0] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_MD_SLCK);
 	cm[1] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_TD_SLCK);
 	cm[2] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_MAINCK);
-	cm[3] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_MCK0);
+	cm[3] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_MCK0_DIV);
 	cm[4] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_PLL_SYS_DIV);
 	cm[5] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_PLL_DDR_DIV);
 	cm[6] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_PLL_IMG_DIV);
@@ -1315,7 +1311,7 @@ static int sama7g5_clk_probe(struct udevice *dev)
 	p[0] = clk_names[ID_MD_SLCK];
 	p[1] = clk_names[ID_TD_SLCK];
 	p[2] = clk_names[ID_MAINCK];
-	p[3] = clk_names[ID_MCK0];
+	p[3] = clk_names[ID_MCK0_DIV];
 	m[0] = 0;
 	m[1] = 1;
 	m[2] = 2;
@@ -1323,7 +1319,7 @@ static int sama7g5_clk_probe(struct udevice *dev)
 	cm[0] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_MD_SLCK);
 	cm[1] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_TD_SLCK);
 	cm[2] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_MAINCK);
-	cm[3] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_MCK0);
+	cm[3] = AT91_TO_CLK_ID(PMC_TYPE_CORE, ID_MCK0_DIV);
 	for (i = 0; i < ARRAY_SIZE(sama7g5_gck); i++) {
 		for (j = 0; j < sama7g5_gck[i].ep_count; j++) {
 			p[4 + j] = sama7g5_gck[i].ep[j];
@@ -1345,34 +1341,9 @@ static int sama7g5_clk_probe(struct udevice *dev)
 	}
 
 	/* Setup clocks. */
-	for (i = 0; i < ARRAY_SIZE(sama7g5_clk_setup); i++) {
-		ret = clk_get_by_id(sama7g5_clk_setup[i].cid, &c);
-		if (ret)
-			goto fail;
-
-		if (sama7g5_clk_setup[i].pid) {
-			ret = clk_get_by_id(sama7g5_clk_setup[i].pid, &parent);
-			if (ret)
-				goto fail;
-
-			ret = clk_set_parent(c, parent);
-			if (ret)
-				goto fail;
-
-			if (sama7g5_clk_setup[i].prate) {
-				ret = clk_set_rate(parent,
-					sama7g5_clk_setup[i].prate);
-				if (ret < 0)
-					goto fail;
-			}
-		}
-
-		if (sama7g5_clk_setup[i].rate) {
-			ret = clk_set_rate(c, sama7g5_clk_setup[i].rate);
-			if (ret < 0)
-				goto fail;
-		}
-	}
+	ret = at91_clk_setup(sama7g5_clk_setup, ARRAY_SIZE(sama7g5_clk_setup));
+	if (ret)
+		goto fail;
 
 	return 0;
 

@@ -3,10 +3,10 @@
  * Copyright 2015 Freescale Semiconductor, Inc.
  */
 
-#include <common.h>
 #include <command.h>
 #include <env.h>
 #include <fsl_validate.h>
+#include <vsprintf.h>
 
 int do_esbc_halt(struct cmd_tbl *cmdtp, int flag, int argc,
 		 char *const argv[])
@@ -23,7 +23,7 @@ loop:
 	return 0;
 }
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 static int do_esbc_validate(struct cmd_tbl *cmdtp, int flag, int argc,
 			    char *const argv[])
 {
@@ -40,7 +40,7 @@ static int do_esbc_validate(struct cmd_tbl *cmdtp, int flag, int argc,
 		hash_str = argv[2];
 
 	/* First argument - header address -32/64bit */
-	haddr = (uintptr_t)simple_strtoul(argv[1], NULL, 16);
+	haddr = (uintptr_t)hextoul(argv[1], NULL);
 
 	/* With esbc_validate command, Image address must be
 	 * part of header. So, the function is called
@@ -63,14 +63,14 @@ static int do_esbc_validate(struct cmd_tbl *cmdtp, int flag, int argc,
 }
 
 /***************************************************/
-static char esbc_validate_help_text[] =
+U_BOOT_LONGHELP(esbc_validate,
 	"esbc_validate hdr_addr <hash_val> - Validates signature using\n"
 	"                          RSA verification\n"
 	"                          $hdr_addr Address of header of the image\n"
 	"                          to be validated.\n"
 	"                          $hash_val -Optional\n"
 	"                          It provides Hash of public/srk key to be\n"
-	"                          used to verify signature.\n";
+	"                          used to verify signature.\n");
 
 U_BOOT_CMD(
 	esbc_validate,	3,	0,	do_esbc_validate,

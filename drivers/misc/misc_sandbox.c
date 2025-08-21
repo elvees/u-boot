@@ -4,7 +4,6 @@
  * Mario Six, Guntermann & Drunck GmbH, mario.six@gdsys.cc
  */
 
-#include <common.h>
 #include <dm.h>
 #include <misc.h>
 
@@ -112,8 +111,11 @@ static const struct misc_ops misc_sandbox_ops = {
 int misc_sandbox_probe(struct udevice *dev)
 {
 	struct misc_sandbox_priv *priv = dev_get_priv(dev);
+	/* For eth5 */
+	const u8 mac[] = { 0x02, 0x00, 0x11, 0x22, 0x33, 0x46 };
 
 	priv->enabled = true;
+	memcpy(&priv->mem[16], mac, sizeof(mac));
 
 	return 0;
 }

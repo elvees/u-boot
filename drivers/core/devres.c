@@ -9,7 +9,6 @@
 
 #define LOG_CATEGORY LOGC_DEVRES
 
-#include <common.h>
 #include <log.h>
 #include <malloc.h>
 #include <linux/compat.h>
@@ -232,7 +231,7 @@ static void dump_resources(struct udevice *dev, int depth)
 		       (unsigned long)dr->size, dr->name,
 		       devres_phase_name[dr->phase]);
 
-	list_for_each_entry(child, &dev->child_head, sibling_node)
+	device_foreach_child(child, dev)
 		dump_resources(child, depth + 1);
 }
 

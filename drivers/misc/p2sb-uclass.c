@@ -6,7 +6,8 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_P2SB
+
 #include <dm.h>
 #include <log.h>
 #include <malloc.h>
@@ -181,23 +182,23 @@ int p2sb_set_port_id(struct udevice *dev, int portid)
 
 static int p2sb_child_post_bind(struct udevice *dev)
 {
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
-	struct p2sb_child_plat *pplat = dev_get_parent_plat(dev);
-	int ret;
-	u32 pid;
+	if (CONFIG_IS_ENABLED(OF_REAL)) {
+		struct p2sb_child_plat *pplat = dev_get_parent_plat(dev);
+		int ret;
+		u32 pid;
 
-	ret = dev_read_u32(dev, "intel,p2sb-port-id", &pid);
-	if (ret)
-		return ret;
-	pplat->pid = pid;
-#endif
+		ret = dev_read_u32(dev, "intel,p2sb-port-id", &pid);
+		if (ret)
+			return ret;
+		pplat->pid = pid;
+	}
 
 	return 0;
 }
 
 static int p2sb_post_bind(struct udevice *dev)
 {
-	if (spl_phase() > PHASE_TPL && !CONFIG_IS_ENABLED(OF_PLATDATA))
+	if (xpl_phase() > PHASE_TPL && !CONFIG_IS_ENABLED(OF_PLATDATA))
 		return dm_scan_fdt_dev(dev);
 
 	return 0;

@@ -38,11 +38,11 @@
  *
  */
 
-#include <common.h>
 #include <dm.h>
 #include <i2c.h>
 #include <log.h>
 #include <linux/delay.h>
+#include <linux/printk.h>
 
 #include <asm/io.h>
 #include <asm/omap_i2c.h>
@@ -535,12 +535,16 @@ pr_exit:
 	return res;
 }
 
+#if !CONFIG_IS_ENABLED(DM_I2C)
+/*
+ * The legacy I2C functions. These need to get removed once
+ * all users of this driver are converted to DM.
+ */
+
 /*
  * i2c_read: Function now uses a single I2C read transaction with bulk transfer
  *           of the requested number of bytes (note that the 'i2c md' command
- *           limits this to 16 bytes anyway). If CONFIG_I2C_REPEATED_START is
- *           defined in the board config header, this transaction shall be with
- *           Repeated Start (Sr) between the address and data phases; otherwise
+ *           limits this to 16 bytes anyway).
  *           Stop-Start (P-S) shall be used (some I2C chips do require a P-S).
  *           The address (reg offset) may be 0, 1 or 2 bytes long.
  *           Function now reads correctly from chips that return more than one
@@ -608,16 +612,10 @@ static int __omap24_i2c_read(void __iomem *i2c_base, int ip_rev, int waitdelay,
 
 	if (alen) {
 		/* Must write reg offset first */
-#ifdef CONFIG_I2C_REPEATED_START
-		/* No stop bit, use Repeated Start (Sr) */
-		omap_i2c_write_reg(i2c_base, ip_rev, I2C_CON_EN | I2C_CON_MST |
-				   I2C_CON_STT | I2C_CON_TRX, OMAP_I2C_CON_REG);
-#else
 		/* Stop - Start (P-S) */
 		omap_i2c_write_reg(i2c_base, ip_rev, I2C_CON_EN | I2C_CON_MST |
 				   I2C_CON_STT | I2C_CON_STP | I2C_CON_TRX,
 				   OMAP_I2C_CON_REG);
-#endif
 		/* Send register offset */
 		while (1) {
 			status = wait_for_event(i2c_base, ip_rev, waitdelay);
@@ -836,11 +834,6 @@ wr_exit:
 	return i2c_error;
 }
 
-#if !CONFIG_IS_ENABLED(DM_I2C)
-/*
- * The legacy I2C functions. These need to get removed once
- * all users of this driver are converted to DM.
- */
 static void __iomem *omap24_get_base(struct i2c_adapter *adap)
 {
 	switch (adap->hwadapnr) {
@@ -936,62 +929,34 @@ static int omap24_i2c_probe(struct i2c_adapter *adap, uchar chip)
 	return __omap24_i2c_probe(i2c_base, ip_rev, adap->waitdelay, chip);
 }
 
-#if !defined(CONFIG_SYS_OMAP24_I2C_SPEED1)
-#define CONFIG_SYS_OMAP24_I2C_SPEED1 CONFIG_SYS_OMAP24_I2C_SPEED
-#endif
-#if !defined(CONFIG_SYS_OMAP24_I2C_SLAVE1)
-#define CONFIG_SYS_OMAP24_I2C_SLAVE1 CONFIG_SYS_OMAP24_I2C_SLAVE
-#endif
-
 U_BOOT_I2C_ADAP_COMPLETE(omap24_0, omap24_i2c_init, omap24_i2c_probe,
 			 omap24_i2c_read, omap24_i2c_write, omap24_i2c_setspeed,
-			 CONFIG_SYS_OMAP24_I2C_SPEED,
-			 CONFIG_SYS_OMAP24_I2C_SLAVE,
+			 CONFIG_SYS_I2C_SPEED,
+			 CONFIG_SYS_I2C_SLAVE,
 			 0)
 U_BOOT_I2C_ADAP_COMPLETE(omap24_1, omap24_i2c_init, omap24_i2c_probe,
 			 omap24_i2c_read, omap24_i2c_write, omap24_i2c_setspeed,
-			 CONFIG_SYS_OMAP24_I2C_SPEED1,
-			 CONFIG_SYS_OMAP24_I2C_SLAVE1,
+			 CONFIG_SYS_I2C_SPEED,
+			 CONFIG_SYS_I2C_SLAVE,
 			 1)
 
 #if (CONFIG_SYS_I2C_BUS_MAX > 2)
-#if !defined(CONFIG_SYS_OMAP24_I2C_SPEED2)
-#define CONFIG_SYS_OMAP24_I2C_SPEED2 CONFIG_SYS_OMAP24_I2C_SPEED
-#endif
-#if !defined(CONFIG_SYS_OMAP24_I2C_SLAVE2)
-#define CONFIG_SYS_OMAP24_I2C_SLAVE2 CONFIG_SYS_OMAP24_I2C_SLAVE
-#endif
-
 U_BOOT_I2C_ADAP_COMPLETE(omap24_2, omap24_i2c_init, omap24_i2c_probe,
 			 omap24_i2c_read, omap24_i2c_write, NULL,
-			 CONFIG_SYS_OMAP24_I2C_SPEED2,
-			 CONFIG_SYS_OMAP24_I2C_SLAVE2,
+			 CONFIG_SYS_I2C_SPEED,
+			 CONFIG_SYS_I2C_SLAVE,
 			 2)
 #if (CONFIG_SYS_I2C_BUS_MAX > 3)
-#if !defined(CONFIG_SYS_OMAP24_I2C_SPEED3)
-#define CONFIG_SYS_OMAP24_I2C_SPEED3 CONFIG_SYS_OMAP24_I2C_SPEED
-#endif
-#if !defined(CONFIG_SYS_OMAP24_I2C_SLAVE3)
-#define CONFIG_SYS_OMAP24_I2C_SLAVE3 CONFIG_SYS_OMAP24_I2C_SLAVE
-#endif
-
 U_BOOT_I2C_ADAP_COMPLETE(omap24_3, omap24_i2c_init, omap24_i2c_probe,
 			 omap24_i2c_read, omap24_i2c_write, NULL,
-			 CONFIG_SYS_OMAP24_I2C_SPEED3,
-			 CONFIG_SYS_OMAP24_I2C_SLAVE3,
+			 CONFIG_SYS_I2C_SPEED,
+			 CONFIG_SYS_I2C_SLAVE,
 			 3)
 #if (CONFIG_SYS_I2C_BUS_MAX > 4)
-#if !defined(CONFIG_SYS_OMAP24_I2C_SPEED4)
-#define CONFIG_SYS_OMAP24_I2C_SPEED4 CONFIG_SYS_OMAP24_I2C_SPEED
-#endif
-#if !defined(CONFIG_SYS_OMAP24_I2C_SLAVE4)
-#define CONFIG_SYS_OMAP24_I2C_SLAVE4 CONFIG_SYS_OMAP24_I2C_SLAVE
-#endif
-
 U_BOOT_I2C_ADAP_COMPLETE(omap24_4, omap24_i2c_init, omap24_i2c_probe,
 			 omap24_i2c_read, omap24_i2c_write, NULL,
-			 CONFIG_SYS_OMAP24_I2C_SPEED4,
-			 CONFIG_SYS_OMAP24_I2C_SLAVE4,
+			 CONFIG_SYS_I2C_SPEED,
+			 CONFIG_SYS_I2C_SLAVE,
 			 4)
 #endif
 #endif
@@ -999,28 +964,140 @@ U_BOOT_I2C_ADAP_COMPLETE(omap24_4, omap24_i2c_init, omap24_i2c_probe,
 
 #else /* CONFIG_DM_I2C */
 
+static int __omap24_i2c_xfer_msg(void __iomem *i2c_base, int ip_rev, int waitdelay,
+				 uchar chip, uchar *buffer, int len, u16 i2c_con_reg)
+{
+	int i;
+	u16 status;
+	int i2c_error = 0;
+	int timeout = I2C_TIMEOUT;
+
+	if (len < 0) {
+		printf("%s: data len < 0\n", __func__);
+		return -EINVAL;
+	}
+
+	if (!buffer) {
+		printf("%s: NULL pointer passed\n", __func__);
+		return -EINVAL;
+	}
+
+	if (!(i2c_con_reg & I2C_CON_EN)) {
+		printf("%s: I2C_CON_EN not set\n", __func__);
+		return -EINVAL;
+	}
+
+	/* Set slave address */
+	omap_i2c_write_reg(i2c_base, ip_rev, chip, OMAP_I2C_SA_REG);
+	/* Read/Write len bytes data */
+	omap_i2c_write_reg(i2c_base, ip_rev, len, OMAP_I2C_CNT_REG);
+	/* Configure the I2C_CON register */
+	omap_i2c_write_reg(i2c_base, ip_rev, i2c_con_reg, OMAP_I2C_CON_REG);
+
+	/* read/write data bytewise */
+	for (i = 0; i < len; i++) {
+		status = wait_for_event(i2c_base, ip_rev, waitdelay);
+		/* Ignore I2C_STAT_RRDY in transmitter mode */
+		if (i2c_con_reg & I2C_CON_TRX)
+			status &= ~I2C_STAT_RRDY;
+		else
+			status &= ~I2C_STAT_XRDY;
+
+		/* Try to identify bus that is not padconf'd for I2C */
+		if (status == I2C_STAT_XRDY) {
+			i2c_error = -EREMOTEIO;
+			printf("%s: pads on bus probably not configured (status=0x%x)\n",
+			       __func__, status);
+			goto xfer_exit;
+		}
+		if (status == 0 || (status & I2C_STAT_NACK)) {
+			i2c_error = -EREMOTEIO;
+			printf("%s: error waiting for ACK (status=0x%x)\n",
+			       __func__, status);
+			goto xfer_exit;
+		}
+		if (status & I2C_STAT_XRDY) {
+			/* Transmit data */
+			omap_i2c_write_reg(i2c_base, ip_rev,
+					   buffer[i], OMAP_I2C_DATA_REG);
+			omap_i2c_write_reg(i2c_base, ip_rev,
+					   I2C_STAT_XRDY, OMAP_I2C_STAT_REG);
+		}
+		if (status & I2C_STAT_RRDY) {
+			/* Receive data */
+			*buffer++ = omap_i2c_read_reg(i2c_base, ip_rev,
+							OMAP_I2C_DATA_REG);
+			omap_i2c_write_reg(i2c_base, ip_rev,
+					   I2C_STAT_RRDY, OMAP_I2C_STAT_REG);
+		}
+	}
+
+	/*
+	 * poll ARDY bit for making sure that last byte really has been
+	 * transferred on the bus.
+	 */
+	do {
+		status = wait_for_event(i2c_base, ip_rev, waitdelay);
+	} while (!(status & I2C_STAT_ARDY) && timeout--);
+	if (timeout <= 0) {
+		printf("%s: timed out on last byte!\n", __func__);
+		i2c_error = -EREMOTEIO;
+		goto xfer_exit;
+	} else {
+		omap_i2c_write_reg(i2c_base, ip_rev, I2C_STAT_ARDY, OMAP_I2C_STAT_REG);
+	}
+
+	/* If Stop bit set, flush FIFO. */
+	if (i2c_con_reg & I2C_CON_STP)
+		goto xfer_exit;
+
+	return 0;
+
+xfer_exit:
+	flush_fifo(i2c_base, ip_rev);
+	omap_i2c_write_reg(i2c_base, ip_rev, 0xFFFF, OMAP_I2C_STAT_REG);
+	return i2c_error;
+}
+
 static int omap_i2c_xfer(struct udevice *bus, struct i2c_msg *msg, int nmsgs)
 {
 	struct omap_i2c *priv = dev_get_priv(bus);
 	int ret;
+	u16 i2c_con_reg = 0;
 
-	debug("i2c_xfer: %d messages\n", nmsgs);
-	for (; nmsgs > 0; nmsgs--, msg++) {
-		debug("i2c_xfer: chip=0x%x, len=0x%x\n", msg->addr, msg->len);
-		if (msg->flags & I2C_M_RD) {
-			ret = __omap24_i2c_read(priv->regs, priv->ip_rev,
-						priv->waitdelay,
-						msg->addr, 0, 0, msg->buf,
-						msg->len);
-		} else {
-			ret = __omap24_i2c_write(priv->regs, priv->ip_rev,
-						 priv->waitdelay,
-						 msg->addr, 0, 0, msg->buf,
-						 msg->len);
-		}
+	debug("%s: %d messages\n", __func__, nmsgs);
+	for (int i = 0; i < nmsgs; i++, msg++) {
+		/*
+		 * If previous msg sent a Stop or if this is the first msg
+		 * Wait until bus not busy
+		 */
+		if ((i2c_con_reg & I2C_CON_STP) || (i == 0))
+			if (wait_for_bb(priv->regs, priv->ip_rev, priv->waitdelay))
+				return -EREMOTEIO;
+
+		/* Set Controller mode with Start bit */
+		i2c_con_reg = I2C_CON_EN | I2C_CON_MST | I2C_CON_STT;
+		/* Set Transmitter/Receiver mode if it is a write/read msg */
+		if (msg->flags & I2C_M_RD)
+			i2c_con_reg &= ~I2C_CON_TRX;
+		else
+			i2c_con_reg |= I2C_CON_TRX;
+		/* Send Stop condition (P) by default */
+		if (!IS_ENABLED(CONFIG_SYS_I2C_OMAP24XX_REPEATED_START))
+			i2c_con_reg |= I2C_CON_STP;
+		/* Send Stop if explicitly requested or if this is the last msg */
+		if ((msg->flags & I2C_M_STOP) || (i == nmsgs - 1))
+			i2c_con_reg |= I2C_CON_STP;
+
+		debug("%s: chip=0x%x, len=0x%x, i2c_con_reg=0x%x\n",
+		      __func__, msg->addr, msg->len, i2c_con_reg);
+
+		ret = __omap24_i2c_xfer_msg(priv->regs, priv->ip_rev, priv->waitdelay,
+					    msg->addr, msg->buf, msg->len,
+					    i2c_con_reg);
 		if (ret) {
-			debug("i2c_write: error sending\n");
-			return -EREMOTEIO;
+			printf("%s: errored out at msg %d: %d\n", __func__, i, ret);
+			return ret;
 		}
 	}
 
@@ -1043,7 +1120,7 @@ static int omap_i2c_probe_chip(struct udevice *bus, uint chip_addr,
 	struct omap_i2c *priv = dev_get_priv(bus);
 
 	return __omap24_i2c_probe(priv->regs, priv->ip_rev, priv->waitdelay,
-				  chip_addr);
+				  chip_addr) ? -EREMOTEIO : 0;
 }
 
 static int omap_i2c_probe(struct udevice *bus)
@@ -1062,7 +1139,7 @@ static int omap_i2c_probe(struct udevice *bus)
 	return 0;
 }
 
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 static int omap_i2c_of_to_plat(struct udevice *bus)
 {
 	struct omap_i2c_plat *plat = dev_get_plat(bus);
@@ -1091,7 +1168,7 @@ static const struct dm_i2c_ops omap_i2c_ops = {
 U_BOOT_DRIVER(i2c_omap) = {
 	.name	= "i2c_omap",
 	.id	= UCLASS_I2C,
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	.of_match = omap_i2c_ids,
 	.of_to_plat = omap_i2c_of_to_plat,
 	.plat_auto	= sizeof(struct omap_i2c_plat),

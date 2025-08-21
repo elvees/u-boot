@@ -10,10 +10,11 @@
  *   - drivers/pci/pcie_xilinx.c
  */
 
-#include <common.h>
+#include <config.h>
 #include <dm.h>
 #include <log.h>
 #include <pci.h>
+#include <time.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm-generic/gpio.h>
@@ -115,6 +116,7 @@ struct pcie_dw_mvebu {
 	int first_busno;
 
 	/* IO and MEM PCI regions */
+	int region_count;
 	struct pci_region io;
 	struct pci_region mem;
 };
@@ -267,9 +269,10 @@ static int pcie_dw_mvebu_read_config(const struct udevice *bus, pci_dev_t bdf,
 	debug("(addr,val)=(0x%04x, 0x%08lx)\n", offset, value);
 	*valuep = pci_conv_32_to_size(value, offset, size);
 
-	pcie_dw_prog_outbound_atu(pcie, PCIE_ATU_REGION_INDEX0,
-				  PCIE_ATU_TYPE_IO, pcie->io.phys_start,
-				  pcie->io.bus_start, pcie->io.size);
+	if (pcie->region_count > 1)
+		pcie_dw_prog_outbound_atu(pcie, PCIE_ATU_REGION_INDEX0,
+					  PCIE_ATU_TYPE_IO, pcie->io.phys_start,
+					  pcie->io.bus_start, pcie->io.size);
 
 	return 0;
 }
@@ -312,9 +315,10 @@ static int pcie_dw_mvebu_write_config(struct udevice *bus, pci_dev_t bdf,
 	value = pci_conv_size_to_32(old, value, offset, size);
 	writel(value, va_address);
 
-	pcie_dw_prog_outbound_atu(pcie, PCIE_ATU_REGION_INDEX0,
-				  PCIE_ATU_TYPE_IO, pcie->io.phys_start,
-				  pcie->io.bus_start, pcie->io.size);
+	if (pcie->region_count > 1)
+		pcie_dw_prog_outbound_atu(pcie, PCIE_ATU_REGION_INDEX0,
+					  PCIE_ATU_TYPE_IO, pcie->io.phys_start,
+					  pcie->io.bus_start, pcie->io.size);
 
 	return 0;
 }
@@ -456,9 +460,9 @@ static void pcie_dw_set_host_bars(const void *regs_base)
 	}
 
 	/* Set the BAR base and size towards DDR */
-	bar0 = CONFIG_SYS_SDRAM_BASE & ~0xf;
+	bar0 = CFG_SYS_SDRAM_BASE & ~0xf;
 	bar0 |= PCI_BASE_ADDRESS_MEM_TYPE_32;
-	writel(CONFIG_SYS_SDRAM_BASE, regs_base + PCIE_CONFIG_BAR0);
+	writel(CFG_SYS_SDRAM_BASE, regs_base + PCIE_CONFIG_BAR0);
 
 	reg = ((size >> 20) - 1) << 12;
 	writel(size, regs_base + RESIZABLE_BAR_CTL0);
@@ -513,22 +517,32 @@ static int pcie_dw_mvebu_probe(struct udevice *dev)
 		       hose->first_busno);
 	}
 
-	/* Store the IO and MEM windows settings for future use by the ATU */
-	pcie->io.phys_start = hose->regions[0].phys_start; /* IO base */
-	pcie->io.bus_start  = hose->regions[0].bus_start;  /* IO_bus_addr */
-	pcie->io.size	    = hose->regions[0].size;	   /* IO size */
+	pcie->region_count = hose->region_count - CONFIG_NR_DRAM_BANKS;
 
-	pcie->mem.phys_start = hose->regions[1].phys_start; /* MEM base */
-	pcie->mem.bus_start  = hose->regions[1].bus_start;  /* MEM_bus_addr */
-	pcie->mem.size	     = hose->regions[1].size;	    /* MEM size */
+	/* Store the IO and MEM windows settings for future use by the ATU */
+	if (pcie->region_count > 1) {
+		/* IO base */
+		pcie->io.phys_start = hose->regions[0].phys_start;
+		/* IO_bus_addr */
+		pcie->io.bus_start  = hose->regions[0].bus_start;
+		/* IO size */
+		pcie->io.size       = hose->regions[0].size;
+	}
+
+	/* MEM base */
+	pcie->mem.phys_start = hose->regions[pcie->region_count - 1].phys_start;
+	/* MEM_bus_addr */
+	pcie->mem.bus_start  = hose->regions[pcie->region_count - 1].bus_start;
+	/* MEM size */
+	pcie->mem.size       = hose->regions[pcie->region_count - 1].size;
 
 	pcie_dw_prog_outbound_atu(pcie, PCIE_ATU_REGION_INDEX1,
 				  PCIE_ATU_TYPE_MEM, pcie->mem.phys_start,
 				  pcie->mem.bus_start, pcie->mem.size);
 
-	/* Set the CLASS_REV of RC CFG header to PCI_CLASS_BRIDGE_PCI */
+	/* Set the CLASS_REV of RC CFG header to PCI_CLASS_BRIDGE_PCI_NORMAL */
 	clrsetbits_le32(pcie->ctrl_base + PCI_CLASS_REVISION,
-			0xffff << 16, PCI_CLASS_BRIDGE_PCI << 16);
+			0xffffff << 8, PCI_CLASS_BRIDGE_PCI_NORMAL << 8);
 
 	pcie_dw_set_host_bars(pcie->ctrl_base);
 
@@ -551,14 +565,14 @@ static int pcie_dw_mvebu_of_to_plat(struct udevice *dev)
 	struct pcie_dw_mvebu *pcie = dev_get_priv(dev);
 
 	/* Get the controller base address */
-	pcie->ctrl_base = (void *)devfdt_get_addr_index(dev, 0);
-	if ((fdt_addr_t)pcie->ctrl_base == FDT_ADDR_T_NONE)
+	pcie->ctrl_base = devfdt_get_addr_index_ptr(dev, 0);
+	if (!pcie->ctrl_base)
 		return -EINVAL;
 
 	/* Get the config space base address and size */
-	pcie->cfg_base = (void *)devfdt_get_addr_size_index(dev, 1,
-							 &pcie->cfg_size);
-	if ((fdt_addr_t)pcie->cfg_base == FDT_ADDR_T_NONE)
+	pcie->cfg_base = devfdt_get_addr_size_index_ptr(dev, 1,
+							&pcie->cfg_size);
+	if (!pcie->cfg_base)
 		return -EINVAL;
 
 	return 0;

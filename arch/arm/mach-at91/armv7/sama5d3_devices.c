@@ -4,7 +4,6 @@
  * Bo Shen <voice.shen@atmel.com>
  */
 
-#include <common.h>
 #include <asm/arch/sama5d3.h>
 #include <asm/arch/at91_common.h>
 #include <asm/arch/clk.h>
@@ -167,39 +166,6 @@ void at91_gmac_hw_init(void)
 
 	/* Enable clock */
 	at91_periph_clk_enable(ATMEL_ID_GMAC);
-}
-#endif
-
-#ifdef CONFIG_LCD
-void at91_lcd_hw_init(void)
-{
-	at91_pio3_set_a_periph(AT91_PIO_PORTA, 24, 0);	/* LCDPWM */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA, 25, 0);	/* LCDDISP */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA, 26, 0);	/* LCDVSYNC */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA, 27, 0);	/* LCDHSYNC */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA, 28, 0);	/* LCDDOTCK */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA, 29, 0);	/* LCDDEN */
-
-	/* The lower 16-bit of LCD only available on Port A */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA,  0, 0);	/* LCDD0 */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA,  1, 0);	/* LCDD1 */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA,  2, 0);	/* LCDD2 */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA,  3, 0);	/* LCDD3 */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA,  4, 0);	/* LCDD4 */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA,  5, 0);	/* LCDD5 */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA,  6, 0);	/* LCDD6 */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA,  7, 0);	/* LCDD7 */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA,  8, 0);	/* LCDD8 */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA,  9, 0);	/* LCDD9 */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA, 10, 0);	/* LCDD10 */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA, 11, 0);	/* LCDD11 */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA, 12, 0);	/* LCDD12 */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA, 13, 0);	/* LCDD13 */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA, 14, 0);	/* LCDD14 */
-	at91_pio3_set_a_periph(AT91_PIO_PORTA, 15, 0);	/* LCDD15 */
-
-	/* Enable clock */
-	at91_periph_clk_enable(ATMEL_ID_LCDC);
 }
 #endif
 

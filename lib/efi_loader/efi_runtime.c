@@ -5,17 +5,20 @@
  *  Copyright (c) 2016 Alexander Graf
  */
 
-#include <common.h>
+#define LOG_CATEGORY LOGC_EFI
+
 #include <command.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <elf.h>
 #include <efi_loader.h>
+#include <efi_variable.h>
 #include <log.h>
 #include <malloc.h>
 #include <rtc.h>
 #include <asm/global_data.h>
 #include <u-boot/crc.h>
+#include <asm/sections.h>
 
 /* For manual relocation support */
 DECLARE_GLOBAL_DATA_PTR;
@@ -32,7 +35,7 @@ struct efi_runtime_mmio_list {
 };
 
 /* This list contains all runtime available mmio regions */
-LIST_HEAD(efi_runtime_mmio);
+static LIST_HEAD(efi_runtime_mmio);
 
 static efi_status_t __efi_runtime EFIAPI efi_unimplemented(void);
 
@@ -110,6 +113,7 @@ static __efi_runtime_data efi_uintn_t efi_descriptor_size;
  */
 efi_status_t efi_init_runtime_supported(void)
 {
+	const efi_guid_t efi_guid_efi_rt_var_file = U_BOOT_EFI_RT_VAR_FILE_GUID;
 	efi_status_t ret;
 	struct efi_rt_properties_table *rt_table;
 
@@ -126,6 +130,50 @@ efi_status_t efi_init_runtime_supported(void)
 				EFI_RT_SUPPORTED_GET_NEXT_VARIABLE_NAME |
 				EFI_RT_SUPPORTED_SET_VIRTUAL_ADDRESS_MAP |
 				EFI_RT_SUPPORTED_CONVERT_POINTER;
+
+	if (IS_ENABLED(CONFIG_EFI_VARIABLE_FILE_STORE))
+		rt_table->runtime_services_supported |=
+			EFI_RT_SUPPORTED_QUERY_VARIABLE_INFO;
+
+	if (IS_ENABLED(CONFIG_EFI_RT_VOLATILE_STORE)) {
+		u8 s = 0;
+
+		ret = efi_set_variable_int(u"RTStorageVolatile",
+					   &efi_guid_efi_rt_var_file,
+					   EFI_VARIABLE_BOOTSERVICE_ACCESS |
+					   EFI_VARIABLE_RUNTIME_ACCESS |
+					   EFI_VARIABLE_READ_ONLY,
+					   sizeof(EFI_VAR_FILE_NAME),
+					   EFI_VAR_FILE_NAME, false);
+		if (ret != EFI_SUCCESS) {
+			log_err("Failed to set RTStorageVolatile\n");
+			return ret;
+		}
+		/*
+		 * This variable needs to be visible so users can read it,
+		 * but the real contents are going to be filled during
+		 * GetVariable
+		 */
+		ret = efi_set_variable_int(u"VarToFile",
+					   &efi_guid_efi_rt_var_file,
+					   EFI_VARIABLE_BOOTSERVICE_ACCESS |
+					   EFI_VARIABLE_RUNTIME_ACCESS |
+					   EFI_VARIABLE_READ_ONLY,
+					   sizeof(s),
+					   &s, false);
+		if (ret != EFI_SUCCESS) {
+			log_err("Failed to set VarToFile\n");
+			efi_set_variable_int(u"RTStorageVolatile",
+					     &efi_guid_efi_rt_var_file,
+					     EFI_VARIABLE_BOOTSERVICE_ACCESS |
+					     EFI_VARIABLE_RUNTIME_ACCESS |
+					     EFI_VARIABLE_READ_ONLY,
+					     0, NULL, false);
+
+			return ret;
+		}
+		rt_table->runtime_services_supported |= EFI_RT_SUPPORTED_SET_VARIABLE;
+	}
 
 	/*
 	 * This value must be synced with efi_runtime_detach_list
@@ -462,7 +510,7 @@ efi_status_t __weak __efi_runtime EFIAPI efi_set_time(struct efi_time *time)
  * @scatter_gather_list:	pointer to array of physical pointers
  * Returns:			status code
  */
-efi_status_t __efi_runtime EFIAPI efi_update_capsule_unsupported(
+static efi_status_t __efi_runtime EFIAPI efi_update_capsule_unsupported(
 			struct efi_capsule_header **capsule_header_array,
 			efi_uintn_t capsule_count,
 			u64 scatter_gather_list)
@@ -484,7 +532,7 @@ efi_status_t __efi_runtime EFIAPI efi_update_capsule_unsupported(
  * @reset_type:			type of reset needed for capsule update
  * Returns:			status code
  */
-efi_status_t __efi_runtime EFIAPI efi_query_capsule_caps_unsupported(
+static efi_status_t __efi_runtime EFIAPI efi_query_capsule_caps_unsupported(
 			struct efi_capsule_header **capsule_header_array,
 			efi_uintn_t capsule_count,
 			u64 *maximum_capsule_size,
@@ -669,15 +717,15 @@ static __efi_runtime void efi_relocate_runtime_table(ulong offset)
 void efi_runtime_relocate(ulong offset, struct efi_mem_desc *map)
 {
 #ifdef IS_RELA
-	struct elf_rela *rel = (void*)&__efi_runtime_rel_start;
+	struct elf_rela *rel = (void *)__efi_runtime_rel_start;
 #else
-	struct elf_rel *rel = (void*)&__efi_runtime_rel_start;
-	static ulong lastoff = CONFIG_SYS_TEXT_BASE;
+	struct elf_rel *rel = (void *)__efi_runtime_rel_start;
+	static ulong lastoff = CONFIG_TEXT_BASE;
 #endif
 
 	debug("%s: Relocating to offset=%lx\n", __func__, offset);
-	for (; (ulong)rel < (ulong)&__efi_runtime_rel_stop; rel++) {
-		ulong base = CONFIG_SYS_TEXT_BASE;
+	for (; (uintptr_t)rel < (uintptr_t)__efi_runtime_rel_stop; rel++) {
+		ulong base = CONFIG_TEXT_BASE;
 		ulong *p;
 		ulong newaddr;
 
@@ -696,7 +744,7 @@ void efi_runtime_relocate(ulong offset, struct efi_mem_desc *map)
 		switch (rel->info & R_MASK) {
 		case R_RELATIVE:
 #ifdef IS_RELA
-		newaddr = rel->addend + offset - CONFIG_SYS_TEXT_BASE;
+		newaddr = rel->addend + offset - CONFIG_TEXT_BASE;
 #else
 		newaddr = *p - lastoff + offset;
 #endif
@@ -707,7 +755,7 @@ void efi_runtime_relocate(ulong offset, struct efi_mem_desc *map)
 			extern struct dyn_sym __dyn_sym_start[];
 			newaddr = __dyn_sym_start[symidx].addr + offset;
 #ifdef IS_RELA
-			newaddr -= CONFIG_SYS_TEXT_BASE;
+			newaddr -= CONFIG_TEXT_BASE;
 #endif
 			break;
 		}
@@ -737,7 +785,12 @@ void efi_runtime_relocate(ulong offset, struct efi_mem_desc *map)
 	lastoff = offset;
 #endif
 
-        invalidate_icache_all();
+	/*
+	 * If on x86 a write affects a prefetched instruction,
+	 * the prefetch queue is invalidated.
+	 */
+	if (!CONFIG_IS_ENABLED(X86))
+		invalidate_icache_all();
 }
 
 /**

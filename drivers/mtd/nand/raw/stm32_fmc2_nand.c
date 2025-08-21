@@ -6,12 +6,12 @@
 
 #define LOG_CATEGORY UCLASS_MTD
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <log.h>
 #include <nand.h>
 #include <reset.h>
+#include <asm/gpio.h>
 #include <dm/device_compat.h>
 #include <linux/bitfield.h>
 #include <linux/bitops.h>
@@ -19,6 +19,9 @@
 #include <linux/err.h>
 #include <linux/iopoll.h>
 #include <linux/ioport.h>
+#include <linux/mtd/rawnand.h>
+#include <linux/printk.h>
+#include <linux/time.h>
 
 /* Bad block marker length */
 #define FMC2_BBM_LEN			2
@@ -30,7 +33,7 @@
 #define FMC2_RB_DELAY_US		30
 
 /* Max chip enable */
-#define FMC2_MAX_CE			2
+#define FMC2_MAX_CE			4
 
 /* Timings */
 #define FMC2_THIZ			1
@@ -124,8 +127,6 @@
 #define FMC2_BCHDSR4_EBP7		GENMASK(12, 0)
 #define FMC2_BCHDSR4_EBP8		GENMASK(28, 16)
 
-#define FMC2_NSEC_PER_SEC		1000000000L
-
 #define FMC2_TIMEOUT_5S			5000000
 
 enum stm32_fmc2_ecc {
@@ -148,6 +149,7 @@ struct stm32_fmc2_timings {
 struct stm32_fmc2_nand {
 	struct nand_chip chip;
 	struct stm32_fmc2_timings timings;
+	struct gpio_desc wp_gpio;
 	int ncs;
 	int cs_used[FMC2_MAX_CE];
 };
@@ -156,6 +158,11 @@ static inline struct stm32_fmc2_nand *to_fmc2_nand(struct nand_chip *chip)
 {
 	return container_of(chip, struct stm32_fmc2_nand, chip);
 }
+
+struct stm32_fmc2_nfc_data {
+	int max_ncs;
+	struct udevice *(*get_cdev)(struct udevice *dev);
+};
 
 struct stm32_fmc2_nfc {
 	struct nand_hw_control base;
@@ -166,6 +173,7 @@ struct stm32_fmc2_nfc {
 	fdt_addr_t cmd_base[FMC2_MAX_CE];
 	fdt_addr_t addr_base[FMC2_MAX_CE];
 	struct clk clk;
+	const struct stm32_fmc2_nfc_data *data;
 
 	u8 cs_assigned;
 	int cs_sel;
@@ -599,7 +607,7 @@ static void stm32_fmc2_nfc_calc_timings(struct nand_chip *chip,
 	struct stm32_fmc2_nand *nand = to_fmc2_nand(chip);
 	struct stm32_fmc2_timings *tims = &nand->timings;
 	unsigned long hclk = clk_get_rate(&nfc->clk);
-	unsigned long hclkp = FMC2_NSEC_PER_SEC / (hclk / 1000);
+	unsigned long hclkp = NSEC_PER_SEC / (hclk / 1000);
 	unsigned long timing, tar, tclr, thiz, twait;
 	unsigned long tset_mem, tset_att, thold_mem, thold_att;
 
@@ -732,6 +740,9 @@ static int stm32_fmc2_nfc_setup_interface(struct mtd_info *mtd, int chipnr,
 	if (IS_ERR(sdrt))
 		return PTR_ERR(sdrt);
 
+	if (sdrt->tRC_min < 30000)
+		return -EOPNOTSUPP;
+
 	if (chipnr == NAND_DATA_IFACE_CHECK_ONLY)
 		return 0;
 
@@ -809,7 +820,7 @@ static int stm32_fmc2_nfc_parse_child(struct stm32_fmc2_nfc *nfc, ofnode node)
 	}
 
 	for (i = 0; i < nand->ncs; i++) {
-		if (cs[i] >= FMC2_MAX_CE) {
+		if (cs[i] >= nfc->data->max_ncs) {
 			log_err("Invalid reg value: %d\n", nand->cs_used[i]);
 			return -EINVAL;
 		}
@@ -823,7 +834,10 @@ static int stm32_fmc2_nfc_parse_child(struct stm32_fmc2_nfc *nfc, ofnode node)
 		nand->cs_used[i] = cs[i];
 	}
 
-	nand->chip.flash_node = ofnode_to_offset(node);
+	gpio_request_by_name_nodev(node, "wp-gpios", 0, &nand->wp_gpio,
+				   GPIOD_IS_OUT | GPIOD_IS_OUT_ACTIVE);
+
+	nand->chip.flash_node = node;
 
 	return 0;
 }
@@ -897,9 +911,17 @@ static int stm32_fmc2_nfc_probe(struct udevice *dev)
 	spin_lock_init(&nfc->controller.lock);
 	init_waitqueue_head(&nfc->controller.wq);
 
-	cdev = stm32_fmc2_nfc_get_cdev(dev);
-	if (!cdev)
+	nfc->data = (void *)dev_get_driver_data(dev);
+	if (!nfc->data)
 		return -EINVAL;
+
+	if (nfc->data->get_cdev) {
+		cdev = nfc->data->get_cdev(dev);
+		if (!cdev)
+			return -EINVAL;
+	} else {
+		cdev = dev->parent;
+	}
 
 	ret = stm32_fmc2_nfc_parse_dt(dev, nfc);
 	if (ret)
@@ -912,7 +934,7 @@ static int stm32_fmc2_nfc_probe(struct udevice *dev)
 	if (dev == cdev)
 		start_region = 1;
 
-	for (chip_cs = 0, mem_region = start_region; chip_cs < FMC2_MAX_CE;
+	for (chip_cs = 0, mem_region = start_region; chip_cs < nfc->data->max_ncs;
 	     chip_cs++, mem_region += 3) {
 		if (!(nfc->cs_assigned & BIT(chip_cs)))
 			continue;
@@ -971,6 +993,10 @@ static int stm32_fmc2_nfc_probe(struct udevice *dev)
 	chip->ecc.size = FMC2_ECC_STEP_SIZE;
 	chip->ecc.strength = FMC2_ECC_BCH8;
 
+	/* Disable Write Protect */
+	if (dm_gpio_is_valid(&nand->wp_gpio))
+		dm_gpio_set_value(&nand->wp_gpio, 0);
+
 	ret = nand_scan_ident(mtd, nand->ncs, NULL);
 	if (ret)
 		return ret;
@@ -1020,9 +1046,28 @@ static int stm32_fmc2_nfc_probe(struct udevice *dev)
 	return nand_register(0, mtd);
 }
 
+static const struct stm32_fmc2_nfc_data stm32_fmc2_nfc_mp1_data = {
+	.max_ncs = 2,
+	.get_cdev = stm32_fmc2_nfc_get_cdev,
+};
+
+static const struct stm32_fmc2_nfc_data stm32_fmc2_nfc_mp25_data = {
+	.max_ncs = 4,
+};
+
 static const struct udevice_id stm32_fmc2_nfc_match[] = {
-	{ .compatible = "st,stm32mp15-fmc2" },
-	{ .compatible = "st,stm32mp1-fmc2-nfc" },
+	{
+		.compatible = "st,stm32mp15-fmc2",
+		.data = (ulong)&stm32_fmc2_nfc_mp1_data,
+	},
+	{
+		.compatible = "st,stm32mp1-fmc2-nfc",
+		.data = (ulong)&stm32_fmc2_nfc_mp1_data,
+	},
+	{
+		.compatible = "st,stm32mp25-fmc2-nfc",
+		.data = (ulong)&stm32_fmc2_nfc_mp25_data,
+	},
 	{ /* Sentinel */ }
 };
 

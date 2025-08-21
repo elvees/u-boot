@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ *  Main sandbox64 devicetree
+ */
 /dts-v1/;
 
 #include <config.h>
@@ -17,7 +21,7 @@
 	};
 
 	memory {
-		reg = /bits/ 64 <0 CONFIG_SYS_SDRAM_SIZE>;
+		reg = /bits/ 64 <0 CFG_SYS_SDRAM_SIZE>;
 	};
 
 	reserved-memory {
@@ -42,7 +46,7 @@
 	/* ... */
 	cros_ec: cros-ec {
 		reg = <0 0 0 0>;
-		u-boot,dm-pre-reloc;
+		bootph-all;
 		compatible = "google,cros-ec-sandbox";
 	};
 
@@ -54,7 +58,6 @@
 	eth@10002000 {
 		compatible = "sandbox,eth";
 		reg = <0x0 0x10002000 0x0 0x1000>;
-		fake-host-hwaddr = [00 00 66 44 22 00];
 	};
 
 	i2c_0: i2c@0 {
@@ -78,7 +81,7 @@
 	};
 
 	spi: spi@0 {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0 0 0 0>;
@@ -86,6 +89,19 @@
 		cs-gpios = <0>, <&gpio_a 0>;
 	};
 
+	nvmxip-qspi1@08000000 {
+		compatible = "nvmxip,qspi";
+		reg = /bits/ 64 <0x08000000 0x00200000>;
+		lba_shift = <9>;
+		lba = <4096>;
+	};
+
+	nvmxip-qspi2@08200000 {
+		compatible = "nvmxip,qspi";
+		reg = /bits/ 64 <0x08200000 0x00100000>;
+		lba_shift = <9>;
+		lba = <2048>;
+	};
 };
 
 #include "sandbox.dtsi"

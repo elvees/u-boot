@@ -4,23 +4,31 @@
  *
  * Common bootmode functions for omap based boards
  *
- * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
+ * Copyright (C) 2011, Texas Instruments, Incorporated - https://www.ti.com/
  */
 
-#include <common.h>
 #include <ahci.h>
 #include <log.h>
+#include <dm/uclass.h>
+#include <fs_loader.h>
 #include <spl.h>
 #include <asm/global_data.h>
 #include <asm/omap_common.h>
+#include <asm/omap_sec_common.h>
 #include <asm/arch/omap.h>
 #include <asm/arch/mmc_host_def.h>
 #include <asm/arch/sys_proto.h>
 #include <watchdog.h>
 #include <scsi.h>
 #include <i2c.h>
+#include <remoteproc.h>
+#include <image.h>
 
 DECLARE_GLOBAL_DATA_PTR;
+
+#define IPU1_LOAD_ADDR         (0xa17ff000)
+#define MAX_REMOTECORE_BIN_SIZE (8 * 0x100000)
+#define IPU2_LOAD_ADDR         (IPU1_LOAD_ADDR + MAX_REMOTECORE_BIN_SIZE)
 
 __weak u32 omap_sys_boot_device(void)
 {
@@ -66,23 +74,6 @@ void save_omap_boot_params(void)
 	if (boot_device == BOOT_DEVICE_QSPI_4)
 		boot_device = BOOT_DEVICE_SPI;
 #endif
-#ifdef CONFIG_TI816X
-	/*
-	 * On PG2.0 and later TI816x the values we get when booting are not the
-	 * same as on PG1.0, which is what the defines are based on.  Update
-	 * them as needed.
-	 */
-	if (get_cpu_rev() != 1) {
-		if (boot_device == 0x05) {
-			omap_boot_params->boot_device = BOOT_DEVICE_NAND;
-			boot_device = BOOT_DEVICE_NAND;
-		}
-		if (boot_device == 0x08) {
-			omap_boot_params->boot_device = BOOT_DEVICE_MMC1;
-			boot_device = BOOT_DEVICE_MMC1;
-		}
-	}
-#endif
 	/*
 	 * When booting from peripheral booting, the boot device is not usable
 	 * as-is (unless there is support for it), so the boot device is instead
@@ -104,7 +95,7 @@ void save_omap_boot_params(void)
 			sys_boot_device = 1;
 			break;
 #endif
-#if defined(BOOT_DEVICE_CPGMAC) && !defined(CONFIG_SPL_ETH_SUPPORT)
+#if defined(BOOT_DEVICE_CPGMAC) && !defined(CONFIG_SPL_ETH)
 		case BOOT_DEVICE_CPGMAC:
 			sys_boot_device = 1;
 			break;
@@ -174,8 +165,7 @@ void save_omap_boot_params(void)
 
 	gd->arch.omap_boot_mode = boot_mode;
 
-#if !defined(CONFIG_TI814X) && !defined(CONFIG_TI816X) && \
-    !defined(CONFIG_AM33XX) && !defined(CONFIG_AM43XX)
+#if !defined(CONFIG_AM33XX) && !defined(CONFIG_AM43XX)
 
 	/* CH flags */
 
@@ -183,18 +173,103 @@ void save_omap_boot_params(void)
 #endif
 }
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 u32 spl_boot_device(void)
 {
 	return gd->arch.omap_boot_device;
 }
 
-u32 spl_mmc_boot_mode(const u32 boot_device)
+u32 spl_mmc_boot_mode(struct mmc *mmc, const u32 boot_device)
 {
 	return gd->arch.omap_boot_mode;
 }
 
-void spl_board_init(void)
+int load_firmware(char *name_fw, u32 *loadaddr)
+{
+	struct udevice *fsdev;
+	int size = 0;
+
+	if (!CONFIG_IS_ENABLED(FS_LOADER))
+		return 0;
+
+	if (!*loadaddr)
+		return 0;
+
+	if (!get_fs_loader(&fsdev)) {
+		size = request_firmware_into_buf(fsdev, name_fw,
+						 (void *)*loadaddr, 0, 0);
+	}
+
+	return size;
+}
+
+void spl_boot_ipu(void)
+{
+	int ret, size;
+	u32 loadaddr = IPU1_LOAD_ADDR;
+
+	if (!IS_ENABLED(CONFIG_XPL_BUILD) ||
+	    !IS_ENABLED(CONFIG_REMOTEPROC_TI_IPU))
+		return;
+
+	size = load_firmware("dra7-ipu1-fw.xem4", &loadaddr);
+	if (size <= 0) {
+		pr_err("Firmware loading failed\n");
+		goto skip_ipu1;
+	}
+
+	enable_ipu1_clocks();
+	ret = rproc_dev_init(0);
+	if (ret) {
+		debug("%s: IPU1 failed to initialize on rproc (%d)\n",
+		      __func__, ret);
+		goto skip_ipu1;
+	}
+
+	ret = rproc_load(0, IPU1_LOAD_ADDR, 0x2000000);
+	if (ret) {
+		debug("%s: IPU1 failed to load on rproc (%d)\n", __func__,
+		      ret);
+		goto skip_ipu1;
+	}
+
+	debug("Starting IPU1...\n");
+
+	ret = rproc_start(0);
+	if (ret)
+		debug("%s: IPU1 failed to start (%d)\n", __func__, ret);
+
+skip_ipu1:
+	loadaddr = IPU2_LOAD_ADDR;
+	size = load_firmware("dra7-ipu2-fw.xem4", &loadaddr);
+	if (size <= 0) {
+		pr_err("Firmware loading failed for ipu2\n");
+		return;
+	}
+
+	enable_ipu2_clocks();
+	ret = rproc_dev_init(1);
+	if (ret) {
+		debug("%s: IPU2 failed to initialize on rproc (%d)\n", __func__,
+		      ret);
+		return;
+	}
+
+	ret = rproc_load(1, IPU2_LOAD_ADDR, 0x2000000);
+	if (ret) {
+		debug("%s: IPU2 failed to load on rproc (%d)\n", __func__,
+		      ret);
+		return;
+	}
+
+	debug("Starting IPU2...\n");
+
+	ret = rproc_start(1);
+	if (ret)
+		debug("%s: IPU2 failed to start (%d)\n", __func__, ret);
+}
+
+void spl_soc_init(void)
 {
 	/* Prepare console output */
 	preloader_console_init();
@@ -202,18 +277,18 @@ void spl_board_init(void)
 #if defined(CONFIG_SPL_NAND_SUPPORT) || defined(CONFIG_SPL_ONENAND_SUPPORT)
 	gpmc_init();
 #endif
-#if defined(CONFIG_SPL_I2C_SUPPORT) && !CONFIG_IS_ENABLED(DM_I2C)
-	i2c_init(CONFIG_SYS_OMAP24_I2C_SPEED, CONFIG_SYS_OMAP24_I2C_SLAVE);
+#if defined(CONFIG_SPL_I2C) && !CONFIG_IS_ENABLED(DM_I2C)
+	i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
 #endif
-#if defined(CONFIG_AM33XX) && defined(CONFIG_SPL_MUSB_NEW_SUPPORT)
+#if defined(CONFIG_AM33XX) && defined(CONFIG_SPL_MUSB_NEW)
 	arch_misc_init();
 #endif
 #if defined(CONFIG_HW_WATCHDOG) || defined(CONFIG_WATCHDOG)
 	hw_watchdog_init();
 #endif
-#ifdef CONFIG_AM33XX
-	am33xx_spl_board_init();
-#endif
+	if (IS_ENABLED(CONFIG_XPL_BUILD) &&
+	    IS_ENABLED(CONFIG_REMOTEPROC_TI_IPU))
+		spl_boot_ipu();
 }
 
 void __noreturn jump_to_image_no_args(struct spl_image_info *spl_image)
@@ -230,9 +305,16 @@ void __noreturn jump_to_image_no_args(struct spl_image_info *spl_image)
 }
 #endif
 
-#ifdef CONFIG_SCSI_AHCI_PLAT
-void arch_preboot_os(void)
+#ifdef CONFIG_TI_SECURE_DEVICE
+void board_fit_image_post_process(const void *fit, int node, void **p_image,
+				  size_t *p_size)
 {
-	ahci_reset((void __iomem *)DWC_AHSATA_BASE);
+	secure_boot_verify_image(p_image, p_size);
 }
+
+static void tee_image_process(ulong tee_image, size_t tee_size)
+{
+	secure_tee_install((u32)tee_image);
+}
+U_BOOT_FIT_LOADABLE_HANDLER(IH_TYPE_TEE, tee_image_process);
 #endif

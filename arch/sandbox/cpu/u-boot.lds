@@ -8,41 +8,36 @@
 SECTIONS
 {
 
-	. = ALIGN(4);
-	.u_boot_list : {
-		KEEP(*(SORT(.u_boot_list*)));
+	. = ALIGN(32);
+	__u_boot_list : {
+		KEEP(*(SORT(__u_boot_list*)));
 	}
 
-	__u_boot_sandbox_option_start = .;
-	_u_boot_sandbox_getopt : { *(.u_boot_sandbox_getopt) }
-	__u_boot_sandbox_option_end = .;
-
-	.__efi_runtime_start : {
-		*(.__efi_runtime_start)
+	_u_boot_sandbox_getopt : {
+		*(_u_boot_sandbox_getopt_start)
+		KEEP(*(_u_boot_sandbox_getopt))
+		*(_u_boot_sandbox_getopt_end)
 	}
 
-	.efi_runtime : {
+	efi_runtime : {
+                __efi_runtime_start = .;
 		*(efi_runtime_text)
 		*(efi_runtime_data)
+                __efi_runtime_stop = .;
 	}
 
-	.__efi_runtime_stop : {
-		*(.__efi_runtime_stop)
-	}
-
-	.efi_runtime_rel_start :
-	{
-		*(.__efi_runtime_rel_start)
-	}
-
-	.efi_runtime_rel : {
+	efi_runtime_rel : {
+                __efi_runtime_rel_start = .;
 		*(.relefi_runtime_text)
 		*(.relefi_runtime_data)
+                __efi_runtime_rel_stop = .;
 	}
 
-	.efi_runtime_rel_stop :
+	.dynsym :
 	{
-		*(.__efi_runtime_rel_stop)
+		__dyn_sym_start = .;
+		*(.dynsym)
+		__dyn_sym_end = .;
 	}
 }
 

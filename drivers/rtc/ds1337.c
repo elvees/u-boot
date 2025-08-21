@@ -11,7 +11,7 @@
  * DS1337 Real Time Clock (RTC).
  */
 
-#include <common.h>
+#include <config.h>
 #include <command.h>
 #include <dm.h>
 #include <log.h>
@@ -61,7 +61,6 @@
 #define RTC_STAT_BIT_A1F	0x1	/* Alarm 1 flag			*/
 #define RTC_STAT_BIT_A2F	0x2	/* Alarm 2 flag			*/
 #define RTC_STAT_BIT_OSF	0x80	/* Oscillator stop flag		*/
-
 
 #if !CONFIG_IS_ENABLED(DM_RTC)
 static uchar rtc_read (uchar reg);
@@ -119,7 +118,6 @@ int rtc_get (struct rtc_time *tmp)
 	return rel;
 }
 
-
 /*
  * Set the RTC
  */
@@ -144,7 +142,6 @@ int rtc_set (struct rtc_time *tmp)
 
 	return 0;
 }
-
 
 /*
  * Reset the RTC.  We also enable the oscillator output on the
@@ -176,7 +173,6 @@ void rtc_reset (void)
 #endif
 }
 
-
 /*
  * Helper functions
  */
@@ -184,13 +180,12 @@ void rtc_reset (void)
 static
 uchar rtc_read (uchar reg)
 {
-	return (i2c_reg_read (CONFIG_SYS_I2C_RTC_ADDR, reg));
+	return (i2c_reg_read (CFG_SYS_I2C_RTC_ADDR, reg));
 }
-
 
 static void rtc_write (uchar reg, uchar val)
 {
-	i2c_reg_write (CONFIG_SYS_I2C_RTC_ADDR, reg, val);
+	i2c_reg_write (CFG_SYS_I2C_RTC_ADDR, reg, val);
 }
 #else
 static uchar rtc_read(struct udevice *dev, uchar reg)
@@ -306,7 +301,7 @@ static const struct rtc_ops ds1337_rtc_ops = {
 static const struct udevice_id ds1337_rtc_ids[] = {
 	{ .compatible = "ds1337" },
 	{ .compatible = "ds1338" },
-	{ .compatible = "ds1338" },
+	{ .compatible = "ds1339" },
 	{ }
 };
 

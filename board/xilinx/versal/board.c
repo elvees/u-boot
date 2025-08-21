@@ -1,36 +1,84 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2014 - 2018 Xilinx, Inc.
- * Michal Simek <michal.simek@xilinx.com>
+ * Michal Simek <michal.simek@amd.com>
  */
 
-#include <common.h>
+#include <command.h>
 #include <cpu_func.h>
+#include <dfu.h>
 #include <env.h>
+#include <efi_loader.h>
 #include <fdtdec.h>
 #include <init.h>
+#include <env_internal.h>
 #include <log.h>
 #include <malloc.h>
+#include <memalign.h>
+#include <mmc.h>
+#include <mtd.h>
 #include <time.h>
 #include <asm/cache.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/hardware.h>
 #include <asm/arch/sys_proto.h>
+#include <linux/sizes.h>
 #include <dm/device.h>
 #include <dm/uclass.h>
 #include <versalpl.h>
+#include <zynqmp_firmware.h>
 #include "../common/board.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 
 #if defined(CONFIG_FPGA_VERSALPL)
-static xilinx_desc versalpl = XILINX_VERSAL_DESC;
+static xilinx_desc versalpl = {
+	xilinx_versal, csu_dma, 1, &versal_op, 0, &versal_op, NULL,
+	FPGA_LEGACY
+};
 #endif
+
+static u8 versal_get_bootmode(void)
+{
+	u8 bootmode;
+	u32 reg = 0;
+
+	if (IS_ENABLED(CONFIG_ZYNQMP_FIRMWARE) && current_el() != 3) {
+		reg = zynqmp_pm_get_bootmode_reg();
+	} else {
+		reg = readl(&crp_base->boot_mode_usr);
+	}
+
+	if (reg >> BOOT_MODE_ALT_SHIFT)
+		reg >>= BOOT_MODE_ALT_SHIFT;
+
+	bootmode = reg & BOOT_MODES_MASK;
+
+	return bootmode;
+}
+
+static u32 versal_multi_boot(void)
+{
+	u8 bootmode = versal_get_bootmode();
+	u32 reg = 0;
+
+	/* Mostly workaround for QEMU CI pipeline */
+	if (bootmode == JTAG_MODE)
+		return 0;
+
+	if (IS_ENABLED(CONFIG_ZYNQMP_FIRMWARE) && current_el() != 3)
+		reg = zynqmp_pm_get_pmc_multi_boot_reg();
+	else
+		reg = readl(PMC_MULTI_BOOT_REG);
+
+	return reg & PMC_MULTI_BOOT_MASK;
+}
 
 int board_init(void)
 {
 	printf("EL Level:\tEL%d\n", current_el());
+	printf("Multiboot:\t%d\n", versal_multi_boot());
 
 #if defined(CONFIG_FPGA_VERSALPL)
 	fpga_init();
@@ -72,7 +120,7 @@ int board_early_init_r(void)
 	 * Program freq register in System counter and
 	 * enable system counter.
 	 */
-	writel(COUNTER_FREQUENCY,
+	writel(CONFIG_COUNTER_FREQUENCY,
 	       &iou_scntr_secure->base_frequency_id_register);
 
 	debug("counter val 0x%x\n",
@@ -89,39 +137,33 @@ int board_early_init_r(void)
 	return 0;
 }
 
-static u8 versal_get_bootmode(void)
+unsigned long do_go_exec(ulong (*entry)(int, char * const []), int argc,
+			 char *const argv[])
 {
-	u8 bootmode;
-	u32 reg = 0;
+	int ret = 0;
 
-	reg = readl(&crp_base->boot_mode_usr);
-
-	if (reg >> BOOT_MODE_ALT_SHIFT)
-		reg >>= BOOT_MODE_ALT_SHIFT;
-
-	bootmode = reg & BOOT_MODES_MASK;
-
-	return bootmode;
+	if (current_el() > 1) {
+		smp_kick_all_cpus();
+		dcache_disable();
+		armv8_switch_to_el1(0x0, 0, 0, 0, (unsigned long)entry,
+				    ES_TO_AARCH64);
+	} else {
+		printf("FAIL: current EL is not above EL1\n");
+		ret = EINVAL;
+	}
+	return ret;
 }
 
-int board_late_init(void)
+static int boot_targets_setup(void)
 {
 	u8 bootmode;
 	struct udevice *dev;
 	int bootseq = -1;
 	int bootseq_len = 0;
 	int env_targets_len = 0;
-	const char *mode;
+	const char *mode = NULL;
 	char *new_targets;
 	char *env_targets;
-
-	if (!(gd->flags & GD_FLG_ENV_DEFAULT)) {
-		debug("Saved variables - Skipping\n");
-		return 0;
-	}
-
-	if (!CONFIG_IS_ENABLED(ENV_VARS_UBOOT_RUNTIME_CONFIG))
-		return 0;
 
 	bootmode = versal_get_bootmode();
 
@@ -129,7 +171,7 @@ int board_late_init(void)
 	switch (bootmode) {
 	case USB_MODE:
 		puts("USB_MODE\n");
-		mode = "dfu_usb";
+		mode = "usb_dfu0 usb_dfu1";
 		break;
 	case JTAG_MODE:
 		puts("JTAG_MODE\n");
@@ -137,33 +179,55 @@ int board_late_init(void)
 		break;
 	case QSPI_MODE_24BIT:
 		puts("QSPI_MODE_24\n");
+		if (uclass_get_device_by_name(UCLASS_SPI,
+					      "spi@f1030000", &dev)) {
+			debug("QSPI driver for QSPI device is not present\n");
+			break;
+		}
 		mode = "xspi0";
 		break;
 	case QSPI_MODE_32BIT:
 		puts("QSPI_MODE_32\n");
+		if (uclass_get_device_by_name(UCLASS_SPI,
+					      "spi@f1030000", &dev)) {
+			debug("QSPI driver for QSPI device is not present\n");
+			break;
+		}
 		mode = "xspi0";
 		break;
 	case OSPI_MODE:
 		puts("OSPI_MODE\n");
+		if (uclass_get_device_by_name(UCLASS_SPI,
+					      "spi@f1010000", &dev)) {
+			debug("OSPI driver for OSPI device is not present\n");
+			break;
+		}
 		mode = "xspi0";
 		break;
 	case EMMC_MODE:
 		puts("EMMC_MODE\n");
 		if (uclass_get_device_by_name(UCLASS_MMC,
+					      "mmc@f1050000", &dev) &&
+		    uclass_get_device_by_name(UCLASS_MMC,
 					      "sdhci@f1050000", &dev)) {
-			puts("Boot from EMMC but without SD1 enabled!\n");
-			return -1;
+			debug("SD1 driver for SD1 device is not present\n");
+			break;
 		}
 		debug("mmc1 device found at %p, seq %d\n", dev, dev_seq(dev));
 		mode = "mmc";
 		bootseq = dev_seq(dev);
 		break;
+	case SELECTMAP_MODE:
+		puts("SELECTMAP_MODE\n");
+		break;
 	case SD_MODE:
 		puts("SD_MODE\n");
 		if (uclass_get_device_by_name(UCLASS_MMC,
+					      "mmc@f1040000", &dev) &&
+		    uclass_get_device_by_name(UCLASS_MMC,
 					      "sdhci@f1040000", &dev)) {
-			puts("Boot from SD0 but without SD0 enabled!\n");
-			return -1;
+			debug("SD0 driver for SD0 device is not present\n");
+			break;
 		}
 		debug("mmc0 device found at %p, seq %d\n", dev, dev_seq(dev));
 
@@ -176,9 +240,11 @@ int board_late_init(void)
 	case SD_MODE1:
 		puts("SD_MODE1\n");
 		if (uclass_get_device_by_name(UCLASS_MMC,
+					      "mmc@f1050000", &dev) &&
+		    uclass_get_device_by_name(UCLASS_MMC,
 					      "sdhci@f1050000", &dev)) {
-			puts("Boot from SD1 but without SD1 enabled!\n");
-			return -1;
+			debug("SD1 driver for SD1 device is not present\n");
+			break;
 		}
 		debug("mmc1 device found at %p, seq %d\n", dev, dev_seq(dev));
 
@@ -186,37 +252,63 @@ int board_late_init(void)
 		bootseq = dev_seq(dev);
 		break;
 	default:
-		mode = "";
 		printf("Invalid Boot Mode:0x%x\n", bootmode);
 		break;
 	}
 
-	if (bootseq >= 0) {
-		bootseq_len = snprintf(NULL, 0, "%i", bootseq);
-		debug("Bootseq len: %x\n", bootseq_len);
+	if (mode) {
+		if (bootseq >= 0) {
+			bootseq_len = snprintf(NULL, 0, "%i", bootseq);
+			debug("Bootseq len: %x\n", bootseq_len);
+		}
+
+		/*
+		 * One terminating char + one byte for space between mode
+		 * and default boot_targets
+		 */
+		env_targets = env_get("boot_targets");
+		if (env_targets)
+			env_targets_len = strlen(env_targets);
+
+		new_targets = calloc(1, strlen(mode) + env_targets_len + 2 +
+				     bootseq_len);
+		if (!new_targets)
+			return -ENOMEM;
+
+		if (bootseq >= 0)
+			sprintf(new_targets, "%s%x %s", mode, bootseq,
+				env_targets ? env_targets : "");
+		else
+			sprintf(new_targets, "%s %s", mode,
+				env_targets ? env_targets : "");
+
+		env_set("boot_targets", new_targets);
+		free(new_targets);
 	}
 
-	/*
-	 * One terminating char + one byte for space between mode
-	 * and default boot_targets
-	 */
-	env_targets = env_get("boot_targets");
-	if (env_targets)
-		env_targets_len = strlen(env_targets);
+	return 0;
+}
 
-	new_targets = calloc(1, strlen(mode) + env_targets_len + 2 +
-			     bootseq_len);
-	if (!new_targets)
-		return -ENOMEM;
+int board_late_init(void)
+{
+	int ret;
 
-	if (bootseq >= 0)
-		sprintf(new_targets, "%s%x %s", mode, bootseq,
-			env_targets ? env_targets : "");
-	else
-		sprintf(new_targets, "%s %s", mode,
-			env_targets ? env_targets : "");
+	if (IS_ENABLED(CONFIG_EFI_HAVE_CAPSULE_SUPPORT))
+		configure_capsule_updates();
 
-	env_set("boot_targets", new_targets);
+	if (!(gd->flags & GD_FLG_ENV_DEFAULT)) {
+		debug("Saved variables - Skipping\n");
+		return 0;
+	}
+
+	if (!IS_ENABLED(CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG))
+		return 0;
+
+	if (IS_ENABLED(CONFIG_DISTRO_DEFAULTS)) {
+		ret = boot_targets_setup();
+		if (ret)
+			return ret;
+	}
 
 	return board_late_init_xilinx();
 }
@@ -242,6 +334,119 @@ int dram_init(void)
 	return 0;
 }
 
-void reset_cpu(ulong addr)
+#if !CONFIG_IS_ENABLED(SYSRESET)
+void reset_cpu(void)
 {
+}
+#endif
+
+#if defined(CONFIG_ENV_IS_NOWHERE)
+enum env_location env_get_location(enum env_operation op, int prio)
+{
+	u32 bootmode = versal_get_bootmode();
+
+	if (prio)
+		return ENVL_UNKNOWN;
+
+	switch (bootmode) {
+	case EMMC_MODE:
+	case SD_MODE:
+	case SD1_LSHFT_MODE:
+	case SD_MODE1:
+		if (IS_ENABLED(CONFIG_ENV_IS_IN_FAT))
+			return ENVL_FAT;
+		if (IS_ENABLED(CONFIG_ENV_IS_IN_EXT4))
+			return ENVL_EXT4;
+		return ENVL_NOWHERE;
+	case OSPI_MODE:
+	case QSPI_MODE_24BIT:
+	case QSPI_MODE_32BIT:
+		if (IS_ENABLED(CONFIG_ENV_IS_IN_SPI_FLASH))
+			return ENVL_SPI_FLASH;
+		return ENVL_NOWHERE;
+	case JTAG_MODE:
+	case SELECTMAP_MODE:
+	default:
+		return ENVL_NOWHERE;
+	}
+}
+#endif
+
+#define DFU_ALT_BUF_LEN		SZ_1K
+
+static void mtd_found_part(u32 *base, u32 *size)
+{
+	struct mtd_info *part, *mtd;
+
+	mtd_probe_devices();
+
+	mtd = get_mtd_device_nm("nor0");
+	if (!IS_ERR_OR_NULL(mtd)) {
+		list_for_each_entry(part, &mtd->partitions, node) {
+			debug("0x%012llx-0x%012llx : \"%s\"\n",
+			      part->offset, part->offset + part->size,
+			      part->name);
+
+			if (*base >= part->offset &&
+			    *base < part->offset + part->size) {
+				debug("Found my partition: %d/%s\n",
+				      part->index, part->name);
+				*base = part->offset;
+				*size = part->size;
+				break;
+			}
+		}
+	}
+}
+
+void configure_capsule_updates(void)
+{
+	int bootseq = 0, len = 0;
+	u32 multiboot = versal_multi_boot();
+	u32 bootmode = versal_get_bootmode();
+
+	ALLOC_CACHE_ALIGN_BUFFER(char, buf, DFU_ALT_BUF_LEN);
+
+	memset(buf, 0, DFU_ALT_BUF_LEN);
+
+	multiboot = env_get_hex("multiboot", multiboot);
+
+	switch (bootmode) {
+	case EMMC_MODE:
+	case SD_MODE:
+	case SD1_LSHFT_MODE:
+	case SD_MODE1:
+		bootseq = mmc_get_env_dev();
+
+		len += snprintf(buf + len, DFU_ALT_BUF_LEN, "mmc %d=boot",
+			       bootseq);
+
+		if (multiboot)
+			len += snprintf(buf + len, DFU_ALT_BUF_LEN,
+					"%04d", multiboot);
+
+		len += snprintf(buf + len, DFU_ALT_BUF_LEN, ".bin fat %d 1",
+			       bootseq);
+		break;
+	case QSPI_MODE_24BIT:
+	case QSPI_MODE_32BIT:
+	case OSPI_MODE:
+		{
+			u32 base = multiboot * SZ_32K;
+			u32 size = 0x1500000;
+			u32 limit = size;
+
+			mtd_found_part(&base, &limit);
+
+			len += snprintf(buf + len, DFU_ALT_BUF_LEN,
+					"sf 0:0=boot.bin raw 0x%x 0x%x",
+					base, limit);
+		}
+		break;
+	default:
+		return;
+	}
+
+	update_info.dfu_string = strdup(buf);
+	debug("Capsule DFU: %s\n", update_info.dfu_string);
 }

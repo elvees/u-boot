@@ -11,9 +11,9 @@
  * #defines from the assembly-language output.
  */
 
-#include <common.h>
 #include <asm-offsets.h>
 #include <asm/global_data.h>
+#include <asm/u-boot.h>
 
 #include <linux/kbuild.h>
 
@@ -29,7 +29,10 @@ int main(void)
 	DEFINE(GD_SIZE, sizeof(struct global_data));
 
 	DEFINE(GD_BD, offsetof(struct global_data, bd));
-#if CONFIG_VAL(SYS_MALLOC_F_LEN)
+
+	DEFINE(GD_FLAGS, offsetof(struct global_data, flags));
+
+#if CONFIG_IS_ENABLED(SYS_MALLOC_F)
 	DEFINE(GD_MALLOC_BASE, offsetof(struct global_data, malloc_base));
 #endif
 
@@ -40,6 +43,10 @@ int main(void)
 	DEFINE(GD_START_ADDR_SP, offsetof(struct global_data, start_addr_sp));
 
 	DEFINE(GD_NEW_GD, offsetof(struct global_data, new_gd));
+
+#if CONFIG_IS_ENABLED(ENV_SUPPORT)
+	DEFINE(GD_ENV_ADDR, offsetof(struct global_data, env_addr));
+#endif
 
 	return 0;
 }

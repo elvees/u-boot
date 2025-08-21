@@ -3,7 +3,6 @@
  * Copyright (C) 2014, Bin Meng <bmeng.cn@gmail.com>
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <errno.h>
@@ -25,12 +24,6 @@ DECLARE_GLOBAL_DATA_PTR;
 int checkcpu(void)
 {
 	return 0;
-}
-
-int print_cpuinfo(void)
-{
-	post_code(POST_CPU_INFO);
-	return default_print_cpuinfo();
 }
 
 int fsp_init_phase_pci(void)
@@ -61,22 +54,7 @@ void board_final_init(void)
 		debug("OK\n");
 }
 
-void board_final_cleanup(void)
-{
-	u32 status;
-
-	/* TODO(sjg@chromium.org): This causes Linux to crash */
-	return;
-
-	/* call into FspNotify */
-	debug("Calling into FSP (notify phase INIT_PHASE_END_FIRMWARE): ");
-	status = fsp_notify(NULL, INIT_PHASE_END_FIRMWARE);
-	if (status)
-		debug("fail, error code %x\n", status);
-	else
-		debug("OK\n");
-}
-
+#if CONFIG_IS_ENABLED(DM_RTC)
 int fsp_save_s3_stack(void)
 {
 	struct udevice *dev;
@@ -100,3 +78,4 @@ int fsp_save_s3_stack(void)
 
 	return 0;
 }
+#endif

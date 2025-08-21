@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0+
 #
 # (C) Copyright 2014 - 2016 Xilinx, Inc.
-# Michal Simek <michal.simek@xilinx.com>
+# Michal Simek <michal.simek@amd.com>
 
 obj-y	:= zynqmp.o
 
@@ -26,28 +26,18 @@ endif
 ifeq ($(init-objs),)
 ifneq ($(wildcard $(srctree)/$(src)/psu_init_gpl.c),)
 init-objs := psu_init_gpl.o
-$(if $(CONFIG_SPL_BUILD),\
+$(if $(CONFIG_XPL_BUILD),\
 $(warning Put custom psu_init_gpl.c/h to board/xilinx/zynqmp/custom_hw_platform/))
 endif
 endif
 
-ifdef_any_of = $(filter-out undefined,$(foreach v,$(1),$(origin $(v))))
+obj-$(CONFIG_$(PHASE_)ZYNQMP_PSU_INIT_ENABLED) += $(init-objs)
 
-ifneq ($(call ifdef_any_of, CONFIG_ZYNQMP_PSU_INIT_ENABLED CONFIG_SPL_BUILD),)
-obj-y += $(init-objs)
-endif
-
-ifdef CONFIG_SPL_BUILD
+ifdef CONFIG_XPL_BUILD
 ifneq ($(CONFIG_ZYNQMP_SPL_PM_CFG_OBJ_FILE),"")
-obj-$(CONFIG_SPL_BUILD) += pm_cfg_obj.o
+obj-$(CONFIG_XPL_BUILD) += pm_cfg_obj.o
 $(obj)/pm_cfg_obj.o: $(shell cd $(srctree); readlink -f $(CONFIG_ZYNQMP_SPL_PM_CFG_OBJ_FILE)) FORCE
 endif
-endif
-
-obj-$(CONFIG_MMC_SDHCI_ZYNQ) += tap_delays.o
-
-ifndef CONFIG_SPL_BUILD
-obj-$(CONFIG_CMD_ZYNQMP) += cmds.o
 endif
 
 # Suppress "warning: function declaration isn't a prototype"

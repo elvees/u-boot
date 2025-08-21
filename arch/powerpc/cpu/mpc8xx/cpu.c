@@ -16,8 +16,8 @@
  * Wolfgang Denk <wd@denx.de>
  */
 
-#include <common.h>
 #include <cpu_func.h>
+#include <display_options.h>
 #include <net.h>
 #include <time.h>
 #include <vsprintf.h>
@@ -126,7 +126,7 @@ static int check_CPU(long clock, uint pvr, uint immr)
 		return -1;
 
 	k = (immr << 16) |
-	    in_be16(&immap->im_cpm.cp_dparam16[PROFF_REVNUM / sizeof(u16)]);
+	    in_be16((u16 __iomem *)&immap->im_cpm.cp_dpmem[PROFF_REVNUM]);
 
 	/*
 	 * Some boards use sockets so different CPUs can be used.
@@ -215,19 +215,12 @@ int do_reset(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	/*
 	 * Trying to execute the next instruction at a non-existing address
 	 * should cause a machine check, resulting in reset
-	 */
-#ifdef CONFIG_SYS_RESET_ADDRESS
-	addr = CONFIG_SYS_RESET_ADDRESS;
-#else
-	/*
+	 *
 	 * note: when CONFIG_SYS_MONITOR_BASE points to a RAM address,
 	 * CONFIG_SYS_MONITOR_BASE - sizeof (ulong) is usually a valid address.
-	 * Better pick an address known to be invalid on your system and assign
-	 * it to CONFIG_SYS_RESET_ADDRESS.
-	 * "(ulong)-1" used to be a good choice for many systems...
 	 */
 	addr = CONFIG_SYS_MONITOR_BASE - sizeof(ulong);
-#endif
+
 	((void (*)(void)) addr)();
 	return 1;
 }
@@ -272,16 +265,4 @@ unsigned long get_tbclk(void)
 		return oscclk / 4;
 
 	return oscclk / 16;
-}
-
-/*
- * Initializes on-chip ethernet controllers.
- * to override, implement board_eth_init()
- */
-int cpu_eth_init(struct bd_info *bis)
-{
-#if defined(CONFIG_MPC8XX_FEC)
-	fec_initialize(bis);
-#endif
-	return 0;
 }

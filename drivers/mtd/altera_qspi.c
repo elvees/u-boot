@@ -3,7 +3,6 @@
  * Copyright (C) 2015 Thomas Chou <thomas@wytron.com.tw>
  */
 
-#include <common.h>
 #include <console.h>
 #include <dm.h>
 #include <errno.h>
@@ -97,7 +96,7 @@ int flash_erase(flash_info_t *info, int s_first, int s_last)
 	ret = mtd_erase(mtd, &instr);
 	flash_set_verbose(0);
 	if (ret)
-		return ERR_PROTECTED;
+		return FL_ERR_PROTECTED;
 
 	puts(" done\n");
 	return 0;
@@ -115,7 +114,7 @@ int write_buff(flash_info_t *info, uchar *src, ulong addr, ulong cnt)
 
 	ret = mtd_write(mtd, to, cnt, &retlen, src);
 	if (ret)
-		return ERR_PROTECTED;
+		return FL_ERR_PROTECTED;
 
 	return 0;
 }
@@ -153,7 +152,6 @@ static int altera_qspi_erase(struct mtd_info *mtd, struct erase_info *instr)
 				putc('\n');
 			instr->fail_addr = MTD_FAIL_ADDR_UNKNOWN;
 			instr->state = MTD_ERASE_FAILED;
-			mtd_erase_callback(instr);
 			return -EIO;
 		}
 		flash = pdata->base + addr;
@@ -177,7 +175,6 @@ static int altera_qspi_erase(struct mtd_info *mtd, struct erase_info *instr)
 				writel(stat, &regs->isr); /* clear isr */
 				instr->fail_addr = addr;
 				instr->state = MTD_ERASE_FAILED;
-				mtd_erase_callback(instr);
 				return -EIO;
 			}
 			if (flash_verbose)
@@ -189,7 +186,6 @@ static int altera_qspi_erase(struct mtd_info *mtd, struct erase_info *instr)
 		addr += mtd->erasesize;
 	}
 	instr->state = MTD_ERASE_DONE;
-	mtd_erase_callback(instr);
 
 	return 0;
 }

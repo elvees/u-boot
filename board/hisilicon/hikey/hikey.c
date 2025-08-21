@@ -3,7 +3,6 @@
  * (C) Copyright 2015 Linaro
  * Peter Griffin <peter.griffin@linaro.org>
  */
-#include <common.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <fdt_support.h>
@@ -245,7 +244,6 @@ static int config_sd_carddetect(void)
 	return 0;
 }
 
-
 static void mmc1_init_pll(void)
 {
 	uint32_t data;
@@ -340,7 +338,6 @@ static void mmc0_reset_clk(void)
 	} while (data & PERI_RST0_MMC0);
 }
 
-
 /* PMU SSI is the IP that maps the external PMU hi6553 registers as IO */
 static void hi6220_pmussi_init(void)
 {
@@ -398,7 +395,6 @@ static int init_dwmmc(void)
 	ret |= hi6220_dwmci_add_port(0, HI6220_MMC0_BASE, 8);
 	if (ret)
 		printf("%s: Error adding eMMC port (%d)\n", __func__, ret);
-
 
 	/* take mmc1 (sd slot) out of reset, configure clocks and pinmuxing */
 	mmc1_init_pll();
@@ -486,7 +482,7 @@ int dram_init_banksize(void)
 	return 0;
 }
 
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 	writel(0x48698284, &ao_sc->stat0);
 	wfi();

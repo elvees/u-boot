@@ -4,7 +4,6 @@
  * Copyright (C) 2015 Phil Sutter <phil@nwl.cc>
  */
 
-#include <common.h>
 #include <init.h>
 #include <miiphy.h>
 #include <asm/global_data.h>
@@ -17,6 +16,8 @@
 #include "../drivers/ddr/marvell/axp/ddr3_hw_training.h"
 #include "../arch/arm/mach-mvebu/serdes/axp/high_speed_env_spec.h"
 #include "../arch/arm/mach-mvebu/serdes/axp/board_env_spec.h"
+
+#include "cmd_syno.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -179,9 +180,18 @@ int board_init(void)
 	return 0;
 }
 
-int checkboard(void)
+int board_late_init(void)
 {
-	puts("Board: DS414\n");
+	/* Do late init to ensure successful enumeration of XHCI devices */
+	pci_init();
+	return 0;
+}
 
+int misc_init_r(void)
+{
+	if (!env_get("ethaddr")) {
+		puts("Incomplete environment, populating from SPI flash\n");
+		do_syno_populate(0, NULL);
+	}
 	return 0;
 }

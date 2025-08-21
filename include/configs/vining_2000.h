@@ -10,13 +10,6 @@
 
 #include "mx6_common.h"
 
-#ifdef CONFIG_SPL
-#include "imx6_spl.h"
-#endif
-
-/* Size of malloc() pool */
-#define CONFIG_SYS_MALLOC_LEN		(3 * SZ_1M)
-
 #define BOOT_TARGET_DEVICES(func) \
 	func(MMC, mmc, 0) \
 	func(MMC, mmc, 1) \
@@ -30,57 +23,32 @@
 /* Physical Memory Map */
 #define PHYS_SDRAM			MMDC0_ARB_BASE_ADDR
 
-#define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM
-#define CONFIG_SYS_INIT_RAM_ADDR	IRAM_BASE_ADDR
-#define CONFIG_SYS_INIT_RAM_SIZE	IRAM_SIZE
-
-#define CONFIG_SYS_INIT_SP_OFFSET \
-	(CONFIG_SYS_INIT_RAM_SIZE - GENERATED_GBL_DATA_SIZE)
-#define CONFIG_SYS_INIT_SP_ADDR \
-	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
+#define CFG_SYS_SDRAM_BASE		PHYS_SDRAM
+#define CFG_SYS_INIT_RAM_ADDR	IRAM_BASE_ADDR
+#define CFG_SYS_INIT_RAM_SIZE	IRAM_SIZE
 
 /* MMC Configuration */
-#define CONFIG_SYS_FSL_ESDHC_ADDR	USDHC4_BASE_ADDR
-
-/* I2C Configs */
-#define CONFIG_SYS_I2C
-#define CONFIG_SYS_I2C_MXC
-#define CONFIG_SYS_I2C_MXC_I2C1		/* enable I2C bus 1 */
-#define CONFIG_SYS_I2C_MXC_I2C3		/* enable I2C bus 3 */
-#define CONFIG_SYS_I2C_SPEED		  100000
+#define CFG_SYS_FSL_ESDHC_ADDR	USDHC4_BASE_ADDR
 
 /* PMIC */
-#define CONFIG_POWER
-#define CONFIG_POWER_I2C
-#define CONFIG_POWER_PFUZE100
-#define CONFIG_POWER_PFUZE100_I2C_ADDR	0x08
+#define CFG_POWER_PFUZE100_I2C_ADDR	0x08
 
 /* Network */
-#define IMX_FEC_BASE			ENET_BASE_ADDR
-#define CONFIG_FEC_MXC_PHYADDR          0x0
+#define CFG_FEC_MXC_PHYADDR          0x0
 
-#define CONFIG_FEC_XCV_TYPE             RMII
-#define CONFIG_ETHPRIME                 "FEC"
-
-#define CONFIG_EHCI_HCD_INIT_AFTER_RESET
-#define CONFIG_MXC_USB_PORTSC  (PORT_PTS_UTMI | PORT_PTS_PTW)
-#define CONFIG_MXC_USB_FLAGS   0
-#define CONFIG_USB_MAX_CONTROLLER_COUNT 2
 
 #ifdef CONFIG_CMD_PCI
-#define CONFIG_PCI_SCAN_SHOW
-#define CONFIG_PCIE_IMX
-#define CONFIG_PCIE_IMX_PERST_GPIO	IMX_GPIO_NR(4, 6)
+#define CFG_PCIE_IMX_PERST_GPIO	IMX_GPIO_NR(4, 6)
 #endif
 
-#define CONFIG_IMX6_PWM_PER_CLK 66000000
+#define CFG_IMX6_PWM_PER_CLK 66000000
 
 #ifdef CONFIG_ENV_IS_IN_MMC
 /* 0=user, 1=boot0, 2=boot1, * 4..7=general0..3. */
 #endif
 
-#ifdef CONFIG_SPL_BUILD
-#define CONFIG_MXC_UART_BASE		UART1_BASE
+#ifdef CONFIG_XPL_BUILD
+#define CFG_MXC_UART_BASE		UART1_BASE
 #endif
 
 #endif				/* __CONFIG_H */

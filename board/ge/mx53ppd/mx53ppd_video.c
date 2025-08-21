@@ -8,7 +8,6 @@
  * Fabio Estevam <fabio.estevam@freescale.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <linux/list.h>
 #include <asm/arch/iomux-mx53.h>
@@ -92,4 +91,3 @@ struct display_info_t const displays[] = {
 };
 
 size_t display_count = ARRAY_SIZE(displays);
-

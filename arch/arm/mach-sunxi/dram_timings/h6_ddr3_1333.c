@@ -19,7 +19,6 @@
  * SPDX-License-Identifier:	GPL-2.0+
  */
 
-#include <common.h>
 #include <asm/arch/dram.h>
 #include <asm/arch/cpu.h>
 
@@ -30,7 +29,7 @@
  * MR1: DLL enabled, output strength RZQ/6, Rtt_norm RZQ/2,
  *	write levelling disabled, TDQS disabled, output buffer enabled
  * MR2: manual full array self refresh, dynamic ODT off,
- * 	CAS write latency (CWL): 8
+ *	CAS write latency (CWL): 8
  */
 static u32 mr_ddr3[7] = {
 	0x00001c70, 0x00000040, 0x00000018, 0x00000000,
@@ -38,7 +37,7 @@ static u32 mr_ddr3[7] = {
 };
 
 /* TODO: flexible timing */
-void mctl_set_timing_params(struct dram_para *para)
+void mctl_set_timing_params(void)
 {
 	struct sunxi_mctl_ctl_reg * const mctl_ctl =
 			(struct sunxi_mctl_ctl_reg *)SUNXI_DRAM_CTL0_BASE;

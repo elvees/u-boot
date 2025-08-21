@@ -3,7 +3,6 @@
  * Copyright (C) 2020 Texas Instruments Inc.
  * Pratyush Yadav <p.yadav@ti.com>
  */
-#include <common.h>
 #include <dm.h>
 #include <mux.h>
 #include <mux-internal.h>
@@ -13,6 +12,7 @@
 #include <test/ut.h>
 #include <console.h>
 #include <rand.h>
+#include <time.h>
 
 #define BUF_SIZE		256
 
@@ -25,8 +25,6 @@ static int dm_test_cmd_mux_list(struct unit_test_state *uts)
 	struct mux_control *mux;
 	int i;
 	unsigned long val;
-
-	sandbox_set_enable_memio(true);
 
 	ut_assertok(uclass_get_device_by_name(UCLASS_MUX, "a-mux-controller",
 					      &dev));
@@ -109,7 +107,7 @@ static int dm_test_cmd_mux_list(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_cmd_mux_list, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_cmd_mux_list, UTF_SCAN_PDATA | UTF_SCAN_FDT | UTF_CONSOLE);
 
 static int dm_test_cmd_mux_select(struct unit_test_state *uts)
 {
@@ -118,8 +116,6 @@ static int dm_test_cmd_mux_select(struct unit_test_state *uts)
 	struct mux_control *mux;
 	char cmd[BUF_SIZE];
 	unsigned int i, state;
-
-	sandbox_set_enable_memio(true);
 
 	ut_assertok(uclass_get_device_by_name(UCLASS_MUX, "a-mux-controller",
 					      &dev));
@@ -143,7 +139,7 @@ static int dm_test_cmd_mux_select(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_cmd_mux_select, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_cmd_mux_select, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 static int dm_test_cmd_mux_deselect(struct unit_test_state *uts)
 {
@@ -152,8 +148,6 @@ static int dm_test_cmd_mux_deselect(struct unit_test_state *uts)
 	struct mux_control *mux;
 	char cmd[BUF_SIZE];
 	unsigned int i, state;
-
-	sandbox_set_enable_memio(true);
 
 	ut_assertok(uclass_get_device_by_name(UCLASS_MUX, "a-mux-controller",
 					      &dev));
@@ -174,4 +168,4 @@ static int dm_test_cmd_mux_deselect(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_cmd_mux_deselect, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_cmd_mux_deselect, UTF_SCAN_PDATA | UTF_SCAN_FDT);

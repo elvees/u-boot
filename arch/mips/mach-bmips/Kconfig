@@ -21,9 +21,9 @@ choice
 
 config SOC_BMIPS_BCM3380
 	bool "BMIPS BCM3380 family"
-	select MIPS_L1_CACHE_SHIFT_4
+	select SYS_CACHE_SHIFT_4
 	select MIPS_TUNE_4KC
-	select SUPPORTS_BIG_ENDIAN
+	select SUPPORT_BIG_ENDIAN
 	select SUPPORTS_CPU_MIPS32_R1
 	select SYSRESET_WATCHDOG
 	help
@@ -31,9 +31,9 @@ config SOC_BMIPS_BCM3380
 
 config SOC_BMIPS_BCM6318
 	bool "BMIPS BCM6318 family"
-	select MIPS_L1_CACHE_SHIFT_4
+	select SYS_CACHE_SHIFT_4
 	select MIPS_TUNE_4KC
-	select SUPPORTS_BIG_ENDIAN
+	select SUPPORT_BIG_ENDIAN
 	select SUPPORTS_CPU_MIPS32_R1
 	select SYSRESET_SYSCON
 	help
@@ -41,9 +41,9 @@ config SOC_BMIPS_BCM6318
 
 config SOC_BMIPS_BCM6328
 	bool "BMIPS BCM6328 family"
-	select MIPS_L1_CACHE_SHIFT_4
+	select SYS_CACHE_SHIFT_4
 	select MIPS_TUNE_4KC
-	select SUPPORTS_BIG_ENDIAN
+	select SUPPORT_BIG_ENDIAN
 	select SUPPORTS_CPU_MIPS32_R1
 	select SYSRESET_SYSCON
 	help
@@ -51,9 +51,9 @@ config SOC_BMIPS_BCM6328
 
 config SOC_BMIPS_BCM6338
 	bool "BMIPS BCM6338 family"
-	select MIPS_L1_CACHE_SHIFT_4
+	select SYS_CACHE_SHIFT_4
 	select MIPS_TUNE_4KC
-	select SUPPORTS_BIG_ENDIAN
+	select SUPPORT_BIG_ENDIAN
 	select SUPPORTS_CPU_MIPS32_R1
 	select SYSRESET_SYSCON
 	help
@@ -61,9 +61,9 @@ config SOC_BMIPS_BCM6338
 
 config SOC_BMIPS_BCM6348
 	bool "BMIPS BCM6348 family"
-	select MIPS_L1_CACHE_SHIFT_4
+	select SYS_CACHE_SHIFT_4
 	select MIPS_TUNE_4KC
-	select SUPPORTS_BIG_ENDIAN
+	select SUPPORT_BIG_ENDIAN
 	select SUPPORTS_CPU_MIPS32_R1
 	select SYSRESET_WATCHDOG
 	help
@@ -71,9 +71,9 @@ config SOC_BMIPS_BCM6348
 
 config SOC_BMIPS_BCM6358
 	bool "BMIPS BCM6358 family"
-	select MIPS_L1_CACHE_SHIFT_4
+	select SYS_CACHE_SHIFT_4
 	select MIPS_TUNE_4KC
-	select SUPPORTS_BIG_ENDIAN
+	select SUPPORT_BIG_ENDIAN
 	select SUPPORTS_CPU_MIPS32_R1
 	select SYSRESET_SYSCON
 	help
@@ -81,9 +81,9 @@ config SOC_BMIPS_BCM6358
 
 config SOC_BMIPS_BCM6368
 	bool "BMIPS BCM6368 family"
-	select MIPS_L1_CACHE_SHIFT_4
+	select SYS_CACHE_SHIFT_4
 	select MIPS_TUNE_4KC
-	select SUPPORTS_BIG_ENDIAN
+	select SUPPORT_BIG_ENDIAN
 	select SUPPORTS_CPU_MIPS32_R1
 	select SYSRESET_SYSCON
 	help
@@ -91,9 +91,9 @@ config SOC_BMIPS_BCM6368
 
 config SOC_BMIPS_BCM6362
 	bool "BMIPS BCM6362 family"
-	select MIPS_L1_CACHE_SHIFT_4
+	select SYS_CACHE_SHIFT_4
 	select MIPS_TUNE_4KC
-	select SUPPORTS_BIG_ENDIAN
+	select SUPPORT_BIG_ENDIAN
 	select SUPPORTS_CPU_MIPS32_R1
 	select SYSRESET_SYSCON
 	help
@@ -101,9 +101,9 @@ config SOC_BMIPS_BCM6362
 
 config SOC_BMIPS_BCM63268
 	bool "BMIPS BCM63268 family"
-	select MIPS_L1_CACHE_SHIFT_4
+	select SYS_CACHE_SHIFT_4
 	select MIPS_TUNE_4KC
-	select SUPPORTS_BIG_ENDIAN
+	select SUPPORT_BIG_ENDIAN
 	select SUPPORTS_CPU_MIPS32_R1
 	select SYSRESET_SYSCON
 	help
@@ -112,9 +112,9 @@ config SOC_BMIPS_BCM63268
 
 config SOC_BMIPS_BCM6838
 	bool "BMIPS BCM6838 family"
-	select MIPS_L1_CACHE_SHIFT_4
+	select SYS_CACHE_SHIFT_4
 	select MIPS_TUNE_4KC
-	select SUPPORTS_BIG_ENDIAN
+	select SUPPORT_BIG_ENDIAN
 	select SUPPORTS_CPU_MIPS32_R1
 	select SYSRESET_SYSCON
 	help
@@ -203,6 +203,17 @@ config BOARD_HUAWEI_HG556A
 	  ethernet ports, 3 USB ports, 1 UART, GPIO buttons and LEDs, and
 	  a RT3062F/AR9223 (PCI).
 
+config BOARD_INTENO_XG6846
+	bool "Inteno XG6846"
+	depends on SOC_BMIPS_BCM6328
+	select BMIPS_SUPPORTS_BOOT_RAM
+	help
+	  Inteno XG6846 boards have a BCM6328 SoC with 64 MB of RAM and 16
+	  MB of flash (SPI).
+	  Between its different peripherals there's an integrated switch with 4
+	  ethernet ports, 1 UART, GPIO buttons and LEDs, and a Marvell
+	  DSA switch connected to a fiber SFP.
+
 config BOARD_NETGEAR_CG3100D
 	bool "Netgear CG3100D"
 	depends on SOC_BMIPS_BCM3380
@@ -272,6 +283,7 @@ source "board/comtrend/ct5361/Kconfig"
 source "board/comtrend/vr3032u/Kconfig"
 source "board/comtrend/wap5813n/Kconfig"
 source "board/huawei/hg556a/Kconfig"
+source "board/inteno/xg6846/Kconfig"
 source "board/netgear/cg3100d/Kconfig"
 source "board/netgear/dgnd3700v2/Kconfig"
 source "board/sagem/f@st1704/Kconfig"

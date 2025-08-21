@@ -4,7 +4,7 @@
  *
  */
 
-#include <common.h>
+#include <config.h>
 #include <hang.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
@@ -97,7 +97,7 @@ int board_mmc_init(struct bd_info *bis)
 	 * mmc0                    USDHC1
 	 * mmc1                    USDHC2
 	 */
-	for (i = 0; i < CONFIG_SYS_FSL_USDHC_NUM; i++) {
+	for (i = 0; i < CFG_SYS_FSL_USDHC_NUM; i++) {
 		switch (i) {
 		case 0:
 			init_clk_usdhc(0);

@@ -4,13 +4,22 @@
  * Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
  */
 
-#include <common.h>
 #include <command.h>
 #include <irq_func.h>
 #include <cpu_func.h>
 #include <net.h>
 #include <netdev.h>
 #include <asm/processor.h>
+#include <asm/system.h>
+
+void reset_cpu(void)
+{
+	/* Address error with SR.BL=1 first. */
+	trigger_address_error();
+
+	while (1)
+		;
+}
 
 int checkcpu(void)
 {
@@ -32,7 +41,7 @@ int cleanup_before_linux (void)
 int do_reset(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	disable_interrupts();
-	reset_cpu(0);
+	reset_cpu();
 	return 0;
 }
 

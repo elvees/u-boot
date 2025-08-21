@@ -5,7 +5,6 @@
  * Copyright (C) 2019 Hannes Schmelzer <oe5hpm@oevsv.at>
  * B&R Industrial Automation GmbH - http://www.br-automation.com/ *
  */
-#include <common.h>
 #include <env.h>
 #include <errno.h>
 #include <i2c.h>
@@ -23,14 +22,8 @@
 #define BMODE_PME		12
 #define BMODE_DIAG		15
 
-#if CONFIG_IS_ENABLED(LCD) && !CONFIG_IS_ENABLED(DM_VIDEO)
-#include <lcd.h>
-#define LCD_SETCURSOR(x, y)	lcd_position_cursor(x, y)
-#define LCD_PUTS(x)		lcd_puts(x)
-#else
 #define LCD_SETCURSOR(x, y)
 #define LCD_PUTS(x)
-#endif /* CONFIG_LCD */
 
 static const char *bootmodeascii[16] = {
 	"BOOT",		"reserved",	"reserved",	"reserved",
@@ -59,10 +52,16 @@ static int resetc_init(void)
 {
 	struct udevice *i2cbus;
 	int rc;
+#if !defined(BR_RESETC_I2CBUS)
+	int busno = 0;
+#else
+	int busno = CONFIG_BR_RESETC_I2CBUS;
+#endif
 
-	rc = uclass_get_device_by_seq(UCLASS_I2C, 0, &i2cbus);
+	rc = uclass_get_device_by_seq(UCLASS_I2C, busno, &i2cbus);
+
 	if (rc) {
-		printf("Cannot find I2C bus #0!\n");
+		printf("Cannot find I2C bus #%d!\n", busno);
 		return -1;
 	}
 
@@ -115,8 +114,6 @@ int br_resetc_bmode(void)
 {
 	int rc = 0;
 	u16 regw;
-	u8 regb, scr;
-	int cnt;
 	unsigned int bmode = 0;
 
 	if (!resetc.i2cdev)
@@ -125,68 +122,11 @@ int br_resetc_bmode(void)
 	if (rc != 0)
 		return rc;
 
-	rc = dm_i2c_read(resetc.i2cdev, RSTCTRL_ENHSTATUS, &regb, 1);
-	if (rc != 0) {
-		printf("WARN: cannot read ENHSTATUS from resetcontroller!\n");
-		return -1;
-	}
-
-	rc = dm_i2c_read(resetc.i2cdev, RSTCTRL_SCRATCHREG0, &scr, 1);
-	if (rc != 0) {
-		printf("WARN: cannot read SCRATCHREG from resetcontroller!\n");
-		return -1;
-	}
-
 	board_boot_led(1);
 
-	/* special bootmode from resetcontroller */
-	if (regb & 0x4) {
-		bmode = BMODE_DIAG;
-	} else if (regb & 0x8) {
-		bmode = BMODE_DEFAULTAR;
-	} else if (board_boot_key() != 0) {
-		cnt = 4;
-		do {
-			LCD_SETCURSOR(1, 8);
-			switch (cnt) {
-			case 4:
-				LCD_PUTS
-				("release KEY to enter SERVICE-mode.     ");
-				break;
-			case 3:
-				LCD_PUTS
-				("release KEY to enter DIAGNOSE-mode.    ");
-				break;
-			case 2:
-				LCD_PUTS
-				("release KEY to enter BOOT-mode.        ");
-				break;
-			}
-			mdelay(1000);
-			cnt--;
-			if (board_boot_key() == 0)
-				break;
-		} while (cnt);
-
-		switch (cnt) {
-		case 0:
-			bmode = BMODE_PME;
-			break;
-		case 1:
-			bmode = BMODE_DEFAULTAR;
-			break;
-		case 2:
-			bmode = BMODE_DIAG;
-			break;
-		case 3:
-			bmode = BMODE_SERVICE;
-			break;
-		}
-	} else if ((regb & 0x1) || scr == 0xCC) {
-		bmode = BMODE_PME;
-	} else {
-		bmode = BMODE_RUN;
-	}
+	rc = br_resetc_bmode_get(&bmode);
+	if (rc != 0)
+		return rc;
 
 	LCD_SETCURSOR(1, 8);
 
@@ -232,6 +172,82 @@ int br_resetc_bmode(void)
 
 	printf("Mode:  %s\n", bootmodeascii[regw & 0x0F]);
 	env_set_ulong("b_mode", regw & 0x0F);
+
+	return rc;
+}
+
+int br_resetc_bmode_get(unsigned int *bmode)
+{
+	int rc = 0;
+	u8 regb, scr;
+	int cnt;
+
+	if (!resetc.i2cdev)
+		rc = resetc_init();
+
+	if (rc != 0)
+		return rc;
+
+	rc = dm_i2c_read(resetc.i2cdev, RSTCTRL_ENHSTATUS, &regb, 1);
+	if (rc != 0) {
+		printf("WARN: cannot read ENHSTATUS from resetcontroller!\n");
+		return -1;
+	}
+
+	rc = dm_i2c_read(resetc.i2cdev, RSTCTRL_SCRATCHREG0, &scr, 1);
+	if (rc != 0) {
+		printf("WARN: cannot read SCRATCHREG from resetcontroller!\n");
+		return -1;
+	}
+
+	/* special bootmode from resetcontroller */
+	if (regb & 0x4) {
+		*bmode = BMODE_DIAG;
+	} else if (regb & 0x8) {
+		*bmode = BMODE_DEFAULTAR;
+	} else if (board_boot_key() != 0) {
+		cnt = 4;
+		do {
+			LCD_SETCURSOR(1, 8);
+			switch (cnt) {
+			case 4:
+				LCD_PUTS
+				("release KEY to enter SERVICE-mode.     ");
+				break;
+			case 3:
+				LCD_PUTS
+				("release KEY to enter DIAGNOSE-mode.    ");
+				break;
+			case 2:
+				LCD_PUTS
+				("release KEY to enter BOOT-mode.        ");
+				break;
+			}
+			mdelay(1000);
+			cnt--;
+			if (board_boot_key() == 0)
+				break;
+		} while (cnt);
+
+		switch (cnt) {
+		case 0:
+			*bmode = BMODE_PME;
+			break;
+		case 1:
+			*bmode = BMODE_DEFAULTAR;
+			break;
+		case 2:
+			*bmode = BMODE_DIAG;
+			break;
+		case 3:
+			*bmode = BMODE_SERVICE;
+			break;
+		}
+	} else if ((regb & 0x1) || scr == 0xCC) {
+		*bmode = BMODE_PME;
+	} else {
+		*bmode = BMODE_RUN;
+	}
 
 	return rc;
 }

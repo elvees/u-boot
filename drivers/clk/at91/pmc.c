@@ -4,9 +4,9 @@
  *               Wenyou.Yang <wenyou.yang@atmel.com>
  */
 
-#include <common.h>
 #include <asm/io.h>
 #include <clk-uclass.h>
+#include <linux/clk-provider.h>
 #include "pmc.h"
 
 static int at91_clk_of_xlate(struct clk *clk, struct ofnode_phandle_args *args)
@@ -21,60 +21,12 @@ static int at91_clk_of_xlate(struct clk *clk, struct ofnode_phandle_args *args)
 	return 0;
 }
 
-static ulong at91_clk_get_rate(struct clk *clk)
-{
-	struct clk *c;
-	int ret;
-
-	ret = clk_get_by_id(clk->id, &c);
-	if (ret)
-		return ret;
-
-	return clk_get_rate(c);
-}
-
-static ulong at91_clk_set_rate(struct clk *clk, ulong rate)
-{
-	struct clk *c;
-	int ret;
-
-	ret = clk_get_by_id(clk->id, &c);
-	if (ret)
-		return ret;
-
-	return clk_set_rate(c, rate);
-}
-
-static int at91_clk_enable(struct clk *clk)
-{
-	struct clk *c;
-	int ret;
-
-	ret = clk_get_by_id(clk->id, &c);
-	if (ret)
-		return ret;
-
-	return clk_enable(c);
-}
-
-static int at91_clk_disable(struct clk *clk)
-{
-	struct clk *c;
-	int ret;
-
-	ret = clk_get_by_id(clk->id, &c);
-	if (ret)
-		return ret;
-
-	return clk_disable(c);
-}
-
 const struct clk_ops at91_clk_ops = {
 	.of_xlate	= at91_clk_of_xlate,
-	.set_rate	= at91_clk_set_rate,
-	.get_rate	= at91_clk_get_rate,
-	.enable		= at91_clk_enable,
-	.disable	= at91_clk_disable,
+	.set_rate	= ccf_clk_set_rate,
+	.get_rate	= ccf_clk_get_rate,
+	.enable		= ccf_clk_enable,
+	.disable	= ccf_clk_disable,
 };
 
 /**
@@ -166,4 +118,46 @@ int at91_clk_mux_index_to_val(const u32 *table, u32 num_parents, u32 index)
 		return -EINVAL;
 
 	return table[index];
+}
+
+int at91_clk_setup(const struct pmc_clk_setup *setup, int size)
+{
+	struct clk *c, *parent;
+	int i, ret;
+
+	if (!size)
+		return 0;
+
+	if (!setup)
+		return -EINVAL;
+
+	for (i = 0; i < size; i++) {
+		ret = clk_get_by_id(setup[i].cid, &c);
+		if (ret)
+			return ret;
+
+		if (setup[i].pid) {
+			ret = clk_get_by_id(setup[i].pid, &parent);
+			if (ret)
+				return ret;
+
+			ret = clk_set_parent(c, parent);
+			if (ret)
+				return ret;
+
+			if (setup[i].prate) {
+				ret = clk_set_rate(parent, setup[i].prate);
+				if (ret < 0)
+					return ret;
+			}
+		}
+
+		if (setup[i].rate) {
+			ret = clk_set_rate(c, setup[i].rate);
+			if (ret < 0)
+				return ret;
+		}
+	}
+
+	return 0;
 }

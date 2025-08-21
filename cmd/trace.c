@@ -3,11 +3,11 @@
  * Copyright (c) 2011 The Chromium OS Authors.
  */
 
-#include <common.h>
 #include <command.h>
 #include <env.h>
 #include <mapmem.h>
 #include <trace.h>
+#include <vsprintf.h>
 #include <asm/io.h>
 
 static int get_args(int argc, char *const argv[], char **buff,
@@ -21,8 +21,8 @@ static int get_args(int argc, char *const argv[], char **buff,
 				   *buff_size);
 		*buff_ptr = env_get_ulong("profoffset", 16, 0);
 	} else {
-		*buff_size = simple_strtoul(argv[3], NULL, 16);
-		*buff = map_sysmem(simple_strtoul(argv[2], NULL, 16),
+		*buff_size = hextoul(argv[3], NULL);
+		*buff = map_sysmem(hextoul(argv[2], NULL),
 				   *buff_size);
 		*buff_ptr = 0;
 	};
@@ -100,6 +100,10 @@ int do_trace(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	case 's':
 		trace_print_stats();
 		break;
+	case 'w':
+		if (trace_wipe())
+			return CMD_RET_FAILURE;
+		break;
 	default:
 		return CMD_RET_USAGE;
 	}
@@ -113,6 +117,7 @@ U_BOOT_CMD(
 	"stats                        - display tracing statistics\n"
 	"trace pause                        - pause tracing\n"
 	"trace resume                       - resume tracing\n"
+	"trace wipe                         - wipe traces\n"
 	"trace funclist [<addr> <size>]     - dump function list into buffer\n"
 	"trace calls  [<addr> <size>]       "
 		"- dump function call trace into buffer"

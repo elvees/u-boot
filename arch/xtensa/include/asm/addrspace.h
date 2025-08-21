@@ -7,6 +7,8 @@
 #ifndef _XTENSA_ADDRSPACE_H
 #define _XTENSA_ADDRSPACE_H
 
+#include <config.h>
+
 #include <asm/arch/core.h>
 
 /*
@@ -22,8 +24,8 @@
  * The actual location of memory and IO is the board property.
  */
 
-#define IOADDR(x)		(CONFIG_SYS_IO_BASE + (x))
-#define MEMADDR(x)		(CONFIG_SYS_MEMORY_BASE + (x))
+#define IOADDR(x)		(CFG_SYS_IO_BASE + (x))
+#define MEMADDR(x)		(CFG_SYS_MEMORY_BASE + (x))
 #define PHYSADDR(x)		((x) - XCHAL_VECBASE_RESET_VADDR + \
 				 XCHAL_VECBASE_RESET_PADDR)
 

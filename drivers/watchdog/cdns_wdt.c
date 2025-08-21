@@ -6,7 +6,6 @@
  * Author(s):	Shreenidhi Shedi <yesshedi@gmail.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <wdt.h>
@@ -215,6 +214,45 @@ static int cdns_wdt_stop(struct udevice *dev)
 }
 
 /**
+ * cdns_wdt_expire_now - Expire the watchdog.
+ *
+ * @dev: Watchdog device
+ * @flags: Driver flags
+ *
+ * Access WDT and configure with minimal counter value to expire ASAP.
+ * Expiration issues system reset. When DEBUG is enabled count should be
+ * bigger to at least see debug message.
+ *
+ * Return: Always 0
+ */
+static int cdns_wdt_expire_now(struct udevice *dev, ulong flags)
+{
+	struct cdns_wdt_priv *priv = dev_get_priv(dev);
+	u32 data, count = 0;
+
+#if defined(DEBUG)
+	count = 0x40; /* Increase the value if you need more time */
+	debug("%s: Expire wdt%u\n", __func__, dev_seq(dev));
+#endif
+
+	cdns_wdt_writereg(&priv->regs->zmr, CDNS_WDT_ZMR_ZKEY_VAL);
+
+	count = (count << 2) & CDNS_WDT_CCR_CRV_MASK;
+
+	/* Write counter access key first to be able write to register */
+	data = count | CDNS_WDT_REGISTER_ACCESS_KEY;
+	cdns_wdt_writereg(&priv->regs->ccr, data);
+
+	data = CDNS_WDT_ZMR_WDEN_MASK |  CDNS_WDT_ZMR_RSTEN_MASK |
+		CDNS_WDT_ZMR_ZKEY_VAL;
+
+	cdns_wdt_writereg(&priv->regs->zmr, data);
+	cdns_wdt_writereg(&priv->regs->restart, CDNS_WDT_RESTART_KEY);
+
+	return 0;
+}
+
+/**
  * cdns_wdt_probe - Probe call for the device.
  *
  * @dev: Handle to the udevice structure.
@@ -232,9 +270,9 @@ static int cdns_wdt_of_to_plat(struct udevice *dev)
 {
 	struct cdns_wdt_priv *priv = dev_get_priv(dev);
 
-	priv->regs = (struct cdns_regs *)dev_read_addr(dev);
-	if (IS_ERR(priv->regs))
-		return PTR_ERR(priv->regs);
+	priv->regs = dev_read_addr_ptr(dev);
+	if (!priv->regs)
+		return -EINVAL;
 
 	priv->rst = dev_read_bool(dev, "reset-on-timeout");
 
@@ -247,7 +285,7 @@ static const struct wdt_ops cdns_wdt_ops = {
 	.start = cdns_wdt_start,
 	.reset = cdns_wdt_reset,
 	.stop = cdns_wdt_stop,
-	/* There is no bit/reg/support in IP for expire_now functionality */
+	.expire_now = cdns_wdt_expire_now,
 };
 
 static const struct udevice_id cdns_wdt_ids[] = {

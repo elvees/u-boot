@@ -8,7 +8,6 @@
  * Author: Yixun Lan <yixun.lan@amlogic.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <dm/pinctrl.h>
 #include <dt-bindings/gpio/meson-g12a-gpio.h>
@@ -1220,7 +1219,7 @@ static struct meson_bank meson_g12a_aobus_banks[] = {
 };
 
 static struct meson_pmx_bank meson_g12a_periphs_pmx_banks[] = {
-	/*	 name	 first			last	   	       reg   offset  */
+	/*	 name	 first			last		       reg   offset  */
 	BANK_PMX("Z",    PIN(GPIOZ_0, EE_OFF),   PIN(GPIOZ_15, EE_OFF), 0x6, 0),
 	BANK_PMX("H",    PIN(GPIOH_0, EE_OFF),   PIN(GPIOH_8,  EE_OFF),  0xb, 0),
 	BANK_PMX("BOOT", PIN(BOOT_0,  EE_OFF),   PIN(BOOT_15,  EE_OFF),  0x0, 0),
@@ -1254,7 +1253,7 @@ static struct meson_pinctrl_data meson_g12a_periphs_pinctrl_data = {
 	.num_groups	= ARRAY_SIZE(meson_g12a_periphs_groups),
 	.num_funcs	= ARRAY_SIZE(meson_g12a_periphs_functions),
 	.num_banks	= ARRAY_SIZE(meson_g12a_periphs_banks),
-	.gpio_driver	= &meson_axg_gpio_driver,
+	.gpio_driver	= DM_DRIVER_REF(meson_axg_gpio),
 	.pmx_data	= &meson_g12a_periphs_pmx_banks_data,
 };
 
@@ -1268,7 +1267,7 @@ static struct meson_pinctrl_data meson_g12a_aobus_pinctrl_data = {
 	.num_groups	= ARRAY_SIZE(meson_g12a_aobus_groups),
 	.num_funcs	= ARRAY_SIZE(meson_g12a_aobus_functions),
 	.num_banks	= ARRAY_SIZE(meson_g12a_aobus_banks),
-	.gpio_driver	= &meson_axg_gpio_driver,
+	.gpio_driver	= DM_DRIVER_REF(meson_axg_gpio),
 	.pmx_data	= &meson_g12a_aobus_pmx_banks_data,
 };
 

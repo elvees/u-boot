@@ -12,7 +12,7 @@ config SYS_CPU
 config SYS_CONFIG_NAME
 	default "microchip_mpfs_icicle"
 
-config SYS_TEXT_BASE
+config TEXT_BASE
 	default 0x80000000 if !RISCV_SMODE
 	default 0x80200000 if RISCV_SMODE
 
@@ -24,6 +24,8 @@ config BOARD_SPECIFIC_OPTIONS # dummy
 	imply SMP
 	imply CLK_CCF
 	imply CLK_MPFS
+	imply REGMAP
+	imply SYSCON
 	imply SYS_NS16550
 	imply CMD_DHCP
 	imply CMD_EXT2
@@ -45,5 +47,17 @@ config BOARD_SPECIFIC_OPTIONS # dummy
 	imply MMC_WRITE
 	imply MMC_SDHCI
 	imply MMC_SDHCI_CADENCE
+	imply MMC_SDHCI_ADMA
+	imply MMC_HS200_SUPPORT
+	imply CMD_I2C
+	imply DM_I2C
+	imply SYS_I2C_MICROCHIP
+	imply MTD
+	imply SPI
+	imply DM_SPI
+	imply MICROCHIP_COREQSPI
+	imply MTD_SPI_NAND
+	imply CMD_MTD
+	imply CMD_MTDPARTS
 
 endif

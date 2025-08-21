@@ -25,22 +25,19 @@
 #define __ns16550_h
 
 #include <linux/types.h>
+#include <serial.h>
 
-#ifdef CONFIG_DM_SERIAL
+#if CONFIG_IS_ENABLED(DM_SERIAL) ||  defined(CONFIG_NS16550_DYNAMIC) || \
+	defined(CONFIG_DEBUG_UART)
 /*
  * For driver model we always use one byte per register, and sort out the
- * differences in the driver
+ * differences in the driver. In the case of CONFIG_NS16550_DYNAMIC we do
+ * similar, and CONFIG_DEBUG_UART is responsible for shifts in its own manner.
  */
-#define CONFIG_SYS_NS16550_REG_SIZE (-1)
-#endif
-
-#ifdef CONFIG_NS16550_DYNAMIC
 #define UART_REG(x)	unsigned char x
 #else
 #if !defined(CONFIG_SYS_NS16550_REG_SIZE) || (CONFIG_SYS_NS16550_REG_SIZE == 0)
 #error "Please define NS16550 registers size."
-#elif defined(CONFIG_SYS_NS16550_MEM32) && !defined(CONFIG_DM_SERIAL)
-#define UART_REG(x) u32 x
 #elif (CONFIG_SYS_NS16550_REG_SIZE > 0)
 #define UART_REG(x)						   \
 	unsigned char prepad_##x[CONFIG_SYS_NS16550_REG_SIZE - 1]; \
@@ -62,6 +59,7 @@ enum ns16550_flags {
  * struct ns16550_plat - information about a NS16550 port
  *
  * @base:		Base register address
+ * @size:		Size of register area in bytes
  * @reg_width:		IO accesses size of registers (in bytes, 1 or 4)
  * @reg_shift:		Shift size of registers (0=byte, 1=16bit, 2=32bit...)
  * @reg_offset:		Offset to start of registers (normally 0)
@@ -71,7 +69,8 @@ enum ns16550_flags {
  * @bdf:		PCI slot/function (pci_dev_t)
  */
 struct ns16550_plat {
-	unsigned long base;
+	ulong base;
+	ulong size;
 	int reg_width;
 	int reg_shift;
 	int reg_offset;
@@ -113,10 +112,19 @@ struct ns16550 {
 	UART_REG(scr);		/* 10*/
 	UART_REG(ssr);		/* 11*/
 #endif
-#ifdef CONFIG_DM_SERIAL
+#if CONFIG_IS_ENABLED(DM_SERIAL)
 	struct ns16550_plat *plat;
 #endif
 };
+
+#if CONFIG_IS_ENABLED(DM_SERIAL)
+#define serial_out(value, addr)	\
+	ns16550_writeb(com_port, \
+		(unsigned char *)(addr) - (unsigned char *)com_port, value)
+#define serial_in(addr) \
+	ns16550_readb(com_port, \
+		(unsigned char *)(addr) - (unsigned char *)com_port)
+#endif
 
 #define thr rbr
 #define iir fcr
@@ -227,6 +235,14 @@ void ns16550_putc(struct ns16550 *com_port, char c);
 char ns16550_getc(struct ns16550 *com_port);
 int ns16550_tstc(struct ns16550 *com_port);
 void ns16550_reinit(struct ns16550 *com_port, int baud_divisor);
+int ns16550_serial_putc(struct udevice *dev, const char ch);
+int ns16550_serial_pending(struct udevice *dev, bool input);
+int ns16550_serial_getc(struct udevice *dev);
+int ns16550_serial_setbrg(struct udevice *dev, int baudrate);
+int ns16550_serial_setconfig(struct udevice *dev, uint serial_config);
+int ns16550_serial_getinfo(struct udevice *dev, struct serial_device_info *info);
+void ns16550_writeb(struct ns16550 *port, int offset, int value);
+void ns16550_setbrg(struct ns16550 *com_port, int baud_divisor);
 
 /**
  * ns16550_calc_divisor() - calculate the divisor given clock and baud rate
@@ -237,7 +253,7 @@ void ns16550_reinit(struct ns16550 *com_port, int baud_divisor);
  * @port:	UART port
  * @clock:	UART input clock speed in Hz
  * @baudrate:	Required baud rate
- * @return baud rate divisor that should be used
+ * Return: baud rate divisor that should be used
  */
 int ns16550_calc_divisor(struct ns16550 *port, int clock, int baudrate);
 
@@ -257,7 +273,7 @@ int ns16550_serial_of_to_plat(struct udevice *dev);
  * ns16550_serial_probe() - probe a serial port
  *
  * This sets up the serial port ready for use, except for the baud rate
- * @return 0, or -ve on error
+ * Return: 0, or -ve on error
  */
 int ns16550_serial_probe(struct udevice *dev);
 

@@ -2,8 +2,10 @@
 #define _LINUX_COMPAT_H_
 
 #include <console.h>
+#include <cyclic.h>
 #include <log.h>
 #include <malloc.h>
+#include <time.h>
 
 #include <asm/processor.h>
 
@@ -230,7 +232,6 @@ typedef unsigned long blkcnt_t;
 #define try_to_freeze(...)		0
 #define set_current_state(...)		do { } while (0)
 #define kthread_should_stop(...)	0
-#define schedule()			do { } while (0)
 
 #define setup_timer(timer, func, data) do {} while (0)
 #define del_timer_sync(timer) do {} while (0)
@@ -271,6 +272,8 @@ typedef int	wait_queue_head_t;
 #define __devinit
 #define __devinitdata
 #define __devinitconst
+#define __initconst
+#define __initdata
 
 #define kthread_create(...)	__builtin_return_address(0)
 #define kthread_stop(...)	do { } while (0)

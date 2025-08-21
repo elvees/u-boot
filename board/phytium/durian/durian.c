@@ -5,9 +5,9 @@
  * liuhao  <liuhao@phytium.com.cn>
  */
 
-#include <common.h>
 #include <command.h>
 #include <cpu_func.h>
+#include <event.h>
 #include <init.h>
 #include <log.h>
 #include <asm/armv8/mmu.h>
@@ -42,7 +42,7 @@ int board_init(void)
 	return 0;
 }
 
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 	struct arm_smccc_res res;
 
@@ -99,7 +99,7 @@ int __asm_flush_l3_dcache(void)
 	return 0;
 }
 
-int last_stage_init(void)
+static int last_stage_init(void)
 {
 	int ret;
 
@@ -113,4 +113,4 @@ int last_stage_init(void)
 	}
 	return ret;
 }
-
+EVENT_SPY_SIMPLE(EVT_LAST_STAGE_INIT, last_stage_init);

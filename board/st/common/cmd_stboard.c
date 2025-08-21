@@ -2,14 +2,14 @@
 /*
  * Copyright (C) 2019, STMicroelectronics - All Rights Reserved
  *
- * the st command stboard supports the STMicroelectronics board identification
- * saved in OTP 59.
+ * the command stboard supports the STMicroelectronics board identification
+ * saved in OTP_BOARD.
  *
  * The ST product codification have several element
  * - "Commercial Product Name" (CPN): type of product board (DKX, EVX)
  *   associated to the board ID "MBxxxx"
  * - "Finished Good" or "Finish Good" (FG):
- *   effective content of the product without chip STM32MP1xx (LCD, Wifi,…)
+ *   effective content of the product without chip STM32MP1xx (LCD, Wifi,...)
  * - BOM: cost variant for same FG (for example, several provider of the same
  *   component)
  *
@@ -18,7 +18,7 @@
  * - Finished Good = EVA32MP157A1$AU1
  *
  * Both information are written on board and these information are also saved
- * in OTP59, with:
+ * in OTP_BOARD (59 for STM32MP15x or 60 for STM32MP13x), with:
  * bit [31:16] (hex) => Board id, MBxxxx
  * bit [15:12] (dec) => Variant CPN (1....15)
  * bit [11:8]  (dec) => Revision board (index with A = 1, Z = 26)
@@ -29,11 +29,11 @@
  *   Board: MB<Board> Var<VarCPN>.<VarFG> Rev.<Revision>-<BOM>
  */
 
-#ifndef CONFIG_SPL_BUILD
-#include <common.h>
+#ifndef CONFIG_XPL_BUILD
 #include <command.h>
 #include <console.h>
 #include <misc.h>
+#include <asm/arch/bsec.h>
 #include <dm/device.h>
 #include <dm/uclass.h>
 
@@ -48,6 +48,9 @@ static bool check_stboard(u16 board)
 		0x1298,
 		0x1341,
 		0x1497,
+		0x1605, /* stm32mp25xx-dk */
+		0x1635,
+		0x1936, /* stm32mp25xx-ev1 */
 	};
 
 	for (i = 0; i < ARRAY_SIZE(st_board_id); i++)
@@ -91,15 +94,15 @@ static int do_stboard(struct cmd_tbl *cmdtp, int flag, int argc,
 	ret = misc_read(dev, STM32_BSEC_OTP(BSEC_OTP_BOARD),
 			&otp, sizeof(otp));
 
-	if (ret < 0) {
-		puts("OTP read error");
+	if (ret != sizeof(otp)) {
+		puts("OTP read error\n");
 		return CMD_RET_FAILURE;
 	}
 
 	ret = misc_read(dev, STM32_BSEC_LOCK(BSEC_OTP_BOARD),
 			&lock, sizeof(lock));
-	if (ret < 0) {
-		puts("LOCK read error");
+	if (ret != sizeof(lock)) {
+		puts("LOCK read error\n");
 		return CMD_RET_FAILURE;
 	}
 
@@ -109,7 +112,7 @@ static int do_stboard(struct cmd_tbl *cmdtp, int flag, int argc,
 		else
 			display_stboard(otp);
 		printf("      OTP %d %s locked !\n", BSEC_OTP_BOARD,
-		       lock == 1 ? "" : "NOT");
+		       lock & BSEC_LOCK_PERM ? "" : "NOT");
 		return CMD_RET_SUCCESS;
 	}
 
@@ -172,16 +175,16 @@ static int do_stboard(struct cmd_tbl *cmdtp, int flag, int argc,
 	ret = misc_write(dev, STM32_BSEC_OTP(BSEC_OTP_BOARD),
 			 &otp, sizeof(otp));
 
-	if (ret < 0) {
+	if (ret != sizeof(otp)) {
 		puts("BOARD programming error\n");
 		return CMD_RET_FAILURE;
 	}
 
 	/* write persistent lock */
-	otp = 1;
+	otp = BSEC_LOCK_PERM;
 	ret = misc_write(dev, STM32_BSEC_LOCK(BSEC_OTP_BOARD),
 			 &otp, sizeof(otp));
-	if (ret < 0) {
+	if (ret != sizeof(otp)) {
 		puts("BOARD lock error\n");
 		return CMD_RET_FAILURE;
 	}

@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include <common.h>
+#include <config.h>
 #include <asm/io.h>
 #include <linux/errno.h>
 #include <asm/arch/fpga_manager.h>
@@ -69,4 +69,3 @@ void fpgamgr_program_write(const void *rbf_data, size_t rbf_size)
 		: "+r"(src), "+r"(dst), "+r"(loops32), "+r"(loops4) :
 		: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "cc");
 }
-

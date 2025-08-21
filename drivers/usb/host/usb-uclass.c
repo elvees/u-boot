@@ -6,7 +6,10 @@
  * usb_match_device() modified from Linux kernel v4.0.
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_USB
+
+#include <bootdev.h>
+#include <uthread.h>
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
@@ -15,8 +18,8 @@
 #include <dm/device-internal.h>
 #include <dm/lists.h>
 #include <dm/uclass-internal.h>
+#include <time.h>
 
-extern bool usb_started; /* flag for the started/stopped USB status */
 static bool asynch_allowed;
 
 struct usb_uclass_priv {
@@ -171,6 +174,10 @@ int usb_get_max_xfer_size(struct usb_device *udev, size_t *size)
 	return ops->get_max_xfer_size(bus, size);
 }
 
+#if CONFIG_IS_ENABLED(UTHREAD)
+static struct uthread_mutex mutex = UTHREAD_MUTEX_INITIALIZER;
+#endif
+
 int usb_stop(void)
 {
 	struct udevice *bus;
@@ -179,10 +186,14 @@ int usb_stop(void)
 	struct usb_uclass_priv *uc_priv;
 	int err = 0, ret;
 
+	uthread_mutex_lock(&mutex);
+
 	/* De-activate any devices that have been activated */
 	ret = uclass_get(UCLASS_USB, &uc);
-	if (ret)
+	if (ret) {
+		uthread_mutex_unlock(&mutex);
 		return ret;
+	}
 
 	uc_priv = uclass_get_priv(uc);
 
@@ -207,31 +218,33 @@ int usb_stop(void)
 #ifdef CONFIG_USB_STORAGE
 	usb_stor_reset();
 #endif
+	if (CONFIG_IS_ENABLED(BOOTSTD)) {
+		int ret;
+
+		ret = bootdev_unhunt(UCLASS_USB);
+		if (IS_ENABLED(CONFIG_BOOTSTD_FULL) && ret && ret != -EALREADY)
+			printf("failed to unhunt USB (err=%dE)\n", ret);
+	}
 	uc_priv->companion_device_count = 0;
 	usb_started = 0;
+
+	uthread_mutex_unlock(&mutex);
 
 	return err;
 }
 
-static void usb_scan_bus(struct udevice *bus, bool recurse)
+static void _usb_scan_bus(void *arg)
 {
+	struct udevice *bus = (struct udevice *)arg;
 	struct usb_bus_priv *priv;
 	struct udevice *dev;
 	int ret;
 
 	priv = dev_get_uclass_priv(bus);
 
-	assert(recurse);	/* TODO: Support non-recusive */
-
-	printf("scanning bus %s for devices... ", bus->name);
-	debug("\n");
 	ret = usb_scan_device(bus, 0, USB_SPEED_FULL, &dev);
 	if (ret)
-		printf("failed, error %d\n", ret);
-	else if (priv->next_addr == 0)
-		printf("No USB Device found\n");
-	else
-		printf("%d USB Device(s) found\n", priv->next_addr);
+		printf("Scanning bus %s failed, error %d\n", bus->name, ret);
 }
 
 static void remove_inactive_children(struct uclass *uc, struct udevice *bus)
@@ -248,55 +261,158 @@ static void remove_inactive_children(struct uclass *uc, struct udevice *bus)
 	}
 }
 
+static int usb_probe_companion(struct udevice *bus)
+{
+	struct udevice *companion_dev;
+	int ret;
+
+	/*
+	 * Enforce optional companion controller is marked as such in order to
+	 * 1st scan the primary controller, before the companion controller
+	 * (ownership is given to companion when low or full speed devices
+	 * have been detected).
+	 */
+	ret = uclass_get_device_by_phandle(UCLASS_USB, bus, "companion", &companion_dev);
+	if (!ret) {
+		struct usb_bus_priv *companion_bus_priv;
+
+		debug("%s is the companion of %s\n", companion_dev->name, bus->name);
+		companion_bus_priv = dev_get_uclass_priv(companion_dev);
+		companion_bus_priv->companion = true;
+	} else if (ret && ret != -ENOENT && ret != -ENODEV) {
+		/*
+		 * Treat everything else than no companion or disabled
+		 * companion as an error. (It may not be enabled on boards
+		 * that have a High-Speed HUB to handle FS and LS traffic).
+		 */
+		printf("Failed to get companion (ret=%d)\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static void _usb_init_bus(void *arg)
+{
+	struct udevice *bus = (struct udevice *)arg;
+	int ret;
+
+	/* init low_level USB */
+
+	/*
+	 * For Sandbox, we need scan the device tree each time when we
+	 * start the USB stack, in order to re-create the emulated USB
+	 * devices and bind drivers for them before we actually do the
+	 * driver probe.
+	 *
+	 * For USB onboard HUB, we need to do some non-trivial init
+	 * like enabling a power regulator, before enumeration.
+	 */
+	if (IS_ENABLED(CONFIG_SANDBOX) ||
+	    IS_ENABLED(CONFIG_USB_ONBOARD_HUB)) {
+		ret = dm_scan_fdt_dev(bus);
+		if (ret) {
+			printf("Bus %s: USB device scan from fdt failed (%d)\n",
+			       bus->name, ret);
+			return;
+		}
+	}
+
+	ret = device_probe(bus);
+	if (ret == -ENODEV) {	/* No such device. */
+		printf("Bus %s: Port not available.\n", bus->name);
+		return;
+	}
+
+	if (ret) {		/* Other error. */
+		printf("Bus %s: probe failed, error %d\n", bus->name, ret);
+		return;
+	}
+
+	usb_probe_companion(bus);
+}
+
+static int nthr;
+static int grp_id;
+
+static void usb_init_bus(struct udevice *bus)
+{
+	if (!grp_id)
+		grp_id = uthread_grp_new_id();
+	if (!uthread_create(NULL, _usb_init_bus, (void *)bus, 0, grp_id))
+		nthr++;
+}
+
+static void usb_scan_bus(struct udevice *bus, bool recurse)
+{
+	if (!grp_id)
+		grp_id = uthread_grp_new_id();
+	if (!uthread_create(NULL, _usb_scan_bus, (void *)bus, 0, grp_id))
+		nthr++;
+}
+
+static void usb_report_devices(struct uclass *uc)
+{
+	struct usb_bus_priv *priv;
+	struct udevice *bus;
+
+	uclass_foreach_dev(bus, uc) {
+		if (!device_active(bus))
+			continue;
+		priv = dev_get_uclass_priv(bus);
+		printf("Bus %s: ", bus->name);
+		if (priv->next_addr == 0)
+			printf("No USB Device found\n");
+		else
+			printf("%d USB Device(s) found\n", priv->next_addr);
+	}
+}
+
+static void run_threads(void)
+{
+#if CONFIG_IS_ENABLED(UTHREAD)
+	if (!nthr)
+		return;
+	while (!uthread_grp_done(grp_id))
+		uthread_schedule();
+	nthr = 0;
+	grp_id = 0;
+#endif
+}
+
 int usb_init(void)
 {
 	int controllers_initialized = 0;
+	unsigned long t0 = timer_get_us();
 	struct usb_uclass_priv *uc_priv;
 	struct usb_bus_priv *priv;
 	struct udevice *bus;
 	struct uclass *uc;
 	int ret;
 
+	uthread_mutex_lock(&mutex);
+
+	if (usb_started) {
+		ret = 0;
+		goto out;
+	}
+
 	asynch_allowed = 1;
 
 	ret = uclass_get(UCLASS_USB, &uc);
 	if (ret)
-		return ret;
+		goto out;
 
 	uc_priv = uclass_get_priv(uc);
 
 	uclass_foreach_dev(bus, uc) {
-		/* init low_level USB */
-		printf("Bus %s: ", bus->name);
-
-#ifdef CONFIG_SANDBOX
-		/*
-		 * For Sandbox, we need scan the device tree each time when we
-		 * start the USB stack, in order to re-create the emulated USB
-		 * devices and bind drivers for them before we actually do the
-		 * driver probe.
-		 */
-		ret = dm_scan_fdt_dev(bus);
-		if (ret) {
-			printf("Sandbox USB device scan failed (%d)\n", ret);
-			continue;
-		}
-#endif
-
-		ret = device_probe(bus);
-		if (ret == -ENODEV) {	/* No such device. */
-			puts("Port not available.\n");
-			controllers_initialized++;
-			continue;
-		}
-
-		if (ret) {		/* Other error. */
-			printf("probe failed, error %d\n", ret);
-			continue;
-		}
-		controllers_initialized++;
-		usb_started = true;
+		usb_init_bus(bus);
 	}
+
+	if (CONFIG_IS_ENABLED(UTHREAD))
+		run_threads();
+
+	usb_started = true;
 
 	/*
 	 * lowlevel init done, now scan the bus for devices i.e. search HUBs
@@ -306,10 +422,15 @@ int usb_init(void)
 		if (!device_active(bus))
 			continue;
 
+		controllers_initialized++;
+
 		priv = dev_get_uclass_priv(bus);
 		if (!priv->companion)
 			usb_scan_bus(bus, true);
 	}
+
+	if (CONFIG_IS_ENABLED(UTHREAD))
+		run_threads();
 
 	/*
 	 * Now that the primary controllers have been scanned and have handed
@@ -327,65 +448,35 @@ int usb_init(void)
 		}
 	}
 
-	debug("scan end\n");
+	if (CONFIG_IS_ENABLED(UTHREAD))
+		run_threads();
+
+	usb_report_devices(uc);
 
 	/* Remove any devices that were not found on this scan */
 	remove_inactive_children(uc, bus);
 
 	ret = uclass_get(UCLASS_USB_HUB, &uc);
 	if (ret)
-		return ret;
+		goto out;
+
 	remove_inactive_children(uc, bus);
 
 	/* if we were not able to find at least one working bus, bail out */
 	if (controllers_initialized == 0)
-		printf("No working controllers found\n");
+		printf("No USB controllers found\n");
 
-	return usb_started ? 0 : -1;
+	debug("USB initialized in %ld ms\n",
+	      (timer_get_us() - t0) / 1000);
+
+	uthread_mutex_unlock(&mutex);
+
+	return usb_started ? 0 : -ENOENT;
+out:
+	uthread_mutex_unlock(&mutex);
+
+	return ret;
 }
-
-/*
- * TODO(sjg@chromium.org): Remove this legacy function. At present it is needed
- * to support boards which use driver model for USB but not Ethernet, and want
- * to use USB Ethernet.
- *
- * The #if clause is here to ensure that remains the only case.
- */
-#if !defined(CONFIG_DM_ETH) && defined(CONFIG_USB_HOST_ETHER)
-static struct usb_device *find_child_devnum(struct udevice *parent, int devnum)
-{
-	struct usb_device *udev;
-	struct udevice *dev;
-
-	if (!device_active(parent))
-		return NULL;
-	udev = dev_get_parent_priv(parent);
-	if (udev->devnum == devnum)
-		return udev;
-
-	for (device_find_first_child(parent, &dev);
-	     dev;
-	     device_find_next_child(&dev)) {
-		udev = find_child_devnum(dev, devnum);
-		if (udev)
-			return udev;
-	}
-
-	return NULL;
-}
-
-struct usb_device *usb_get_dev_index(struct udevice *bus, int index)
-{
-	struct udevice *dev;
-	int devnum = index + 1; /* Addresses are allocated from 1 on USB */
-
-	device_find_first_child(bus, &dev);
-	if (!dev)
-		return NULL;
-
-	return find_child_devnum(dev, devnum);
-}
-#endif
 
 int usb_setup_ehci_gadget(struct ehci_ctrl **ctlrp)
 {
@@ -394,7 +485,7 @@ int usb_setup_ehci_gadget(struct ehci_ctrl **ctlrp)
 	int ret;
 
 	/* Find the old device and remove it */
-	ret = uclass_find_device_by_seq(UCLASS_USB, 0, &dev);
+	ret = uclass_find_first_device(UCLASS_USB, &dev);
 	if (ret)
 		return ret;
 	ret = device_remove(dev, DM_REMOVE_NORMAL);
@@ -417,7 +508,7 @@ int usb_remove_ehci_gadget(struct ehci_ctrl **ctlrp)
 	int ret;
 
 	/* Find the old device and remove it */
-	ret = uclass_find_device_by_seq(UCLASS_USB, 0, &dev);
+	ret = uclass_find_first_device(UCLASS_USB, &dev);
 	if (ret)
 		return ret;
 	ret = device_remove(dev, DM_REMOVE_NORMAL);
@@ -555,7 +646,7 @@ static int usb_find_and_bind_driver(struct udevice *parent,
 	struct usb_driver_entry *start, *entry;
 	int n_ents;
 	int ret;
-	char name[30], *str;
+	char name[34], *str;
 	ofnode node = usb_get_ofnode(parent, port);
 
 	*devp = NULL;
@@ -600,6 +691,8 @@ static int usb_find_and_bind_driver(struct udevice *parent,
 	if (!str)
 		return -ENOMEM;
 	ret = device_bind_driver(parent, "usb_dev_generic_drv", str, devp);
+	if (!ret)
+		device_set_name_alloced(*devp);
 
 error:
 	debug("%s: No match found: %d\n", __func__, ret);

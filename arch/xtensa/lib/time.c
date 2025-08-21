@@ -3,7 +3,7 @@
  * (C) Copyright 2008 - 2013 Tensilica Inc.
  */
 
-#include <common.h>
+#include <clock_legacy.h>
 #include <time.h>
 #include <asm/global_data.h>
 #include <linux/delay.h>
@@ -51,7 +51,7 @@ static void delay_cycles(unsigned cycles)
 void __udelay(unsigned long usec)
 {
 	ulong lo, hi, i;
-	ulong mhz = CONFIG_SYS_CLK_FREQ / 1000000;
+	ulong mhz = get_board_sys_clk() / 1000000;
 
 	/* Scale to support full 32-bit usec range */
 
@@ -61,7 +61,6 @@ void __udelay(unsigned long usec)
 		delay_cycles(mhz << 22);
 	delay_cycles(mhz * lo);
 }
-
 
 /*
  * Return the elapsed time (ticks) since 'base'.
@@ -74,7 +73,7 @@ ulong get_timer(ulong base)
 #if XCHAL_HAVE_CCOUNT
 	register ulong ccount;
 	__asm__ volatile ("rsr %0, CCOUNT" : "=a"(ccount));
-	return ccount / (CONFIG_SYS_CLK_FREQ / CONFIG_SYS_HZ) - base;
+	return ccount / (get_board_sys_clk() / CONFIG_SYS_HZ) - base;
 #else
 	/*
 	 * Add at least the overhead of this call (in cycles).
@@ -85,10 +84,9 @@ ulong get_timer(ulong base)
 	 */
 
 	fake_ccount += 20;
-	return fake_ccount / (CONFIG_SYS_CLK_FREQ / CONFIG_SYS_HZ) - base;
+	return fake_ccount / (get_board_sys_clk() / CONFIG_SYS_HZ) - base;
 #endif
 }
-
 
 /*
  * This function is derived from ARM/PowerPC code (read timebase as long long).
@@ -114,6 +112,6 @@ unsigned long timer_get_us(void)
 	unsigned long ccount;
 
 	__asm__ volatile ("rsr %0, CCOUNT" : "=a"(ccount));
-	return ccount / (CONFIG_SYS_CLK_FREQ / 1000000);
+	return ccount / (get_board_sys_clk() / 1000000);
 }
 #endif

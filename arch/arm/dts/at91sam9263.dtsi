@@ -75,14 +75,14 @@
 		#address-cells = <1>;
 		#size-cells = <1>;
 		ranges;
-		u-boot,dm-pre-reloc;
+		bootph-all;
 
 		apb {
 			compatible = "simple-bus";
 			#address-cells = <1>;
 			#size-cells = <1>;
 			ranges;
-			u-boot,dm-pre-reloc;
+			bootph-all;
 
 			aic: interrupt-controller@fffff000 {
 				#interrupt-cells = <3>;
@@ -100,7 +100,7 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				#interrupt-cells = <1>;
-				u-boot,dm-pre-reloc;
+				bootph-all;
 
 				main_osc: main_osc {
 					compatible = "atmel,at91rm9200-clk-main-osc";
@@ -146,7 +146,7 @@
 					clocks = <&slow_xtal>, <&main>, <&plla>, <&pllb>;
 					atmel,clk-output-range = <0 120000000>;
 					atmel,clk-divisors = <1 2 4 0>;
-					u-boot,dm-pre-reloc;
+					bootph-all;
 				};
 
 				usb: usbck {
@@ -235,24 +235,24 @@
 					#address-cells = <1>;
 					#size-cells = <0>;
 					clocks = <&mck>;
-					u-boot,dm-pre-reloc;
+					bootph-all;
 
 					pioA_clk: pioA_clk@2 {
 						#clock-cells = <0>;
 						reg = <2>;
-						u-boot,dm-pre-reloc;
+						bootph-all;
 					};
 
 					pioB_clk: pioB_clk@3 {
 						#clock-cells = <0>;
 						reg = <3>;
-						u-boot,dm-pre-reloc;
+						bootph-all;
 					};
 
 					pioCDE_clk: pioCDE_clk@4 {
 						#clock-cells = <0>;
 						reg = <4>;
-						u-boot,dm-pre-reloc;
+						bootph-all;
 					};
 
 					usart0_clk: usart0_clk@7 {
@@ -404,12 +404,6 @@
 				#size-cells = <1>;
 				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
 				ranges = <0xfffff200 0xfffff200 0xa00>;
-				reg = <0xfffff200 0x200
-				       0xfffff400 0x200
-				       0xfffff600 0x200
-				       0xfffff800 0x200
-				       0xfffffa00 0x200
-				      >;
 
 				atmel,mux-mask = <
 				      /*    A         B     */
@@ -719,66 +713,65 @@
 					};
 				};
 
-			};
+				pioA: gpio@fffff200 {
+					compatible = "atmel,at91rm9200-gpio";
+					reg = <0xfffff200 0x200>;
+					interrupts = <2 IRQ_TYPE_LEVEL_HIGH 1>;
+					#gpio-cells = <2>;
+					gpio-controller;
+					interrupt-controller;
+					#interrupt-cells = <2>;
+					clocks = <&pioA_clk>;
+					bootph-all;
+				};
 
-			pioA: gpio@fffff200 {
-				compatible = "atmel,at91rm9200-gpio";
-				reg = <0xfffff200 0x200>;
-				interrupts = <2 IRQ_TYPE_LEVEL_HIGH 1>;
-				#gpio-cells = <2>;
-				gpio-controller;
-				interrupt-controller;
-				#interrupt-cells = <2>;
-				clocks = <&pioA_clk>;
-				u-boot,dm-pre-reloc;
-			};
+				pioB: gpio@fffff400 {
+					compatible = "atmel,at91rm9200-gpio";
+					reg = <0xfffff400 0x200>;
+					interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
+					#gpio-cells = <2>;
+					gpio-controller;
+					interrupt-controller;
+					#interrupt-cells = <2>;
+					clocks = <&pioB_clk>;
+					bootph-all;
+				};
 
-			pioB: gpio@fffff400 {
-				compatible = "atmel,at91rm9200-gpio";
-				reg = <0xfffff400 0x200>;
-				interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
-				#gpio-cells = <2>;
-				gpio-controller;
-				interrupt-controller;
-				#interrupt-cells = <2>;
-				clocks = <&pioB_clk>;
-				u-boot,dm-pre-reloc;
-			};
+				pioC: gpio@fffff600 {
+					compatible = "atmel,at91rm9200-gpio";
+					reg = <0xfffff600 0x200>;
+					interrupts = <4 IRQ_TYPE_LEVEL_HIGH 1>;
+					#gpio-cells = <2>;
+					gpio-controller;
+					interrupt-controller;
+					#interrupt-cells = <2>;
+					clocks = <&pioCDE_clk>;
+					bootph-all;
+				};
 
-			pioC: gpio@fffff600 {
-				compatible = "atmel,at91rm9200-gpio";
-				reg = <0xfffff600 0x200>;
-				interrupts = <4 IRQ_TYPE_LEVEL_HIGH 1>;
-				#gpio-cells = <2>;
-				gpio-controller;
-				interrupt-controller;
-				#interrupt-cells = <2>;
-				clocks = <&pioCDE_clk>;
-				u-boot,dm-pre-reloc;
-			};
+				pioD: gpio@fffff800 {
+					compatible = "atmel,at91rm9200-gpio";
+					reg = <0xfffff800 0x200>;
+					interrupts = <4 IRQ_TYPE_LEVEL_HIGH 1>;
+					#gpio-cells = <2>;
+					gpio-controller;
+					interrupt-controller;
+					#interrupt-cells = <2>;
+					clocks = <&pioCDE_clk>;
+					bootph-all;
+				};
 
-			pioD: gpio@fffff800 {
-				compatible = "atmel,at91rm9200-gpio";
-				reg = <0xfffff800 0x200>;
-				interrupts = <4 IRQ_TYPE_LEVEL_HIGH 1>;
-				#gpio-cells = <2>;
-				gpio-controller;
-				interrupt-controller;
-				#interrupt-cells = <2>;
-				clocks = <&pioCDE_clk>;
-				u-boot,dm-pre-reloc;
-			};
-
-			pioE: gpio@fffffa00 {
-				compatible = "atmel,at91rm9200-gpio";
-				reg = <0xfffffa00 0x200>;
-				interrupts = <4 IRQ_TYPE_LEVEL_HIGH 1>;
-				#gpio-cells = <2>;
-				gpio-controller;
-				interrupt-controller;
-				#interrupt-cells = <2>;
-				clocks = <&pioCDE_clk>;
-				u-boot,dm-pre-reloc;
+				pioE: gpio@fffffa00 {
+					compatible = "atmel,at91rm9200-gpio";
+					reg = <0xfffffa00 0x200>;
+					interrupts = <4 IRQ_TYPE_LEVEL_HIGH 1>;
+					#gpio-cells = <2>;
+					gpio-controller;
+					interrupt-controller;
+					#interrupt-cells = <2>;
+					clocks = <&pioCDE_clk>;
+					bootph-all;
+				};
 			};
 
 			dbgu: serial@ffffee00 {

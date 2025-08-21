@@ -9,7 +9,7 @@ from collections import OrderedDict
 
 from binman.entry import Entry, EntryArg
 from dtoc import fdt_util
-from patman import tools
+from u_boot_pylib import tools
 
 
 class Entry__testing(Entry):
@@ -39,6 +39,10 @@ class Entry__testing(Entry):
             error if not)
         force-bad-datatype: Force a call to GetEntryArgsOrProps() with a bad
             data type (generating an error)
+        require-bintool-for-contents: Raise an error if the specified
+            bintool isn't usable in ObtainContents()
+        require-bintool-for-pack: Raise an error if the specified
+            bintool isn't usable in Pack()
     """
     def __init__(self, section, etype, node):
         super().__init__(section, etype, node)
@@ -59,6 +63,7 @@ class Entry__testing(Entry):
                                                     'bad-update-contents-twice')
         self.return_contents_later = fdt_util.GetBool(self._node,
                                                      'return-contents-later')
+        self.set_to_absent = fdt_util.GetBool(self._node, 'set-to-absent')
 
         # Set to True when the entry is ready to process the FDT.
         self.process_fdt_ready = False
@@ -82,7 +87,27 @@ class Entry__testing(Entry):
         self.return_contents = True
         self.contents = b'aa'
 
-    def ObtainContents(self):
+        # Set to the required bintool when collecting bintools.
+        self.bintool_for_contents = None
+        self.require_bintool_for_contents = fdt_util.GetString(self._node,
+                                              'require-bintool-for-contents')
+        if self.require_bintool_for_contents == '':
+            self.require_bintool_for_contents = '_testing'
+
+        self.bintool_for_pack = None
+        self.require_bintool_for_pack = fdt_util.GetString(self._node,
+                                                  'require-bintool-for-pack')
+        if self.require_bintool_for_pack == '':
+            self.require_bintool_for_pack = '_testing'
+
+    def Pack(self, offset):
+        """Figure out how to pack the entry into the section"""
+        if self.require_bintool_for_pack:
+            if self.bintool_for_pack is None:
+                self.Raise("Required bintool unusable in Pack()")
+        return super().Pack(offset)
+
+    def ObtainContents(self, fake_size=0):
         if self.return_unknown_contents or not self.return_contents:
             return False
         if self.return_contents_later:
@@ -92,6 +117,11 @@ class Entry__testing(Entry):
         self.contents_size = len(self.data)
         if self.return_contents_once:
             self.return_contents = False
+        if self.require_bintool_for_contents:
+            if self.bintool_for_contents is None:
+                self.Raise("Required bintool unusable in ObtainContents()")
+        if self.set_to_absent:
+            self.mark_absent('for testing purposes')
         return True
 
     def GetOffsets(self):
@@ -127,3 +157,12 @@ class Entry__testing(Entry):
         if not self.never_complete_process_fdt:
             self.process_fdt_ready = True
         return ready
+
+    def AddBintools(self, btools):
+        """Add the bintools used by this entry type"""
+        if self.require_bintool_for_contents is not None:
+            self.bintool_for_contents = self.AddBintool(btools,
+                    self.require_bintool_for_contents)
+        if self.require_bintool_for_pack is not None:
+            self.bintool_for_pack = self.AddBintool(btools,
+                    self.require_bintool_for_pack)

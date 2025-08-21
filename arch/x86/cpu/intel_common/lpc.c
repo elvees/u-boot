@@ -3,7 +3,6 @@
  * Copyright (c) 2016 Google, Inc
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <fdtdec.h>
@@ -39,7 +38,7 @@ static void enable_port80_on_lpc(struct udevice *pch)
  * lpc_early_init() - set up LPC serial ports and other early things
  *
  * @dev:	LPC device
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int lpc_common_early_init(struct udevice *dev)
 {

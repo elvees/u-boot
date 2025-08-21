@@ -3,7 +3,8 @@
  * Copyright (C) 2018, STMicroelectronics - All Rights Reserved
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_HWSPINLOCK
+
 #include <dm.h>
 #include <errno.h>
 #include <hwspinlock.h>
@@ -23,7 +24,7 @@ static int hwspinlock_of_xlate_default(struct hwspinlock *hws,
 				       struct ofnode_phandle_args *args)
 {
 	if (args->args_count > 1) {
-		debug("Invaild args_count: %d\n", args->args_count);
+		debug("Invalid args_count: %d\n", args->args_count);
 		return -EINVAL;
 	}
 
@@ -121,28 +122,7 @@ int hwspinlock_unlock(struct hwspinlock *hws)
 	return ops->unlock(hws->dev, hws->id);
 }
 
-static int hwspinlock_post_bind(struct udevice *dev)
-{
-#if defined(CONFIG_NEEDS_MANUAL_RELOC)
-	struct hwspinlock_ops *ops = device_get_ops(dev);
-	static int reloc_done;
-
-	if (!reloc_done) {
-		if (ops->lock)
-			ops->lock += gd->reloc_off;
-		if (ops->unlock)
-			ops->unlock += gd->reloc_off;
-		if (ops->relax)
-			ops->relax += gd->reloc_off;
-
-		reloc_done++;
-	}
-#endif
-	return 0;
-}
-
 UCLASS_DRIVER(hwspinlock) = {
 	.id		= UCLASS_HWSPINLOCK,
 	.name		= "hwspinlock",
-	.post_bind	= hwspinlock_post_bind,
 };

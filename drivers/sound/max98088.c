@@ -8,7 +8,6 @@
  * following the changes made in max98095.c
  */
 
-#include <common.h>
 #include <audio_codec.h>
 #include <div64.h>
 #include <dm.h>
@@ -30,7 +29,7 @@ static const int rate_table[] = {0, 8000, 11025, 16000, 22050, 24000, 32000,
  * @param rate sampling rate
  * @param value address of indexvalue to be stored
  *
- * @return	0 for success or negative error code.
+ * Return:	0 for success or negative error code.
  */
 static int rate_value(int rate, u8 *value)
 {
@@ -54,7 +53,7 @@ static int rate_value(int rate, u8 *value)
  * @rate: Sampling rate
  * @bits_per_sample: Bits per sample
  *
- * @return -EIO for error, 0 for success.
+ * Return: -EIO for error, 0 for success.
  */
 int max98088_hw_params(struct maxim_priv *priv, unsigned int rate,
 		       unsigned int bits_per_sample)
@@ -115,7 +114,7 @@ int max98088_hw_params(struct maxim_priv *priv, unsigned int rate,
  * @priv: max98088 information
  * @freq: Sampling frequency in Hz
  *
- * @return -EIO for error, 0 for success.
+ * Return: -EIO for error, 0 for success.
  */
 int max98088_set_sysclk(struct maxim_priv *priv, unsigned int freq)
 {
@@ -163,7 +162,7 @@ int max98088_set_sysclk(struct maxim_priv *priv, unsigned int freq)
  * @priv: max98088 information
  * @fmt: i2S format - supports a subset of the options defined in i2s.h.
  *
- * @return -EIO for error, 0 for success.
+ * Return: -EIO for error, 0 for success.
  */
 int max98088_set_fmt(struct maxim_priv *priv, int fmt)
 {
@@ -241,7 +240,7 @@ int max98088_set_fmt(struct maxim_priv *priv, int fmt)
  * max98088_reset() - reset the audio codec
  *
  * @priv: max98088 information
- * @return -EIO for error, 0 for success.
+ * Return: -EIO for error, 0 for success.
  */
 static int max98088_reset(struct maxim_priv *priv)
 {
@@ -278,7 +277,7 @@ static int max98088_reset(struct maxim_priv *priv)
  *
  * @priv: max98088 information
  *
- * @return -EIO for error, 0 for success.
+ * Return: -EIO for error, 0 for success.
  */
 static int max98088_device_init(struct maxim_priv *priv)
 {

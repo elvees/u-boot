@@ -8,7 +8,7 @@
 
 #define LOG_CATEGORY LOGC_DM
 
-#include <common.h>
+#include <debug_uart.h>
 #include <errno.h>
 #include <log.h>
 #include <dm/device.h>
@@ -51,6 +51,21 @@ struct uclass_driver *lists_uclass_lookup(enum uclass_id id)
 	return NULL;
 }
 
+/**
+ * bind_drivers_pass() - Perform a pass of driver binding
+ *
+ * Work through the driver_info records binding a driver for each one. If the
+ * binding fails, continue binding others, but return the error.
+ *
+ * For OF_PLATDATA we must bind parent devices before their children. So only
+ * children of bound parents are bound on each call to this function. When a
+ * child is left unbound, -EAGAIN is returned, indicating that this function
+ * should be called again
+ *
+ * @parent: Parent device to use when binding each child device
+ * Return: 0 if OK, -EAGAIN if unbound children exist, -ENOENT if there is no
+ * driver for one of the devices, other -ve on other error
+ */
 static int bind_drivers_pass(struct udevice *parent, bool pre_reloc_only)
 {
 	struct driver_info *info =
@@ -58,7 +73,7 @@ static int bind_drivers_pass(struct udevice *parent, bool pre_reloc_only)
 	const int n_ents = ll_entry_count(struct driver_info, driver_info);
 	bool missing_parent = false;
 	int result = 0;
-	uint idx;
+	int idx;
 
 	/*
 	 * Do one iteration through the driver_info records. For of-platdata,
@@ -120,10 +135,10 @@ int lists_bind_drivers(struct udevice *parent, bool pre_reloc_only)
 		int ret;
 
 		ret = bind_drivers_pass(parent, pre_reloc_only);
-		if (!ret)
-			break;
-		if (ret != -EAGAIN && !result)
+		if (!result || result == -EAGAIN)
 			result = ret;
+		if (ret != -EAGAIN)
+			break;
 	}
 
 	return result;
@@ -145,7 +160,7 @@ int device_bind_driver_to_node(struct udevice *parent, const char *drv_name,
 
 	drv = lists_driver_lookup_name(drv_name);
 	if (!drv) {
-		debug("Cannot find driver '%s'\n", drv_name);
+		dm_warn("Cannot find driver '%s'\n", drv_name);
 		return -ENOENT;
 	}
 	ret = device_bind_with_driver_data(parent, drv, dev_name, 0 /* data */,
@@ -154,14 +169,14 @@ int device_bind_driver_to_node(struct udevice *parent, const char *drv_name,
 	return ret;
 }
 
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 /**
  * driver_check_compatible() - Check if a driver matches a compatible string
  *
  * @param of_match:	List of compatible strings to match
  * @param of_idp:	Returns the match that was found
  * @param compat:	The compatible string to search for
- * @return 0 if there is a match, -ENOENT if no match
+ * Return: 0 if there is a match, -ENOENT if no match
  */
 static int driver_check_compatible(const struct udevice_id *of_match,
 				   const struct udevice_id **of_idp,
@@ -182,7 +197,7 @@ static int driver_check_compatible(const struct udevice_id *of_match,
 }
 
 int lists_bind_fdt(struct udevice *parent, ofnode node, struct udevice **devp,
-		   bool pre_reloc_only)
+		   struct driver *drv, bool pre_reloc_only)
 {
 	struct driver *driver = ll_entry_start(struct driver, driver);
 	const int n_ents = ll_entry_count(struct driver, driver);
@@ -222,7 +237,14 @@ int lists_bind_fdt(struct udevice *parent, ofnode node, struct udevice **devp,
 		log_debug("   - attempt to match compatible string '%s'\n",
 			  compat);
 
+		id = NULL;
 		for (entry = driver; entry != driver + n_ents; entry++) {
+			if (drv) {
+				if (drv != entry)
+					continue;
+				if (!entry->of_match)
+					break;
+			}
 			ret = driver_check_compatible(entry->of_match, &id,
 						      compat);
 			if (!ret)
@@ -239,11 +261,12 @@ int lists_bind_fdt(struct udevice *parent, ofnode node, struct udevice **devp,
 			}
 		}
 
-		log_debug("   - found match at '%s': '%s' matches '%s'\n",
-			  entry->name, entry->of_match->compatible,
-			  id->compatible);
+		if (entry->of_match)
+			log_debug("   - found match at driver '%s' for '%s'\n",
+				  entry->name, id->compatible);
 		ret = device_bind_with_driver_data(parent, entry, name,
-						   id->data, node, &dev);
+						   id ? id->data : 0, node,
+						   &dev);
 		if (ret == -ENODEV) {
 			log_debug("Driver '%s' refuses to bind\n", entry->name);
 			continue;

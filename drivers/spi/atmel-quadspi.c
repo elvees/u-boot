@@ -10,13 +10,15 @@
  */
 
 #include <malloc.h>
+#include <asm/gpio.h>
 #include <asm/io.h>
 #include <clk.h>
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <fdtdec.h>
+#include <log.h>
 #include <dm/device_compat.h>
+#include <linux/bitfield.h>
 #include <linux/bitops.h>
 #include <linux/err.h>
 #include <linux/io.h>
@@ -32,6 +34,7 @@
 #define QSPI_RD      0x0008  /* Receive Data Register */
 #define QSPI_TD      0x000c  /* Transmit Data Register */
 #define QSPI_SR      0x0010  /* Status Register */
+#define QSPI_SR2     0x0024  /* SAMA7G5 Status Register */
 #define QSPI_IER     0x0014  /* Interrupt Enable Register */
 #define QSPI_IDR     0x0018  /* Interrupt Disable Register */
 #define QSPI_IMR     0x001c  /* Interrupt Mask Register */
@@ -46,6 +49,13 @@
 #define QSPI_SMR     0x0040  /* Scrambling Mode Register */
 #define QSPI_SKR     0x0044  /* Scrambling Key Register */
 
+#define QSPI_REFRESH 0x0050  /* Refresh Register */
+#define QSPI_WRACNT  0x0054  /* Write Access Counter Register */
+#define QSPI_DLLCFG  0x0058  /* DLL Configuration Register */
+#define QSPI_PCALCFG 0x005C  /* Pad Calibration Configuration Register */
+#define QSPI_PCALBP  0x0060  /* Pad Calibration Bypass Register */
+#define QSPI_TOUT    0x0064  /* Timeout Register */
+
 #define QSPI_WPMR    0x00E4  /* Write Protection Mode Register */
 #define QSPI_WPSR    0x00E8  /* Write Protection Status Register */
 
@@ -54,7 +64,14 @@
 /* Bitfields in QSPI_CR (Control Register) */
 #define QSPI_CR_QSPIEN                  BIT(0)
 #define QSPI_CR_QSPIDIS                 BIT(1)
+#define QSPI_CR_DLLON			BIT(2)
+#define QSPI_CR_DLLOFF			BIT(3)
+#define QSPI_CR_STPCAL			BIT(4)
+#define QSPI_CR_SRFRSH			BIT(5)
 #define QSPI_CR_SWRST                   BIT(7)
+#define QSPI_CR_UPDCFG			BIT(8)
+#define QSPI_CR_STTFR			BIT(9)
+#define QSPI_CR_RTOUT			BIT(10)
 #define QSPI_CR_LASTXFER                BIT(24)
 
 /* Bitfields in QSPI_MR (Mode Register) */
@@ -62,12 +79,15 @@
 #define QSPI_MR_LLB                     BIT(1)
 #define QSPI_MR_WDRBT                   BIT(2)
 #define QSPI_MR_SMRM                    BIT(3)
+#define QSPI_MR_DQSDLYEN		BIT(3)
+
 #define QSPI_MR_CSMODE_MASK             GENMASK(5, 4)
 #define QSPI_MR_CSMODE_NOT_RELOADED     (0 << 4)
 #define QSPI_MR_CSMODE_LASTXFER         (1 << 4)
 #define QSPI_MR_CSMODE_SYSTEMATICALLY   (2 << 4)
 #define QSPI_MR_NBBITS_MASK             GENMASK(11, 8)
 #define QSPI_MR_NBBITS(n)               ((((n) - 8) << 8) & QSPI_MR_NBBITS_MASK)
+#define QSPI_MR_OENSD			BIT(15)
 #define QSPI_MR_DLYBCT_MASK             GENMASK(23, 16)
 #define QSPI_MR_DLYBCT(n)               (((n) << 16) & QSPI_MR_DLYBCT_MASK)
 #define QSPI_MR_DLYCS_MASK              GENMASK(31, 24)
@@ -81,6 +101,13 @@
 #define QSPI_SR_CSR                     BIT(8)
 #define QSPI_SR_CSS                     BIT(9)
 #define QSPI_SR_INSTRE                  BIT(10)
+#define QSPI_SR_LWRA			BIT(11)
+#define QSPI_SR_QITF			BIT(12)
+#define QSPI_SR_QITR			BIT(13)
+#define QSPI_SR_CSFA			BIT(14)
+#define QSPI_SR_CSRA			BIT(15)
+#define QSPI_SR_RFRSHD			BIT(16)
+#define QSPI_SR_TOUT			BIT(17)
 #define QSPI_SR_QSPIENS                 BIT(24)
 
 #define QSPI_SR_CMD_COMPLETED	(QSPI_SR_INSTRE | QSPI_SR_CSR)
@@ -93,9 +120,22 @@
 #define QSPI_SCR_DLYBS_MASK             GENMASK(23, 16)
 #define QSPI_SCR_DLYBS(n)               (((n) << 16) & QSPI_SCR_DLYBS_MASK)
 
+/* Bitfields in QSPI_SR2 (SAMA7G5 Status Register) */
+#define QSPI_SR2_SYNCBSY		BIT(0)
+#define QSPI_SR2_QSPIENS		BIT(1)
+#define QSPI_SR2_CSS			BIT(2)
+#define QSPI_SR2_RBUSY			BIT(3)
+#define QSPI_SR2_HIDLE			BIT(4)
+#define QSPI_SR2_DLOCK			BIT(5)
+#define QSPI_SR2_CALBSY			BIT(6)
+
+/* Bitfields in QSPI_IAR (Instruction Address Register) */
+#define QSPI_IAR_ADDR			GENMASK(31, 0)
+
 /* Bitfields in QSPI_ICR (Read/Write Instruction Code Register) */
 #define QSPI_ICR_INST_MASK              GENMASK(7, 0)
 #define QSPI_ICR_INST(inst)             (((inst) << 0) & QSPI_ICR_INST_MASK)
+#define QSPI_ICR_INST_MASK_SAMA7G5	GENMASK(15, 0)
 #define QSPI_ICR_OPT_MASK               GENMASK(23, 16)
 #define QSPI_ICR_OPT(opt)               (((opt) << 16) & QSPI_ICR_OPT_MASK)
 
@@ -108,6 +148,9 @@
 #define QSPI_IFR_WIDTH_QUAD_IO          (4 << 0)
 #define QSPI_IFR_WIDTH_DUAL_CMD         (5 << 0)
 #define QSPI_IFR_WIDTH_QUAD_CMD         (6 << 0)
+#define QSPI_IFR_WIDTH_OCT_OUTPUT	(7 << 0)
+#define QSPI_IFR_WIDTH_OCT_IO		(8 << 0)
+#define QSPI_IFR_WIDTH_OCT_CMD		(9 << 0)
 #define QSPI_IFR_INSTEN                 BIT(4)
 #define QSPI_IFR_ADDREN                 BIT(5)
 #define QSPI_IFR_OPTEN                  BIT(6)
@@ -118,19 +161,60 @@
 #define QSPI_IFR_OPTL_4BIT              (2 << 8)
 #define QSPI_IFR_OPTL_8BIT              (3 << 8)
 #define QSPI_IFR_ADDRL                  BIT(10)
+#define QSPI_IFR_ADDRL_SAMA7G5		GENMASK(11, 10)
 #define QSPI_IFR_TFRTYP_MEM		BIT(12)
 #define QSPI_IFR_SAMA5D2_WRITE_TRSFR	BIT(13)
 #define QSPI_IFR_CRM                    BIT(14)
+#define QSPI_IFR_DDREN			BIT(15)
 #define QSPI_IFR_NBDUM_MASK             GENMASK(20, 16)
 #define QSPI_IFR_NBDUM(n)               (((n) << 16) & QSPI_IFR_NBDUM_MASK)
+#define QSPI_IFR_END			BIT(22)
+#define QSPI_IFR_SMRM			BIT(23)
 #define QSPI_IFR_APBTFRTYP_READ		BIT(24)	/* Defined in SAM9X60 */
+#define QSPI_IFR_DQSEN			BIT(25)
+#define QSPI_IFR_DDRCMDEN		BIT(26)
+#define QSPI_IFR_HFWBEN			BIT(27)
+#define QSPI_IFR_PROTTYP		GENMASK(29, 28)
+#define QSPI_IFR_PROTTYP_STD_SPI	0
+#define QSPI_IFR_PROTTYP_TWIN_QUAD	1
+#define QSPI_IFR_PROTTYP_OCTAFLASH	2
+#define QSPI_IFR_PROTTYP_HYPERFLASH	3
 
 /* Bitfields in QSPI_SMR (Scrambling Mode Register) */
 #define QSPI_SMR_SCREN                  BIT(0)
 #define QSPI_SMR_RVDIS                  BIT(1)
+#define QSPI_SMR_SCRKL			BIT(2)
+
+/* Bitfields in QSPI_REFRESH (Refresh Register) */
+#define QSPI_REFRESH_DELAY_COUNTER	GENMASK(31, 0)
+
+/* Bitfields in QSPI_WRACNT (Write Access Counter Register) */
+#define QSPI_WRACNT_NBWRA		GENMASK(31, 0)
+
+/* Bitfields in QSPI_DLLCFG (DLL Configuration Register) */
+#define QSPI_DLLCFG_RANGE		BIT(0)
+
+/* Bitfields in QSPI_PCALCFG (DLL Pad Calibration Configuration Register) */
+#define QSPI_PCALCFG_AAON		BIT(0)
+#define QSPI_PCALCFG_DAPCAL		BIT(1)
+#define QSPI_PCALCFG_DIFFPM		BIT(2)
+#define QSPI_PCALCFG_CLKDIV		GENMASK(6, 4)
+#define QSPI_PCALCFG_CALCNT		GENMASK(16, 8)
+#define QSPI_PCALCFG_CALP		GENMASK(27, 24)
+#define QSPI_PCALCFG_CALN		GENMASK(31, 28)
+
+/* Bitfields in QSPI_PCALBP (DLL Pad Calibration Bypass Register) */
+#define QSPI_PCALBP_BPEN		BIT(0)
+#define QSPI_PCALBP_CALPBP		GENMASK(11, 8)
+#define QSPI_PCALBP_CALNBP		GENMASK(19, 16)
+
+/* Bitfields in QSPI_TOUT (Timeout Register) */
+#define QSPI_TOUT_TCNTM			GENMASK(15, 0)
 
 /* Bitfields in QSPI_WPMR (Write Protection Mode Register) */
 #define QSPI_WPMR_WPEN                  BIT(0)
+#define QSPI_WPMR_WPITEN		BIT(1)
+#define QSPI_WPMR_WPCREN		BIT(2)
 #define QSPI_WPMR_WPKEY_MASK            GENMASK(31, 8)
 #define QSPI_WPMR_WPKEY(wpkey)          (((wpkey) << 8) & QSPI_WPMR_WPKEY_MASK)
 
@@ -139,19 +223,61 @@
 #define QSPI_WPSR_WPVSRC_MASK           GENMASK(15, 8)
 #define QSPI_WPSR_WPVSRC(src)           (((src) << 8) & QSPI_WPSR_WPVSRC)
 
-struct atmel_qspi_caps {
-	bool has_qspick;
-	bool has_ricr;
+#define ATMEL_QSPI_TIMEOUT		1000000	/* us */
+#define ATMEL_QSPI_SYNC_TIMEOUT		300000	/* us */
+#define QSPI_DLLCFG_THRESHOLD_FREQ	90000000U
+#define QSPI_TOUT_MAX			0xffff
+
+/**
+ * struct atmel_qspi_pcal - Pad Calibration Clock Division
+ * @pclk_rate: peripheral clock rate.
+ * @pclkdiv: calibration clock division. The clock applied to the calibration
+ *	     cell is divided by pclkdiv + 1.
+ */
+struct atmel_qspi_pcal {
+	u32 pclk_rate;
+	u8 pclk_div;
 };
 
+#define ATMEL_QSPI_PCAL_ARRAY_SIZE     8
+static const struct atmel_qspi_pcal pcal[ATMEL_QSPI_PCAL_ARRAY_SIZE] = {
+	{25000000, 0},
+	{50000000, 1},
+	{75000000, 2},
+	{100000000, 3},
+	{125000000, 4},
+	{150000000, 5},
+	{175000000, 6},
+	{200000000, 7},
+};
+
+struct atmel_qspi_caps {
+	bool has_qspick;
+	bool has_gclk;
+	bool has_ricr;
+	bool octal;
+};
+
+struct atmel_qspi_priv_ops;
+
+#define MAX_CS_COUNT	2
 struct atmel_qspi {
 	void __iomem *regs;
 	void __iomem *mem;
 	resource_size_t mmap_size;
 	const struct atmel_qspi_caps *caps;
+	const struct atmel_qspi_priv_ops *ops;
 	struct udevice *dev;
 	ulong bus_clk_rate;
 	u32 mr;
+	struct gpio_desc cs_gpios[MAX_CS_COUNT];
+};
+
+struct atmel_qspi_priv_ops {
+	int (*set_cfg)(struct atmel_qspi *aq, const struct spi_mem_op *op,
+		       u32 *offset);
+	int (*transfer)(struct atmel_qspi *aq, const struct spi_mem_op *op,
+			u32 offset);
 };
 
 struct atmel_qspi_mode {
@@ -171,6 +297,19 @@ static const struct atmel_qspi_mode atmel_qspi_modes[] = {
 	{ 4, 4, 4, QSPI_IFR_WIDTH_QUAD_CMD },
 };
 
+static const struct atmel_qspi_mode atmel_qspi_sama7g5_modes[] = {
+	{ 1, 1, 1, QSPI_IFR_WIDTH_SINGLE_BIT_SPI },
+	{ 1, 1, 2, QSPI_IFR_WIDTH_DUAL_OUTPUT },
+	{ 1, 1, 4, QSPI_IFR_WIDTH_QUAD_OUTPUT },
+	{ 1, 2, 2, QSPI_IFR_WIDTH_DUAL_IO },
+	{ 1, 4, 4, QSPI_IFR_WIDTH_QUAD_IO },
+	{ 2, 2, 2, QSPI_IFR_WIDTH_DUAL_CMD },
+	{ 4, 4, 4, QSPI_IFR_WIDTH_QUAD_CMD },
+	{ 1, 1, 8, QSPI_IFR_WIDTH_OCT_OUTPUT },
+	{ 1, 8, 8, QSPI_IFR_WIDTH_OCT_IO },
+	{ 8, 8, 8, QSPI_IFR_WIDTH_OCT_CMD },
+};
+
 #ifdef VERBOSE_DEBUG
 static const char *atmel_qspi_reg_name(u32 offset, char *tmp, size_t sz)
 {
@@ -180,7 +319,7 @@ static const char *atmel_qspi_reg_name(u32 offset, char *tmp, size_t sz)
 	case QSPI_MR:
 		return "MR";
 	case QSPI_RD:
-		return "MR";
+		return "RD";
 	case QSPI_TD:
 		return "TD";
 	case QSPI_SR:
@@ -193,6 +332,8 @@ static const char *atmel_qspi_reg_name(u32 offset, char *tmp, size_t sz)
 		return "IMR";
 	case QSPI_SCR:
 		return "SCR";
+	case QSPI_SR2:
+		return "SR2";
 	case QSPI_IAR:
 		return "IAR";
 	case QSPI_ICR:
@@ -205,6 +346,18 @@ static const char *atmel_qspi_reg_name(u32 offset, char *tmp, size_t sz)
 		return "SMR";
 	case QSPI_SKR:
 		return "SKR";
+	case QSPI_REFRESH:
+		return "REFRESH";
+	case QSPI_WRACNT:
+		return "WRACNT";
+	case QSPI_DLLCFG:
+		return "DLLCFG";
+	case QSPI_PCALCFG:
+		return "PCALCFG";
+	case QSPI_PCALBP:
+		return "PCALBP";
+	case QSPI_TOUT:
+		return "TOUT";
 	case QSPI_WPMR:
 		return "WPMR";
 	case QSPI_WPSR:
@@ -246,6 +399,26 @@ static void atmel_qspi_write(u32 value, struct atmel_qspi *aq, u32 offset)
 	writel(value, aq->regs + offset);
 }
 
+static int atmel_qspi_reg_sync(struct atmel_qspi *aq)
+{
+	u32 val;
+
+	return readl_poll_timeout(aq->regs + QSPI_SR2, val,
+				  !(val & QSPI_SR2_SYNCBSY),
+				  ATMEL_QSPI_SYNC_TIMEOUT);
+}
+
+static int atmel_qspi_update_config(struct atmel_qspi *aq)
+{
+	int ret;
+
+	ret = atmel_qspi_reg_sync(aq);
+	if (ret)
+		return ret;
+	atmel_qspi_write(QSPI_CR_UPDCFG, aq, QSPI_CR);
+	return atmel_qspi_reg_sync(aq);
+}
+
 static inline bool atmel_qspi_is_compatible(const struct spi_mem_op *op,
 					    const struct atmel_qspi_mode *mode)
 {
@@ -272,9 +445,32 @@ static int atmel_qspi_find_mode(const struct spi_mem_op *op)
 	return -ENOTSUPP;
 }
 
+static int atmel_qspi_sama7g5_find_mode(const struct spi_mem_op *op)
+{
+	u32 i;
+
+	for (i = 0; i < ARRAY_SIZE(atmel_qspi_sama7g5_modes); i++)
+		if (atmel_qspi_is_compatible(op, &atmel_qspi_sama7g5_modes[i]))
+			return i;
+
+	return -EOPNOTSUPP;
+}
+
 static bool atmel_qspi_supports_op(struct spi_slave *slave,
 				   const struct spi_mem_op *op)
 {
+	struct atmel_qspi *aq = dev_get_priv(slave->dev->parent);
+
+	if (!spi_mem_default_supports_op(slave, op))
+		return false;
+
+	if (aq->caps->octal) {
+		if (atmel_qspi_sama7g5_find_mode(op) < 0)
+			return false;
+		else
+			return true;
+	}
+
 	if (atmel_qspi_find_mode(op) < 0)
 		return false;
 
@@ -284,6 +480,29 @@ static bool atmel_qspi_supports_op(struct spi_slave *slave,
 		return false;
 
 	return true;
+}
+
+/*
+ * Switch QSPI controller between regular SPI mode or Serial Memory Mode (SMM).
+ */
+static int atmel_qspi_set_serial_memory_mode(struct atmel_qspi *aq,
+					     bool enable)
+{
+	int ret = 0;
+
+	/* only write if designated state differs from current state */
+	if (!!(aq->mr & QSPI_MR_SMM) != enable) {
+		if (enable)
+			aq->mr |= QSPI_MR_SMM;
+		else
+			aq->mr &= ~QSPI_MR_SMM;
+		atmel_qspi_write(aq->mr, aq, QSPI_MR);
+
+		if (aq->caps->has_gclk)
+			ret = atmel_qspi_update_config(aq);
+	}
+
+	return ret;
 }
 
 static int atmel_qspi_set_cfg(struct atmel_qspi *aq,
@@ -302,7 +521,7 @@ static int atmel_qspi_set_cfg(struct atmel_qspi *aq,
 		return mode;
 	ifr |= atmel_qspi_modes[mode].config;
 
-	if (op->dummy.buswidth && op->dummy.nbytes)
+	if (op->dummy.nbytes)
 		dummy_cycles = op->dummy.nbytes * 8 / op->dummy.buswidth;
 
 	/*
@@ -357,64 +576,46 @@ static int atmel_qspi_set_cfg(struct atmel_qspi *aq,
 	if (dummy_cycles)
 		ifr |= QSPI_IFR_NBDUM(dummy_cycles);
 
-	/* Set data enable */
-	if (op->data.nbytes)
+	/* Set data enable and data transfer type. */
+	if (op->data.nbytes) {
 		ifr |= QSPI_IFR_DATAEN;
 
-	/*
-	 * If the QSPI controller is set in regular SPI mode, set it in
-	 * Serial Memory Mode (SMM).
-	 */
-	if (aq->mr != QSPI_MR_SMM) {
-		atmel_qspi_write(QSPI_MR_SMM, aq, QSPI_MR);
-		aq->mr = QSPI_MR_SMM;
+		if (op->addr.nbytes)
+			ifr |= QSPI_IFR_TFRTYP_MEM;
 	}
+
+	mode = atmel_qspi_set_serial_memory_mode(aq, true);
+	if (mode < 0)
+		return mode;
 
 	/* Clear pending interrupts */
 	(void)atmel_qspi_read(aq, QSPI_SR);
 
-	if (aq->caps->has_ricr) {
-		if (!op->addr.nbytes && op->data.dir == SPI_MEM_DATA_IN)
-			ifr |= QSPI_IFR_APBTFRTYP_READ;
-
-		/* Set QSPI Instruction Frame registers */
+	/* Set QSPI Instruction Frame registers. */
+	if (op->addr.nbytes && !op->data.nbytes)
 		atmel_qspi_write(iar, aq, QSPI_IAR);
+
+	if (aq->caps->has_ricr) {
 		if (op->data.dir == SPI_MEM_DATA_IN)
 			atmel_qspi_write(icr, aq, QSPI_RICR);
 		else
 			atmel_qspi_write(icr, aq, QSPI_WICR);
-		atmel_qspi_write(ifr, aq, QSPI_IFR);
 	} else {
-		if (op->data.dir == SPI_MEM_DATA_OUT)
+		if (op->data.nbytes && op->data.dir == SPI_MEM_DATA_OUT)
 			ifr |= QSPI_IFR_SAMA5D2_WRITE_TRSFR;
 
-		/* Set QSPI Instruction Frame registers */
-		atmel_qspi_write(iar, aq, QSPI_IAR);
 		atmel_qspi_write(icr, aq, QSPI_ICR);
-		atmel_qspi_write(ifr, aq, QSPI_IFR);
 	}
+
+	atmel_qspi_write(ifr, aq, QSPI_IFR);
 
 	return 0;
 }
 
-static int atmel_qspi_exec_op(struct spi_slave *slave,
-			      const struct spi_mem_op *op)
+static int atmel_qspi_transfer(struct atmel_qspi *aq,
+			       const struct spi_mem_op *op, u32 offset)
 {
-	struct atmel_qspi *aq = dev_get_priv(slave->dev->parent);
-	u32 sr, imr, offset;
-	int err;
-
-	/*
-	 * Check if the address exceeds the MMIO window size. An improvement
-	 * would be to add support for regular SPI mode and fall back to it
-	 * when the flash memories overrun the controller's memory space.
-	 */
-	if (op->addr.val + op->data.nbytes > aq->mmap_size)
-		return -ENOTSUPP;
-
-	err = atmel_qspi_set_cfg(aq, op, &offset);
-	if (err)
-		return err;
+	u32 sr, imr;
 
 	/* Skip to the final steps if there is no data */
 	if (op->data.nbytes) {
@@ -436,7 +637,440 @@ static int atmel_qspi_exec_op(struct spi_slave *slave,
 	/* Poll INSTruction End and Chip Select Rise flags. */
 	imr = QSPI_SR_INSTRE | QSPI_SR_CSR;
 	return readl_poll_timeout(aq->regs + QSPI_SR, sr, (sr & imr) == imr,
-				  1000000);
+				  ATMEL_QSPI_TIMEOUT);
+}
+
+static int atmel_qspi_sama7g5_set_cfg(struct atmel_qspi *aq,
+				      const struct spi_mem_op *op, u32 *offset)
+{
+	u32 iar, icr, ifr;
+	int mode, ret;
+
+	iar = 0;
+	icr = FIELD_PREP(QSPI_ICR_INST_MASK_SAMA7G5, op->cmd.opcode);
+	ifr = QSPI_IFR_INSTEN;
+
+	mode = atmel_qspi_sama7g5_find_mode(op);
+	if (mode < 0)
+		return mode;
+	ifr |= atmel_qspi_sama7g5_modes[mode].config;
+
+	if (op->dummy.buswidth && op->dummy.nbytes) {
+		if (op->addr.dtr && op->dummy.dtr && op->data.dtr)
+			ifr |= QSPI_IFR_NBDUM(op->dummy.nbytes * 8 /
+					      (2 * op->dummy.buswidth));
+		else
+			ifr |= QSPI_IFR_NBDUM(op->dummy.nbytes * 8 /
+					      op->dummy.buswidth);
+	}
+
+	if (op->addr.buswidth && op->addr.nbytes) {
+		ifr |= FIELD_PREP(QSPI_IFR_ADDRL_SAMA7G5, op->addr.nbytes - 1) |
+		       QSPI_IFR_ADDREN;
+		iar = FIELD_PREP(QSPI_IAR_ADDR, op->addr.val);
+	}
+
+	if (op->addr.dtr && op->dummy.dtr && op->data.dtr) {
+		ifr |= QSPI_IFR_DDREN;
+		if (op->cmd.dtr)
+			ifr |= QSPI_IFR_DDRCMDEN;
+		ifr |= QSPI_IFR_DQSEN;
+	}
+
+	if (op->cmd.buswidth == 8 || op->addr.buswidth == 8 ||
+	    op->data.buswidth == 8)
+		ifr |= FIELD_PREP(QSPI_IFR_PROTTYP, QSPI_IFR_PROTTYP_OCTAFLASH);
+
+	/* offset of the data access in the QSPI memory space */
+	*offset = iar;
+
+	/* Set data enable */
+	if (op->data.nbytes) {
+		ifr |= QSPI_IFR_DATAEN;
+		if (op->addr.nbytes)
+			ifr |= QSPI_IFR_TFRTYP_MEM;
+	}
+
+	ret = atmel_qspi_set_serial_memory_mode(aq, true);
+	if (ret < 0)
+		return ret;
+
+	/* Clear pending interrupts */
+	(void)atmel_qspi_read(aq, QSPI_SR);
+
+	/* Set QSPI Instruction Frame registers */
+	if (op->addr.nbytes && !op->data.nbytes)
+		atmel_qspi_write(iar, aq, QSPI_IAR);
+
+	if (op->data.dir == SPI_MEM_DATA_IN) {
+		atmel_qspi_write(icr, aq, QSPI_RICR);
+	} else {
+		atmel_qspi_write(icr, aq, QSPI_WICR);
+		if (op->data.nbytes)
+			atmel_qspi_write(FIELD_PREP(QSPI_WRACNT_NBWRA,
+						    op->data.nbytes),
+					 aq, QSPI_WRACNT);
+	}
+
+	atmel_qspi_write(ifr, aq, QSPI_IFR);
+
+	return atmel_qspi_update_config(aq);
+}
+
+static int atmel_qspi_sama7g5_transfer(struct atmel_qspi *aq,
+				       const struct spi_mem_op *op, u32 offset)
+{
+	int err;
+	u32 val;
+
+	if (!op->data.nbytes) {
+		/* Start the transfer. */
+		err = atmel_qspi_reg_sync(aq);
+		if (err)
+			return err;
+		atmel_qspi_write(QSPI_CR_STTFR, aq, QSPI_CR);
+
+		return readl_poll_timeout(aq->regs + QSPI_SR, val,
+					  val & QSPI_SR_CSRA,
+					  ATMEL_QSPI_TIMEOUT);
+	}
+
+	/* Send/Receive data. */
+	if (op->data.dir == SPI_MEM_DATA_IN) {
+		memcpy_fromio(op->data.buf.in, aq->mem + offset,
+			      op->data.nbytes);
+
+		if (op->addr.nbytes) {
+			err = readl_poll_timeout(aq->regs + QSPI_SR2, val,
+						 !(val & QSPI_SR2_RBUSY),
+						 ATMEL_QSPI_SYNC_TIMEOUT);
+			if (err)
+				return err;
+		}
+	} else {
+		memcpy_toio(aq->mem + offset, op->data.buf.out,
+			    op->data.nbytes);
+
+		err = readl_poll_timeout(aq->regs + QSPI_SR, val,
+					 val & QSPI_SR_LWRA,
+					 ATMEL_QSPI_TIMEOUT);
+		if (err)
+			return err;
+	}
+
+	/* Release the chip-select. */
+	err = atmel_qspi_reg_sync(aq);
+	if (err)
+		return err;
+	atmel_qspi_write(QSPI_CR_LASTXFER, aq, QSPI_CR);
+
+	return readl_poll_timeout(aq->regs + QSPI_SR, val, val & QSPI_SR_CSRA,
+				  ATMEL_QSPI_TIMEOUT);
+}
+
+static int atmel_qspi_exec_op(struct spi_slave *slave,
+			      const struct spi_mem_op *op)
+{
+	struct atmel_qspi *aq = dev_get_priv(slave->dev->parent);
+	u32 offset;
+	int err;
+
+	/*
+	 * Check if the address exceeds the MMIO window size. An improvement
+	 * would be to add support for regular SPI mode and fall back to it
+	 * when the flash memories overrun the controller's memory space.
+	 */
+	if (op->addr.val + op->data.nbytes > aq->mmap_size)
+		return -ENOTSUPP;
+
+	if (op->addr.nbytes > 4)
+		return -EOPNOTSUPP;
+
+	err = aq->ops->set_cfg(aq, op, &offset);
+	if (err)
+		return err;
+
+	return aq->ops->transfer(aq, op, offset);
+}
+
+static int atmel_qspi_set_pad_calibration(struct udevice *bus, uint hz)
+{
+	struct atmel_qspi *aq = dev_get_priv(bus);
+	u32 status, val;
+	int i, ret;
+	u8 pclk_div = 0;
+
+	for (i = 0; i < ATMEL_QSPI_PCAL_ARRAY_SIZE; i++) {
+		if (aq->bus_clk_rate <= pcal[i].pclk_rate) {
+			pclk_div = pcal[i].pclk_div;
+			break;
+		}
+	}
+
+	/*
+	 * Use the biggest divider in case the peripheral clock exceeds
+	 * 200MHZ.
+	 */
+	if (aq->bus_clk_rate > pcal[ATMEL_QSPI_PCAL_ARRAY_SIZE - 1].pclk_rate)
+		pclk_div = pcal[ATMEL_QSPI_PCAL_ARRAY_SIZE - 1].pclk_div;
+
+	/* Disable QSPI while configuring the pad calibration. */
+	status = atmel_qspi_read(aq, QSPI_SR2);
+	if (status & QSPI_SR2_QSPIENS) {
+		ret = atmel_qspi_reg_sync(aq);
+		if (ret)
+			return ret;
+		atmel_qspi_write(QSPI_CR_QSPIDIS, aq, QSPI_CR);
+	}
+
+	/*
+	 * The analog circuitry is not shut down at the end of the calibration
+	 * and the start-up time is only required for the first calibration
+	 * sequence, thus increasing performance. Set the delay between the Pad
+	 * calibration analog circuitry and the calibration request to 2us.
+	 */
+	atmel_qspi_write(QSPI_PCALCFG_AAON |
+			 FIELD_PREP(QSPI_PCALCFG_CLKDIV, pclk_div) |
+			 FIELD_PREP(QSPI_PCALCFG_CALCNT,
+				    2 * (aq->bus_clk_rate / 1000000)),
+			 aq, QSPI_PCALCFG);
+
+	/* DLL On + start calibration. */
+	atmel_qspi_write(QSPI_CR_DLLON | QSPI_CR_STPCAL, aq, QSPI_CR);
+	ret =  readl_poll_timeout(aq->regs + QSPI_SR2, val,
+				  (val & QSPI_SR2_DLOCK) &&
+				  !(val & QSPI_SR2_CALBSY),
+				  ATMEL_QSPI_TIMEOUT);
+
+	/* Refresh analogic blocks every 1 ms.*/
+	atmel_qspi_write(FIELD_PREP(QSPI_REFRESH_DELAY_COUNTER, hz / 1000),
+			 aq, QSPI_REFRESH);
+
+	return ret;
+}
+
+static int atmel_qspi_set_gclk(struct udevice *bus, uint hz)
+{
+	struct atmel_qspi *aq = dev_get_priv(bus);
+	struct clk gclk;
+	u32 status, val;
+	int ret;
+
+	/* Disable DLL before setting GCLK */
+	status = atmel_qspi_read(aq, QSPI_SR2);
+	if (status & QSPI_SR2_DLOCK) {
+		atmel_qspi_write(QSPI_CR_DLLOFF, aq, QSPI_CR);
+		ret = readl_poll_timeout(aq->regs + QSPI_SR2, val,
+					 !(val & QSPI_SR2_DLOCK),
+					 ATMEL_QSPI_TIMEOUT);
+		if (ret)
+			return ret;
+	}
+
+	if (hz > QSPI_DLLCFG_THRESHOLD_FREQ)
+		atmel_qspi_write(QSPI_DLLCFG_RANGE, aq, QSPI_DLLCFG);
+	else
+		atmel_qspi_write(0, aq, QSPI_DLLCFG);
+
+	ret = clk_get_by_name(bus, "gclk", &gclk);
+	if (ret) {
+		dev_err(bus, "Missing QSPI generic clock\n");
+		return ret;
+	}
+
+	ret = clk_disable(&gclk);
+	if (ret)
+		dev_err(bus, "Failed to disable QSPI generic clock\n");
+
+	ret = clk_set_rate(&gclk, hz);
+	if (ret < 0) {
+		dev_err(bus, "Failed to set generic clock rate.\n");
+		return ret;
+	}
+
+	ret = clk_enable(&gclk);
+	if (ret)
+		dev_err(bus, "Failed to enable QSPI generic clock\n");
+
+	return ret;
+}
+
+static int atmel_qspi_sama7g5_set_speed(struct udevice *bus, uint hz)
+{
+	struct atmel_qspi *aq = dev_get_priv(bus);
+	u32 val;
+	int ret;
+
+	ret = atmel_qspi_set_gclk(bus, hz);
+	if (ret)
+		return ret;
+
+	if (aq->caps->octal) {
+		ret = atmel_qspi_set_pad_calibration(bus, hz);
+		if (ret)
+			return ret;
+	} else {
+		atmel_qspi_write(QSPI_CR_DLLON, aq, QSPI_CR);
+		ret =  readl_poll_timeout(aq->regs + QSPI_SR2, val,
+					  val & QSPI_SR2_DLOCK,
+					  ATMEL_QSPI_TIMEOUT);
+	}
+
+	/* Set the QSPI controller by default in Serial Memory Mode */
+	aq->mr |= QSPI_MR_DQSDLYEN;
+	ret = atmel_qspi_set_serial_memory_mode(aq, true);
+	if (ret < 0)
+		return ret;
+
+	/* Enable the QSPI controller. */
+	ret = atmel_qspi_reg_sync(aq);
+	if (ret)
+		return ret;
+	atmel_qspi_write(QSPI_CR_QSPIEN, aq, QSPI_CR);
+	ret = readl_poll_timeout(aq->regs + QSPI_SR2, val,
+				 val & QSPI_SR2_QSPIENS,
+				 ATMEL_QSPI_SYNC_TIMEOUT);
+	if (ret)
+		return ret;
+
+	if (aq->caps->octal)
+		ret = readl_poll_timeout(aq->regs + QSPI_SR, val,
+					 val & QSPI_SR_RFRSHD,
+					 ATMEL_QSPI_TIMEOUT);
+
+	atmel_qspi_write(FIELD_PREP(QSPI_TOUT_TCNTM, QSPI_TOUT_MAX),
+			 aq, QSPI_TOUT);
+
+	return ret;
+}
+
+static int atmel_qspi_claim_bus(struct udevice *dev)
+{
+	struct udevice *bus = dev_get_parent(dev);
+	struct atmel_qspi *aq = dev_get_priv(bus);
+	int ret;
+
+	aq->mr &= ~QSPI_MR_CSMODE_MASK;
+	aq->mr |= QSPI_MR_CSMODE_LASTXFER | QSPI_MR_WDRBT;
+	atmel_qspi_write(aq->mr, aq, QSPI_MR);
+
+	ret = atmel_qspi_set_serial_memory_mode(aq, false);
+	if (ret)
+		return log_ret(ret);
+
+	/* de-assert all chip selects */
+	if (IS_ENABLED(CONFIG_DM_GPIO)) {
+		for (int i = 0; i < ARRAY_SIZE(aq->cs_gpios); i++) {
+			if (dm_gpio_is_valid(&aq->cs_gpios[i]))
+				dm_gpio_set_value(&aq->cs_gpios[i], 0);
+		}
+	}
+
+	atmel_qspi_write(QSPI_CR_QSPIEN, aq, QSPI_CR);
+
+	return 0;
+}
+
+static int atmel_qspi_release_bus(struct udevice *dev)
+{
+	struct udevice *bus = dev_get_parent(dev);
+	struct atmel_qspi *aq = dev_get_priv(bus);
+
+	/* de-assert all chip selects */
+	if (IS_ENABLED(CONFIG_DM_GPIO)) {
+		for (int i = 0; i < ARRAY_SIZE(aq->cs_gpios); i++) {
+			if (dm_gpio_is_valid(&aq->cs_gpios[i]))
+				dm_gpio_set_value(&aq->cs_gpios[i], 0);
+		}
+	}
+
+	atmel_qspi_write(QSPI_CR_QSPIDIS, aq, QSPI_CR);
+
+	return 0;
+}
+
+static int atmel_qspi_set_cs(struct udevice *dev, int value)
+{
+	struct udevice *bus = dev_get_parent(dev);
+	struct atmel_qspi *aq = dev_get_priv(bus);
+	int cs = spi_chip_select(dev);
+
+	if (IS_ENABLED(CONFIG_DM_GPIO)) {
+		if (!dm_gpio_is_valid(&aq->cs_gpios[cs]))
+			return log_ret(-ENOENT);
+
+		return dm_gpio_set_value(&aq->cs_gpios[cs], value);
+	} else {
+		return -ENOENT;
+	}
+}
+
+static int atmel_qspi_xfer(struct udevice *dev, unsigned int bitlen,
+			   const void *dout, void *din, unsigned long flags)
+{
+	struct udevice *bus = dev_get_parent(dev);
+	struct atmel_qspi *aq = dev_get_priv(bus);
+	unsigned int len, len_rx, len_tx;
+	const u8 *txp = dout;
+	u8 *rxp = din;
+	u32 reg;
+	int ret;
+
+	if (bitlen == 0)
+		goto out;
+
+	if (bitlen % 8) {
+		flags |= SPI_XFER_END;
+		goto out;
+	}
+
+	len = bitlen / 8;
+
+	if (flags & SPI_XFER_BEGIN) {
+		ret = atmel_qspi_set_cs(dev, 1);
+		if (ret)
+			return log_ret(ret);
+		reg = atmel_qspi_read(aq, QSPI_RD);
+	}
+
+	for (len_tx = 0, len_rx = 0; len_rx < len; ) {
+		u32 status = atmel_qspi_read(aq, QSPI_SR);
+		u8 value;
+
+		if (status & QSPI_SR_OVRES)
+			return log_ret(-1);
+
+		if (len_tx < len && (status & QSPI_SR_TDRE)) {
+			if (txp)
+				value = *txp++;
+			else
+				value = 0;
+			atmel_qspi_write(value, aq, QSPI_TD);
+			len_tx++;
+		}
+
+		if (status & QSPI_SR_RDRF) {
+			value = atmel_qspi_read(aq, QSPI_RD);
+			if (rxp)
+				*rxp++ = value;
+			len_rx++;
+		}
+	}
+
+out:
+	if (flags & SPI_XFER_END) {
+		readl_poll_timeout(aq->regs + QSPI_SR, reg,
+				   reg & QSPI_SR_TXEMPTY,
+				   ATMEL_QSPI_TIMEOUT);
+
+		atmel_qspi_write(QSPI_CR_LASTXFER, aq, QSPI_CR);
+
+		ret = atmel_qspi_set_cs(dev, 0);
+		if (ret)
+			return log_ret(ret);
+	}
+
+	return 0;
 }
 
 static int atmel_qspi_set_speed(struct udevice *bus, uint hz)
@@ -444,7 +1078,11 @@ static int atmel_qspi_set_speed(struct udevice *bus, uint hz)
 	struct atmel_qspi *aq = dev_get_priv(bus);
 	u32 scr, scbr, mask, new_value;
 
+	if (aq->caps->has_gclk)
+		return atmel_qspi_sama7g5_set_speed(bus, hz);
+
 	/* Compute the QSPI baudrate */
+	dev_dbg(bus, "bus_clk_rate: %lu, hz: %u\n", aq->bus_clk_rate, hz);
 	scbr = DIV_ROUND_UP(aq->bus_clk_rate, hz);
 	if (scbr > 0)
 		scbr--;
@@ -480,6 +1118,8 @@ static int atmel_qspi_set_mode(struct udevice *bus, uint mode)
 
 	scr = (scr & ~mask) | new_value;
 	atmel_qspi_write(scr, aq, QSPI_SCR);
+	if (aq->caps->has_gclk)
+		return atmel_qspi_update_config(aq);
 
 	return 0;
 }
@@ -487,7 +1127,7 @@ static int atmel_qspi_set_mode(struct udevice *bus, uint mode)
 static int atmel_qspi_enable_clk(struct udevice *dev)
 {
 	struct atmel_qspi *aq = dev_get_priv(dev);
-	struct clk pclk, qspick;
+	struct clk pclk, qspick, gclk;
 	int ret;
 
 	ret = clk_get_by_name(dev, "pclk", &pclk);
@@ -502,7 +1142,7 @@ static int atmel_qspi_enable_clk(struct udevice *dev)
 	ret = clk_enable(&pclk);
 	if (ret) {
 		dev_err(dev, "Failed to enable QSPI peripheral clock\n");
-		goto free_pclk;
+		return ret;
 	}
 
 	if (aq->caps->has_qspick) {
@@ -510,37 +1150,61 @@ static int atmel_qspi_enable_clk(struct udevice *dev)
 		ret = clk_get_by_name(dev, "qspick", &qspick);
 		if (ret) {
 			dev_err(dev, "Missing QSPI peripheral clock\n");
-			goto free_pclk;
+			return ret;
 		}
 
 		ret = clk_enable(&qspick);
 		if (ret)
 			dev_err(dev, "Failed to enable QSPI system clock\n");
-		clk_free(&qspick);
+	} else if (aq->caps->has_gclk) {
+		ret = clk_get_by_name(dev, "gclk", &gclk);
+		if (ret) {
+			dev_err(dev, "Missing QSPI generic clock\n");
+			return ret;
+		}
+
+		ret = clk_enable(&gclk);
+		if (ret)
+			dev_err(dev, "Failed to enable QSPI system clock\n");
 	}
 
 	aq->bus_clk_rate = clk_get_rate(&pclk);
 	if (!aq->bus_clk_rate)
-		ret = -EINVAL;
-
-free_pclk:
-	clk_free(&pclk);
+		return -EINVAL;
 
 	return ret;
 }
 
-static void atmel_qspi_init(struct atmel_qspi *aq)
+static int atmel_qspi_init(struct atmel_qspi *aq)
 {
+	int ret;
+
+	if (aq->caps->has_gclk) {
+		ret = atmel_qspi_reg_sync(aq);
+		if (ret)
+			return ret;
+		atmel_qspi_write(QSPI_CR_SWRST, aq, QSPI_CR);
+		return 0;
+	}
+
 	/* Reset the QSPI controller */
 	atmel_qspi_write(QSPI_CR_SWRST, aq, QSPI_CR);
 
-	/* Set the QSPI controller by default in Serial Memory Mode */
-	atmel_qspi_write(QSPI_MR_SMM, aq, QSPI_MR);
-	aq->mr = QSPI_MR_SMM;
-
 	/* Enable the QSPI controller */
 	atmel_qspi_write(QSPI_CR_QSPIEN, aq, QSPI_CR);
+
+	return 0;
 }
+
+static const struct atmel_qspi_priv_ops atmel_qspi_priv_ops = {
+	.set_cfg = atmel_qspi_set_cfg,
+	.transfer = atmel_qspi_transfer,
+};
+
+static const struct atmel_qspi_priv_ops atmel_qspi_sama7g5_priv_ops = {
+	.set_cfg = atmel_qspi_sama7g5_set_cfg,
+	.transfer = atmel_qspi_sama7g5_transfer,
+};
 
 static int atmel_qspi_probe(struct udevice *dev)
 {
@@ -551,42 +1215,61 @@ static int atmel_qspi_probe(struct udevice *dev)
 	aq->caps = (struct atmel_qspi_caps *)dev_get_driver_data(dev);
 	if (!aq->caps) {
 		dev_err(dev, "Could not retrieve QSPI caps\n");
-		return -EINVAL;
+		return log_ret(-EINVAL);
 	};
+
+	if (aq->caps->has_gclk)
+		aq->ops = &atmel_qspi_sama7g5_priv_ops;
+	else
+		aq->ops = &atmel_qspi_priv_ops;
+
+	if (IS_ENABLED(CONFIG_DM_GPIO)) {
+		ret = gpio_request_list_by_name(dev, "cs-gpios", aq->cs_gpios,
+						ARRAY_SIZE(aq->cs_gpios), 0);
+		if (ret < 0) {
+			pr_err("Can't get %s gpios! Error: %d", dev->name, ret);
+			return log_ret(ret);
+		}
+
+		for (int i = 0; i < ARRAY_SIZE(aq->cs_gpios); i++) {
+			if (!dm_gpio_is_valid(&aq->cs_gpios[i]))
+				continue;
+
+			dm_gpio_set_dir_flags(&aq->cs_gpios[i],
+					      GPIOD_IS_OUT | GPIOD_IS_OUT_ACTIVE);
+		}
+	}
 
 	/* Map the registers */
 	ret = dev_read_resource_byname(dev, "qspi_base", &res);
 	if (ret) {
 		dev_err(dev, "missing registers\n");
-		return ret;
+		return log_ret(ret);
 	}
 
 	aq->regs = devm_ioremap(dev, res.start, resource_size(&res));
 	if (IS_ERR(aq->regs))
-		return PTR_ERR(aq->regs);
+		return log_ret(PTR_ERR(aq->regs));
 
 	/* Map the AHB memory */
 	ret = dev_read_resource_byname(dev, "qspi_mmap", &res);
 	if (ret) {
 		dev_err(dev, "missing AHB memory\n");
-		return ret;
+		return log_ret(ret);
 	}
 
 	aq->mem = devm_ioremap(dev, res.start, resource_size(&res));
 	if (IS_ERR(aq->mem))
-		return PTR_ERR(aq->mem);
+		return log_ret(PTR_ERR(aq->mem));
 
 	aq->mmap_size = resource_size(&res);
 
 	ret = atmel_qspi_enable_clk(dev);
 	if (ret)
-		return ret;
+		return log_ret(ret);
 
 	aq->dev = dev;
-
-	atmel_qspi_init(aq);
-
-	return 0;
+	return log_ret(atmel_qspi_init(aq));
 }
 
 static const struct spi_controller_mem_ops atmel_qspi_mem_ops = {
@@ -595,9 +1278,12 @@ static const struct spi_controller_mem_ops atmel_qspi_mem_ops = {
 };
 
 static const struct dm_spi_ops atmel_qspi_ops = {
+	.claim_bus = atmel_qspi_claim_bus,
+	.release_bus = atmel_qspi_release_bus,
+	.xfer = atmel_qspi_xfer,
+	.mem_ops = &atmel_qspi_mem_ops,
 	.set_speed = atmel_qspi_set_speed,
 	.set_mode = atmel_qspi_set_mode,
-	.mem_ops = &atmel_qspi_mem_ops,
 };
 
 static const struct atmel_qspi_caps atmel_sama5d2_qspi_caps = {};
@@ -605,6 +1291,15 @@ static const struct atmel_qspi_caps atmel_sama5d2_qspi_caps = {};
 static const struct atmel_qspi_caps atmel_sam9x60_qspi_caps = {
 	.has_qspick = true,
 	.has_ricr = true,
+};
+
+static const struct atmel_qspi_caps atmel_sama7g5_ospi_caps = {
+	.has_gclk = true,
+	.octal = true,
+};
+
+static const struct atmel_qspi_caps atmel_sama7g5_qspi_caps = {
+	.has_gclk = true,
 };
 
 static const struct udevice_id atmel_qspi_ids[] = {
@@ -615,6 +1310,14 @@ static const struct udevice_id atmel_qspi_ids[] = {
 	{
 		.compatible = "microchip,sam9x60-qspi",
 		.data = (ulong)&atmel_sam9x60_qspi_caps,
+	},
+	{
+		.compatible = "microchip,sama7g5-ospi",
+		.data = (ulong)&atmel_sama7g5_ospi_caps,
+	},
+	{
+		.compatible = "microchip,sama7g5-qspi",
+		.data = (ulong)&atmel_sama7g5_qspi_caps,
 	},
 	{ /* sentinel */ }
 };

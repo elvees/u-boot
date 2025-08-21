@@ -4,7 +4,6 @@
  * Mario Six, Guntermann & Drunck GmbH, mario.six@gdsys.cc
  */
 
-#include <common.h>
 #include <dm.h>
 #include <init.h>
 #include <log.h>
@@ -118,12 +117,7 @@ int dram_init(void)
 
 phys_size_t get_effective_memsize(void)
 {
-	if (!IS_ENABLED(CONFIG_VERY_BIG_RAM))
-		return gd->ram_size;
-
-	/* Limit stack to what we can reasonable map */
-	return ((gd->ram_size > CONFIG_MAX_MEM_MAPPED) ?
-		CONFIG_MAX_MEM_MAPPED : gd->ram_size);
+	return gd->ram_size;
 }
 
 /**

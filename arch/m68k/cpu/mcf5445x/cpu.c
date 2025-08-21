@@ -8,7 +8,6 @@
  * TsiChung Liew (Tsi-Chung.Liew@freescale.com)
  */
 
-#include <common.h>
 #include <init.h>
 #include <net.h>
 #include <vsprintf.h>
@@ -93,7 +92,7 @@ int print_cpuinfo(void)
 		       strmhz(buf3, gd->arch.flb_clk));
 #ifdef CONFIG_PCI
 		printf("       PCI CLK %s MHz INP CLK %s MHz VCO CLK %s MHz\n",
-		       strmhz(buf1, gd->pci_clk),
+		       strmhz(buf1, gd->arch.pci_clk),
 		       strmhz(buf2, gd->arch.inp_clk),
 		       strmhz(buf3, gd->arch.vco_clk));
 #else
@@ -110,7 +109,7 @@ int print_cpuinfo(void)
 #if defined(CONFIG_MCFFEC)
 /* Default initializations for MCFFEC controllers.  To override,
  * create a board-specific function called:
- * 	int board_eth_init(struct bd_info *bis)
+ *	int board_eth_init(struct bd_info *bis)
  */
 
 int cpu_eth_init(struct bd_info *bis)

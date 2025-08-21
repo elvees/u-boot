@@ -14,7 +14,6 @@
  *
  * [1] - http://xenbits.xen.org/gitweb/?p=mini-os.git;a=summary
  */
-#include <common.h>
 #include <log.h>
 
 #include <asm/io.h>
@@ -23,7 +22,9 @@
 #include <xen/events.h>
 #include <xen/hvm.h>
 
+#if IS_ENABLED(CONFIG_XEN_SERIAL)
 extern u32 console_evtchn;
+#endif /* IS_ENABLED(CONFIG_XEN_SERIAL) */
 
 #define NR_EVS 1024
 
@@ -51,8 +52,11 @@ void unbind_all_ports(void)
 	struct vcpu_info *vcpu_info = &s->vcpu_info[cpu];
 
 	for (i = 0; i < NR_EVS; i++) {
+#if IS_ENABLED(CONFIG_XEN_SERIAL)
 		if (i == console_evtchn)
 			continue;
+#endif /* IS_ENABLED(CONFIG_XEN_SERIAL) */
+
 		if (test_and_clear_bit(i, bound_ports)) {
 			printf("port %d still bound!\n", i);
 			unbind_evtchn(i);
@@ -196,4 +200,3 @@ void fini_events(void)
 	/* Dealloc all events */
 	unbind_all_ports();
 }
-

@@ -8,12 +8,9 @@
 
 #include "rcar-gen3-common.h"
 
-/* Ethernet RAVB */
-#define CONFIG_BITBANGMII_MULTI
+#undef CFG_EXTRA_ENV_SETTINGS
 
-#undef CONFIG_EXTRA_ENV_SETTINGS
-
-#define CONFIG_EXTRA_ENV_SETTINGS		\
+#define CFG_EXTRA_ENV_SETTINGS		\
 	"usb_pgood_delay=2000\0"	\
 	"script=boot.scr\0" \
 	"image=Image\0" \
@@ -23,7 +20,7 @@
 	"boot_fdt=try\0" \
 	"fdt_file=" CONFIG_DEFAULT_FDT_FILE "\0" \
 	"initrd_addr=0x43800000\0"		\
-	"mmcdev=0\0" \
+	"mmcdev=1\0" \
 	"mmcpart=1\0" \
 	"mmcrootpart=2\0" \
 	"finduuid=part uuid mmc ${mmcdev}:${mmcrootpart} uuid\0" \
@@ -66,19 +63,5 @@
 		"else " \
 			"booti; " \
 		"fi;\0"
-
-#undef CONFIG_BOOTCOMMAND
-
-#define CONFIG_BOOTCOMMAND \
-	"mmc dev ${mmcdev}; if mmc rescan; then " \
-	   "if run loadbootscript; then " \
-		   "run bootscript; " \
-	   "else " \
-		   "if run loadimage; then " \
-			   "run mmcboot; " \
-		   "else run netboot; " \
-		   "fi; " \
-	   "fi; " \
-	"else booti ${loadaddr} - ${fdt_addr}; fi"
 
 #endif /* __BEACON_RZG2M_H */

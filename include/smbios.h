@@ -8,11 +8,16 @@
 #ifndef _SMBIOS_H_
 #define _SMBIOS_H_
 
-#include <dm/ofnode.h>
+#include <linux/types.h>
+#include <smbios_def.h>
 
 /* SMBIOS spec version implemented */
 #define SMBIOS_MAJOR_VER	3
-#define SMBIOS_MINOR_VER	0
+#define SMBIOS_MINOR_VER	7
+
+enum {
+	SMBIOS_STR_MAX	= 64,	/* Maximum length allowed for a string */
+};
 
 /* SMBIOS structure types */
 enum {
@@ -33,6 +38,11 @@ enum {
 #define SMBIOS_INTERMEDIATE_OFFSET	16
 #define SMBIOS_STRUCT_EOS_BYTES		2
 
+struct str_lookup_table {
+	u16 idx;
+	const char *str;
+};
+
 struct __packed smbios_entry {
 	u8 anchor[4];
 	u8 checksum;
@@ -50,19 +60,40 @@ struct __packed smbios_entry {
 	u8 bcd_rev;
 };
 
-/* BIOS characteristics */
-#define BIOS_CHARACTERISTICS_PCI_SUPPORTED	(1 << 7)
-#define BIOS_CHARACTERISTICS_UPGRADEABLE	(1 << 11)
-#define BIOS_CHARACTERISTICS_SELECTABLE_BOOT	(1 << 16)
+/**
+ * struct smbios3_entry - SMBIOS 3.0 (64-bit) Entry Point structure
+ */
+struct __packed smbios3_entry {
+	/** @anchor: anchor string */
+	u8 anchor[5];
+	/** @checksum: checksum of the entry point structure */
+	u8 checksum;
+	/** @length: length of the entry point structure */
+	u8 length;
+	/** @major_ver: major version of the SMBIOS specification */
+	u8 major_ver;
+	/** @minor_ver: minor version of the SMBIOS specification */
+	u8 minor_ver;
+	/** @docrev: revision of the SMBIOS specification */
+	u8 doc_rev;
+	/** @entry_point_rev: revision of the entry point structure */
+	u8 entry_point_rev;
+	/** @reserved: reserved */
+	u8 reserved;
+	/** maximum size of SMBIOS table */
+	u32 table_maximum_size;
+	/** @struct_table_address: 64-bit physical starting address */
+	u64 struct_table_address;
+};
 
-#define BIOS_CHARACTERISTICS_EXT1_ACPI		(1 << 0)
-#define BIOS_CHARACTERISTICS_EXT1_UEFI		(1 << 3)
-#define BIOS_CHARACTERISTICS_EXT2_TARGET	(1 << 2)
-
-struct __packed smbios_type0 {
+struct __packed smbios_header {
 	u8 type;
 	u8 length;
 	u16 handle;
+};
+
+struct __packed smbios_type0 {
+	struct smbios_header hdr;
 	u8 vendor;
 	u8 bios_ver;
 	u16 bios_start_segment;
@@ -75,13 +106,16 @@ struct __packed smbios_type0 {
 	u8 bios_minor_release;
 	u8 ec_major_release;
 	u8 ec_minor_release;
+	u16 extended_bios_rom_size;
 	char eos[SMBIOS_STRUCT_EOS_BYTES];
 };
 
+#define SMBIOS_TYPE1_LENGTH_V20		0x08
+#define SMBIOS_TYPE1_LENGTH_V21		0x19
+#define SMBIOS_TYPE1_LENGTH_V24		0x1b
+
 struct __packed smbios_type1 {
-	u8 type;
-	u8 length;
-	u16 handle;
+	struct smbios_header hdr;
 	u8 manufacturer;
 	u8 product_name;
 	u8 version;
@@ -93,13 +127,10 @@ struct __packed smbios_type1 {
 	char eos[SMBIOS_STRUCT_EOS_BYTES];
 };
 
-#define SMBIOS_BOARD_FEATURE_HOSTING	(1 << 0)
-#define SMBIOS_BOARD_MOTHERBOARD	10
+#define SMBIOS_TYPE2_CON_OBJ_HANDLE_SIZE sizeof(u16)
 
 struct __packed smbios_type2 {
-	u8 type;
-	u8 length;
-	u16 handle;
+	struct smbios_header hdr;
 	u8 manufacturer;
 	u8 product_name;
 	u8 version;
@@ -109,17 +140,16 @@ struct __packed smbios_type2 {
 	u8 chassis_location;
 	u16 chassis_handle;
 	u8 board_type;
+	u8 number_contained_objects;
+	/*
+	 * Dynamic bytes will be inserted here to store the objects.
+	 * length is equal to 'number_contained_objects'.
+	 */
 	char eos[SMBIOS_STRUCT_EOS_BYTES];
 };
 
-#define SMBIOS_ENCLOSURE_DESKTOP	3
-#define SMBIOS_STATE_SAFE		3
-#define SMBIOS_SECURITY_NONE		3
-
 struct __packed smbios_type3 {
-	u8 type;
-	u8 length;
-	u16 handle;
+	struct smbios_header hdr;
 	u8 manufacturer;
 	u8 chassis_type;
 	u8 version;
@@ -134,21 +164,17 @@ struct __packed smbios_type3 {
 	u8 number_of_power_cords;
 	u8 element_count;
 	u8 element_record_length;
+	/*
+	 * Dynamic bytes will be inserted here to store the elements.
+	 * length is equal to 'element_record_length' * 'element_record_length'
+	 */
+	u8 sku_number;
 	char eos[SMBIOS_STRUCT_EOS_BYTES];
 };
 
-#define SMBIOS_PROCESSOR_TYPE_CENTRAL	3
-#define SMBIOS_PROCESSOR_STATUS_ENABLED	1
-#define SMBIOS_PROCESSOR_UPGRADE_NONE	6
-
-#define SMBIOS_PROCESSOR_FAMILY_OTHER	1
-#define SMBIOS_PROCESSOR_FAMILY_UNKNOWN	2
-
 struct __packed smbios_type4 {
-	u8 type;
-	u8 length;
-	u16 handle;
-	u8 socket_designation;
+	struct smbios_header hdr;
+	u8 socket_design;
 	u8 processor_type;
 	u8 processor_family;
 	u8 processor_manufacturer;
@@ -174,6 +200,67 @@ struct __packed smbios_type4 {
 	u16 core_count2;
 	u16 core_enabled2;
 	u16 thread_count2;
+	u16 thread_enabled;
+	char eos[SMBIOS_STRUCT_EOS_BYTES];
+};
+
+union cache_config {
+	struct {
+		u16 level:3;
+		u16 bsocketed:1;
+		u16 rsvd0:1;
+		u16 locate:2;
+		u16 benabled:1;
+		u16 opmode:2;
+		u16 rsvd1:6;
+	} fields;
+	u16 data;
+};
+
+union cache_size_word {
+	struct {
+		u16 size:15;
+		u16 granu:1;
+	} fields;
+	u16 data;
+};
+
+union cache_size_dword {
+	struct {
+		u32 size:31;
+		u32 granu:1;
+	} fields;
+	u32 data;
+};
+
+union cache_sram_type {
+	struct {
+		u16 other:1;
+		u16 unknown:1;
+		u16 nonburst:1;
+		u16 burst:1;
+		u16 plburst:1;
+		u16 sync:1;
+		u16 async:1;
+		u16 rsvd:9;
+	} fields;
+	u16 data;
+};
+
+struct __packed smbios_type7 {
+	struct smbios_header hdr;
+	u8 socket_design;
+	union cache_config config;
+	union cache_size_word max_size;
+	union cache_size_word inst_size;
+	union cache_sram_type supp_sram_type;
+	union cache_sram_type curr_sram_type;
+	u8 speed;
+	u8 err_corr_type;
+	u8 sys_cache_type;
+	u8 associativity;
+	union cache_size_dword max_size2;
+	union cache_size_dword inst_size2;
 	char eos[SMBIOS_STRUCT_EOS_BYTES];
 };
 
@@ -191,12 +278,6 @@ struct __packed smbios_type127 {
 	u8 length;
 	u16 handle;
 	char eos[SMBIOS_STRUCT_EOS_BYTES];
-};
-
-struct __packed smbios_header {
-	u8 type;
-	u8 length;
-	u16 handle;
 };
 
 /**
@@ -224,9 +305,13 @@ static inline void fill_smbios_header(void *table, int type,
  *
  * This writes SMBIOS table at a given address.
  *
- * @addr:	start address to write SMBIOS table. If this is not
- *	16-byte-aligned then it will be aligned before the table is written
- * @return:	end address of SMBIOS table (and start address for next entry)
+ * @addr:	start address to write SMBIOS table, 16-byte-alignment
+ * recommended. Note that while the SMBIOS tables themself have no alignment
+ * requirement, some systems may requires alignment. For example x86 systems
+ * which put tables at f0000 require 16-byte alignment
+ *
+ * Return:	end address of SMBIOS table (and start address for next entry)
+ *		or NULL in case of an error
  */
 ulong write_smbios_table(ulong addr);
 
@@ -253,9 +338,9 @@ const struct smbios_header *smbios_header(const struct smbios_entry *entry, int 
  *
  * @header:    pointer to struct smbios_header
  * @index:     string index
- * @return:    NULL or a valid const char pointer
+ * @return:    NULL or a valid char pointer
  */
-const char *smbios_string(const struct smbios_header *header, int index);
+char *smbios_string(const struct smbios_header *header, int index);
 
 /**
  * smbios_update_version() - Update the version string
@@ -264,9 +349,38 @@ const char *smbios_string(const struct smbios_header *header, int index);
  * main loop has started) to update the BIOS version string (SMBIOS table 0).
  *
  * @version: New version string to use
- * @return 0 if OK, -ENOENT if no version string was previously written,
+ * Return: 0 if OK, -ENOENT if no version string was previously written,
  *	-ENOSPC if the new string is too large to fit
  */
 int smbios_update_version(const char *version);
+
+/**
+ * smbios_update_version_full() - Update the version string
+ *
+ * This can be called after the SMBIOS tables are written (e.g. after the U-Boot
+ * main loop has started) to update the BIOS version string (SMBIOS table 0).
+ * It scans for the correct place to put the version, so does not need U-Boot
+ * to have actually written the tables itself (e.g. if a previous bootloader
+ * did it).
+ *
+ * @smbios_tab: Start of SMBIOS tables
+ * @version: New version string to use
+ * Return: 0 if OK, -ENOENT if no version string was previously written,
+ *	-ENOSPC if the new string is too large to fit
+ */
+int smbios_update_version_full(void *smbios_tab, const char *version);
+
+/**
+ * smbios_prepare_measurement() - Update smbios table for the measurement
+ *
+ * TCG specification requires to measure static configuration information.
+ * This function clear the device dependent parameters such as
+ * serial number for the measurement.
+ *
+ * @entry: pointer to a struct smbios3_entry
+ * @header: pointer to a struct smbios_header
+ */
+void smbios_prepare_measurement(const struct smbios3_entry *entry,
+				struct smbios_header *header);
 
 #endif /* _SMBIOS_H_ */

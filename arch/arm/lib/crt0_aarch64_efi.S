@@ -25,7 +25,7 @@ pe_header:
 	.long	IMAGE_NT_SIGNATURE		/* 'PE' */
 coff_header:
 	.short	IMAGE_FILE_MACHINE_ARM64	/* AArch64 */
-	.short	2				/* nr_sections */
+	.short	3				/* nr_sections */
 	.long	0				/* TimeDateStamp */
 	.long	0				/* PointerToSymbolTable */
 	.long	0				/* NumberOfSymbols */
@@ -34,21 +34,22 @@ coff_header:
 	.short	(IMAGE_FILE_EXECUTABLE_IMAGE | \
 		 IMAGE_FILE_LINE_NUMS_STRIPPED | \
 		 IMAGE_FILE_LOCAL_SYMS_STRIPPED | \
+		 IMAGE_FILE_LARGE_ADDRESS_AWARE | \
 		 IMAGE_FILE_DEBUG_STRIPPED)
 optional_header:
 	.short	IMAGE_NT_OPTIONAL_HDR64_MAGIC	/* PE32+ format */
 	.byte	0x02				/* MajorLinkerVersion */
 	.byte	0x14				/* MinorLinkerVersion */
-	.long	_edata - _start			/* SizeOfCode */
-	.long	0				/* SizeOfInitializedData */
+	.long	_etext - _start			/* SizeOfCode */
+	.long	_data_size			/* SizeOfInitializedData */
 	.long	0				/* SizeOfUninitializedData */
 	.long	_start - ImageBase		/* AddressOfEntryPoint */
 	.long	_start - ImageBase		/* BaseOfCode */
 
 extra_header_fields:
 	.quad	0				/* ImageBase */
-	.long	0x20				/* SectionAlignment */
-	.long	0x8				/* FileAlignment */
+	.long	0x1000				/* SectionAlignment */
+	.long	0x200				/* FileAlignment */
 	.short	0				/* MajorOperatingSystemVersion */
 	.short	0				/* MinorOperatingSystemVersion */
 	.short	0				/* MajorImageVersion */
@@ -65,7 +66,11 @@ extra_header_fields:
 	.long	_start - ImageBase		/* SizeOfHeaders */
 	.long	0				/* CheckSum */
 	.short	IMAGE_SUBSYSTEM_EFI_APPLICATION /* Subsystem */
+#if CONFIG_VENDOR_EFI
 	.short	0				/* DllCharacteristics */
+#else
+	.short	IMAGE_DLLCHARACTERISTICS_NX_COMPAT
+#endif
 	.quad	0				/* SizeOfStackReserve */
 	.quad	0				/* SizeOfStackCommit */
 	.quad	0				/* SizeOfHeapReserve */
@@ -99,24 +104,47 @@ section_table:
 	.long	0			/* PointerToLineNumbers */
 	.short	0			/* NumberOfRelocations */
 	.short	0			/* NumberOfLineNumbers */
-	.long	0x42100040		/* Characteristics (section flags) */
-
+	/* Characteristics (section flags) */
+	.long	(IMAGE_SCN_MEM_READ | \
+		 IMAGE_SCN_MEM_DISCARDABLE | \
+		 IMAGE_SCN_CNT_INITIALIZED_DATA)
 
 	.ascii	".text"
 	.byte	0
 	.byte	0
 	.byte	0			/* end of 0 padding of section name */
-	.long	_edata - _start		/* VirtualSize */
+	.long	_etext - _start		/* VirtualSize */
 	.long	_start - ImageBase	/* VirtualAddress */
-	.long	_edata - _start		/* SizeOfRawData */
+	.long	_etext - _start		/* SizeOfRawData */
 	.long	_start - ImageBase	/* PointerToRawData */
+	.long	0			/* PointerToRelocations */
+	.long	0			/* PointerToLineNumbers */
+	.short	0			/* NumberOfRelocations */
+	.short	0			/* NumberOfLineNumbers */
+	/* Characteristics (section flags) */
+	.long	(IMAGE_SCN_MEM_READ | \
+		 IMAGE_SCN_MEM_EXECUTE | \
+		 IMAGE_SCN_CNT_CODE)
 
-	.long	0		/* PointerToRelocations (0 for executables) */
-	.long	0		/* PointerToLineNumbers (0 for executables) */
-	.short	0		/* NumberOfRelocations  (0 for executables) */
-	.short	0		/* NumberOfLineNumbers  (0 for executables) */
-	.long	0xe0500020	/* Characteristics (section flags) */
+	.ascii	".data"
+	.byte	0
+	.byte	0
+	.byte	0			/* end of 0 padding of section name */
+	.long	_data_size		/* VirtualSize */
+	.long	_data - ImageBase	/* VirtualAddress */
+	.long	_data_size		/* SizeOfRawData */
+	.long	_data - ImageBase	/* PointerToRawData */
+	.long	0			/* PointerToRelocations */
+	.long	0			/* PointerToLineNumbers */
+	.short	0			/* NumberOfRelocations */
+	.short	0			/* NumberOfLineNumbers */
+	/* Characteristics (section flags) */
+	.long	(IMAGE_SCN_MEM_WRITE | \
+		 IMAGE_SCN_MEM_READ | \
+		 IMAGE_SCN_CNT_INITIALIZED_DATA)
 
+	.align		12
+	.globl		_start
 _start:
 	stp		x29, x30, [sp, #-32]!
 	mov		x29, sp

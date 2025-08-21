@@ -6,7 +6,6 @@
  * Timur Tabi (timur@freescale.com)
  */
 
-#include <common.h>
 #include <command.h>
 #include <env.h>
 #include <i2c.h>
@@ -62,7 +61,7 @@ static struct __attribute__ ((__packed__)) eeprom {
 	u8 mac_count;     /* 0x40        Number of MAC addresses */
 	u8 mac_flag;      /* 0x41        MAC table flags */
 	u8 mac[MAX_NUM_PORTS][6];     /* 0x42 - 0xa1 MAC addresses */
-	u8 res_2[90];     /* 0xa2 - 0xfb Reserved */	
+	u8 res_2[90];     /* 0xa2 - 0xfb Reserved */
 	u32 crc;          /* 0xfc - 0xff CRC32 checksum */
 #endif
 } e;
@@ -378,7 +377,7 @@ static void set_mac_address(unsigned int index, const char *string)
 	}
 
 	for (i = 0; *p && (i < 6); i++) {
-		e.mac[index][i] = simple_strtoul(p, &p, 16);
+		e.mac[index][i] = hextoul(p, &p);
 		if (*p == ':')
 			p++;
 	}
@@ -424,7 +423,7 @@ int do_mac(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 			prog_eeprom();
 			break;
 		default:
-			return cmd_usage(cmdtp);
+			return CMD_RET_USAGE;
 		}
 
 		return 0;
@@ -452,11 +451,11 @@ int do_mac(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		set_date(argv[2]);
 		break;
 	case 'p':	/* MAC table size */
-		e.mac_count = simple_strtoul(argv[2], NULL, 16);
+		e.mac_count = hextoul(argv[2], NULL);
 		update_crc();
 		break;
 	case '0' ... '9':	/* "mac 0" through "mac 22" */
-		set_mac_address(simple_strtoul(argv[1], NULL, 10), argv[2]);
+		set_mac_address(dectoul(argv[1], NULL), argv[2]);
 		break;
 	case 'h':	/* help */
 	default:
@@ -623,3 +622,27 @@ unsigned int get_cpu_board_revision(void)
 	return MPC85XX_CPU_BOARD_REV(be.major, be.minor);
 }
 #endif
+
+U_BOOT_LONGHELP(mac,
+	"[read|save|id|num|errata|date|ports|port_number]\n"
+	"mac read\n"
+	"    - read EEPROM content into memory data structure\n"
+	"mac save\n"
+	"    - save memory data structure to the EEPROM\n"
+	"mac id\n"
+	"    - program system id per hard coded value\n"
+	"mac num string\n"
+	"    - program system serial number to value string\n"
+	"mac errata string\n"
+	"    - program errata data to value string\n"
+	"mac date YYMMDDhhmmss\n"
+	"    - program date to string value YYMMDDhhmmss\n"
+	"mac ports N\n"
+	"    - program the number of network ports to integer N\n"
+	"mac X string\n"
+	"    - program MAC addr for port X [X=0,1..] to colon separated string");
+
+U_BOOT_CMD(
+	mac, 3, 1,  do_mac,
+	"display and program the system ID and MAC addresses in EEPROM",
+	mac_help_text);

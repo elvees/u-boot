@@ -4,7 +4,6 @@
  * Author: Ken Ma<make@marvell.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <dm/device-internal.h>
 #include <dm/lists.h>
@@ -13,6 +12,7 @@
 #include <asm/io.h>
 #include <wait_bit.h>
 #include <linux/bitops.h>
+#include <linux/printk.h>
 
 #define MVMDIO_SMI_DATA_SHIFT		0
 #define MVMDIO_SMI_PHY_ADDR_SHIFT	16
@@ -208,7 +208,7 @@ static int mvmdio_probe(struct udevice *dev)
 {
 	struct mvmdio_priv *priv = dev_get_priv(dev);
 
-	priv->mdio_base = (void *)dev_read_addr(dev);
+	priv->mdio_base = dev_read_addr_ptr(dev);
 	priv->type = (enum mvmdio_bus_type)dev_get_driver_data(dev);
 
 	return 0;
@@ -234,4 +234,3 @@ U_BOOT_DRIVER(mvmdio) = {
 	.ops			= &mvmdio_ops,
 	.priv_auto	= sizeof(struct mvmdio_priv),
 };
-

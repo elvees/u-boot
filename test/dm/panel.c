@@ -6,7 +6,6 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
 #include <backlight.h>
 #include <dm.h>
 #include <panel.h>
@@ -28,13 +27,13 @@ static int dm_test_panel(struct unit_test_state *uts)
 	bool polarity;
 
 	ut_assertok(uclass_first_device_err(UCLASS_PANEL, &dev));
-	ut_assertok(uclass_first_device_err(UCLASS_PWM, &pwm));
+	ut_assertok(uclass_get_device_by_name(UCLASS_PWM, "pwm", &pwm));
 	ut_assertok(uclass_get_device(UCLASS_GPIO, 1, &gpio));
 	ut_assertok(regulator_get_by_platname("VDD_EMMC_1.8V", &reg));
 	ut_assertok(sandbox_pwm_get_config(pwm, 0, &period_ns, &duty_ns,
 					   &enable, &polarity));
 	ut_asserteq(false, enable);
-	ut_asserteq(false, regulator_get_enable(reg));
+	ut_asserteq(true, regulator_get_enable(reg));
 
 	ut_assertok(panel_enable_backlight(dev));
 	ut_assertok(sandbox_pwm_get_config(pwm, 0, &period_ns, &duty_ns,
@@ -77,4 +76,4 @@ static int dm_test_panel(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_panel, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_panel, UTF_SCAN_PDATA | UTF_SCAN_FDT);

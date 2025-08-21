@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2014 - 2015 Xilinx, Inc.
- * Michal Simek <michal.simek@xilinx.com>
+ * Michal Simek <michal.simek@amd.com>
  */
 
-#include <common.h>
 #include <init.h>
 #include <time.h>
+#include <linux/errno.h>
+#include <linux/types.h>
 #include <asm/arch/hardware.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/armv8/mmu.h>
@@ -15,6 +16,7 @@
 #include <asm/io.h>
 #include <zynqmp_firmware.h>
 #include <asm/cache.h>
+#include <dm/platdata.h>
 
 #define ZYNQ_SILICON_VER_MASK	0xF000
 #define ZYNQ_SILICON_VER_SHIFT	12
@@ -110,19 +112,32 @@ u64 get_page_table_size(void)
 	return 0x14000;
 }
 
-#if defined(CONFIG_SYS_MEM_RSVD_FOR_MMU) || defined(CONFIG_DEFINE_TCM_OCM_MMAP)
-void tcm_init(u8 mode)
+#if defined(CONFIG_DEFINE_TCM_OCM_MMAP)
+void tcm_init(enum tcm_mode mode)
 {
-	puts("WARNING: Initializing TCM overwrites TCM content\n");
-	initialize_tcm(mode);
-	memset((void *)ZYNQMP_TCM_BASE_ADDR, 0, ZYNQMP_TCM_SIZE);
+	int ret;
+
+	ret = check_tcm_mode(mode);
+	if (!ret) {
+		puts("WARNING: Initializing TCM overwrites TCM content\n");
+		initialize_tcm(mode);
+		memset((void *)ZYNQMP_TCM_BASE_ADDR, 0, ZYNQMP_TCM_SIZE);
+	}
+
+	if (ret == -EACCES)
+		printf("ERROR: Split to lockstep mode required reset/disable cpu\n");
+
+	/* Ignore if ret is -EAGAIN, trying to initialize same mode again */
 }
 #endif
 
 #ifdef CONFIG_SYS_MEM_RSVD_FOR_MMU
 int arm_reserve_mmu(void)
 {
-	tcm_init(TCM_LOCK);
+	puts("WARNING: Initializing TCM overwrites TCM content\n");
+	initialize_tcm(TCM_LOCK);
+	memset((void *)ZYNQMP_TCM_BASE_ADDR, 0, ZYNQMP_TCM_SIZE);
+
 	gd->arch.tlb_size = PGTABLE_SIZE;
 	gd->arch.tlb_addr = ZYNQMP_TCM_BASE_ADDR;
 
@@ -185,7 +200,7 @@ int zynqmp_mmio_write(const u32 address,
 		      const u32 mask,
 		      const u32 value)
 {
-	if (IS_ENABLED(CONFIG_SPL_BUILD) || current_el() == 3)
+	if (IS_ENABLED(CONFIG_XPL_BUILD) || current_el() == 3)
 		return zynqmp_mmio_rawwrite(address, mask, value);
 #if defined(CONFIG_ZYNQMP_FIRMWARE)
 	else
@@ -203,7 +218,7 @@ int zynqmp_mmio_read(const u32 address, u32 *value)
 	if (!value)
 		return ret;
 
-	if (IS_ENABLED(CONFIG_SPL_BUILD) || current_el() == 3) {
+	if (IS_ENABLED(CONFIG_XPL_BUILD) || current_el() == 3) {
 		ret = zynqmp_mmio_rawread(address, value);
 	}
 #if defined(CONFIG_ZYNQMP_FIRMWARE)
@@ -218,3 +233,7 @@ int zynqmp_mmio_read(const u32 address, u32 *value)
 
 	return ret;
 }
+
+U_BOOT_DRVINFO(soc_xilinx_zynqmp) = {
+	.name = "soc_xilinx_zynqmp",
+};

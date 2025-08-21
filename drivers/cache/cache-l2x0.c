@@ -2,7 +2,6 @@
 /*
  * Copyright (C) 2019 Intel Corporation <www.intel.com>
  */
-#include <common.h>
 #include <command.h>
 #include <dm.h>
 
@@ -13,7 +12,7 @@ static void l2c310_of_parse_and_init(struct udevice *dev)
 {
 	u32 tag[3] = { 0, 0, 0 };
 	u32 saved_reg, prefetch;
-	struct pl310_regs *regs = (struct pl310_regs *)dev_read_addr(dev);
+	struct pl310_regs *regs = dev_read_addr_ptr(dev);
 
 	/* Disable the L2 Cache */
 	clrbits_le32(&regs->pl310_ctrl, L2X0_CTRL_EN);
@@ -62,7 +61,6 @@ static int l2x0_probe(struct udevice *dev)
 
 	return 0;
 }
-
 
 static const struct udevice_id l2x0_ids[] = {
 	{ .compatible = "arm,pl310-cache" },

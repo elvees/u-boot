@@ -11,7 +11,6 @@
 
 #define DRV_NAME "sh-pfc"
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <dm/device_compat.h>
@@ -31,15 +30,21 @@ enum sh_pfc_model {
 	SH_PFC_R8A7793,
 	SH_PFC_R8A7794,
 	SH_PFC_R8A7795,
-	SH_PFC_R8A7796,
+	SH_PFC_R8A77960,
+	SH_PFC_R8A77961,
 	SH_PFC_R8A774A1,
 	SH_PFC_R8A774B1,
+	SH_PFC_R8A774C0,
 	SH_PFC_R8A774E1,
 	SH_PFC_R8A77965,
 	SH_PFC_R8A77970,
 	SH_PFC_R8A77980,
 	SH_PFC_R8A77990,
 	SH_PFC_R8A77995,
+	SH_PFC_R8A779A0,
+	SH_PFC_R8A779F0,
+	SH_PFC_R8A779G0,
+	SH_PFC_R8A779H0,
 };
 
 struct sh_pfc_pin_config {
@@ -130,14 +135,25 @@ u32 sh_pfc_read(struct sh_pfc *pfc, u32 reg)
 	return sh_pfc_read_raw_reg((void __iomem *)(uintptr_t)reg, 32);
 }
 
+static void sh_pfc_unlock_reg(struct sh_pfc *pfc, u32 reg, u32 data)
+{
+	u32 unlock;
+
+	if (!pfc->info->unlock_reg)
+		return;
+
+	if (pfc->info->unlock_reg >= 0x80000000UL)
+		unlock = pfc->info->unlock_reg;
+	else
+		/* unlock_reg is a mask */
+		unlock = reg & ~pfc->info->unlock_reg;
+
+	sh_pfc_write_raw_reg((void __iomem *)(uintptr_t)unlock, 32, ~data);
+}
+
 void sh_pfc_write(struct sh_pfc *pfc, u32 reg, u32 data)
 {
-	void __iomem *unlock_reg =
-		(void __iomem *)(uintptr_t)pfc->info->unlock_reg;
-
-	if (pfc->info->unlock_reg)
-		sh_pfc_write_raw_reg(unlock_reg, 32, ~data);
-
+	sh_pfc_unlock_reg(pfc, reg, data);
 	sh_pfc_write_raw_reg((void __iomem *)(uintptr_t)reg, 32, data);
 }
 
@@ -158,7 +174,7 @@ static void sh_pfc_config_reg_helper(struct sh_pfc *pfc,
 		*maskp = (1 << crp->var_field_width[in_pos]) - 1;
 		*posp = crp->reg_width;
 		for (k = 0; k <= in_pos; k++)
-			*posp -= crp->var_field_width[k];
+			*posp -= abs(crp->var_field_width[k]);
 	}
 }
 
@@ -167,8 +183,6 @@ static void sh_pfc_write_config_reg(struct sh_pfc *pfc,
 				    unsigned int field, u32 value)
 {
 	void __iomem *mapped_reg;
-	void __iomem *unlock_reg =
-		(void __iomem *)(uintptr_t)pfc->info->unlock_reg;
 	unsigned int pos;
 	u32 mask, data;
 
@@ -185,9 +199,7 @@ static void sh_pfc_write_config_reg(struct sh_pfc *pfc,
 	data &= mask;
 	data |= value;
 
-	if (pfc->info->unlock_reg)
-		sh_pfc_write_raw_reg(unlock_reg, 32, ~data);
-
+	sh_pfc_unlock_reg(pfc, crp->reg, data);
 	sh_pfc_write_raw_reg(mapped_reg, crp->reg_width, data);
 }
 
@@ -210,14 +222,17 @@ static int sh_pfc_get_config_reg(struct sh_pfc *pfc, u16 enum_id,
 		if (!r_width)
 			break;
 
-		for (bit_pos = 0; bit_pos < r_width; bit_pos += curr_width) {
+		for (bit_pos = 0; bit_pos < r_width; bit_pos += curr_width, m++) {
 			u32 ncomb;
 			u32 n;
 
-			if (f_width)
+			if (f_width) {
 				curr_width = f_width;
-			else
-				curr_width = config_reg->var_field_width[m];
+			} else {
+				curr_width = abs(config_reg->var_field_width[m]);
+				if (config_reg->var_field_width[m] < 0)
+					continue;
+			}
 
 			ncomb = 1 << curr_width;
 			for (n = 0; n < ncomb; n++) {
@@ -229,7 +244,6 @@ static int sh_pfc_get_config_reg(struct sh_pfc *pfc, u16 enum_id,
 				}
 			}
 			pos += ncomb;
-			m++;
 		}
 		k++;
 	}
@@ -341,16 +355,16 @@ int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned mark, int pinmux_type)
 }
 
 const struct pinmux_bias_reg *
-sh_pfc_pin_to_bias_reg(const struct sh_pfc *pfc, unsigned int pin,
-		       unsigned int *bit)
+rcar_pin_to_bias_reg(const struct sh_pfc_soc_info *info, unsigned int pin,
+		     unsigned int *bit)
 {
 	unsigned int i, j;
 
-	for (i = 0; pfc->info->bias_regs[i].puen; i++) {
-		for (j = 0; j < ARRAY_SIZE(pfc->info->bias_regs[i].pins); j++) {
-			if (pfc->info->bias_regs[i].pins[j] == pin) {
+	for (i = 0; info->bias_regs[i].puen || info->bias_regs[i].pud; i++) {
+		for (j = 0; j < ARRAY_SIZE(info->bias_regs[i].pins); j++) {
+			if (info->bias_regs[i].pins[j] == pin) {
 				*bit = j;
-				return &pfc->info->bias_regs[i];
+				return &info->bias_regs[i];
 			}
 		}
 	}
@@ -358,6 +372,64 @@ sh_pfc_pin_to_bias_reg(const struct sh_pfc *pfc, unsigned int pin,
 	WARN_ONCE(1, "Pin %u is not in bias info list\n", pin);
 
 	return NULL;
+}
+
+unsigned int rcar_pinmux_get_bias(struct sh_pfc *pfc, unsigned int pin)
+{
+	const struct pinmux_bias_reg *reg;
+	unsigned int bit;
+
+	reg = rcar_pin_to_bias_reg(pfc->info, pin, &bit);
+	if (!reg)
+		return PIN_CONFIG_BIAS_DISABLE;
+
+	if (reg->puen) {
+		if (!(sh_pfc_read(pfc, reg->puen) & BIT(bit)))
+			return PIN_CONFIG_BIAS_DISABLE;
+		else if (!reg->pud || (sh_pfc_read(pfc, reg->pud) & BIT(bit)))
+			return PIN_CONFIG_BIAS_PULL_UP;
+		else
+			return PIN_CONFIG_BIAS_PULL_DOWN;
+	} else {
+		if (sh_pfc_read(pfc, reg->pud) & BIT(bit))
+			return PIN_CONFIG_BIAS_PULL_DOWN;
+		else
+			return PIN_CONFIG_BIAS_DISABLE;
+	}
+}
+
+void rcar_pinmux_set_bias(struct sh_pfc *pfc, unsigned int pin,
+			  unsigned int bias)
+{
+	const struct pinmux_bias_reg *reg;
+	u32 enable, updown;
+	unsigned int bit;
+
+	reg = rcar_pin_to_bias_reg(pfc->info, pin, &bit);
+	if (!reg)
+		return;
+
+	if (reg->puen) {
+		enable = sh_pfc_read(pfc, reg->puen) & ~BIT(bit);
+		if (bias != PIN_CONFIG_BIAS_DISABLE) {
+			enable |= BIT(bit);
+
+			if (reg->pud) {
+				updown = sh_pfc_read(pfc, reg->pud) & ~BIT(bit);
+				if (bias == PIN_CONFIG_BIAS_PULL_UP)
+					updown |= BIT(bit);
+
+				sh_pfc_write(pfc, reg->pud, updown);
+			}
+		}
+		sh_pfc_write(pfc, reg->puen, enable);
+	} else {
+		enable = sh_pfc_read(pfc, reg->pud) & ~BIT(bit);
+		if (bias == PIN_CONFIG_BIAS_PULL_DOWN)
+			enable |= BIT(bit);
+
+		sh_pfc_write(pfc, reg->pud, enable);
+	}
 }
 
 static int sh_pfc_init_ranges(struct sh_pfc *pfc)
@@ -678,8 +750,6 @@ static int sh_pfc_pinconf_set_drive_strength(struct sh_pfc *pfc,
 	unsigned int size;
 	unsigned int step;
 	void __iomem *reg;
-	void __iomem *unlock_reg =
-		(void __iomem *)(uintptr_t)pfc->info->unlock_reg;
 	u32 val;
 
 	reg = sh_pfc_pinconf_find_drive_strength_reg(pfc, pin, &offset, &size);
@@ -700,9 +770,7 @@ static int sh_pfc_pinconf_set_drive_strength(struct sh_pfc *pfc,
 	val &= ~GENMASK(offset + 4 - 1, offset);
 	val |= strength << offset;
 
-	if (unlock_reg)
-		sh_pfc_write_raw_reg(unlock_reg, 32, ~val);
-
+	sh_pfc_unlock_reg(pfc, (uintptr_t)reg, val);
 	sh_pfc_write_raw_reg(reg, 32, val);
 
 	return 0;
@@ -730,7 +798,7 @@ static bool sh_pfc_pinconf_validate(struct sh_pfc *pfc, unsigned int _pin,
 		return pin->configs & SH_PFC_PIN_CFG_DRIVE_STRENGTH;
 
 	case PIN_CONFIG_POWER_SOURCE:
-		return pin->configs & SH_PFC_PIN_CFG_IO_VOLTAGE;
+		return pin->configs & SH_PFC_PIN_CFG_IO_VOLTAGE_MASK;
 
 	default:
 		return false;
@@ -742,10 +810,11 @@ static int sh_pfc_pinconf_set(struct sh_pfc_pinctrl *pmx, unsigned _pin,
 {
 	struct sh_pfc *pfc = pmx->pfc;
 	void __iomem *pocctrl;
-	void __iomem *unlock_reg =
-		(void __iomem *)(uintptr_t)pfc->info->unlock_reg;
 	u32 addr, val;
 	int bit, ret;
+	int idx = sh_pfc_get_pin_index(pfc, _pin);
+	const struct sh_pfc_pin *pin = &pfc->info->pins[idx];
+	unsigned int mode, hi, lo;
 
 	if (!sh_pfc_pinconf_validate(pfc, _pin, param))
 		return -ENOTSUPP;
@@ -772,26 +841,28 @@ static int sh_pfc_pinconf_set(struct sh_pfc_pinctrl *pmx, unsigned _pin,
 		if (!pfc->info->ops || !pfc->info->ops->pin_to_pocctrl)
 			return -ENOTSUPP;
 
-		bit = pfc->info->ops->pin_to_pocctrl(pfc, _pin, &addr);
+		bit = pfc->info->ops->pin_to_pocctrl(_pin, &addr);
 		if (bit < 0) {
 			printf("invalid pin %#x", _pin);
 			return bit;
 		}
 
-		if (arg != 1800 && arg != 3300)
+		if (arg != 1800 && arg != 2500 && arg != 3300)
 			return -EINVAL;
 
 		pocctrl = (void __iomem *)(uintptr_t)addr;
 
+		mode = pin->configs & SH_PFC_PIN_CFG_IO_VOLTAGE_MASK;
+		lo = mode <= SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 ? 1800 : 2500;
+		hi = mode >= SH_PFC_PIN_CFG_IO_VOLTAGE_18_33 ? 3300 : 2500;
+
 		val = sh_pfc_read_raw_reg(pocctrl, 32);
-		if (arg == 3300)
+		if (arg == hi)
 			val |= BIT(bit);
 		else
 			val &= ~BIT(bit);
 
-		if (unlock_reg)
-			sh_pfc_write_raw_reg(unlock_reg, 32, ~val);
-
+		sh_pfc_unlock_reg(pfc, addr, val);
 		sh_pfc_write_raw_reg(pocctrl, 32, val);
 
 		break;
@@ -876,7 +947,6 @@ static int sh_pfc_map_pins(struct sh_pfc *pfc, struct sh_pfc_pinctrl *pmx)
 	return 0;
 }
 
-
 static int sh_pfc_pinctrl_probe(struct udevice *dev)
 {
 	struct sh_pfc_pinctrl_priv *priv = dev_get_priv(dev);
@@ -891,66 +961,50 @@ static int sh_pfc_pinctrl_probe(struct udevice *dev)
 	if (!priv->pfc.regs)
 		return -ENOMEM;
 
-#ifdef CONFIG_PINCTRL_PFC_R8A7790
-	if (model == SH_PFC_R8A7790)
+	if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A7790) && model == SH_PFC_R8A7790)
 		priv->pfc.info = &r8a7790_pinmux_info;
-#endif
-#ifdef CONFIG_PINCTRL_PFC_R8A7791
-	if (model == SH_PFC_R8A7791)
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A7791) && model == SH_PFC_R8A7791)
 		priv->pfc.info = &r8a7791_pinmux_info;
-#endif
-#ifdef CONFIG_PINCTRL_PFC_R8A7792
-	if (model == SH_PFC_R8A7792)
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A7792) && model == SH_PFC_R8A7792)
 		priv->pfc.info = &r8a7792_pinmux_info;
-#endif
-#ifdef CONFIG_PINCTRL_PFC_R8A7793
-	if (model == SH_PFC_R8A7793)
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A7793) && model == SH_PFC_R8A7793)
 		priv->pfc.info = &r8a7793_pinmux_info;
-#endif
-#ifdef CONFIG_PINCTRL_PFC_R8A7794
-	if (model == SH_PFC_R8A7794)
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A7794) && model == SH_PFC_R8A7794)
 		priv->pfc.info = &r8a7794_pinmux_info;
-#endif
-#ifdef CONFIG_PINCTRL_PFC_R8A7795
-	if (model == SH_PFC_R8A7795)
-		priv->pfc.info = &r8a7795_pinmux_info;
-#endif
-#ifdef CONFIG_PINCTRL_PFC_R8A7796
-	if (model == SH_PFC_R8A7796)
-		priv->pfc.info = &r8a7796_pinmux_info;
-#endif
-#ifdef CONFIG_PINCTRL_PFC_R8A774A1
-	if (model == SH_PFC_R8A774A1)
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A77951) && model == SH_PFC_R8A7795)
+		priv->pfc.info = &r8a77951_pinmux_info;
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A77960) && model == SH_PFC_R8A77960)
+		priv->pfc.info = &r8a77960_pinmux_info;
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A77961) && model == SH_PFC_R8A77961)
+		priv->pfc.info = &r8a77961_pinmux_info;
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A774A1) && model == SH_PFC_R8A774A1)
 		priv->pfc.info = &r8a774a1_pinmux_info;
-#endif
-#ifdef CONFIG_PINCTRL_PFC_R8A774B1
-	if (model == SH_PFC_R8A774B1)
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A774B1) && model == SH_PFC_R8A774B1)
 		priv->pfc.info = &r8a774b1_pinmux_info;
-#endif
-#ifdef CONFIG_PINCTRL_PFC_R8A774E1
-	if (model == SH_PFC_R8A774E1)
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A774C0) && model == SH_PFC_R8A774C0)
+		priv->pfc.info = &r8a774c0_pinmux_info;
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A774E1) && model == SH_PFC_R8A774E1)
 		priv->pfc.info = &r8a774e1_pinmux_info;
-#endif
-#ifdef CONFIG_PINCTRL_PFC_R8A77965
-	if (model == SH_PFC_R8A77965)
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A77965) && model == SH_PFC_R8A77965)
 		priv->pfc.info = &r8a77965_pinmux_info;
-#endif
-#ifdef CONFIG_PINCTRL_PFC_R8A77970
-	if (model == SH_PFC_R8A77970)
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A77970) && model == SH_PFC_R8A77970)
 		priv->pfc.info = &r8a77970_pinmux_info;
-#endif
-#ifdef CONFIG_PINCTRL_PFC_R8A77980
-	if (model == SH_PFC_R8A77980)
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A77980) && model == SH_PFC_R8A77980)
 		priv->pfc.info = &r8a77980_pinmux_info;
-#endif
-#ifdef CONFIG_PINCTRL_PFC_R8A77990
-	if (model == SH_PFC_R8A77990)
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A77990) && model == SH_PFC_R8A77990)
 		priv->pfc.info = &r8a77990_pinmux_info;
-#endif
-#ifdef CONFIG_PINCTRL_PFC_R8A77995
-	if (model == SH_PFC_R8A77995)
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A77995) && model == SH_PFC_R8A77995)
 		priv->pfc.info = &r8a77995_pinmux_info;
-#endif
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A779A0) && model == SH_PFC_R8A779A0)
+		priv->pfc.info = &r8a779a0_pinmux_info;
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A779F0) && model == SH_PFC_R8A779F0)
+		priv->pfc.info = &r8a779f0_pinmux_info;
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A779G0) && model == SH_PFC_R8A779G0)
+		priv->pfc.info = &r8a779g0_pinmux_info;
+	else if (IS_ENABLED(CONFIG_PINCTRL_PFC_R8A779H0) && model == SH_PFC_R8A779H0)
+		priv->pfc.info = &r8a779h0_pinmux_info;
+	else
+		return -ENODEV;
 
 	priv->pmx.pfc = &priv->pfc;
 	sh_pfc_init_ranges(&priv->pfc);
@@ -960,96 +1014,133 @@ static int sh_pfc_pinctrl_probe(struct udevice *dev)
 }
 
 static const struct udevice_id sh_pfc_pinctrl_ids[] = {
-#ifdef CONFIG_PINCTRL_PFC_R8A7790
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A7790)
 	{
 		.compatible = "renesas,pfc-r8a7790",
 		.data = SH_PFC_R8A7790,
 	},
 #endif
-#ifdef CONFIG_PINCTRL_PFC_R8A7791
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A7791)
 	{
 		.compatible = "renesas,pfc-r8a7791",
 		.data = SH_PFC_R8A7791,
 	},
 #endif
-#ifdef CONFIG_PINCTRL_PFC_R8A7792
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A7792)
 	{
 		.compatible = "renesas,pfc-r8a7792",
 		.data = SH_PFC_R8A7792,
 	},
 #endif
-#ifdef CONFIG_PINCTRL_PFC_R8A7793
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A7793)
 	{
 		.compatible = "renesas,pfc-r8a7793",
 		.data = SH_PFC_R8A7793,
 	},
 #endif
-#ifdef CONFIG_PINCTRL_PFC_R8A7794
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A7794)
 	{
 		.compatible = "renesas,pfc-r8a7794",
 		.data = SH_PFC_R8A7794,
 	},
 #endif
-#ifdef CONFIG_PINCTRL_PFC_R8A7795
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A77951)
 	{
 		.compatible = "renesas,pfc-r8a7795",
 		.data = SH_PFC_R8A7795,
 	},
 #endif
-#ifdef CONFIG_PINCTRL_PFC_R8A7796
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A77960)
 	{
 		.compatible = "renesas,pfc-r8a7796",
-		.data = SH_PFC_R8A7796,
+		.data = SH_PFC_R8A77960,
 	},
 #endif
-#ifdef CONFIG_PINCTRL_PFC_R8A774A1
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A77961)
+	{
+		.compatible = "renesas,pfc-r8a77961",
+		.data = SH_PFC_R8A77961,
+	},
+#endif
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A774A1)
 	{
 		.compatible = "renesas,pfc-r8a774a1",
 		.data = SH_PFC_R8A774A1,
 	},
 #endif
-#ifdef CONFIG_PINCTRL_PFC_R8A774B1
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A774B1)
 	{
 		.compatible = "renesas,pfc-r8a774b1",
 		.data = SH_PFC_R8A774B1,
 	},
 #endif
-#ifdef CONFIG_PINCTRL_PFC_R8A774E1
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A774C0)
+	{
+		.compatible = "renesas,pfc-r8a774c0",
+		.data = SH_PFC_R8A774C0,
+	},
+#endif
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A774E1)
 	{
 		.compatible = "renesas,pfc-r8a774e1",
 		.data = SH_PFC_R8A774E1,
 	},
 #endif
-#ifdef CONFIG_PINCTRL_PFC_R8A77965
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A77965)
 	{
 		.compatible = "renesas,pfc-r8a77965",
 		.data = SH_PFC_R8A77965,
 	},
 #endif
-#ifdef CONFIG_PINCTRL_PFC_R8A77970
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A77970)
 	{
 		.compatible = "renesas,pfc-r8a77970",
 		.data = SH_PFC_R8A77970,
 	},
 #endif
-#ifdef CONFIG_PINCTRL_PFC_R8A77980
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A77980)
 	{
 		.compatible = "renesas,pfc-r8a77980",
 		.data = SH_PFC_R8A77980,
 	},
 #endif
-#ifdef CONFIG_PINCTRL_PFC_R8A77990
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A77990)
 	{
 		.compatible = "renesas,pfc-r8a77990",
 		.data = SH_PFC_R8A77990,
 	},
 #endif
-#ifdef CONFIG_PINCTRL_PFC_R8A77995
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A77995)
 	{
 		.compatible = "renesas,pfc-r8a77995",
 		.data = SH_PFC_R8A77995,
 	},
 #endif
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A779A0)
+	{
+		.compatible = "renesas,pfc-r8a779a0",
+		.data = SH_PFC_R8A779A0,
+	},
+#endif
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A779F0)
+	{
+		.compatible = "renesas,pfc-r8a779f0",
+		.data = SH_PFC_R8A779F0,
+	},
+#endif
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A779G0)
+	{
+		.compatible = "renesas,pfc-r8a779g0",
+		.data = SH_PFC_R8A779G0,
+	},
+#endif
+#if IS_ENABLED(CONFIG_PINCTRL_PFC_R8A779H0)
+	{
+		.compatible = "renesas,pfc-r8a779h0",
+		.data = SH_PFC_R8A779H0,
+	},
+#endif
+
 	{ },
 };
 

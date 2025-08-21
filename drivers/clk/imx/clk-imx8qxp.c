@@ -4,11 +4,10 @@
  * Peng Fan <peng.fan@nxp.com>
  */
 
-#include <common.h>
 #include <clk-uclass.h>
 #include <dm.h>
 #include <log.h>
-#include <asm/arch/sci/sci.h>
+#include <firmware/imx/sci/sci.h>
 #include <asm/arch/clock.h>
 #include <dt-bindings/clock/imx8qxp-clock.h>
 #include <dt-bindings/soc/imx_rsrc.h>
@@ -16,7 +15,7 @@
 
 #include "clk-imx8.h"
 
-#if CONFIG_IS_ENABLED(CMD_CLK)
+#if IS_ENABLED(CONFIG_CMD_CLK)
 struct imx8_clks imx8_clk_names[] = {
 	{ IMX8QXP_A35_DIV, "A35_DIV" },
 	{ IMX8QXP_I2C0_CLK, "I2C0" },
@@ -52,6 +51,8 @@ ulong imx8_clk_get_rate(struct clk *clk)
 	debug("%s(#%lu)\n", __func__, clk->id);
 
 	switch (clk->id) {
+	case IMX8QXP_CLK_DUMMY:
+		return 0;
 	case IMX8QXP_A35_DIV:
 		resource = SC_R_A35;
 		pm_clk = SC_PM_CLK_CPU;
@@ -88,20 +89,23 @@ ulong imx8_clk_get_rate(struct clk *clk)
 		resource = SC_R_SDHC_1;
 		pm_clk = SC_PM_CLK_PER;
 		break;
-	case IMX8QXP_UART0_IPG_CLK:
 	case IMX8QXP_UART0_CLK:
+	case IMX8QXP_UART0_IPG_CLK:
 		resource = SC_R_UART_0;
 		pm_clk = SC_PM_CLK_PER;
 		break;
 	case IMX8QXP_UART1_CLK:
+	case IMX8QXP_UART1_IPG_CLK:
 		resource = SC_R_UART_1;
 		pm_clk = SC_PM_CLK_PER;
 		break;
 	case IMX8QXP_UART2_CLK:
+	case IMX8QXP_UART2_IPG_CLK:
 		resource = SC_R_UART_2;
 		pm_clk = SC_PM_CLK_PER;
 		break;
 	case IMX8QXP_UART3_CLK:
+	case IMX8QXP_UART3_IPG_CLK:
 		resource = SC_R_UART_3;
 		pm_clk = SC_PM_CLK_PER;
 		break;
@@ -126,7 +130,7 @@ ulong imx8_clk_get_rate(struct clk *clk)
 			       __func__, clk->id);
 			return -EINVAL;
 		}
-		return -ENOTSUPP;
+		return -EINVAL;
 	};
 
 	ret = sc_pm_get_clock_rate(-1, resource, pm_clk,
@@ -170,18 +174,22 @@ ulong imx8_clk_set_rate(struct clk *clk, unsigned long rate)
 		pm_clk = SC_PM_CLK_PER;
 		break;
 	case IMX8QXP_UART0_CLK:
+	case IMX8QXP_UART0_IPG_CLK:
 		resource = SC_R_UART_0;
 		pm_clk = SC_PM_CLK_PER;
 		break;
 	case IMX8QXP_UART1_CLK:
+	case IMX8QXP_UART1_IPG_CLK:
 		resource = SC_R_UART_1;
 		pm_clk = SC_PM_CLK_PER;
 		break;
 	case IMX8QXP_UART2_CLK:
+	case IMX8QXP_UART2_IPG_CLK:
 		resource = SC_R_UART_2;
 		pm_clk = SC_PM_CLK_PER;
 		break;
 	case IMX8QXP_UART3_CLK:
+	case IMX8QXP_UART3_IPG_CLK:
 		resource = SC_R_UART_3;
 		pm_clk = SC_PM_CLK_PER;
 		break;
@@ -221,7 +229,7 @@ ulong imx8_clk_set_rate(struct clk *clk, unsigned long rate)
 			       __func__, clk->id);
 			return -EINVAL;
 		}
-		return -ENOTSUPP;
+		return -EINVAL;
 	};
 
 	ret = sc_pm_set_clock_rate(-1, resource, pm_clk, &new_rate);
@@ -242,6 +250,8 @@ int __imx8_clk_enable(struct clk *clk, bool enable)
 	debug("%s(#%lu)\n", __func__, clk->id);
 
 	switch (clk->id) {
+	case IMX8QXP_CLK_DUMMY:
+		return 0;
 	case IMX8QXP_I2C0_CLK:
 	case IMX8QXP_I2C0_IPG_CLK:
 		resource = SC_R_I2C_0;
@@ -263,18 +273,22 @@ int __imx8_clk_enable(struct clk *clk, bool enable)
 		pm_clk = SC_PM_CLK_PER;
 		break;
 	case IMX8QXP_UART0_CLK:
+	case IMX8QXP_UART0_IPG_CLK:
 		resource = SC_R_UART_0;
 		pm_clk = SC_PM_CLK_PER;
 		break;
 	case IMX8QXP_UART1_CLK:
+	case IMX8QXP_UART1_IPG_CLK:
 		resource = SC_R_UART_1;
 		pm_clk = SC_PM_CLK_PER;
 		break;
 	case IMX8QXP_UART2_CLK:
+	case IMX8QXP_UART2_IPG_CLK:
 		resource = SC_R_UART_2;
 		pm_clk = SC_PM_CLK_PER;
 		break;
 	case IMX8QXP_UART3_CLK:
+	case IMX8QXP_UART3_IPG_CLK:
 		resource = SC_R_UART_3;
 		pm_clk = SC_PM_CLK_PER;
 		break;
@@ -311,7 +325,7 @@ int __imx8_clk_enable(struct clk *clk, bool enable)
 			       __func__, clk->id);
 			return -EINVAL;
 		}
-		return -ENOTSUPP;
+		return -EINVAL;
 	}
 
 	ret = sc_pm_clock_enable(-1, resource, pm_clk, enable, 0);

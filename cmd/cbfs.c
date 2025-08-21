@@ -6,10 +6,10 @@
 /*
  * CBFS commands
  */
-#include <common.h>
 #include <command.h>
 #include <env.h>
 #include <cbfs.h>
+#include <vsprintf.h>
 
 static int do_cbfs_init(struct cmd_tbl *cmdtp, int flag, int argc,
 			char *const argv[])
@@ -22,7 +22,7 @@ static int do_cbfs_init(struct cmd_tbl *cmdtp, int flag, int argc,
 		return 0;
 	}
 	if (argc == 2) {
-		end_of_rom = simple_strtoul(argv[1], &ep, 16);
+		end_of_rom = hextoul(argv[1], &ep);
 		if (*ep) {
 			puts("\n** Invalid end of ROM **\n");
 			return 1;
@@ -58,9 +58,9 @@ static int do_cbfs_fsload(struct cmd_tbl *cmdtp, int flag, int argc,
 	}
 
 	/* parse offset and count */
-	offset = simple_strtoul(argv[1], NULL, 16);
+	offset = hextoul(argv[1], NULL);
 	if (argc == 4)
-		count = simple_strtoul(argv[3], NULL, 16);
+		count = hextoul(argv[3], NULL);
 	else
 		count = 0;
 
@@ -118,7 +118,7 @@ static int do_cbfs_ls(struct cmd_tbl *cmdtp, int flag, int argc,
 		case CBFS_TYPE_CBFSHEADER:
 			type_name = "cbfs header";
 			break;
-		case CBFS_TYPE_STAGE:
+		case CBFS_TYPE_LEGACY_STAGE:
 			type_name = "stage";
 			break;
 		case CBFS_TYPE_PAYLOAD:

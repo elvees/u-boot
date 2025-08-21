@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2009
- * Vipin Kumar, ST Micoelectronics, vipin.kumar@st.com.
+ * Vipin Kumar, STMicroelectronics, vipin.kumar@st.com.
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <i2c.h>
@@ -24,16 +23,17 @@
  */
 #define DW_I2C_COMP_TYPE	0x44570140
 
-#ifdef CONFIG_SYS_I2C_DW_ENABLE_STATUS_UNSUPPORTED
-static int  dw_i2c_enable(struct i2c_regs *i2c_base, bool enable)
-{
-	u32 ena = enable ? IC_ENABLE_0B : 0;
+/*
+ * This constant is used to calculate when during the clock high phase the data
+ * bit shall be read. The value was copied from the Linux v6.5 function
+ * i2c_dw_scl_hcnt() which provides the following explanation:
+ *
+ * "This is just an experimental rule: the tHD;STA period turned out to be
+ * proportinal to (_HCNT + 3). With this setting, we could meet both tHIGH and
+ * tHD;STA timing specs."
+ */
+#define T_HD_STA_OFFSET 3
 
-	writel(ena, &i2c_base->ic_enable);
-
-	return 0;
-}
-#else
 static int dw_i2c_enable(struct i2c_regs *i2c_base, bool enable)
 {
 	u32 ena = enable ? IC_ENABLE_0B : 0;
@@ -55,7 +55,6 @@ static int dw_i2c_enable(struct i2c_regs *i2c_base, bool enable)
 
 	return -ETIMEDOUT;
 }
-#endif
 
 /* High and low times in different speed modes (in ns) */
 enum {
@@ -68,7 +67,7 @@ enum {
  *
  * @ic_clk: Input clock in Hz
  * @period_ns: Period to represent, in ns
- * @return calculated count
+ * Return: calculated count
  */
 static uint calc_counts(uint ic_clk, uint period_ns)
 {
@@ -134,7 +133,7 @@ static const struct i2c_mode_info info_for_mode[] = {
  * @ic_clk: IC clock speed in Hz
  * @spk_cnt: Spike-suppression count
  * @config: Returns value to use
- * @return 0 if OK, -EINVAL if the calculation failed due to invalid data
+ * Return: 0 if OK, -EINVAL if the calculation failed due to invalid data
  */
 static int dw_i2c_calc_timing(struct dw_i2c *priv, enum i2c_speed_mode mode,
 			      int ic_clk, int spk_cnt,
@@ -166,10 +165,10 @@ static int dw_i2c_calc_timing(struct dw_i2c *priv, enum i2c_speed_mode mode,
 
 	/*
 	 * Back-solve for hcnt and lcnt according to the following equations:
-	 * SCL_High_time = [(HCNT + IC_*_SPKLEN + 7) * ic_clk] + SCL_Fall_time
+	 * SCL_High_time = [(HCNT + IC_*_SPKLEN + T_HD_STA_OFFSET) * ic_clk] + SCL_Fall_time
 	 * SCL_Low_time = [(LCNT + 1) * ic_clk] - SCL_Fall_time + SCL_Rise_time
 	 */
-	hcnt = min_thigh_cnt - fall_cnt - 7 - spk_cnt;
+	hcnt = min_thigh_cnt - fall_cnt - T_HD_STA_OFFSET - spk_cnt;
 	lcnt = min_tlow_cnt - rise_cnt + fall_cnt - 1;
 
 	if (hcnt < 0 || lcnt < 0) {
@@ -181,13 +180,13 @@ static int dw_i2c_calc_timing(struct dw_i2c *priv, enum i2c_speed_mode mode,
 	 * Now add things back up to ensure the period is hit. If it is off,
 	 * split the difference and bias to lcnt for remainder
 	 */
-	tot = hcnt + lcnt + 7 + spk_cnt + rise_cnt + 1;
+	tot = hcnt + lcnt + T_HD_STA_OFFSET + spk_cnt + rise_cnt + 1;
 
 	if (tot < period_cnt) {
 		diff = (period_cnt - tot) / 2;
 		hcnt += diff;
 		lcnt += diff;
-		tot = hcnt + lcnt + 7 + spk_cnt + rise_cnt + 1;
+		tot = hcnt + lcnt + T_HD_STA_OFFSET + spk_cnt + rise_cnt + 1;
 		lcnt += period_cnt - tot;
 	}
 
@@ -213,7 +212,7 @@ static int dw_i2c_calc_timing(struct dw_i2c *priv, enum i2c_speed_mode mode,
  * @speed: Required i2c speed in Hz
  * @bus_clk: Input clock to the I2C controller in Hz (e.g. IC_CLK)
  * @config: Returns the config to use for this speed
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 static int calc_bus_speed(struct dw_i2c *priv, struct i2c_regs *regs, int speed,
 			  ulong bus_clk, struct dw_i2c_speed_config *config)
@@ -282,7 +281,7 @@ static int calc_bus_speed(struct dw_i2c *priv, struct i2c_regs *regs, int speed,
  * @i2c_base: Registers for the I2C controller
  * @speed: Required i2c speed in Hz
  * @bus_clk: Input clock to the I2C controller in Hz (e.g. IC_CLK)
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 static int _dw_i2c_set_bus_speed(struct dw_i2c *priv, struct i2c_regs *i2c_base,
 				 unsigned int speed, unsigned int bus_clk)
@@ -405,7 +404,7 @@ static int i2c_wait_for_bb(struct i2c_regs *i2c_base)
 
 		/* Evaluate timeout */
 		if (get_timer(start_time_bb) > (unsigned long)(I2C_BYTE_TO_BB))
-			return 1;
+			return -ETIMEDOUT;
 	}
 
 	return 0;
@@ -414,8 +413,10 @@ static int i2c_wait_for_bb(struct i2c_regs *i2c_base)
 static int i2c_xfer_init(struct i2c_regs *i2c_base, uchar chip, uint addr,
 			 int alen)
 {
-	if (i2c_wait_for_bb(i2c_base))
-		return 1;
+	int ret = i2c_wait_for_bb(i2c_base);
+
+	if (ret)
+		return ret;
 
 	i2c_setaddress(i2c_base, chip);
 	while (alen) {
@@ -430,6 +431,7 @@ static int i2c_xfer_init(struct i2c_regs *i2c_base, uchar chip, uint addr,
 static int i2c_xfer_finish(struct i2c_regs *i2c_base)
 {
 	ulong start_stop_det = get_timer(0);
+	int ret;
 
 	while (1) {
 		if ((readl(&i2c_base->ic_raw_intr_stat) & IC_STOP_DET)) {
@@ -440,9 +442,10 @@ static int i2c_xfer_finish(struct i2c_regs *i2c_base)
 		}
 	}
 
-	if (i2c_wait_for_bb(i2c_base)) {
+	ret = i2c_wait_for_bb(i2c_base);
+	if (ret) {
 		printf("Timed out waiting for bus\n");
-		return 1;
+		return ret;
 	}
 
 	i2c_flush_rxfifo(i2c_base);
@@ -465,6 +468,7 @@ static int __dw_i2c_read(struct i2c_regs *i2c_base, u8 dev, uint addr,
 {
 	unsigned long start_time_rx;
 	unsigned int active = 0;
+	int ret;
 
 #ifdef CONFIG_SYS_I2C_EEPROM_ADDR_OVERFLOW
 	/*
@@ -485,8 +489,9 @@ static int __dw_i2c_read(struct i2c_regs *i2c_base, u8 dev, uint addr,
 	      addr);
 #endif
 
-	if (i2c_xfer_init(i2c_base, dev, addr, alen))
-		return 1;
+	ret = i2c_xfer_init(i2c_base, dev, addr, alen);
+	if (ret)
+		return ret;
 
 	start_time_rx = get_timer(0);
 	while (len) {
@@ -511,7 +516,7 @@ static int __dw_i2c_read(struct i2c_regs *i2c_base, u8 dev, uint addr,
 			start_time_rx = get_timer(0);
 			active = 0;
 		} else if (get_timer(start_time_rx) > I2C_BYTE_TO) {
-			return 1;
+			return -ETIMEDOUT;
 		}
 	}
 
@@ -533,6 +538,7 @@ static int __dw_i2c_write(struct i2c_regs *i2c_base, u8 dev, uint addr,
 {
 	int nb = len;
 	unsigned long start_time_tx;
+	int ret;
 
 #ifdef CONFIG_SYS_I2C_EEPROM_ADDR_OVERFLOW
 	/*
@@ -553,8 +559,9 @@ static int __dw_i2c_write(struct i2c_regs *i2c_base, u8 dev, uint addr,
 	      addr);
 #endif
 
-	if (i2c_xfer_init(i2c_base, dev, addr, alen))
-		return 1;
+	ret = i2c_xfer_init(i2c_base, dev, addr, alen);
+	if (ret)
+		return ret;
 
 	start_time_tx = get_timer(0);
 	while (len) {
@@ -570,7 +577,7 @@ static int __dw_i2c_write(struct i2c_regs *i2c_base, u8 dev, uint addr,
 
 		} else if (get_timer(start_time_tx) > (nb * I2C_BYTE_TO)) {
 				printf("Timed out. i2c write Failed\n");
-				return 1;
+				return -ETIMEDOUT;
 		}
 	}
 
@@ -685,24 +692,6 @@ U_BOOT_I2C_ADAP_COMPLETE(dw_0, dw_i2c_init, dw_i2c_probe, dw_i2c_read,
 			 dw_i2c_write, dw_i2c_set_bus_speed,
 			 CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE, 0)
 
-#if CONFIG_SYS_I2C_BUS_MAX >= 2
-U_BOOT_I2C_ADAP_COMPLETE(dw_1, dw_i2c_init, dw_i2c_probe, dw_i2c_read,
-			 dw_i2c_write, dw_i2c_set_bus_speed,
-			 CONFIG_SYS_I2C_SPEED1, CONFIG_SYS_I2C_SLAVE1, 1)
-#endif
-
-#if CONFIG_SYS_I2C_BUS_MAX >= 3
-U_BOOT_I2C_ADAP_COMPLETE(dw_2, dw_i2c_init, dw_i2c_probe, dw_i2c_read,
-			 dw_i2c_write, dw_i2c_set_bus_speed,
-			 CONFIG_SYS_I2C_SPEED2, CONFIG_SYS_I2C_SLAVE2, 2)
-#endif
-
-#if CONFIG_SYS_I2C_BUS_MAX >= 4
-U_BOOT_I2C_ADAP_COMPLETE(dw_3, dw_i2c_init, dw_i2c_probe, dw_i2c_read,
-			 dw_i2c_write, dw_i2c_set_bus_speed,
-			 CONFIG_SYS_I2C_SPEED3, CONFIG_SYS_I2C_SLAVE3, 3)
-#endif
-
 #else /* CONFIG_DM_I2C */
 /* The DM I2C functions */
 
@@ -788,7 +777,6 @@ int designware_i2c_of_to_plat(struct udevice *bus)
 
 	ret = clk_enable(&priv->clk);
 	if (ret && ret != -ENOSYS && ret != -ENOTSUPP) {
-		clk_free(&priv->clk);
 		dev_err(bus, "failed to enable clock\n");
 		return ret;
 	}
@@ -821,7 +809,6 @@ int designware_i2c_remove(struct udevice *dev)
 
 #if CONFIG_IS_ENABLED(CLK)
 	clk_disable(&priv->clk);
-	clk_free(&priv->clk);
 #endif
 
 	return reset_release_bulk(&priv->resets);

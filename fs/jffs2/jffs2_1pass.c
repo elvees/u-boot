@@ -110,10 +110,7 @@
  * it should probably be dumped and replaced by something like jffs2reader!
  */
 
-
-#include <common.h>
 #include <config.h>
-#include <flash.h>
 #include <malloc.h>
 #include <div64.h>
 #include <linux/compiler.h>
@@ -128,7 +125,6 @@
 
 #include "jffs2_private.h"
 
-
 #define	NODE_CHUNK	1024	/* size of memory allocation chunk in b_nodes */
 #define	SPIN_BLKSIZE	18	/* spin after having scanned 1<<BLKSIZE bytes */
 
@@ -136,7 +132,6 @@
 #undef	DEBUG_DIRENTS		/* print directory entry list after scan */
 #undef	DEBUG_FRAGMENTS		/* print fragment list after scan */
 #undef	DEBUG			/* enable debugging messages */
-
 
 #ifdef  DEBUG
 # define DEBUGF(fmt,args...)	printf(fmt ,##args)
@@ -180,6 +175,7 @@ static int read_nand_cached(u32 off, u32 size, u_char *buf)
 	struct mtd_info *mtd;
 	u32 bytes_read = 0;
 	size_t retlen;
+	size_t toread;
 	int cpy_bytes;
 
 	mtd = get_nand_dev_by_index(id->num);
@@ -187,8 +183,12 @@ static int read_nand_cached(u32 off, u32 size, u_char *buf)
 		return -1;
 
 	while (bytes_read < size) {
+		retlen = NAND_CACHE_SIZE;
+		if( nand_cache_off + retlen > mtd->size )
+			retlen = mtd->size - nand_cache_off;
+
 		if ((off + bytes_read < nand_cache_off) ||
-		    (off + bytes_read >= nand_cache_off+NAND_CACHE_SIZE)) {
+		    (off + bytes_read >= nand_cache_off + retlen)) {
 			nand_cache_off = (off + bytes_read) & NAND_PAGE_MASK;
 			if (!nand_cache) {
 				/* This memory never gets freed but 'cause
@@ -201,16 +201,20 @@ static int read_nand_cached(u32 off, u32 size, u_char *buf)
 				}
 			}
 
-			retlen = NAND_CACHE_SIZE;
+			toread = NAND_CACHE_SIZE;
+			if( nand_cache_off + toread > mtd->size )
+				toread = mtd->size - nand_cache_off;
+
+			retlen = toread;
 			if (nand_read(mtd, nand_cache_off,
 				      &retlen, nand_cache) < 0 ||
-					retlen != NAND_CACHE_SIZE) {
+					retlen != toread) {
 				printf("read_nand_cached: error reading nand off %#x size %d bytes\n",
-						nand_cache_off, NAND_CACHE_SIZE);
+						nand_cache_off, toread);
 				return -1;
 			}
 		}
-		cpy_bytes = nand_cache_off + NAND_CACHE_SIZE - (off + bytes_read);
+		cpy_bytes = nand_cache_off + retlen - (off + bytes_read);
 		if (cpy_bytes > size - bytes_read)
 			cpy_bytes = size - bytes_read;
 		memcpy(buf + bytes_read,
@@ -283,11 +287,16 @@ static int read_onenand_cached(u32 off, u32 size, u_char *buf)
 {
 	u32 bytes_read = 0;
 	size_t retlen;
+	size_t toread;
 	int cpy_bytes;
 
 	while (bytes_read < size) {
+		retlen = ONENAND_CACHE_SIZE;
+		if( onenand_cache_off + retlen > onenand_mtd.size )
+			retlen = onenand_mtd.size - onenand_cache_off;
+
 		if ((off + bytes_read < onenand_cache_off) ||
-		    (off + bytes_read >= onenand_cache_off + ONENAND_CACHE_SIZE)) {
+		    (off + bytes_read >= onenand_cache_off + retlen)) {
 			onenand_cache_off = (off + bytes_read) & ONENAND_PAGE_MASK;
 			if (!onenand_cache) {
 				/* This memory never gets freed but 'cause
@@ -300,16 +309,19 @@ static int read_onenand_cached(u32 off, u32 size, u_char *buf)
 				}
 			}
 
-			retlen = ONENAND_CACHE_SIZE;
+			toread = ONENAND_CACHE_SIZE;
+			if( onenand_cache_off + toread > onenand_mtd.size )
+				toread = onenand_mtd.size - onenand_cache_off;
+			retlen = toread;
 			if (onenand_read(&onenand_mtd, onenand_cache_off, retlen,
 						&retlen, onenand_cache) < 0 ||
-					retlen != ONENAND_CACHE_SIZE) {
+					retlen != toread) {
 				printf("read_onenand_cached: error reading nand off %#x size %d bytes\n",
-					onenand_cache_off, ONENAND_CACHE_SIZE);
+					onenand_cache_off, toread);
 				return -1;
 			}
 		}
-		cpy_bytes = onenand_cache_off + ONENAND_CACHE_SIZE - (off + bytes_read);
+		cpy_bytes = onenand_cache_off + retlen - (off + bytes_read);
 		if (cpy_bytes > size - bytes_read)
 			cpy_bytes = size - bytes_read;
 		memcpy(buf + bytes_read,
@@ -355,15 +367,15 @@ static void *get_node_mem_onenand(u32 off, void *ext_buf)
 	return ret;
 }
 
-
 static void put_fl_mem_onenand(void *buf)
 {
 	free(buf);
 }
 #endif
 
-
 #if defined(CONFIG_CMD_FLASH)
+#include <flash.h>
+
 /*
  * Support for jffs2 on top of NOR-flash
  *
@@ -375,7 +387,6 @@ static inline void *get_fl_mem_nor(u32 off, u32 size, void *ext_buf)
 	u32 addr = off;
 	struct mtdids *id = current_part->dev->id;
 
-	extern flash_info_t flash_info[];
 	flash_info_t *flash = &flash_info[id->num];
 
 	addr += flash->start[0];
@@ -397,7 +408,6 @@ static inline void *get_node_mem_nor(u32 off, void *ext_buf)
 			pNode->totlen : sizeof(*pNode), ext_buf);
 }
 #endif
-
 
 /*
  * Generic jffs2 raw memory and node read routines.
@@ -498,7 +508,6 @@ struct mem_block {
 	struct mem_block *next;
 	struct b_node nodes[NODE_CHUNK];
 };
-
 
 static void
 free_nodes(struct b_list *list)
@@ -1276,6 +1285,7 @@ static int jffs2_sum_process_sum_data(struct part_info *part, uint32_t offset,
 							&spi->version);
 						b->ino = sum_get_unaligned32(
 							&spi->inode);
+						b->datacrc = CRC_UNKNOWN;
 					}
 
 					sp += JFFS2_SUMMARY_INODE_SIZE;
@@ -1297,6 +1307,7 @@ static int jffs2_sum_process_sum_data(struct part_info *part, uint32_t offset,
 							&spd->version);
 						b->pino = sum_get_unaligned32(
 							&spd->pino);
+						b->datacrc = CRC_UNKNOWN;
 					}
 
 					sp += JFFS2_SUMMARY_DIRENT_SIZE(
@@ -1504,7 +1515,7 @@ jffs2_1pass_build_lists(struct part_info * part)
 
 		/* Set buf_size to maximum length */
 		buf_size = DEFAULT_EMPTY_SCAN_SIZE;
-		WATCHDOG_RESET();
+		schedule();
 
 #ifdef CONFIG_JFFS2_SUMMARY
 		buf_len = sizeof(*sm);
@@ -1836,7 +1847,6 @@ jffs2_1pass_build_lists(struct part_info * part)
 	return 1;
 }
 
-
 static u32
 jffs2_1pass_fill_info(struct b_lists * pL, struct b_jffs2_info * piL)
 {
@@ -1865,7 +1875,6 @@ jffs2_1pass_fill_info(struct b_lists * pL, struct b_jffs2_info * piL)
 	return 0;
 }
 
-
 static struct b_lists *
 jffs2_get_list(struct part_info * part, const char *who)
 {
@@ -1880,7 +1889,6 @@ jffs2_get_list(struct part_info * part, const char *who)
 	}
 	return (struct b_lists *)part->jffs2_priv;
 }
-
 
 /* Print directory / file contents */
 u32
@@ -1898,7 +1906,6 @@ jffs2_1pass_ls(struct part_info * part, const char *fname)
 		return 0;
 	}
 
-
 #if 0
 	putLabeledWord("found file at inode = ", inode);
 	putLabeledWord("read_inode returns = ", ret);
@@ -1906,7 +1913,6 @@ jffs2_1pass_ls(struct part_info * part, const char *fname)
 
 	return ret;
 }
-
 
 /* Load a file from flash into memory. fname can be a full path */
 u32

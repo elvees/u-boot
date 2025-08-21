@@ -6,10 +6,10 @@
  *
  * Copyright (C) 2018, EETS GmbH, http://www.eets.ch/
  *
- * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
+ * Copyright (C) 2011, Texas Instruments, Incorporated - https://www.ti.com/
  */
 
-#include <common.h>
+#include <config.h>
 #include <env.h>
 #include <errno.h>
 #include <init.h>
@@ -56,16 +56,16 @@ DECLARE_GLOBAL_DATA_PTR;
  *  boot device save register
  * -------------------------
  * The boot device can be quired by 'spl_boot_device()' in
- * 'am33xx_spl_board_init'. However it can't be saved in the u-boot
+ * 'spl_board_init'. However it can't be saved in the u-boot
  * environment here. In turn 'spl_boot_device' can't be called in
  * 'board_late_init' which allows writing to u-boot environment.
- * To get the boot device from 'am33xx_spl_board_init' to
+ * To get the boot device from 'spl_board_init' to
  * 'board_late_init' we therefore use a scratch register from the RTC.
  */
-#define CONFIG_SYS_RTC_SCRATCH0 0x60
-#define BOOT_DEVICE_SAVE_REGISTER (RTC_BASE + CONFIG_SYS_RTC_SCRATCH0)
+#define CFG_SYS_RTC_SCRATCH0 0x60
+#define BOOT_DEVICE_SAVE_REGISTER (RTC_BASE + CFG_SYS_RTC_SCRATCH0)
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 static void save_boot_device(void)
 {
 	*((u32 *)(BOOT_DEVICE_SAVE_REGISTER)) = spl_boot_device();
@@ -162,7 +162,7 @@ static void set_mpu_and_core_voltage(void)
 	}
 }
 
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT)
 static const struct ddr_data ddr2_data = {
 	.datardsratio0 = MT47H128M16RT25E_RD_DQS,
 	.datafwsratio0 = MT47H128M16RT25E_PHY_FIFO_WE,
@@ -192,7 +192,7 @@ const struct dpll_params dpll_ddr_evm_sk = {
 const struct dpll_params dpll_ddr_bone_black = {
 		400, OSC - 1, 1, -1, -1, -1, -1};
 
-void am33xx_spl_board_init(void)
+void spl_board_init(void)
 {
 	struct ctrl_dev *cdev = (struct ctrl_dev *)CTRL_DEVICE_BASE;
 
@@ -216,6 +216,36 @@ const struct dpll_params *get_dpll_ddr_params(void)
 	return &dpll_ddr;
 }
 
+void set_uart_mux_conf(void)
+{
+	switch (CONFIG_CONS_INDEX) {
+		case 1: {
+			enable_uart0_pin_mux();
+			break;
+		}
+		case 2: {
+			enable_uart1_pin_mux();
+			break;
+		}
+		case 3: {
+			enable_uart2_pin_mux();
+			break;
+		}
+		case 4: {
+			enable_uart3_pin_mux();
+			break;
+		}
+		case 5: {
+			enable_uart4_pin_mux();
+			break;
+		}
+		case 6: {
+			enable_uart5_pin_mux();
+			break;
+		}
+	}
+}
+
 void set_mux_conf_regs(void)
 {
 	/* done first by the ROM and afterwards by the pin controller driver */
@@ -235,13 +265,15 @@ void sdram_init(void)
 	config_ddr(266, &ioregs, &ddr2_data,
 		   &ddr2_cmd_ctrl_data, &ddr2_emif_reg_data, 0);
 }
-#endif /* CONFIG_SKIP_LOWLEVEL_INIT */
+#endif /* CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT) */
 
 #ifdef CONFIG_DEBUG_UART
 void board_debug_uart_init(void)
 {
+	setup_early_clocks();
+
 	/* done by pin controller driver if not debugging */
-	enable_uart_pin_mux(CONFIG_DEBUG_UART_BASE);
+	enable_uart_pin_mux(CONFIG_VAL(DEBUG_UART_BASE));
 }
 #endif
 
@@ -254,7 +286,7 @@ int board_init(void)
 	hw_watchdog_init();
 #endif
 
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE + 0x100;
 	return 0;
 }
 

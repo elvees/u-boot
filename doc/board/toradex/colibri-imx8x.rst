@@ -1,7 +1,11 @@
-.. SPDX-License-Identifier: GPL-2.0+
+.. SPDX-License-Identifier: GPL-2.0-or-later
+.. sectionauthor:: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 
-Colibri iMX8QXP V1.0B Module
-============================
+Colibri iMX8X Module
+====================
+
+- SoM: https://www.toradex.com/computer-on-modules/colibri-arm-family/nxp-imx-8x
+- Carrier board: https://www.toradex.com/products/carrier-board/colibri-evaluation-board
 
 Quick Start
 -----------
@@ -16,36 +20,35 @@ Quick Start
 Get and Build the ARM Trusted Firmware
 --------------------------------------
 
+Download the imx-atf repository:
+
 .. code-block:: bash
 
-    $ git clone -b imx_4.14.78_1.0.0_ga https://source.codeaurora.org/external/imx/imx-atf
-    $ cd imx-atf/
-    $ make PLAT=imx8qxp bl31
+    $ git clone -b lf_v2.6 https://github.com/nxp-imx/imx-atf.git
+
+Compile it with an aarch64 toolchain:
+
+.. code-block:: bash
+
+    $ make PLAT=imx8qx bl31 -C imx-atf
 
 Get scfw_tcm.bin and ahab-container.img
 ---------------------------------------
-.. code-block:: bash
 
-    $ wget https://github.com/toradex/meta-fsl-bsp-release/blob/
-           toradex-sumo-4.14.78-1.0.0_ga-bringup/imx/meta-bsp/recipes-
-           bsp/imx-sc-firmware/files/mx8qx-colibri-scfw-tcm.bin?raw=true
-    $ mv mx8qx-colibri-scfw-tcm.bin\?raw\=true mx8qx-colibri-scfw-tcm.bin
-    $ wget https://www.nxp.com/lgfiles/NMG/MAD/YOCTO/firmware-imx-8.0.bin
-    $ chmod +x firmware-imx-8.0.bin
-    $ ./firmware-imx-8.0.bin
-
-Copy the following binaries to the U-Boot folder:
+Download imx-seco firmware and extract it:
 
 .. code-block:: bash
 
-    $ cp imx-atf/build/imx8qxp/release/bl31.bin .
-    $ cp u-boot/u-boot.bin .
+    $ wget https://www.nxp.com/lgfiles/NMG/MAD/YOCTO/imx-seco-5.8.7.bin
+    $ sh imx-seco-5.8.7.bin --auto-accept
 
 Copy the following firmware to the U-Boot folder:
 
 .. code-block:: bash
 
-    $ cp firmware-imx-8.0/firmware/seco/ahab-container.img .
+    $ wget https://github.com/toradex/i.MX-System-Controller-Firmware/raw/master/src/scfw_export_mx8qx_b0/build_mx8qx_b0/mx8qx-colibri-scfw-tcm.bin
+    $ cp ../imx-atf/build/imx8qx/release/bl31.bin .
+    $ cp ../imx-seco-5.8.7/firmware/seco/mx8qxc0-ahab-container.img mx8qx-ahab-container.img
 
 Build U-Boot
 ------------
@@ -60,10 +63,10 @@ Load the U-Boot Binary Using UUU
 
 Get the latest version of the universal update utility (uuu) aka ``mfgtools 3.0``:
 
-https://community.nxp.com/external-link.jspa?url=https%3A%2F%2Fgithub.com%2FNXPmicro%2Fmfgtools%2Freleases
+https://github.com/nxp-imx/mfgtools/releases
 
-Put the module into USB recovery aka serial downloader mode, connect USB device
-to your host and execute ``uuu``:
+Put the module into USB recovery aka serial downloader mode, connect the USB
+device to your host and execute ``uuu``:
 
 .. code-block:: bash
 
@@ -72,7 +75,8 @@ to your host and execute ``uuu``:
 Flash the U-Boot Binary into the eMMC
 -------------------------------------
 
-Burn the ``u-boot-dtb.imx`` binary to the primary eMMC hardware boot area partition:
+Burn the ``u-boot-dtb.imx`` binary to the primary eMMC hardware boot area
+partition and boot:
 
 .. code-block:: bash
 
@@ -80,3 +84,10 @@ Burn the ``u-boot-dtb.imx`` binary to the primary eMMC hardware boot area partit
     setexpr blkcnt ${filesize} + 0x1ff && setexpr blkcnt ${blkcnt} / 0x200
     mmc dev 0 1
     mmc write ${loadaddr} 0x0 ${blkcnt}
+
+As a convenience, instead of the last three commands, one may also use the
+update U-Boot wrapper:
+
+.. code-block:: bash
+
+    > run update_uboot

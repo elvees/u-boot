@@ -21,7 +21,7 @@ else
 obj-y   += setjmp.o
 endif
 
-ifndef CONFIG_SPL_BUILD
+ifndef CONFIG_XPL_BUILD
 ifdef CONFIG_ARM64
 obj-y	+= relocate_64.o
 else
@@ -33,18 +33,33 @@ obj-$(CONFIG_OF_LIBFDT) += bootm-fdt.o
 obj-$(CONFIG_CMD_BOOTI) += bootm.o image.o
 obj-$(CONFIG_CMD_BOOTM) += bootm.o
 obj-$(CONFIG_CMD_BOOTZ) += bootm.o zimage.o
-obj-$(CONFIG_SYS_L2_PL310) += cache-pl310.o
 else
-obj-$(CONFIG_$(SPL_TPL_)FRAMEWORK) += spl.o
-obj-$(CONFIG_SPL_FRAMEWORK) += zimage.o
+obj-$(CONFIG_$(PHASE_)FRAMEWORK) += spl.o
+ifdef CONFIG_SPL_FRAMEWORK
+obj-$(CONFIG_CMD_BOOTI) += image.o
+obj-$(CONFIG_CMD_BOOTZ) += zimage.o
+endif
 obj-$(CONFIG_OF_LIBFDT) += bootm-fdt.o
 endif
-obj-$(CONFIG_$(SPL_TPL_)USE_ARCH_MEMSET) += memset.o
-obj-$(CONFIG_$(SPL_TPL_)USE_ARCH_MEMCPY) += memcpy.o
-obj-$(CONFIG_SEMIHOSTING) += semihosting.o
+ifdef CONFIG_ARM64
+obj-$(CONFIG_$(PHASE_)USE_ARCH_MEMSET) += memset-arm64.o
+obj-$(CONFIG_$(PHASE_)USE_ARCH_MEMCPY) += memcpy-arm64.o
+else
+obj-$(CONFIG_$(PHASE_)USE_ARCH_MEMSET) += memset.o
+obj-$(CONFIG_$(PHASE_)USE_ARCH_MEMCPY) += memcpy.o
+endif
+obj-$(CONFIG_$(PHASE_)SYS_L2_PL310) += cache-pl310.o
+obj-$(CONFIG_$(PHASE_)SEMIHOSTING) += semihosting.o
 
+ifneq ($(filter y,$(CONFIG_SAVE_PREV_BL_INITRAMFS_START_ADDR) $(CONFIG_SAVE_PREV_BL_FDT_ADDR)),)
+obj-y += save_prev_bl_data.o
+endif
+
+# obj-$(CONFIG_SAVE_PREV_BL_INITRAMFS_START_ADDR) += save_prev_bl_data.o
 obj-y	+= bdinfo.o
 obj-y	+= sections.o
+CFLAGS_REMOVE_sections.o := $(LTO_CFLAGS)
+
 obj-y	+= stack.o
 ifdef CONFIG_CPU_V7M
 obj-y	+= interrupts_m.o
@@ -53,30 +68,36 @@ obj-$(CONFIG_FSL_LAYERSCAPE) += ccn504.o
 ifneq ($(CONFIG_GICV2)$(CONFIG_GICV3),)
 obj-y	+= gic_64.o
 endif
+obj-$(CONFIG_DRIVER_GICV2)	+= gic-v2.o
 obj-$(CONFIG_GIC_V3_ITS)	+= gic-v3-its.o
 obj-y	+= interrupts_64.o
 else
 obj-y	+= interrupts.o
 endif
-ifndef CONFIG_$(SPL_TPL_)SYSRESET
+ifndef CONFIG_$(PHASE_)SYSRESET
 obj-y	+= reset.o
 endif
 
 obj-y	+= cache.o
 obj-$(CONFIG_SYS_ARM_CACHE_CP15)	+= cache-cp15.o
+CFLAGS_REMOVE_cache-cp15.o := $(LTO_CFLAGS)
 
 obj-y	+= psci-dt.o
 
 obj-$(CONFIG_DEBUG_LL)	+= debug.o
 
+obj-$(CONFIG_BLOBLIST)  += xferlist.o
+obj-$(CONFIG_GENERATE_ACPI_TABLE) += acpi_table.o
+
 # For EABI conformant tool chains, provide eabi_compat()
 ifneq (,$(findstring -mabi=aapcs-linux,$(PLATFORM_CPPFLAGS)))
 extra-y	+= eabi_compat.o
+CFLAGS_REMOVE_eabi_compat.o := $(LTO_CFLAGS)
 endif
 
 # some files can only build in ARM or THUMB2, not THUMB1
 
-ifdef CONFIG_$(SPL_)SYS_THUMB_BUILD
+ifdef CONFIG_$(PHASE_)SYS_THUMB_BUILD
 asflags-$(CONFIG_HAS_THUMB2) += -DCONFIG_THUMB2_KERNEL
 ifndef CONFIG_HAS_THUMB2
 
@@ -97,6 +118,11 @@ AFLAGS_REMOVE_memset.o := -mthumb -mthumb-interwork
 AFLAGS_REMOVE_memcpy.o := -mthumb -mthumb-interwork
 AFLAGS_memset.o := -DMEMSET_NO_THUMB_BUILD
 AFLAGS_memcpy.o := -DMEMCPY_NO_THUMB_BUILD
+
+# This is only necessary to force ARM mode on THUMB1 targets.
+ifneq ($(CONFIG_SYS_ARM_ARCH),4)
+obj-y   += bitops.o
+endif
 endif
 endif
 
@@ -106,11 +132,3 @@ CFLAGS_REMOVE_$(EFI_CRT0) := $(CFLAGS_NON_EFI)
 
 CFLAGS_$(EFI_RELOC) := $(CFLAGS_EFI)
 CFLAGS_REMOVE_$(EFI_RELOC) := $(CFLAGS_NON_EFI)
-
-extra-$(CONFIG_CMD_BOOTEFI_HELLO_COMPILE) += $(EFI_CRT0) $(EFI_RELOC)
-# TODO: As of v2019.01 the relocation code for the EFI application cannot
-# be built on ARMv7-M.
-ifndef CONFIG_CPU_V7M
-#extra-$(CONFIG_CMD_BOOTEFI_SELFTEST) += $(EFI_CRT0) $(EFI_RELOC)
-endif
-extra-$(CONFIG_EFI) += $(EFI_CRT0) $(EFI_RELOC)

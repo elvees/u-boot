@@ -23,17 +23,14 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand_bch.h>
 #include <linux/mtd/nand_ecc.h>
+#include <linux/mtd/rawnand.h>
+#include <linux/time.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/types.h>
 #include <asm/dma-mapping.h>
 #include <asm/arch/clock.h>
 #include "octeontx_bch.h"
-
-#ifdef DEBUG
-# undef CONFIG_LOGLEVEL
-# define CONFIG_LOGLEVEL 8
-#endif
 
 /*
  * The NDF_CMD queue takes commands between 16 - 128 bit.
@@ -295,7 +292,6 @@ union ndf_cmd {
 #define OCTEONTX_NAND_DRIVER_NAME	"octeontx_nand"
 
 #define NDF_TIMEOUT		1000	/** Timeout in ms */
-#define USEC_PER_SEC		1000000	/** Linux compatibility */
 #ifndef NAND_MAX_CHIPS
 # define NAND_MAX_CHIPS		8	/** Linux compatibility */
 #endif
@@ -358,7 +354,7 @@ struct octeontx_probe_device {
 
 static struct bch_vf *bch_vf;
 /** Deferred devices due to BCH not being ready */
-LIST_HEAD(octeontx_pci_nand_deferred_devices);
+static LIST_HEAD(octeontx_pci_nand_deferred_devices);
 
 /** default parameters used for probing chips */
 #define MAX_ONFI_MODE	5
@@ -2097,7 +2093,7 @@ static int octeontx_pci_nand_probe(struct udevice *dev)
 	tn->dev = dev;
 	INIT_LIST_HEAD(&tn->chips);
 
-	tn->base = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_0, PCI_REGION_MEM);
+	tn->base = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_0, 0, 0, PCI_REGION_TYPE, PCI_REGION_MEM);
 	if (!tn->base) {
 		ret = -EINVAL;
 		goto release;
@@ -2178,7 +2174,7 @@ int octeontx_pci_nand_disable(struct udevice *dev)
  * In this case, the initial probe returns success but the actual probing
  * is deferred until the BCH VF has been probed.
  *
- * @return	0 for success, otherwise error
+ * Return:	0 for success, otherwise error
  */
 int octeontx_pci_nand_deferred_probe(void)
 {

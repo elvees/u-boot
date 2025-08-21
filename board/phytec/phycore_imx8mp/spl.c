@@ -4,7 +4,6 @@
  * Author: Teresa Remmet <t.remmet@phytec.de>
  */
 
-#include <common.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/ddr.h>
 #include <asm/arch/imx8mp_pins.h>
@@ -21,15 +20,103 @@
 #include <power/pca9450.h>
 #include <spl.h>
 
+#include "lpddr4_timing.h"
+#include "../common/imx8m_som_detection.h"
+
 DECLARE_GLOBAL_DATA_PTR;
+
+#define EEPROM_ADDR		0x51
+#define EEPROM_ADDR_FALLBACK	0x59
 
 int spl_board_boot_device(enum boot_device boot_dev_spl)
 {
 	return BOOT_DEVICE_BOOTROM;
 }
 
+enum phytec_imx8mp_ddr_eeprom_code {
+	PHYTEC_IMX8MP_DDR_1GB = 2,
+	PHYTEC_IMX8MP_DDR_2GB = 3,
+	PHYTEC_IMX8MP_DDR_4GB = 5,
+	PHYTEC_IMX8MP_DDR_8GB = 7,
+	PHYTEC_IMX8MP_DDR_4GB_2GHZ = 8,
+};
+
 void spl_dram_init(void)
 {
+	int ret;
+	bool use_2ghz_timings = false;
+	enum phytec_imx8mp_ddr_eeprom_code size = PHYTEC_EEPROM_INVAL;
+
+	ret = phytec_eeprom_data_setup_fallback(NULL, 0, EEPROM_ADDR,
+						EEPROM_ADDR_FALLBACK);
+	if (ret && !IS_ENABLED(CONFIG_PHYCORE_IMX8MP_RAM_SIZE_FIX))
+		goto out;
+
+	ret = phytec_imx8m_detect(NULL);
+	if (!ret)
+		phytec_print_som_info(NULL);
+
+	if (IS_ENABLED(CONFIG_PHYCORE_IMX8MP_RAM_SIZE_FIX)) {
+		if (IS_ENABLED(CONFIG_PHYCORE_IMX8MP_RAM_SIZE_1GB))
+			size = PHYTEC_IMX8MP_DDR_1GB;
+		else if (IS_ENABLED(CONFIG_PHYCORE_IMX8MP_RAM_SIZE_2GB))
+			size = PHYTEC_IMX8MP_DDR_2GB;
+		else if (IS_ENABLED(CONFIG_PHYCORE_IMX8MP_RAM_SIZE_4GB))
+			size = PHYTEC_IMX8MP_DDR_4GB;
+		else if (IS_ENABLED(CONFIG_PHYCORE_IMX8MP_RAM_SIZE_8GB))
+			size = PHYTEC_IMX8MP_DDR_8GB;
+	} else {
+		size = phytec_get_imx8m_ddr_size(NULL);
+	}
+
+	if (IS_ENABLED(CONFIG_PHYCORE_IMX8MP_RAM_FREQ_FIX)) {
+		if (IS_ENABLED(CONFIG_PHYCORE_IMX8MP_USE_2GHZ_RAM_TIMINGS)) {
+			if (size == PHYTEC_IMX8MP_DDR_4GB)
+				size = PHYTEC_IMX8MP_DDR_4GB_2GHZ;
+			else
+				use_2ghz_timings = true;
+		} else if (IS_ENABLED(CONFIG_PHYCORE_IMX8MP_USE_1_5GHZ_RAM_TIMINGS)) {
+			if (size == PHYTEC_IMX8MP_DDR_4GB_2GHZ)
+				size = PHYTEC_IMX8MP_DDR_4GB;
+			else
+				use_2ghz_timings = false;
+		}
+	} else {
+		u8 rev = phytec_get_rev(NULL);
+		u8 somtype = phytec_get_som_type(NULL);
+
+		if (rev != PHYTEC_EEPROM_INVAL &&
+		    (rev >= 3 || (somtype == SOM_TYPE_PCL && rev >= 1)))
+			use_2ghz_timings = true;
+	}
+
+	switch (size) {
+	case PHYTEC_IMX8MP_DDR_1GB:
+		if (use_2ghz_timings)
+			set_dram_timings_2ghz_1gb();
+		else
+			set_dram_timings_1_5ghz_1gb();
+		break;
+	case PHYTEC_IMX8MP_DDR_2GB:
+		if (use_2ghz_timings)
+			set_dram_timings_2ghz_2gb();
+		break;
+	case PHYTEC_IMX8MP_DDR_4GB:
+		set_dram_timings_1_5ghz_4gb();
+		break;
+	case PHYTEC_IMX8MP_DDR_4GB_2GHZ:
+		set_dram_timings_2ghz_4gb();
+		break;
+	case PHYTEC_IMX8MP_DDR_8GB:
+		set_dram_timings_2ghz_8gb();
+		break;
+	default:
+		goto out;
+	}
+	ddr_init(&dram_timing);
+	return;
+out:
+	printf("Could not detect correct RAM size. Fallback to default.\n");
 	ddr_init(&dram_timing);
 }
 
@@ -53,7 +140,7 @@ int power_init_board(void)
 	struct pmic *p;
 	int ret;
 
-	ret = power_pca9450_init(0);
+	ret = power_pca9450_init(0, 0x25);
 	if (ret)
 		printf("power init failed");
 	p = pmic_get("PCA9450");
@@ -62,42 +149,32 @@ int power_init_board(void)
 	/* BUCKxOUT_DVS0/1 control BUCK123 output */
 	pmic_reg_write(p, PCA9450_BUCK123_DVS, 0x29);
 
-	/* increase VDD_SOC to typical value 0.95V */
+	/* Increase VDD_SOC and VDD_ARM to OD voltage 0.95V */
+	pmic_reg_write(p, PCA9450_BUCK1OUT_DVS0, 0x1C);
 	pmic_reg_write(p, PCA9450_BUCK2OUT_DVS0, 0x1C);
 
-	/* set WDOG_B_CFG to cold reset */
+	/* Set BUCK1 DVS1 to suspend controlled through PMIC_STBY_REQ */
+	pmic_reg_write(p, PCA9450_BUCK1OUT_DVS1, 0x14);
+	pmic_reg_write(p, PCA9450_BUCK1CTRL, 0x59);
+
+	/* Set WDOG_B_CFG to cold reset */
 	pmic_reg_write(p, PCA9450_RESET_CTRL, 0xA1);
 
 	return 0;
 }
 
-int board_fit_config_name_match(const char *name)
+void spl_board_init(void)
 {
-	return 0;
+	arch_misc_init();
+
+	/* Set GIC clock to 500Mhz for OD VDD_SOC. */
+	clock_enable(CCGR_GIC, 0);
+	clock_set_target_val(GIC_CLK_ROOT, CLK_ROOT_ON | CLK_ROOT_SOURCE_SEL(5));
+	clock_enable(CCGR_GIC, 1);
 }
 
-#define UART_PAD_CTRL   (PAD_CTL_DSE6 | PAD_CTL_FSEL1)
-#define WDOG_PAD_CTRL   (PAD_CTL_DSE6 | PAD_CTL_ODE | PAD_CTL_PUE | PAD_CTL_PE)
-
-static iomux_v3_cfg_t const uart_pads[] = {
-	MX8MP_PAD_UART2_RXD__UART2_DCE_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
-	MX8MP_PAD_UART2_TXD__UART2_DCE_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
-};
-
-static iomux_v3_cfg_t const wdog_pads[] = {
-	MX8MP_PAD_GPIO1_IO02__WDOG1_WDOG_B  | MUX_PAD_CTRL(WDOG_PAD_CTRL),
-};
-
-int board_early_init_f(void)
+int board_fit_config_name_match(const char *name)
 {
-	struct wdog_regs *wdog = (struct wdog_regs *)WDOG1_BASE_ADDR;
-
-	imx_iomux_v3_setup_multiple_pads(wdog_pads, ARRAY_SIZE(wdog_pads));
-
-	set_wdog_reset(wdog);
-
-	imx_iomux_v3_setup_multiple_pads(uart_pads, ARRAY_SIZE(uart_pads));
-
 	return 0;
 }
 
@@ -107,9 +184,7 @@ void board_init_f(ulong dummy)
 
 	arch_cpu_init();
 
-	init_uart_clk(1);
-
-	board_early_init_f();
+	init_uart_clk(0);
 
 	ret = spl_early_init();
 	if (ret) {

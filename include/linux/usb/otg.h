@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /* include/linux/usb/otg.h
  *
- * Copyright (c) 2015 Texas Instruments Incorporated - http://www.ti.com
+ * Copyright (c) 2015 Texas Instruments Incorporated - https://www.ti.com
  *
  * USB OTG (On The Go) defines
  */
@@ -26,6 +26,16 @@ enum usb_dr_mode {
  * and returns the correspondig enum usb_dr_mode
  */
 enum usb_dr_mode usb_get_dr_mode(ofnode node);
+
+/**
+ * usb_get_dr_mode() - Get dual role mode for given device
+ * @node: ofnode of the given device
+ *
+ * The function gets phy interface string from property
+ * 'role-switch-defaulr-mode', and returns the correspondig enum
+ * usb_dr_mode
+ */
+enum usb_dr_mode usb_get_role_switch_default_mode(ofnode node);
 
 /**
  * usb_get_maximum_speed() - Get maximum speed for given device

@@ -5,89 +5,202 @@
  * Secure monitor calls.
  */
 
-#include <common.h>
-#include <command.h>
-#include <env.h>
+#include <dm.h>
 #include <log.h>
+#include <regmap.h>
+#include <sm.h>
+#include <syscon.h>
+#include <asm/arch/boot.h>
 #include <asm/arch/sm.h>
 #include <asm/cache.h>
 #include <asm/global_data.h>
 #include <asm/ptrace.h>
 #include <linux/bitops.h>
+#include <linux/compiler_attributes.h>
 #include <linux/err.h>
 #include <linux/kernel.h>
-#include <dm.h>
 #include <linux/bitfield.h>
-#include <regmap.h>
-#include <syscon.h>
+#include <meson/sm.h>
 
-#define FN_GET_SHARE_MEM_INPUT_BASE	0x82000020
-#define FN_GET_SHARE_MEM_OUTPUT_BASE	0x82000021
-#define FN_EFUSE_READ			0x82000030
-#define FN_EFUSE_WRITE			0x82000031
-#define FN_CHIP_ID			0x82000044
-
-static void *shmem_input;
-static void *shmem_output;
-
-static void meson_init_shmem(void)
+static inline struct udevice *meson_get_sm_device(void)
 {
-	struct pt_regs regs;
+	struct udevice *dev;
+	int err;
 
-	if (shmem_input && shmem_output)
-		return;
+	err = uclass_first_device_err(UCLASS_SM, &dev);
+	if (err) {
+		pr_err("Mesom SM device not found\n");
+		return ERR_PTR(err);
+	}
 
-	regs.regs[0] = FN_GET_SHARE_MEM_INPUT_BASE;
-	smc_call(&regs);
-	shmem_input = (void *)regs.regs[0];
-
-	regs.regs[0] = FN_GET_SHARE_MEM_OUTPUT_BASE;
-	smc_call(&regs);
-	shmem_output = (void *)regs.regs[0];
-
-	debug("Secure Monitor shmem: 0x%p 0x%p\n", shmem_input, shmem_output);
+	return dev;
 }
 
 ssize_t meson_sm_read_efuse(uintptr_t offset, void *buffer, size_t size)
 {
-	struct pt_regs regs;
+	struct udevice *dev;
+	struct pt_regs regs = { 0 };
+	int err;
 
-	meson_init_shmem();
+	dev = meson_get_sm_device();
+	if (IS_ERR(dev))
+		return PTR_ERR(dev);
 
-	regs.regs[0] = FN_EFUSE_READ;
 	regs.regs[1] = offset;
 	regs.regs[2] = size;
 
-	smc_call(&regs);
+	err = sm_call_read(dev, buffer, size,
+			   MESON_SMC_CMD_EFUSE_READ, &regs);
+	if (err < 0)
+		pr_err("Failed to read efuse memory (%d)\n", err);
 
-	if (regs.regs[0] == 0)
-		return -1;
-
-	memcpy(buffer, shmem_output, min(size, regs.regs[0]));
-
-	return regs.regs[0];
+	return err;
 }
 
-#define SM_CHIP_ID_LENGTH	119
-#define SM_CHIP_ID_OFFSET	4
-#define SM_CHIP_ID_SIZE		12
+ssize_t meson_sm_write_efuse(uintptr_t offset, void *buffer, size_t size)
+{
+	struct udevice *dev;
+	struct pt_regs regs = { 0 };
+	int err;
+
+	dev = meson_get_sm_device();
+	if (IS_ERR(dev))
+		return PTR_ERR(dev);
+
+	regs.regs[1] = offset;
+	regs.regs[2] = size;
+
+	err = sm_call_write(dev, buffer, size,
+			    MESON_SMC_CMD_EFUSE_WRITE, &regs);
+	if (err < 0)
+		pr_err("Failed to write efuse memory (%d)\n", err);
+
+	return err;
+}
+
+/*
+ * Helps to handle two flavors of cpu_id layouts:
+ *
+ * - in-register view (value read from cpu_id reg, a.k.a. socinfo):
+ *   +-----------+------------+------------+------------+
+ *   | family_id | package_id |  chip_rev  | layout_rev |
+ *   +-----------+------------+------------+------------+
+ *   | 31     24 | 23      16 | 15       8 | 7        0 |
+ *   +-----------+------------+------------+------------+
+ *
+ * - in-efuse view (value, residing inside efuse/shmem data usually for
+ *   chip_id v2. Chip_id v1 does not contain cpu_id value inside efuse
+ *   data (i.e. in chip_id_efuse)):
+ *   +-----------+------------+------------+------------+
+ *   | family_id |  chip_rev  | package_id | layout_rev |
+ *   +-----------+------------+------------+------------+
+ *   | 31     24 | 23      16 | 15       8 | 7        0 |
+ *   +-----------+------------+------------+------------+
+ */
+enum {
+	/* In-register view of cpu_id */
+	CPU_ID_REG_MAJOR,	/* 31-24 bits */
+	CPU_ID_REG_PACK,	/* 23-16 bits */
+	CPU_ID_REG_MINOR,	/* 15-8 bits */
+	CPU_ID_REG_MISC,	/* 7-0 bits */
+
+	/* In-efuse view of cpu_id */
+	CPU_ID_MAJOR = CPU_ID_REG_MAJOR,
+	CPU_ID_PACK  = CPU_ID_REG_MINOR,
+	CPU_ID_MINOR = CPU_ID_REG_PACK,
+	CPU_ID_MISC  = CPU_ID_REG_MISC,
+};
+
+/*
+ * This is a beginning chunk of the whole efuse storage area, containing
+ * data related to chip_id only
+ */
+struct chip_id_efuse {
+	u32 version;
+	u8 raw[MESON_CHIP_ID_SZ]; /* payload */
+} __packed;
+
+static void meson_sm_serial_reverse(u8 serial[SM_SERIAL_SIZE])
+{
+	for (int i = 0; i < SM_SERIAL_SIZE / 2; i++) {
+		int k = SM_SERIAL_SIZE - 1 - i;
+
+		swap(serial[i], serial[k]);
+	}
+}
+
+int meson_sm_get_chip_id(struct meson_sm_chip_id *chip_id)
+{
+	struct udevice *dev;
+	union meson_cpu_id socinfo;
+	struct pt_regs regs = { 0 };
+	struct chip_id_efuse chip_id_efuse;
+	int err;
+
+	dev = meson_get_sm_device();
+	if (IS_ERR(dev))
+		return PTR_ERR(dev);
+
+	/*
+	 * Request v2. If not supported by secure monitor, then v1 should be
+	 * returned.
+	 */
+	regs.regs[1] = 2;
+
+	err = sm_call_read(dev, &chip_id_efuse, sizeof(chip_id_efuse),
+			   MESON_SMC_CMD_CHIP_ID_GET, &regs);
+	if (err < 0) {
+		pr_err("Failed to read chip_id (%d)\n", err);
+		return err;
+	}
+
+	if (chip_id_efuse.version == 2) {
+		memcpy((u8 *)chip_id, chip_id_efuse.raw,
+		       sizeof(struct meson_sm_chip_id));
+		return 0;
+	}
+
+	/*
+	 * Legacy chip_id (v1) read out, transform data
+	 * to expected order format (little-endian)
+	 */
+	memcpy(chip_id->serial, chip_id_efuse.raw, sizeof(chip_id->serial));
+	meson_sm_serial_reverse(chip_id->serial);
+
+	socinfo.val = meson_get_socinfo();
+	if (!socinfo.val)
+		return -ENODEV;
+
+	chip_id->cpu_id = (union meson_cpu_id){
+		.raw[CPU_ID_MAJOR] = socinfo.raw[CPU_ID_REG_MAJOR],
+		.raw[CPU_ID_PACK]  = socinfo.raw[CPU_ID_REG_PACK],
+		.raw[CPU_ID_MINOR] = socinfo.raw[CPU_ID_REG_MINOR],
+		.raw[CPU_ID_MISC]  = socinfo.raw[CPU_ID_REG_MISC],
+	};
+
+	return 0;
+}
 
 int meson_sm_get_serial(void *buffer, size_t size)
 {
-	struct pt_regs regs;
+	struct meson_sm_chip_id chip_id;
+	int ret;
 
-	meson_init_shmem();
+	if (size < SM_SERIAL_SIZE)
+		return -EINVAL;
 
-	regs.regs[0] = FN_CHIP_ID;
-	regs.regs[1] = 0;
-	regs.regs[2] = 0;
+	ret = meson_sm_get_chip_id(&chip_id);
+	if (ret)
+		return ret;
 
-	smc_call(&regs);
-
-	memcpy(buffer, shmem_output + SM_CHIP_ID_OFFSET,
-	       min_t(size_t, size, SM_CHIP_ID_SIZE));
-
-	return 0;
+	/*
+	 * The order of serial inside chip_id and serial which function must
+	 * return does not match: stick here to big-endian for backward
+	 * compatibility.
+	 */
+	meson_sm_serial_reverse(chip_id.serial);
+	memcpy(buffer, chip_id.serial, sizeof(chip_id.serial));
+	return ret;
 }
 
 #define AO_SEC_SD_CFG15		0xfc
@@ -123,98 +236,23 @@ int meson_sm_get_reboot_reason(void)
 	return FIELD_GET(REBOOT_REASON_MASK, reason);
 }
 
-static int do_sm_serial(struct cmd_tbl *cmdtp, int flag, int argc,
-			char *const argv[])
+int meson_sm_pwrdm_set(size_t index, int cmd)
 {
-	ulong address;
-	int ret;
+	struct udevice *dev;
+	struct pt_regs regs = { 0 };
+	int err;
 
-	if (argc < 2)
-		return CMD_RET_USAGE;
+	dev = meson_get_sm_device();
+	if (IS_ERR(dev))
+		return PTR_ERR(dev);
 
-	address = simple_strtoul(argv[1], NULL, 0);
+	regs.regs[1] = index;
+	regs.regs[2] = cmd;
 
-	ret = meson_sm_get_serial((void *)address, SM_CHIP_ID_SIZE);
-	if (ret)
-		return CMD_RET_FAILURE;
+	err = sm_call(dev, MESON_SMC_CMD_PWRDM_SET, NULL, &regs);
+	if (err)
+		pr_err("Failed to %s power domain ind=%zu (%d)\n", cmd == PWRDM_ON ?
+				"enable" : "disable", index, err);
 
-	return CMD_RET_SUCCESS;
+	return err;
 }
-
-#define MAX_REBOOT_REASONS 14
-
-static const char *reboot_reasons[MAX_REBOOT_REASONS] = {
-	[REBOOT_REASON_COLD] = "cold_boot",
-	[REBOOT_REASON_NORMAL] = "normal",
-	[REBOOT_REASON_RECOVERY] = "recovery",
-	[REBOOT_REASON_UPDATE] = "update",
-	[REBOOT_REASON_FASTBOOT] = "fastboot",
-	[REBOOT_REASON_SUSPEND_OFF] = "suspend_off",
-	[REBOOT_REASON_HIBERNATE] = "hibernate",
-	[REBOOT_REASON_BOOTLOADER] = "bootloader",
-	[REBOOT_REASON_SHUTDOWN_REBOOT] = "shutdown_reboot",
-	[REBOOT_REASON_RPMBP] = "rpmbp",
-	[REBOOT_REASON_CRASH_DUMP] = "crash_dump",
-	[REBOOT_REASON_KERNEL_PANIC] = "kernel_panic",
-	[REBOOT_REASON_WATCHDOG_REBOOT] = "watchdog_reboot",
-};
-
-static int do_sm_reboot_reason(struct cmd_tbl *cmdtp, int flag, int argc,
-			       char *const argv[])
-{
-	const char *reason_str;
-	char *destarg = NULL;
-	int reason;
-
-	if (argc > 1)
-		destarg = argv[1];
-
-	reason = meson_sm_get_reboot_reason();
-	if (reason < 0)
-		return CMD_RET_FAILURE;
-
-	if (reason >= MAX_REBOOT_REASONS ||
-	    !reboot_reasons[reason])
-		reason_str = "unknown";
-	else
-		reason_str = reboot_reasons[reason];
-
-	if (destarg)
-		env_set(destarg, reason_str);
-	else
-		printf("reboot reason: %s (%x)\n", reason_str, reason);
-
-	return CMD_RET_SUCCESS;
-}
-
-static struct cmd_tbl cmd_sm_sub[] = {
-	U_BOOT_CMD_MKENT(serial, 2, 1, do_sm_serial, "", ""),
-	U_BOOT_CMD_MKENT(reboot_reason, 1, 1, do_sm_reboot_reason, "", ""),
-};
-
-static int do_sm(struct cmd_tbl *cmdtp, int flag, int argc,
-		 char *const argv[])
-{
-	struct cmd_tbl *c;
-
-	if (argc < 2)
-		return CMD_RET_USAGE;
-
-	/* Strip off leading 'sm' command argument */
-	argc--;
-	argv++;
-
-	c = find_cmd_tbl(argv[0], &cmd_sm_sub[0], ARRAY_SIZE(cmd_sm_sub));
-
-	if (c)
-		return c->cmd(cmdtp, flag, argc, argv);
-	else
-		return CMD_RET_USAGE;
-}
-
-U_BOOT_CMD(
-	sm, 5, 0, do_sm,
-	"Secure Monitor Control",
-	"serial <address> - read chip unique id to memory address\n"
-	"sm reboot_reason [name] - get reboot reason and store to to environment"
-);

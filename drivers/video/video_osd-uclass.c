@@ -4,7 +4,8 @@
  * Mario Six,  Guntermann & Drunck GmbH, mario.six@gdsys.cc
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_VIDEO_OSD
+
 #include <dm.h>
 #include <video_osd.h>
 

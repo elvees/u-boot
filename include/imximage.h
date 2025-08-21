@@ -124,7 +124,7 @@ typedef struct {
 } flash_header_v1_t;
 
 typedef struct {
-	uint32_t length; 	/* Length of data to be read from flash */
+	uint32_t length;	/* Length of data to be read from flash */
 } flash_cfg_parms_t;
 
 typedef struct {
@@ -200,6 +200,48 @@ struct imx_header {
 		imx_header_v2_t hdr_v2;
 	} header;
 };
+
+typedef struct {
+	uint8_t tag[4];
+	uint8_t version[4];
+	uint8_t reserved_1[4];
+	uint8_t read_sample;
+	uint8_t datahold;
+	uint8_t datasetup;
+	uint8_t coladdrwidth;
+	uint8_t devcfgenable;
+	uint8_t deviceModeType;
+	uint16_t waitTimeCfgCommands;
+	uint8_t devmodeseq[4];
+	uint32_t devmodearg;
+	uint8_t cmd_enable;
+	uint8_t configModeType[3];
+	uint8_t cmd_seq[16] ;
+	uint8_t cmd_arg[16];
+	uint32_t controllermisc;
+	uint8_t dev_type;
+	uint8_t sflash_pad;
+	uint8_t serial_clk;
+	uint8_t lut_custom;
+	uint8_t reserved_2[8];
+	uint32_t sflashA1;
+	uint32_t sflashA2;
+	uint32_t sflashB1;
+	uint32_t sflashB2;
+	uint32_t cspadover;
+	uint32_t sclkpadover;
+	uint32_t datapadover;
+	uint32_t dqspadover;
+	uint32_t timeout;
+	uint32_t commandInt;
+	uint16_t datavalid[2];
+	uint16_t busyoffset;
+	uint16_t busybitpolarity;
+	uint8_t lut[256];
+	uint8_t lutCustomSeq[48];
+	uint8_t reserved_3[16];
+
+} __attribute__((packed)) fspi_conf;
 
 typedef void (*set_dcd_val_t)(struct imx_header *imxhdr,
 					char *name, int lineno,

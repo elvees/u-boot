@@ -3,7 +3,7 @@
  * Copyright (C) 2019-20 Sean Anderson <seanga2@gmail.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <clk.h>
 #include <dm.h>
 #include <fdt_support.h>
@@ -11,18 +11,18 @@
 
 phys_size_t get_effective_memsize(void)
 {
-	return CONFIG_SYS_SDRAM_SIZE;
+	return CFG_SYS_SDRAM_SIZE;
 }
 
-int board_init(void)
+static int sram_init(void)
 {
 	int ret, i;
-	const char * const banks[] = { "sram0", "sram1", "airam" };
+	const char * const banks[] = { "sram0", "sram1", "aisram" };
 	ofnode memory;
 	struct clk clk;
 
 	/* Enable RAM clocks */
-	memory = ofnode_by_compatible(ofnode_null(), "kendryte,k210-sram");
+	memory = ofnode_by_compatible(ofnode_null(), "canaan,k210-sram");
 	if (ofnode_equal(memory, ofnode_null()))
 		return -ENOENT;
 
@@ -32,10 +32,19 @@ int board_init(void)
 			continue;
 
 		ret = clk_enable(&clk);
-		clk_free(&clk);
 		if (ret)
 			return ret;
 	}
 
+	return 0;
+}
+
+int board_early_init_f(void)
+{
+	return sram_init();
+}
+
+int board_init(void)
+{
 	return 0;
 }

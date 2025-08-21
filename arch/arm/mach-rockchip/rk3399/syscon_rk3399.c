@@ -3,7 +3,6 @@
  * (C) Copyright 2016 Rockchip Electronics Co., Ltd
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <syscon.h>
@@ -21,7 +20,7 @@ static const struct udevice_id rk3399_syscon_ids[] = {
 U_BOOT_DRIVER(syscon_rk3399) = {
 	.name = "rk3399_syscon",
 	.id = UCLASS_SYSCON,
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	.bind = dm_scan_fdt_dev,
 #endif
 	.of_match = rk3399_syscon_ids,

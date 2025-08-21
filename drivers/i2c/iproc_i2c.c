@@ -6,9 +6,9 @@
 
 #include <asm/global_data.h>
 #include <asm/io.h>
-#include <common.h>
 #include <config.h>
 #include <dm.h>
+#include <linux/printk.h>
 #include "errno.h"
 #include <i2c.h>
 #include "iproc_i2c.h"

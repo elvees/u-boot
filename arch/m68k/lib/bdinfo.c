@@ -6,7 +6,7 @@
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  */
 
-#include <common.h>
+#include <config.h>
 #include <init.h>
 #include <asm/global_data.h>
 
@@ -16,13 +16,13 @@ int arch_setup_bdinfo(void)
 {
 	struct bd_info *bd = gd->bd;
 
-	bd->bi_mbar_base = CONFIG_SYS_MBAR; /* base of internal registers */
+	bd->bi_mbar_base = CFG_SYS_MBAR; /* base of internal registers */
 
 	bd->bi_intfreq = gd->cpu_clk;	/* Internal Freq, in Hz */
 	bd->bi_busfreq = gd->bus_clk;	/* Bus Freq,      in Hz */
 
 	if (IS_ENABLED(CONFIG_PCI))
-		bd->bi_pcifreq = gd->pci_clk;
+		bd->bi_pcifreq = gd->arch.pci_clk;
 
 #if defined(CONFIG_EXTRA_CLOCK)
 	bd->bi_inpfreq = gd->arch.inp_clk;	/* input Freq in Hz */
@@ -38,7 +38,7 @@ void arch_print_bdinfo(void)
 	struct bd_info *bd = gd->bd;
 
 	bdinfo_print_mhz("busfreq", bd->bi_busfreq);
-#if defined(CONFIG_SYS_MBAR)
+#if defined(CFG_SYS_MBAR)
 	bdinfo_print_num_l("mbar", bd->bi_mbar_base);
 #endif
 	bdinfo_print_mhz("cpufreq", bd->bi_intfreq);

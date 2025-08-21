@@ -8,10 +8,8 @@
  * Derived work from spl_mmc.c
  */
 
-#include <common.h>
 #include <log.h>
 #include <spl.h>
-#include <asm/u-boot.h>
 #include <errno.h>
 #include <usb.h>
 #include <fat.h>
@@ -41,18 +39,18 @@ int spl_usb_load(struct spl_image_info *spl_image,
 
 	/* try to recognize storage devices immediately */
 	usb_stor_curr_dev = usb_stor_scan(1);
-	stor_dev = blk_get_devnum_by_type(IF_TYPE_USB, usb_stor_curr_dev);
+	stor_dev = blk_get_devnum_by_uclass_id(UCLASS_USB, usb_stor_curr_dev);
 	if (!stor_dev)
 		return -ENODEV;
 
 	debug("boot mode - FAT\n");
 
-#ifdef CONFIG_SPL_OS_BOOT
+#if CONFIG_IS_ENABLED(OS_BOOT)
 	if (spl_start_uboot() ||
-	    spl_load_image_fat_os(spl_image, stor_dev, partition))
+	    spl_load_image_fat_os(spl_image, bootdev, stor_dev, partition))
 #endif
 	{
-		err = spl_load_image_fat(spl_image, stor_dev, partition, filename);
+		err = spl_load_image_fat(spl_image, bootdev, stor_dev, partition, filename);
 	}
 
 	if (err) {

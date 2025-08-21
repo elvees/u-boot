@@ -4,13 +4,14 @@
  * Copyright 2014 Rockchip Inc.
  */
 
-#include <common.h>
 #include <clk.h>
 #include <display.h>
 #include <dm.h>
+#include <dm/device_compat.h>
 #include <edid.h>
 #include <log.h>
 #include <regmap.h>
+#include <reset.h>
 #include <syscon.h>
 #include <video.h>
 #include <asm/global_data.h>
@@ -21,6 +22,8 @@
 #include <asm/arch-rockchip/vop_rk3288.h>
 #include <dm/device-internal.h>
 #include <dm/uclass-internal.h>
+#include <efi.h>
+#include <efi_loader.h>
 #include <linux/bitops.h>
 #include <linux/err.h>
 #include <power/regulator.h>
@@ -35,42 +38,47 @@ enum vop_pol {
 	DCLK_INVERT    = 3
 };
 
-static void rkvop_enable(struct rk3288_vop *regs, ulong fbbase,
+static void rkvop_enable(struct udevice *dev, ulong fbbase,
 			 int fb_bits_per_pixel,
-			 const struct display_timing *edid)
+			 const struct display_timing *edid,
+			 struct reset_ctl *dclk_rst)
 {
+	struct rk_vop_priv *priv = dev_get_priv(dev);
+	struct rk3288_vop *regs = priv->regs;
+	struct rk3288_vop *win_regs = priv->regs + priv->win_offset;
 	u32 lb_mode;
 	u32 rgb_mode;
 	u32 hactive = edid->hactive.typ;
 	u32 vactive = edid->vactive.typ;
+	int ret;
 
 	writel(V_ACT_WIDTH(hactive - 1) | V_ACT_HEIGHT(vactive - 1),
-	       &regs->win0_act_info);
+	       &win_regs->win0_act_info);
 
 	writel(V_DSP_XST(edid->hsync_len.typ + edid->hback_porch.typ) |
 	       V_DSP_YST(edid->vsync_len.typ + edid->vback_porch.typ),
-	       &regs->win0_dsp_st);
+	       &win_regs->win0_dsp_st);
 
 	writel(V_DSP_WIDTH(hactive - 1) |
 		V_DSP_HEIGHT(vactive - 1),
-		&regs->win0_dsp_info);
+		&win_regs->win0_dsp_info);
 
-	clrsetbits_le32(&regs->win0_color_key, M_WIN0_KEY_EN | M_WIN0_KEY_COLOR,
+	clrsetbits_le32(&win_regs->win0_color_key, M_WIN0_KEY_EN | M_WIN0_KEY_COLOR,
 			V_WIN0_KEY_EN(0) | V_WIN0_KEY_COLOR(0));
 
 	switch (fb_bits_per_pixel) {
 	case 16:
 		rgb_mode = RGB565;
-		writel(V_RGB565_VIRWIDTH(hactive), &regs->win0_vir);
+		writel(V_RGB565_VIRWIDTH(hactive), &win_regs->win0_vir);
 		break;
 	case 24:
 		rgb_mode = RGB888;
-		writel(V_RGB888_VIRWIDTH(hactive), &regs->win0_vir);
+		writel(V_RGB888_VIRWIDTH(hactive), &win_regs->win0_vir);
 		break;
 	case 32:
 	default:
 		rgb_mode = ARGB8888;
-		writel(V_ARGB888_VIRWIDTH(hactive), &regs->win0_vir);
+		writel(V_ARGB888_VIRWIDTH(hactive), &win_regs->win0_vir);
 		break;
 	}
 
@@ -83,13 +91,25 @@ static void rkvop_enable(struct rk3288_vop *regs, ulong fbbase,
 	else
 		lb_mode = LB_RGB_1280X8;
 
-	clrsetbits_le32(&regs->win0_ctrl0,
+	clrsetbits_le32(&win_regs->win0_ctrl0,
 			M_WIN0_LB_MODE | M_WIN0_DATA_FMT | M_WIN0_EN,
 			V_WIN0_LB_MODE(lb_mode) | V_WIN0_DATA_FMT(rgb_mode) |
 			V_WIN0_EN(1));
 
-	writel(fbbase, &regs->win0_yrgb_mst);
+	writel(fbbase, &win_regs->win0_yrgb_mst);
 	writel(0x01, &regs->reg_cfg_done); /* enable reg config */
+
+	ret = reset_assert(dclk_rst);
+	if (ret) {
+		dev_warn(dev, "failed to assert dclk reset (ret=%d)\n", ret);
+		return;
+	}
+	udelay(20);
+
+	ret = reset_deassert(dclk_rst);
+	if (ret)
+		dev_warn(dev, "failed to deassert dclk reset (ret=%d)\n", ret);
+
 }
 
 static void rkvop_set_pin_polarity(struct udevice *dev,
@@ -144,6 +164,7 @@ static void rkvop_mode_set(struct udevice *dev,
 {
 	struct rk_vop_priv *priv = dev_get_priv(dev);
 	struct rk3288_vop *regs = priv->regs;
+	struct rk3288_vop *dsp_regs = priv->regs + priv->dsp_offset;
 	struct rkvop_driverdata *data =
 		(struct rkvop_driverdata *)dev_get_driver_data(dev);
 
@@ -177,27 +198,27 @@ static void rkvop_mode_set(struct udevice *dev,
 
 	writel(V_HSYNC(hsync_len) |
 	       V_HORPRD(hsync_len + hback_porch + hactive + hfront_porch),
-			&regs->dsp_htotal_hs_end);
+			&dsp_regs->dsp_htotal_hs_end);
 
 	writel(V_HEAP(hsync_len + hback_porch + hactive) |
 	       V_HASP(hsync_len + hback_porch),
-	       &regs->dsp_hact_st_end);
+	       &dsp_regs->dsp_hact_st_end);
 
 	writel(V_VSYNC(vsync_len) |
 	       V_VERPRD(vsync_len + vback_porch + vactive + vfront_porch),
-	       &regs->dsp_vtotal_vs_end);
+	       &dsp_regs->dsp_vtotal_vs_end);
 
 	writel(V_VAEP(vsync_len + vback_porch + vactive)|
 	       V_VASP(vsync_len + vback_porch),
-	       &regs->dsp_vact_st_end);
+	       &dsp_regs->dsp_vact_st_end);
 
 	writel(V_HEAP(hsync_len + hback_porch + hactive) |
 	       V_HASP(hsync_len + hback_porch),
-	       &regs->post_dsp_hact_info);
+	       &dsp_regs->post_dsp_hact_info);
 
 	writel(V_VAEP(vsync_len + vback_porch + vactive)|
 	       V_VASP(vsync_len + vback_porch),
-	       &regs->post_dsp_vact_info);
+	       &dsp_regs->post_dsp_vact_info);
 
 	writel(0x01, &regs->reg_cfg_done); /* enable reg config */
 }
@@ -220,14 +241,12 @@ static void rkvop_mode_set(struct udevice *dev,
  * @fbbase:	Frame buffer address
  * @ep_node:	Device tree node to process - this is the offset of an endpoint
  *		node within the VOP's 'port' list.
- * @return 0 if OK, -ve if something went wrong
+ * Return: 0 if OK, -ve if something went wrong
  */
 static int rk_display_init(struct udevice *dev, ulong fbbase, ofnode ep_node)
 {
 	struct video_priv *uc_priv = dev_get_uclass_priv(dev);
-	struct rk_vop_priv *priv = dev_get_priv(dev);
 	int vop_id, remote_vop_id;
-	struct rk3288_vop *regs = priv->regs;
 	struct display_timing timing;
 	struct udevice *disp;
 	int ret;
@@ -236,12 +255,12 @@ static int rk_display_init(struct udevice *dev, ulong fbbase, ofnode ep_node)
 	struct clk clk;
 	enum video_log2_bpp l2bpp;
 	ofnode remote;
+	const char *compat;
+	struct reset_ctl dclk_rst;
 
-	debug("%s(%s, %lu, %s)\n", __func__,
+	debug("%s(%s, 0x%lx, %s)\n", __func__,
 	      dev_read_name(dev), fbbase, ofnode_get_name(ep_node));
 
-	vop_id = ofnode_read_s32_default(ep_node, "reg", -1);
-	debug("vop_id=%d\n", vop_id);
 	ret = ofnode_read_u32(ep_node, "remote-endpoint", &remote_phandle);
 	if (ret)
 		return ret;
@@ -283,6 +302,29 @@ static int rk_display_init(struct udevice *dev, ulong fbbase, ofnode ep_node)
 		if (disp)
 			break;
 	};
+	compat = ofnode_get_property(remote, "compatible", NULL);
+	if (!compat) {
+		debug("%s(%s): Failed to find compatible property\n",
+		      __func__, dev_read_name(dev));
+		return -EINVAL;
+	}
+	if (strstr(compat, "edp") ||
+	    strstr(compat, "rk3288-dp")) {
+		vop_id = VOP_MODE_EDP;
+	} else if (strstr(compat, "mipi")) {
+		vop_id = VOP_MODE_MIPI;
+	} else if (strstr(compat, "hdmi")) {
+		vop_id = VOP_MODE_HDMI;
+	} else if (strstr(compat, "cdn-dp")) {
+		vop_id = VOP_MODE_DP;
+	} else if (strstr(compat, "lvds")) {
+		vop_id = VOP_MODE_LVDS;
+	} else {
+		debug("%s(%s): Failed to find vop mode for %s\n",
+		      __func__, dev_read_name(dev), compat);
+		return -EINVAL;
+	}
+	debug("vop_id=%d\n", vop_id);
 
 	disp_uc_plat = dev_get_uclass_plat(disp);
 	debug("Found device '%s', disp_uc_priv=%p\n", disp->name, disp_uc_plat);
@@ -332,7 +374,14 @@ static int rk_display_init(struct udevice *dev, ulong fbbase, ofnode ep_node)
 	}
 
 	rkvop_mode_set(dev, &timing, vop_id);
-	rkvop_enable(regs, fbbase, 1 << l2bpp, &timing);
+
+	ret = reset_get_by_name(dev, "dclk", &dclk_rst);
+	if (ret) {
+		dev_err(dev, "failed to get dclk reset (ret=%d)\n", ret);
+		return ret;
+	}
+
+	rkvop_enable(dev, fbbase, 1 << l2bpp, &timing, &dclk_rst);
 
 	ret = display_enable(disp, 1 << l2bpp, &timing);
 	if (ret)
@@ -367,14 +416,43 @@ int rk_vop_probe(struct udevice *dev)
 {
 	struct video_uc_plat *plat = dev_get_uclass_plat(dev);
 	struct rk_vop_priv *priv = dev_get_priv(dev);
+	struct rkvop_driverdata *ops =
+		(struct rkvop_driverdata *)dev_get_driver_data(dev);
 	int ret = 0;
 	ofnode port, node;
+	struct reset_ctl ahb_rst;
 
 	/* Before relocation we don't need to do anything */
 	if (!(gd->flags & GD_FLG_RELOC))
 		return 0;
 
-	priv->regs = (struct rk3288_vop *)dev_read_addr(dev);
+	ret = reset_get_by_name(dev, "ahb", &ahb_rst);
+	if (ret) {
+		dev_err(dev, "failed to get ahb reset (ret=%d)\n", ret);
+		return ret;
+	}
+
+	ret = reset_assert(&ahb_rst);
+	if (ret) {
+		dev_err(dev, "failed to assert ahb reset (ret=%d)\n", ret);
+		return ret;
+	}
+	udelay(20);
+
+	ret = reset_deassert(&ahb_rst);
+	if (ret) {
+		dev_err(dev, "failed to deassert ahb reset (ret=%d)\n", ret);
+		return ret;
+	}
+
+#if defined(CONFIG_EFI_LOADER)
+	debug("Adding to EFI map %d @ %lx\n", plat->size, plat->base);
+	efi_add_memory_map(plat->base, plat->size, EFI_RESERVED_MEMORY_TYPE);
+#endif
+
+	priv->regs = dev_read_addr_ptr(dev);
+	priv->win_offset = ops->win_offset;
+	priv->dsp_offset = ops->dsp_offset;
 
 	/*
 	 * Try all the ports until we find one that works. In practice this

@@ -6,7 +6,6 @@
  * SPDX-License-Identifier:	GPL-2.0+
  */
 
-#include <common.h>
 #include <asm/gpio.h>
 #include <dm.h>
 #include <linux/io.h>
@@ -532,7 +531,7 @@ static int arasan_gemac_probe(struct udevice *dev)
 	if (!phy_mode)
 		return -EINVAL;
 
-	priv->phy_interface = phy_get_interface_by_name(phy_mode);
+	priv->phy_interface = dev_read_phy_mode(dev);
 	if (priv->phy_interface < 0)
 		return -EINVAL;
 

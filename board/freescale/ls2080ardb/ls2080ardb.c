@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2015 Freescale Semiconductor
- * Copyright 2017 NXP
+ * Copyright 2017, 2021 NXP
  */
-#include <common.h>
+#include <config.h>
+#include <clock_legacy.h>
+#include <display_options.h>
 #include <env.h>
 #include <init.h>
 #include <malloc.h>
@@ -22,9 +24,8 @@
 #include <i2c.h>
 #include <asm/arch/mmu.h>
 #include <asm/arch/soc.h>
-#include <asm/arch/ppa.h>
-#include <fsl_sec.h>
 #include <asm/arch-fsl-layerscape/fsl_icid.h>
+#include "../common/i2c_mux.h"
 
 #ifdef CONFIG_FSL_QIXIS
 #include "../common/qixis.h"
@@ -32,6 +33,9 @@
 #endif
 #include "../common/vid.h"
 
+#define CORTINA_FW_ADDR_IFCNOR			0x580980000
+#define CORTINA_FW_ADDR_IFCNOR_ALTBANK	0x584980000
+#define CORTINA_FW_ADDR_QSPI			0x980000
 #define PIN_MUX_SEL_SDHC	0x00
 #define PIN_MUX_SEL_DSPI	0x0a
 
@@ -205,31 +209,9 @@ unsigned long get_board_sys_clk(void)
 	return 100000000;
 }
 
-int select_i2c_ch_pca9547(u8 ch)
-{
-	int ret;
-
-#if !CONFIG_IS_ENABLED(DM_I2C)
-	ret = i2c_write(I2C_MUX_PCA_ADDR_PRI, 0, 1, &ch, 1);
-#else
-	struct udevice *dev;
-
-	ret = i2c_get_chip_for_busnum(0, I2C_MUX_PCA_ADDR_PRI, 1, &dev);
-	if (!ret)
-		ret = dm_i2c_write(dev, 0, &ch, 1);
-#endif
-
-	if (ret) {
-		puts("PCA: failed to select proper channel\n");
-		return ret;
-	}
-
-	return 0;
-}
-
 int i2c_multiplexer_select_vid_channel(u8 channel)
 {
-	return select_i2c_ch_pca9547(channel);
+	return select_i2c_ch_pca9547(channel, 0);
 }
 
 int config_board_mux(int ctrl_type)
@@ -256,6 +238,41 @@ int config_board_mux(int ctrl_type)
 	return 0;
 }
 
+ulong *cs4340_get_fw_addr(void)
+{
+#ifdef CONFIG_TFABOOT
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
+	u32 svr = gur_in32(&gur->svr);
+#endif
+	ulong cortina_fw_addr = CONFIG_CORTINA_FW_ADDR;
+
+#ifdef CONFIG_TFABOOT
+	/* LS2088A TFA boot */
+	if (SVR_SOC_VER(svr) == SVR_LS2088A) {
+		enum boot_src src = get_boot_src();
+		u8 sw;
+
+		switch (src) {
+		case BOOT_SOURCE_IFC_NOR:
+			sw = QIXIS_READ(brdcfg[0]);
+			sw = (sw & 0x0f);
+			if (sw == 0)
+				cortina_fw_addr = CORTINA_FW_ADDR_IFCNOR;
+			else if (sw == 4)
+				cortina_fw_addr = CORTINA_FW_ADDR_IFCNOR_ALTBANK;
+			break;
+		case BOOT_SOURCE_QSPI_NOR:
+			/* Only one bank in QSPI */
+			cortina_fw_addr = CORTINA_FW_ADDR_QSPI;
+			break;
+		default:
+			printf("WARNING: Boot source not found\n");
+		}
+	}
+#endif
+	return (ulong *)cortina_fw_addr;
+}
+
 int board_init(void)
 {
 #ifdef CONFIG_FSL_MC_ENET
@@ -264,31 +281,18 @@ int board_init(void)
 
 	init_final_memctl_regs();
 
-#ifdef CONFIG_ENV_IS_NOWHERE
-	gd->env_addr = (ulong)&default_environment[0];
-#endif
-	select_i2c_ch_pca9547(I2C_MUX_CH_DEFAULT);
+	select_i2c_ch_pca9547(I2C_MUX_CH_DEFAULT, 0);
 
 #ifdef CONFIG_FSL_QIXIS
 	QIXIS_WRITE(rst_ctl, QIXIS_RST_CTL_RESET_EN);
-#endif
-
-#ifdef CONFIG_FSL_CAAM
-	sec_init();
-#endif
-#ifdef CONFIG_FSL_LS_PPA
-	ppa_init();
 #endif
 
 #ifdef CONFIG_FSL_MC_ENET
 	/* invert AQR405 IRQ pins polarity */
 	out_le32(irq_ccsr + IRQCR_OFFSET / 4, AQR405_IRQ_MASK);
 #endif
-#ifdef CONFIG_FSL_CAAM
-	sec_init();
-#endif
 
-#if !defined(CONFIG_SYS_EARLY_PCI_INIT) && defined(CONFIG_DM_ETH)
+#if !defined(CONFIG_SYS_EARLY_PCI_INIT)
 	pci_init();
 #endif
 
@@ -297,7 +301,7 @@ int board_init(void)
 
 int board_early_init_f(void)
 {
-#ifdef CONFIG_SYS_I2C_EARLY_INIT
+#if defined(CONFIG_SYS_I2C_EARLY_INIT)
 	i2c_early_init_f();
 #endif
 	fsl_lsch3_early_init_f();
@@ -309,7 +313,7 @@ int misc_init_r(void)
 	char *env_hwconfig;
 	u32 __iomem *dcfg_ccsr = (u32 __iomem *)DCFG_BASE;
 	u32 val;
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	u32 svr = gur_in32(&gur->svr);
 
 	val = in_le32(dcfg_ccsr + DCFG_RCWSR13 / 4);
@@ -518,6 +522,7 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 
 #ifdef CONFIG_FSL_MC_ENET
 	fdt_fixup_board_enet(blob);
+	fdt_reserve_mc_mem(blob, 0x300);
 #endif
 
 	fdt_fixup_icid(blob);

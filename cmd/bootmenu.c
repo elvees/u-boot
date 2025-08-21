@@ -3,9 +3,12 @@
  * (C) Copyright 2011-2013 Pali Rohár <pali@kernel.org>
  */
 
-#include <common.h>
+#include <charset.h>
+#include <cli.h>
 #include <command.h>
 #include <ansi.h>
+#include <efi_config.h>
+#include <efi_variable.h>
 #include <env.h>
 #include <log.h>
 #include <menu.h>
@@ -24,28 +27,28 @@
  */
 #define MAX_ENV_SIZE	(9 + 2 + 1)
 
+enum bootmenu_ret {
+	BOOTMENU_RET_SUCCESS = 0,
+	BOOTMENU_RET_FAIL,
+	BOOTMENU_RET_QUIT,
+	BOOTMENU_RET_UPDATED,
+};
+
+enum boot_type {
+	BOOTMENU_TYPE_NONE = 0,
+	BOOTMENU_TYPE_BOOTMENU,
+	BOOTMENU_TYPE_UEFI_BOOT_OPTION,
+};
+
 struct bootmenu_entry {
 	unsigned short int num;		/* unique number 0 .. MAX_COUNT */
 	char key[3];			/* key identifier of number */
 	char *title;			/* title of entry */
 	char *command;			/* hush command of entry */
+	enum boot_type type;		/* boot type of entry */
+	u16 bootorder;			/* order for each boot type */
 	struct bootmenu_data *menu;	/* this bootmenu */
 	struct bootmenu_entry *next;	/* next menu entry (num+1) */
-};
-
-struct bootmenu_data {
-	int delay;			/* delay for autoboot */
-	int active;			/* active menu entry */
-	int count;			/* total count of menu entries */
-	struct bootmenu_entry *first;	/* first menu entry */
-};
-
-enum bootmenu_key {
-	KEY_NONE = 0,
-	KEY_UP,
-	KEY_DOWN,
-	KEY_SELECT,
-	KEY_QUIT,
 };
 
 static char *bootmenu_getoption(unsigned short int n)
@@ -68,184 +71,56 @@ static void bootmenu_print_entry(void *data)
 	 * Move cursor to line where the entry will be drown (entry->num)
 	 * First 3 lines contain bootmenu header + 1 empty line
 	 */
-	printf(ANSI_CURSOR_POSITION, entry->num + 4, 1);
-
-	puts("     ");
+	printf(ANSI_CURSOR_POSITION, entry->num + 4, 7);
 
 	if (reverse)
 		puts(ANSI_COLOR_REVERSE);
 
-	puts(entry->title);
+	printf("%s", entry->title);
 
 	if (reverse)
 		puts(ANSI_COLOR_RESET);
 }
 
-static void bootmenu_autoboot_loop(struct bootmenu_data *menu,
-				enum bootmenu_key *key, int *esc)
-{
-	int i, c;
-
-	if (menu->delay > 0) {
-		printf(ANSI_CURSOR_POSITION, menu->count + 5, 1);
-		printf("  Hit any key to stop autoboot: %2d ", menu->delay);
-	}
-
-	while (menu->delay > 0) {
-		for (i = 0; i < 100; ++i) {
-			if (!tstc()) {
-				WATCHDOG_RESET();
-				mdelay(10);
-				continue;
-			}
-
-			menu->delay = -1;
-			c = getchar();
-
-			switch (c) {
-			case '\e':
-				*esc = 1;
-				*key = KEY_NONE;
-				break;
-			case '\r':
-				*key = KEY_SELECT;
-				break;
-			case 0x3: /* ^C */
-				*key = KEY_QUIT;
-				break;
-			default:
-				*key = KEY_NONE;
-				break;
-			}
-
-			break;
-		}
-
-		if (menu->delay < 0)
-			break;
-
-		--menu->delay;
-		printf("\b\b\b%2d ", menu->delay);
-	}
-
-	printf(ANSI_CURSOR_POSITION, menu->count + 5, 1);
-	puts(ANSI_CLEAR_LINE);
-
-	if (menu->delay == 0)
-		*key = KEY_SELECT;
-}
-
-static void bootmenu_loop(struct bootmenu_data *menu,
-		enum bootmenu_key *key, int *esc)
-{
-	int c;
-
-	if (*esc == 1) {
-		if (tstc()) {
-			c = getchar();
-		} else {
-			WATCHDOG_RESET();
-			mdelay(10);
-			if (tstc())
-				c = getchar();
-			else
-				c = '\e';
-		}
-	} else {
-		while (!tstc()) {
-			WATCHDOG_RESET();
-			mdelay(10);
-		}
-		c = getchar();
-	}
-
-	switch (*esc) {
-	case 0:
-		/* First char of ANSI escape sequence '\e' */
-		if (c == '\e') {
-			*esc = 1;
-			*key = KEY_NONE;
-		}
-		break;
-	case 1:
-		/* Second char of ANSI '[' */
-		if (c == '[') {
-			*esc = 2;
-			*key = KEY_NONE;
-		} else {
-		/* Alone ESC key was pressed */
-			*key = KEY_QUIT;
-			*esc = (c == '\e') ? 1 : 0;
-		}
-		break;
-	case 2:
-	case 3:
-		/* Third char of ANSI (number '1') - optional */
-		if (*esc == 2 && c == '1') {
-			*esc = 3;
-			*key = KEY_NONE;
-			break;
-		}
-
-		*esc = 0;
-
-		/* ANSI 'A' - key up was pressed */
-		if (c == 'A')
-			*key = KEY_UP;
-		/* ANSI 'B' - key down was pressed */
-		else if (c == 'B')
-			*key = KEY_DOWN;
-		/* other key was pressed */
-		else
-			*key = KEY_NONE;
-
-		break;
-	}
-
-	/* enter key was pressed */
-	if (c == '\r')
-		*key = KEY_SELECT;
-
-	/* ^C was pressed */
-	if (c == 0x3)
-		*key = KEY_QUIT;
-}
-
 static char *bootmenu_choice_entry(void *data)
 {
+	struct cli_ch_state s_cch, *cch = &s_cch;
 	struct bootmenu_data *menu = data;
 	struct bootmenu_entry *iter;
-	enum bootmenu_key key = KEY_NONE;
-	int esc = 0;
+	enum bootmenu_key key = BKEY_NONE;
 	int i;
+
+	cli_ch_init(cch);
 
 	while (1) {
 		if (menu->delay >= 0) {
 			/* Autoboot was not stopped */
-			bootmenu_autoboot_loop(menu, &key, &esc);
+			key = bootmenu_autoboot_loop(menu, cch);
 		} else {
 			/* Some key was pressed, so autoboot was stopped */
-			bootmenu_loop(menu, &key, &esc);
+			key = bootmenu_loop(menu, cch);
 		}
 
 		switch (key) {
-		case KEY_UP:
+		case BKEY_UP:
+			menu->last_active = menu->active;
 			if (menu->active > 0)
 				--menu->active;
 			/* no menu key selected, regenerate menu */
 			return NULL;
-		case KEY_DOWN:
+		case BKEY_DOWN:
+			menu->last_active = menu->active;
 			if (menu->active < menu->count - 1)
 				++menu->active;
 			/* no menu key selected, regenerate menu */
 			return NULL;
-		case KEY_SELECT:
+		case BKEY_SELECT:
 			iter = menu->first;
 			for (i = 0; i < menu->active; ++i)
 				iter = iter->next;
 			return iter->key;
-		case KEY_QUIT:
-			/* Quit by choosing the last entry - U-Boot console */
+		case BKEY_QUIT:
+			/* Quit by choosing the last entry */
 			iter = menu->first;
 			while (iter->next)
 				iter = iter->next;
@@ -258,6 +133,17 @@ static char *bootmenu_choice_entry(void *data)
 	/* never happens */
 	debug("bootmenu: this should not happen");
 	return NULL;
+}
+
+static bool bootmenu_need_reprint(void *data)
+{
+	struct bootmenu_data *menu = data;
+	bool need_reprint;
+
+	need_reprint = menu->last_active != menu->active;
+	menu->last_active = menu->active;
+
+	return need_reprint;
 }
 
 static void bootmenu_destroy(struct bootmenu_data *menu)
@@ -275,31 +161,31 @@ static void bootmenu_destroy(struct bootmenu_data *menu)
 	free(menu);
 }
 
-static struct bootmenu_data *bootmenu_create(int delay)
+/**
+ * prepare_bootmenu_entry() - generate the bootmenu_xx entries
+ *
+ * This function read the "bootmenu_x" U-Boot environment variable
+ * and generate the bootmenu entries.
+ *
+ * @menu:	pointer to the bootmenu structure
+ * @current:	pointer to the last bootmenu entry list
+ * @index:	pointer to the index of the last bootmenu entry,
+ *		the number of bootmenu entry is added by this function
+ * Return:	1 on success, negative value on error
+ */
+static int prepare_bootmenu_entry(struct bootmenu_data *menu,
+				  struct bootmenu_entry **current,
+				  unsigned short int *index)
 {
-	unsigned short int i = 0;
-	const char *option;
-	struct bootmenu_data *menu;
-	struct bootmenu_entry *iter = NULL;
-
-	int len;
 	char *sep;
-	char *default_str;
-	struct bootmenu_entry *entry;
-
-	menu = malloc(sizeof(struct bootmenu_data));
-	if (!menu)
-		return NULL;
-
-	menu->delay = delay;
-	menu->active = 0;
-	menu->first = NULL;
-
-	default_str = env_get("bootmenu_default");
-	if (default_str)
-		menu->active = (int)simple_strtol(default_str, NULL, 10);
+	const char *option;
+	unsigned short int i = *index;
+	struct bootmenu_entry *entry = NULL;
+	struct bootmenu_entry *iter = *current;
 
 	while ((option = bootmenu_getoption(i))) {
+
+		/* bootmenu_[num] format is "[title]=[commands]" */
 		sep = strchr(option, '=');
 		if (!sep) {
 			printf("Invalid bootmenu entry: %s\n", option);
@@ -308,31 +194,27 @@ static struct bootmenu_data *bootmenu_create(int delay)
 
 		entry = malloc(sizeof(struct bootmenu_entry));
 		if (!entry)
-			goto cleanup;
+			return -ENOMEM;
 
-		len = sep-option;
-		entry->title = malloc(len + 1);
+		entry->title = strndup(option, sep - option);
 		if (!entry->title) {
 			free(entry);
-			goto cleanup;
+			return -ENOMEM;
 		}
-		memcpy(entry->title, option, len);
-		entry->title[len] = 0;
 
-		len = strlen(sep + 1);
-		entry->command = malloc(len + 1);
+		entry->command = strdup(sep + 1);
 		if (!entry->command) {
 			free(entry->title);
 			free(entry);
-			goto cleanup;
+			return -ENOMEM;
 		}
-		memcpy(entry->command, sep + 1, len);
-		entry->command[len] = 0;
 
 		sprintf(entry->key, "%d", i);
 
 		entry->num = i;
 		entry->menu = menu;
+		entry->type = BOOTMENU_TYPE_BOOTMENU;
+		entry->bootorder = i;
 		entry->next = NULL;
 
 		if (!iter)
@@ -347,13 +229,169 @@ static struct bootmenu_data *bootmenu_create(int delay)
 			break;
 	}
 
-	/* Add U-Boot console entry at the end */
+	*index = i;
+	*current = iter;
+
+	return 1;
+}
+
+#if (IS_ENABLED(CONFIG_CMD_BOOTEFI_BOOTMGR)) && (IS_ENABLED(CONFIG_CMD_EFICONFIG))
+/**
+ * prepare_uefi_bootorder_entry() - generate the uefi bootmenu entries
+ *
+ * This function reads the "BootOrder" UEFI variable
+ * and generate the bootmenu entries in the order of "BootOrder".
+ *
+ * @menu:	pointer to the bootmenu structure
+ * @current:	pointer to the last bootmenu entry list
+ * @index:	pointer to the index of the last bootmenu entry,
+ *		the number of uefi entry is added by this function
+ * Return:	1 on success, negative value on error
+ */
+static int prepare_uefi_bootorder_entry(struct bootmenu_data *menu,
+					struct bootmenu_entry **current,
+					unsigned short int *index)
+{
+	u16 *bootorder;
+	efi_status_t ret;
+	unsigned short j;
+	efi_uintn_t num, size;
+	void *load_option;
+	struct efi_load_option lo;
+	u16 varname[] = u"Boot####";
+	unsigned short int i = *index;
+	struct bootmenu_entry *entry = NULL;
+	struct bootmenu_entry *iter = *current;
+
+	bootorder = efi_get_var(u"BootOrder", &efi_global_variable_guid, &size);
+	if (!bootorder)
+		return -ENOENT;
+
+	num = size / sizeof(u16);
+	for (j = 0; j < num; j++) {
+		entry = malloc(sizeof(struct bootmenu_entry));
+		if (!entry)
+			return -ENOMEM;
+
+		efi_create_indexed_name(varname, sizeof(varname),
+					"Boot", bootorder[j]);
+		load_option = efi_get_var(varname, &efi_global_variable_guid, &size);
+		if (!load_option)
+			continue;
+
+		ret = efi_deserialize_load_option(&lo, load_option, &size);
+		if (ret != EFI_SUCCESS) {
+			log_warning("Invalid load option for %ls\n", varname);
+			free(load_option);
+			free(entry);
+			continue;
+		}
+
+		if (lo.attributes & LOAD_OPTION_ACTIVE) {
+			char *buf;
+
+			buf = calloc(1, utf16_utf8_strlen(lo.label) + 1);
+			if (!buf) {
+				free(load_option);
+				free(entry);
+				free(bootorder);
+				return -ENOMEM;
+			}
+			entry->title = buf;
+			utf16_utf8_strncpy(&buf, lo.label, u16_strlen(lo.label));
+			entry->command = strdup("bootefi bootmgr");
+			sprintf(entry->key, "%d", i);
+			entry->num = i;
+			entry->menu = menu;
+			entry->type = BOOTMENU_TYPE_UEFI_BOOT_OPTION;
+			entry->bootorder = bootorder[j];
+			entry->next = NULL;
+
+			if (!iter)
+				menu->first = entry;
+			else
+				iter->next = entry;
+
+			iter = entry;
+			i++;
+		}
+
+		free(load_option);
+
+		if (i == MAX_COUNT - 1)
+			break;
+	}
+
+	free(bootorder);
+	*index = i;
+	*current = iter;
+
+	return 1;
+}
+#endif
+
+/**
+ * bootmenu_create() - create boot menu entries
+ *
+ * @uefi:	consider UEFI boot options
+ * @delay:	autostart delay in seconds
+ */
+static struct bootmenu_data *bootmenu_create(int uefi, int delay)
+{
+	int ret;
+	unsigned short int i = 0;
+	struct bootmenu_data *menu;
+	struct bootmenu_entry *iter = NULL;
+	struct bootmenu_entry *entry;
+	char *default_str;
+
+	menu = malloc(sizeof(struct bootmenu_data));
+	if (!menu)
+		return NULL;
+
+	menu->delay = delay;
+	menu->active = 0;
+	menu->last_active = -1;
+	menu->first = NULL;
+
+	default_str = env_get("bootmenu_default");
+	if (default_str)
+		menu->active = (int)simple_strtol(default_str, NULL, 10);
+
+	ret = prepare_bootmenu_entry(menu, &iter, &i);
+	if (ret < 0)
+		goto cleanup;
+
+#if (IS_ENABLED(CONFIG_CMD_BOOTEFI_BOOTMGR)) && (IS_ENABLED(CONFIG_CMD_EFICONFIG))
+	if (uefi && i < MAX_COUNT - 1) {
+		efi_status_t efi_ret;
+
+		/*
+		 * UEFI specification requires booting from removal media using
+		 * a architecture-specific default image name such as BOOTAA64.EFI.
+		 */
+		efi_ret = efi_bootmgr_update_media_device_boot_option();
+		if (efi_ret != EFI_SUCCESS)
+			goto cleanup;
+
+		ret = prepare_uefi_bootorder_entry(menu, &iter, &i);
+		if (ret < 0 && ret != -ENOENT)
+			goto cleanup;
+	}
+#endif
+
+	/* Add Exit entry at the end */
 	if (i <= MAX_COUNT - 1) {
 		entry = malloc(sizeof(struct bootmenu_entry));
 		if (!entry)
 			goto cleanup;
 
-		entry->title = strdup("U-Boot console");
+		/* Add Quit entry if exiting bootmenu is disabled */
+		if (!IS_ENABLED(CONFIG_BOOTMENU_DISABLE_UBOOT_CONSOLE))
+			entry->title = strdup("Exit");
+		else
+			entry->title = strdup("Quit");
+
 		if (!entry->title) {
 			free(entry);
 			goto cleanup;
@@ -370,6 +408,7 @@ static struct bootmenu_data *bootmenu_create(int delay)
 
 		entry->num = i;
 		entry->menu = menu;
+		entry->type = BOOTMENU_TYPE_NONE;
 		entry->next = NULL;
 
 		if (!iter)
@@ -407,8 +446,8 @@ static void menu_display_statusline(struct menu *m)
 
 	printf(ANSI_CURSOR_POSITION, 1, 1);
 	puts(ANSI_CLEAR_LINE);
-	printf(ANSI_CURSOR_POSITION, 2, 1);
-	puts("  *** U-Boot Boot Menu ***");
+	printf(ANSI_CURSOR_POSITION, 2, 3);
+	puts("*** U-Boot Boot Menu ***");
 	puts(ANSI_CLEAR_LINE_TO_END);
 	printf(ANSI_CURSOR_POSITION, 3, 1);
 	puts(ANSI_CLEAR_LINE);
@@ -416,54 +455,91 @@ static void menu_display_statusline(struct menu *m)
 	/* First 3 lines are bootmenu header + 2 empty lines between entries */
 	printf(ANSI_CURSOR_POSITION, menu->count + 5, 1);
 	puts(ANSI_CLEAR_LINE);
-	printf(ANSI_CURSOR_POSITION, menu->count + 6, 1);
-	puts("  Press UP/DOWN to move, ENTER to select, ESC/CTRL+C to quit");
+	printf(ANSI_CURSOR_POSITION, menu->count + 6, 3);
+	puts("Press UP/DOWN to move, ENTER to select, ESC to quit");
 	puts(ANSI_CLEAR_LINE_TO_END);
 	printf(ANSI_CURSOR_POSITION, menu->count + 7, 1);
 	puts(ANSI_CLEAR_LINE);
 }
 
-static void bootmenu_show(int delay)
+static void handle_uefi_bootnext(void)
 {
+	u16 bootnext;
+	efi_status_t ret;
+	efi_uintn_t size;
+
+	/* Initialize EFI drivers */
+	ret = efi_init_obj_list();
+	if (ret != EFI_SUCCESS) {
+		log_err("Error: Cannot initialize UEFI sub-system, r = %lu\n",
+			ret & ~EFI_ERROR_MASK);
+
+		return;
+	}
+
+	/* If UEFI BootNext variable is set, boot the BootNext load option */
+	size = sizeof(u16);
+	ret = efi_get_variable_int(u"BootNext",
+				   &efi_global_variable_guid,
+				   NULL, &size, &bootnext, NULL);
+	if (ret == EFI_SUCCESS)
+		/* BootNext does exist here, try to boot */
+		run_command("bootefi bootmgr", 0);
+}
+
+/**
+ * bootmenu_show - display boot menu
+ *
+ * @uefi:	generated entries for UEFI boot options
+ * @delay:	autoboot delay in seconds
+ */
+static enum bootmenu_ret bootmenu_show(int uefi, int delay)
+{
+	int cmd_ret;
 	int init = 0;
 	void *choice = NULL;
 	char *title = NULL;
 	char *command = NULL;
 	struct menu *menu;
-	struct bootmenu_data *bootmenu;
 	struct bootmenu_entry *iter;
+	int ret = BOOTMENU_RET_SUCCESS;
+	struct bootmenu_data *bootmenu;
+	efi_status_t efi_ret = EFI_SUCCESS;
 	char *option, *sep;
+
+	if (IS_ENABLED(CONFIG_CMD_BOOTEFI_BOOTMGR) && uefi)
+		handle_uefi_bootnext();
 
 	/* If delay is 0 do not create menu, just run first entry */
 	if (delay == 0) {
 		option = bootmenu_getoption(0);
 		if (!option) {
 			puts("bootmenu option 0 was not found\n");
-			return;
+			return BOOTMENU_RET_FAIL;
 		}
 		sep = strchr(option, '=');
 		if (!sep) {
 			puts("bootmenu option 0 is invalid\n");
-			return;
+			return BOOTMENU_RET_FAIL;
 		}
-		run_command(sep+1, 0);
-		return;
+		cmd_ret = run_command(sep + 1, 0);
+		return (cmd_ret == CMD_RET_SUCCESS ? BOOTMENU_RET_SUCCESS : BOOTMENU_RET_FAIL);
 	}
 
-	bootmenu = bootmenu_create(delay);
+	bootmenu = bootmenu_create(uefi, delay);
 	if (!bootmenu)
-		return;
+		return BOOTMENU_RET_FAIL;
 
 	menu = menu_create(NULL, bootmenu->delay, 1, menu_display_statusline,
 			   bootmenu_print_entry, bootmenu_choice_entry,
-			   bootmenu);
+			   bootmenu_need_reprint, bootmenu);
 	if (!menu) {
 		bootmenu_destroy(bootmenu);
-		return;
+		return BOOTMENU_RET_FAIL;
 	}
 
 	for (iter = bootmenu->first; iter; iter = iter->next) {
-		if (!menu_item_add(menu, iter->key, iter))
+		if (menu_item_add(menu, iter->key, iter) != 1)
 			goto cleanup;
 	}
 
@@ -476,10 +552,39 @@ static void bootmenu_show(int delay)
 
 	init = 1;
 
-	if (menu_get_choice(menu, &choice)) {
+	if (menu_get_choice(menu, &choice) == 1) {
 		iter = choice;
 		title = strdup(iter->title);
 		command = strdup(iter->command);
+
+		/* last entry exits bootmenu */
+		if (iter->num == iter->menu->count - 1) {
+			ret = BOOTMENU_RET_QUIT;
+			goto cleanup;
+		}
+	} else {
+		goto cleanup;
+	}
+
+	/*
+	 * If the selected entry is UEFI BOOT####, set the BootNext variable.
+	 * Then uefi bootmgr is invoked by the preset command in iter->command.
+	 */
+	if (IS_ENABLED(CONFIG_CMD_BOOTEFI_BOOTMGR)) {
+		if (iter->type == BOOTMENU_TYPE_UEFI_BOOT_OPTION) {
+			/*
+			 * UEFI specification requires BootNext variable needs non-volatile
+			 * attribute, but this BootNext is only used inside of U-Boot and
+			 * removed by efi bootmgr once BootNext is processed.
+			 * So this BootNext can be volatile.
+			 */
+			efi_ret = efi_set_variable_int(u"BootNext", &efi_global_variable_guid,
+						       EFI_VARIABLE_BOOTSERVICE_ACCESS |
+						       EFI_VARIABLE_RUNTIME_ACCESS,
+						       sizeof(u16), &iter->bootorder, false);
+			if (efi_ret != EFI_SUCCESS)
+				goto cleanup;
+		}
 	}
 
 cleanup:
@@ -495,19 +600,45 @@ cleanup:
 	if (title && command) {
 		debug("Starting entry '%s'\n", title);
 		free(title);
-		run_command(command, 0);
+		if (efi_ret == EFI_SUCCESS)
+			cmd_ret = run_command(command, 0);
 		free(command);
 	}
 
-#ifdef CONFIG_POSTBOOTMENU
-	run_command(CONFIG_POSTBOOTMENU, 0);
+#ifdef CFG_POSTBOOTMENU
+	run_command(CFG_POSTBOOTMENU, 0);
 #endif
+
+	if (efi_ret != EFI_SUCCESS || cmd_ret != CMD_RET_SUCCESS)
+		ret = BOOTMENU_RET_FAIL;
+
+	return ret;
 }
 
 #ifdef CONFIG_AUTOBOOT_MENU_SHOW
 int menu_show(int bootdelay)
 {
-	bootmenu_show(bootdelay);
+	int ret;
+
+	while (1) {
+		ret = bootmenu_show(1, bootdelay);
+		bootdelay = -1;
+		if (ret == BOOTMENU_RET_UPDATED)
+			continue;
+
+		if (IS_ENABLED(CONFIG_BOOTMENU_DISABLE_UBOOT_CONSOLE)) {
+			if (ret == BOOTMENU_RET_QUIT) {
+				/* default boot process */
+				if (IS_ENABLED(CONFIG_CMD_BOOTEFI_BOOTMGR))
+					run_command("bootefi bootmgr", 0);
+
+				run_command("run bootcmd", 0);
+			}
+		} else {
+			break;
+		}
+	}
+
 	return -1; /* -1 - abort boot and run monitor code */
 }
 #endif
@@ -516,11 +647,19 @@ int do_bootmenu(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	char *delay_str = NULL;
 	int delay = 10;
+	int uefi = 0;
 
 #if defined(CONFIG_BOOTDELAY) && (CONFIG_BOOTDELAY >= 0)
 	delay = CONFIG_BOOTDELAY;
 #endif
 
+	if (argc >= 2) {
+		if (!strcmp("-e", argv[1])) {
+			uefi = 1;
+			--argc;
+			++argv;
+		}
+	}
 	if (argc >= 2)
 		delay_str = argv[1];
 
@@ -530,13 +669,14 @@ int do_bootmenu(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	if (delay_str)
 		delay = (int)simple_strtol(delay_str, NULL, 10);
 
-	bootmenu_show(delay);
+	bootmenu_show(uefi, delay);
 	return 0;
 }
 
 U_BOOT_CMD(
 	bootmenu, 2, 1, do_bootmenu,
 	"ANSI terminal bootmenu",
-	"[delay]\n"
-	"    - show ANSI terminal bootmenu with autoboot delay"
+	"[-e] [delay]\n"
+	"-e    - show UEFI entries\n"
+	"delay - show ANSI terminal bootmenu with autoboot delay"
 );

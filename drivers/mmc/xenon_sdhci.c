@@ -14,7 +14,6 @@
  * Stefan Roese <sr@denx.de>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <fdtdec.h>
 #include <asm/global_data.h>
@@ -23,6 +22,7 @@
 #include <linux/libfdt.h>
 #include <malloc.h>
 #include <sdhci.h>
+#include <linux/printk.h>
 #include <power/regulator.h>
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -439,6 +439,8 @@ static const struct sdhci_ops xenon_sdhci_ops = {
 	.set_ios_post = xenon_sdhci_set_ios_post
 };
 
+static struct dm_mmc_ops xenon_mmc_ops;
+
 static int xenon_sdhci_probe(struct udevice *dev)
 {
 	struct xenon_sdhci_plat *plat = dev_get_plat(dev);
@@ -451,6 +453,9 @@ static int xenon_sdhci_probe(struct udevice *dev)
 	host->mmc->priv = host;
 	host->mmc->dev = dev;
 	upriv->mmc = host->mmc;
+
+	xenon_mmc_ops = sdhci_ops;
+	xenon_mmc_ops.wait_dat0 = NULL;
 
 	/* Set quirks */
 	host->quirks = SDHCI_QUIRK_WAIT_SEND_CMD | SDHCI_QUIRK_32BIT_DMA_ADDR;
@@ -532,7 +537,7 @@ static int xenon_sdhci_of_to_plat(struct udevice *dev)
 	host->ioaddr = dev_read_addr_ptr(dev);
 
 	if (device_is_compatible(dev, "marvell,armada-3700-sdhci"))
-		priv->pad_ctrl_reg = (void *)devfdt_get_addr_index(dev, 1);
+		priv->pad_ctrl_reg = devfdt_get_addr_index_ptr(dev, 1);
 
 	name = fdt_getprop(gd->fdt_blob, dev_of_offset(dev), "marvell,pad-type",
 			   NULL);
@@ -568,7 +573,7 @@ U_BOOT_DRIVER(xenon_sdhci_drv) = {
 	.id		= UCLASS_MMC,
 	.of_match	= xenon_sdhci_ids,
 	.of_to_plat = xenon_sdhci_of_to_plat,
-	.ops		= &sdhci_ops,
+	.ops		= &xenon_mmc_ops,
 	.bind		= xenon_sdhci_bind,
 	.probe		= xenon_sdhci_probe,
 	.remove		= xenon_sdhci_remove,

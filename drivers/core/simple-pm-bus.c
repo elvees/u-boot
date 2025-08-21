@@ -3,7 +3,6 @@
  * Copyright (C) 2020 Sean Anderson <seanga2@gmail.com>
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 
@@ -21,7 +20,7 @@ static int simple_pm_bus_probe(struct udevice *dev)
 		return ret;
 
 	ret = clk_enable_bulk(bulk);
-	if (ret && ret != -ENOSYS && ret != -ENOTSUPP) {
+	if (ret && ret != -ENOSYS) {
 		clk_release_bulk(bulk);
 		return ret;
 	}
@@ -34,7 +33,7 @@ static int simple_pm_bus_remove(struct udevice *dev)
 	struct clk_bulk *bulk = dev_get_priv(dev);
 
 	ret = clk_release_bulk(bulk);
-	if (ret && ret != -ENOSYS && ret != -ENOTSUPP)
+	if (ret && ret != -ENOSYS)
 		return ret;
 	else
 		return 0;

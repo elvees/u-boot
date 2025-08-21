@@ -6,7 +6,6 @@
  * Copyright (C) 2019 Rosy Song <rosysong@rosinson.com>
  */
 
-#include <common.h>
 #include <clock_legacy.h>
 #include <cpu_func.h>
 #include <dm.h>
@@ -143,11 +142,11 @@ enum ag7xxx_model {
 #define AG7XXX_ETH_CFG_MII_GE0			BIT(1)
 #define AG7XXX_ETH_CFG_RGMII_GE0		BIT(0)
 
-#define CONFIG_TX_DESCR_NUM	8
-#define CONFIG_RX_DESCR_NUM	8
-#define CONFIG_ETH_BUFSIZE	2048
-#define TX_TOTAL_BUFSIZE	(CONFIG_ETH_BUFSIZE * CONFIG_TX_DESCR_NUM)
-#define RX_TOTAL_BUFSIZE	(CONFIG_ETH_BUFSIZE * CONFIG_RX_DESCR_NUM)
+#define CFG_TX_DESCR_NUM	8
+#define CFG_RX_DESCR_NUM	8
+#define CFG_ETH_BUFSIZE	2048
+#define TX_TOTAL_BUFSIZE	(CFG_ETH_BUFSIZE * CFG_TX_DESCR_NUM)
+#define RX_TOTAL_BUFSIZE	(CFG_ETH_BUFSIZE * CFG_RX_DESCR_NUM)
 
 /* DMA descriptor. */
 struct ag7xxx_dma_desc {
@@ -162,8 +161,8 @@ struct ag7xxx_dma_desc {
 };
 
 struct ar7xxx_eth_priv {
-	struct ag7xxx_dma_desc	tx_mac_descrtable[CONFIG_TX_DESCR_NUM];
-	struct ag7xxx_dma_desc	rx_mac_descrtable[CONFIG_RX_DESCR_NUM];
+	struct ag7xxx_dma_desc	tx_mac_descrtable[CFG_TX_DESCR_NUM];
+	struct ag7xxx_dma_desc	rx_mac_descrtable[CFG_RX_DESCR_NUM];
 	char		txbuffs[TX_TOTAL_BUFSIZE] __aligned(ARCH_DMA_MINALIGN);
 	char		rxbuffs[RX_TOTAL_BUFSIZE] __aligned(ARCH_DMA_MINALIGN);
 
@@ -408,11 +407,11 @@ static void ag7xxx_dma_clean_tx(struct udevice *dev)
 	u32 start, end;
 	int i;
 
-	for (i = 0; i < CONFIG_TX_DESCR_NUM; i++) {
+	for (i = 0; i < CFG_TX_DESCR_NUM; i++) {
 		curr = &priv->tx_mac_descrtable[i];
-		next = &priv->tx_mac_descrtable[(i + 1) % CONFIG_TX_DESCR_NUM];
+		next = &priv->tx_mac_descrtable[(i + 1) % CFG_TX_DESCR_NUM];
 
-		curr->data_addr = virt_to_phys(&priv->txbuffs[i * CONFIG_ETH_BUFSIZE]);
+		curr->data_addr = virt_to_phys(&priv->txbuffs[i * CFG_ETH_BUFSIZE]);
 		curr->config = AG7XXX_DMADESC_IS_EMPTY;
 		curr->next_desc = virt_to_phys(next);
 	}
@@ -432,11 +431,11 @@ static void ag7xxx_dma_clean_rx(struct udevice *dev)
 	u32 start, end;
 	int i;
 
-	for (i = 0; i < CONFIG_RX_DESCR_NUM; i++) {
+	for (i = 0; i < CFG_RX_DESCR_NUM; i++) {
 		curr = &priv->rx_mac_descrtable[i];
-		next = &priv->rx_mac_descrtable[(i + 1) % CONFIG_RX_DESCR_NUM];
+		next = &priv->rx_mac_descrtable[(i + 1) % CFG_RX_DESCR_NUM];
 
-		curr->data_addr = virt_to_phys(&priv->rxbuffs[i * CONFIG_ETH_BUFSIZE]);
+		curr->data_addr = virt_to_phys(&priv->rxbuffs[i * CFG_ETH_BUFSIZE]);
 		curr->config = AG7XXX_DMADESC_IS_EMPTY;
 		curr->next_desc = virt_to_phys(next);
 	}
@@ -492,7 +491,7 @@ static int ag7xxx_eth_send(struct udevice *dev, void *packet, int length)
 	       priv->regs + AG7XXX_ETH_DMA_TX_CTRL);
 
 	/* Switch to next TX descriptor. */
-	priv->tx_currdescnum = (priv->tx_currdescnum + 1) % CONFIG_TX_DESCR_NUM;
+	priv->tx_currdescnum = (priv->tx_currdescnum + 1) % CFG_TX_DESCR_NUM;
 
 	return 0;
 }
@@ -543,7 +542,7 @@ static int ag7xxx_eth_free_pkt(struct udevice *dev, uchar *packet,
 	flush_dcache_range(start, end);
 
 	/* Switch to next RX descriptor. */
-	priv->rx_currdescnum = (priv->rx_currdescnum + 1) % CONFIG_RX_DESCR_NUM;
+	priv->rx_currdescnum = (priv->rx_currdescnum + 1) % CFG_RX_DESCR_NUM;
 
 	return 0;
 }
@@ -1254,7 +1253,6 @@ static const struct eth_ops ag7xxx_eth_ops = {
 static int ag7xxx_eth_of_to_plat(struct udevice *dev)
 {
 	struct eth_pdata *pdata = dev_get_plat(dev);
-	const char *phy_mode;
 	int ret;
 
 	pdata->iobase = dev_read_addr(dev);
@@ -1265,13 +1263,9 @@ static int ag7xxx_eth_of_to_plat(struct udevice *dev)
 	if (ret <= 0)
 		return ret;
 
-	phy_mode = fdt_getprop(gd->fdt_blob, ret, "phy-mode", NULL);
-	if (phy_mode)
-		pdata->phy_interface = phy_get_interface_by_name(phy_mode);
-	if (pdata->phy_interface == -1) {
-		debug("%s: Invalid PHY interface '%s'\n", __func__, phy_mode);
+	pdata->phy_interface = dev_read_phy_mode(dev);
+	if (pdata->phy_interface == PHY_INTERFACE_MODE_NA)
 		return -EINVAL;
-	}
 
 	return 0;
 }

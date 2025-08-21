@@ -4,7 +4,6 @@
  *		      Wenyou.Yang <wenyou.yang@atmel.com>
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <malloc.h>
@@ -14,6 +13,9 @@
 
 #define ATMEL_SDHC_MIN_FREQ	400000
 #define ATMEL_SDHC_GCK_RATE	240000000
+
+#define ATMEL_SDHC_MC1R 0x204
+#define ATMEL_SDHC_MC1R_FCD	0x80
 
 #ifndef CONFIG_DM_MMC
 int atmel_sdhci_init(void *regbase, u32 id)
@@ -50,6 +52,43 @@ DECLARE_GLOBAL_DATA_PTR;
 struct atmel_sdhci_plat {
 	struct mmc_config cfg;
 	struct mmc mmc;
+};
+
+static void atmel_sdhci_config_fcd(struct sdhci_host *host)
+{
+	u8 mc1r;
+
+	/* If nonremovable, assume that the card is always present.
+	 *
+	 * WA: SAMA5D2 doesn't drive CMD if using CD GPIO line.
+	 */
+	if ((host->mmc->cfg->host_caps & MMC_CAP_NONREMOVABLE)
+#if CONFIG_IS_ENABLED(DM_GPIO)
+		|| dm_gpio_get_value(&host->cd_gpio) >= 0
+#endif
+	   ) {
+		sdhci_readb(host, ATMEL_SDHC_MC1R);
+		mc1r |= ATMEL_SDHC_MC1R_FCD;
+		sdhci_writeb(host, mc1r, ATMEL_SDHC_MC1R);
+	}
+}
+
+static int atmel_sdhci_deferred_probe(struct sdhci_host *host)
+{
+	struct udevice *dev = host->mmc->dev;
+	int ret;
+
+	ret = sdhci_probe(dev);
+	if (ret)
+		return ret;
+
+	atmel_sdhci_config_fcd(host);
+
+	return 0;
+}
+
+static const struct sdhci_ops atmel_sdhci_ops = {
+	.deferred_probe	= atmel_sdhci_deferred_probe,
 };
 
 static int atmel_sdhci_probe(struct udevice *dev)
@@ -104,11 +143,16 @@ static int atmel_sdhci_probe(struct udevice *dev)
 		return ret;
 
 	host->mmc->priv = host;
+	host->ops = &atmel_sdhci_ops;
 	upriv->mmc = host->mmc;
 
-	clk_free(&clk);
+	ret = sdhci_probe(dev);
+	if (ret)
+		return ret;
 
-	return sdhci_probe(dev);
+	atmel_sdhci_config_fcd(host);
+
+	return 0;
 }
 
 static int atmel_sdhci_bind(struct udevice *dev)

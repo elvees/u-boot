@@ -6,7 +6,8 @@
 /dts-v1/;
 
 /include/ "skeleton.dtsi"
-/include/ "tsc_timer.dtsi"
+
+#include "tsc_timer.dtsi"
 
 / {
 	model = "EFI x86 Application";
@@ -16,16 +17,17 @@
 		stdout-path = &serial;
 	};
 
-	tsc-timer {
-		clock-frequency = <1000000000>;
-	};
-
 	serial: serial {
 		compatible = "efi,uart";
 	};
 
 	reset {
 		compatible = "efi,reset";
-		u-boot,dm-pre-reloc;
+		bootph-all;
 	};
+	efi-fb {
+		compatible = "efi-fb";
+		bootph-some-ram;
+	};
+
 };

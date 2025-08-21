@@ -8,7 +8,6 @@
  * A command interface to access misc devices with MISC uclass driver APIs.
  */
 
-#include <common.h>
 #include <command.h>
 #include <dm.h>
 #include <errno.h>
@@ -44,7 +43,6 @@ static int do_misc_list(struct cmd_tbl *cmdtp, int flag,
 static int do_misc_op(struct cmd_tbl *cmdtp, int flag,
 		      int argc, char *const argv[], enum misc_op op)
 {
-	int (*misc_op)(struct udevice *, int, void *, int);
 	struct udevice *dev;
 	int offset;
 	void *buf;
@@ -57,16 +55,15 @@ static int do_misc_op(struct cmd_tbl *cmdtp, int flag,
 		return ret;
 	}
 
-	offset = simple_strtoul(argv[1], NULL, 16);
-	buf = (void *)simple_strtoul(argv[2], NULL, 16);
-	size = simple_strtoul(argv[3], NULL, 16);
+	offset = hextoul(argv[1], NULL);
+	buf = (void *)hextoul(argv[2], NULL);
+	size = hextoul(argv[3], NULL);
 
 	if (op == MISC_OP_READ)
-		misc_op = misc_read;
+		ret = misc_read(dev, offset, buf, size);
 	else
-		misc_op = misc_write;
+		ret = misc_write(dev, offset, buf, size);
 
-	ret = misc_op(dev, offset, buf, size);
 	if (ret < 0) {
 		if (ret == -ENOSYS) {
 			printf("The device does not support %s\n",

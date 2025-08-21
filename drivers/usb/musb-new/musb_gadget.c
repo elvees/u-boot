@@ -22,16 +22,15 @@
 #include <linux/dma-mapping.h>
 #include <linux/slab.h>
 #else
-#include <common.h>
 #include <dm.h>
 #include <dm/device_compat.h>
 #include <linux/bug.h>
+#include <linux/printk.h>
 #include <linux/usb/ch9.h>
 #include "linux-compat.h"
 #endif
 
 #include "musb_core.h"
-
 
 /* MUSB PERIPHERAL status 3-mar-2006:
  *
@@ -273,7 +272,6 @@ static inline int max_ep_writesize(struct musb *musb, struct musb_ep *ep)
 	else
 		return ep->packet_sz;
 }
-
 
 #ifdef CONFIG_USB_INVENTRA_DMA
 
@@ -995,8 +993,8 @@ void musb_g_rx(struct musb *musb, u8 epnum)
 				&& (musb_ep->dma->actual_len
 					== musb_ep->packet_sz)) {
 			/* In double buffer case, continue to unload fifo if
- 			 * there is Rx packet in FIFO.
- 			 **/
+			 * there is Rx packet in FIFO.
+			 **/
 			csr = musb_readw(epio, MUSB_RXCSR);
 			if ((csr & MUSB_RXCSR_RXPKTRDY) &&
 				hw_ep->rx_double_buffered)
@@ -1188,6 +1186,7 @@ static int musb_gadget_enable(struct usb_ep *ep,
 	} else
 		musb_ep->dma = NULL;
 
+	musb_ep->end_point.desc = desc;
 	musb_ep->desc = desc;
 	musb_ep->busy = 0;
 	musb_ep->wedged = 0;
@@ -1245,9 +1244,7 @@ static int musb_gadget_disable(struct usb_ep *ep)
 	}
 
 	musb_ep->desc = NULL;
-#ifndef __UBOOT__
 	musb_ep->end_point.desc = NULL;
-#endif
 
 	/* abort all pending DMA and requests */
 	nuke(musb_ep, -ESHUTDOWN);
@@ -1824,7 +1821,6 @@ static void musb_gadget_release(struct device *dev)
 }
 #endif
 
-
 static void __devinit
 init_peripheral_ep(struct musb *musb, struct musb_ep *ep, u8 epnum, int is_in)
 {
@@ -1967,7 +1963,7 @@ void musb_gadget_cleanup(struct musb *musb)
  * -ENOMEM no memory to perform the operation
  *
  * @param driver the gadget driver
- * @return <0 if error, 0 if everything is fine
+ * Return: <0 if error, 0 if everything is fine
  */
 #ifndef __UBOOT__
 static int musb_gadget_start(struct usb_gadget *g,
@@ -2285,7 +2281,6 @@ __acquires(musb->lock)
 	/* clear HR */
 	else if (devctl & MUSB_DEVCTL_HR)
 		musb_writeb(mbase, MUSB_DEVCTL, MUSB_DEVCTL_SESSION);
-
 
 	/* what speed did we negotiate? */
 	power = musb_readb(mbase, MUSB_POWER);

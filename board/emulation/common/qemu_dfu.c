@@ -3,7 +3,6 @@
  * Copyright (c) 2020 Linaro Limited
  */
 
-#include <common.h>
 #include <dfu.h>
 #include <env.h>
 #include <memalign.h>
@@ -44,10 +43,11 @@ void set_dfu_alt_info(char *interface, char *devstr)
 
 	ALLOC_CACHE_ALIGN_BUFFER(char, buf, DFU_ALT_BUF_LEN);
 
-	if (env_get("dfu_alt_info"))
+	if (!IS_ENABLED(CONFIG_EFI_HAVE_CAPSULE_SUPPORT) &&
+	    env_get("dfu_alt_info"))
 		return;
 
-	memset(buf, 0, sizeof(buf));
+	memset(buf, 0, DFU_ALT_BUF_LEN);
 
 	/*
 	 * Currently dfu_alt_info is needed on Qemu ARM64 for

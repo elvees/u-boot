@@ -4,13 +4,17 @@
  * Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
  */
 
-#include <common.h>
+#include <ansi.h>
 #include <cli.h>
 #include <malloc.h>
 #include <errno.h>
+#include <linux/delay.h>
 #include <linux/list.h>
+#include <watchdog.h>
 
 #include "menu.h"
+
+#define ansi 1
 
 /*
  * Internally, each item in a menu is represented by a struct menu_item.
@@ -39,6 +43,7 @@ struct menu {
 	void (*display_statusline)(struct menu *);
 	void (*item_data_print)(void *);
 	char *(*item_choice)(void *);
+	bool (*need_reprint)(void *);
 	void *item_choice_data;
 	struct list_head items;
 	int item_cnt;
@@ -113,6 +118,11 @@ static inline void *menu_item_destroy(struct menu *m,
  */
 static inline void menu_display(struct menu *m)
 {
+	if (m->need_reprint) {
+		if (!m->need_reprint(m->item_choice_data))
+			return;
+	}
+
 	if (m->title) {
 		puts(m->title);
 		putc('\n');
@@ -271,7 +281,10 @@ int menu_get_choice(struct menu *m, void **choice)
 	if (!m || !choice)
 		return -EINVAL;
 
-	if (!m->prompt || m->item_cnt == 1)
+	if (!m->item_cnt)
+		return -ENOENT;
+
+	if (!m->prompt)
 		return menu_default_choice(m, choice);
 
 	return menu_interactive_choice(m, choice);
@@ -355,6 +368,9 @@ int menu_item_add(struct menu *m, char *item_key, void *item_data)
  * item. Returns a key string corresponding to the chosen item or NULL if
  * no item has been selected.
  *
+ * need_reprint - If not NULL, will be called before printing the menu.
+ * Returning FALSE means the menu does not need reprint.
+ *
  * item_choice_data - Will be passed as the argument to the item_choice function
  *
  * Returns a pointer to the menu if successful, or NULL if there is
@@ -364,6 +380,7 @@ struct menu *menu_create(char *title, int timeout, int prompt,
 				void (*display_statusline)(struct menu *),
 				void (*item_data_print)(void *),
 				char *(*item_choice)(void *),
+				bool (*need_reprint)(void *),
 				void *item_choice_data)
 {
 	struct menu *m;
@@ -379,6 +396,7 @@ struct menu *menu_create(char *title, int timeout, int prompt,
 	m->display_statusline = display_statusline;
 	m->item_data_print = item_data_print;
 	m->item_choice = item_choice;
+	m->need_reprint = need_reprint;
 	m->item_choice_data = item_choice_data;
 	m->item_cnt = 0;
 
@@ -390,7 +408,6 @@ struct menu *menu_create(char *title, int timeout, int prompt,
 		}
 	} else
 		m->title = NULL;
-
 
 	INIT_LIST_HEAD(&m->items);
 
@@ -417,4 +434,125 @@ int menu_destroy(struct menu *m)
 	free(m);
 
 	return 1;
+}
+
+enum bootmenu_key bootmenu_autoboot_loop(struct bootmenu_data *menu,
+					 struct cli_ch_state *cch)
+{
+	enum bootmenu_key key = BKEY_NONE;
+	int i, c;
+
+	while (menu->delay > 0) {
+		if (ansi)
+			printf(ANSI_CURSOR_POSITION, menu->count + 5, 3);
+		printf("Hit any key to stop autoboot: %d ", menu->delay);
+		for (i = 0; i < 100; ++i) {
+			int ichar;
+
+			if (!tstc()) {
+				schedule();
+				mdelay(10);
+				continue;
+			}
+
+			menu->delay = -1;
+			c = getchar();
+
+			ichar = cli_ch_process(cch, c);
+
+			switch (ichar) {
+			case '\0':
+				key = BKEY_NONE;
+				break;
+			case '\n':
+				key = BKEY_SELECT;
+				break;
+			case 0x3: /* ^C */
+				key = BKEY_QUIT;
+				break;
+			default:
+				key = BKEY_NONE;
+				break;
+			}
+			break;
+		}
+
+		if (menu->delay < 0)
+			break;
+
+		--menu->delay;
+	}
+
+	if (ansi)
+		printf(ANSI_CURSOR_POSITION ANSI_CLEAR_LINE, menu->count + 5, 1);
+
+	if (menu->delay == 0)
+		key = BKEY_SELECT;
+
+	return key;
+}
+
+enum bootmenu_key bootmenu_conv_key(int ichar)
+{
+	enum bootmenu_key key;
+
+	switch (ichar) {
+	case '\n':
+		/* enter key was pressed */
+		key = BKEY_SELECT;
+		break;
+	case CTL_CH('c'):
+	case '\e':
+		/* ^C was pressed */
+		key = BKEY_QUIT;
+		break;
+	case CTL_CH('p'):
+		key = BKEY_UP;
+		break;
+	case CTL_CH('n'):
+		key = BKEY_DOWN;
+		break;
+	case CTL_CH('s'):
+		key = BKEY_SAVE;
+		break;
+	case '+':
+		key = BKEY_PLUS;
+		break;
+	case '-':
+		key = BKEY_MINUS;
+		break;
+	case ' ':
+		key = BKEY_SPACE;
+		break;
+	default:
+		key = BKEY_NONE;
+		break;
+	}
+
+	return key;
+}
+
+enum bootmenu_key bootmenu_loop(struct bootmenu_data *menu,
+				struct cli_ch_state *cch)
+{
+	enum bootmenu_key key;
+	int c, errchar = 0;
+
+	c = cli_ch_process(cch, 0);
+	if (!c) {
+		while (!c && !tstc()) {
+			schedule();
+			mdelay(10);
+			c = cli_ch_process(cch, errchar);
+			errchar = -ETIMEDOUT;
+		}
+		if (!c) {
+			c = getchar();
+			c = cli_ch_process(cch, c);
+		}
+	}
+
+	key = bootmenu_conv_key(c);
+
+	return key;
 }

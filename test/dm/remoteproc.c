@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2015
- * Texas Instruments Incorporated - http://www.ti.com/
+ * Texas Instruments Incorporated - https://www.ti.com/
  */
-#include <common.h>
+
+#include <config.h>
 #include <dm.h>
 #include <elf.h>
 #include <errno.h>
@@ -26,7 +27,6 @@ static int dm_test_remoteproc_base(struct unit_test_state *uts)
 
 	/* Ensure we are initialized */
 	ut_asserteq(true, rproc_is_initialized());
-
 
 	/* platform data device 1 */
 	ut_assertok(rproc_stop(0));
@@ -68,7 +68,7 @@ static int dm_test_remoteproc_base(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_remoteproc_base, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_remoteproc_base, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 #define DEVICE_TO_PHYSICAL_OFFSET	0x1000
 /**
@@ -139,7 +139,7 @@ static int dm_test_remoteproc_elf(struct unit_test_state *uts)
 		0x20, 0x00, 0x00, 0x00,
 		/* memsz = filesz */
 		0x20, 0x00, 0x00, 0x00,
-		/* flags : readable and exectuable */
+		/* flags : readable and executable */
 		0x05, 0x00, 0x00, 0x00,
 		/* padding */
 		0x00, 0x00, 0x00, 0x00,
@@ -208,7 +208,7 @@ static int dm_test_remoteproc_elf(struct unit_test_state *uts)
 	 * at SDRAM_BASE *device* address (p_paddr field).
 	 * Its size is defined by the p_filesz field.
 	 */
-	phdr->p_paddr = CONFIG_SYS_SDRAM_BASE;
+	phdr->p_paddr = CFG_SYS_SDRAM_BASE;
 	loaded_firmware_size = phdr->p_filesz;
 
 	/*
@@ -231,7 +231,7 @@ static int dm_test_remoteproc_elf(struct unit_test_state *uts)
 	unmap_physmem(loaded_firmware, MAP_NOCACHE);
 
 	/* Resource table */
-	shdr->sh_addr = CONFIG_SYS_SDRAM_BASE;
+	shdr->sh_addr = CFG_SYS_SDRAM_BASE;
 	rsc_table_size = shdr->sh_size;
 
 	loaded_rsc_table_paddr = shdr->sh_addr + DEVICE_TO_PHYSICAL_OFFSET;
@@ -243,7 +243,7 @@ static int dm_test_remoteproc_elf(struct unit_test_state *uts)
 	/* Load and verify */
 	ut_assertok(rproc_elf32_load_rsc_table(dev, (ulong)valid_elf32, size,
 					       &rsc_addr, &rsc_size));
-	ut_asserteq(rsc_addr, CONFIG_SYS_SDRAM_BASE);
+	ut_asserteq(rsc_addr, CFG_SYS_SDRAM_BASE);
 	ut_asserteq(rsc_size, rsc_table_size);
 	ut_asserteq_mem(loaded_firmware, valid_elf32 + shdr->sh_offset,
 			shdr->sh_size);
@@ -256,4 +256,4 @@ static int dm_test_remoteproc_elf(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_remoteproc_elf, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_remoteproc_elf, UTF_SCAN_PDATA | UTF_SCAN_FDT);

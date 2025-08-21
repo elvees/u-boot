@@ -11,11 +11,9 @@
 #include <linux/bitops.h>
 
 /* Clock speed accessors */
-unsigned long cm_get_mpu_clk_hz(void);
 unsigned long cm_get_sdram_clk_hz(void);
 unsigned int cm_get_l4_sp_clk_hz(void);
 unsigned int cm_get_mmc_controller_clk_hz(void);
-unsigned int cm_get_qspi_controller_clk_hz(void);
 unsigned int cm_get_spi_controller_clk_hz(void);
 
 struct cm_config {
@@ -107,7 +105,6 @@ void cm_basic_init(const struct cm_config * const cfg);
 #define CLKMGR_STAT					CLKMGR_S10_STAT
 #define CLKMGR_INTER					CLKMGR_S10_INTER
 #define CLKMGR_PERPLL_EN				CLKMGR_S10_PERPLL_EN
-
 
 #define CLKMGR_CTRL_SAFEMODE				BIT(0)
 #define CLKMGR_BYPASS_MAINPLL_ALL			0x00000007

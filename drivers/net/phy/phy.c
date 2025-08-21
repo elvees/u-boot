@@ -7,7 +7,6 @@
  *
  * Based loosely off of Linux's PHY Lib
  */
-#include <common.h>
 #include <console.h>
 #include <dm.h>
 #include <log.h>
@@ -18,6 +17,9 @@
 #include <phy.h>
 #include <errno.h>
 #include <asm/global_data.h>
+#include <asm-generic/gpio.h>
+#include <dm/device_compat.h>
+#include <dm/of_extra.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -248,7 +250,7 @@ int genphy_update_link(struct phy_device *phydev)
 			/*
 			 * Timeout reached ?
 			 */
-			if (i > (PHY_ANEG_TIMEOUT / 50)) {
+			if (i > (CONFIG_PHY_ANEG_TIMEOUT / 50)) {
 				printf(" TIMEOUT !\n");
 				phydev->link = 0;
 				return -ETIMEDOUT;
@@ -450,7 +452,7 @@ int genphy_shutdown(struct phy_device *phydev)
 	return 0;
 }
 
-static struct phy_driver genphy_driver = {
+U_BOOT_PHY_DRIVER(genphy) = {
 	.uid		= 0xffffffff,
 	.mask		= 0xffffffff,
 	.name		= "Generic PHY",
@@ -461,133 +463,6 @@ static struct phy_driver genphy_driver = {
 	.startup	= genphy_startup,
 	.shutdown	= genphy_shutdown,
 };
-
-int genphy_init(void)
-{
-	return phy_register(&genphy_driver);
-}
-
-static LIST_HEAD(phy_drivers);
-
-int phy_init(void)
-{
-#ifdef CONFIG_NEEDS_MANUAL_RELOC
-	/*
-	 * The pointers inside phy_drivers also needs to be updated incase of
-	 * manual reloc, without which these points to some invalid
-	 * pre reloc address and leads to invalid accesses, hangs.
-	 */
-	struct list_head *head = &phy_drivers;
-
-	head->next = (void *)head->next + gd->reloc_off;
-	head->prev = (void *)head->prev + gd->reloc_off;
-#endif
-
-#ifdef CONFIG_B53_SWITCH
-	phy_b53_init();
-#endif
-#ifdef CONFIG_MV88E61XX_SWITCH
-	phy_mv88e61xx_init();
-#endif
-#ifdef CONFIG_PHY_AQUANTIA
-	phy_aquantia_init();
-#endif
-#ifdef CONFIG_PHY_ATHEROS
-	phy_atheros_init();
-#endif
-#ifdef CONFIG_PHY_BROADCOM
-	phy_broadcom_init();
-#endif
-#ifdef CONFIG_PHY_CORTINA
-	phy_cortina_init();
-#endif
-#ifdef CONFIG_PHY_CORTINA_ACCESS
-	phy_cortina_access_init();
-#endif
-#ifdef CONFIG_PHY_DAVICOM
-	phy_davicom_init();
-#endif
-#ifdef CONFIG_PHY_ET1011C
-	phy_et1011c_init();
-#endif
-#ifdef CONFIG_PHY_LXT
-	phy_lxt_init();
-#endif
-#ifdef CONFIG_PHY_MARVELL
-	phy_marvell_init();
-#endif
-#ifdef CONFIG_PHY_MICREL_KSZ8XXX
-	phy_micrel_ksz8xxx_init();
-#endif
-#ifdef CONFIG_PHY_MICREL_KSZ90X1
-	phy_micrel_ksz90x1_init();
-#endif
-#ifdef CONFIG_PHY_MESON_GXL
-	phy_meson_gxl_init();
-#endif
-#ifdef CONFIG_PHY_NATSEMI
-	phy_natsemi_init();
-#endif
-#ifdef CONFIG_PHY_REALTEK
-	phy_realtek_init();
-#endif
-#ifdef CONFIG_PHY_SMSC
-	phy_smsc_init();
-#endif
-#ifdef CONFIG_PHY_TERANETICS
-	phy_teranetics_init();
-#endif
-#ifdef CONFIG_PHY_TI
-	phy_ti_init();
-#endif
-#ifdef CONFIG_PHY_VITESSE
-	phy_vitesse_init();
-#endif
-#ifdef CONFIG_PHY_XILINX
-	phy_xilinx_init();
-#endif
-#ifdef CONFIG_PHY_MSCC
-	phy_mscc_init();
-#endif
-#ifdef CONFIG_PHY_FIXED
-	phy_fixed_init();
-#endif
-#ifdef CONFIG_PHY_NCSI
-	phy_ncsi_init();
-#endif
-#ifdef CONFIG_PHY_XILINX_GMII2RGMII
-	phy_xilinx_gmii2rgmii_init();
-#endif
-	genphy_init();
-
-	return 0;
-}
-
-int phy_register(struct phy_driver *drv)
-{
-	INIT_LIST_HEAD(&drv->list);
-	list_add_tail(&drv->list, &phy_drivers);
-
-#ifdef CONFIG_NEEDS_MANUAL_RELOC
-	if (drv->probe)
-		drv->probe += gd->reloc_off;
-	if (drv->config)
-		drv->config += gd->reloc_off;
-	if (drv->startup)
-		drv->startup += gd->reloc_off;
-	if (drv->shutdown)
-		drv->shutdown += gd->reloc_off;
-	if (drv->readext)
-		drv->readext += gd->reloc_off;
-	if (drv->writeext)
-		drv->writeext += gd->reloc_off;
-	if (drv->read_mmd)
-		drv->read_mmd += gd->reloc_off;
-	if (drv->write_mmd)
-		drv->write_mmd += gd->reloc_off;
-#endif
-	return 0;
-}
 
 int phy_set_supported(struct phy_device *phydev, u32 max_speed)
 {
@@ -628,36 +503,34 @@ static int phy_probe(struct phy_device *phydev)
 	return err;
 }
 
-static struct phy_driver *generic_for_interface(phy_interface_t interface)
+static struct phy_driver *generic_for_phy(struct phy_device *phydev)
 {
 #ifdef CONFIG_PHYLIB_10G
-	if (is_10g_interface(interface))
-		return &gen10g_driver;
+	if (phydev->is_c45)
+		return ll_entry_get(struct phy_driver, gen10g, phy_driver);
 #endif
 
-	return &genphy_driver;
+	return ll_entry_get(struct phy_driver, genphy, phy_driver);
 }
 
-static struct phy_driver *get_phy_driver(struct phy_device *phydev,
-					 phy_interface_t interface)
+static struct phy_driver *get_phy_driver(struct phy_device *phydev)
 {
-	struct list_head *entry;
+	const int ll_n_ents = ll_entry_count(struct phy_driver, phy_driver);
 	int phy_id = phydev->phy_id;
-	struct phy_driver *drv = NULL;
+	struct phy_driver *ll_entry;
+	struct phy_driver *drv;
 
-	list_for_each(entry, &phy_drivers) {
-		drv = list_entry(entry, struct phy_driver, list);
+	ll_entry = ll_entry_start(struct phy_driver, phy_driver);
+	for (drv = ll_entry; drv != ll_entry + ll_n_ents; drv++)
 		if ((drv->uid & drv->mask) == (phy_id & drv->mask))
 			return drv;
-	}
 
 	/* If we made it here, there's no driver for this PHY */
-	return generic_for_interface(interface);
+	return generic_for_phy(phydev);
 }
 
-static struct phy_device *phy_device_create(struct mii_dev *bus, int addr,
-					    u32 phy_id, bool is_c45,
-					    phy_interface_t interface)
+struct phy_device *phy_device_create(struct mii_dev *bus, int addr,
+				     u32 phy_id, bool is_c45)
 {
 	struct phy_device *dev;
 
@@ -676,11 +549,9 @@ static struct phy_device *phy_device_create(struct mii_dev *bus, int addr,
 
 	dev->duplex = -1;
 	dev->link = 0;
-	dev->interface = interface;
+	dev->interface = PHY_INTERFACE_MODE_NA;
 
-#ifdef CONFIG_DM_ETH
 	dev->node = ofnode_null();
-#endif
 
 	dev->autoneg = AUTONEG_ENABLE;
 
@@ -689,14 +560,15 @@ static struct phy_device *phy_device_create(struct mii_dev *bus, int addr,
 	dev->is_c45 = is_c45;
 	dev->bus = bus;
 
-	dev->drv = get_phy_driver(dev, interface);
+	dev->drv = get_phy_driver(dev);
 
 	if (phy_probe(dev)) {
 		printf("%s, PHY probe failed\n", __func__);
 		return NULL;
 	}
 
-	if (addr >= 0 && addr < PHY_MAX_ADDR && phy_id != PHY_FIXED_ID)
+	if (addr >= 0 && addr < PHY_MAX_ADDR && phy_id != PHY_FIXED_ID &&
+	    phy_id != PHY_NCSI_ID)
 		bus->phymap[addr] = dev;
 
 	return dev;
@@ -738,8 +610,7 @@ int __weak get_phy_id(struct mii_dev *bus, int addr, int devad, u32 *phy_id)
 }
 
 static struct phy_device *create_phy_by_mask(struct mii_dev *bus,
-					     uint phy_mask, int devad,
-					     phy_interface_t interface)
+					     uint phy_mask, int devad)
 {
 	u32 phy_id = 0xffffffff;
 	bool is_c45;
@@ -760,8 +631,7 @@ static struct phy_device *create_phy_by_mask(struct mii_dev *bus,
 		/* If the PHY ID is mostly f's, we didn't find anything */
 		if (r == 0 && (phy_id & 0x1fffffff) != 0x1fffffff) {
 			is_c45 = (devad == MDIO_DEVAD_NONE) ? false : true;
-			return phy_device_create(bus, addr, phy_id, is_c45,
-						 interface);
+			return phy_device_create(bus, addr, phy_id, is_c45);
 		}
 next:
 		phy_mask &= ~(1 << addr);
@@ -770,25 +640,22 @@ next:
 }
 
 static struct phy_device *search_for_existing_phy(struct mii_dev *bus,
-						  uint phy_mask,
-						  phy_interface_t interface)
+						  uint phy_mask)
 {
 	/* If we have one, return the existing device, with new interface */
 	while (phy_mask) {
-		int addr = ffs(phy_mask) - 1;
+		unsigned int addr = ffs(phy_mask) - 1;
 
-		if (bus->phymap[addr]) {
-			bus->phymap[addr]->interface = interface;
+		if (bus->phymap[addr])
 			return bus->phymap[addr];
-		}
-		phy_mask &= ~(1 << addr);
+
+		phy_mask &= ~(1U << addr);
 	}
 	return NULL;
 }
 
 static struct phy_device *get_phy_device_by_mask(struct mii_dev *bus,
-						 uint phy_mask,
-						 phy_interface_t interface)
+						 uint phy_mask)
 {
 	struct phy_device *phydev;
 	int devad[] = {
@@ -804,13 +671,12 @@ static struct phy_device *get_phy_device_by_mask(struct mii_dev *bus,
 	int i, devad_cnt;
 
 	devad_cnt = sizeof(devad)/sizeof(int);
-	phydev = search_for_existing_phy(bus, phy_mask, interface);
+	phydev = search_for_existing_phy(bus, phy_mask);
 	if (phydev)
 		return phydev;
 	/* try different access clauses  */
 	for (i = 0; i < devad_cnt; i++) {
-		phydev = create_phy_by_mask(bus, phy_mask,
-					    devad[i], interface);
+		phydev = create_phy_by_mask(bus, phy_mask, devad[i]);
 		if (IS_ERR(phydev))
 			return NULL;
 		if (phydev)
@@ -838,10 +704,9 @@ static struct phy_device *get_phy_device_by_mask(struct mii_dev *bus,
  * Description: Reads the ID registers of the PHY at @addr on the
  *   @bus, then allocates and returns the phy_device to represent it.
  */
-static struct phy_device *get_phy_device(struct mii_dev *bus, int addr,
-					 phy_interface_t interface)
+static struct phy_device *get_phy_device(struct mii_dev *bus, int addr)
 {
-	return get_phy_device_by_mask(bus, 1 << addr, interface);
+	return get_phy_device_by_mask(bus, 1 << addr);
 }
 
 int phy_reset(struct phy_device *phydev)
@@ -855,7 +720,7 @@ int phy_reset(struct phy_device *phydev)
 
 #ifdef CONFIG_PHYLIB_10G
 	/* If it's 10G, we need to issue reset through one of the MMDs */
-	if (is_10g_interface(phydev->interface)) {
+	if (phydev->is_c45) {
 		if (!phydev->mmds)
 			gen10g_discover_mmds(phydev);
 
@@ -868,7 +733,7 @@ int phy_reset(struct phy_device *phydev)
 		return -1;
 	}
 
-#ifdef CONFIG_PHY_RESET_DELAY
+#if CONFIG_PHY_RESET_DELAY > 0
 	udelay(CONFIG_PHY_RESET_DELAY);	/* Intel LXT971A needs this */
 #endif
 	/*
@@ -900,18 +765,65 @@ int miiphy_reset(const char *devname, unsigned char addr)
 	struct mii_dev *bus = miiphy_get_dev_by_name(devname);
 	struct phy_device *phydev;
 
-	/*
-	 * miiphy_reset was only used on standard PHYs, so we'll fake it here.
-	 * If later code tries to connect with the right interface, this will
-	 * be corrected by get_phy_device in phy_connect()
-	 */
-	phydev = get_phy_device(bus, addr, PHY_INTERFACE_MODE_MII);
+	phydev = get_phy_device(bus, addr);
 
 	return phy_reset(phydev);
 }
 
-struct phy_device *phy_find_by_mask(struct mii_dev *bus, uint phy_mask,
-				    phy_interface_t interface)
+#if CONFIG_IS_ENABLED(DM_GPIO) && CONFIG_IS_ENABLED(OF_REAL) && \
+    !IS_ENABLED(CONFIG_DM_ETH_PHY)
+int phy_gpio_reset(struct udevice *dev)
+{
+	struct ofnode_phandle_args phandle_args;
+	struct gpio_desc gpio;
+	u32 assert, deassert;
+	ofnode node;
+	int ret;
+
+	ret = dev_read_phandle_with_args(dev, "phy-handle", NULL, 0, 0,
+					 &phandle_args);
+	/* No PHY handle is OK */
+	if (ret)
+		return 0;
+
+	node = phandle_args.node;
+	if (!ofnode_valid(node))
+		return -EINVAL;
+
+	ret = gpio_request_by_name_nodev(node, "reset-gpios", 0, &gpio,
+					 GPIOD_IS_OUT | GPIOD_ACTIVE_LOW);
+	/* No PHY reset GPIO is OK */
+	if (ret)
+		return 0;
+
+	assert = ofnode_read_u32_default(node, "reset-assert-us", 20000);
+	deassert = ofnode_read_u32_default(node, "reset-deassert-us", 1000);
+	ret = dm_gpio_set_value(&gpio, 1);
+	if (ret) {
+		dev_err(dev, "Failed assert gpio, err: %d\n", ret);
+		return ret;
+	}
+
+	udelay(assert);
+
+	ret = dm_gpio_set_value(&gpio, 0);
+	if (ret) {
+		dev_err(dev, "Failed deassert gpio, err: %d\n", ret);
+		return ret;
+	}
+
+	udelay(deassert);
+
+	return 0;
+}
+#else
+int phy_gpio_reset(struct udevice *dev)
+{
+	return 0;
+}
+#endif
+
+struct phy_device *phy_find_by_mask(struct mii_dev *bus, uint phy_mask)
 {
 	/* Reset the bus */
 	if (bus->reset) {
@@ -921,14 +833,11 @@ struct phy_device *phy_find_by_mask(struct mii_dev *bus, uint phy_mask,
 		mdelay(15);
 	}
 
-	return get_phy_device_by_mask(bus, phy_mask, interface);
+	return get_phy_device_by_mask(bus, phy_mask);
 }
 
-#ifdef CONFIG_DM_ETH
-void phy_connect_dev(struct phy_device *phydev, struct udevice *dev)
-#else
-void phy_connect_dev(struct phy_device *phydev, struct eth_device *dev)
-#endif
+static void phy_connect_dev(struct phy_device *phydev, struct udevice *dev,
+			    phy_interface_t interface)
 {
 	/* Soft Reset the PHY */
 	phy_reset(phydev);
@@ -938,38 +847,32 @@ void phy_connect_dev(struct phy_device *phydev, struct eth_device *dev)
 		       phydev->dev->name, dev->name);
 	}
 	phydev->dev = dev;
-	debug("%s connected to %s\n", dev->name, phydev->drv->name);
+	phydev->interface = interface;
+	debug("%s connected to %s mode %s\n", dev->name, phydev->drv->name,
+	      phy_string_for_interface(interface));
 }
 
 #ifdef CONFIG_PHY_XILINX_GMII2RGMII
-#ifdef CONFIG_DM_ETH
 static struct phy_device *phy_connect_gmii2rgmii(struct mii_dev *bus,
-						 struct udevice *dev,
-						 phy_interface_t interface)
-#else
-static struct phy_device *phy_connect_gmii2rgmii(struct mii_dev *bus,
-						 struct eth_device *dev,
-						 phy_interface_t interface)
-#endif
+						 struct udevice *dev)
 {
 	struct phy_device *phydev = NULL;
-	int sn = dev_of_offset(dev);
-	int off;
+	ofnode node;
 
-	while (sn > 0) {
-		off = fdt_node_offset_by_compatible(gd->fdt_blob, sn,
-						    "xlnx,gmii-to-rgmii-1.0");
-		if (off > 0) {
-			phydev = phy_device_create(bus, off,
-						   PHY_GMII2RGMII_ID, false,
-						   interface);
+	ofnode_for_each_subnode(node, dev_ofnode(dev)) {
+		node = ofnode_by_compatible(node, "xlnx,gmii-to-rgmii-1.0");
+		if (ofnode_valid(node)) {
+			int gmiirgmii_phyaddr;
+
+			gmiirgmii_phyaddr = ofnode_read_u32_default(node, "reg", 0);
+			phydev = phy_device_create(bus, gmiirgmii_phyaddr,
+						   PHY_GMII2RGMII_ID, false);
+			if (phydev)
+				phydev->node = node;
 			break;
 		}
-		if (off == -FDT_ERR_NOTFOUND)
-			sn = fdt_first_subnode(gd->fdt_blob, sn);
-		else
-			printf("%s: Error finding compat string:%d\n",
-			       __func__, off);
+
+		node = ofnode_first_subnode(node);
 	}
 
 	return phydev;
@@ -987,88 +890,70 @@ static struct phy_device *phy_connect_gmii2rgmii(struct mii_dev *bus,
  */
 struct phy_device *fixed_phy_create(ofnode node)
 {
-	phy_interface_t interface = PHY_INTERFACE_MODE_NONE;
-	const char *if_str;
+	struct phy_device *phydev;
 	ofnode subnode;
-
-	if_str = ofnode_read_string(node, "phy-mode");
-	if (!if_str) {
-		if_str = ofnode_read_string(node, "phy-interface-type");
-	}
-	if (if_str) {
-		interface = phy_get_interface_by_name(if_str);
-	}
 
 	subnode = ofnode_find_subnode(node, "fixed-link");
 	if (!ofnode_valid(subnode)) {
 		return NULL;
 	}
 
-	return phy_device_create(NULL, ofnode_to_offset(subnode), PHY_FIXED_ID,
-				 false, interface);
+	phydev = phy_device_create(NULL, 0, PHY_FIXED_ID, false);
+	if (phydev) {
+		phydev->node = subnode;
+		phydev->interface = ofnode_read_phy_mode(node);
+	}
+
+	return phydev;
 }
 
-#ifdef CONFIG_DM_ETH
 static struct phy_device *phy_connect_fixed(struct mii_dev *bus,
-					    struct udevice *dev,
-					    phy_interface_t interface)
-#else
-static struct phy_device *phy_connect_fixed(struct mii_dev *bus,
-					    struct eth_device *dev,
-					    phy_interface_t interface)
-#endif
+					    struct udevice *dev)
 {
+	ofnode node = dev_ofnode(dev), subnode;
 	struct phy_device *phydev = NULL;
-	int sn;
-	const char *name;
 
-	sn = fdt_first_subnode(gd->fdt_blob, dev_of_offset(dev));
-	while (sn > 0) {
-		name = fdt_get_name(gd->fdt_blob, sn, NULL);
-		if (name && strcmp(name, "fixed-link") == 0) {
-			phydev = phy_device_create(bus, sn, PHY_FIXED_ID, false,
-						   interface);
-			break;
-		}
-		sn = fdt_next_subnode(gd->fdt_blob, sn);
+	if (ofnode_phy_is_fixed_link(node, &subnode)) {
+		phydev = phy_device_create(bus, 0, PHY_FIXED_ID, false);
+		if (phydev)
+			phydev->node = subnode;
 	}
 
 	return phydev;
 }
 #endif
 
-#ifdef CONFIG_DM_ETH
 struct phy_device *phy_connect(struct mii_dev *bus, int addr,
 			       struct udevice *dev,
 			       phy_interface_t interface)
-#else
-struct phy_device *phy_connect(struct mii_dev *bus, int addr,
-			       struct eth_device *dev,
-			       phy_interface_t interface)
-#endif
 {
 	struct phy_device *phydev = NULL;
 	uint mask = (addr >= 0) ? (1 << addr) : 0xffffffff;
 
 #ifdef CONFIG_PHY_FIXED
-	phydev = phy_connect_fixed(bus, dev, interface);
+	phydev = phy_connect_fixed(bus, dev);
 #endif
 
 #ifdef CONFIG_PHY_NCSI
+	if (!phydev && interface == PHY_INTERFACE_MODE_NCSI)
+		phydev = phy_device_create(bus, 0, PHY_NCSI_ID, false);
+#endif
+
+#ifdef CONFIG_PHY_ETHERNET_ID
 	if (!phydev)
-		phydev = phy_device_create(bus, 0, PHY_NCSI_ID, false, interface);
+		phydev = phy_connect_phy_id(bus, dev, addr);
 #endif
 
 #ifdef CONFIG_PHY_XILINX_GMII2RGMII
 	if (!phydev)
-		phydev = phy_connect_gmii2rgmii(bus, dev, interface);
+		phydev = phy_connect_gmii2rgmii(bus, dev);
 #endif
 
 	if (!phydev)
-		phydev = phy_find_by_mask(bus, mask, interface);
+		phydev = phy_find_by_mask(bus, mask);
 
 	if (phydev)
-		phy_connect_dev(phydev, dev);
+		phy_connect_dev(phydev, dev, interface);
 	else
 		printf("Could not get PHY for %s: addr %d\n", bus->name, addr);
 	return phydev;
@@ -1106,14 +991,261 @@ int phy_shutdown(struct phy_device *phydev)
 	return 0;
 }
 
-int phy_get_interface_by_name(const char *str)
+/**
+ * phy_modify - Convenience function for modifying a given PHY register
+ * @phydev: the phy_device struct
+ * @devad: The MMD to read from
+ * @regnum: register number to write
+ * @mask: bit mask of bits to clear
+ * @set: new value of bits set in mask to write to @regnum
+ */
+int phy_modify(struct phy_device *phydev, int devad, int regnum, u16 mask,
+	       u16 set)
 {
-	int i;
+	int ret;
 
-	for (i = 0; i < PHY_INTERFACE_MODE_COUNT; i++) {
-		if (!strcmp(str, phy_interface_strings[i]))
-			return i;
+	ret = phy_read(phydev, devad, regnum);
+	if (ret < 0)
+		return ret;
+
+	return phy_write(phydev, devad, regnum, (ret & ~mask) | set);
+}
+
+/**
+ * phy_read - Convenience function for reading a given PHY register
+ * @phydev: the phy_device struct
+ * @devad: The MMD to read from
+ * @regnum: register number to read
+ * @return: value for success or negative errno for failure
+ */
+int phy_read(struct phy_device *phydev, int devad, int regnum)
+{
+	struct mii_dev *bus = phydev->bus;
+
+	if (!bus || !bus->read) {
+		debug("%s: No bus configured\n", __func__);
+		return -1;
 	}
 
-	return -1;
+	return bus->read(bus, phydev->addr, devad, regnum);
+}
+
+/**
+ * phy_write - Convenience function for writing a given PHY register
+ * @phydev: the phy_device struct
+ * @devad: The MMD to read from
+ * @regnum: register number to write
+ * @val: value to write to @regnum
+ * @return: 0 for success or negative errno for failure
+ */
+int phy_write(struct phy_device *phydev, int devad, int regnum, u16 val)
+{
+	struct mii_dev *bus = phydev->bus;
+
+	if (!bus || !bus->write) {
+		debug("%s: No bus configured\n", __func__);
+		return -1;
+	}
+
+	return bus->write(bus, phydev->addr, devad, regnum, val);
+}
+
+/**
+ * phy_mmd_start_indirect - Convenience function for writing MMD registers
+ * @phydev: the phy_device struct
+ * @devad: The MMD to read from
+ * @regnum: register number to write
+ * @return: None
+ */
+void phy_mmd_start_indirect(struct phy_device *phydev, int devad, int regnum)
+{
+	/* Write the desired MMD Devad */
+	phy_write(phydev, MDIO_DEVAD_NONE, MII_MMD_CTRL, devad);
+
+	/* Write the desired MMD register address */
+	phy_write(phydev, MDIO_DEVAD_NONE, MII_MMD_DATA, regnum);
+
+	/* Select the Function : DATA with no post increment */
+	phy_write(phydev, MDIO_DEVAD_NONE, MII_MMD_CTRL,
+		  (devad | MII_MMD_CTRL_NOINCR));
+}
+
+/**
+ * phy_read_mmd - Convenience function for reading a register
+ * from an MMD on a given PHY.
+ * @phydev: The phy_device struct
+ * @devad: The MMD to read from
+ * @regnum: The register on the MMD to read
+ * @return: Value for success or negative errno for failure
+ */
+int phy_read_mmd(struct phy_device *phydev, int devad, int regnum)
+{
+	struct phy_driver *drv = phydev->drv;
+
+	if (regnum > (u16)~0 || devad > 32)
+		return -EINVAL;
+
+	/* driver-specific access */
+	if (drv->read_mmd)
+		return drv->read_mmd(phydev, devad, regnum);
+
+	/* direct C45 / C22 access */
+	if ((drv->features & PHY_10G_FEATURES) == PHY_10G_FEATURES ||
+	    devad == MDIO_DEVAD_NONE || !devad)
+		return phy_read(phydev, devad, regnum);
+
+	/* indirect C22 access */
+	phy_mmd_start_indirect(phydev, devad, regnum);
+
+	/* Read the content of the MMD's selected register */
+	return phy_read(phydev, MDIO_DEVAD_NONE, MII_MMD_DATA);
+}
+
+/**
+ * phy_write_mmd - Convenience function for writing a register
+ * on an MMD on a given PHY.
+ * @phydev: The phy_device struct
+ * @devad: The MMD to read from
+ * @regnum: The register on the MMD to read
+ * @val: value to write to @regnum
+ * @return: 0 for success or negative errno for failure
+ */
+int phy_write_mmd(struct phy_device *phydev, int devad, int regnum, u16 val)
+{
+	struct phy_driver *drv = phydev->drv;
+
+	if (regnum > (u16)~0 || devad > 32)
+		return -EINVAL;
+
+	/* driver-specific access */
+	if (drv->write_mmd)
+		return drv->write_mmd(phydev, devad, regnum, val);
+
+	/* direct C45 / C22 access */
+	if ((drv->features & PHY_10G_FEATURES) == PHY_10G_FEATURES ||
+	    devad == MDIO_DEVAD_NONE || !devad)
+		return phy_write(phydev, devad, regnum, val);
+
+	/* indirect C22 access */
+	phy_mmd_start_indirect(phydev, devad, regnum);
+
+	/* Write the data into MMD's selected register */
+	return phy_write(phydev, MDIO_DEVAD_NONE, MII_MMD_DATA, val);
+}
+
+/**
+ * phy_set_bits_mmd - Convenience function for setting bits in a register
+ * on MMD
+ * @phydev: the phy_device struct
+ * @devad: the MMD containing register to modify
+ * @regnum: register number to modify
+ * @val: bits to set
+ * @return: 0 for success or negative errno for failure
+ */
+int phy_set_bits_mmd(struct phy_device *phydev, int devad, u32 regnum, u16 val)
+{
+	int value, ret;
+
+	value = phy_read_mmd(phydev, devad, regnum);
+	if (value < 0)
+		return value;
+
+	value |= val;
+
+	ret = phy_write_mmd(phydev, devad, regnum, value);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+/**
+ * phy_clear_bits_mmd - Convenience function for clearing bits in a register
+ * on MMD
+ * @phydev: the phy_device struct
+ * @devad: the MMD containing register to modify
+ * @regnum: register number to modify
+ * @val: bits to clear
+ * @return: 0 for success or negative errno for failure
+ */
+int phy_clear_bits_mmd(struct phy_device *phydev, int devad, u32 regnum, u16 val)
+{
+	int value, ret;
+
+	value = phy_read_mmd(phydev, devad, regnum);
+	if (value < 0)
+		return value;
+
+	value &= ~val;
+
+	ret = phy_write_mmd(phydev, devad, regnum, value);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+/**
+ * phy_modify_mmd_changed - Function for modifying a register on MMD
+ * @phydev: the phy_device struct
+ * @devad: the MMD containing register to modify
+ * @regnum: register number to modify
+ * @mask: bit mask of bits to clear
+ * @set: new value of bits set in mask to write to @regnum
+ *
+ * NOTE: MUST NOT be called from interrupt context,
+ * because the bus read/write functions may wait for an interrupt
+ * to conclude the operation.
+ *
+ * Returns negative errno, 0 if there was no change, and 1 in case of change
+ */
+int phy_modify_mmd_changed(struct phy_device *phydev, int devad, u32 regnum,
+			   u16 mask, u16 set)
+{
+	int new, ret;
+
+	ret = phy_read_mmd(phydev, devad, regnum);
+	if (ret < 0)
+		return ret;
+
+	new = (ret & ~mask) | set;
+	if (new == ret)
+		return 0;
+
+	ret = phy_write_mmd(phydev, devad, regnum, new);
+
+	return ret < 0 ? ret : 1;
+}
+
+/**
+ * phy_modify_mmd - Convenience function for modifying a register on MMD
+ * @phydev: the phy_device struct
+ * @devad: the MMD containing register to modify
+ * @regnum: register number to modify
+ * @mask: bit mask of bits to clear
+ * @set: new value of bits set in mask to write to @regnum
+ *
+ * NOTE: MUST NOT be called from interrupt context,
+ * because the bus read/write functions may wait for an interrupt
+ * to conclude the operation.
+ */
+int phy_modify_mmd(struct phy_device *phydev, int devad, u32 regnum,
+		   u16 mask, u16 set)
+{
+	int ret;
+
+	ret = phy_modify_mmd_changed(phydev, devad, regnum, mask, set);
+
+	return ret < 0 ? ret : 0;
+}
+
+bool phy_interface_is_ncsi(void)
+{
+#ifdef CONFIG_PHY_NCSI
+	struct eth_pdata *pdata = dev_get_plat(eth_get_dev());
+
+	return pdata->phy_interface == PHY_INTERFACE_MODE_NCSI;
+#else
+	return 0;
+#endif
 }

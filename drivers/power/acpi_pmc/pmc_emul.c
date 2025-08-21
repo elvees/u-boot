@@ -6,7 +6,6 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <pci.h>
@@ -37,6 +36,7 @@ static struct pci_bar {
 	{ 0, 0 },
 	{ 0, 0 },
 	{ PCI_BASE_ADDRESS_SPACE_IO, 256 },
+	{ 0, 0 },
 };
 
 struct pmc_emul_priv {

@@ -6,7 +6,6 @@
  * Author: Paul Burton <paul.burton@imgtec.com>
  */
 
-#include <common.h>
 #include <env.h>
 #include <init.h>
 #include <net.h>
@@ -40,7 +39,7 @@ static void ci20_mux_mmc(void)
 	jz4780_clk_ungate_mmc();
 }
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 
 static void ci20_mux_eth(void)
 {
@@ -252,9 +251,9 @@ int checkboard(void)
 	return 0;
 }
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 
-#if defined(CONFIG_SPL_MMC_SUPPORT)
+#if defined(CONFIG_SPL_MMC)
 int board_mmc_init(struct bd_info *bd)
 {
 	ci20_mux_mmc();
@@ -349,10 +348,6 @@ static const struct jz4780_ddr_config H5TQ2G83CFR_48_config = {
 	.pullup = 0x0e,
 	.pulldn = 0x0e,
 };
-
-#if (CONFIG_SYS_MHZ != 1200)
-#error No DDR configuration for CPU speed
-#endif
 
 const struct jz4780_ddr_config *jz4780_get_ddr_config(void)
 {

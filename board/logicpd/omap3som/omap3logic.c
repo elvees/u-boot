@@ -10,12 +10,11 @@
  *	Richard Woodruff <r-woodruff2@ti.com>
  *	Syed Mohammed Khasim <khasim@ti.com>
  */
-#include <common.h>
+#include <config.h>
 #include <dm.h>
 #include <init.h>
 #include <net.h>
 #include <ns16550.h>
-#include <flash.h>
 #include <nand.h>
 #include <i2c.h>
 #include <serial.h>
@@ -59,7 +58,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define LOGIC_MT28_OMAP35_ASYNC_GPMC_CONFIG6	0x09030000
 #define LOGIC_MT28_OMAP35_ASYNC_GPMC_CONFIG7	0x00000C50
 
-#define CONFIG_SMC911X_BASE 0x08000000
+#define CFG_SMC911X_BASE 0x08000000
 
 #ifdef CONFIG_SPL_OS_BOOT
 int spl_start_uboot(void)
@@ -69,7 +68,7 @@ int spl_start_uboot(void)
 }
 #endif
 
-#if defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_XPL_BUILD)
 /*
  * Routine: get_board_mem_timings
  * Description: If we use SPL then there is no x-loader nor config header
@@ -227,7 +226,7 @@ int board_late_init(void)
 
 #ifdef CONFIG_SMC911X
 	enable_gpmc_cs_config(gpmc_lan92xx_config, &gpmc_cfg->cs[1],
-			CONFIG_SMC911X_BASE, GPMC_SIZE_16M);
+			CFG_SMC911X_BASE, GPMC_SIZE_16M);
 #endif
 	return 0;
 }

@@ -11,7 +11,6 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
@@ -74,7 +73,7 @@ static void pciauto_show_region(const char *name, struct pci_region *region)
 {
 	pciauto_region_init(region);
 	debug("PCI Autoconfig: Bus %s region: [%llx-%llx],\n"
-	      "\t\tPhysical Memory [%llx-%llxx]\n", name,
+	      "\t\tPhysical Memory [%llx-%llx]\n", name,
 	      (unsigned long long)region->bus_start,
 	      (unsigned long long)(region->bus_start + region->size - 1),
 	      (unsigned long long)region->phys_start,
@@ -108,7 +107,6 @@ void pciauto_config_init(struct pci_controller *hose)
 			break;
 		}
 	}
-
 
 	if (hose->pci_mem)
 		pciauto_show_region("Memory", hose->pci_mem);

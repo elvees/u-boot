@@ -12,6 +12,7 @@
 #include <linux/errno.h>
 #include <linux/io.h>
 #include <linux/log2.h>
+#include <linux/printk.h>
 
 #include "../init.h"
 #include "../sg-regs.h"
@@ -213,7 +214,7 @@ int uniphier_boot_from_backend(void)
 	return !!(readl(sg_base + SG_PINMON0) & BIT(27));
 }
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 
 static int do_pinmon(struct cmd_tbl *cmdtp, int flag, int argc,
 		     char *const argv[])
@@ -266,4 +267,4 @@ U_BOOT_CMD(
 	""
 );
 
-#endif /* !CONFIG_SPL_BUILD */
+#endif /* !CONFIG_XPL_BUILD */

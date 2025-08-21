@@ -4,7 +4,6 @@
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  */
 
-#include <common.h>
 #include <command.h>
 #include <log.h>
 #include <net.h>
@@ -14,11 +13,6 @@
 #include "rarp.h"
 
 #define TIMEOUT 5000UL /* Milliseconds before trying BOOTP again */
-#ifndef	CONFIG_NET_RETRY_COUNT
-#define TIMEOUT_COUNT 5 /* # of timeouts before giving up  */
-#else
-#define TIMEOUT_COUNT (CONFIG_NET_RETRY_COUNT)
-#endif
 
 int rarp_try;
 
@@ -51,13 +45,12 @@ void rarp_receive(struct ip_udp_hdr *ip, unsigned len)
 	}
 }
 
-
 /*
  *	Timeout on BOOTP request.
  */
 static void rarp_timeout_handler(void)
 {
-	if (rarp_try >= TIMEOUT_COUNT) {
+	if (rarp_try >= CONFIG_NET_RETRY_COUNT) {
 		puts("\nRetry count exceeded; starting again\n");
 		net_start_again();
 	} else {
@@ -65,7 +58,6 @@ static void rarp_timeout_handler(void)
 		rarp_request();
 	}
 }
-
 
 void rarp_request(void)
 {

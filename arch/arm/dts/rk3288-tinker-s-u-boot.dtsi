@@ -14,21 +14,26 @@
 };
 
 &emmc {
-	u-boot,dm-spl;
-};
-
-&emmc_clk {
-	u-boot,dm-spl;
-};
-
-&emmc_cmd {
-	u-boot,dm-spl;
-};
-
-&emmc_pwr {
-	u-boot,dm-spl;
+	bootph-pre-ram;
+	bootph-some-ram;
 };
 
 &emmc_bus8 {
-	u-boot,dm-spl;
+	bootph-pre-ram;
+	bootph-some-ram;
+};
+
+&emmc_clk {
+	bootph-pre-ram;
+	bootph-some-ram;
+};
+
+&emmc_cmd {
+	bootph-pre-ram;
+	bootph-some-ram;
+};
+
+&emmc_pwr {
+	bootph-pre-ram;
+	bootph-some-ram;
 };

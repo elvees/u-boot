@@ -5,20 +5,21 @@
  * Freescale T2080RDB board-specific CPLD controlling supports.
  */
 
-#include <common.h>
+#include <config.h>
 #include <command.h>
+#include <asm/io.h>
 #include "cpld.h"
 
 u8 cpld_read(unsigned int reg)
 {
-	void *p = (void *)CONFIG_SYS_CPLD_BASE;
+	void *p = (void *)CFG_SYS_CPLD_BASE;
 
 	return in_8(p + reg);
 }
 
 void cpld_write(unsigned int reg, u8 value)
 {
-	void *p = (void *)CONFIG_SYS_CPLD_BASE;
+	void *p = (void *)CFG_SYS_CPLD_BASE;
 
 	out_8(p + reg, value);
 }

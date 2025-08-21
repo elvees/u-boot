@@ -1,5 +1,4 @@
 #include <config.h>
-#include <common.h>
 #include <watchdog.h>
 
 /*-------------------------------------------------------------*/
@@ -61,9 +60,7 @@
   For more information on these sources, see the manual.
 --*/
 
-
 #include "bzlib_private.h"
-
 
 /*---------------------------------------------------*/
 static
@@ -77,7 +74,6 @@ void makeMaps_d ( DState* s )
 	 s->nInUse++;
       }
 }
-
 
 /*---------------------------------------------------*/
 #define RETURN(rrr)                               \
@@ -143,7 +139,6 @@ void makeMaps_d ( DState* s )
       RETURN(BZ_DATA_ERROR);                      \
    lval = gPerm[zvec - gBase[zn]];                \
 }
-
 
 /*---------------------------------------------------*/
 Int32 BZ2_decompress ( DState* s )
@@ -418,7 +413,7 @@ Int32 BZ2_decompress ( DState* s )
       while (True) {
 
 #if defined(CONFIG_HW_WATCHDOG) || defined(CONFIG_WATCHDOG)
-	WATCHDOG_RESET();
+	schedule();
 #endif
 	 if (nextSym == EOB) break;
 
@@ -503,7 +498,7 @@ Int32 BZ2_decompress ( DState* s )
 		     kk = MTFA_SIZE-1;
 		     for (ii = 256 / MTFL_SIZE-1; ii >= 0; ii--) {
 #if defined(CONFIG_HW_WATCHDOG) || defined(CONFIG_WATCHDOG)
-			WATCHDOG_RESET();
+			schedule();
 #endif
 			for (jj = MTFL_SIZE-1; jj >= 0; jj--) {
 			   s->mtfa[kk] = s->mtfa[s->mtfbase[ii] + jj];
@@ -568,7 +563,7 @@ Int32 BZ2_decompress ( DState* s )
 	    while (i != s->origPtr);
 
 #if defined(CONFIG_HW_WATCHDOG) || defined(CONFIG_WATCHDOG)
-	WATCHDOG_RESET();
+	schedule();
 #endif
 	 s->tPos = s->origPtr;
 	 s->nblock_used = 0;
@@ -583,7 +578,7 @@ Int32 BZ2_decompress ( DState* s )
       } else {
 
 #if defined(CONFIG_HW_WATCHDOG) || defined(CONFIG_WATCHDOG)
-	WATCHDOG_RESET();
+	schedule();
 #endif
 	 /*-- compute the T^(-1) vector --*/
 	 for (i = 0; i < nblock; i++) {
@@ -605,7 +600,6 @@ Int32 BZ2_decompress ( DState* s )
       }
 
       RETURN(BZ_OK);
-
 
     endhdr_2:
 
@@ -667,7 +661,6 @@ Int32 BZ2_decompress ( DState* s )
 
    return retVal;
 }
-
 
 /*-------------------------------------------------------------*/
 /*--- end                                      decompress.c ---*/

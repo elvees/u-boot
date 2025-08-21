@@ -20,9 +20,23 @@ F:	board/sandbox/
 F:	include/configs/sandbox_spl.h
 F:	configs/sandbox_spl_defconfig
 
+SANDBOX NOINST BOARD
+M:	Simon Glass <sjg@chromium.org>
+S:	Maintained
+F:	board/sandbox/
+F:	include/configs/sandbox_spl.h
+F:	configs/sandbox_noinst_defconfig
+
 SANDBOX FLAT TREE BOARD
 M:	Simon Glass <sjg@chromium.org>
 S:	Maintained
 F:	board/sandbox/
 F:	include/configs/sandbox.h
 F:	configs/sandbox_flattree_defconfig
+
+SANDBOX VPL BOARD
+M:	Simon Glass <sjg@chromium.org>
+S:	Maintained
+F:	board/sandbox/
+F:	include/configs/sandbox_spl.h
+F:	configs/sandbox_vpl_defconfig

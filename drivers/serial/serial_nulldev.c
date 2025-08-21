@@ -3,7 +3,6 @@
  * Copyright (c) 2015 National Instruments
  */
 
-#include <common.h>
 #include <dm.h>
 #include <serial.h>
 
@@ -22,11 +21,6 @@ static int nulldev_serial_pending(struct udevice *dev, bool input)
 	return 0;
 }
 
-static int nulldev_serial_input(struct udevice *dev)
-{
-	return 0;
-}
-
 static int nulldev_serial_putc(struct udevice *dev, const char ch)
 {
 	return 0;
@@ -36,7 +30,6 @@ static const struct udevice_id nulldev_serial_ids[] = {
 	{ .compatible = "nulldev-serial" },
 	{ }
 };
-
 
 const struct dm_serial_ops nulldev_serial_ops = {
 	.putc = nulldev_serial_putc,

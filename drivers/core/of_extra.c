@@ -4,12 +4,12 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
 #include <log.h>
 #include <linux/libfdt.h>
 #include <dm/of_access.h>
 #include <dm/of_extra.h>
 #include <dm/ofnode.h>
+#include <dm/util.h>
 
 int ofnode_read_fmap_entry(ofnode node, struct fmap_entry *entry)
 {
@@ -17,13 +17,13 @@ int ofnode_read_fmap_entry(ofnode node, struct fmap_entry *entry)
 	ofnode subnode;
 
 	if (ofnode_read_u32(node, "image-pos", &entry->offset)) {
-		debug("Node '%s' has bad/missing 'image-pos' property\n",
-		      ofnode_get_name(node));
+		dm_warn("Node '%s' has bad/missing 'image-pos' property\n",
+			ofnode_get_name(node));
 		return log_msg_ret("image-pos", -ENOENT);
 	}
 	if (ofnode_read_u32(node, "size", &entry->length)) {
-		debug("Node '%s' has bad/missing 'size' property\n",
-		      ofnode_get_name(node));
+		dm_warn("Node '%s' has bad/missing 'size' property\n",
+			ofnode_get_name(node));
 		return log_msg_ret("size", -ENOENT);
 	}
 	entry->used = ofnode_read_s32_default(node, "used", entry->length);
@@ -31,6 +31,8 @@ int ofnode_read_fmap_entry(ofnode node, struct fmap_entry *entry)
 	if (prop) {
 		if (!strcmp(prop, "lz4"))
 			entry->compress_algo = FMAP_COMPRESS_LZ4;
+		else if (!strcmp(prop, "lzma"))
+			entry->compress_algo = FMAP_COMPRESS_LZMA;
 		else
 			return log_msg_ret("compression algo", -EINVAL);
 	} else {
@@ -56,17 +58,17 @@ int ofnode_decode_region(ofnode node, const char *prop_name, fdt_addr_t *basep,
 	const fdt_addr_t *cell;
 	int len;
 
-	debug("%s: %s: %s\n", __func__, ofnode_get_name(node), prop_name);
+	log_debug("%s: %s: %s\n", __func__, ofnode_get_name(node), prop_name);
 	cell = ofnode_get_property(node, prop_name, &len);
 	if (!cell || (len < sizeof(fdt_addr_t) * 2)) {
-		debug("cell=%p, len=%d\n", cell, len);
+		dm_warn("cell=%p, len=%d\n", cell, len);
 		return -1;
 	}
 
 	*basep = fdt_addr_to_cpu(*cell);
 	*sizep = fdt_size_to_cpu(cell[1]);
-	debug("%s: base=%08lx, size=%lx\n", __func__, (ulong)*basep,
-	      (ulong)*sizep);
+	log_debug("%s: base=%08lx, size=%lx\n", __func__, (ulong)*basep,
+		  (ulong)*sizep);
 
 	return 0;
 }
@@ -84,7 +86,7 @@ int ofnode_decode_memory_region(ofnode config_node, const char *mem_type,
 	if (!ofnode_valid(config_node)) {
 		config_node = ofnode_path("/config");
 		if (!ofnode_valid(config_node)) {
-			debug("%s: Cannot find /config node\n", __func__);
+			dm_warn("%s: Cannot find /config node\n", __func__);
 			return -ENOENT;
 		}
 	}
@@ -95,14 +97,14 @@ int ofnode_decode_memory_region(ofnode config_node, const char *mem_type,
 		 suffix);
 	mem = ofnode_read_string(config_node, prop_name);
 	if (!mem) {
-		debug("%s: No memory type for '%s', using /memory\n", __func__,
-		      prop_name);
+		dm_warn("%s: No memory type for '%s', using /memory\n", __func__,
+			prop_name);
 		mem = "/memory";
 	}
 
 	node = ofnode_path(mem);
 	if (!ofnode_valid(node)) {
-		debug("%s: Failed to find node '%s'\n", __func__, mem);
+		dm_warn("%s: Failed to find node '%s'\n", __func__, mem);
 		return -ENOENT;
 	}
 
@@ -111,8 +113,8 @@ int ofnode_decode_memory_region(ofnode config_node, const char *mem_type,
 	 * use the first
 	 */
 	if (ofnode_decode_region(node, "reg", &base, &size)) {
-		debug("%s: Failed to decode memory region %s\n", __func__,
-		      mem);
+		dm_warn("%s: Failed to decode memory region %s\n", __func__,
+			mem);
 		return -EINVAL;
 	}
 
@@ -120,8 +122,8 @@ int ofnode_decode_memory_region(ofnode config_node, const char *mem_type,
 		 suffix);
 	if (ofnode_decode_region(config_node, prop_name, &offset,
 				 &offset_size)) {
-		debug("%s: Failed to decode memory region '%s'\n", __func__,
-		      prop_name);
+		dm_warn("%s: Failed to decode memory region '%s'\n", __func__,
+			prop_name);
 		return -EINVAL;
 	}
 
@@ -129,4 +131,39 @@ int ofnode_decode_memory_region(ofnode config_node, const char *mem_type,
 	*sizep = offset_size;
 
 	return 0;
+}
+
+bool ofnode_phy_is_fixed_link(ofnode eth_node, ofnode *phy_node)
+{
+	ofnode node, subnode;
+	int len;
+
+	subnode = ofnode_find_subnode(eth_node, "fixed-link");
+	if (ofnode_valid(subnode)) {
+		/* new binding */
+		node = subnode;
+	} else if (ofnode_get_property(eth_node, "fixed-link", &len) &&
+		   len == (5 * sizeof(__be32))) {
+		/* old binding */
+		node = eth_node;
+	} else {
+		return false;
+	}
+
+	if (phy_node)
+		*phy_node = node;
+
+	return true;
+}
+
+bool ofnode_eth_uses_inband_aneg(ofnode eth_node)
+{
+	bool inband_aneg = false;
+	const char *managed;
+
+	managed = ofnode_read_string(eth_node, "managed");
+	if (managed && !strcmp(managed, "in-band-status"))
+		inband_aneg = true;
+
+	return inband_aneg;
 }

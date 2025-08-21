@@ -4,3 +4,4 @@
 # Usama Arif <usama.arif@arm.com>
 
 obj-y	:= total_compute.o
+obj-$(CONFIG_OF_HAS_PRIOR_STAGE)	+= lowlevel_init.o

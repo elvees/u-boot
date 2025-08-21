@@ -12,7 +12,6 @@
  * Copyright (C) 2010 Linus Walleij for ST-Ericsson
  */
 
-#include <common.h>
 #include <dm.h>
 #include <timer.h>
 #include <asm/io.h>
@@ -67,14 +66,11 @@ static int nomadik_mtu_probe(struct udevice *dev)
 	struct timer_dev_priv *uc_priv = dev_get_uclass_priv(dev);
 	struct nomadik_mtu_priv *priv = dev_get_priv(dev);
 	struct nomadik_mtu_regs *mtu;
-	fdt_addr_t addr;
 	u32 prescale;
 
-	addr = dev_read_addr(dev);
-	if (addr == FDT_ADDR_T_NONE)
+	mtu = dev_read_addr_ptr(dev);
+	if (!mtu)
 		return -EINVAL;
-
-	mtu = (struct nomadik_mtu_regs *)addr;
 	priv->timer = mtu->timers; /* Use first timer */
 
 	if (!uc_priv->clock_rate)

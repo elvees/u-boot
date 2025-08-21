@@ -9,13 +9,13 @@
  * numbers) are rounded to within 0.5 ulp.  PR other/14354.
  */
 
-#include <common.h>
+#include <config.h>
 
 #include <post.h>
 
 GNU_FPOST_ATTR
 
-#if CONFIG_POST & CONFIG_SYS_POST_FPU
+#if CFG_POST & CFG_SYS_POST_FPU
 
 union uf
 {
@@ -82,4 +82,4 @@ int fpu_post_test_math7 (void)
 	return 0;
 }
 
-#endif /* CONFIG_POST & CONFIG_SYS_POST_FPU */
+#endif /* CFG_POST & CFG_SYS_POST_FPU */

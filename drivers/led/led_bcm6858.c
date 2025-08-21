@@ -7,7 +7,6 @@
  * drivers/led/led_bcm6358.c
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <led.h>
@@ -18,6 +17,7 @@
 
 #define LEDS_MAX		32
 #define LEDS_WAIT		100
+#define LEDS_MAX_BRIGHTNESS	7
 
 /* LED Mode register */
 #define LED_MODE_REG		0x0
@@ -38,6 +38,8 @@
 #define LED_HW_LED_EN_REG		0x08
 /* LED Flash control register0 */
 #define LED_FLASH_RATE_CONTROL_REG0	0x10
+/* LED Brightness control register0 */
+#define LED_BRIGHTNESS_CONTROL_REG0	0x20
 /* Soft LED input register */
 #define LED_SW_LED_IP_REG		0xb8
 /* Parallel LED Output Polarity Register */
@@ -96,6 +98,27 @@ static int bcm6858_led_set_period(struct udevice *dev, int period_ms)
 }
 #endif
 
+static int led_set_brightness(struct udevice *dev, unsigned int brightness)
+{
+	struct bcm6858_led_priv *priv = dev_get_priv(dev);
+	u32 offset, shift, mask, value;
+
+	offset = (priv->pin / 8) * 4;
+	shift  = (priv->pin % 8) * 4;
+	mask   = 0xf << shift;
+
+	/* 8 levels of brightness achieved through PWM */
+	value = (brightness > LEDS_MAX_BRIGHTNESS ?
+			LEDS_MAX_BRIGHTNESS : brightness) << shift;
+
+	debug("%s: %s brightness set to %u\n", __func__, dev->name, value >> shift);
+
+	clrbits_32(priv->regs + LED_BRIGHTNESS_CONTROL_REG0 + offset, mask);
+	setbits_32(priv->regs + LED_BRIGHTNESS_CONTROL_REG0 + offset, value);
+
+	return 0;
+}
+
 static enum led_state_t bcm6858_led_get_state(struct udevice *dev)
 {
 	struct bcm6858_led_priv *priv = dev_get_priv(dev);
@@ -112,6 +135,8 @@ static enum led_state_t bcm6858_led_get_state(struct udevice *dev)
 static int bcm6858_led_set_state(struct udevice *dev, enum led_state_t state)
 {
 	struct bcm6858_led_priv *priv = dev_get_priv(dev);
+
+	debug("%s: Set led %s to %d\n", __func__, dev->name, state);
 
 	switch (state) {
 	case LEDST_OFF:
@@ -154,83 +179,83 @@ static const struct led_ops bcm6858_led_ops = {
 
 static int bcm6858_led_probe(struct udevice *dev)
 {
-	struct led_uc_plat *uc_plat = dev_get_uclass_plat(dev);
+	struct bcm6858_led_priv *priv = dev_get_priv(dev);
+	void __iomem *regs;
+	unsigned int pin, brightness;
 
-	/* Top-level LED node */
-	if (!uc_plat->label) {
-		void __iomem *regs;
-		u32 set_bits = 0;
+	regs = dev_remap_addr(dev_get_parent(dev));
+	if (!regs)
+		return -EINVAL;
 
-		regs = dev_remap_addr(dev);
-		if (!regs)
-			return -EINVAL;
+	pin = dev_read_u32_default(dev, "reg", LEDS_MAX);
+	if (pin >= LEDS_MAX)
+		return -EINVAL;
 
-		if (dev_read_bool(dev, "brcm,serial-led-msb-first"))
-			set_bits |= LED_CTRL_SERIAL_LED_MSB_FIRST;
-		if (dev_read_bool(dev, "brcm,serial-led-en-pol"))
-			set_bits |= LED_CTRL_SERIAL_LED_EN_POL;
-		if (dev_read_bool(dev, "brcm,serial-led-clk-pol"))
-			set_bits |= LED_CTRL_SERIAL_LED_CLK_POL;
-		if (dev_read_bool(dev, "brcm,serial-led-data-ppol"))
-			set_bits |= LED_CTRL_SERIAL_LED_DATA_PPOL;
-		if (dev_read_bool(dev, "brcm,led-test-mode"))
-			set_bits |= LED_CTRL_LED_TEST_MODE;
+	priv->regs = regs;
+	priv->pin = pin;
 
-		clrsetbits_32(regs + LED_CTRL_REG, ~0, set_bits);
-	} else {
-		struct bcm6858_led_priv *priv = dev_get_priv(dev);
-		void __iomem *regs;
-		unsigned int pin;
+	/* this led is managed by software */
+	clrbits_32(regs + LED_HW_LED_EN_REG, 1 << pin);
 
-		regs = dev_remap_addr(dev_get_parent(dev));
-		if (!regs)
-			return -EINVAL;
+	/* configure the polarity */
+	if (dev_read_bool(dev, "active-low"))
+		clrbits_32(regs + LED_PLED_OP_PPOL_REG, 1 << pin);
+	else
+		setbits_32(regs + LED_PLED_OP_PPOL_REG, 1 << pin);
 
-		pin = dev_read_u32_default(dev, "reg", LEDS_MAX);
-		if (pin >= LEDS_MAX)
-			return -EINVAL;
-
-		priv->regs = regs;
-		priv->pin = pin;
-
-		/* this led is managed by software */
-		clrbits_32(regs + LED_HW_LED_EN_REG, 1 << pin);
-
-		/* configure the polarity */
-		if (dev_read_bool(dev, "active-low"))
-			clrbits_32(regs + LED_PLED_OP_PPOL_REG, 1 << pin);
-		else
-			setbits_32(regs + LED_PLED_OP_PPOL_REG, 1 << pin);
-	}
+	brightness = dev_read_u32_default(dev, "default-brightness",
+						  LEDS_MAX_BRIGHTNESS);
+	led_set_brightness(dev, brightness);
 
 	return 0;
 }
 
-static int bcm6858_led_bind(struct udevice *parent)
+U_BOOT_DRIVER(bcm6858_led) = {
+	.name = "bcm6858-led",
+	.id = UCLASS_LED,
+	.probe = bcm6858_led_probe,
+	.priv_auto	= sizeof(struct bcm6858_led_priv),
+	.ops = &bcm6858_led_ops,
+};
+
+static int bcm6858_led_wrap_probe(struct udevice *dev)
+{
+	void __iomem *regs;
+	u32 set_bits = 0;
+
+	regs = dev_remap_addr(dev);
+	if (!regs)
+		return -EINVAL;
+
+	if (dev_read_bool(dev, "brcm,serial-led-msb-first"))
+		set_bits |= LED_CTRL_SERIAL_LED_MSB_FIRST;
+	if (dev_read_bool(dev, "brcm,serial-led-en-pol"))
+		set_bits |= LED_CTRL_SERIAL_LED_EN_POL;
+	if (dev_read_bool(dev, "brcm,serial-led-clk-pol"))
+		set_bits |= LED_CTRL_SERIAL_LED_CLK_POL;
+	if (dev_read_bool(dev, "brcm,serial-led-data-ppol"))
+		set_bits |= LED_CTRL_SERIAL_LED_DATA_PPOL;
+	if (dev_read_bool(dev, "brcm,led-test-mode"))
+		set_bits |= LED_CTRL_LED_TEST_MODE;
+
+	clrsetbits_32(regs + LED_CTRL_REG, ~0, set_bits);
+
+	return 0;
+}
+
+static int bcm6858_led_wrap_bind(struct udevice *parent)
 {
 	ofnode node;
 
 	dev_for_each_subnode(node, parent) {
-		struct led_uc_plat *uc_plat;
 		struct udevice *dev;
-		const char *label;
 		int ret;
-
-		label = ofnode_read_string(node, "label");
-		if (!label) {
-			debug("%s: node %s has no label\n", __func__,
-			      ofnode_get_name(node));
-			return -EINVAL;
-		}
 
 		ret = device_bind_driver_to_node(parent, "bcm6858-led",
 						 ofnode_get_name(node),
 						 node, &dev);
 		if (ret)
 			return ret;
-
-		uc_plat = dev_get_uclass_plat(dev);
-		uc_plat->label = label;
 	}
 
 	return 0;
@@ -241,12 +266,10 @@ static const struct udevice_id bcm6858_led_ids[] = {
 	{ /* sentinel */ }
 };
 
-U_BOOT_DRIVER(bcm6858_led) = {
-	.name = "bcm6858-led",
-	.id = UCLASS_LED,
+U_BOOT_DRIVER(bcm6858_led_wrap) = {
+	.name	= "bcm6858_led_wrap",
+	.id	= UCLASS_NOP,
 	.of_match = bcm6858_led_ids,
-	.bind = bcm6858_led_bind,
-	.probe = bcm6858_led_probe,
-	.priv_auto	= sizeof(struct bcm6858_led_priv),
-	.ops = &bcm6858_led_ops,
+	.probe = bcm6858_led_wrap_probe,
+	.bind = bcm6858_led_wrap_bind,
 };

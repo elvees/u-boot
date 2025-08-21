@@ -188,7 +188,7 @@ static void add_end_cmd(void)
 void pbl_load_uboot(int ifd, struct image_tool_params *params)
 {
 	FILE *fp_uboot;
-	int size;
+	int size, ret;
 
 	/* parse the rcw.cfg file. */
 	pbl_parser(params->imagename);
@@ -208,7 +208,12 @@ void pbl_load_uboot(int ifd, struct image_tool_params *params)
 		fclose(fp_uboot);
 	}
 	add_end_cmd();
-	lseek(ifd, 0, SEEK_SET);
+	ret = lseek(ifd, 0, SEEK_SET);
+	if (ret < 0) {
+		fprintf(stderr, "%s: lseek error %s\n",
+			__func__, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
 
 	size = pbl_size;
 	if (write(ifd, (const void *)&mem_buf, size) != size) {
@@ -230,25 +235,31 @@ static int pblimage_verify_header(unsigned char *ptr, int image_size,
 			struct image_tool_params *params)
 {
 	struct pbl_header *pbl_hdr = (struct pbl_header *) ptr;
+	uint32_t rcwheader;
+
+	if (params->arch == IH_ARCH_ARM)
+		rcwheader = RCW_ARM_HEADER;
+	else
+		rcwheader = RCW_PPC_HEADER;
 
 	/* Only a few checks can be done: search for magic numbers */
 	if (ENDIANNESS == 'l') {
 		if (pbl_hdr->preamble != reverse_byte(RCW_PREAMBLE))
 			return -FDT_ERR_BADSTRUCTURE;
 
-		if (pbl_hdr->rcwheader != reverse_byte(RCW_HEADER))
+		if (pbl_hdr->rcwheader != reverse_byte(rcwheader))
 			return -FDT_ERR_BADSTRUCTURE;
 	} else {
 		if (pbl_hdr->preamble != RCW_PREAMBLE)
 			return -FDT_ERR_BADSTRUCTURE;
 
-		if (pbl_hdr->rcwheader != RCW_HEADER)
+		if (pbl_hdr->rcwheader != rcwheader)
 			return -FDT_ERR_BADSTRUCTURE;
 	}
 	return 0;
 }
 
-static void pblimage_print_header(const void *ptr)
+static void pblimage_print_header(const void *ptr, struct image_tool_params *params)
 {
 	printf("Image Type:   Freescale PBL Boot Image\n");
 }

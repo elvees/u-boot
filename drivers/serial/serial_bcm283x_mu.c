@@ -14,7 +14,6 @@
 
 /* Simple U-Boot driver for the BCM283x mini UART */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <watchdog.h>
@@ -114,7 +113,7 @@ static int bcm283x_mu_serial_pending(struct udevice *dev, bool input)
 	lsr = readl(&regs->lsr);
 
 	if (input) {
-		WATCHDOG_RESET();
+		schedule();
 		return (lsr & BCM283X_MU_LSR_RX_READY) ? 1 : 0;
 	} else {
 		return (lsr & BCM283X_MU_LSR_TX_IDLE) ? 0 : 1;
@@ -140,14 +139,14 @@ static const struct udevice_id bcm283x_mu_serial_id[] = {
  * The serial device will only work properly if it has been muxed to the serial
  * pins by firmware. Check whether that happened here.
  *
- * @return true if serial device is muxed, false if not
+ * Return: true if serial device is muxed, false if not
  */
 static bool bcm283x_is_serial_muxed(void)
 {
 	int serial_gpio = 15;
 	struct udevice *dev;
 
-	if (uclass_first_device(UCLASS_PINCTRL, &dev) || !dev)
+	if (uclass_first_device_err(UCLASS_PINCTRL, &dev))
 		return false;
 
 	if (pinctrl_get_gpio_mux(dev, 0, serial_gpio) != BCM2835_GPIO_ALT5)
@@ -197,7 +196,7 @@ U_BOOT_DRIVER(serial_bcm283x_mu) = {
 	.plat_auto	= sizeof(struct bcm283x_mu_serial_plat),
 	.probe = bcm283x_mu_serial_probe,
 	.ops = &bcm283x_mu_serial_ops,
-#if !CONFIG_IS_ENABLED(OF_CONTROL) || CONFIG_IS_ENABLED(OF_BOARD)
+#if !CONFIG_IS_ENABLED(OF_CONTROL) || IS_ENABLED(CONFIG_OF_BOARD)
 	.flags = DM_FLAG_PRE_RELOC,
 #endif
 	.priv_auto	= sizeof(struct bcm283x_mu_priv),

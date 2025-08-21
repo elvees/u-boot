@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * (C) Copyright 2019, Xilinx, Inc,
- * Siva Durga Prasad Paladugu <siva.durga.paladugu@xilinx.com>
+ * Siva Durga Prasad Paladugu <siva.durga.prasad.paladugu@amd.com>>
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <log.h>
 #include <asm/arch/sys_proto.h>
@@ -27,7 +26,7 @@ static ulong versal_align_dma_buffer(ulong *buf, u32 len)
 }
 
 static int versal_load(xilinx_desc *desc, const void *buf, size_t bsize,
-		       bitstream_type bstype)
+		       bitstream_type bstype, int flags)
 {
 	ulong bin_buf;
 	int ret;
@@ -42,8 +41,15 @@ static int versal_load(xilinx_desc *desc, const void *buf, size_t bsize,
 	buf_lo = lower_32_bits(bin_buf);
 	buf_hi = upper_32_bits(bin_buf);
 
-	ret = xilinx_pm_request(VERSAL_PM_LOAD_PDI, VERSAL_PM_PDI_TYPE, buf_lo,
-				buf_hi, 0, ret_payload);
+
+	if (desc->family == xilinx_versal2) {
+		ret = xilinx_pm_request(VERSAL_PM_LOAD_PDI, VERSAL_PM_PDI_TYPE, buf_hi,
+					buf_lo, 0, ret_payload);
+	} else {
+		ret = xilinx_pm_request(VERSAL_PM_LOAD_PDI, VERSAL_PM_PDI_TYPE, buf_lo,
+					buf_hi, 0, ret_payload);
+	}
+
 	if (ret)
 		printf("PL FPGA LOAD failed with err: 0x%08x\n", ret);
 

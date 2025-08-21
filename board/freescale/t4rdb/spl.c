@@ -5,7 +5,7 @@
  * Author: Chunhe Lan <Chunhe.Lan@freescale.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <clock_legacy.h>
 #include <console.h>
 #include <env_internal.h>
@@ -30,20 +30,10 @@ phys_size_t get_effective_memsize(void)
 	return CONFIG_SYS_L3_SIZE;
 }
 
-unsigned long get_board_sys_clk(void)
-{
-	return CONFIG_SYS_CLK_FREQ;
-}
-
-unsigned long get_board_ddr_clk(void)
-{
-	return CONFIG_DDR_CLK_FREQ;
-}
-
 void board_init_f(ulong bootflag)
 {
 	u32 plat_ratio, sys_clk, ccb_clk;
-	ccsr_gur_t *gur = (void *)CONFIG_SYS_MPC85xx_GUTS_ADDR;
+	ccsr_gur_t *gur = (void *)CFG_SYS_MPC85xx_GUTS_ADDR;
 
 	/* Memcpy existing GD at CONFIG_SPL_GD_ADDR */
 	memcpy((void *)CONFIG_SPL_GD_ADDR, (void *)gd, sizeof(gd_t));
@@ -61,7 +51,7 @@ void board_init_f(ulong bootflag)
 	plat_ratio = (in_be32(&gur->rcwsr[0]) >> 25) & 0x1f;
 	ccb_clk = sys_clk * plat_ratio / 2;
 
-	ns16550_init((struct ns16550 *)CONFIG_SYS_NS16550_COM1,
+	ns16550_init((struct ns16550 *)CFG_SYS_NS16550_COM1,
 		     ccb_clk / 16 / CONFIG_BAUDRATE);
 
 	puts("\nSD boot...\n");

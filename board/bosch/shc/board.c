@@ -8,10 +8,10 @@
  * Based on:
  * Board functions for TI AM335X based boards
  *
- * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
+ * Copyright (C) 2011, Texas Instruments, Incorporated - https://www.ti.com/
  */
 
-#include <common.h>
+#include <config.h>
 #include <bootstage.h>
 #include <cpu_func.h>
 #include <env.h>
@@ -34,6 +34,7 @@
 #include <asm/emif.h>
 #include <asm/gpio.h>
 #include <i2c.h>
+#include <i2c_eeprom.h>
 #include <miiphy.h>
 #include <cpsw.h>
 #include <linux/delay.h>
@@ -45,7 +46,7 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-static struct shc_eeprom __attribute__((section(".data"))) header;
+static struct shc_eeprom __section(".data") header;
 static int shc_eeprom_valid;
 
 /*
@@ -53,18 +54,19 @@ static int shc_eeprom_valid;
  */
 static int read_eeprom(void)
 {
+	struct udevice *dev;
+	int ret;
+
 	/* Check if baseboard eeprom is available */
-	if (i2c_probe(CONFIG_SYS_I2C_EEPROM_ADDR)) {
-		puts("Could not probe the EEPROM; something fundamentally wrong on the I2C bus.\n");
-		return -ENODEV;
+	ret = uclass_first_device_err(UCLASS_I2C_EEPROM, &dev);
+	if (ret) {
+		puts("Could not find EEPROM.\n");
+		return ret;
 	}
 
-	/* read the eeprom using i2c */
-	if (i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0, 2, (uchar *)&header,
-		     sizeof(header))) {
-		puts("Could not read the EEPROM; something fundamentally wrong on the I2C bus.\n");
-		return -EIO;
-	}
+	ret = i2c_eeprom_read(dev, 0, (uint8_t *)&header, sizeof(header));
+	if (ret)
+		return ret;
 
 	if (header.magic != HDR_MAGIC) {
 		printf("Incorrect magic number (0x%x) in EEPROM\n",
@@ -114,7 +116,7 @@ static void __maybe_unused force_modules_running(void)
 	gpio_direction_output(WIFI_REGEN_GPIO, 1);
 	/*
 	 * Wait for Wi-Fi power regulator to reach a stable voltage
-	 * (soft-start time, max. 350 µs)
+	 * (soft-start time, max. 350 us)
 	 */
 	__udelay(350);
 
@@ -188,7 +190,7 @@ static void __maybe_unused leds_set_booting(void)
 /*
  * Function to set the LEDs in the state "Bootloader error"
  */
-static void leds_set_failure(int state)
+static void __maybe_unused leds_set_failure(int state)
 {
 #if defined(CONFIG_B_SAMPLE)
 	/* Turn all blue and green LEDs off */
@@ -257,7 +259,7 @@ static void check_button_status(void)
 	}
 }
 
-#if defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_XPL_BUILD)
 #ifdef CONFIG_SPL_OS_BOOT
 int spl_start_uboot(void)
 {
@@ -309,7 +311,7 @@ const struct dpll_params *get_dpll_ddr_params(void)
 const struct dpll_params dpll_mpu_shc_opp100 = {
 		99, MPUPLL_N, 1, -1, -1, -1, -1};
 
-void am33xx_spl_board_init(void)
+void spl_board_init(void)
 {
 	int sil_rev;
 	int mpu_vdd;
@@ -444,11 +446,10 @@ int board_init(void)
 #if defined(CONFIG_HW_WATCHDOG)
 	hw_watchdog_init();
 #endif
-	i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
 	if (read_eeprom() < 0)
 		puts("EEPROM Content Invalid.\n");
 
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE + 0x100;
 #if defined(CONFIG_NOR) || defined(CONFIG_MTD_RAW_NAND)
 	gpmc_init();
 #endif
@@ -472,21 +473,21 @@ int board_late_init(void)
 #endif
 
 #if defined(CONFIG_USB_ETHER) && \
-	(!defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_USB_ETHER))
+	(!defined(CONFIG_XPL_BUILD) || defined(CONFIG_SPL_USB_ETHER))
 int board_eth_init(struct bd_info *bis)
 {
 	return usb_eth_initialize(bis);
 }
 #endif
 
-#ifdef CONFIG_SHOW_BOOT_PROGRESS
+#if CONFIG_IS_ENABLED(BOOTSTAGE)
 static void bosch_check_reset_pin(void)
 {
 	if (readl(GPIO1_BASE + OMAP_GPIO_IRQSTATUS_SET_0) & RESET_MASK) {
 		printf("Resetting ...\n");
 		writel(RESET_MASK, GPIO1_BASE + OMAP_GPIO_IRQSTATUS_SET_0);
 		disable_interrupts();
-		reset_cpu(0);
+		reset_cpu();
 		/*NOTREACHED*/
 	}
 }
@@ -525,9 +526,9 @@ void show_boot_progress(int val)
 		break;
 	}
 }
+#endif
 
 void arch_preboot_os(void)
 {
 	leds_set_finish();
 }
-#endif

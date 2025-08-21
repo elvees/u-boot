@@ -18,6 +18,7 @@ dtb-$(CONFIG_TARGET_P2041RDB) += p2041rdb.dtb
 dtb-$(CONFIG_TARGET_P3041DS) += p3041ds.dtb
 dtb-$(CONFIG_TARGET_P4080DS) += p4080ds.dtb
 dtb-$(CONFIG_TARGET_P5040DS) += p5040ds.dtb
+dtb-$(CONFIG_TARGET_QEMU_PPCE500) += qemu-ppce500.dtb
 dtb-$(CONFIG_TARGET_SOCRATES) += socrates.dtb
 dtb-$(CONFIG_TARGET_T1024RDB) += t1024rdb.dtb
 dtb-$(CONFIG_TARGET_T1042D4RDB) += t1042d4rdb.dtb
@@ -25,17 +26,14 @@ dtb-$(CONFIG_TARGET_T2080QDS) += t2080qds.dtb
 dtb-$(CONFIG_TARGET_T2080RDB) += t2080rdb.dtb
 dtb-$(CONFIG_TARGET_T4240RDB) += t4240rdb.dtb
 dtb-$(CONFIG_TARGET_TUGE1) += kmtuge1.dtb
+dtb-$(CONFIG_TARGET_TURRIS_1X) += turris1x.dtb
 dtb-$(CONFIG_TARGET_TUXX1) += kmtuxa1.dtb
 dtb-$(CONFIG_TARGET_MCR3000) += mcr3000.dtb
 dtb-$(CONFIG_TARGET_GAZERBEAM) += gazerbeam.dtb
+dtb-$(CONFIG_TARGET_CMPC885) += cmpc885.dtb
+dtb-$(CONFIG_TARGET_CMPCPRO) += cmpcpro.dtb
 
-targets += $(dtb-y)
+include $(srctree)/scripts/Makefile.dts
 
 # Add any required device tree compiler flags here
 DTC_FLAGS +=
-
-PHONY += dtbs
-dtbs: $(addprefix $(obj)/, $(dtb-y))
-	@:
-
-clean-files := *.dtb

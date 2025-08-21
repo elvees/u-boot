@@ -93,7 +93,7 @@ __secondary_boot_func:
 4:
 #ifdef CONFIG_ARMV8_SWITCH_TO_EL1
 	switch_el x7, _dead_loop, 0f, _dead_loop
-0:	armv8_switch_to_el1_m x4, x6, x7
+0:	armv8_switch_to_el1_m x4, x6, x7, x9
 #else
 	switch_el x7, 0f, _dead_loop, _dead_loop
 0:	armv8_switch_to_el2_m x4, x6, x7
@@ -113,6 +113,6 @@ _dead_loop:
 	.align 3
 	.global __real_cntfrq
 __real_cntfrq:
-	.quad COUNTER_FREQUENCY
+	.quad CONFIG_COUNTER_FREQUENCY
 	/* Secondary Boot Code ends here */
 __secondary_boot_code_end:

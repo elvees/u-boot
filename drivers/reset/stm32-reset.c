@@ -6,7 +6,6 @@
 
 #define LOG_CATEGORY UCLASS_RESET
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
@@ -27,21 +26,11 @@ struct stm32_reset_priv {
 	fdt_addr_t base;
 };
 
-static int stm32_reset_request(struct reset_ctl *reset_ctl)
-{
-	return 0;
-}
-
-static int stm32_reset_free(struct reset_ctl *reset_ctl)
-{
-	return 0;
-}
-
 static int stm32_reset_assert(struct reset_ctl *reset_ctl)
 {
 	struct stm32_reset_priv *priv = dev_get_priv(reset_ctl->dev);
-	int bank = (reset_ctl->id / BITS_PER_LONG) * 4;
-	int offset = reset_ctl->id % BITS_PER_LONG;
+	int bank = (reset_ctl->id / (sizeof(u32) * BITS_PER_BYTE)) * 4;
+	int offset = reset_ctl->id % (sizeof(u32) * BITS_PER_BYTE);
 
 	dev_dbg(reset_ctl->dev, "reset id = %ld bank = %d offset = %d)\n",
 		reset_ctl->id, bank, offset);
@@ -61,8 +50,8 @@ static int stm32_reset_assert(struct reset_ctl *reset_ctl)
 static int stm32_reset_deassert(struct reset_ctl *reset_ctl)
 {
 	struct stm32_reset_priv *priv = dev_get_priv(reset_ctl->dev);
-	int bank = (reset_ctl->id / BITS_PER_LONG) * 4;
-	int offset = reset_ctl->id % BITS_PER_LONG;
+	int bank = (reset_ctl->id / (sizeof(u32) * BITS_PER_BYTE)) * 4;
+	int offset = reset_ctl->id % (sizeof(u32) * BITS_PER_BYTE);
 
 	dev_dbg(reset_ctl->dev, "reset id = %ld bank = %d offset = %d)\n",
 		reset_ctl->id, bank, offset);
@@ -80,8 +69,6 @@ static int stm32_reset_deassert(struct reset_ctl *reset_ctl)
 }
 
 static const struct reset_ops stm32_reset_ops = {
-	.request	= stm32_reset_request,
-	.rfree		= stm32_reset_free,
 	.rst_assert	= stm32_reset_assert,
 	.rst_deassert	= stm32_reset_deassert,
 };

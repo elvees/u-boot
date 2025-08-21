@@ -4,12 +4,95 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
 #include <dm.h>
+#include <dm/lists.h>
+#include <bitfield.h>
 #include <errno.h>
 #include <log.h>
+#include <linux/bitfield.h>
 #include <power/rk8xx_pmic.h>
 #include <power/pmic.h>
+#include <spi.h>
+#include <sysreset.h>
+
+static int rk8xx_sysreset_request(struct udevice *dev, enum sysreset_t type)
+{
+	struct rk8xx_priv *priv = dev_get_priv(dev->parent);
+
+	if (type != SYSRESET_POWER_OFF)
+		return -EPROTONOSUPPORT;
+
+	switch (priv->variant) {
+	case RK805_ID:
+	case RK808_ID:
+	case RK816_ID:
+	case RK818_ID:
+		pmic_clrsetbits(dev->parent, REG_DEVCTRL, 0, BIT(0));
+		break;
+	case RK809_ID:
+	case RK817_ID:
+		pmic_clrsetbits(dev->parent, RK817_REG_SYS_CFG3, 0,
+				BIT(0));
+		break;
+	case RK806_ID:
+		pmic_clrsetbits(dev->parent, RK806_REG_SYS_CFG3, 0,
+				BIT(0));
+		break;
+	default:
+		printf("Unknown PMIC RK%x: Cannot shutdown\n",
+		       priv->variant);
+		return -EPROTONOSUPPORT;
+	};
+
+	return -EINPROGRESS;
+}
+
+static struct sysreset_ops rk8xx_sysreset_ops = {
+	.request	= rk8xx_sysreset_request,
+};
+
+U_BOOT_DRIVER(rk8xx_sysreset) = {
+	.name		= "rk8xx_sysreset",
+	.id		= UCLASS_SYSRESET,
+	.ops		= &rk8xx_sysreset_ops,
+};
+
+/* In the event of a plug-in and the appropriate option has been
+ * selected, we simply shutdown instead of continue the normal boot
+ * process. Please note the rk808 is not supported as it doesn't
+ * have the appropriate register.
+ */
+void rk8xx_off_for_plugin(struct udevice *dev)
+{
+	struct rk8xx_priv *priv = dev_get_priv(dev);
+
+	switch (priv->variant) {
+	case RK805_ID:
+	case RK816_ID:
+	case RK818_ID:
+		if (pmic_reg_read(dev, RK8XX_ON_SOURCE) & RK8XX_ON_PLUG_IN) {
+			printf("Power Off due to plug-in event\n");
+			pmic_clrsetbits(dev, REG_DEVCTRL, 0, BIT(0));
+		}
+		break;
+	case RK809_ID:
+	case RK817_ID:
+		if (pmic_reg_read(dev, RK817_ON_SOURCE) & RK8XX_ON_PLUG_IN) {
+			printf("Power Off due to plug-in event\n");
+			pmic_clrsetbits(dev, RK817_REG_SYS_CFG3, 0,
+					BIT(0));
+		}
+		break;
+	default:
+		printf("PMIC RK%x: Cannot read boot reason.\n",
+		       priv->variant);
+	}
+}
+
+static struct reg_data rk806_init_reg[] = {
+	/* RST_FUN */
+	{ RK806_REG_SYS_CFG3, BIT(7), GENMASK(7, 6)},
+};
 
 static struct reg_data rk817_init_reg[] = {
 /* enable the under-voltage protection,
@@ -20,7 +103,10 @@ static struct reg_data rk817_init_reg[] = {
 
 static const struct pmic_child_info pmic_children_info[] = {
 	{ .prefix = "DCDC_REG", .driver = "rk8xx_buck"},
+	{ .prefix = "dcdc-reg", .driver = "rk8xx_buck"},
 	{ .prefix = "LDO_REG", .driver = "rk8xx_ldo"},
+	{ .prefix = "nldo-reg", .driver = "rk8xx_nldo"},
+	{ .prefix = "pldo-reg", .driver = "rk8xx_pldo"},
 	{ .prefix = "SWITCH_REG", .driver = "rk8xx_switch"},
 	{ },
 };
@@ -30,10 +116,50 @@ static int rk8xx_reg_count(struct udevice *dev)
 	return RK808_NUM_OF_REGS;
 }
 
+#if CONFIG_IS_ENABLED(SPI) && CONFIG_IS_ENABLED(DM_SPI)
+struct rk806_cmd {
+	uint8_t	len: 4; /* Payload size in bytes - 1 */
+	uint8_t	reserved: 2;
+	uint8_t	crc_en: 1;
+	uint8_t	op: 1; /* READ=0; WRITE=1; */
+	uint8_t	reg_l;
+#define REG_L_MASK	GENMASK(7, 0)
+	uint8_t	reg_h;
+#define REG_H_MASK	GENMASK(15, 8)
+};
+#endif
+
 static int rk8xx_write(struct udevice *dev, uint reg, const uint8_t *buff,
 			  int len)
 {
 	int ret;
+
+#if CONFIG_IS_ENABLED(SPI) && CONFIG_IS_ENABLED(DM_SPI)
+	if (device_get_uclass_id(dev->parent) == UCLASS_SPI) {
+		struct spi_slave *spi = dev_get_parent_priv(dev);
+		struct rk806_cmd cmd = {
+			.op = 1,
+			.len = len - 1,
+			.reg_l = FIELD_GET(REG_L_MASK, reg),
+			.reg_h = FIELD_GET(REG_H_MASK, reg),
+		};
+
+		ret = dm_spi_claim_bus(dev);
+		if (ret) {
+			debug("Couldn't claim bus for device: %p!\n", dev);
+			return ret;
+		}
+
+		ret = spi_write_then_read(spi, (u8 *)&cmd, sizeof(cmd), buff, NULL, len);
+		if (ret)
+			debug("write error to device: %p register: %#x!\n",
+			      dev, reg);
+
+		dm_spi_release_bus(dev);
+
+		return ret;
+	}
+#endif
 
 	ret = dm_i2c_write(dev, reg, buff, len);
 	if (ret) {
@@ -48,6 +174,33 @@ static int rk8xx_read(struct udevice *dev, uint reg, uint8_t *buff, int len)
 {
 	int ret;
 
+#if CONFIG_IS_ENABLED(SPI) && CONFIG_IS_ENABLED(DM_SPI)
+	if (device_get_uclass_id(dev->parent) == UCLASS_SPI) {
+		struct spi_slave *spi = dev_get_parent_priv(dev);
+		struct rk806_cmd cmd = {
+			.op = 0,
+			.len = len - 1,
+			.reg_l = FIELD_GET(REG_L_MASK, reg),
+			.reg_h = FIELD_GET(REG_H_MASK, reg),
+		};
+
+		ret = dm_spi_claim_bus(dev);
+		if (ret) {
+			debug("Couldn't claim bus for device: %p!\n", dev);
+			return ret;
+		}
+
+		ret = spi_write_then_read(spi, (u8 *)&cmd, sizeof(cmd), NULL, buff, len);
+		if (ret)
+			debug("read error to device: %p register: %#x!\n",
+			      dev, reg);
+
+		dm_spi_release_bus(dev);
+
+		return ret;
+	}
+#endif
+
 	ret = dm_i2c_read(dev, reg, buff, len);
 	if (ret) {
 		debug("read error from device: %p register: %#x!\n", dev, reg);
@@ -61,7 +214,7 @@ static int rk8xx_read(struct udevice *dev, uint reg, uint8_t *buff, int len)
 static int rk8xx_bind(struct udevice *dev)
 {
 	ofnode regulators_node;
-	int children;
+	int children, ret;
 
 	regulators_node = dev_read_subnode(dev, "regulators");
 	if (!ofnode_valid(regulators_node)) {
@@ -72,9 +225,21 @@ static int rk8xx_bind(struct udevice *dev)
 
 	debug("%s: '%s' - found regulators subnode\n", __func__, dev->name);
 
+	if (CONFIG_IS_ENABLED(SYSRESET)) {
+		ret = device_bind_driver_to_node(dev, "rk8xx_sysreset",
+						 "rk8xx_sysreset",
+						 dev_ofnode(dev), NULL);
+		if (ret)
+			return ret;
+	}
+
 	children = pmic_bind_children(dev, regulators_node, pmic_children_info);
 	if (!children)
 		debug("%s: %s - no child found\n", __func__, dev->name);
+
+	if (IS_ENABLED(CONFIG_XPL_BUILD) &&
+	    IS_ENABLED(CONFIG_ROCKCHIP_RK8XX_DISABLE_BOOT_ON_POWERON))
+		dev_or_flags(dev, DM_FLAG_PROBE_AFTER_BIND);
 
 	/* Always return success for this device */
 	return 0;
@@ -97,6 +262,9 @@ static int rk8xx_probe(struct udevice *dev)
 	    device_is_compatible(dev, "rockchip,rk809")) {
 		id_msb = RK817_ID_MSB;
 		id_lsb = RK817_ID_LSB;
+	} else if (device_is_compatible(dev, "rockchip,rk806")) {
+		id_msb = RK806_ID_MSB;
+		id_lsb = RK806_ID_LSB;
 	} else {
 		id_msb = ID_MSB;
 		id_lsb = ID_LSB;
@@ -110,10 +278,11 @@ static int rk8xx_probe(struct udevice *dev)
 		return ret;
 
 	priv->variant = ((msb << 8) | lsb) & RK8XX_ID_MSK;
-	show_variant = priv->variant;
+	show_variant = bitfield_extract_by_mask(priv->variant, RK8XX_ID_MSK);
 	switch (priv->variant) {
 	case RK808_ID:
-		show_variant = 0x808;	/* RK808 hardware ID is 0 */
+		/* RK808 ID is 0x0000, so fix show_variant for that PMIC */
+		show_variant = 0x808;
 		break;
 	case RK805_ID:
 	case RK816_ID:
@@ -137,8 +306,14 @@ static int rk8xx_probe(struct udevice *dev)
 		value = (power_en2 & 0x0f) | ((power_en3 & 0x0f) << 4);
 		pmic_reg_write(dev, RK817_POWER_EN_SAVE1, value);
 		break;
+	case RK806_ID:
+		on_source = RK806_ON_SOURCE;
+		off_source = RK806_OFF_SOURCE;
+		init_data = rk806_init_reg;
+		init_data_num = ARRAY_SIZE(rk806_init_reg);
+		break;
 	default:
-		printf("Unknown PMIC: RK%x!!\n", priv->variant);
+		printf("Unknown PMIC: RK%x!!\n", show_variant);
 		return -EINVAL;
 	}
 
@@ -156,13 +331,17 @@ static int rk8xx_probe(struct udevice *dev)
 		      pmic_reg_read(dev, init_data[i].reg));
 	}
 
-	printf("PMIC:  RK%x ", show_variant);
+	if (!IS_ENABLED(CONFIG_XPL_BUILD)) {
+		printf("PMIC:  RK%x ", show_variant);
+		if (on_source && off_source)
+			printf("(on=0x%02x, off=0x%02x)",
+			       pmic_reg_read(dev, on_source),
+			       pmic_reg_read(dev, off_source));
+		printf("\n");
+	}
 
-	if (on_source && off_source)
-		printf("(on=0x%02x, off=0x%02x)",
-		       pmic_reg_read(dev, on_source),
-		       pmic_reg_read(dev, off_source));
-	printf("\n");
+	if (IS_ENABLED(CONFIG_ROCKCHIP_RK8XX_DISABLE_BOOT_ON_POWERON))
+		rk8xx_off_for_plugin(dev);
 
 	return 0;
 }
@@ -175,6 +354,7 @@ static struct dm_pmic_ops rk8xx_ops = {
 
 static const struct udevice_id rk8xx_ids[] = {
 	{ .compatible = "rockchip,rk805" },
+	{ .compatible = "rockchip,rk806" },
 	{ .compatible = "rockchip,rk808" },
 	{ .compatible = "rockchip,rk809" },
 	{ .compatible = "rockchip,rk816" },

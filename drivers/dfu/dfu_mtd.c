@@ -7,15 +7,28 @@
  * Based on dfu_nand.c
  */
 
-#include <common.h>
 #include <dfu.h>
 #include <mtd.h>
-#include <jffs2/load_kernel.h>
 #include <linux/err.h>
+#include <linux/ctype.h>
 
 static bool mtd_is_aligned_with_block_size(struct mtd_info *mtd, u64 size)
 {
 	return !do_div(size, mtd->erasesize);
+}
+
+/* Logic taken from cmd/mtd.c:mtd_oob_write_is_empty() */
+static bool mtd_page_is_empty(struct mtd_oob_ops *op)
+{
+	int i;
+
+	for (i = 0; i < op->len; i++)
+		if (op->datbuf[i] != 0xff)
+			return false;
+
+	/* oob is not used, with MTD_OPS_AUTO_OOB & ooblen=0 */
+
+	return true;
 }
 
 static int mtd_block_op(enum dfu_op op, struct dfu_entity *dfu,
@@ -71,27 +84,41 @@ static int mtd_block_op(enum dfu_op op, struct dfu_entity *dfu,
 
 		while (remaining) {
 			if (erase_op.addr + remaining > lim) {
-				printf("Limit reached 0x%llx while erasing at offset 0x%llx\n",
-				       lim, off);
+				printf("Limit reached 0x%llx while erasing at offset 0x%llx, remaining 0x%llx\n",
+				       lim, erase_op.addr, remaining);
 				return -EIO;
+			}
+
+			/* Skip the block if it is bad, don't erase it again */
+			ret = mtd_block_isbad(mtd, erase_op.addr);
+			if (ret) {
+				printf("Skipping %s at 0x%08llx\n",
+				       ret == 1 ? "bad block" : "bbt reserved",
+				       erase_op.addr);
+				erase_op.addr += mtd->erasesize;
+				continue;
 			}
 
 			ret = mtd_erase(mtd, &erase_op);
 
 			if (ret) {
-				/* Abort if its not a bad block error */
-				if (ret != -EIO) {
-					printf("Failure while erasing at offset 0x%llx\n",
-					       erase_op.fail_addr);
-					return 0;
+				/* If this is not -EIO, we have no idea what to do. */
+				if (ret == -EIO) {
+					printf("Marking bad block at 0x%08llx (%d)\n",
+					       erase_op.fail_addr, ret);
+					ret = mtd_block_markbad(mtd, erase_op.addr);
 				}
-				printf("Skipping bad block at 0x%08llx\n",
-				       erase_op.addr);
+				/* Abort if it is not -EIO or can't mark bad */
+				if (ret) {
+					printf("Failure while erasing at offset 0x%llx (%d)\n",
+					       erase_op.fail_addr, ret);
+					return ret;
+				}
 			} else {
 				remaining -= mtd->erasesize;
 			}
 
-			/* Continue erase behind bad block */
+			/* Continue erase behind the current block */
 			erase_op.addr += mtd->erasesize;
 		}
 	}
@@ -129,8 +156,14 @@ static int mtd_block_op(enum dfu_op op, struct dfu_entity *dfu,
 
 		if (op == DFU_OP_READ)
 			ret = mtd_read_oob(mtd, off, &io_op);
-		else
+		else if (has_pages && dfu->data.mtd.ubi && mtd_page_is_empty(&io_op)) {
+			/* in case of ubi partition, do not write an empty page, only skip it */
+			ret = 0;
+			io_op.retlen = mtd->writesize;
+			io_op.oobretlen = mtd->oobsize;
+		} else {
 			ret = mtd_write_oob(mtd, off, &io_op);
+		}
 
 		if (ret) {
 			printf("Failure while %s at offset 0x%llx\n",
@@ -150,7 +183,9 @@ static int mtd_block_op(enum dfu_op op, struct dfu_entity *dfu,
 		/* Write done, lock again */
 		debug("Locking the mtd device\n");
 		ret = mtd_lock(mtd, lock_ofs, lock_len);
-		if (ret && ret != -EOPNOTSUPP)
+		if (ret == -EOPNOTSUPP)
+			ret = 0;
+		else if (ret)
 			printf("MTD device lock failed\n");
 	}
 	return ret;
@@ -248,12 +283,11 @@ static unsigned int dfu_polltimeout_mtd(struct dfu_entity *dfu)
 	return DFU_DEFAULT_POLL_TIMEOUT;
 }
 
-int dfu_fill_entity_mtd(struct dfu_entity *dfu, char *devstr, char *s)
+int dfu_fill_entity_mtd(struct dfu_entity *dfu, char *devstr, char **argv, int argc)
 {
-	char *st;
+	char *s;
 	struct mtd_info *mtd;
-	bool has_pages;
-	int ret, part;
+	int part;
 
 	mtd = get_mtd_device_nm(devstr);
 	if (IS_ERR_OR_NULL(mtd))
@@ -262,43 +296,57 @@ int dfu_fill_entity_mtd(struct dfu_entity *dfu, char *devstr, char *s)
 
 	dfu->dev_type = DFU_DEV_MTD;
 	dfu->data.mtd.info = mtd;
+	dfu->max_buf_size = mtd->erasesize;
+	if (argc < 1)
+		return -EINVAL;
 
-	has_pages = mtd->type == MTD_NANDFLASH || mtd->type == MTD_MLCNANDFLASH;
-	dfu->max_buf_size = has_pages ? mtd->erasesize : 0;
-
-	st = strsep(&s, " ");
-	if (!strcmp(st, "raw")) {
+	if (!strcmp(argv[0], "raw")) {
+		if (argc != 3)
+			return -EINVAL;
 		dfu->layout = DFU_RAW_ADDR;
-		dfu->data.mtd.start = simple_strtoul(s, &s, 16);
-		s++;
-		dfu->data.mtd.size = simple_strtoul(s, &s, 16);
-	} else if ((!strcmp(st, "part")) || (!strcmp(st, "partubi"))) {
-		char mtd_id[32];
-		struct mtd_device *mtd_dev;
-		u8 part_num;
-		struct part_info *pi;
+		dfu->data.mtd.start = hextoul(argv[1], &s);
+		if (*s)
+			return -EINVAL;
+		dfu->data.mtd.size = hextoul(argv[2], &s);
+		if (*s)
+			return -EINVAL;
+	} else if ((!strcmp(argv[0], "part")) || (!strcmp(argv[0], "partubi"))) {
+		struct mtd_info *partition;
+		int partnum = 0;
+		bool part_found = false;
+
+		if (argc != 2)
+			return -EINVAL;
 
 		dfu->layout = DFU_RAW_ADDR;
 
-		part = simple_strtoul(s, &s, 10);
+		part = dectoul(argv[1], &s);
+		if (*s)
+			return -EINVAL;
 
-		sprintf(mtd_id, "%s,%d", devstr, part - 1);
-		printf("using id '%s'\n", mtd_id);
+		/* register partitions with MTDIDS/MTDPARTS or OF fallback */
+		mtd_probe_devices();
 
-		mtdparts_init();
-
-		ret = find_dev_and_part(mtd_id, &mtd_dev, &part_num, &pi);
-		if (ret != 0) {
-			printf("Could not locate '%s'\n", mtd_id);
+		partnum = 0;
+		list_for_each_entry(partition, &mtd->partitions, node) {
+			partnum++;
+			if (partnum == part) {
+				part_found = true;
+				break;
+			}
+		}
+		if (!part_found) {
+			printf("No partition %d in %s\n", part, mtd->name);
 			return -1;
 		}
+		log_debug("partition %d:%s in %s\n", partnum, partition->name, mtd->name);
 
-		dfu->data.mtd.start = pi->offset;
-		dfu->data.mtd.size = pi->size;
-		if (!strcmp(st, "partubi"))
+		dfu->data.mtd.start = partition->offset;
+		dfu->data.mtd.size = partition->size;
+		if (!strcmp(argv[0], "partubi"))
 			dfu->data.mtd.ubi = 1;
 	} else {
-		printf("%s: Memory layout (%s) not supported!\n", __func__, st);
+		printf("%s: Memory layout (%s) not supported!\n", __func__, argv[0]);
 		return -1;
 	}
 

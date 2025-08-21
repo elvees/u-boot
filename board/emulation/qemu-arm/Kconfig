@@ -1,14 +1,21 @@
 if TARGET_QEMU_ARM_32BIT || TARGET_QEMU_ARM_64BIT
 
-config SYS_TEXT_BASE
+config TEXT_BASE
 	default 0x00000000
 
 config BOARD_SPECIFIC_OPTIONS # dummy
 	def_bool y
+	select HAS_CUSTOM_SYS_INIT_SP_ADDR
+	select QFW if ACPI
+	select QFW_MMIO if CMD_QFW
 	imply VIRTIO_MMIO
 	imply VIRTIO_PCI
 	imply VIRTIO_NET
 	imply VIRTIO_BLK
+
+config PRE_CON_BUF_ADDR
+	hex
+	default 0x40100000
 
 endif
 

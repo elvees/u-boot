@@ -4,7 +4,6 @@
  * Gary Jennejohn, DENX Software Engineering GmbH, garyj@denx.de.
  */
 
-#include <common.h>
 #include <console.h>
 #include <serial.h>
 #include <malloc.h>
@@ -132,7 +131,7 @@ int iomux_doenv(const int console, const char *arg)
 	/* Stop dropped consoles */
 	for (i = 0; i < repeat; i++) {
 		j = iomux_match_device(cons_set, cs_idx, old_set[i]);
-		if (j == cs_idx)
+		if (j == -ENOENT)
 			console_stop(console, old_set[i]);
 	}
 
@@ -158,8 +157,12 @@ int iomux_replace_device(const int console, const char *old, const char *new)
 			return -ENOMEM;
 		}
 
-		strcat(tmp, ",");
-		strcat(tmp, name);
+		if (arg) {
+			strcat(tmp, ",");
+			strcat(tmp, name);
+		}
+		else
+			strcpy(tmp, name);
 
 		arg = tmp;
 		size = strlen(tmp) + 1;

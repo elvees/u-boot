@@ -6,7 +6,6 @@
 
 #ifdef CONFIG_GDSYS_LEGACY_DRIVERS
 
-#include <common.h>
 #include <command.h>
 #include <i2c.h>
 #include <malloc.h>
@@ -166,7 +165,6 @@ static unsigned int ics8n3qv01_get_fout_calc(unsigned index)
 	return fout_calc;
 }
 
-
 static void ics8n3qv01_calc_parameters(unsigned int fout,
 	unsigned int *_mint, unsigned int *_mfrac,
 	unsigned int *_n)
@@ -284,9 +282,9 @@ static int osd_print(struct cmd_tbl *cmdtp, int flag, int argc,
 		if (!(osd_screen_mask & (1 << screen)))
 			continue;
 
-		x = simple_strtoul(argv[1], NULL, 16);
-		y = simple_strtoul(argv[2], NULL, 16);
-		color = simple_strtoul(argv[3], NULL, 16);
+		x = hextoul(argv[1], NULL);
+		y = hextoul(argv[2], NULL);
+		color = hextoul(argv[3], NULL);
 		text = argv[4];
 		charcount = strlen(text);
 		len = (charcount > bufsize) ? bufsize : charcount;
@@ -416,22 +414,21 @@ int osd_write(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		char *rp;
 		u16 *wp = buffer;
 		unsigned count = (argc > 4) ?
-			simple_strtoul(argv[4], NULL, 16) : 1;
+			hextoul(argv[4], NULL) : 1;
 
 		if (!(osd_screen_mask & (1 << screen)))
 			continue;
 
-		x = simple_strtoul(argv[1], NULL, 16);
-		y = simple_strtoul(argv[2], NULL, 16);
+		x = hextoul(argv[1], NULL);
+		y = hextoul(argv[2], NULL);
 		rp = argv[3];
-
 
 		while (*rp) {
 			char substr[5];
 
 			memcpy(substr, rp, 4);
 			substr[4] = 0;
-			*wp = simple_strtoul(substr, NULL, 16);
+			*wp = hextoul(substr, NULL);
 
 			rp += 4;
 			wp++;
@@ -463,8 +460,8 @@ int osd_size(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		return 1;
 	}
 
-	x = simple_strtoul(argv[1], NULL, 16);
-	y = simple_strtoul(argv[2], NULL, 16);
+	x = hextoul(argv[1], NULL);
+	y = hextoul(argv[2], NULL);
 
 	if (!x || (x > 64) || (x > MAX_X_CHARS) ||
 	    !y || (y > 32) || (y > MAX_Y_CHARS)) {

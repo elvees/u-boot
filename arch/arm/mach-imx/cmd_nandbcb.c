@@ -11,7 +11,6 @@
  * SPDX-License-Identifier:	GPL-2.0+
  */
 
-#include <common.h>
 #include <command.h>
 #include <log.h>
 #include <malloc.h>
@@ -23,6 +22,7 @@
 #include <jffs2/jffs2.h>
 #include <linux/bch.h>
 #include <linux/mtd/mtd.h>
+#include <linux/mtd/rawnand.h>
 
 #include <asm/arch/sys_proto.h>
 #include <asm/mach-imx/imx-nandbcb.h>
@@ -131,6 +131,7 @@ static struct platform_config imx8q_plat_config = {
 
 /* boot search related variables and definitions */
 static int g_boot_search_count = 4;
+static int g_boot_secondary_offset;
 static int g_boot_search_stride;
 static int g_pages_per_stride;
 
@@ -274,9 +275,9 @@ static int nandbcb_set_boot_config(int argc, char * const argv[],
 	boot_stream2_address = ((maxsize - boot_stream1_address) / 2 +
 			       boot_stream1_address);
 
-	if (boot_cfg->secondary_boot_stream_off_in_MB)
+	if (g_boot_secondary_offset)
 		boot_stream2_address =
-			(loff_t)boot_cfg->secondary_boot_stream_off_in_MB * 1024 * 1024;
+			(loff_t)g_boot_secondary_offset * 1024 * 1024;
 
 	max_boot_stream_size = boot_stream2_address - boot_stream1_address;
 
@@ -504,10 +505,6 @@ static int read_fcb(struct boot_config *boot_cfg, struct fcb_block *fcb,
 	int ret = 0;
 
 	mtd = boot_cfg->mtd;
-	if (mtd_block_isbad(mtd, off)) {
-		printf("Block %d is bad, skipped\n", (int)CONV_TO_BLOCKS(off));
-		return 1;
-	}
 
 	fcb_raw_page = kzalloc(mtd->writesize + mtd->oobsize, GFP_KERNEL);
 	if (!fcb_raw_page) {
@@ -528,7 +525,7 @@ static int read_fcb(struct boot_config *boot_cfg, struct fcb_block *fcb,
 		else if (plat_config.misc_flags & FCB_ENCODE_BCH_40b)
 			mxs_nand_mode_fcb_40bit(mtd);
 
-		ret = nand_read(mtd, off, &size, (u_char *)fcb);
+		ret = nand_read_skip_bad(mtd, off, &size, NULL, mtd->size, (u_char *)fcb);
 
 		/* switch BCH back */
 		mxs_nand_mode_normal(mtd);
@@ -615,6 +612,7 @@ static int write_fcb(struct boot_config *boot_cfg, struct fcb_block *fcb)
 	for (i = 0; i < g_boot_search_count; i++) {
 		if (mtd_block_isbad(mtd, off)) {
 			printf("Block %d is bad, skipped\n", i);
+			off += mtd->erasesize;
 			continue;
 		}
 
@@ -649,7 +647,7 @@ static int write_fcb(struct boot_config *boot_cfg, struct fcb_block *fcb)
 			};
 
 			ret = mtd_write_oob(mtd, off, &ops);
-			printf("NAND FCB write to 0x%llxx offset 0x%zx written: %s\n", off, ops.len, ret ? "ERROR" : "OK");
+			printf("NAND FCB write to 0x%llx offset 0x%zx written: %s\n", off, ops.len, ret ? "ERROR" : "OK");
 		}
 
 		if (ret)
@@ -674,20 +672,15 @@ static int read_dbbt(struct boot_config *boot_cfg, struct dbbt_block *dbbt,
 		      void *dbbt_data_page, loff_t off)
 {
 	size_t size;
+	size_t actual_size;
 	struct mtd_info *mtd;
 	loff_t to;
 	int ret;
 
 	mtd = boot_cfg->mtd;
 
-	if (mtd_block_isbad(mtd, off)) {
-		printf("Block %d is bad, skipped\n",
-		       (int)CONV_TO_BLOCKS(off));
-		return 1;
-	}
-
 	size = sizeof(struct dbbt_block);
-	ret = nand_read(mtd, off, &size, (u_char *)dbbt);
+	ret = nand_read_skip_bad(mtd, off, &size, &actual_size, mtd->size, (u_char *)dbbt);
 	printf("NAND DBBT read from 0x%llx offset 0x%zx read: %s\n",
 	       off, size, ret ? "ERROR" : "OK");
 	if (ret)
@@ -695,9 +688,9 @@ static int read_dbbt(struct boot_config *boot_cfg, struct dbbt_block *dbbt,
 
 	/* dbbtpages == 0 if no bad blocks */
 	if (dbbt->dbbtpages > 0) {
-		to = off + 4 * mtd->writesize;
+		to = off + 4 * mtd->writesize + actual_size - size;
 		size = mtd->writesize;
-		ret = nand_read(mtd, to, &size, dbbt_data_page);
+		ret = nand_read_skip_bad(mtd, to, &size, NULL, mtd->size, dbbt_data_page);
 		printf("DBBT data read from 0x%llx offset 0x%zx read: %s\n",
 		       to, size, ret ? "ERROR" : "OK");
 
@@ -727,6 +720,7 @@ static int write_dbbt(struct boot_config *boot_cfg, struct dbbt_block *dbbt,
 		if (mtd_block_isbad(mtd, off)) {
 			printf("Block %d is bad, skipped\n",
 			       (int)(i + CONV_TO_BLOCKS(off)));
+			off += mtd->erasesize;
 			continue;
 		}
 
@@ -1083,13 +1077,13 @@ static int do_nandbcb_bcbonly(int argc, char *const argv[])
 
 	mtd = cfg.mtd;
 
-	cfg.boot_stream1_address = simple_strtoul(argv[2], NULL, 16);
-	cfg.boot_stream1_size = simple_strtoul(argv[3], NULL, 16);
+	cfg.boot_stream1_address = hextoul(argv[2], NULL);
+	cfg.boot_stream1_size = hextoul(argv[3], NULL);
 	cfg.boot_stream1_size = ALIGN(cfg.boot_stream1_size, mtd->writesize);
 
 	if (argc > 5) {
-		cfg.boot_stream2_address = simple_strtoul(argv[4], NULL, 16);
-		cfg.boot_stream2_size = simple_strtoul(argv[5], NULL, 16);
+		cfg.boot_stream2_address = hextoul(argv[4], NULL);
+		cfg.boot_stream2_size = hextoul(argv[5], NULL);
 		cfg.boot_stream2_size = ALIGN(cfg.boot_stream2_size,
 					      mtd->writesize);
 	}
@@ -1267,6 +1261,36 @@ static bool check_fingerprint(void *data, int fingerprint)
 
 	return (*(int *)(data + off) == fingerprint);
 }
+
+static int fuse_secondary_boot(u32 bank, u32 word, u32 mask, u32 off)
+{
+	int err;
+	u32 val;
+	int ret;
+
+	err = fuse_read(bank, word, &val);
+	if (err)
+		return 0;
+
+	val = (val & mask) >> off;
+
+	if (val > 10)
+		return 0;
+
+	switch (val) {
+	case 0:
+		ret = 4;
+		break;
+	case 1:
+		ret = 1;
+		break;
+	default:
+		ret = 2 << val;
+		break;
+	}
+
+	return ret;
+};
 
 static int fuse_to_search_count(u32 bank, u32 word, u32 mask, u32 off)
 {
@@ -1450,7 +1474,7 @@ static int do_nandbcb_init(int argc, char * const argv[])
 	if (nandbcb_set_boot_config(argc, argv, &cfg))
 		return CMD_RET_FAILURE;
 
-	addr = simple_strtoul(argv[1], &endp, 16);
+	addr = hextoul(argv[1], &endp);
 	if (*argv[1] == 0 || *endp != 0)
 		return CMD_RET_FAILURE;
 
@@ -1505,6 +1529,11 @@ static int do_nandbcb(struct cmd_tbl *cmdtp, int flag, int argc,
 		       g_boot_search_count);
 	}
 
+	if (plat_config.misc_flags & FIRMWARE_SECONDARY_FIXED_ADDR) {
+		if (is_imx8mn())
+			g_boot_secondary_offset = fuse_secondary_boot(2, 1, 0xff0000, 16);
+	}
+
 	cmd = argv[1];
 	--argc;
 	++argv;
@@ -1531,8 +1560,7 @@ usage:
 	return CMD_RET_USAGE;
 }
 
-#ifdef CONFIG_SYS_LONGHELP
-static char nandbcb_help_text[] =
+U_BOOT_LONGHELP(nandbcb,
 	"init addr off|partition len - update 'len' bytes starting at\n"
 	"       'off|part' to memory address 'addr', skipping  bad blocks\n"
 	"nandbcb bcbonly off|partition fw1-off fw1-size [fw2-off fw2-size]\n"
@@ -1542,8 +1570,7 @@ static char nandbcb_help_text[] =
 	"       FIY, BCB isn't erased automatically, so mtd erase should\n"
 	"       be called in advance before writing new BCB:\n"
 	"           > mtd erase mx7-bcb\n"
-	"nandbcb dump off|partition - dump/verify boot structures\n";
-#endif
+	"nandbcb dump off|partition - dump/verify boot structures\n");
 
 U_BOOT_CMD(nandbcb, 7, 1, do_nandbcb,
 	   "i.MX NAND Boot Control Blocks write",

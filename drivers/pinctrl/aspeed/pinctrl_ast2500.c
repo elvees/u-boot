@@ -3,7 +3,6 @@
  * Copyright 2017 Google, Inc
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
@@ -61,6 +60,9 @@ static const struct ast2500_group_config ast2500_groups[] = {
 	{ "MDIO2", 5, (1 << 2) },
 	{ "SD1", 5, (1 << 0) },
 	{ "SD2", 5, (1 << 1) },
+	{ "FWSPICS1", 3, (1 << 24) },
+	{ "SPI1CS1", 1, (1 << 15) },
+	{ "SGPM", 2, (1 << 11) | (1 << 10) | (1 << 9) | (1 << 8) },
 };
 
 static int ast2500_pinctrl_get_groups_count(struct udevice *dev)

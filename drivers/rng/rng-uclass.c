@@ -3,7 +3,8 @@
  * Copyright (c) 2019, Linaro Limited
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_RNG
+
 #include <dm.h>
 #include <rng.h>
 

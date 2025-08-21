@@ -8,7 +8,6 @@
  *         Kever Yang <kever.yang@rock-chips.com>
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <asm/global_data.h>
@@ -674,9 +673,9 @@ static int rockchip_tcphy_probe(struct udevice *dev)
 	unsigned int reg;
 	int index, ret;
 
-	priv->reg_base = (void __iomem *)dev_read_addr(dev);
-	if (IS_ERR(priv->reg_base))
-		return PTR_ERR(priv->reg_base);
+	priv->reg_base = dev_read_addr_ptr(dev);
+	if (!priv->reg_base)
+		return -EINVAL;
 
 	ret = dev_read_u32_index(dev, "reg", 1, &reg);
 	if (ret) {

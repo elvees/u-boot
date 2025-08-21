@@ -9,7 +9,6 @@
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <fdtdec.h>
@@ -125,7 +124,18 @@ static int soft_spi_xfer(struct udevice *dev, unsigned int bitlen,
 	u8		*rxd = din;
 	int		cpha = !!(priv->mode & SPI_CPHA);
 	int		cidle = !!(priv->mode & SPI_CPOL);
+	int		txrx = plat->flags;
 	unsigned int	j;
+
+	if (priv->mode & SPI_3WIRE) {
+		if (txd && rxd)
+			return -EINVAL;
+
+		txrx = txd ? SPI_MASTER_NO_RX : SPI_MASTER_NO_TX;
+		dm_gpio_set_dir_flags(&plat->mosi,
+				      txd ? GPIOD_IS_OUT | GPIOD_IS_OUT_ACTIVE :
+					    GPIOD_IS_IN | GPIOD_PULL_UP);
+	}
 
 	debug("spi_xfer: slave %s:%s dout %08X din %08X bitlen %u\n",
 	      dev->parent->name, dev->name, *(uint *)txd, *(uint *)rxd,
@@ -161,7 +171,7 @@ static int soft_spi_xfer(struct udevice *dev, unsigned int bitlen,
 		 */
 		if (cpha)
 			soft_spi_scl(dev, !cidle);
-		if ((plat->flags & SPI_MASTER_NO_TX) == 0)
+		if ((txrx & SPI_MASTER_NO_TX) == 0)
 			soft_spi_sda(dev, !!(tmpdout & 0x80));
 		udelay(plat->spi_delay_us);
 
@@ -175,8 +185,10 @@ static int soft_spi_xfer(struct udevice *dev, unsigned int bitlen,
 		else
 			soft_spi_scl(dev, cidle);
 		tmpdin	<<= 1;
-		if ((plat->flags & SPI_MASTER_NO_RX) == 0)
-			tmpdin	|= dm_gpio_get_value(&plat->miso);
+		if ((txrx & SPI_MASTER_NO_RX) == 0)
+			tmpdin |= dm_gpio_get_value((priv->mode & SPI_3WIRE) ?
+							    &plat->mosi :
+							    &plat->miso);
 		tmpdout	<<= 1;
 		udelay(plat->spi_delay_us);
 
@@ -238,6 +250,18 @@ static int soft_spi_of_to_plat(struct udevice *dev)
 	return 0;
 }
 
+static int retrieve_num_chipselects(struct udevice *dev)
+{
+	int chipselects;
+	int ret;
+
+	ret = ofnode_read_u32(dev_ofnode(dev), "num-chipselects", &chipselects);
+	if (ret)
+		return ret;
+
+	return chipselects;
+}
+
 static int soft_spi_probe(struct udevice *dev)
 {
 	struct spi_slave *slave = dev_get_parent_priv(dev);
@@ -248,19 +272,40 @@ static int soft_spi_probe(struct udevice *dev)
 	cs_flags = (slave && slave->mode & SPI_CS_HIGH) ? 0 : GPIOD_ACTIVE_LOW;
 	clk_flags = (slave && slave->mode & SPI_CPOL) ? GPIOD_ACTIVE_LOW : 0;
 
-	if (gpio_request_by_name(dev, "cs-gpios", 0, &plat->cs,
-				 GPIOD_IS_OUT | cs_flags) ||
-	    gpio_request_by_name(dev, "gpio-sck", 0, &plat->sclk,
-				 GPIOD_IS_OUT | clk_flags))
+	ret = gpio_request_by_name(dev, "cs-gpios", 0, &plat->cs,
+				   GPIOD_IS_OUT | cs_flags);
+	/*
+	 * If num-chipselects is zero we're ignoring absence of cs-gpios. This
+	 * code relies on the fact that `gpio_request_by_name` call above
+	 * initiailizes plat->cs to correct value with invalid GPIO even when
+	 * there is no cs-gpios node in dts. All other functions which work
+	 * with plat->cs verify it via `dm_gpio_is_valid` before using it, so
+	 * such value doesn't cause any problems.
+	 */
+	if (ret && retrieve_num_chipselects(dev) != 0)
+		return -EINVAL;
+
+	ret = gpio_request_by_name(dev, "gpio-sck", 0, &plat->sclk,
+				   GPIOD_IS_OUT | clk_flags);
+	if (ret)
+		ret = gpio_request_by_name(dev, "sck-gpios", 0, &plat->sclk,
+					   GPIOD_IS_OUT | clk_flags);
+	if (ret)
 		return -EINVAL;
 
 	ret = gpio_request_by_name(dev, "gpio-mosi", 0, &plat->mosi,
 				   GPIOD_IS_OUT | GPIOD_IS_OUT_ACTIVE);
 	if (ret)
+		ret = gpio_request_by_name(dev, "mosi-gpios", 0, &plat->mosi,
+					   GPIOD_IS_OUT | GPIOD_IS_OUT_ACTIVE);
+	if (ret)
 		plat->flags |= SPI_MASTER_NO_TX;
 
 	ret = gpio_request_by_name(dev, "gpio-miso", 0, &plat->miso,
 				   GPIOD_IS_IN);
+	if (ret)
+		ret = gpio_request_by_name(dev, "miso-gpios", 0, &plat->miso,
+					   GPIOD_IS_IN);
 	if (ret)
 		plat->flags |= SPI_MASTER_NO_RX;
 

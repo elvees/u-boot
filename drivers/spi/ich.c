@@ -7,7 +7,6 @@
 
 #define LOG_CATEGORY	UCLASS_SPI
 
-#include <common.h>
 #include <bootstage.h>
 #include <div64.h>
 #include <dm.h>
@@ -114,7 +113,7 @@ static bool ich9_can_do_33mhz(struct udevice *dev)
 	struct ich_spi_priv *priv = dev_get_priv(dev);
 	u32 fdod, speed;
 
-	if (!CONFIG_IS_ENABLED(PCI))
+	if (!CONFIG_IS_ENABLED(PCI) || !priv->pch)
 		return false;
 	/* Observe SPI Descriptor Component Section 0 */
 	dm_pci_write_config32(priv->pch, 0xb0, 0x1000);
@@ -504,7 +503,7 @@ static int wait_for_hwseq_xfer(struct fast_spi_regs *regs, uint offset)
  * @hsfsts_cycle: Cycle type (enum hsfsts_cycle_t)
  * @offset: Offset to access
  * @len: Number of bytes to transfer (can be 0)
- * @return 0 if OK, -EIO on flash-cycle error (FCERR), -EPERM on access error
+ * Return: 0 if OK, -EIO on flash-cycle error (FCERR), -EPERM on access error
  *	(AEL), -ETIMEDOUT on timeout
  */
 static int exec_sync_hwseq_xfer(struct fast_spi_regs *regs, uint hsfsts_cycle,
@@ -604,7 +603,7 @@ static int ich_spi_exec_op(struct spi_slave *slave, const struct spi_mem_op *op)
 	return ret;
 }
 
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 /**
  * ich_spi_get_basics() - Get basic information about the ICH device
  *
@@ -615,7 +614,7 @@ static int ich_spi_exec_op(struct spi_slave *slave, const struct spi_mem_op *op)
  * @pchp: Returns a pointer to the pch, or NULL if not found
  * @ich_versionp: Returns ICH version detected on success
  * @mmio_basep: Returns the address of the SPI registers on success
- * @return 0 if OK, -EPROTOTYPE if the PCH could not be found, -EAGAIN if
+ * Return: 0 if OK, -EPROTOTYPE if the PCH could not be found, -EAGAIN if
  *	the function cannot success without probing, possible another error if
  *	pch_get_spi_base() fails
  */
@@ -632,7 +631,7 @@ static int ich_spi_get_basics(struct udevice *bus, bool can_probe,
 		if (device_get_uclass_id(pch) != UCLASS_PCH) {
 			uclass_first_device(UCLASS_PCH, &pch);
 			if (!pch)
-				return log_msg_ret("uclass", -EPROTOTYPE);
+				; /* ignore this error since we don't need it */
 		}
 	}
 
@@ -672,7 +671,7 @@ static int ich_get_mmap_bus(struct udevice *bus, ulong *map_basep,
 			    uint *map_sizep, uint *offsetp)
 {
 	pci_dev_t spi_bdf;
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	if (device_is_on_pci_bus(bus)) {
 		struct pci_child_plat *pplat;
 
@@ -780,7 +779,7 @@ static int ich_init_controller(struct udevice *dev,
 			       struct ich_spi_plat *plat,
 			       struct ich_spi_priv *ctlr)
 {
-	if (spl_phase() == PHASE_TPL) {
+	if (xpl_phase() == PHASE_TPL) {
 		struct ich_spi_plat *plat = dev_get_plat(dev);
 		int ret;
 
@@ -868,7 +867,7 @@ static int ich_spi_probe(struct udevice *dev)
 	if (ret)
 		return ret;
 
-	if (spl_phase() == PHASE_TPL) {
+	if (xpl_phase() == PHASE_TPL) {
 		/* Cache the BIOS to speed things up */
 		ret = ich_cache_bios_region(dev);
 		if (ret)
@@ -918,12 +917,14 @@ static int ich_spi_child_pre_probe(struct udevice *dev)
 	struct spi_slave *slave = dev_get_parent_priv(dev);
 
 	/*
-	 * Yes this controller can only write a small number of bytes at
+	 * Yes this controller can only transfer a small number of bytes at
 	 * once! The limit is typically 64 bytes. For hardware sequencing a
 	 * a loop is used to get around this.
 	 */
-	if (!plat->hwseq)
+	if (!plat->hwseq) {
+		slave->max_read_size = priv->databytes;
 		slave->max_write_size = priv->databytes;
+	}
 	/*
 	 * ICH 7 SPI controller only supports array read command
 	 * and byte program command for SST flash
@@ -938,7 +939,7 @@ static int ich_spi_of_to_plat(struct udevice *dev)
 {
 	struct ich_spi_plat *plat = dev_get_plat(dev);
 
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	struct ich_spi_priv *priv = dev_get_priv(dev);
 	int ret;
 

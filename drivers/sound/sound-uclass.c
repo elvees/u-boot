@@ -4,7 +4,8 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_SOUND
+
 #include <dm.h>
 #include <i2s.h>
 #include <log.h>

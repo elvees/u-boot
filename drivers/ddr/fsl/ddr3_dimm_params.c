@@ -8,7 +8,7 @@
  * JEDEC standard No.21-C 4_01_02_11R18.pdf
  */
 
-#include <common.h>
+#include <linux/string.h>
 #include <fsl_ddr_sdram.h>
 #include <log.h>
 
@@ -36,18 +36,18 @@
  *	0110		16Gb		2GB
  *
  * SPD byte8 - module memory bus width
- * 	bit[2:0]	primary bus width
+ *	bit[2:0]	primary bus width
  *	000		8bits
- * 	001		16bits
- * 	010		32bits
- * 	011		64bits
+ *	001		16bits
+ *	010		32bits
+ *	011		64bits
  *
  * SPD byte7 - module organiztion
- * 	bit[2:0]	sdram device width
- * 	000		4bits
- * 	001		8bits
- * 	010		16bits
- * 	011		32bits
+ *	bit[2:0]	sdram device width
+ *	000		4bits
+ *	001		8bits
+ *	010		16bits
+ *	011		32bits
  *
  */
 static unsigned long long

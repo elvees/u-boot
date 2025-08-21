@@ -6,7 +6,6 @@
  *     Texas Instruments Incorporated, <www.ti.com>
  */
 
-#include <common.h>
 #include <hang.h>
 #include <asm/io.h>
 #include <asm/arch/mux-k2g.h>
@@ -367,6 +366,9 @@ struct pin_cfg k2g_ice_evm_pin_cfg[] = {
 	/* MDIO */
 	{ 98,	BUFFER_CLASS_B | PIN_PDIS | MODE(0) },	/* MDIO_DATA */
 	{ 99,	BUFFER_CLASS_B | PIN_PDIS | MODE(0) },	/* MDIO_CLK */
+
+	/* ICSS1 Padconf Workaround */
+	{ 202, MODE(1) | PIN_PDIS },    /* PR1_PRU1_GPO1.PR1_PRU1_GPI1 (PR1_MII1_RXD1) */
 
 	{ MAX_PIN_N, }
 };

@@ -4,11 +4,18 @@ Emulation
 =========
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
+   acpi
+   blkdev
    qemu-arm
    qemu-mips
    qemu-ppce500
    qemu-riscv
+   qemu-sbsa
    qemu-x86
-   qemu_capsule_update
+   qemu-xtensa
+
+Also see
+
+* :doc:`../../usage/semihosting`

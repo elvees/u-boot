@@ -3,7 +3,6 @@
  * Copyright (C) 2015 Google, Inc
  */
 
-#include <common.h>
 #include <dm.h>
 #include <asm/io.h>
 #include <asm/test.h>
@@ -20,7 +19,7 @@ static int dm_test_pci_base(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_pci_base, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_pci_base, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 /* Test that sandbox PCI bus numbering and device works correctly */
 static int dm_test_pci_busdev(struct unit_test_state *uts)
@@ -55,7 +54,7 @@ static int dm_test_pci_busdev(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_pci_busdev, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_pci_busdev, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 /* Test that we can use the swapcase device correctly */
 static int dm_test_pci_swapcase(struct unit_test_state *uts)
@@ -108,7 +107,7 @@ static int dm_test_pci_swapcase(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_pci_swapcase, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_pci_swapcase, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 /* Test that we can dynamically bind the device driver correctly */
 static int dm_test_pci_drvdata(struct unit_test_state *uts)
@@ -130,7 +129,7 @@ static int dm_test_pci_drvdata(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_pci_drvdata, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_pci_drvdata, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 /* Test that devices on PCI bus#2 can be accessed correctly */
 static int dm_test_pci_mixed(struct unit_test_state *uts)
@@ -193,7 +192,7 @@ static int dm_test_pci_mixed(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_pci_mixed, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_pci_mixed, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 /* Test looking up PCI capability and extended capability */
 static int dm_test_pci_cap(struct unit_test_state *uts)
@@ -245,7 +244,7 @@ static int dm_test_pci_cap(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_pci_cap, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_pci_cap, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 /* Test looking up BARs in EA capability structure */
 static int dm_test_pci_ea(struct unit_test_state *uts)
@@ -268,43 +267,45 @@ static int dm_test_pci_ea(struct unit_test_state *uts)
 	ut_asserteq(PCI_CAP_ID_EA_OFFSET, cap);
 
 	/* test swap case in BAR 1 */
-	bar = dm_pci_map_bar(swap, PCI_BASE_ADDRESS_0, 0);
+	bar = dm_pci_map_bar(swap, PCI_BASE_ADDRESS_0, 0, 0, PCI_REGION_TYPE, 0);
 	ut_assertnonnull(bar);
 	*(int *)bar = 2; /* swap upper/lower */
 
-	bar = dm_pci_map_bar(swap, PCI_BASE_ADDRESS_1, 0);
+	bar = dm_pci_map_bar(swap, PCI_BASE_ADDRESS_1, 0, 0, PCI_REGION_TYPE, 0);
 	ut_assertnonnull(bar);
 	strcpy(bar, "ea TEST");
 	unmap_sysmem(bar);
-	bar = dm_pci_map_bar(swap, PCI_BASE_ADDRESS_1, 0);
+	bar = dm_pci_map_bar(swap, PCI_BASE_ADDRESS_1, 0, 0, PCI_REGION_TYPE, 0);
 	ut_assertnonnull(bar);
 	ut_asserteq_str("EA test", bar);
 
 	/* test magic values in BARs2, 4;  BAR 3 is n/a */
-	bar = dm_pci_map_bar(swap, PCI_BASE_ADDRESS_2, 0);
+	bar = dm_pci_map_bar(swap, PCI_BASE_ADDRESS_2, 0, 0, PCI_REGION_TYPE, 0);
 	ut_assertnonnull(bar);
 	ut_asserteq(PCI_EA_BAR2_MAGIC, *(u32 *)bar);
 
-	bar = dm_pci_map_bar(swap, PCI_BASE_ADDRESS_3, 0);
+	bar = dm_pci_map_bar(swap, PCI_BASE_ADDRESS_3, 0, 0, PCI_REGION_TYPE, 0);
 	ut_assertnull(bar);
 
-	bar = dm_pci_map_bar(swap, PCI_BASE_ADDRESS_4, 0);
+	bar = dm_pci_map_bar(swap, PCI_BASE_ADDRESS_4, 0, 0, PCI_REGION_TYPE, 0);
 	ut_assertnonnull(bar);
 	ut_asserteq(PCI_EA_BAR4_MAGIC, *(u32 *)bar);
 
 	return 0;
 }
-DM_TEST(dm_test_pci_ea, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_pci_ea, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 /* Test the dev_read_addr_pci() function */
 static int dm_test_pci_addr_flat(struct unit_test_state *uts)
 {
 	struct udevice *swap1f, *swap1;
 	ulong io_addr, mem_addr;
+	fdt_addr_t size;
 
 	ut_assertok(dm_pci_bus_find_bdf(PCI_BDF(0, 0x1f, 0), &swap1f));
 	io_addr = dm_pci_read_bar32(swap1f, 0);
-	ut_asserteq(io_addr, dev_read_addr_pci(swap1f));
+	ut_asserteq(io_addr, dev_read_addr_pci(swap1f, &size));
+	ut_asserteq(0, size);
 
 	/*
 	 * This device has both I/O and MEM spaces but the MEM space appears
@@ -312,34 +313,37 @@ static int dm_test_pci_addr_flat(struct unit_test_state *uts)
 	 */
 	ut_assertok(dm_pci_bus_find_bdf(PCI_BDF(0, 0x1, 0), &swap1));
 	mem_addr = dm_pci_read_bar32(swap1, 1);
-	ut_asserteq(mem_addr, dev_read_addr_pci(swap1));
+	ut_asserteq(mem_addr, dev_read_addr_pci(swap1, &size));
+	ut_asserteq(0, size);
 
 	return 0;
 }
-DM_TEST(dm_test_pci_addr_flat, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT |
-		UT_TESTF_FLAT_TREE);
+DM_TEST(dm_test_pci_addr_flat, UTF_SCAN_PDATA | UTF_SCAN_FDT |
+		UTF_FLAT_TREE);
 
 /*
  * Test the dev_read_addr_pci() function with livetree. That function is
  * not currently fully implemented, in that it fails to return the BAR address.
  * Once that is implemented this test can be removed and dm_test_pci_addr_flat()
- * can be used for both flattree and livetree by removing the UT_TESTF_FLAT_TREE
+ * can be used for both flattree and livetree by removing the UTF_FLAT_TREE
  * flag above.
  */
 static int dm_test_pci_addr_live(struct unit_test_state *uts)
 {
 	struct udevice *swap1f, *swap1;
+	fdt_size_t size;
 
 	ut_assertok(dm_pci_bus_find_bdf(PCI_BDF(0, 0x1f, 0), &swap1f));
-	ut_asserteq(FDT_ADDR_T_NONE, dev_read_addr_pci(swap1f));
+	ut_asserteq_64(FDT_ADDR_T_NONE, dev_read_addr_pci(swap1f, &size));
+	ut_asserteq(0, size);
 
 	ut_assertok(dm_pci_bus_find_bdf(PCI_BDF(0, 0x1, 0), &swap1));
-	ut_asserteq(FDT_ADDR_T_NONE, dev_read_addr_pci(swap1));
+	ut_asserteq_64(FDT_ADDR_T_NONE, dev_read_addr_pci(swap1, &size));
+	ut_asserteq(0, size);
 
 	return 0;
 }
-DM_TEST(dm_test_pci_addr_live, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT |
-		UT_TESTF_LIVE_TREE);
+DM_TEST(dm_test_pci_addr_live, UTF_SCAN_PDATA | UTF_SCAN_FDT | UTF_LIVE_TREE);
 
 /* Test device_is_on_pci_bus() */
 static int dm_test_pci_on_bus(struct unit_test_state *uts)
@@ -353,7 +357,7 @@ static int dm_test_pci_on_bus(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_pci_on_bus, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_pci_on_bus, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 /*
  * Test support for multiple memory regions enabled via
@@ -375,4 +379,110 @@ static int dm_test_pci_region_multi(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_pci_region_multi, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_pci_region_multi, UTF_SCAN_PDATA | UTF_SCAN_FDT);
+
+/*
+ * Test the translation of PCI bus addresses to physical addresses using the
+ * ranges from bus#1.
+ */
+static int dm_test_pci_bus_to_phys(struct unit_test_state *uts)
+{
+	unsigned long mask = PCI_REGION_TYPE;
+	unsigned long flags = PCI_REGION_MEM;
+	struct udevice *dev;
+	phys_addr_t phys_addr;
+
+	ut_assertok(dm_pci_bus_find_bdf(PCI_BDF(1, 0x08, 0), &dev));
+
+	/* Before any of the ranges. */
+	phys_addr = dm_pci_bus_to_phys(dev, 0x20000000, 0x400, mask, flags);
+	ut_asserteq(0, phys_addr);
+
+	/* Identity range: whole, start, mid, end */
+	phys_addr = dm_pci_bus_to_phys(dev, 0x2ffff000, 0x2000, mask, flags);
+	ut_asserteq(0, phys_addr);
+	phys_addr = dm_pci_bus_to_phys(dev, 0x30000000, 0x2000, mask, flags);
+	ut_asserteq(0x30000000, phys_addr);
+	phys_addr = dm_pci_bus_to_phys(dev, 0x30000000, 0x1000, mask, flags);
+	ut_asserteq(0x30000000, phys_addr);
+	phys_addr = dm_pci_bus_to_phys(dev, 0x30000abc, 0x12, mask, flags);
+	ut_asserteq(0x30000abc, phys_addr);
+	phys_addr = dm_pci_bus_to_phys(dev, 0x30000800, 0x1800, mask, flags);
+	ut_asserteq(0x30000800, phys_addr);
+	phys_addr = dm_pci_bus_to_phys(dev, 0x30008000, 0x1801, mask, flags);
+	ut_asserteq(0, phys_addr);
+
+	/* Translated range: whole, start, mid, end */
+	phys_addr = dm_pci_bus_to_phys(dev, 0x30fff000, 0x2000, mask, flags);
+	ut_asserteq(0, phys_addr);
+	phys_addr = dm_pci_bus_to_phys(dev, 0x31000000, 0x2000, mask, flags);
+	ut_asserteq(0x3e000000, phys_addr);
+	phys_addr = dm_pci_bus_to_phys(dev, 0x31000000, 0x1000, mask, flags);
+	ut_asserteq(0x3e000000, phys_addr);
+	phys_addr = dm_pci_bus_to_phys(dev, 0x31000abc, 0x12, mask, flags);
+	ut_asserteq(0x3e000abc, phys_addr);
+	phys_addr = dm_pci_bus_to_phys(dev, 0x31000800, 0x1800, mask, flags);
+	ut_asserteq(0x3e000800, phys_addr);
+	phys_addr = dm_pci_bus_to_phys(dev, 0x31008000, 0x1801, mask, flags);
+	ut_asserteq(0, phys_addr);
+
+	/* Beyond all of the ranges. */
+	phys_addr = dm_pci_bus_to_phys(dev, 0x32000000, 0x400, mask, flags);
+	ut_asserteq(0, phys_addr);
+
+	return 0;
+}
+DM_TEST(dm_test_pci_bus_to_phys, UTF_SCAN_PDATA | UTF_SCAN_FDT);
+
+/*
+ * Test the translation of physical addresses to PCI bus addresses using the
+ * ranges from bus#1.
+ */
+static int dm_test_pci_phys_to_bus(struct unit_test_state *uts)
+{
+	unsigned long mask = PCI_REGION_TYPE;
+	unsigned long flags = PCI_REGION_MEM;
+	struct udevice *dev;
+	pci_addr_t pci_addr;
+
+	ut_assertok(dm_pci_bus_find_bdf(PCI_BDF(1, 0x08, 0), &dev));
+
+	/* Before any of the ranges. */
+	pci_addr = dm_pci_phys_to_bus(dev, 0x20000000, 0x400, mask, flags);
+	ut_asserteq(0, pci_addr);
+
+	/* Identity range: partial overlap, whole, start, mid, end */
+	pci_addr = dm_pci_phys_to_bus(dev, 0x2ffff000, 0x2000, mask, flags);
+	ut_asserteq(0, pci_addr);
+	pci_addr = dm_pci_phys_to_bus(dev, 0x30000000, 0x2000, mask, flags);
+	ut_asserteq(0x30000000, pci_addr);
+	pci_addr = dm_pci_phys_to_bus(dev, 0x30000000, 0x1000, mask, flags);
+	ut_asserteq(0x30000000, pci_addr);
+	pci_addr = dm_pci_phys_to_bus(dev, 0x30000abc, 0x12, mask, flags);
+	ut_asserteq(0x30000abc, pci_addr);
+	pci_addr = dm_pci_phys_to_bus(dev, 0x30000800, 0x1800, mask, flags);
+	ut_asserteq(0x30000800, pci_addr);
+	pci_addr = dm_pci_phys_to_bus(dev, 0x30008000, 0x1801, mask, flags);
+	ut_asserteq(0, pci_addr);
+
+	/* Translated range: partial overlap, whole, start, mid, end */
+	pci_addr = dm_pci_phys_to_bus(dev, 0x3dfff000, 0x2000, mask, flags);
+	ut_asserteq(0, pci_addr);
+	pci_addr = dm_pci_phys_to_bus(dev, 0x3e000000, 0x2000, mask, flags);
+	ut_asserteq(0x31000000, pci_addr);
+	pci_addr = dm_pci_phys_to_bus(dev, 0x3e000000, 0x1000, mask, flags);
+	ut_asserteq(0x31000000, pci_addr);
+	pci_addr = dm_pci_phys_to_bus(dev, 0x3e000abc, 0x12, mask, flags);
+	ut_asserteq(0x31000abc, pci_addr);
+	pci_addr = dm_pci_phys_to_bus(dev, 0x3e000800, 0x1800, mask, flags);
+	ut_asserteq(0x31000800, pci_addr);
+	pci_addr = dm_pci_phys_to_bus(dev, 0x3e008000, 0x1801, mask, flags);
+	ut_asserteq(0, pci_addr);
+
+	/* Beyond all of the ranges. */
+	pci_addr = dm_pci_phys_to_bus(dev, 0x3f000000, 0x400, mask, flags);
+	ut_asserteq(0, pci_addr);
+
+	return 0;
+}
+DM_TEST(dm_test_pci_phys_to_bus, UTF_SCAN_PDATA | UTF_SCAN_FDT);

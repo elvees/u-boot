@@ -2,13 +2,12 @@
 /*
  * Marvell Armada 37xx SoC Peripheral clocks
  *
- * Marek Behun <marek.behun@nic.cz>
+ * Marek Behún <kabel@kernel.org>
  *
  * Based on Linux driver by:
  *   Gregory CLEMENT <gregory.clement@free-electrons.com>
  */
 
-#include <common.h>
 #include <malloc.h>
 #include <clk-uclass.h>
 #include <clk.h>
@@ -340,7 +339,7 @@ static int periph_clk_enable(struct clk *clk, int enable)
 		return -EINVAL;
 
 	if (!periph_clk->can_gate)
-		return -ENOTSUPP;
+		return -EINVAL;
 
 	if (enable)
 		clrbits_le32(priv->reg + CLK_DIS, periph_clk->disable_bit);
@@ -408,7 +407,7 @@ static ulong armada_37xx_periph_clk_set_rate(struct clk *clk, ulong req_rate)
 		return old_rate;
 
 	if (!periph_clk->can_gate || !periph_clk->dividers)
-		return -ENOTSUPP;
+		return -EINVAL;
 
 	parent_rate = get_parent_rate(priv, clk->id);
 	if (parent_rate == -EINVAL)
@@ -445,7 +444,7 @@ static int armada_37xx_periph_clk_set_parent(struct clk *clk,
 		return -EINVAL;
 
 	if (!periph_clk->can_mux || !periph_clk->can_gate)
-		return -ENOTSUPP;
+		return -EINVAL;
 
 	ret = clk_get_by_index(clk->dev, 0, &check_parent);
 	if (ret < 0)
@@ -454,7 +453,6 @@ static int armada_37xx_periph_clk_set_parent(struct clk *clk,
 	if (parent->dev != check_parent.dev)
 		ret = -EINVAL;
 
-	clk_free(&check_parent);
 	if (ret < 0)
 		return ret;
 
@@ -488,33 +486,36 @@ static int armada_37xx_periph_clk_dump(struct udevice *dev)
 static int clk_dump(const char *name, int (*func)(struct udevice *))
 {
 	struct udevice *dev;
+	int ret;
 
 	if (uclass_get_device_by_name(UCLASS_CLK, name, &dev)) {
 		printf("Cannot find device %s\n", name);
 		return -ENODEV;
 	}
 
-	return func(dev);
+	ret = func(dev);
+	if (ret)
+		printf("Dump failed for %s: %d\n", name, ret);
+
+	return ret;
 }
 
 int armada_37xx_tbg_clk_dump(struct udevice *);
 
-int soc_clk_dump(void)
+static void armada37xx_clk_dump(struct udevice __always_unused *dev)
 {
 	printf("  xtal at %u000000 Hz\n\n", get_ref_clk());
 
 	if (clk_dump("tbg@13200", armada_37xx_tbg_clk_dump))
-		return 1;
+		return;
 
 	if (clk_dump("nb-periph-clk@13000",
 		     armada_37xx_periph_clk_dump))
-		return 1;
+		return;
 
 	if (clk_dump("sb-periph-clk@18000",
 		     armada_37xx_periph_clk_dump))
-		return 1;
-
-	return 0;
+		return;
 }
 #endif
 
@@ -593,7 +594,6 @@ static int armada_37xx_periph_clk_probe(struct udevice *dev)
 		}
 
 		priv->parents[i] = clk_get_rate(&clk);
-		clk_free(&clk);
 	}
 
 	return 0;
@@ -605,6 +605,9 @@ static const struct clk_ops armada_37xx_periph_clk_ops = {
 	.set_parent = armada_37xx_periph_clk_set_parent,
 	.enable = armada_37xx_periph_clk_enable,
 	.disable = armada_37xx_periph_clk_disable,
+#if IS_ENABLED(CONFIG_CMD_CLK)
+	.dump = armada37xx_clk_dump,
+#endif
 };
 
 static const struct udevice_id armada_37xx_periph_clk_ids[] = {
@@ -626,4 +629,5 @@ U_BOOT_DRIVER(armada_37xx_periph_clk) = {
 	.ops		= &armada_37xx_periph_clk_ops,
 	.priv_auto	= sizeof(struct a37xx_periphclk),
 	.probe		= armada_37xx_periph_clk_probe,
+	.flags		= DM_FLAG_PRE_RELOC,
 };

@@ -3,19 +3,23 @@
  * Device Tree Include file for Freescale Layerscape-1043A family SoC.
  *
  * Copyright (C) 2015, Freescale Semiconductor
- * Copyright 2020 NXP
+ * Copyright 2020-2021 NXP
  *
  * Mingkai Hu <Mingkai.hu@freescale.com>
  */
 
 /dts-v1/;
-/include/ "fsl-ls1043a.dtsi"
+#include "fsl-ls1043a.dtsi"
 
 / {
 	model = "LS1043A RDB Board";
 
         aliases {
 		spi1 = &dspi0;
+		serial0 = &duart0;
+		serial1 = &duart1;
+		serial2 = &duart2;
+		serial3 = &duart3;
         };
 
 };
@@ -117,13 +121,13 @@
 
 	ethernet@e4000 {
 		phy-handle = <&rgmii_phy1>;
-		phy-connection-type = "rgmii-txid";
+		phy-connection-type = "rgmii-id";
 		status = "okay";
 	};
 
 	ethernet@e6000 {
 		phy-handle = <&rgmii_phy2>;
-		phy-connection-type = "rgmii-txid";
+		phy-connection-type = "rgmii-id";
 		status = "okay";
 	};
 

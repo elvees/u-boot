@@ -6,7 +6,6 @@
  *	Copyright (C) 2008 Maxime Bizon <mbizon@freebox.fr>
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <dma.h>
@@ -18,6 +17,7 @@
 #include <reset.h>
 #include <wait_bit.h>
 #include <asm/io.h>
+#include <linux/printk.h>
 
 #define ETH_RX_DESC			PKTBUFSRX
 #define ETH_MAX_MTU_SIZE		1518
@@ -415,7 +415,6 @@ static int bcm6348_eth_probe(struct udevice *dev)
 	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct bcm6348_eth_priv *priv = dev_get_priv(dev);
 	struct ofnode_phandle_args phy;
-	const char *phy_mode;
 	int ret, i;
 
 	/* get base address */
@@ -425,11 +424,8 @@ static int bcm6348_eth_probe(struct udevice *dev)
 	pdata->iobase = (phys_addr_t) priv->base;
 
 	/* get phy mode */
-	pdata->phy_interface = PHY_INTERFACE_MODE_NONE;
-	phy_mode = dev_read_string(dev, "phy-mode");
-	if (phy_mode)
-		pdata->phy_interface = phy_get_interface_by_name(phy_mode);
-	if (pdata->phy_interface == PHY_INTERFACE_MODE_NONE)
+	pdata->phy_interface = dev_read_phy_mode(dev);
+	if (pdata->phy_interface == PHY_INTERFACE_MODE_NA)
 		return -ENODEV;
 
 	/* get phy */
@@ -458,12 +454,6 @@ static int bcm6348_eth_probe(struct udevice *dev)
 		ret = clk_enable(&clk);
 		if (ret < 0) {
 			pr_err("%s: error enabling clock %d\n", __func__, i);
-			return ret;
-		}
-
-		ret = clk_free(&clk);
-		if (ret < 0) {
-			pr_err("%s: error freeing clock %d\n", __func__, i);
 			return ret;
 		}
 	}

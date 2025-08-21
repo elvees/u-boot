@@ -3,13 +3,14 @@
  * Copyright 2018 NXP
  */
 
-#include <common.h>
+#include <config.h>
 #include <asm/arch-fsl-layerscape/immap_lsch2.h>
 #include <asm/arch-fsl-layerscape/fsl_icid.h>
 #include <asm/arch-fsl-layerscape/fsl_portals.h>
+#include <asm/arch/stream_id_lsch3.h>
 
 #ifdef CONFIG_SYS_DPAA_QBMAN
-struct qportal_info qp_info[CONFIG_SYS_QMAN_NUM_PORTALS] = {
+struct qportal_info qp_info[CFG_SYS_QMAN_NUM_PORTALS] = {
 	SET_QP_INFO(FSL_DPAA1_STREAM_ID_END, 0),
 	SET_QP_INFO(FSL_DPAA1_STREAM_ID_END, 0),
 	SET_QP_INFO(FSL_DPAA1_STREAM_ID_END, 0),
@@ -58,7 +59,7 @@ struct icid_id_table icid_tbl[] = {
 
 int icid_tbl_sz = ARRAY_SIZE(icid_tbl);
 
-#ifdef CONFIG_SYS_DPAA_FMAN
+#if defined(CONFIG_SYS_DPAA_FMAN) && !defined(CONFIG_XPL_BUILD)
 struct fman_icid_id_table fman_icid_tbl[] = {
 	/* port id, icid */
 	SET_FMAN_ICID_ENTRY(0x02, FSL_DPAA1_STREAM_ID_END),

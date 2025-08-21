@@ -14,12 +14,12 @@
  *
  */
 
-#include <common.h>
 #include <asm/io.h>
 #include <malloc.h>
 #include <clk-uclass.h>
 #include <dm/device.h>
 #include <dm/devres.h>
+#include <linux/bug.h>
 #include <linux/clk-provider.h>
 #include <clk.h>
 #include "clk.h"
@@ -33,6 +33,7 @@ struct clk_gate2 {
 	u8		bit_idx;
 	u8		cgr_val;
 	u8		flags;
+	unsigned int	*share_count;
 };
 
 #define to_clk_gate2(_clk) container_of(_clk, struct clk_gate2, clk)
@@ -41,6 +42,9 @@ static int clk_gate2_enable(struct clk *clk)
 {
 	struct clk_gate2 *gate = to_clk_gate2(clk);
 	u32 reg;
+
+	if (gate->share_count && (*gate->share_count)++ > 0)
+		return 0;
 
 	reg = readl(gate->reg);
 	reg &= ~(3 << gate->bit_idx);
@@ -54,6 +58,13 @@ static int clk_gate2_disable(struct clk *clk)
 {
 	struct clk_gate2 *gate = to_clk_gate2(clk);
 	u32 reg;
+
+	if (gate->share_count) {
+		if (WARN_ON(*gate->share_count == 0))
+			return 0;
+		else if (--(*gate->share_count) > 0)
+			return 0;
+	}
 
 	reg = readl(gate->reg);
 	reg &= ~(3 << gate->bit_idx);
@@ -79,10 +90,10 @@ static const struct clk_ops clk_gate2_ops = {
 	.get_rate = clk_generic_get_rate,
 };
 
-struct clk *clk_register_gate2(struct device *dev, const char *name,
+struct clk *clk_register_gate2(struct udevice *dev, const char *name,
 		const char *parent_name, unsigned long flags,
 		void __iomem *reg, u8 bit_idx, u8 cgr_val,
-		u8 clk_gate2_flags)
+		u8 clk_gate2_flags, unsigned int *share_count)
 {
 	struct clk_gate2 *gate;
 	struct clk *clk;
@@ -96,10 +107,12 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
 	gate->bit_idx = bit_idx;
 	gate->cgr_val = cgr_val;
 	gate->flags = clk_gate2_flags;
+	gate->share_count = share_count;
 
 	clk = &gate->clk;
 
-	ret = clk_register(clk, UBOOT_DM_CLK_IMX_GATE2, name, parent_name);
+	ret = clk_register(clk, UBOOT_DM_CLK_IMX_GATE2, name,
+		clk_resolve_parent_clk(dev, parent_name));
 	if (ret) {
 		kfree(gate);
 		return ERR_PTR(ret);

@@ -6,7 +6,9 @@
 
 """Functional tests for checking that patman behaves correctly"""
 
+import contextlib
 import os
+import pathlib
 import re
 import shutil
 import sys
@@ -16,21 +18,31 @@ import unittest
 
 from patman.commit import Commit
 from patman import control
-from patman import gitutil
 from patman import patchstream
 from patman.patchstream import PatchStream
 from patman.series import Series
 from patman import settings
-from patman import terminal
-from patman import tools
-from patman.test_util import capture_sys_output
+from u_boot_pylib import gitutil
+from u_boot_pylib import terminal
+from u_boot_pylib import tools
+from u_boot_pylib.test_util import capture_sys_output
 
-try:
-    import pygit2
-    HAVE_PYGIT2 = True
-    from patman import status
-except ModuleNotFoundError:
-    HAVE_PYGIT2 = False
+import pygit2
+from patman import status
+
+PATMAN_DIR = pathlib.Path(__file__).parent
+TEST_DATA_DIR = PATMAN_DIR / 'test/'
+
+
+@contextlib.contextmanager
+def directory_excursion(directory):
+    """Change directory to `directory` for a limited to the context block."""
+    current = os.getcwd()
+    try:
+        os.chdir(directory)
+        yield
+    finally:
+        os.chdir(current)
 
 
 class TestFunctional(unittest.TestCase):
@@ -50,7 +62,7 @@ class TestFunctional(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
-        terminal.SetPrintTestMode(False)
+        terminal.set_print_test_mode(False)
 
     @staticmethod
     def _get_path(fname):
@@ -62,8 +74,7 @@ class TestFunctional(unittest.TestCase):
         Returns:
             str: Full path to file in the test directory
         """
-        return os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])),
-                            'test', fname)
+        return TEST_DATA_DIR / fname
 
     @classmethod
     def _get_text(cls, fname):
@@ -119,7 +130,7 @@ class TestFunctional(unittest.TestCase):
 
         return cover_fname, fname_list
 
-    def testBasic(self):
+    def test_basic(self):
         """Tests the basic flow of patman
 
         This creates a series from some hard-coded patches build from a simple
@@ -127,6 +138,7 @@ class TestFunctional(unittest.TestCase):
 
             Series-to: u-boot
             Series-prefix: RFC
+            Series-postfix: some-branch
             Series-cc: Stefan Brüns <stefan.bruens@rwth-aachen.de>
             Cover-letter-cc: Lord Mëlchett <clergy@palace.gov>
             Series-version: 3
@@ -141,7 +153,7 @@ class TestFunctional(unittest.TestCase):
             Commit-changes: 2
             - Changes only for this commit
 
-            Cover-changes: 4
+'            Cover-changes: 4
             - Some notes for the cover letter
 
             Cover-letter:
@@ -181,12 +193,12 @@ class TestFunctional(unittest.TestCase):
             - each patch has the correct subject
             - dry-run information prints out correctly
             - unicode is handled correctly
-            - Series-to, Series-cc, Series-prefix, Cover-letter
+            - Series-to, Series-cc, Series-prefix, Series-postfix, Cover-letter
             - Cover-letter-cc, Series-version, Series-changes, Series-notes
             - Commit-notes
         """
         process_tags = True
-        ignore_bad_tags = True
+        ignore_bad_tags = False
         stefan = b'Stefan Br\xc3\xbcns <stefan.bruens@rwth-aachen.de>'.decode('utf-8')
         rick = 'Richard III <richard@palace.gov>'
         mel = b'Lord M\xc3\xablchett <clergy@palace.gov>'.decode('utf-8')
@@ -199,11 +211,16 @@ class TestFunctional(unittest.TestCase):
             'u-boot': ['u-boot@lists.denx.de'],
             'simon': [self.leb],
             'fred': [self.fred],
+            'joe': [self.joe],
         }
 
         text = self._get_text('test01.txt')
         series = patchstream.get_metadata_for_test(text)
+        series.base_commit = Commit('1a44532')
+        series.branch = 'mybranch'
         cover_fname, args = self._create_patches_for_test(series)
+        get_maintainer_script = str(pathlib.Path(__file__).parent.parent.parent
+                                    / 'get_maintainer.pl') + ' --norolestats'
         with capture_sys_output() as out:
             patchstream.fix_patches(series, args)
             if cover_fname and series.get('cover'):
@@ -211,8 +228,8 @@ class TestFunctional(unittest.TestCase):
             series.DoChecks()
             cc_file = series.MakeCcFile(process_tags, cover_fname,
                                         not ignore_bad_tags, add_maintainers,
-                                        None)
-            cmd = gitutil.EmailPatches(
+                                        None, get_maintainer_script)
+            cmd = gitutil.email_patches(
                 series, cover_fname, args, dry_run, not ignore_bad_tags,
                 cc_file, in_reply_to=in_reply_to, thread=None)
             series.ShowActions(args, cmd, process_tags)
@@ -226,6 +243,8 @@ class TestFunctional(unittest.TestCase):
         self.assertEqual('Change log missing for v3', next(lines))
         self.assertEqual('Change log for unknown version v4', next(lines))
         self.assertEqual("Alias 'pci' not found", next(lines))
+        while next(lines) != 'Cc processing complete':
+            pass
         self.assertIn('Dry run', next(lines))
         self.assertEqual('', next(lines))
         self.assertIn('Send a total of %d patches' % count, next(lines))
@@ -240,8 +259,10 @@ class TestFunctional(unittest.TestCase):
         self.assertEqual('Cc:	  %s' % stefan, next(lines))
         self.assertEqual('Version:  3', next(lines))
         self.assertEqual('Prefix:\t  RFC', next(lines))
+        self.assertEqual('Postfix:\t  some-branch', next(lines))
         self.assertEqual('Cover: 4 lines', next(lines))
         self.assertEqual('      Cc:  %s' % self.fred, next(lines))
+        self.assertEqual('      Cc:  %s' % self.joe, next(lines))
         self.assertEqual('      Cc:  %s' % self.leb,
                          next(lines))
         self.assertEqual('      Cc:  %s' % mel, next(lines))
@@ -255,7 +276,8 @@ class TestFunctional(unittest.TestCase):
 
         self.assertEqual(('%s %s\0%s' % (args[0], rick, stefan)), cc_lines[0])
         self.assertEqual(
-            '%s %s\0%s\0%s\0%s' % (args[1], self.fred, self.leb, rick, stefan),
+            '%s %s\0%s\0%s\0%s\0%s' % (args[1], self.fred, self.joe, self.leb,
+                                       rick, stefan),
             cc_lines[1])
 
         expected = '''
@@ -273,6 +295,7 @@ Changes in v4:
   change
 - Some changes
 - Some notes for the cover letter
+- fdt: Correct cast for sandbox in fdtdec_setup_mem_size_base()
 
 Simon Glass (2):
   pci: Correct cast for sandbox
@@ -287,10 +310,12 @@ Simon Glass (2):
 --\x20
 2.7.4
 
+base-commit: 1a44532
+branch: mybranch
 '''
         lines = open(cover_fname, encoding='utf-8').read().splitlines()
         self.assertEqual(
-            'Subject: [RFC PATCH v3 0/2] test: A test patch series',
+            'Subject: [RFC PATCH some-branch v3 0/2] test: A test patch series',
             lines[3])
         self.assertEqual(expected.splitlines(), lines[7:])
 
@@ -322,6 +347,7 @@ Changes in v4:
 - Multi
   line
   change
+- New
 - Some changes
 
 Changes in v2:
@@ -330,6 +356,31 @@ Changes in v2:
             if expected:
                 expected = expected.splitlines()
                 self.assertEqual(expected, lines[start:(start+len(expected))])
+
+    def test_base_commit(self):
+        """Test adding a base commit with no cover letter"""
+        orig_text = self._get_text('test01.txt')
+        pos = orig_text.index('commit 5ab48490f03051875ab13d288a4bf32b507d76fd')
+        text = orig_text[:pos]
+        series = patchstream.get_metadata_for_test(text)
+        series.base_commit = Commit('1a44532')
+        series.branch = 'mybranch'
+        cover_fname, args = self._create_patches_for_test(series)
+        self.assertFalse(cover_fname)
+        with capture_sys_output() as out:
+            patchstream.fix_patches(series, args, insert_base_commit=True)
+        self.assertEqual('Cleaned 1 patch\n', out[0].getvalue())
+        lines = tools.read_file(args[0], binary=False).splitlines()
+        pos = lines.index('-- ')
+
+        # We expect these lines at the end:
+        # -- (with trailing space)
+        # 2.7.4
+        # (empty)
+        # base-commit: xxx
+        # branch: xxx
+        self.assertEqual('base-commit: 1a44532', lines[pos + 3])
+        self.assertEqual('branch: mybranch', lines[pos + 4])
 
     def make_commit_with_file(self, subject, body, fname, text):
         """Create a file and add it to the git repo with a new commit
@@ -341,9 +392,11 @@ Changes in v2:
             text (str): Text to put into the file
         """
         path = os.path.join(self.gitdir, fname)
-        tools.WriteFile(path, text, binary=False)
+        tools.write_file(path, text, binary=False)
         index = self.repo.index
         index.add(fname)
+        # pylint doesn't seem to find this
+        # pylint: disable=E1101
         author = pygit2.Signature('Test user', 'test@email.com')
         committer = author
         tree = index.write_tree()
@@ -366,6 +419,8 @@ Changes in v2:
         self.repo = repo
         new_tree = repo.TreeBuilder().write()
 
+        # pylint doesn't seem to find this
+        # pylint: disable=E1101
         author = pygit2.Signature('Test user', 'test@email.com')
         committer = author
         _ = repo.create_commit('HEAD', author, committer, 'Created master',
@@ -417,6 +472,8 @@ better than before''')
         first_target = repo.revparse_single('HEAD')
 
         target = repo.revparse_single('HEAD~2')
+        # pylint doesn't seem to find this
+        # pylint: disable=E1101
         repo.reset(target.oid, pygit2.GIT_CHECKOUT_FORCE)
         self.make_commit_with_file('video: Some video improvements', '''
 Fix up the video so that
@@ -458,19 +515,20 @@ complicated as possible''')
         repo.branches.local.create('base', base_target)
         return repo
 
-    @unittest.skipIf(not HAVE_PYGIT2, 'Missing python3-pygit2')
-    def testBranch(self):
+    def test_branch(self):
         """Test creating patches from a branch"""
         repo = self.make_git_tree()
         target = repo.lookup_reference('refs/heads/first')
+        # pylint doesn't seem to find this
+        # pylint: disable=E1101
         self.repo.checkout(target, strategy=pygit2.GIT_CHECKOUT_FORCE)
         control.setup()
+        orig_dir = os.getcwd()
         try:
-            orig_dir = os.getcwd()
             os.chdir(self.gitdir)
 
             # Check that it can detect the current branch
-            self.assertEqual(2, gitutil.CountCommitsToBranch(None))
+            self.assertEqual(2, gitutil.count_commits_to_branch(None))
             col = terminal.Color()
             with capture_sys_output() as _:
                 _, cover_fname, patch_files = control.prepare_patches(
@@ -480,13 +538,24 @@ complicated as possible''')
             self.assertEqual(2, len(patch_files))
 
             # Check that it can detect a different branch
-            self.assertEqual(3, gitutil.CountCommitsToBranch('second'))
+            self.assertEqual(3, gitutil.count_commits_to_branch('second'))
             with capture_sys_output() as _:
-                _, cover_fname, patch_files = control.prepare_patches(
+                series, cover_fname, patch_files = control.prepare_patches(
                     col, branch='second', count=-1, start=0, end=0,
                     ignore_binary=False, signoff=True)
             self.assertIsNotNone(cover_fname)
             self.assertEqual(3, len(patch_files))
+
+            cover = tools.read_file(cover_fname, binary=False)
+            lines = cover.splitlines()[-2:]
+            base = repo.lookup_reference('refs/heads/base').target
+            self.assertEqual(f'base-commit: {base}', lines[0])
+            self.assertEqual('branch: second', lines[1])
+
+            # Make sure that the base-commit is not present when it is in the
+            # cover letter
+            for fname in patch_files:
+                self.assertNotIn(b'base-commit:', tools.read_file(fname))
 
             # Check that it can skip patches at the end
             with capture_sys_output() as _:
@@ -495,10 +564,49 @@ complicated as possible''')
                     ignore_binary=False, signoff=True)
             self.assertIsNotNone(cover_fname)
             self.assertEqual(2, len(patch_files))
+
+            cover = tools.read_file(cover_fname, binary=False)
+            lines = cover.splitlines()[-2:]
+            base2 = repo.lookup_reference('refs/heads/second')
+            ref = base2.peel(pygit2.GIT_OBJ_COMMIT).parents[0].parents[0].id
+            self.assertEqual(f'base-commit: {ref}', lines[0])
+            self.assertEqual('branch: second', lines[1])
         finally:
             os.chdir(orig_dir)
 
-    def testTags(self):
+    def test_custom_get_maintainer_script(self):
+        """Validate that a custom get_maintainer script gets used."""
+        self.make_git_tree()
+        with directory_excursion(self.gitdir):
+            # Setup git.
+            os.environ['GIT_CONFIG_GLOBAL'] = '/dev/null'
+            os.environ['GIT_CONFIG_SYSTEM'] = '/dev/null'
+            tools.run('git', 'config', 'user.name', 'Dummy')
+            tools.run('git', 'config', 'user.email', 'dumdum@dummy.com')
+            tools.run('git', 'branch', 'upstream')
+            tools.run('git', 'branch', '--set-upstream-to=upstream')
+            tools.run('git', 'add', '.')
+            tools.run('git', 'commit', '-m', 'new commit')
+
+            # Setup patman configuration.
+            with open('.patman', 'w', buffering=1) as f:
+                f.write('[settings]\n'
+                        'get_maintainer_script: dummy-script.sh\n'
+                        'check_patch: False\n'
+                        'add_maintainers: True\n')
+            with open('dummy-script.sh', 'w', buffering=1) as f:
+                f.write('#!/usr/bin/env python\n'
+                        'print("hello@there.com")\n')
+            os.chmod('dummy-script.sh', 0x555)
+
+            # Finally, do the test
+            with capture_sys_output():
+                output = tools.run(PATMAN_DIR / 'patman', '--dry-run')
+                # Assert the email address is part of the dry-run
+                # output.
+                self.assertIn('hello@there.com', output)
+
+    def test_tags(self):
         """Test collection of tags in a patchstream"""
         text = '''This is a patch
 
@@ -512,7 +620,18 @@ Tested-by: %s
             'Reviewed-by': {self.joe, self.mary},
             'Tested-by': {self.leb}})
 
-    def testMissingEnd(self):
+    def test_invalid_tag(self):
+        """Test invalid tag in a patchstream"""
+        text = '''This is a patch
+
+Serie-version: 2
+'''
+        with self.assertRaises(ValueError) as exc:
+            pstrm = PatchStream.process_text(text)
+        self.assertEqual("Line 3: Invalid tag = 'Serie-version: 2'",
+                         str(exc.exception))
+
+    def test_missing_end(self):
         """Test a missing END tag"""
         text = '''This is a patch
 
@@ -525,7 +644,7 @@ Signed-off-by: Fred
         self.assertEqual(["Missing 'END' in section 'cover'"],
                          pstrm.commit.warn)
 
-    def testMissingBlankLine(self):
+    def test_missing_blank_line(self):
         """Test a missing blank line after a tag"""
         text = '''This is a patch
 
@@ -538,7 +657,7 @@ Signed-off-by: Fred
         self.assertEqual(["Missing 'blank line' in section 'Series-changes'"],
                          pstrm.commit.warn)
 
-    def testInvalidCommitTag(self):
+    def test_invalid_commit_tag(self):
         """Test an invalid Commit-xxx tag"""
         text = '''This is a patch
 
@@ -547,7 +666,7 @@ Commit-fred: testing
         pstrm = PatchStream.process_text(text)
         self.assertEqual(["Line 3: Ignoring Commit-fred"], pstrm.commit.warn)
 
-    def testSelfTest(self):
+    def test_self_test(self):
         """Test a tested by tag by this user"""
         test_line = 'Tested-by: %s@napier.com' % os.getenv('USER')
         text = '''This is a patch
@@ -557,7 +676,7 @@ Commit-fred: testing
         pstrm = PatchStream.process_text(text)
         self.assertEqual(["Ignoring '%s'" % test_line], pstrm.commit.warn)
 
-    def testSpaceBeforeTab(self):
+    def test_space_before_tab(self):
         """Test a space before a tab"""
         text = '''This is a patch
 
@@ -566,7 +685,7 @@ Commit-fred: testing
         pstrm = PatchStream.process_text(text)
         self.assertEqual(["Line 3/0 has space before tab"], pstrm.commit.warn)
 
-    def testLinesAfterTest(self):
+    def test_lines_after_test(self):
         """Test detecting lines after TEST= line"""
         text = '''This is a patch
 
@@ -577,7 +696,7 @@ here
         pstrm = PatchStream.process_text(text)
         self.assertEqual(["Found 2 lines after TEST="], pstrm.commit.warn)
 
-    def testBlankLineAtEnd(self):
+    def test_blank_line_at_end(self):
         """Test detecting a blank line at the end of a file"""
         text = '''This is a patch
 
@@ -604,19 +723,20 @@ diff --git a/lib/efi_loader/efi_memory.c b/lib/efi_loader/efi_memory.c
             ["Found possible blank line(s) at end of file 'lib/fdtdec.c'"],
             pstrm.commit.warn)
 
-    @unittest.skipIf(not HAVE_PYGIT2, 'Missing python3-pygit2')
-    def testNoUpstream(self):
+    def test_no_upstream(self):
         """Test CountCommitsToBranch when there is no upstream"""
         repo = self.make_git_tree()
         target = repo.lookup_reference('refs/heads/base')
+        # pylint doesn't seem to find this
+        # pylint: disable=E1101
         self.repo.checkout(target, strategy=pygit2.GIT_CHECKOUT_FORCE)
 
         # Check that it can detect the current branch
+        orig_dir = os.getcwd()
         try:
-            orig_dir = os.getcwd()
             os.chdir(self.gitdir)
             with self.assertRaises(ValueError) as exc:
-                gitutil.CountCommitsToBranch(None)
+                gitutil.count_commits_to_branch(None)
             self.assertIn(
                 "Failed to determine upstream: fatal: no upstream configured for branch 'base'",
                 str(exc.exception))
@@ -642,8 +762,7 @@ diff --git a/lib/efi_loader/efi_memory.c b/lib/efi_loader/efi_memory.c
                     {'id': '1', 'name': 'Some patch'}]}
         raise ValueError('Fake Patchwork does not understand: %s' % subpath)
 
-    @unittest.skipIf(not HAVE_PYGIT2, 'Missing python3-pygit2')
-    def testStatusMismatch(self):
+    def test_status_mismatch(self):
         """Test Patchwork patches not matching the series"""
         series = Series()
 
@@ -652,8 +771,7 @@ diff --git a/lib/efi_loader/efi_memory.c b/lib/efi_loader/efi_memory.c
         self.assertIn('Warning: Patchwork reports 1 patches, series has 0',
                       err.getvalue())
 
-    @unittest.skipIf(not HAVE_PYGIT2, 'Missing python3-pygit2')
-    def testStatusReadPatch(self):
+    def test_status_read_patch(self):
         """Test handling a single patch in Patchwork"""
         series = Series()
         series.commits = [Commit('abcd')]
@@ -665,8 +783,7 @@ diff --git a/lib/efi_loader/efi_memory.c b/lib/efi_loader/efi_memory.c
         self.assertEqual('1', patch.id)
         self.assertEqual('Some patch', patch.raw_subject)
 
-    @unittest.skipIf(not HAVE_PYGIT2, 'Missing python3-pygit2')
-    def testParseSubject(self):
+    def test_parse_subject(self):
         """Test parsing of the patch subject"""
         patch = status.Patch('1')
 
@@ -728,8 +845,7 @@ diff --git a/lib/efi_loader/efi_memory.c b/lib/efi_loader/efi_memory.c
         self.assertEqual('RESEND', patch.prefix)
         self.assertEqual(None, patch.version)
 
-    @unittest.skipIf(not HAVE_PYGIT2, 'Missing python3-pygit2')
-    def testCompareSeries(self):
+    def test_compare_series(self):
         """Test operation of compare_with_series()"""
         commit1 = Commit('abcd')
         commit1.subject = 'Subject 1'
@@ -831,8 +947,7 @@ diff --git a/lib/efi_loader/efi_memory.c b/lib/efi_loader/efi_memory.c
             return patch.comments
         raise ValueError('Fake Patchwork does not understand: %s' % subpath)
 
-    @unittest.skipIf(not HAVE_PYGIT2, 'Missing python3-pygit2')
-    def testFindNewResponses(self):
+    def test_find_new_responses(self):
         """Test operation of find_new_responses()"""
         commit1 = Commit('abcd')
         commit1.subject = 'Subject 1'
@@ -906,10 +1021,10 @@ diff --git a/lib/efi_loader/efi_memory.c b/lib/efi_loader/efi_memory.c
 
         series = Series()
         series.commits = [commit1, commit2]
-        terminal.SetPrintTestMode()
+        terminal.set_print_test_mode()
         status.check_patchwork_status(series, '1234', None, None, False, False,
                                       None, self._fake_patchwork2)
-        lines = iter(terminal.GetPrintTestLines())
+        lines = iter(terminal.get_print_test_lines())
         col = terminal.Color()
         self.assertEqual(terminal.PrintLine('  1 Subject 1', col.BLUE),
                          next(lines))
@@ -970,8 +1085,7 @@ diff --git a/lib/efi_loader/efi_memory.c b/lib/efi_loader/efi_memory.c
             return patch.comments
         raise ValueError('Fake Patchwork does not understand: %s' % subpath)
 
-    @unittest.skipIf(not HAVE_PYGIT2, 'Missing python3-pygit2')
-    def testCreateBranch(self):
+    def test_create_branch(self):
         """Test operation of create_branch()"""
         repo = self.make_git_tree()
         branch = 'first'
@@ -1021,11 +1135,11 @@ diff --git a/lib/efi_loader/efi_memory.c b/lib/efi_loader/efi_memory.c
         # 4 responses added from patchwork into new branch 'first2'
         # <unittest.result.TestResult run=8 errors=0 failures=0>
 
-        terminal.SetPrintTestMode()
+        terminal.set_print_test_mode()
         status.check_patchwork_status(series, '1234', branch, dest_branch,
                                       False, False, None, self._fake_patchwork3,
                                       repo)
-        lines = terminal.GetPrintTestLines()
+        lines = terminal.get_print_test_lines()
         self.assertEqual(12, len(lines))
         self.assertEqual(
             "4 responses added from patchwork into new branch 'first2'",
@@ -1058,8 +1172,7 @@ diff --git a/lib/efi_loader/efi_memory.c b/lib/efi_loader/efi_memory.c
         self.assertEqual('Reviewed-by: %s' % self.mary, next(lines))
         self.assertEqual('Tested-by: %s' % self.leb, next(lines))
 
-    @unittest.skipIf(not HAVE_PYGIT2, 'Missing python3-pygit2')
-    def testParseSnippets(self):
+    def test_parse_snippets(self):
         """Test parsing of review snippets"""
         text = '''Hi Fred,
 
@@ -1089,7 +1202,7 @@ Even more
 
 And another comment
 
-> @@ -153,8 +143,13 @@ def CheckPatch(fname, show_types=False):
+> @@ -153,8 +143,13 @@ def check_patch(fname, show_types=False):
 >  further down on the file
 >  and more code
 > +Addition here
@@ -1132,7 +1245,7 @@ line8
               '> Code line 7', '> Code line 8', '> Code line 9',
               'And another comment'],
              ['> File: file.c',
-              '> Line: 153 / 143: def CheckPatch(fname, show_types=False):',
+              '> Line: 153 / 143: def check_patch(fname, show_types=False):',
               '>  and more code', '> +Addition here', '> +Another addition here',
               '>  codey', '>  more codey', 'and another thing in same file'],
              ['> File: file.c', '> Line: 253 / 243',
@@ -1142,8 +1255,7 @@ line8
               'line2', 'line3', 'line4', 'line5', 'line6', 'line7', 'line8']],
             pstrm.snippets)
 
-    @unittest.skipIf(not HAVE_PYGIT2, 'Missing python3-pygit2')
-    def testReviewSnippets(self):
+    def test_review_snippets(self):
         """Test showing of review snippets"""
         def _to_submitter(who):
             m_who = re.match('(.*) <(.*)>', who)
@@ -1198,7 +1310,7 @@ On some date Fred wrote:
 > +    def __str__(self):
 > +        return self.subject
 > +
->      def AddChange(self, version, info):
+>      def add_change(self, version, info):
 >          """Add a new change line to the change list for a version.
 >
 A comment
@@ -1225,10 +1337,10 @@ Reviewed-by: %s
 
         series = Series()
         series.commits = [commit1, commit2]
-        terminal.SetPrintTestMode()
+        terminal.set_print_test_mode()
         status.check_patchwork_status(series, '1234', None, None, False, True,
                                       None, self._fake_patchwork2)
-        lines = iter(terminal.GetPrintTestLines())
+        lines = iter(terminal.get_print_test_lines())
         col = terminal.Color()
         self.assertEqual(terminal.PrintLine('  1 Subject 1', col.BLUE),
                          next(lines))
@@ -1282,7 +1394,7 @@ Reviewed-by: %s
         self.assertEqual(terminal.PrintLine(
             '    > +', col.MAGENTA), next(lines))
         self.assertEqual(
-            terminal.PrintLine('    >      def AddChange(self, version, info):',
+            terminal.PrintLine('    >      def add_change(self, version, info):',
                                col.MAGENTA),
             next(lines))
         self.assertEqual(terminal.PrintLine(
@@ -1297,3 +1409,24 @@ Reviewed-by: %s
         self.assertEqual(terminal.PrintLine(
             '4 new responses available in patchwork (use -d to write them to a new branch)',
             None), next(lines))
+
+    def test_insert_tags(self):
+        """Test inserting of review tags"""
+        msg = '''first line
+second line.'''
+        tags = [
+            'Reviewed-by: Bin Meng <bmeng.cn@gmail.com>',
+            'Tested-by: Bin Meng <bmeng.cn@gmail.com>'
+            ]
+        signoff = 'Signed-off-by: Simon Glass <sjg@chromium.com>'
+        tag_str = '\n'.join(tags)
+
+        new_msg = patchstream.insert_tags(msg, tags)
+        self.assertEqual(msg + '\n\n' + tag_str, new_msg)
+
+        new_msg = patchstream.insert_tags(msg + '\n', tags)
+        self.assertEqual(msg + '\n\n' + tag_str, new_msg)
+
+        msg += '\n\n' + signoff
+        new_msg = patchstream.insert_tags(msg, tags)
+        self.assertEqual(msg + '\n' + tag_str, new_msg)

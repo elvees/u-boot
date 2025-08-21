@@ -5,7 +5,7 @@
  * Copyright (C) 2014 Marek Vasut <marex@denx.de>
  */
 
-#include <common.h>
+#include <display_options.h>
 #include <dm.h>
 #include <eeprom.h>
 #include <init.h>
@@ -46,67 +46,6 @@
 #include "novena.h"
 
 DECLARE_GLOBAL_DATA_PTR;
-
-/*
- * GPIO button
- */
-#ifdef CONFIG_KEYBOARD
-static struct input_config button_input;
-
-static int novena_gpio_button_read_keys(struct input_config *input)
-{
-	int key = KEY_ENTER;
-	if (gpio_get_value(NOVENA_BUTTON_GPIO))
-		return 0;
-	input_send_keycodes(&button_input, &key, 1);
-	return 1;
-}
-
-static int novena_gpio_button_getc(struct stdio_dev *dev)
-{
-	return input_getc(&button_input);
-}
-
-static int novena_gpio_button_tstc(struct stdio_dev *dev)
-{
-	return input_tstc(&button_input);
-}
-
-static int novena_gpio_button_init(struct stdio_dev *dev)
-{
-	gpio_direction_input(NOVENA_BUTTON_GPIO);
-	input_set_delays(&button_input, 250, 250);
-	return 0;
-}
-
-int drv_keyboard_init(void)
-{
-	int error;
-	struct stdio_dev dev = {
-		.name	= "button",
-		.flags	= DEV_FLAGS_INPUT,
-		.start	= novena_gpio_button_init,
-		.getc	= novena_gpio_button_getc,
-		.tstc	= novena_gpio_button_tstc,
-	};
-
-	gpio_request(NOVENA_BUTTON_GPIO, "button");
-
-	error = input_init(&button_input, 0);
-	if (error) {
-		debug("%s: Cannot set up input\n", __func__);
-		return -1;
-	}
-	input_add_tables(&button_input, false);
-	button_input.read_keys = novena_gpio_button_read_keys;
-
-	error = input_stdio_register(&dev);
-	if (error)
-		return error;
-
-	return 0;
-}
-#endif
 
 int board_early_init_f(void)
 {
@@ -198,23 +137,23 @@ struct novena_eeprom_data {
 int misc_init_r(void)
 {
 	struct novena_eeprom_data data;
-	uchar *datap = (uchar *)&data;
+	uint8_t *datap = (uint8_t *)&data;
 	const char *signature = "Novena";
+	struct udevice *eeprom;
 	int ret;
 
 	/* If 'ethaddr' is already set, do nothing. */
 	if (env_get("ethaddr"))
 		return 0;
 
-	/* EEPROM is at bus 2. */
-	ret = i2c_set_bus_num(2);
+	/* EEPROM is at bus 2, address 0x56 */
+	ret = i2c_get_chip_for_busnum(2, 0x56, 1, &eeprom);
 	if (ret) {
 		puts("Cannot select EEPROM I2C bus.\n");
 		return 0;
 	}
 
-	/* EEPROM is at address 0x56. */
-	ret = eeprom_read(0x56, 0, datap, sizeof(data));
+	ret = dm_i2c_read(eeprom, 0, datap, sizeof(data));
 	if (ret) {
 		puts("Cannot read I2C EEPROM.\n");
 		return 0;

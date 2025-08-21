@@ -3,14 +3,12 @@
  * (C) Copyright 2015 Google, Inc
  */
 
-#include <common.h>
 #include <clk-uclass.h>
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
 #include <malloc.h>
 #include <syscon.h>
-#include <asm/io.h>
 #include <asm/arch-rockchip/clock.h>
 #include <asm/arch-rockchip/cru_rk3036.h>
 #include <asm/arch-rockchip/hardware.h>
@@ -361,7 +359,7 @@ static int rk3036_clk_bind(struct udevice *dev)
 	ret = offsetof(struct rk3036_cru, cru_softrst_con[0]);
 	ret = rockchip_reset_bind(dev, ret, 9);
 	if (ret)
-		debug("Warning: software reset driver bind faile\n");
+		debug("Warning: software reset driver bind failed\n");
 #endif
 
 	return 0;

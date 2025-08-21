@@ -5,11 +5,12 @@
  * Based on code from coreboot src/soc/intel/broadwell/cpu.c
  */
 
-#include <common.h>
 #include <dm.h>
 #include <cpu.h>
+#include <event.h>
 #include <init.h>
 #include <log.h>
+#include <spl.h>
 #include <asm/cpu.h>
 #include <asm/cpu_x86.h>
 #include <asm/cpu_common.h>
@@ -24,23 +25,22 @@
 #include <asm/arch/pch.h>
 #include <asm/arch/rcb.h>
 
-int arch_cpu_init_dm(void)
+static int broadwell_init_cpu(void)
 {
 	struct udevice *dev;
 	int ret;
 
 	/* Start up the LPC so we have serial */
-	ret = uclass_first_device(UCLASS_LPC, &dev);
+	ret = uclass_first_device_err(UCLASS_LPC, &dev);
 	if (ret)
 		return ret;
-	if (!dev)
-		return -ENODEV;
 	ret = cpu_set_flex_ratio_to_tdp_nominal();
 	if (ret)
 		return ret;
 
 	return 0;
 }
+EVENT_SPY_SIMPLE(EVT_DM_POST_INIT_F, broadwell_init_cpu);
 
 void set_max_freq(void)
 {
@@ -67,12 +67,11 @@ int arch_cpu_init(void)
 {
 	post_code(POST_CPU_INIT);
 
-#ifdef CONFIG_TPL
 	/* Do a mini-init if TPL has already done the full init */
-	return x86_cpu_reinit_f();
-#else
-	return x86_cpu_init_f();
-#endif
+	if (IS_ENABLED(CONFIG_TPL) && xpl_phase() != PHASE_TPL)
+		return x86_cpu_reinit_f();
+	else
+		return x86_cpu_init_f();
 }
 
 int checkcpu(void)
@@ -85,18 +84,6 @@ int checkcpu(void)
 	if (ret)
 		return ret;
 	gd->arch.pei_boot_mode = PEI_BOOT_NONE;
-
-	return 0;
-}
-
-int print_cpuinfo(void)
-{
-	char processor_name[CPU_MAX_NAME_LEN];
-	const char *name;
-
-	/* Print processor name */
-	name = cpu_get_name(processor_name);
-	printf("CPU:   %s\n", name);
 
 	return 0;
 }

@@ -8,12 +8,13 @@
  */
 
 #include <clk.h>
-#include <common.h>
+#include <config.h>
 #include <dm.h>
 #include <ram.h>
 #include <asm/io.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
+#include <linux/sizes.h>
 
 /* EMI */
 #define EMI_CONA			0x000
@@ -232,7 +233,7 @@ struct mtk_ddr3_priv {
 	struct clk mem_mux;
 };
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 static int mtk_ddr3_rank_size_detect(struct udevice *dev)
 {
 	struct mtk_ddr3_priv *priv = dev_get_priv(dev);
@@ -243,17 +244,17 @@ static int mtk_ddr3_rank_size_detect(struct udevice *dev)
 	 * and it has maximum addressing region
 	 */
 
-	writel(WALKING_PATTERN, CONFIG_SYS_SDRAM_BASE);
+	writel(WALKING_PATTERN, CFG_SYS_SDRAM_BASE);
 
-	if (readl(CONFIG_SYS_SDRAM_BASE) != WALKING_PATTERN)
+	if (readl(CFG_SYS_SDRAM_BASE) != WALKING_PATTERN)
 		return -EINVAL;
 
 	for (step = 0; step < 5; step++) {
-		writel(~WALKING_PATTERN, CONFIG_SYS_SDRAM_BASE +
+		writel(~WALKING_PATTERN, CFG_SYS_SDRAM_BASE +
 		       (WALKING_STEP << step));
 
-		start = readl(CONFIG_SYS_SDRAM_BASE);
-		test = readl(CONFIG_SYS_SDRAM_BASE + (WALKING_STEP << step));
+		start = readl(CFG_SYS_SDRAM_BASE);
+		test = readl(CFG_SYS_SDRAM_BASE + (WALKING_STEP << step));
 		if ((test != ~WALKING_PATTERN) || test == start)
 			break;
 	}
@@ -696,7 +697,7 @@ static int mtk_ddr3_probe(struct udevice *dev)
 	if (priv->dramc_ao == FDT_ADDR_T_NONE)
 		return -EINVAL;
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 	int ret;
 
 	ret = clk_get_by_index(dev, 0, &priv->phy);
@@ -727,7 +728,7 @@ static int mtk_ddr3_get_info(struct udevice *dev, struct ram_info *info)
 	struct mtk_ddr3_priv *priv = dev_get_priv(dev);
 	u32 val = readl(priv->emi + EMI_CONA);
 
-	info->base = CONFIG_SYS_SDRAM_BASE;
+	info->base = CFG_SYS_SDRAM_BASE;
 
 	switch ((val & EMI_COL_ADDR_MASK) >> EMI_COL_ADDR_SHIFT) {
 	case 0:

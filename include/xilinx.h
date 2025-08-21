@@ -34,8 +34,15 @@ typedef enum {			/* typedef xilinx_family */
 	xilinx_zynq,		/* Zynq Family */
 	xilinx_zynqmp,		/* ZynqMP Family */
 	xilinx_versal,		/* Versal Family */
+	xilinx_versal_net,	/* Versal NET Family */
+	xilinx_versal2,		/* Versal Gen 2 Family */
 	max_xilinx_type		/* insert all new types before this */
 } xilinx_family;		/* end, typedef xilinx_family */
+
+/* FPGA bitstream supported types */
+#define FPGA_LEGACY			BIT(0)
+#define FPGA_XILINX_ZYNQMP_DDRAUTH	BIT(1)
+#define FPGA_XILINX_ZYNQMP_ENC		BIT(2)
 
 typedef struct {		/* typedef xilinx_desc */
 	xilinx_family family;	/* part type */
@@ -45,21 +52,27 @@ typedef struct {		/* typedef xilinx_desc */
 	int cookie;		/* implementation specific cookie */
 	struct xilinx_fpga_op *operations; /* operations */
 	char *name;		/* device name in bitstream */
+	int flags;		/* compatible flags */
 } xilinx_desc;			/* end, typedef xilinx_desc */
 
 struct xilinx_fpga_op {
-	int (*load)(xilinx_desc *, const void *, size_t, bitstream_type);
-	int (*loadfs)(xilinx_desc *, const void *, size_t, fpga_fs_info *);
+	int (*load)(xilinx_desc *desc, const void *buf, size_t bsize,
+		    bitstream_type bstype, int flags);
+	int (*loadfs)(xilinx_desc *desc, const void *buf, size_t bsize,
+		      fpga_fs_info *fpga_fsinfo);
 	int (*loads)(xilinx_desc *desc, const void *buf, size_t bsize,
 		     struct fpga_secure_info *fpga_sec_info);
-	int (*dump)(xilinx_desc *, const void *, size_t);
-	int (*info)(xilinx_desc *);
+	int (*dump)(xilinx_desc *desc, const void *buf, size_t bsize);
+	int (*info)(xilinx_desc *desc);
+#if CONFIG_IS_ENABLED(FPGA_LOAD_SECURE)
+	int (*str2flag)(xilinx_desc *desc, const char *string);
+#endif
 };
 
 /* Generic Xilinx Functions
  *********************************************************************/
 int xilinx_load(xilinx_desc *desc, const void *image, size_t size,
-		bitstream_type bstype);
+		bitstream_type bstype, int flags);
 int xilinx_dump(xilinx_desc *desc, const void *buf, size_t bsize);
 int xilinx_info(xilinx_desc *desc);
 int xilinx_loadfs(xilinx_desc *desc, const void *buf, size_t bsize,

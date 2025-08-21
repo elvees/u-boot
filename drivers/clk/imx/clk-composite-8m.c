@@ -3,7 +3,6 @@
  * Copyright 2019 NXP
  */
 
-#include <common.h>
 #include <log.h>
 #include <asm/io.h>
 #include <malloc.h>
@@ -117,7 +116,70 @@ static const struct clk_ops imx8m_clk_composite_divider_ops = {
 	.set_rate = imx8m_clk_composite_divider_set_rate,
 };
 
-struct clk *imx8m_clk_composite_flags(const char *name,
+static int imx8m_clk_mux_fetch_parent_index(struct udevice *cdev, struct clk *clk, struct clk *parent)
+{
+	struct clk_mux *mux = to_clk_mux(clk);
+	struct clk cclk;
+	int ret;
+	int i;
+
+	if (!parent)
+		return -EINVAL;
+
+	for (i = 0; i < mux->num_parents; i++) {
+		ret = clk_get_by_name(cdev, mux->parent_names[i], &cclk);
+		if (!ret && ofnode_equal(dev_ofnode(parent->dev), dev_ofnode(cclk.dev)))
+			return i;
+
+		if (!strcmp(parent->dev->name, mux->parent_names[i]))
+			return i;
+		if (!strcmp(parent->dev->name,
+			    clk_resolve_parent_clk(clk->dev,
+						   mux->parent_names[i])))
+			return i;
+	}
+
+	return -EINVAL;
+}
+
+
+static int imx8m_clk_mux_set_parent(struct clk *clk, struct clk *parent)
+{
+	struct clk_mux *mux = to_clk_mux(clk);
+	struct clk_composite *composite = (struct clk_composite *)clk->data;
+	int index;
+	u32 val;
+	u32 reg;
+
+	index = imx8m_clk_mux_fetch_parent_index(composite->dev, clk, parent);
+	if (index < 0) {
+		log_err("Could not fetch index\n");
+		return index;
+	}
+
+	val = clk_mux_index_to_val(mux->table, mux->flags, index);
+
+	reg = readl(mux->reg);
+	reg &= ~(mux->mask << mux->shift);
+	val = val << mux->shift;
+	reg |= val;
+
+	/*
+	 * write twice to make sure non-target interface
+	 * SEL_A/B point the same clk input.
+	 */
+	writel(reg, mux->reg);
+	writel(reg, mux->reg);
+
+	return 0;
+}
+
+const struct clk_ops imx8m_clk_mux_ops = {
+	.get_rate = clk_generic_get_rate,
+	.set_parent = imx8m_clk_mux_set_parent,
+};
+
+struct clk *imx8m_clk_composite_flags(struct udevice *dev, const char *name,
 				      const char * const *parent_names,
 				      int num_parents, void __iomem *reg,
 				      unsigned long flags)
@@ -135,7 +197,6 @@ struct clk *imx8m_clk_composite_flags(const char *name,
 	mux->shift = PCG_PCS_SHIFT;
 	mux->mask = PCG_PCS_MASK;
 	mux->num_parents = num_parents;
-	mux->flags = flags;
 	mux->parent_names = parent_names;
 
 	div = kzalloc(sizeof(*div), GFP_KERNEL);
@@ -145,7 +206,7 @@ struct clk *imx8m_clk_composite_flags(const char *name,
 	div->reg = reg;
 	div->shift = PCG_PREDIV_SHIFT;
 	div->width = PCG_PREDIV_WIDTH;
-	div->flags = CLK_DIVIDER_ROUND_CLOSEST | flags;
+	div->flags = CLK_DIVIDER_ROUND_CLOSEST;
 
 	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
 	if (!gate)
@@ -153,11 +214,10 @@ struct clk *imx8m_clk_composite_flags(const char *name,
 
 	gate->reg = reg;
 	gate->bit_idx = PCG_CGC_SHIFT;
-	gate->flags = flags;
 
-	clk = clk_register_composite(NULL, name,
+	clk = clk_register_composite(dev, name,
 				     parent_names, num_parents,
-				     &mux->clk, &clk_mux_ops, &div->clk,
+				     &mux->clk, &imx8m_clk_mux_ops, &div->clk,
 				     &imx8m_clk_composite_divider_ops,
 				     &gate->clk, &clk_gate_ops, flags);
 	if (IS_ERR(clk))

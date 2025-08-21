@@ -84,7 +84,6 @@ typedef int Bool;
 #define True 1
 #define False 0
 
-
 #ifdef _MSC_VER
 
 #if _MSC_VER >= 1300
@@ -102,7 +101,6 @@ typedef int Bool;
 #define MY_FAST_CALL
 
 #endif
-
 
 /* The following interfaces use first parameter as pointer to structure */
 
@@ -225,9 +223,9 @@ typedef struct
 #else
 
 #define CHAR_PATH_SEPARATOR '/'
-#define WCHAR_PATH_SEPARATOR L'/'
+#define WCHAR_PATH_SEPARATOR u'/'
 #define STRING_PATH_SEPARATOR "/"
-#define WSTRING_PATH_SEPARATOR L"/"
+#define WSTRING_PATH_SEPARATOR u"/"
 
 #endif
 

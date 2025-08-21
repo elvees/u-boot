@@ -31,7 +31,7 @@
 	};
 
 	adc@12D10000 {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 		vdd-supply = <&ldo4_reg>;
 		status = "okay";
 	};
@@ -280,11 +280,11 @@
 	};
 
 	mmc@12200000 {
-		fifoth_val = <0x201f0020>;
+		fifo-depth = <0x40>;
 	};
 
 	mmc@12220000 {
-		fifoth_val = <0x201f0020>;
+		fifo-depth = <0x40>;
 	};
 
 	emmc-reset {

@@ -8,7 +8,6 @@
  *   Copyright (C) 2014-2015 Felix Fietkau <nbd@nbd.name>
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <log.h>
@@ -16,6 +15,7 @@
 #include <wait_bit.h>
 #include <linux/bitops.h>
 #include <linux/io.h>
+#include <linux/printk.h>
 
 #define MT7621_RX_FIFO_LEN	32
 #define MT7621_TX_FIFO_LEN	36

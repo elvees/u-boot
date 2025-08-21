@@ -5,7 +5,6 @@
 
 #define LOG_CATEGORY UCLASS_WDT
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <log.h>
@@ -15,6 +14,7 @@
 #include <dm/device_compat.h>
 #include <linux/bitops.h>
 #include <linux/iopoll.h>
+#include <linux/printk.h>
 
 /* IWDG registers */
 #define IWDG_KR		0x00	/* Key register */

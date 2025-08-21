@@ -5,7 +5,6 @@
  * Rockchip GMAC ethernet IP driver for U-Boot
  */
 
-#include <common.h>
 #include <dm.h>
 #include <clk.h>
 #include <log.h>
@@ -13,14 +12,13 @@
 #include <phy.h>
 #include <syscon.h>
 #include <asm/global_data.h>
-#include <asm/io.h>
 #include <asm/arch-rockchip/periph.h>
 #include <asm/arch-rockchip/clock.h>
 #include <asm/arch-rockchip/hardware.h>
 #include <asm/arch-rockchip/grf_px30.h>
 #include <asm/arch-rockchip/grf_rk322x.h>
 #include <asm/arch-rockchip/grf_rk3288.h>
-#include <asm/arch-rk3308/grf_rk3308.h>
+#include <asm/arch-rockchip/grf_rk3308.h>
 #include <asm/arch-rockchip/grf_rk3328.h>
 #include <asm/arch-rockchip/grf_rk3368.h>
 #include <asm/arch-rockchip/grf_rk3399.h>
@@ -52,7 +50,6 @@ struct rk_gmac_ops {
 	void (*set_to_rmii)(struct gmac_rockchip_plat *pdata);
 	void (*set_to_rgmii)(struct gmac_rockchip_plat *pdata);
 };
-
 
 static int gmac_rockchip_of_to_plat(struct udevice *dev)
 {
@@ -154,26 +151,51 @@ static int rk3228_gmac_fix_mac_speed(struct dw_eth_dev *priv)
 
 static int rk3288_gmac_fix_mac_speed(struct dw_eth_dev *priv)
 {
+	struct dw_eth_pdata *dw_pdata = dev_get_plat(priv->dev);
+	struct eth_pdata *eth_pdata = &dw_pdata->eth_pdata;
 	struct rk3288_grf *grf;
+	grf = syscon_get_first_range(ROCKCHIP_SYSCON_GRF);
 	int clk;
 
-	switch (priv->phydev->speed) {
-	case 10:
-		clk = RK3288_GMAC_CLK_SEL_2_5M;
-		break;
-	case 100:
-		clk = RK3288_GMAC_CLK_SEL_25M;
-		break;
-	case 1000:
-		clk = RK3288_GMAC_CLK_SEL_125M;
-		break;
-	default:
-		debug("Unknown phy speed: %d\n", priv->phydev->speed);
-		return -EINVAL;
-	}
+	if (eth_pdata->phy_interface == PHY_INTERFACE_MODE_RMII) {
+		switch (priv->phydev->speed) {
+		case 10:
+			rk_clrsetreg(&grf->soc_con1,
+				     RK3288_RMII_CLK_SEL_MASK |
+				     RK3288_GMAC_SPEED_MASK,
+				     RK3288_RMII_CLK_SEL_2_5M |
+				     RK3288_GMAC_SPEED_10M);
+			break;
+		case 100:
+			rk_clrsetreg(&grf->soc_con1,
+				     RK3288_RMII_CLK_SEL_MASK |
+				     RK3288_GMAC_SPEED_MASK,
+				     RK3288_RMII_CLK_SEL_25M |
+				     RK3288_GMAC_SPEED_100M);
+			break;
+		default:
+			debug("Unknown phy speed: %d\n", priv->phydev->speed);
+			return -EINVAL;
+		}
+	} else {
+		switch (priv->phydev->speed) {
+		case 10:
+			clk = RK3288_GMAC_CLK_SEL_2_5M;
+			break;
+		case 100:
+			clk = RK3288_GMAC_CLK_SEL_25M;
+			break;
+		case 1000:
+			clk = RK3288_GMAC_CLK_SEL_125M;
+			break;
 
-	grf = syscon_get_first_range(ROCKCHIP_SYSCON_GRF);
-	rk_clrsetreg(&grf->soc_con1, RK3288_GMAC_CLK_SEL_MASK, clk);
+		default:
+			debug("Unknown phy speed: %d\n", priv->phydev->speed);
+			return -EINVAL;
+		}
+
+		rk_clrsetreg(&grf->soc_con1, RK3288_GMAC_CLK_SEL_MASK, clk);
+	}
 
 	return 0;
 }
@@ -404,6 +426,17 @@ static void rk3228_gmac_set_to_rgmii(struct gmac_rockchip_plat *pdata)
 		     pdata->tx_delay << RK3228_CLK_TX_DL_CFG_GMAC_SHIFT);
 }
 
+static void rk3288_gmac_set_to_rmii(struct gmac_rockchip_plat *pdata)
+{
+	struct rk3288_grf *grf;
+
+	grf = syscon_get_first_range(ROCKCHIP_SYSCON_GRF);
+
+	rk_clrsetreg(&grf->soc_con1,
+		     RK3288_GMAC_PHY_INTF_SEL_MASK | RK3288_RMII_MODE_MASK,
+		     RK3288_GMAC_PHY_INTF_SEL_RMII | RK3288_RMII_MODE);
+}
+
 static void rk3288_gmac_set_to_rgmii(struct gmac_rockchip_plat *pdata)
 {
 	struct rk3288_grf *grf;
@@ -565,7 +598,7 @@ static int gmac_rockchip_probe(struct udevice *dev)
 	ulong rate;
 	int ret;
 
-	ret = clk_set_defaults(dev, 0);
+	ret = clk_set_defaults(dev, CLK_DEFAULTS_PRE);
 	if (ret)
 		debug("%s clk_set_defaults failed %d\n", __func__, ret);
 
@@ -706,6 +739,7 @@ const struct rk_gmac_ops rk3228_gmac_ops = {
 const struct rk_gmac_ops rk3288_gmac_ops = {
 	.fix_mac_speed = rk3288_gmac_fix_mac_speed,
 	.set_to_rgmii = rk3288_gmac_set_to_rgmii,
+	.set_to_rmii = rk3288_gmac_set_to_rmii,
 };
 
 const struct rk_gmac_ops rk3308_gmac_ops = {
@@ -740,7 +774,7 @@ static const struct udevice_id rockchip_gmac_ids[] = {
 	  .data = (ulong)&rk3228_gmac_ops },
 	{ .compatible = "rockchip,rk3288-gmac",
 	  .data = (ulong)&rk3288_gmac_ops },
-	{ .compatible = "rockchip,rk3308-mac",
+	{ .compatible = "rockchip,rk3308-gmac",
 	  .data = (ulong)&rk3308_gmac_ops },
 	{ .compatible = "rockchip,rk3328-gmac",
 	  .data = (ulong)&rk3328_gmac_ops },

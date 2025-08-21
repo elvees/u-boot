@@ -7,11 +7,12 @@
  * Copyright (C) 2017 Axentia Technologies AB
  * Author: Peter Rosin <peda@axentia.se>
  *
- * Copyright (C) 2017-2018 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2017-2018 Texas Instruments Incorporated - https://www.ti.com/
  * Jean-Jacques Hiblot <jjhiblot@ti.com>
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_MUX
+
 #include <dm.h>
 #include <mux-internal.h>
 #include <dm/device-internal.h>
@@ -128,7 +129,7 @@ static int mux_of_xlate_default(struct mux_chip *mux_chip,
 	log_debug("%s(muxp=%p)\n", __func__, muxp);
 
 	if (args->args_count > 1) {
-		debug("Invaild args_count: %d\n", args->args_count);
+		debug("Invalid args_count: %d\n", args->args_count);
 		return -EINVAL;
 	}
 
@@ -316,7 +317,8 @@ int dm_mux_init(void)
 		return ret;
 	}
 	uclass_foreach_dev(dev, uc) {
-		if (dev_read_bool(dev, "u-boot,mux-autoprobe")) {
+		if (dev_read_bool(dev, "u-boot,mux-autoprobe") ||
+		    dev_read_bool(dev, "idle-states")) {
 			ret = device_probe(dev);
 			if (ret)
 				log_debug("unable to probe device %s\n",

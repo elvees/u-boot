@@ -3,7 +3,6 @@
  * Copyright 2009 Freescale Semiconductor, Inc.
  */
 
-#include <common.h>
 #include <asm/processor.h>
 #include <asm/global_data.h>
 #include <fsl_ifc.h>
@@ -14,10 +13,10 @@ DECLARE_GLOBAL_DATA_PTR;
 
 ulong cpu_init_f(void)
 {
-#ifdef CONFIG_SYS_INIT_L2_ADDR
-	ccsr_l2cache_t *l2cache = (void *)CONFIG_SYS_MPC85xx_L2_ADDR;
+#ifdef CFG_SYS_INIT_L2_ADDR
+	ccsr_l2cache_t *l2cache = (void *)CFG_SYS_MPC85xx_L2_ADDR;
 
-	out_be32(&l2cache->l2srbar0, CONFIG_SYS_INIT_L2_ADDR);
+	out_be32(&l2cache->l2srbar0, CFG_SYS_INIT_L2_ADDR);
 
 	/* set MBECCDIS=1, SBECCDIS=1 */
 	out_be32(&l2cache->l2errdis,
@@ -30,10 +29,6 @@ ulong cpu_init_f(void)
 
 	return 0;
 }
-
-#ifndef CONFIG_SYS_FSL_TBCLK_DIV
-#define CONFIG_SYS_FSL_TBCLK_DIV 8
-#endif
 
 void udelay(unsigned long usec)
 {

@@ -33,7 +33,6 @@ struct search_path {
 /* This is the list of directories that we search for source files */
 static struct search_path *search_path_head, **search_path_tail;
 
-
 static char *get_dirname(const char *path)
 {
 	const char *slash = strrchr(path, '/');
@@ -56,7 +55,6 @@ struct srcfile_state *current_srcfile; /* = NULL */
 #define MAX_SRCFILE_DEPTH     (100)
 static int srcfile_depth; /* = 0 */
 
-
 /**
  * Try to open a file in a given directory.
  *
@@ -66,7 +64,7 @@ static int srcfile_depth; /* = 0 */
  * @param dirname	Directory to look in, or NULL for none
  * @param fname		Filename to look for
  * @param fp		Set to NULL if file did not open
- * @return allocated filename on success (caller must free), NULL on failure
+ * Return: allocated filename on success (caller must free), NULL on failure
  */
 static char *try_open(const char *dirname, const char *fname, FILE **fp)
 {
@@ -93,7 +91,7 @@ static char *try_open(const char *dirname, const char *fname, FILE **fp)
  *
  * @param fname	Filename to open
  * @param fp	Returns pointer to opened FILE, or NULL on failure
- * @return pointer to allocated filename, which caller must free
+ * Return: pointer to allocated filename, which caller must free
  */
 static char *fopen_any_on_path(const char *fname, FILE **fp)
 {
@@ -249,7 +247,6 @@ srcpos_string(struct srcpos *pos)
 
 	if (pos->file && pos->file->name)
 		fname = pos->file->name;
-
 
 	if (pos->first_line != pos->last_line)
 		xasprintf(&pos_str, "%s:%d.%d-%d.%d", fname,

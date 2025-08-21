@@ -3,11 +3,9 @@
  * Copyright (C) 2020 Dario Binacchi <dariobin@libero.it>
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <dm/device_compat.h>
-#include <lcd.h>
 #include <log.h>
 #include <panel.h>
 #include <video.h>
@@ -236,7 +234,7 @@ static int tilcdc_probe(struct udevice *dev)
 		return -EINVAL;
 	}
 
-	err = uclass_get_device_by_name(UCLASS_CLK, "lcd_gclk@534", &clk_dev);
+	err = uclass_get_device_by_name(UCLASS_CLK, "clock-lcd-gclk@534", &clk_dev);
 	if (err) {
 		dev_err(dev, "failed to get lcd_gclk device\n");
 		return err;
@@ -254,7 +252,7 @@ static int tilcdc_probe(struct udevice *dev)
 		return rate;
 	}
 
-	err = uclass_get_device_by_name(UCLASS_CLK, "dpll_disp_m2_ck@4a4",
+	err = uclass_get_device_by_name(UCLASS_CLK, "clock-dpll-disp-m2@4a4",
 					&clk_dev);
 	if (err) {
 		dev_err(dev, "failed to get dpll_disp_m2 clock device\n");
@@ -388,8 +386,8 @@ static int tilcdc_of_to_plat(struct udevice *dev)
 {
 	struct tilcdc_priv *priv = dev_get_priv(dev);
 
-	priv->regs = (struct tilcdc_regs *)dev_read_addr(dev);
-	if ((fdt_addr_t)priv->regs == FDT_ADDR_T_NONE) {
+	priv->regs = dev_read_addr_ptr(dev);
+	if (!priv->regs) {
 		dev_err(dev, "failed to get base address\n");
 		return -EINVAL;
 	}

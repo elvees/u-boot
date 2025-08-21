@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * (C) Copyright 2020 - Texas Instruments Incorporated - http://www.ti.com/
+ * (C) Copyright 2020 - Texas Instruments Incorporated - https://www.ti.com/
  *	Dave Gerlach <d-gerlach@ti.com>
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_SOC
+
 #include <soc.h>
 #include <dm.h>
 #include <errno.h>

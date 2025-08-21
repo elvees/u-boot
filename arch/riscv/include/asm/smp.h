@@ -7,6 +7,8 @@
 #ifndef _ASM_RISCV_SMP_H
 #define _ASM_RISCV_SMP_H
 
+#include <linux/types.h>
+
 /**
  * struct ipi_data - Inter-processor interrupt (IPI) data structure
  *
@@ -54,7 +56,7 @@ void handle_ipi(ulong hart);
  * @arg0: First argument of function
  * @arg1: Second argument of function
  * @wait: Wait for harts to acknowledge request
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int smp_call_function(ulong addr, ulong arg0, ulong arg1, int wait);
 
@@ -65,7 +67,7 @@ int smp_call_function(ulong addr, ulong arg0, ulong arg1, int wait);
  * the cpu driver is initialized. No other riscv_*_ipi() calls will be made
  * before this function is called.
  *
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int riscv_init_ipi(void);
 
@@ -75,7 +77,7 @@ int riscv_init_ipi(void);
  * Platform code must provide this function.
  *
  * @hart: Hart ID of receiving hart
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int riscv_send_ipi(int hart);
 
@@ -85,7 +87,7 @@ int riscv_send_ipi(int hart);
  * Platform code must provide this function.
  *
  * @hart: Hart ID of hart to be cleared
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int riscv_clear_ipi(int hart);
 
@@ -97,7 +99,7 @@ int riscv_clear_ipi(int hart);
  * @hart: Hart ID of hart to be checked
  * @pending: Pointer to variable with result of the check,
  *           1 if IPI is pending, 0 otherwise
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int riscv_get_ipi(int hart, int *pending);
 

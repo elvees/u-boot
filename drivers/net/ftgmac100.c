@@ -11,8 +11,8 @@
  * Copyright (C) 2018, IBM Corporation.
  */
 
-#include <common.h>
 #include <clk.h>
+#include <reset.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <log.h>
@@ -25,6 +25,8 @@
 #include <linux/bitops.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>
+#include <linux/printk.h>
+#include <linux/bitfield.h>
 
 #include "ftgmac100.h"
 
@@ -56,6 +58,15 @@
 enum ftgmac100_model {
 	FTGMAC100_MODEL_FARADAY,
 	FTGMAC100_MODEL_ASPEED,
+	FTGMAC100_MODEL_ASPEED_AST2700,
+};
+
+union ftgmac100_dma_addr {
+	dma_addr_t addr;
+	struct {
+		u32 lo;
+		u32 hi;
+	};
 };
 
 /**
@@ -90,10 +101,13 @@ struct ftgmac100_data {
 	u32 max_speed;
 
 	struct clk_bulk clks;
+	struct reset_ctl *reset_ctl;
 
 	/* End of RX/TX ring buffer bits. Depend on model */
 	u32 rxdes0_edorr_mask;
 	u32 txdes0_edotr_mask;
+
+	bool is_ast2700;
 };
 
 /*
@@ -119,7 +133,7 @@ static int ftgmac100_mdio_read(struct mii_dev *bus, int phy_addr, int dev_addr,
 				 FTGMAC100_MDIO_TIMEOUT_USEC);
 	if (ret) {
 		pr_err("%s: mdio read failed (phy:%d reg:%x)\n",
-		       priv->phydev->dev->name, phy_addr, reg_addr);
+		       bus->name, phy_addr, reg_addr);
 		return ret;
 	}
 
@@ -151,7 +165,7 @@ static int ftgmac100_mdio_write(struct mii_dev *bus, int phy_addr, int dev_addr,
 				 FTGMAC100_MDIO_TIMEOUT_USEC);
 	if (ret) {
 		pr_err("%s: mdio write failed (phy:%d reg:%x)\n",
-		       priv->phydev->dev->name, phy_addr, reg_addr);
+		       bus->name, phy_addr, reg_addr);
 	}
 
 	return ret;
@@ -188,7 +202,7 @@ static int ftgmac100_phy_adjust_link(struct ftgmac100_data *priv)
 	struct phy_device *phydev = priv->phydev;
 	u32 maccr;
 
-	if (!phydev->link) {
+	if (!phydev->link && priv->phy_mode != PHY_INTERFACE_MODE_NCSI) {
 		dev_err(phydev->dev, "No link\n");
 		return -EREMOTEIO;
 	}
@@ -220,11 +234,16 @@ static int ftgmac100_phy_init(struct udevice *dev)
 	struct phy_device *phydev;
 	int ret;
 
-	phydev = phy_connect(priv->bus, priv->phy_addr, dev, priv->phy_mode);
+	if (IS_ENABLED(CONFIG_DM_MDIO) && priv->phy_mode != PHY_INTERFACE_MODE_NCSI)
+		phydev = dm_eth_phy_connect(dev);
+	else
+		phydev = phy_connect(priv->bus, priv->phy_addr, dev, priv->phy_mode);
+
 	if (!phydev)
 		return -ENODEV;
 
-	phydev->supported &= PHY_GBIT_FEATURES;
+	if (priv->phy_mode != PHY_INTERFACE_MODE_NCSI)
+		phydev->supported &= PHY_GBIT_FEATURES;
 	if (priv->max_speed) {
 		ret = phy_set_supported(phydev, priv->max_speed);
 		if (ret)
@@ -304,7 +323,8 @@ static void ftgmac100_stop(struct udevice *dev)
 
 	writel(0, &ftgmac100->maccr);
 
-	phy_shutdown(priv->phydev);
+	if (priv->phy_mode != PHY_INTERFACE_MODE_NCSI)
+		phy_shutdown(priv->phydev);
 }
 
 static int ftgmac100_start(struct udevice *dev)
@@ -312,8 +332,9 @@ static int ftgmac100_start(struct udevice *dev)
 	struct eth_pdata *plat = dev_get_plat(dev);
 	struct ftgmac100_data *priv = dev_get_priv(dev);
 	struct ftgmac100 *ftgmac100 = priv->iobase;
+	union ftgmac100_dma_addr dma_addr = {.hi = 0, .lo = 0};
 	struct phy_device *phydev = priv->phydev;
-	unsigned int maccr;
+	unsigned int maccr, dblac, desc_size;
 	ulong start, end;
 	int ret;
 	int i;
@@ -333,6 +354,7 @@ static int ftgmac100_start(struct udevice *dev)
 	priv->rx_index = 0;
 
 	for (i = 0; i < PKTBUFSTX; i++) {
+		priv->txdes[i].txdes2 = 0;
 		priv->txdes[i].txdes3 = 0;
 		priv->txdes[i].txdes0 = 0;
 	}
@@ -343,7 +365,14 @@ static int ftgmac100_start(struct udevice *dev)
 	flush_dcache_range(start, end);
 
 	for (i = 0; i < PKTBUFSRX; i++) {
-		priv->rxdes[i].rxdes3 = (unsigned int)net_rx_packets[i];
+		unsigned int ip_align = 0;
+
+		dma_addr.addr = (dma_addr_t)net_rx_packets[i];
+		priv->rxdes[i].rxdes2 = FIELD_PREP(FTGMAC100_RXDES2_RXBUF_BADR_HI, dma_addr.hi);
+		/* For IP alignment */
+		if ((dma_addr.lo & (PKTALIGN - 1)) == 0)
+			ip_align = 2;
+		priv->rxdes[i].rxdes3 = dma_addr.lo + ip_align;
 		priv->rxdes[i].rxdes0 = 0;
 	}
 	priv->rxdes[PKTBUFSRX - 1].rxdes0 = priv->rxdes0_edorr_mask;
@@ -353,10 +382,25 @@ static int ftgmac100_start(struct udevice *dev)
 	flush_dcache_range(start, end);
 
 	/* transmit ring */
-	writel((u32)priv->txdes, &ftgmac100->txr_badr);
+	dma_addr.addr = (dma_addr_t)priv->txdes;
+	writel(dma_addr.lo, &ftgmac100->txr_badr);
+	writel(dma_addr.hi, &ftgmac100->txr_badr_hi);
 
 	/* receive ring */
-	writel((u32)priv->rxdes, &ftgmac100->rxr_badr);
+	dma_addr.addr = (dma_addr_t)priv->rxdes;
+	writel(dma_addr.lo, &ftgmac100->rxr_badr);
+	writel(dma_addr.hi, &ftgmac100->rxr_badr_hi);
+
+	/* Configure TX/RX decsriptor size
+	 * This size is calculated based on cache line.
+	 */
+	desc_size = ARCH_DMA_MINALIGN / FTGMAC100_DESC_UNIT;
+	/* The descriptor size is at least 2 descriptor units. */
+	if (desc_size < 2)
+		desc_size = 2;
+	dblac = readl(&ftgmac100->dblac) & ~GENMASK(19, 12);
+	dblac |= FTGMAC100_DBLAC_RXDES_SIZE(desc_size) | FTGMAC100_DBLAC_TXDES_SIZE(desc_size);
+	writel(dblac, &ftgmac100->dblac);
 
 	/* poll receive descriptor automatically */
 	writel(FTGMAC100_APTC_RXPOLL_CNT(1), &ftgmac100->aptc);
@@ -373,6 +417,10 @@ static int ftgmac100_start(struct udevice *dev)
 		FTGMAC100_MACCR_FULLDUP |
 		FTGMAC100_MACCR_RX_RUNT |
 		FTGMAC100_MACCR_RX_BROADPKT;
+
+	if (priv->is_ast2700 && (priv->phydev->interface == PHY_INTERFACE_MODE_RMII ||
+				 priv->phydev->interface == PHY_INTERFACE_MODE_NCSI))
+		maccr |= FTGMAC100_MACCR_RMII_ENABLE;
 
 	writel(maccr, &ftgmac100->maccr);
 
@@ -402,6 +450,14 @@ static int ftgmac100_free_pkt(struct udevice *dev, uchar *packet, int length)
 	ulong des_end = des_start +
 		roundup(sizeof(*curr_des), ARCH_DMA_MINALIGN);
 
+	/*
+	 * Make sure there are no stale data in write-back over this area, which
+	 * might get written into the memory while the ftgmac100 also writes
+	 * into the same memory area.
+	 */
+	flush_dcache_range((ulong)net_rx_packets[priv->rx_index],
+			   (ulong)net_rx_packets[priv->rx_index] + PKTSIZE_ALIGN);
+
 	/* Release buffer to DMA and flush descriptor */
 	curr_des->rxdes0 &= ~FTGMAC100_RXDES0_RXPKT_RDY;
 	flush_dcache_range(des_start, des_end);
@@ -423,9 +479,11 @@ static int ftgmac100_recv(struct udevice *dev, int flags, uchar **packetp)
 	ulong des_start = ((ulong)curr_des) & ~(ARCH_DMA_MINALIGN - 1);
 	ulong des_end = des_start +
 		roundup(sizeof(*curr_des), ARCH_DMA_MINALIGN);
-	ulong data_start = curr_des->rxdes3;
+	union ftgmac100_dma_addr data_start = { .lo = 0, .hi = 0 };
 	ulong data_end;
 
+	data_start.hi = FIELD_GET(FTGMAC100_RXDES2_RXBUF_BADR_HI, curr_des->rxdes2);
+	data_start.lo = curr_des->rxdes3;
 	invalidate_dcache_range(des_start, des_end);
 
 	if (!(curr_des->rxdes0 & FTGMAC100_RXDES0_RXPKT_RDY))
@@ -445,9 +503,9 @@ static int ftgmac100_recv(struct udevice *dev, int flags, uchar **packetp)
 	       __func__, priv->rx_index, rxlen);
 
 	/* Invalidate received data */
-	data_end = data_start + roundup(rxlen, ARCH_DMA_MINALIGN);
-	invalidate_dcache_range(data_start, data_end);
-	*packetp = (uchar *)data_start;
+	data_end = data_start.addr + roundup(rxlen, ARCH_DMA_MINALIGN);
+	invalidate_dcache_range(data_start.addr, data_end);
+	*packetp = (uchar *)data_start.addr;
 
 	return rxlen;
 }
@@ -473,6 +531,7 @@ static int ftgmac100_send(struct udevice *dev, void *packet, int length)
 	struct ftgmac100_data *priv = dev_get_priv(dev);
 	struct ftgmac100 *ftgmac100 = priv->iobase;
 	struct ftgmac100_txdes *curr_des = &priv->txdes[priv->tx_index];
+	union ftgmac100_dma_addr dma_addr;
 	ulong des_start = ((ulong)curr_des) & ~(ARCH_DMA_MINALIGN - 1);
 	ulong des_end = des_start +
 		roundup(sizeof(*curr_des), ARCH_DMA_MINALIGN);
@@ -491,10 +550,12 @@ static int ftgmac100_send(struct udevice *dev, void *packet, int length)
 
 	length = (length < ETH_ZLEN) ? ETH_ZLEN : length;
 
-	curr_des->txdes3 = (unsigned int)packet;
+	dma_addr.addr = (dma_addr_t)packet;
+	curr_des->txdes2 = FIELD_PREP(FTGMAC100_TXDES2_TXBUF_BADR_HI, dma_addr.hi);
+	curr_des->txdes3 = dma_addr.lo;
 
 	/* Flush data to be sent */
-	data_start = curr_des->txdes3;
+	data_start = (ulong)dma_addr.addr;
 	data_end = data_start + roundup(length, ARCH_DMA_MINALIGN);
 	flush_dcache_range(data_start, data_end);
 
@@ -545,27 +606,29 @@ static int ftgmac100_of_to_plat(struct udevice *dev)
 {
 	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct ftgmac100_data *priv = dev_get_priv(dev);
-	const char *phy_mode;
 
 	pdata->iobase = dev_read_addr(dev);
-	pdata->phy_interface = -1;
-	phy_mode = dev_read_string(dev, "phy-mode");
-	if (phy_mode)
-		pdata->phy_interface = phy_get_interface_by_name(phy_mode);
-	if (pdata->phy_interface == -1) {
-		dev_err(dev, "Invalid PHY interface '%s'\n", phy_mode);
+
+	pdata->phy_interface = dev_read_phy_mode(dev);
+	if (pdata->phy_interface == PHY_INTERFACE_MODE_NA)
 		return -EINVAL;
-	}
 
 	pdata->max_speed = dev_read_u32_default(dev, "max-speed", 0);
 
 	if (dev_get_driver_data(dev) == FTGMAC100_MODEL_ASPEED) {
 		priv->rxdes0_edorr_mask = BIT(30);
 		priv->txdes0_edotr_mask = BIT(30);
+		priv->is_ast2700 = false;
+	} else if (dev_get_driver_data(dev) == FTGMAC100_MODEL_ASPEED_AST2700) {
+		priv->rxdes0_edorr_mask = BIT(30);
+		priv->txdes0_edotr_mask = BIT(30);
+		priv->is_ast2700 = true;
 	} else {
 		priv->rxdes0_edorr_mask = BIT(15);
 		priv->txdes0_edotr_mask = BIT(15);
 	}
+
+	priv->reset_ctl = devm_reset_control_get_optional(dev, NULL);
 
 	return clk_get_bulk(dev, &priv->clks);
 }
@@ -581,6 +644,9 @@ static int ftgmac100_probe(struct udevice *dev)
 	priv->max_speed = pdata->max_speed;
 	priv->phy_addr = 0;
 
+	if (dev_read_bool(dev, "use-ncsi"))
+		priv->phy_mode = PHY_INTERFACE_MODE_NCSI;
+
 #ifdef CONFIG_PHY_ADDR
 	priv->phy_addr = CONFIG_PHY_ADDR;
 #endif
@@ -589,10 +655,23 @@ static int ftgmac100_probe(struct udevice *dev)
 	if (ret)
 		goto out;
 
-	ret = ftgmac100_mdio_init(dev);
-	if (ret) {
-		dev_err(dev, "Failed to initialize mdiobus: %d\n", ret);
-		goto out;
+	if (priv->reset_ctl) {
+		ret = reset_deassert(priv->reset_ctl);
+		if (ret)
+			goto out;
+	}
+
+	/*
+	 * If DM MDIO is enabled, the MDIO bus will be initialized later in
+	 * dm_eth_phy_connect
+	 */
+	if (priv->phy_mode != PHY_INTERFACE_MODE_NCSI &&
+	    !IS_ENABLED(CONFIG_DM_MDIO)) {
+		ret = ftgmac100_mdio_init(dev);
+		if (ret) {
+			dev_err(dev, "Failed to initialize mdiobus: %d\n", ret);
+			goto out;
+		}
 	}
 
 	ret = ftgmac100_phy_init(dev);
@@ -617,6 +696,8 @@ static int ftgmac100_remove(struct udevice *dev)
 	free(priv->phydev);
 	mdio_unregister(priv->bus);
 	mdio_free(priv->bus);
+	if (priv->reset_ctl)
+		reset_assert(priv->reset_ctl);
 	clk_release_bulk(&priv->clks);
 
 	return 0;
@@ -632,9 +713,11 @@ static const struct eth_ops ftgmac100_ops = {
 };
 
 static const struct udevice_id ftgmac100_ids[] = {
-	{ .compatible = "faraday,ftgmac100",  .data = FTGMAC100_MODEL_FARADAY },
-	{ .compatible = "aspeed,ast2500-mac", .data = FTGMAC100_MODEL_ASPEED  },
-	{ }
+	{ .compatible = "faraday,ftgmac100", .data = FTGMAC100_MODEL_FARADAY },
+	{ .compatible = "aspeed,ast2500-mac", .data = FTGMAC100_MODEL_ASPEED },
+	{ .compatible = "aspeed,ast2600-mac", .data = FTGMAC100_MODEL_ASPEED },
+	{ .compatible = "aspeed,ast2700-mac", .data = FTGMAC100_MODEL_ASPEED_AST2700 },
+	{}
 };
 
 U_BOOT_DRIVER(ftgmac100) = {

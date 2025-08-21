@@ -22,16 +22,6 @@
 		mmc0 = &sdio1;
 		spi0 = &qspi;
 	};
-
-	button1 {
-		compatible = "st,button1";
-		button-gpio = <&gpioc 13 0>;
-	};
-
-	led1 {
-		compatible = "st,led1";
-		led-gpio = <&gpiof 10 0>;
-	};
 };
 
 &fmc {
@@ -39,7 +29,7 @@
 	 * Memory configuration from sdram datasheet IS42S32800G-6BLI
 	 */
 	bank1: bank@0 {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 		st,sdram-control = /bits/ 8 <NO_COL_9
 					     NO_ROW_12
 					     MWIDTH_32
@@ -166,18 +156,18 @@
 	};
 
 	usart1_pins_a: usart1-0	{
-		u-boot,dm-pre-reloc;
+		bootph-all;
 		pins1 {
-			u-boot,dm-pre-reloc;
+			bootph-all;
 		};
 		pins2 {
-			u-boot,dm-pre-reloc;
+			bootph-all;
 		};
 	};
 };
 
 &qspi {
-	reg = <0xA0001000 0x1000>, <0x90000000 0x4000000>;
+	reg = <0xa0001000 0x1000>, <0x90000000 0x4000000>;
 	qflash0: n25q512a@0 {
 		#address-cells = <1>;
 		#size-cells = <1>;

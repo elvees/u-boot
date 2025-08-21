@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2007, 2010-2011 Freescale Semiconductor, Inc
- * Copyright 2019-2020 NXP
+ * Copyright 2019-2021 NXP
  * Andy Fleming
  *
  * Based vaguely on the pxa mmc code:
@@ -10,7 +10,6 @@
  */
 
 #include <config.h>
-#include <common.h>
 #include <command.h>
 #include <cpu_func.h>
 #include <errno.h>
@@ -27,8 +26,10 @@
 #include <dm/device_compat.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
+#include <linux/iopoll.h>
 #include <linux/dma-mapping.h>
 #include <sdhci.h>
+#include "../../board/freescale/common/qixis.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -71,7 +72,8 @@ struct fsl_esdhc {
 	uint	sdtimingctl;	/* SD timing control register */
 	char    reserved8[20];	/* reserved */
 	uint	dllcfg0;	/* DLL config 0 register */
-	char	reserved9[12];	/* reserved */
+	uint	dllcfg1;	/* DLL config 1 register */
+	char	reserved9[8];	/* reserved */
 	uint	dllstat0;	/* DLL status 0 register */
 	char    reserved10[664];/* reserved */
 	uint    esdhcctl;	/* eSDHC control register */
@@ -249,7 +251,7 @@ static void esdhc_setup_dma(struct fsl_esdhc_priv *priv, struct mmc_data *data)
 	    priv->adma_desc_table) {
 		debug("Using ADMA2\n");
 		/* prefer ADMA2 if it is available */
-		sdhci_prepare_adma_table(priv->adma_desc_table, data,
+		sdhci_prepare_adma_table(NULL, priv->adma_desc_table, data,
 					 priv->dma_addr);
 
 		adma_addr = virt_to_phys(priv->adma_desc_table);
@@ -359,13 +361,6 @@ static int esdhc_send_cmd_common(struct fsl_esdhc_priv *priv, struct mmc *mmc,
 
 	while (esdhc_read32(&regs->prsstat) & PRSSTAT_DLA)
 		;
-
-	/* Wait at least 8 SD clock cycles before the next command */
-	/*
-	 * Note: This is way more than 8 cycles, but 1ms seems to
-	 * resolve timing issues with some cards
-	 */
-	udelay(1000);
 
 	/* Set up for a data transfer if we have one */
 	if (data) {
@@ -508,6 +503,7 @@ static void set_sysctl(struct fsl_esdhc_priv *priv, struct mmc *mmc, uint clock)
 	u32 time_out;
 	u32 value;
 	uint clk;
+	u32 hostver;
 
 	if (clock < mmc->cfg->f_min)
 		clock = mmc->cfg->f_min;
@@ -517,6 +513,24 @@ static void set_sysctl(struct fsl_esdhc_priv *priv, struct mmc *mmc, uint clock)
 
 	while (sdhc_clk / (div * pre_div) > clock && div < 16)
 		div++;
+
+	if (IS_ENABLED(CONFIG_SYS_FSL_ERRATUM_A011334) &&
+	    clock == 200000000 && mmc->selected_mode == MMC_HS_400) {
+		u32 div_ratio = pre_div * div;
+
+		if (div_ratio <= 4) {
+			pre_div = 4;
+			div = 1;
+		} else if (div_ratio <= 8) {
+			pre_div = 4;
+			div = 2;
+		} else if (div_ratio <= 12) {
+			pre_div = 4;
+			div = 3;
+		} else {
+			printf("unsupported clock division.\n");
+		}
+	}
 
 	mmc->clock = sdhc_clk / pre_div / div;
 	priv->clock = mmc->clock;
@@ -529,6 +543,14 @@ static void set_sysctl(struct fsl_esdhc_priv *priv, struct mmc *mmc, uint clock)
 	esdhc_clrbits32(&regs->sysctl, SYSCTL_CKEN);
 
 	esdhc_clrsetbits32(&regs->sysctl, SYSCTL_CLOCK_MASK, clk);
+
+	/* Only newer eSDHC controllers set PRSSTAT_SDSTB flag */
+	hostver = esdhc_read32(&priv->esdhc_regs->hostver);
+	if (HOSTVER_VENDOR(hostver) <= VENDOR_V_22) {
+		udelay(10000);
+		esdhc_setbits32(&regs->sysctl, SYSCTL_PEREN | SYSCTL_CKEN);
+		return;
+	}
 
 	time_out = 20;
 	value = PRSSTAT_SDSTB;
@@ -549,6 +571,7 @@ static void esdhc_clock_control(struct fsl_esdhc_priv *priv, bool enable)
 	struct fsl_esdhc *regs = priv->esdhc_regs;
 	u32 value;
 	u32 time_out;
+	u32 hostver;
 
 	value = esdhc_read32(&regs->sysctl);
 
@@ -558,6 +581,13 @@ static void esdhc_clock_control(struct fsl_esdhc_priv *priv, bool enable)
 		value &= ~SYSCTL_CKEN;
 
 	esdhc_write32(&regs->sysctl, value);
+
+	/* Only newer eSDHC controllers set PRSSTAT_SDSTB flag */
+	hostver = esdhc_read32(&priv->esdhc_regs->hostver);
+	if (HOSTVER_VENDOR(hostver) <= VENDOR_V_22) {
+		udelay(10000);
+		return;
+	}
 
 	time_out = 20;
 	value = PRSSTAT_SDSTB;
@@ -711,7 +741,7 @@ static void esdhc_enable_cache_snooping(struct fsl_esdhc *regs)
 
 	setbits_be32(&sysconf->sdhccr, 0x02000000);
 #else
-	esdhc_write32(&regs->esdhcctl, 0x00000040);
+	esdhc_write32(&regs->esdhcctl, ESDHCCTL_SNOOP);
 #endif
 }
 
@@ -749,6 +779,9 @@ static int esdhc_init_common(struct fsl_esdhc_priv *priv, struct mmc *mmc)
 	/* Set timout to the maximum value */
 	esdhc_clrsetbits32(&regs->sysctl, SYSCTL_TIMEOUT_MASK, 14 << 16);
 
+	if (IS_ENABLED(CONFIG_SYS_FSL_ESDHC_UNRELIABLE_PULSE_DETECTION_WORKAROUND))
+		esdhc_clrbits32(&regs->dllcfg1, DLL_PD_PULSE_STRETCH_SEL);
+
 	return 0;
 }
 
@@ -757,7 +790,7 @@ static int esdhc_getcd_common(struct fsl_esdhc_priv *priv)
 	struct fsl_esdhc *regs = priv->esdhc_regs;
 
 #ifdef CONFIG_ESDHC_DETECT_QUIRK
-	if (CONFIG_ESDHC_DETECT_QUIRK)
+	if (qixis_esdhc_detect_quirk())
 		return 1;
 #endif
 	if (esdhc_read32(&regs->prsstat) & PRSSTAT_CINS)
@@ -773,10 +806,21 @@ static void fsl_esdhc_get_cfg_common(struct fsl_esdhc_priv *priv,
 	u32 caps;
 
 	caps = esdhc_read32(&regs->hostcapblt);
+
+	/*
+	 * For eSDHC, power supply is through peripheral circuit. Some eSDHC
+	 * versions have value 0 of the bit but that does not reflect the
+	 * truth. 3.3V is common for SD/MMC, and is supported for all boards
+	 * with eSDHC in current u-boot. So, make 3.3V is supported in
+	 * default in code. CONFIG_FSL_ESDHC_VS33_NOT_SUPPORT can be enabled
+	 * if future board does not support 3.3V.
+	 */
+	caps |= HOSTCAPBLT_VS33;
+	if (IS_ENABLED(CONFIG_FSL_ESDHC_VS33_NOT_SUPPORT))
+		caps &= ~HOSTCAPBLT_VS33;
+
 	if (IS_ENABLED(CONFIG_SYS_FSL_ERRATUM_ESDHC135))
 		caps &= ~(HOSTCAPBLT_SRS | HOSTCAPBLT_VS18 | HOSTCAPBLT_VS30);
-	if (IS_ENABLED(CONFIG_SYS_FSL_MMC_HAS_CAPBLT_VS33))
-		caps |= HOSTCAPBLT_VS33;
 	if (caps & HOSTCAPBLT_VS18)
 		cfg->voltages |= MMC_VDD_165_195;
 	if (caps & HOSTCAPBLT_VS30)
@@ -805,7 +849,6 @@ __weak int esdhc_status_fixup(void *blob, const char *compat)
 
 	return 0;
 }
-
 
 #if CONFIG_IS_ENABLED(DM_MMC)
 static int fsl_esdhc_get_cd(struct udevice *dev);
@@ -919,9 +962,8 @@ int fsl_esdhc_initialize(struct bd_info *bis, struct fsl_esdhc_cfg *cfg)
 	} else if (cfg->max_bus_width == 1) {
 		mmc_cfg->host_caps |= MMC_MODE_1BIT;
 	} else {
-		mmc_cfg->host_caps |= MMC_MODE_1BIT | MMC_MODE_4BIT |
-				      MMC_MODE_8BIT;
-		printf("No max bus width provided. Assume 8-bit supported.\n");
+		mmc_cfg->host_caps |= MMC_MODE_1BIT;
+		printf("No max bus width provided. Fallback to 1-bit mode.\n");
 	}
 
 	if (IS_ENABLED(CONFIG_ESDHC_DETECT_8_BIT_QUIRK))
@@ -944,7 +986,8 @@ int fsl_esdhc_mmc_init(struct bd_info *bis)
 	struct fsl_esdhc_cfg *cfg;
 
 	cfg = calloc(sizeof(struct fsl_esdhc_cfg), 1);
-	cfg->esdhc_base = CONFIG_SYS_FSL_ESDHC_ADDR;
+	cfg->esdhc_base = CFG_SYS_FSL_ESDHC_ADDR;
+	cfg->max_bus_width = CONFIG_SYS_FSL_ESDHC_DEFAULT_BUS_WIDTH;
 	/* Prefer peripheral clock which provides higher frequency. */
 	if (gd->arch.sdhc_per_clk)
 		cfg->sdhc_clk = gd->arch.sdhc_per_clk;
@@ -1057,14 +1100,19 @@ static int fsl_esdhc_reinit(struct udevice *dev)
 	return esdhc_init_common(priv, &plat->mmc);
 }
 
-#ifdef MMC_SUPPORTS_TUNING
+#if CONFIG_IS_ENABLED(MMC_SUPPORTS_TUNING)
 static int fsl_esdhc_execute_tuning(struct udevice *dev, uint32_t opcode)
 {
 	struct fsl_esdhc_plat *plat = dev_get_plat(dev);
 	struct fsl_esdhc_priv *priv = dev_get_priv(dev);
 	struct fsl_esdhc *regs = priv->esdhc_regs;
+	struct mmc *mmc = &plat->mmc;
 	u32 val, irqstaten;
 	int i;
+
+	if (IS_ENABLED(CONFIG_SYS_FSL_ERRATUM_A011334) &&
+	    plat->mmc.hs400_tuning)
+		set_sysctl(priv, mmc, mmc->clock);
 
 	esdhc_tuning_block_enable(priv, true);
 	esdhc_setbits32(&regs->autoc12err, EXECUTE_TUNING);
@@ -1073,7 +1121,7 @@ static int fsl_esdhc_execute_tuning(struct udevice *dev, uint32_t opcode)
 	esdhc_write32(&regs->irqstaten, IRQSTATEN_BRR);
 
 	for (i = 0; i < MAX_TUNING_LOOP; i++) {
-		mmc_send_tuning(&plat->mmc, opcode, NULL);
+		mmc_send_tuning(mmc, opcode);
 		mdelay(1);
 
 		val = esdhc_read32(&regs->autoc12err);
@@ -1107,15 +1155,30 @@ int fsl_esdhc_hs400_prepare_ddr(struct udevice *dev)
 	return 0;
 }
 
+static int fsl_esdhc_wait_dat0(struct udevice *dev, int state,
+			       int timeout_us)
+{
+	int ret;
+	u32 tmp;
+	struct fsl_esdhc_priv *priv = dev_get_priv(dev);
+	struct fsl_esdhc *regs = priv->esdhc_regs;
+
+	ret = readx_poll_timeout(esdhc_read32, &regs->prsstat, tmp,
+				 !!(tmp & PRSSTAT_DAT0) == !!state,
+				 timeout_us);
+	return ret;
+}
+
 static const struct dm_mmc_ops fsl_esdhc_ops = {
 	.get_cd		= fsl_esdhc_get_cd,
 	.send_cmd	= fsl_esdhc_send_cmd,
 	.set_ios	= fsl_esdhc_set_ios,
-#ifdef MMC_SUPPORTS_TUNING
+#if CONFIG_IS_ENABLED(MMC_SUPPORTS_TUNING)
 	.execute_tuning = fsl_esdhc_execute_tuning,
 #endif
 	.reinit = fsl_esdhc_reinit,
 	.hs400_prepare_ddr = fsl_esdhc_hs400_prepare_ddr,
+	.wait_dat0 = fsl_esdhc_wait_dat0,
 };
 
 static const struct udevice_id fsl_esdhc_ids[] = {

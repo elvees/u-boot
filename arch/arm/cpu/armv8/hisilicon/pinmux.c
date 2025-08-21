@@ -4,7 +4,6 @@
  * Peter Griffin <peter.griffin@linaro.org>
  */
 
-#include <common.h>
 #include <fdtdec.h>
 #include <log.h>
 #include <asm/gpio.h>
@@ -181,5 +180,3 @@ int hi6220_pinmux_config(int peripheral)
 
 	return 0;
 }
-
-

@@ -7,7 +7,6 @@
  * (C) Copyright 2007 Pengutronix, Juergen Beisert <j.beisert@pengutronix.de>
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <env.h>
@@ -30,6 +29,8 @@
 #include <asm/arch/imx-regs.h>
 #include <asm/mach-imx/sys_proto.h>
 #include <asm-generic/gpio.h>
+#include <dm/device_compat.h>
+#include <dm/lists.h>
 
 #include "fec_mxc.h"
 #include <eth_phy.h>
@@ -54,16 +55,12 @@ DECLARE_GLOBAL_DATA_PTR;
 #error "CONFIG_MII has to be defined!"
 #endif
 
-#ifndef CONFIG_FEC_XCV_TYPE
-#define CONFIG_FEC_XCV_TYPE MII100
-#endif
-
 /*
  * The i.MX28 operates with packets in big endian. We need to swap them before
  * sending and after receiving.
  */
 #ifdef CONFIG_MX28
-#define CONFIG_FEC_MXC_SWAP_PACKET
+#define CFG_FEC_MXC_SWAP_PACKET
 #endif
 
 #define RXDESC_PER_CACHELINE (ARCH_DMA_MINALIGN/sizeof(struct fec_bd))
@@ -80,7 +77,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #undef DEBUG
 
-#ifdef CONFIG_FEC_MXC_SWAP_PACKET
+#ifdef CFG_FEC_MXC_SWAP_PACKET
 static void swap_packet(uint32_t *packet, int length)
 {
 	int i;
@@ -146,7 +143,7 @@ static int fec_get_clk_rate(void *udev, int idx)
 	    CONFIG_IS_ENABLED(CLK_CCF)) {
 		dev = udev;
 		if (!dev) {
-			ret = uclass_get_device(UCLASS_ETH, idx, &dev);
+			ret = uclass_get_device_by_seq(UCLASS_ETH, idx, &dev);
 			if (ret < 0) {
 				debug("Can't get FEC udev: %d\n", ret);
 				return ret;
@@ -163,7 +160,7 @@ static int fec_get_clk_rate(void *udev, int idx)
 	}
 }
 
-static void fec_mii_setspeed(struct ethernet_regs *eth)
+static void fec_mii_setspeed(struct udevice *dev, struct ethernet_regs *eth)
 {
 	/*
 	 * Set MII_SPEED = (1/(mii_speed * 2)) * System Clock
@@ -185,7 +182,7 @@ static void fec_mii_setspeed(struct ethernet_regs *eth)
 	u32 hold;
 	int ret;
 
-	ret = fec_get_clk_rate(NULL, 0);
+	ret = fec_get_clk_rate(dev, 0);
 	if (ret < 0) {
 		printf("Can't find FEC0 clk rate: %d\n", ret);
 		return;
@@ -255,9 +252,6 @@ static int miiphy_restart_aneg(struct eth_device *dev)
 	 * Wake up from sleep if necessary
 	 * Reset PHY, then delay 300ns
 	 */
-#ifdef CONFIG_MX27
-	fec_mdio_write(eth, fec->phy_id, MII_DCOUNTER, 0x00FF);
-#endif
 	fec_mdio_write(eth, fec->phy_id, MII_BMCR, BMCR_RESET);
 	udelay(1000);
 
@@ -275,7 +269,6 @@ static int miiphy_restart_aneg(struct eth_device *dev)
 	return ret;
 }
 
-#ifndef CONFIG_FEC_FIXED_SPEED
 static int miiphy_wait_aneg(struct eth_device *dev)
 {
 	uint32_t start;
@@ -301,7 +294,6 @@ static int miiphy_wait_aneg(struct eth_device *dev)
 
 	return 0;
 }
-#endif /* CONFIG_FEC_FIXED_SPEED */
 #endif
 
 static int fec_rx_task_enable(struct fec_priv *fec)
@@ -331,7 +323,7 @@ static int fec_tx_task_disable(struct fec_priv *fec)
  * @param[in] fec all we know about the device yet
  * @param[in] count receive buffer count to be allocated
  * @param[in] dsize desired size of each receive buffer
- * @return 0 on success
+ * Return: 0 on success
  *
  * Init all RX descriptors to default values.
  */
@@ -408,20 +400,11 @@ static int fec_get_hwaddr(int dev_id, unsigned char *mac)
 	return !is_valid_ethaddr(mac);
 }
 
-#ifdef CONFIG_DM_ETH
 static int fecmxc_set_hwaddr(struct udevice *dev)
-#else
-static int fec_set_hwaddr(struct eth_device *dev)
-#endif
 {
-#ifdef CONFIG_DM_ETH
 	struct fec_priv *fec = dev_get_priv(dev);
 	struct eth_pdata *pdata = dev_get_plat(dev);
 	uchar *mac = pdata->enetaddr;
-#else
-	uchar *mac = dev->enetaddr;
-	struct fec_priv *fec = (struct fec_priv *)dev->priv;
-#endif
 
 	writel(0, &fec->eth->iaddr1);
 	writel(0, &fec->eth->iaddr2);
@@ -458,6 +441,9 @@ static void fec_reg_setup(struct fec_priv *fec)
 	else if (fec->xcv_type == RMII)
 		rcntrl |= FEC_RCNTRL_RMII;
 
+	if (fec->promisc)
+		rcntrl |= 0x8;
+
 	writel(rcntrl, &fec->eth->r_cntrl);
 }
 
@@ -465,17 +451,9 @@ static void fec_reg_setup(struct fec_priv *fec)
  * Start the FEC engine
  * @param[in] dev Our device to handle
  */
-#ifdef CONFIG_DM_ETH
 static int fec_open(struct udevice *dev)
-#else
-static int fec_open(struct eth_device *edev)
-#endif
 {
-#ifdef CONFIG_DM_ETH
 	struct fec_priv *fec = dev_get_priv(dev);
-#else
-	struct fec_priv *fec = (struct fec_priv *)edev->priv;
-#endif
 	int speed;
 	ulong addr, size;
 	int i;
@@ -518,7 +496,7 @@ static int fec_open(struct eth_device *edev)
 	       &fec->eth->ecntrl);
 #endif
 
-#if defined(CONFIG_MX25) || defined(CONFIG_MX53) || defined(CONFIG_MX6SL)
+#if defined(CONFIG_MX53) || defined(CONFIG_MX6SL)
 	udelay(100);
 
 	/* setup the MII gasket for RMII mode */
@@ -557,8 +535,6 @@ static int fec_open(struct eth_device *edev)
 		}
 		speed = fec->phydev->speed;
 	}
-#elif CONFIG_FEC_FIXED_SPEED
-	speed = CONFIG_FEC_FIXED_SPEED;
 #else
 	miiphy_wait_aneg(edev);
 	speed = miiphy_speed(edev->name, fec->phy_id);
@@ -586,27 +562,15 @@ static int fec_open(struct eth_device *edev)
 	return 0;
 }
 
-#ifdef CONFIG_DM_ETH
 static int fecmxc_init(struct udevice *dev)
-#else
-static int fec_init(struct eth_device *dev, struct bd_info *bd)
-#endif
 {
-#ifdef CONFIG_DM_ETH
 	struct fec_priv *fec = dev_get_priv(dev);
-#else
-	struct fec_priv *fec = (struct fec_priv *)dev->priv;
-#endif
 	u8 *mib_ptr = (uint8_t *)&fec->eth->rmon_t_drop;
 	u8 *i;
 	ulong addr;
 
 	/* Initialize MAC address */
-#ifdef CONFIG_DM_ETH
 	fecmxc_set_hwaddr(dev);
-#else
-	fec_set_hwaddr(dev);
-#endif
 
 	/* Setup transmit descriptors, there are two in total. */
 	fec_tbd_init(fec);
@@ -617,7 +581,7 @@ static int fec_init(struct eth_device *dev, struct bd_info *bd)
 	fec_reg_setup(fec);
 
 	if (fec->xcv_type != SEVENWIRE)
-		fec_mii_setspeed(fec->bus->priv);
+		fec_mii_setspeed(dev, fec->bus->priv);
 
 	/* Set Opcode/Pause Duration Register */
 	writel(0x00010020, &fec->eth->op_pause);	/* FIXME 0xffff0020; */
@@ -628,7 +592,8 @@ static int fec_init(struct eth_device *dev, struct bd_info *bd)
 	writel(0x00000000, &fec->eth->gaddr2);
 
 	/* Do not access reserved register */
-	if (!is_mx6ul() && !is_mx6ull() && !is_imx8() && !is_imx8m()) {
+	if (!is_mx6ul() && !is_mx6ull() && !is_imx8() && !is_imx8m() && !is_imx8ulp() &&
+	    !is_imx93()) {
 		/* clear MIB RAM */
 		for (i = mib_ptr; i <= mib_ptr + 0xfc; i += 4)
 			writel(0, i);
@@ -650,25 +615,16 @@ static int fec_init(struct eth_device *dev, struct bd_info *bd)
 	if (fec->xcv_type != SEVENWIRE)
 		miiphy_restart_aneg(dev);
 #endif
-	fec_open(dev);
-	return 0;
+	return fec_open(dev);
 }
 
 /**
  * Halt the FEC engine
  * @param[in] dev Our device to handle
  */
-#ifdef CONFIG_DM_ETH
 static void fecmxc_halt(struct udevice *dev)
-#else
-static void fec_halt(struct eth_device *dev)
-#endif
 {
-#ifdef CONFIG_DM_ETH
 	struct fec_priv *fec = dev_get_priv(dev);
-#else
-	struct fec_priv *fec = (struct fec_priv *)dev->priv;
-#endif
 	int counter = 0xffff;
 
 	/* issue graceful stop command to the FEC transmitter if necessary */
@@ -700,13 +656,9 @@ static void fec_halt(struct eth_device *dev)
  * @param[in] dev Our ethernet device to handle
  * @param[in] packet Pointer to the data to be transmitted
  * @param[in] length Data count in bytes
- * @return 0 on success
+ * Return: 0 on success
  */
-#ifdef CONFIG_DM_ETH
 static int fecmxc_send(struct udevice *dev, void *packet, int length)
-#else
-static int fec_send(struct eth_device *dev, void *packet, int length)
-#endif
 {
 	unsigned int status;
 	u32 size;
@@ -718,11 +670,7 @@ static int fec_send(struct eth_device *dev, void *packet, int length)
 	 * This routine transmits one frame.  This routine only accepts
 	 * 6-byte Ethernet addresses.
 	 */
-#ifdef CONFIG_DM_ETH
 	struct fec_priv *fec = dev_get_priv(dev);
-#else
-	struct fec_priv *fec = (struct fec_priv *)dev->priv;
-#endif
 
 	/*
 	 * Check for valid length of data.
@@ -737,7 +685,7 @@ static int fec_send(struct eth_device *dev, void *packet, int length)
 	 * transmission, the second will be empty and only used to stop the DMA
 	 * engine. We also flush the packet to RAM here to avoid cache trouble.
 	 */
-#ifdef CONFIG_FEC_MXC_SWAP_PACKET
+#ifdef CFG_FEC_MXC_SWAP_PACKET
 	swap_packet((uint32_t *)packet, length);
 #endif
 
@@ -851,19 +799,11 @@ out:
 /**
  * Pull one frame from the card
  * @param[in] dev Our ethernet device to handle
- * @return Length of packet read
+ * Return: Length of packet read
  */
-#ifdef CONFIG_DM_ETH
 static int fecmxc_recv(struct udevice *dev, int flags, uchar **packetp)
-#else
-static int fec_recv(struct eth_device *dev)
-#endif
 {
-#ifdef CONFIG_DM_ETH
 	struct fec_priv *fec = dev_get_priv(dev);
-#else
-	struct fec_priv *fec = (struct fec_priv *)dev->priv;
-#endif
 	struct fec_bd *rbd = &fec->rbd_base[fec->rbd_index];
 	unsigned long ievent;
 	int frame_length, len = 0;
@@ -871,28 +811,22 @@ static int fec_recv(struct eth_device *dev)
 	ulong addr, size, end;
 	int i;
 
-#ifdef CONFIG_DM_ETH
 	*packetp = memalign(ARCH_DMA_MINALIGN, FEC_MAX_PKT_SIZE);
 	if (*packetp == 0) {
 		printf("%s: error allocating packetp\n", __func__);
 		return -ENOMEM;
 	}
-#else
-	ALLOC_CACHE_ALIGN_BUFFER(uchar, buff, FEC_MAX_PKT_SIZE);
-#endif
+
+	if (!(readl(&fec->eth->ecntrl) & FEC_ECNTRL_ETHER_EN))
+		return 0;
 
 	/* Check if any critical events have happened */
 	ievent = readl(&fec->eth->ievent);
 	writel(ievent, &fec->eth->ievent);
 	debug("fec_recv: ievent 0x%lx\n", ievent);
 	if (ievent & FEC_IEVENT_BABR) {
-#ifdef CONFIG_DM_ETH
 		fecmxc_halt(dev);
 		fecmxc_init(dev);
-#else
-		fec_halt(dev);
-		fec_init(dev, fec->bd);
-#endif
 		printf("some error: 0x%08lx\n", ievent);
 		return 0;
 	}
@@ -904,18 +838,10 @@ static int fec_recv(struct eth_device *dev)
 	if (ievent & FEC_IEVENT_GRA) {
 		/* Graceful stop complete */
 		if (readl(&fec->eth->x_cntrl) & 0x00000001) {
-#ifdef CONFIG_DM_ETH
 			fecmxc_halt(dev);
-#else
-			fec_halt(dev);
-#endif
 			writel(~0x00000001 & readl(&fec->eth->x_cntrl),
 			       &fec->eth->x_cntrl);
-#ifdef CONFIG_DM_ETH
 			fecmxc_init(dev);
-#else
-			fec_init(dev, fec->bd);
-#endif
 		}
 	}
 
@@ -952,16 +878,11 @@ static int fec_recv(struct eth_device *dev)
 			invalidate_dcache_range(addr, end);
 
 			/* Fill the buffer and pass it to upper layers */
-#ifdef CONFIG_FEC_MXC_SWAP_PACKET
+#ifdef CFG_FEC_MXC_SWAP_PACKET
 			swap_packet((uint32_t *)addr, frame_length);
 #endif
 
-#ifdef CONFIG_DM_ETH
 			memcpy(*packetp, (char *)addr, frame_length);
-#else
-			memcpy(buff, (char *)addr, frame_length);
-			net_process_received_packet(buff, frame_length);
-#endif
 			len = frame_length;
 		} else {
 			if (bd_status & FEC_RBD_ERR)
@@ -1075,7 +996,7 @@ static void fec_free_descs(struct fec_priv *fec)
 	free(fec->tbd_base);
 }
 
-struct mii_dev *fec_get_miibus(ulong base_addr, int dev_id)
+struct mii_dev *fec_get_miibus(struct udevice *dev, ulong base_addr, int dev_id)
 {
 	struct ethernet_regs *eth = (struct ethernet_regs *)base_addr;
 	struct mii_dev *bus;
@@ -1097,178 +1018,84 @@ struct mii_dev *fec_get_miibus(ulong base_addr, int dev_id)
 		free(bus);
 		return NULL;
 	}
-	fec_mii_setspeed(eth);
+	fec_mii_setspeed(dev, eth);
 	return bus;
 }
 
-#ifndef CONFIG_DM_ETH
-#ifdef CONFIG_PHYLIB
-int fec_probe(struct bd_info *bd, int dev_id, uint32_t base_addr,
-		struct mii_dev *bus, struct phy_device *phydev)
-#else
-static int fec_probe(struct bd_info *bd, int dev_id, uint32_t base_addr,
-		struct mii_dev *bus, int phy_id)
-#endif
+#ifdef CONFIG_DM_MDIO
+struct dm_fec_mdio_priv {
+	struct ethernet_regs *regs;
+};
+
+static int dm_fec_mdio_read(struct udevice *dev, int addr, int devad, int reg)
 {
-	struct eth_device *edev;
-	struct fec_priv *fec;
-	unsigned char ethaddr[6];
-	char mac[16];
-	uint32_t start;
-	int ret = 0;
+	struct dm_fec_mdio_priv *priv = dev_get_priv(dev);
 
-	/* create and fill edev struct */
-	edev = (struct eth_device *)malloc(sizeof(struct eth_device));
-	if (!edev) {
-		puts("fec_mxc: not enough malloc memory for eth_device\n");
-		ret = -ENOMEM;
-		goto err1;
-	}
-
-	fec = (struct fec_priv *)malloc(sizeof(struct fec_priv));
-	if (!fec) {
-		puts("fec_mxc: not enough malloc memory for fec_priv\n");
-		ret = -ENOMEM;
-		goto err2;
-	}
-
-	memset(edev, 0, sizeof(*edev));
-	memset(fec, 0, sizeof(*fec));
-
-	ret = fec_alloc_descs(fec);
-	if (ret)
-		goto err3;
-
-	edev->priv = fec;
-	edev->init = fec_init;
-	edev->send = fec_send;
-	edev->recv = fec_recv;
-	edev->halt = fec_halt;
-	edev->write_hwaddr = fec_set_hwaddr;
-
-	fec->eth = (struct ethernet_regs *)(ulong)base_addr;
-	fec->bd = bd;
-
-	fec->xcv_type = CONFIG_FEC_XCV_TYPE;
-
-	/* Reset chip. */
-	writel(readl(&fec->eth->ecntrl) | FEC_ECNTRL_RESET, &fec->eth->ecntrl);
-	start = get_timer(0);
-	while (readl(&fec->eth->ecntrl) & FEC_ECNTRL_RESET) {
-		if (get_timer(start) > (CONFIG_SYS_HZ * 5)) {
-			printf("FEC MXC: Timeout resetting chip\n");
-			goto err4;
-		}
-		udelay(10);
-	}
-
-	fec_reg_setup(fec);
-	fec_set_dev_name(edev->name, dev_id);
-	fec->dev_id = (dev_id == -1) ? 0 : dev_id;
-	fec->bus = bus;
-	fec_mii_setspeed(bus->priv);
-#ifdef CONFIG_PHYLIB
-	fec->phydev = phydev;
-	phy_connect_dev(phydev, edev);
-	/* Configure phy */
-	phy_config(phydev);
-#else
-	fec->phy_id = phy_id;
-#endif
-	eth_register(edev);
-	/* only support one eth device, the index number pointed by dev_id */
-	edev->index = fec->dev_id;
-
-	if (fec_get_hwaddr(fec->dev_id, ethaddr) == 0) {
-		debug("got MAC%d address from fuse: %pM\n", fec->dev_id, ethaddr);
-		memcpy(edev->enetaddr, ethaddr, 6);
-		if (fec->dev_id)
-			sprintf(mac, "eth%daddr", fec->dev_id);
-		else
-			strcpy(mac, "ethaddr");
-		if (!env_get(mac))
-			eth_env_set_enetaddr(mac, ethaddr);
-	}
-	return ret;
-err4:
-	fec_free_descs(fec);
-err3:
-	free(fec);
-err2:
-	free(edev);
-err1:
-	return ret;
+	return fec_mdio_read(priv->regs, addr, reg);
 }
 
-int fecmxc_initialize_multi(struct bd_info *bd, int dev_id, int phy_id,
-			    uint32_t addr)
+static int dm_fec_mdio_write(struct udevice *dev, int addr, int devad, int reg, u16 data)
 {
-	uint32_t base_mii;
-	struct mii_dev *bus = NULL;
-#ifdef CONFIG_PHYLIB
-	struct phy_device *phydev = NULL;
-#endif
-	int ret;
+	struct dm_fec_mdio_priv *priv = dev_get_priv(dev);
 
-	if (CONFIG_IS_ENABLED(IMX_MODULE_FUSE)) {
-		if (enet_fused((ulong)addr)) {
-			printf("SoC fuse indicates Ethernet@0x%x is unavailable.\n", addr);
-			return -ENODEV;
-		}
-	}
-
-#ifdef CONFIG_FEC_MXC_MDIO_BASE
-	/*
-	 * The i.MX28 has two ethernet interfaces, but they are not equal.
-	 * Only the first one can access the MDIO bus.
-	 */
-	base_mii = CONFIG_FEC_MXC_MDIO_BASE;
-#else
-	base_mii = addr;
-#endif
-	debug("eth_init: fec_probe(bd, %i, %i) @ %08x\n", dev_id, phy_id, addr);
-	bus = fec_get_miibus(base_mii, dev_id);
-	if (!bus)
-		return -ENOMEM;
-#ifdef CONFIG_PHYLIB
-	phydev = phy_find_by_mask(bus, 1 << phy_id, PHY_INTERFACE_MODE_RGMII);
-	if (!phydev) {
-		mdio_unregister(bus);
-		free(bus);
-		return -ENOMEM;
-	}
-	ret = fec_probe(bd, dev_id, addr, bus, phydev);
-#else
-	ret = fec_probe(bd, dev_id, addr, bus, phy_id);
-#endif
-	if (ret) {
-#ifdef CONFIG_PHYLIB
-		free(phydev);
-#endif
-		mdio_unregister(bus);
-		free(bus);
-	}
-	return ret;
+	return fec_mdio_write(priv->regs, addr, reg, data);
 }
 
-#ifdef CONFIG_FEC_MXC_PHYADDR
-int fecmxc_initialize(struct bd_info *bd)
-{
-	return fecmxc_initialize_multi(bd, -1, CONFIG_FEC_MXC_PHYADDR,
-			IMX_FEC_BASE);
-}
-#endif
+static const struct mdio_ops dm_fec_mdio_ops = {
+	.read = dm_fec_mdio_read,
+	.write = dm_fec_mdio_write,
+};
 
-#ifndef CONFIG_PHYLIB
-int fecmxc_register_mii_postcall(struct eth_device *dev, int (*cb)(int))
+static int dm_fec_mdio_probe(struct udevice *dev)
 {
-	struct fec_priv *fec = (struct fec_priv *)dev->priv;
-	fec->mii_postcall = cb;
+	struct dm_fec_mdio_priv *priv = dev_get_priv(dev);
+
+	priv->regs = (struct ethernet_regs *)ofnode_get_addr(dev_ofnode(dev->parent));
+
 	return 0;
 }
-#endif
 
-#else
+U_BOOT_DRIVER(fec_mdio) = {
+	.name		= "fec_mdio",
+	.id		= UCLASS_MDIO,
+	.probe		= dm_fec_mdio_probe,
+	.ops		= &dm_fec_mdio_ops,
+	.priv_auto	= sizeof(struct dm_fec_mdio_priv),
+};
+
+static int dm_fec_bind_mdio(struct udevice *dev)
+{
+	struct udevice *mdiodev;
+	const char *name;
+	ofnode mdio;
+	int ret = -ENODEV;
+
+	/* for a UCLASS_MDIO driver we need to bind and probe manually
+	 * for an internal MDIO bus that has no dt compatible of its own
+	 */
+	ofnode_for_each_subnode(mdio, dev_ofnode(dev)) {
+		name = ofnode_get_name(mdio);
+
+		if (strcmp(name, "mdio"))
+			continue;
+
+		ret = device_bind_driver_to_node(dev, "fec_mdio",
+						 name, mdio, &mdiodev);
+		if (ret) {
+			printf("%s bind %s failed: %d\n", __func__, name, ret);
+			break;
+		}
+
+		/* need to probe it as there is no compatible to do so */
+		ret = uclass_get_device_by_ofnode(UCLASS_MDIO, mdio, &mdiodev);
+		if (!ret)
+			return 0;
+		printf("%s probe %s failed: %d\n", __func__, name, ret);
+	}
+
+	return ret;
+}
+#endif
 
 static int fecmxc_read_rom_hwaddr(struct udevice *dev)
 {
@@ -1276,6 +1103,15 @@ static int fecmxc_read_rom_hwaddr(struct udevice *dev)
 	struct eth_pdata *pdata = dev_get_plat(dev);
 
 	return fec_get_hwaddr(priv->dev_id, pdata->enetaddr);
+}
+
+static int fecmxc_set_promisc(struct udevice *dev, bool enable)
+{
+	struct fec_priv *priv = dev_get_priv(dev);
+
+	priv->promisc = enable;
+
+	return 0;
 }
 
 static int fecmxc_free_pkt(struct udevice *dev, uchar *packet, int length)
@@ -1294,21 +1130,29 @@ static const struct eth_ops fecmxc_ops = {
 	.stop			= fecmxc_halt,
 	.write_hwaddr		= fecmxc_set_hwaddr,
 	.read_rom_hwaddr	= fecmxc_read_rom_hwaddr,
+	.set_promisc		= fecmxc_set_promisc,
 };
 
 static int device_get_phy_addr(struct fec_priv *priv, struct udevice *dev)
 {
 	struct ofnode_phandle_args phandle_args;
-	int reg;
+	int reg, ret;
 
-	if (dev_read_phandle_with_args(dev, "phy-handle", NULL, 0, 0,
-				       &phandle_args)) {
-		debug("Failed to find phy-handle");
-		return -ENODEV;
+	ret = dev_read_phandle_with_args(dev, "phy-handle", NULL, 0, 0,
+					 &phandle_args);
+	if (ret) {
+		priv->phy_of_node = ofnode_find_subnode(dev_ofnode(dev),
+							"fixed-link");
+		if (ofnode_valid(priv->phy_of_node))
+			return 0;
+		debug("Failed to find phy-handle (err = %d)\n", ret);
+		return ret;
 	}
 
-	priv->phy_of_node = phandle_args.node;
+	if (!ofnode_is_enabled(phandle_args.node))
+		return -ENOENT;
 
+	priv->phy_of_node = phandle_args.node;
 	reg = ofnode_read_u32_default(phandle_args.node, "reg", 0);
 
 	return reg;
@@ -1316,17 +1160,32 @@ static int device_get_phy_addr(struct fec_priv *priv, struct udevice *dev)
 
 static int fec_phy_init(struct fec_priv *priv, struct udevice *dev)
 {
-	struct phy_device *phydev;
+	struct phy_device *phydev = NULL;
 	int addr;
+	int ret;
 
 	addr = device_get_phy_addr(priv, dev);
-#ifdef CONFIG_FEC_MXC_PHYADDR
-	addr = CONFIG_FEC_MXC_PHYADDR;
+#ifdef CFG_FEC_MXC_PHYADDR
+	addr = CFG_FEC_MXC_PHYADDR;
 #endif
 
-	phydev = phy_connect(priv->bus, addr, dev, priv->interface);
+	if (IS_ENABLED(CONFIG_DM_MDIO))
+		phydev = dm_eth_phy_connect(dev);
+	if (!phydev)
+		phydev = phy_connect(priv->bus, addr, dev, priv->interface);
 	if (!phydev)
 		return -ENODEV;
+
+	switch (priv->interface) {
+	case PHY_INTERFACE_MODE_MII:
+	case PHY_INTERFACE_MODE_RMII:
+		ret = phy_set_supported(phydev, SPEED_100);
+		if (ret)
+			return ret;
+		break;
+	default:
+		break;
+	}
 
 	priv->phydev = phydev;
 	priv->phydev->node = priv->phy_of_node;
@@ -1350,15 +1209,50 @@ static void fec_gpio_reset(struct fec_priv *priv)
 }
 #endif
 
+static int fecmxc_set_ref_clk(struct clk *clk_ref, phy_interface_t interface)
+{
+	unsigned int freq;
+	int ret;
+
+	if (!CONFIG_IS_ENABLED(CLK_CCF))
+		return 0;
+
+	if (interface == PHY_INTERFACE_MODE_MII)
+		freq = 25000000;
+	else if (interface == PHY_INTERFACE_MODE_RMII)
+		freq = 50000000;
+	else if (interface == PHY_INTERFACE_MODE_RGMII ||
+		 interface == PHY_INTERFACE_MODE_RGMII_ID ||
+		 interface == PHY_INTERFACE_MODE_RGMII_RXID ||
+		 interface == PHY_INTERFACE_MODE_RGMII_TXID) {
+		freq = 125000000;
+		if (is_imx93())
+			freq = freq << 1;
+	} else {
+		return -EINVAL;
+	}
+
+	ret = clk_set_rate(clk_ref, freq);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
 static int fecmxc_probe(struct udevice *dev)
 {
+	bool dm_mii_bus = true;
 	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct fec_priv *priv = dev_get_priv(dev);
 	struct mii_dev *bus = NULL;
 	uint32_t start;
 	int ret;
 
-	if (CONFIG_IS_ENABLED(IMX_MODULE_FUSE)) {
+	ret = board_interface_eth_init(dev, pdata->phy_interface);
+	if (ret)
+		return ret;
+
+	if (IS_ENABLED(CONFIG_IMX_MODULE_FUSE)) {
 		if (enet_fused((ulong)priv->eth)) {
 			printf("SoC fuse indicates Ethernet@0x%lx is unavailable.\n", (ulong)priv->eth);
 			return -ENODEV;
@@ -1406,6 +1300,11 @@ static int fecmxc_probe(struct udevice *dev)
 
 		ret = clk_get_by_name(dev, "enet_clk_ref", &priv->clk_ref);
 		if (!ret) {
+			ret = fecmxc_set_ref_clk(&priv->clk_ref,
+						 pdata->phy_interface);
+			if (ret)
+				return ret;
+
 			ret = clk_enable(&priv->clk_ref);
 			if (ret)
 				return ret;
@@ -1427,7 +1326,7 @@ static int fecmxc_probe(struct udevice *dev)
 
 #ifdef CONFIG_DM_REGULATOR
 	if (priv->phy_supply) {
-		ret = regulator_set_enable(priv->phy_supply, true);
+		ret = regulator_set_enable_if_allowed(priv->phy_supply, true);
 		if (ret) {
 			printf("%s: Error enabling phy supply\n", dev->name);
 			return ret;
@@ -1444,7 +1343,7 @@ static int fecmxc_probe(struct udevice *dev)
 	start = get_timer(0);
 	while (readl(&priv->eth->ecntrl) & FEC_ECNTRL_RESET) {
 		if (get_timer(start) > (CONFIG_SYS_HZ * 5)) {
-			printf("FEC MXC: Timeout reseting chip\n");
+			printf("FEC MXC: Timeout resetting chip\n");
 			goto err_timeout;
 		}
 		udelay(10);
@@ -1454,16 +1353,23 @@ static int fecmxc_probe(struct udevice *dev)
 
 	priv->dev_id = dev_seq(dev);
 
+#ifdef CONFIG_DM_MDIO
+	ret = dm_fec_bind_mdio(dev);
+	if (ret && ret != -ENODEV)
+		return ret;
+#endif
+
 #ifdef CONFIG_DM_ETH_PHY
 	bus = eth_phy_get_mdio_bus(dev);
 #endif
 
 	if (!bus) {
+		dm_mii_bus = false;
 #ifdef CONFIG_FEC_MXC_MDIO_BASE
-		bus = fec_get_miibus((ulong)CONFIG_FEC_MXC_MDIO_BASE,
+		bus = fec_get_miibus(dev, (ulong)CONFIG_FEC_MXC_MDIO_BASE,
 				     dev_seq(dev));
 #else
-		bus = fec_get_miibus((ulong)priv->eth, dev_seq(dev));
+		bus = fec_get_miibus(dev, (ulong)priv->eth, dev_seq(dev));
 #endif
 	}
 	if (!bus) {
@@ -1491,9 +1397,9 @@ static int fecmxc_probe(struct udevice *dev)
 		priv->xcv_type = RGMII;
 		break;
 	default:
-		priv->xcv_type = CONFIG_FEC_XCV_TYPE;
-		printf("Unsupported interface type %d defaulting to %d\n",
-		       priv->interface, priv->xcv_type);
+		priv->xcv_type = MII100;
+		printf("Unsupported interface type %d defaulting to MII100\n",
+		       priv->interface);
 		break;
 	}
 
@@ -1504,8 +1410,10 @@ static int fecmxc_probe(struct udevice *dev)
 	return 0;
 
 err_phy:
-	mdio_unregister(bus);
-	free(bus);
+	if (!dm_mii_bus) {
+		mdio_unregister(bus);
+		free(bus);
+	}
 err_mii:
 err_timeout:
 	fec_free_descs(priv);
@@ -1534,20 +1442,13 @@ static int fecmxc_of_to_plat(struct udevice *dev)
 	int ret = 0;
 	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct fec_priv *priv = dev_get_priv(dev);
-	const char *phy_mode;
 
 	pdata->iobase = dev_read_addr(dev);
 	priv->eth = (struct ethernet_regs *)pdata->iobase;
 
-	pdata->phy_interface = -1;
-	phy_mode = fdt_getprop(gd->fdt_blob, dev_of_offset(dev), "phy-mode",
-			       NULL);
-	if (phy_mode)
-		pdata->phy_interface = phy_get_interface_by_name(phy_mode);
-	if (pdata->phy_interface == -1) {
-		debug("%s: Invalid PHY interface '%s'\n", __func__, phy_mode);
+	pdata->phy_interface = dev_read_phy_mode(dev);
+	if (pdata->phy_interface == PHY_INTERFACE_MODE_NA)
 		return -EINVAL;
-	}
 
 #ifdef CONFIG_DM_REGULATOR
 	device_get_supply_regulator(dev, "phy-supply", &priv->phy_supply);
@@ -1555,7 +1456,7 @@ static int fecmxc_of_to_plat(struct udevice *dev)
 
 #if CONFIG_IS_ENABLED(DM_GPIO)
 	ret = gpio_request_by_name(dev, "phy-reset-gpios", 0,
-				   &priv->phy_reset_gpio, GPIOD_IS_OUT);
+				   &priv->phy_reset_gpio, GPIOD_IS_OUT | GPIOD_IS_OUT_ACTIVE);
 	if (ret < 0)
 		return 0; /* property is optional, don't return error! */
 
@@ -1588,6 +1489,7 @@ static const struct udevice_id fecmxc_ids[] = {
 	{ .compatible = "fsl,imx53-fec" },
 	{ .compatible = "fsl,imx7d-fec" },
 	{ .compatible = "fsl,mvf600-fec" },
+	{ .compatible = "fsl,imx93-fec" },
 	{ }
 };
 
@@ -1601,5 +1503,5 @@ U_BOOT_DRIVER(fecmxc_gem) = {
 	.ops	= &fecmxc_ops,
 	.priv_auto	= sizeof(struct fec_priv),
 	.plat_auto	= sizeof(struct eth_pdata),
+	.flags = DM_FLAG_ACTIVE_DMA,
 };
-#endif

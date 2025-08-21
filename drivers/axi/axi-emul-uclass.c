@@ -4,7 +4,8 @@
  * Mario Six, Guntermann & Drunck GmbH, mario.six@gdsys.cc
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_AXI_EMUL
+
 #include <axi.h>
 #include <dm.h>
 #include <log.h>
@@ -12,7 +13,7 @@
 #include <asm/axi.h>
 
 int axi_sandbox_get_emul(struct udevice *bus, ulong address,
-			 enum axi_size_t size, struct udevice **emulp)
+			 const enum axi_size_t size, struct udevice **emulp)
 {
 	struct udevice *dev;
 	u32 reg[2];

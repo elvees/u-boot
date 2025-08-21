@@ -6,9 +6,9 @@
  */
 #include <command.h>
 #include <config.h>
-#include <common.h>
 #include <malloc.h>
 #include <part.h>
+#include <vsprintf.h>
 
 static int blkc_show(struct cmd_tbl *cmdtp, int flag,
 		     int argc, char *const argv[])
@@ -46,24 +46,11 @@ static struct cmd_tbl cmd_blkc_sub[] = {
 	U_BOOT_CMD_MKENT(configure, 3, 0, blkc_configure, "", ""),
 };
 
-static __maybe_unused void blkc_reloc(void)
-{
-	static int relocated;
-
-	if (!relocated) {
-		fixup_cmdtable(cmd_blkc_sub, ARRAY_SIZE(cmd_blkc_sub));
-		relocated = 1;
-	};
-}
-
 static int do_blkcache(struct cmd_tbl *cmdtp, int flag,
 		       int argc, char *const argv[])
 {
 	struct cmd_tbl *c;
 
-#ifdef CONFIG_NEEDS_MANUAL_RELOC
-	blkc_reloc();
-#endif
 	if (argc < 2)
 		return CMD_RET_USAGE;
 
@@ -83,5 +70,6 @@ U_BOOT_CMD(
 	blkcache, 4, 0, do_blkcache,
 	"block cache diagnostics and control",
 	"show - show and reset statistics\n"
-	"blkcache configure blocks entries\n"
+	"blkcache configure <blocks> <entries> "
+	"- set max blocks per entry and max cache entries\n"
 );

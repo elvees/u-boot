@@ -9,8 +9,8 @@
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  */
 
-#include <common.h>
 #include <cpu_func.h>
+#include <clock_legacy.h>
 #include <ppc_asm.tmpl>
 #include <asm/global_data.h>
 #include <linux/compiler.h>
@@ -19,24 +19,20 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-
-#ifndef CONFIG_SYS_FSL_NUM_CC_PLLS
-#define CONFIG_SYS_FSL_NUM_CC_PLLS	6
-#endif
 /* --------------------------------------------------------------- */
 
 void get_sys_info(sys_info_t *sys_info)
 {
-	volatile ccsr_gur_t *gur = (void *)(CONFIG_SYS_MPC85xx_GUTS_ADDR);
+	volatile ccsr_gur_t *gur = (void *)(CFG_SYS_MPC85xx_GUTS_ADDR);
 #ifdef CONFIG_FSL_CORENET
-	volatile ccsr_clk_t *clk = (void *)(CONFIG_SYS_FSL_CORENET_CLK_ADDR);
+	volatile ccsr_clk_t *clk = (void *)(CFG_SYS_FSL_CORENET_CLK_ADDR);
 	unsigned int cpu;
 #ifdef CONFIG_HETROGENOUS_CLUSTERS
 	unsigned int dsp_cpu;
 	uint rcw_tmp1, rcw_tmp2;
 #endif
 #ifdef CONFIG_SYS_FSL_QORIQ_CHASSIS2
-	int cc_group[12] = CONFIG_SYS_FSL_CLUSTER_CLOCKS;
+	int cc_group[12] = CFG_SYS_FSL_CLUSTER_CLOCKS;
 #endif
 	__maybe_unused u32 svr;
 
@@ -70,11 +66,11 @@ void get_sys_info(sys_info_t *sys_info)
 		[14] = 4,	/* CC4 PPL / 4 */
 	};
 	uint i, freq_c_pll[CONFIG_SYS_FSL_NUM_CC_PLLS];
-#if !defined(CONFIG_FM_PLAT_CLK_DIV) || !defined(CONFIG_PME_PLAT_CLK_DIV)
+#if !defined(CFG_FM_PLAT_CLK_DIV) || !defined(CFG_PME_PLAT_CLK_DIV)
 	uint rcw_tmp;
 #endif
 	uint ratio[CONFIG_SYS_FSL_NUM_CC_PLLS];
-	unsigned long sysclk = CONFIG_SYS_CLK_FREQ;
+	unsigned long sysclk = get_board_sys_clk();
 	uint mem_pll_rat;
 
 	sys_info->freq_systembus = sysclk;
@@ -101,11 +97,11 @@ void get_sys_info(sys_info_t *sys_info)
 	 * are driven by differential sysclock.
 	 */
 	if (ddr_refclk_sel == FSL_CORENET2_RCWSR5_DDR_REFCLK_SINGLE_CLK)
-		sys_info->freq_ddrbus = CONFIG_SYS_CLK_FREQ;
+		sys_info->freq_ddrbus = get_board_sys_clk();
 	else
 #endif
-#ifdef CONFIG_DDR_CLK_FREQ
-		sys_info->freq_ddrbus = CONFIG_DDR_CLK_FREQ;
+#if defined(CONFIG_DYNAMIC_DDR_CLK_FREQ) || defined(CONFIG_STATIC_DDR_CLK_FREQ)
+		sys_info->freq_ddrbus = get_board_ddr_clk();
 #else
 		sys_info->freq_ddrbus = sysclk;
 #endif
@@ -126,8 +122,7 @@ void get_sys_info(sys_info_t *sys_info)
 	 * it uses 6.
 	 * T2080 rev 1.1 and later also use half mem_pll comparing with rev 1.0
 	 */
-#if defined(CONFIG_ARCH_T4240) || defined(CONFIG_ARCH_T4160) || \
-	defined(CONFIG_ARCH_T2080) || defined(CONFIG_ARCH_T2081)
+#if defined(CONFIG_ARCH_T4240) || defined(CONFIG_ARCH_T2080)
 	svr = get_svr();
 	switch (SVR_SOC_VER(svr)) {
 	case SVR_T4240:
@@ -198,10 +193,10 @@ void get_sys_info(sys_info_t *sys_info)
 #endif
 
 #if defined(CONFIG_ARCH_B4860) || defined(CONFIG_ARCH_B4420) || \
-	defined(CONFIG_ARCH_T2080) || defined(CONFIG_ARCH_T2081)
+	defined(CONFIG_ARCH_T2080)
 #define FM1_CLK_SEL	0xe0000000
 #define FM1_CLK_SHIFT	29
-#elif defined(CONFIG_ARCH_T1024) || defined(CONFIG_ARCH_T1023)
+#elif defined(CONFIG_ARCH_T1024)
 #define FM1_CLK_SEL	0x00000007
 #define FM1_CLK_SHIFT	0
 #else
@@ -210,8 +205,8 @@ void get_sys_info(sys_info_t *sys_info)
 #define FM1_CLK_SEL	0x1c000000
 #define FM1_CLK_SHIFT	26
 #endif
-#if !defined(CONFIG_FM_PLAT_CLK_DIV) || !defined(CONFIG_PME_PLAT_CLK_DIV)
-#if defined(CONFIG_ARCH_T1024) || defined(CONFIG_ARCH_T1023)
+#if !defined(CFG_FM_PLAT_CLK_DIV) || !defined(CFG_PME_PLAT_CLK_DIV)
+#if defined(CONFIG_ARCH_T1024)
 	rcw_tmp = in_be32(&gur->rcwsr[15]) - 4;
 #else
 	rcw_tmp = in_be32(&gur->rcwsr[7]);
@@ -219,25 +214,25 @@ void get_sys_info(sys_info_t *sys_info)
 #endif
 
 #ifdef CONFIG_SYS_DPAA_PME
-#ifndef CONFIG_PME_PLAT_CLK_DIV
+#ifndef CFG_PME_PLAT_CLK_DIV
 	switch ((rcw_tmp & PME_CLK_SEL) >> PME_CLK_SHIFT) {
 	case 1:
-		sys_info->freq_pme = freq_c_pll[CONFIG_SYS_PME_CLK];
+		sys_info->freq_pme = freq_c_pll[CFG_SYS_PME_CLK];
 		break;
 	case 2:
-		sys_info->freq_pme = freq_c_pll[CONFIG_SYS_PME_CLK] / 2;
+		sys_info->freq_pme = freq_c_pll[CFG_SYS_PME_CLK] / 2;
 		break;
 	case 3:
-		sys_info->freq_pme = freq_c_pll[CONFIG_SYS_PME_CLK] / 3;
+		sys_info->freq_pme = freq_c_pll[CFG_SYS_PME_CLK] / 3;
 		break;
 	case 4:
-		sys_info->freq_pme = freq_c_pll[CONFIG_SYS_PME_CLK] / 4;
+		sys_info->freq_pme = freq_c_pll[CFG_SYS_PME_CLK] / 4;
 		break;
 	case 6:
-		sys_info->freq_pme = freq_c_pll[CONFIG_SYS_PME_CLK + 1] / 2;
+		sys_info->freq_pme = freq_c_pll[CFG_SYS_PME_CLK + 1] / 2;
 		break;
 	case 7:
-		sys_info->freq_pme = freq_c_pll[CONFIG_SYS_PME_CLK + 1] / 3;
+		sys_info->freq_pme = freq_c_pll[CFG_SYS_PME_CLK + 1] / 3;
 		break;
 	default:
 		printf("Error: Unknown PME clock select!\n");
@@ -247,16 +242,16 @@ void get_sys_info(sys_info_t *sys_info)
 
 	}
 #else
-	sys_info->freq_pme = sys_info->freq_systembus / CONFIG_SYS_PME_CLK;
+	sys_info->freq_pme = sys_info->freq_systembus / CFG_SYS_PME_CLK;
 
 #endif
 #endif
 
 #ifdef CONFIG_SYS_DPAA_QBMAN
-#ifndef CONFIG_QBMAN_CLK_DIV
-#define CONFIG_QBMAN_CLK_DIV	2
+#ifndef CFG_QBMAN_CLK_DIV
+#define CFG_QBMAN_CLK_DIV	2
 #endif
-	sys_info->freq_qman = sys_info->freq_systembus / CONFIG_QBMAN_CLK_DIV;
+	sys_info->freq_qman = sys_info->freq_systembus / CFG_QBMAN_CLK_DIV;
 #endif
 
 #if defined(CONFIG_SYS_MAPLE)
@@ -381,28 +376,28 @@ void get_sys_info(sys_info_t *sys_info)
 #endif
 
 #ifdef CONFIG_SYS_DPAA_FMAN
-#ifndef CONFIG_FM_PLAT_CLK_DIV
+#ifndef CFG_FM_PLAT_CLK_DIV
 	switch ((rcw_tmp & FM1_CLK_SEL) >> FM1_CLK_SHIFT) {
 	case 1:
-		sys_info->freq_fman[0] = freq_c_pll[CONFIG_SYS_FM1_CLK];
+		sys_info->freq_fman[0] = freq_c_pll[CFG_SYS_FM1_CLK];
 		break;
 	case 2:
-		sys_info->freq_fman[0] = freq_c_pll[CONFIG_SYS_FM1_CLK] / 2;
+		sys_info->freq_fman[0] = freq_c_pll[CFG_SYS_FM1_CLK] / 2;
 		break;
 	case 3:
-		sys_info->freq_fman[0] = freq_c_pll[CONFIG_SYS_FM1_CLK] / 3;
+		sys_info->freq_fman[0] = freq_c_pll[CFG_SYS_FM1_CLK] / 3;
 		break;
 	case 4:
-		sys_info->freq_fman[0] = freq_c_pll[CONFIG_SYS_FM1_CLK] / 4;
+		sys_info->freq_fman[0] = freq_c_pll[CFG_SYS_FM1_CLK] / 4;
 		break;
 	case 5:
 		sys_info->freq_fman[0] = sys_info->freq_systembus;
 		break;
 	case 6:
-		sys_info->freq_fman[0] = freq_c_pll[CONFIG_SYS_FM1_CLK + 1] / 2;
+		sys_info->freq_fman[0] = freq_c_pll[CFG_SYS_FM1_CLK + 1] / 2;
 		break;
 	case 7:
-		sys_info->freq_fman[0] = freq_c_pll[CONFIG_SYS_FM1_CLK + 1] / 3;
+		sys_info->freq_fman[0] = freq_c_pll[CFG_SYS_FM1_CLK + 1] / 3;
 		break;
 	default:
 		printf("Error: Unknown FMan1 clock select!\n");
@@ -410,32 +405,32 @@ void get_sys_info(sys_info_t *sys_info)
 		sys_info->freq_fman[0] = sys_info->freq_systembus / 2;
 		break;
 	}
-#if (CONFIG_SYS_NUM_FMAN) == 2
-#ifdef CONFIG_SYS_FM2_CLK
+#if (CFG_SYS_NUM_FMAN) == 2
+#ifdef CFG_SYS_FM2_CLK
 #define FM2_CLK_SEL	0x00000038
 #define FM2_CLK_SHIFT	3
 	rcw_tmp = in_be32(&gur->rcwsr[15]);
 	switch ((rcw_tmp & FM2_CLK_SEL) >> FM2_CLK_SHIFT) {
 	case 1:
-		sys_info->freq_fman[1] = freq_c_pll[CONFIG_SYS_FM2_CLK + 1];
+		sys_info->freq_fman[1] = freq_c_pll[CFG_SYS_FM2_CLK + 1];
 		break;
 	case 2:
-		sys_info->freq_fman[1] = freq_c_pll[CONFIG_SYS_FM2_CLK + 1] / 2;
+		sys_info->freq_fman[1] = freq_c_pll[CFG_SYS_FM2_CLK + 1] / 2;
 		break;
 	case 3:
-		sys_info->freq_fman[1] = freq_c_pll[CONFIG_SYS_FM2_CLK + 1] / 3;
+		sys_info->freq_fman[1] = freq_c_pll[CFG_SYS_FM2_CLK + 1] / 3;
 		break;
 	case 4:
-		sys_info->freq_fman[1] = freq_c_pll[CONFIG_SYS_FM2_CLK + 1] / 4;
+		sys_info->freq_fman[1] = freq_c_pll[CFG_SYS_FM2_CLK + 1] / 4;
 		break;
 	case 5:
 		sys_info->freq_fman[1] = sys_info->freq_systembus;
 		break;
 	case 6:
-		sys_info->freq_fman[1] = freq_c_pll[CONFIG_SYS_FM2_CLK] / 2;
+		sys_info->freq_fman[1] = freq_c_pll[CFG_SYS_FM2_CLK] / 2;
 		break;
 	case 7:
-		sys_info->freq_fman[1] = freq_c_pll[CONFIG_SYS_FM2_CLK] / 3;
+		sys_info->freq_fman[1] = freq_c_pll[CFG_SYS_FM2_CLK] / 3;
 		break;
 	default:
 		printf("Error: Unknown FMan2 clock select!\n");
@@ -444,9 +439,9 @@ void get_sys_info(sys_info_t *sys_info)
 		break;
 	}
 #endif
-#endif	/* CONFIG_SYS_NUM_FMAN == 2 */
+#endif	/* CFG_SYS_NUM_FMAN == 2 */
 #else
-	sys_info->freq_fman[0] = sys_info->freq_systembus / CONFIG_SYS_FM1_CLK;
+	sys_info->freq_fman[0] = sys_info->freq_systembus / CFG_SYS_FM1_CLK;
 #endif
 #endif
 
@@ -495,7 +490,7 @@ void get_sys_info(sys_info_t *sys_info)
 	} else {
 		sys_info->freq_fman[0] = sys_info->freq_systembus / 2;
 	}
-#if (CONFIG_SYS_NUM_FMAN) == 2
+#if (CFG_SYS_NUM_FMAN) == 2
 	if (rcw_tmp & FM2_CLK_SEL) {
 		if (rcw_tmp & HWA_ASYNC_DIV)
 			sys_info->freq_fman[1] = freq_c_pll[HWA_CC_PLL] / 4;
@@ -526,7 +521,7 @@ void get_sys_info(sys_info_t *sys_info)
 
 	plat_ratio = (gur->porpllsr) & 0x0000003e;
 	plat_ratio >>= 1;
-	sys_info->freq_systembus = plat_ratio * CONFIG_SYS_CLK_FREQ;
+	sys_info->freq_systembus = plat_ratio * get_board_sys_clk();
 
 	/* Divide before multiply to avoid integer
 	 * overflow for processor speeds above 2GHz */
@@ -539,12 +534,12 @@ void get_sys_info(sys_info_t *sys_info)
 	/* Note: freq_ddrbus is the MCLK frequency, not the data rate. */
 	sys_info->freq_ddrbus = sys_info->freq_systembus;
 
-#ifdef CONFIG_DDR_CLK_FREQ
+#if defined(CONFIG_DYNAMIC_DDR_CLK_FREQ) || defined(CONFIG_STATIC_DDR_CLK_FREQ)
 	{
 		u32 ddr_ratio = ((gur->porpllsr) & MPC85xx_PORPLLSR_DDR_RATIO)
 			>> MPC85xx_PORPLLSR_DDR_RATIO_SHIFT;
 		if (ddr_ratio != 0x7)
-			sys_info->freq_ddrbus = ddr_ratio * CONFIG_DDR_CLK_FREQ;
+			sys_info->freq_ddrbus = ddr_ratio * get_board_ddr_clk();
 	}
 #endif
 
@@ -554,7 +549,7 @@ void get_sys_info(sys_info_t *sys_info)
 #else
 	qe_ratio = ((gur->porpllsr) & MPC85xx_PORPLLSR_QE_RATIO)
 			>> MPC85xx_PORPLLSR_QE_RATIO_SHIFT;
-	sys_info->freq_qe = qe_ratio * CONFIG_SYS_CLK_FREQ;
+	sys_info->freq_qe = qe_ratio * get_board_sys_clk();
 #endif
 #endif
 
@@ -579,16 +574,7 @@ int get_clocks(void)
 {
 	sys_info_t sys_info;
 #ifdef CONFIG_ARCH_MPC8544
-	volatile ccsr_gur_t *gur = (void *) CONFIG_SYS_MPC85xx_GUTS_ADDR;
-#endif
-#if defined(CONFIG_CPM2)
-	volatile ccsr_cpm_t *cpm = (ccsr_cpm_t *)CONFIG_SYS_MPC85xx_CPM_ADDR;
-	uint sccr, dfbrg;
-
-	/* set VCO = 4 * BRG */
-	cpm->im_cpm_intctl.sccr &= 0xfffffffc;
-	sccr = cpm->im_cpm_intctl.sccr;
-	dfbrg = (sccr & SCCR_DFBRG_MSK) >> SCCR_DFBRG_SHIFT;
+	volatile ccsr_gur_t *gur = (void *) CFG_SYS_MPC85xx_GUTS_ADDR;
 #endif
 	get_sys_info (&sys_info);
 	gd->cpu_clk = sys_info.freq_processor[0];
@@ -607,9 +593,7 @@ int get_clocks(void)
 	 * for that SOC. This information is taken from application note
 	 * AN2919.
 	 */
-#if defined(CONFIG_ARCH_MPC8540) || defined(CONFIG_ARCH_MPC8541) || \
-	defined(CONFIG_ARCH_MPC8560) || defined(CONFIG_ARCH_MPC8555) || \
-	defined(CONFIG_ARCH_P1022)
+#if defined(CONFIG_ARCH_MPC8540) || defined(CONFIG_ARCH_MPC8560)
 	gd->arch.i2c1_clk = sys_info.freq_systembus;
 #elif defined(CONFIG_ARCH_MPC8544)
 	/*
@@ -637,17 +621,9 @@ int get_clocks(void)
 #endif
 #endif /* defined(CONFIG_FSL_ESDHC) */
 
-#if defined(CONFIG_CPM2)
-	gd->arch.vco_out = 2*sys_info.freq_systembus;
-	gd->arch.cpm_clk = gd->arch.vco_out / 2;
-	gd->arch.scc_clk = gd->arch.vco_out / 4;
-	gd->arch.brg_clk = gd->arch.vco_out / (1 << (2 * (dfbrg + 1)));
-#endif
-
 	if(gd->cpu_clk != 0) return (0);
 	else return (1);
 }
-
 
 /********************************************
  * get_bus_freq

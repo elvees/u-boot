@@ -9,7 +9,6 @@
  * Copyright (C) 2010 Freescale Semiconductor, Inc.
  */
 
-#include <common.h>
 #include <command.h>
 #include <cpu_func.h>
 #include <hang.h>
@@ -25,6 +24,7 @@
 #include <asm/arch/iomux.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/sys_proto.h>
+#include <asm/sections.h>
 #include <linux/compiler.h>
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -32,9 +32,9 @@ DECLARE_GLOBAL_DATA_PTR;
 /* Lowlevel init isn't used on i.MX28, so just have a dummy here */
 __weak void lowlevel_init(void) {}
 
-void reset_cpu(ulong ignored) __attribute__((noreturn));
+void reset_cpu(void) __attribute__((noreturn));
 
-void reset_cpu(ulong ignored)
+void reset_cpu(void)
 {
 	struct mxs_rtc_regs *rtc_regs =
 		(struct mxs_rtc_regs *)MXS_RTC_BASE;
@@ -70,6 +70,7 @@ void reset_cpu(ulong ignored)
  * actually 0x20, this the associated <destination address>. Loading the PC
  * register with an address performs a jump to that address.
  */
+noinline __attribute__((target("arm")))
 void mx28_fixup_vt(uint32_t start_addr)
 {
 	/* ldr pc, [pc, #0x18] */
@@ -84,6 +85,9 @@ void mx28_fixup_vt(uint32_t start_addr)
 		/* cppcheck-suppress nullPointer */
 		vt[i + 8] = start_addr + (4 * i);
 	}
+
+	/* Make sure ARM core points to low vectors */
+	set_cr(get_cr() & ~CR_V);
 }
 
 #ifdef	CONFIG_ARCH_MISC_INIT
@@ -98,9 +102,8 @@ int arch_cpu_init(void)
 {
 	struct mxs_clkctrl_regs *clkctrl_regs =
 		(struct mxs_clkctrl_regs *)MXS_CLKCTRL_BASE;
-	extern uint32_t _start;
 
-	mx28_fixup_vt((uint32_t)&_start);
+	mx28_fixup_vt((uint32_t)_start);
 
 	/*
 	 * Enable NAND clock

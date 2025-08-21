@@ -8,21 +8,7 @@
 #ifndef _ORIGEN_SETUP_H
 #define _ORIGEN_SETUP_H
 
-#include <config.h>
 #include <asm/arch/cpu.h>
-
-#ifdef CONFIG_CLK_800_330_165
-#define DRAM_CLK_330
-#endif
-#ifdef CONFIG_CLK_1000_200_200
-#define DRAM_CLK_200
-#endif
-#ifdef CONFIG_CLK_1000_330_165
-#define DRAM_CLK_330
-#endif
-#ifdef CONFIG_CLK_1000_400_200
-#define DRAM_CLK_400
-#endif
 
 /* Bus Configuration Register Address */
 #define ASYNC_CONFIG		0x10010350
@@ -298,7 +284,6 @@
 #define MFC_0_SEL		MFC_SEL_MPLL
 #define CLK_SRC_MFC_VAL		((MFC_SEL << 8) | (MFC_0_SEL))
 
-
 /* CLK_DIV_MFC */
 #define MFC_RATIO		3
 #define CLK_DIV_MFC_VAL		(MFC_RATIO)
@@ -433,7 +418,7 @@ struct mem_timings {
 #define ABP_SFR_SLV1_SINGLE_ADDRMAP_START_OFFSET	0x828
 #define ABP_SFR_SLV1_SINGLE_ADDRMAP_END_OFFSET	0x830
 
-#ifdef CONFIG_ORIGEN
+#ifdef CONFIG_TARGET_ORIGEN
 /* Interleave: 2Bit, Interleave_bit1: 0x15, Interleave_bit0: 0x7 */
 #define APB_SFR_INTERLEAVE_CONF_VAL	0x20001507
 #define APB_SFR_ARBRITATION_CONF_VAL	0x00000001
@@ -512,7 +497,6 @@ struct mem_timings {
 				| ADD_LAT_PALL | MEM_TYPE_DDR3 | MEM_WIDTH_32\
 				| NUM_CHIP_2 | BL_8)
 
-
 #define CHIP_BANK_8		(0x3 << 0)
 #define CHIP_ROW_14		(0x2 << 4)
 #define CHIP_COL_10		(0x3 << 8)
@@ -555,22 +539,15 @@ struct mem_timings {
 
 #define CONTROL2_VAL		0x00000000
 
-#ifdef CONFIG_ORIGEN
+#ifdef CONFIG_TARGET_ORIGEN
 #define TIMINGREF_VAL		0x000000BB
 #define TIMINGROW_VAL		0x4046654f
 #define	TIMINGDATA_VAL		0x46400506
 #define	TIMINGPOWER_VAL		0x52000A3C
 #else
 #define TIMINGREF_VAL		0x000000BC
-#ifdef DRAM_CLK_330
-#define TIMINGROW_VAL		0x3545548d
-#define	TIMINGDATA_VAL		0x45430506
-#define	TIMINGPOWER_VAL		0x4439033c
-#endif
-#ifdef DRAM_CLK_400
 #define TIMINGROW_VAL		0x45430506
 #define	TIMINGDATA_VAL		0x56500506
 #define	TIMINGPOWER_VAL		0x5444033d
-#endif
 #endif
 #endif

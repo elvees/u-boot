@@ -3,7 +3,7 @@
  * Copyright (C) 2016 Freescale Semiconductor, Inc.
  */
 
-#include <common.h>
+#include <config.h>
 #include <clock_legacy.h>
 #include <command.h>
 #include <div64.h>
@@ -18,9 +18,9 @@ DECLARE_GLOBAL_DATA_PTR;
 int get_clocks(void)
 {
 #ifdef CONFIG_FSL_ESDHC_IMX
-#if CONFIG_SYS_FSL_ESDHC_ADDR == USDHC0_RBASE
+#if CFG_SYS_FSL_ESDHC_ADDR == USDHC0_RBASE
 	gd->arch.sdhc_clk = mxc_get_clock(MXC_ESDHC_CLK);
-#elif CONFIG_SYS_FSL_ESDHC_ADDR == USDHC1_RBASE
+#elif CFG_SYS_FSL_ESDHC_ADDR == USDHC1_RBASE
 	gd->arch.sdhc_clk = mxc_get_clock(MXC_ESDHC2_CLK);
 #endif
 #endif
@@ -327,7 +327,7 @@ void hab_caam_clock_enable(unsigned char enable)
 }
 #endif
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 /*
  * Dump some core clockes.
  */

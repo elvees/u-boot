@@ -10,7 +10,6 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
-#include <common.h>
 #include <dm.h>
 #include <efi_loader.h>
 #include <hang.h>
@@ -238,7 +237,7 @@ void *x86_get_idt(void)
 	return &idt_ptr;
 }
 
-void __do_irq(int irq)
+static void __do_irq(int irq)
 {
 	printf("Unhandled IRQ : %d\n", irq);
 }
@@ -266,6 +265,10 @@ int interrupt_init(void)
 	struct udevice *dev;
 	int ret;
 
+	/*
+	 * When running as an EFI application we are not in control of
+	 * interrupts and should leave them alone.
+	 */
 	if (!ll_boot_init())
 		return 0;
 
@@ -274,11 +277,6 @@ int interrupt_init(void)
 	if (ret && ret != -ENODEV)
 		return ret;
 
-	/*
-	 * When running as an EFI application we are not in control of
-	 * interrupts and should leave them alone.
-	 */
-#ifndef CONFIG_EFI_APP
 	/* Just in case... */
 	disable_interrupts();
 
@@ -294,14 +292,8 @@ int interrupt_init(void)
 	/* Initialize core interrupt and exception functionality of CPU */
 	cpu_init_interrupts();
 
-	/*
-	 * It is now safe to enable interrupts.
-	 *
-	 * TODO(sjg@chromium.org): But we don't handle these correctly when
-	 * booted from EFI.
-	 */
+	/* It is now safe to enable interrupts */
 	enable_interrupts();
-#endif
 
 	return 0;
 }

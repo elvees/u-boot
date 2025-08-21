@@ -38,7 +38,7 @@ struct pl01x_regs {
 	u32	pl011_cr;	/* 0x30 Control register */
 };
 
-#ifdef CONFIG_DM_SERIAL
+#if CONFIG_IS_ENABLED(DM_SERIAL)
 
 int pl01x_serial_of_to_plat(struct udevice *dev);
 int pl01x_serial_probe(struct udevice *dev);
@@ -91,7 +91,6 @@ struct pl01x_priv {
 #define UART_PL010_LCRH_EPS             (1 << 2)
 #define UART_PL010_LCRH_PEN             (1 << 1)
 #define UART_PL010_LCRH_BRK             (1 << 0)
-
 
 #define UART_PL010_BAUD_460800            1
 #define UART_PL010_BAUD_230400            3

@@ -7,17 +7,19 @@
  * Rich Ireland, Enterasys Networks, rireland@enterasys.com.
  */
 
+#define LOG_CATEGORY UCLASS_FPGA
+
 /*
  *  Altera FPGA support
  */
-#include <common.h>
+#if IS_ENABLED(CONFIG_TARGET_SOCFPGA_AGILEX) || \
+	IS_ENABLED(CONFIG_TARGET_SOCFPGA_STRATIX10)
+#include <asm/arch/misc.h>
+#endif
 #include <errno.h>
 #include <ACEX1K.h>
 #include <log.h>
 #include <stratixII.h>
-
-/* Define FPGA_DEBUG to 1 to get debug printf's */
-#define FPGA_DEBUG	0
 
 static const struct altera_fpga {
 	enum altera_family	family;
@@ -48,6 +50,43 @@ static const struct altera_fpga {
 	  NULL },
 #endif
 };
+
+#if IS_ENABLED(CONFIG_TARGET_SOCFPGA_AGILEX) || \
+	IS_ENABLED(CONFIG_TARGET_SOCFPGA_STRATIX10)
+int fpga_is_partial_data(int devnum, size_t img_len)
+{
+	/*
+	 * The FPGA data (full or partial) is checked by
+	 * the SDM hardware, for Intel SDM Mailbox based
+	 * devices. Hence always return full bitstream.
+	 *
+	 * For Cyclone V and Arria 10 family, the bitstream
+	 * type parameter is not handled by the driver.
+	 */
+	return 0;
+}
+
+int fpga_loadbitstream(int devnum, char *fpgadata, size_t size,
+		       bitstream_type bstype)
+{
+	int ret_val;
+	int flags = 0;
+
+	ret_val = fpga_load(devnum, (void *)fpgadata, size, bstype, flags);
+
+	/*
+	 * Enable the HPS to FPGA bridges when FPGA load is completed
+	 * successfully. This is to ensure the FPGA is accessible
+	 * by the HPS.
+	 */
+	if (!ret_val) {
+		printf("Enable FPGA bridges\n");
+		do_bridge_reset(1, ~0);
+	}
+
+	return ret_val;
+}
+#endif
 
 static int altera_validate(Altera_desc *desc, const char *fn)
 {
@@ -106,8 +145,7 @@ int altera_load(Altera_desc *desc, const void *buf, size_t bsize)
 	if (!fpga)
 		return FPGA_FAIL;
 
-	debug_cond(FPGA_DEBUG, "%s: Launching the %s Loader...\n",
-		   __func__, fpga->name);
+	log_debug("Launching the %s Loader...\n", fpga->name);
 	if (fpga->load)
 		return fpga->load(desc, buf, bsize);
 	return 0;
@@ -120,8 +158,7 @@ int altera_dump(Altera_desc *desc, const void *buf, size_t bsize)
 	if (!fpga)
 		return FPGA_FAIL;
 
-	debug_cond(FPGA_DEBUG, "%s: Launching the %s Reader...\n",
-		   __func__, fpga->name);
+	log_debug("Launching the %s Reader...\n", fpga->name);
 	if (fpga->dump)
 		return fpga->dump(desc, buf, bsize);
 	return 0;

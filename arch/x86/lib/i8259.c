@@ -13,7 +13,8 @@
  * Programmable Interrupt Controllers.
  */
 
-#include <common.h>
+#define LOG_CATEGORY	UCLASS_IRQ
+
 #include <log.h>
 #include <asm/io.h>
 #include <asm/i8259.h>

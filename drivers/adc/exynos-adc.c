@@ -3,11 +3,11 @@
  * Copyright (C) 2015 Samsung Electronics
  * Przemyslaw Marczak <p.marczak@samsung.com>
  */
-#include <common.h>
 #include <errno.h>
 #include <dm.h>
 #include <adc.h>
 #include <asm/arch/adc.h>
+#include <linux/printk.h>
 
 struct exynos_adc_priv {
 	int active_channel;

@@ -4,7 +4,6 @@
  * Ladislav Michl <ladis@linux-mips.org>
  */
 
-#include <common.h>
 #include <config.h>
 #include <image.h>
 #include <nand.h>
@@ -15,7 +14,7 @@
 int spl_ubi_load_image(struct spl_image_info *spl_image,
 		       struct spl_boot_device *bootdev)
 {
-	struct image_header *header;
+	struct legacy_img_hdr *header;
 	struct ubispl_info info;
 	struct ubispl_load volumes[2];
 	int ret = 1;
@@ -31,7 +30,7 @@ int spl_ubi_load_image(struct spl_image_info *spl_image,
 #ifdef CONFIG_SPL_ONENAND_SUPPORT
 	case BOOT_DEVICE_ONENAND:
 		info.read = onenand_spl_read_block;
-		info.peb_size = CONFIG_SYS_ONENAND_BLOCK_SIZE;
+		info.peb_size = CFG_SYS_ONENAND_BLOCK_SIZE;
 		break;
 #endif
 	default:
@@ -45,17 +44,17 @@ int spl_ubi_load_image(struct spl_image_info *spl_image,
 	info.leb_start = CONFIG_SPL_UBI_LEB_START;
 	info.peb_count = CONFIG_SPL_UBI_MAX_PEBS - info.peb_offset;
 
-#ifdef CONFIG_SPL_OS_BOOT
+#if CONFIG_IS_ENABLED(OS_BOOT)
 	if (!spl_start_uboot()) {
 		volumes[0].vol_id = CONFIG_SPL_UBI_LOAD_KERNEL_ID;
 		volumes[0].load_addr = (void *)CONFIG_SYS_LOAD_ADDR;
 		volumes[1].vol_id = CONFIG_SPL_UBI_LOAD_ARGS_ID;
-		volumes[1].load_addr = (void *)CONFIG_SYS_SPL_ARGS_ADDR;
+		volumes[1].load_addr = (void *)CONFIG_SPL_PAYLOAD_ARGS_ADDR;
 
 		ret = ubispl_load_volumes(&info, volumes, 2);
 		if (!ret) {
-			header = (struct image_header *)volumes[0].load_addr;
-			spl_parse_image_header(spl_image, header);
+			header = (struct legacy_img_hdr *)volumes[0].load_addr;
+			spl_parse_image_header(spl_image, bootdev, header);
 			puts("Linux loaded.\n");
 			goto out;
 		}
@@ -75,7 +74,7 @@ int spl_ubi_load_image(struct spl_image_info *spl_image,
 
 	ret = ubispl_load_volumes(&info, volumes, 1);
 	if (!ret)
-		spl_parse_image_header(spl_image, header);
+		spl_parse_image_header(spl_image, bootdev, header);
 out:
 #ifdef CONFIG_SPL_NAND_SUPPORT
 	if (bootdev->boot_device == BOOT_DEVICE_NAND)

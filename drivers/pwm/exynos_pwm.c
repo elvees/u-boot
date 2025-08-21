@@ -3,7 +3,6 @@
  * Copyright 2016 Google Inc.
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <pwm.h>
@@ -43,6 +42,10 @@ static int exynos_pwm_set_config(struct udevice *dev, uint channel,
 		tcnt = period_ns / rate_ns;
 		tcmp = duty_ns / rate_ns;
 		debug("%s: tcnt %u, tcmp %u\n", __func__, tcnt, tcmp);
+
+		/* Ensure that the comparitor will actually hit the target */
+		if (tcmp == tcnt)
+			tcmp = tcnt - 1;
 		offset = channel * 3;
 		writel(tcnt, &regs->tcntb0 + offset);
 		writel(tcmp, &regs->tcmpb0 + offset);

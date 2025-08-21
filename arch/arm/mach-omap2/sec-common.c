@@ -12,7 +12,7 @@
  * Andrew F. Davis <afd@ti.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <command.h>
 #include <cpu_func.h>
 #include <hang.h>
@@ -178,7 +178,7 @@ auth_exit:
 	 * via YMODEM. This is done to avoid disturbing the YMODEM serial
 	 * protocol transactions.
 	 */
-	if (!(IS_ENABLED(CONFIG_SPL_BUILD) &&
+	if (!(IS_ENABLED(CONFIG_XPL_BUILD) &&
 	      IS_ENABLED(CONFIG_SPL_YMODEM_SUPPORT) &&
 	      spl_boot_device() == BOOT_DEVICE_UART))
 		printf("Authentication passed\n");
@@ -198,12 +198,12 @@ u32 get_sec_mem_start(void)
 	 */
 	if (sec_mem_start == 0)
 		sec_mem_start =
-			(CONFIG_SYS_SDRAM_BASE + (
+			(CFG_SYS_SDRAM_BASE + (
 #if defined(CONFIG_OMAP54XX)
 			omap_sdram_size()
 #else
-			get_ram_size((void *)CONFIG_SYS_SDRAM_BASE,
-				     CONFIG_MAX_RAM_BANK_SIZE)
+			get_ram_size((void *)CFG_SYS_SDRAM_BASE,
+				     CFG_MAX_RAM_BANK_SIZE)
 #endif
 			- sec_mem_size));
 	return sec_mem_start;

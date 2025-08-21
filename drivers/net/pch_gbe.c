@@ -5,7 +5,6 @@
  * Intel Platform Controller Hub EG20T (codename Topcliff) GMAC Driver
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <errno.h>
@@ -414,15 +413,12 @@ static int pch_gbe_phy_init(struct udevice *dev)
 	struct pch_gbe_priv *priv = dev_get_priv(dev);
 	struct eth_pdata *plat = dev_get_plat(dev);
 	struct phy_device *phydev;
-	int mask = 0xffffffff;
 
-	phydev = phy_find_by_mask(priv->bus, mask, plat->phy_interface);
+	phydev = phy_connect(priv->bus, -1, dev, plat->phy_interface);
 	if (!phydev) {
 		printf("pch_gbe: cannot find the phy\n");
 		return -1;
 	}
-
-	phy_connect_dev(phydev, dev);
 
 	phydev->supported &= PHY_GBIT_FEATURES;
 	phydev->advertising = phydev->supported;
@@ -449,7 +445,7 @@ static int pch_gbe_probe(struct udevice *dev)
 
 	priv->dev = dev;
 
-	iobase = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_1, PCI_REGION_MEM);
+	iobase = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_1, 0, 0, PCI_REGION_TYPE, PCI_REGION_MEM);
 
 	plat->iobase = (ulong)iobase;
 	priv->mac_regs = (struct pch_gbe_regs *)iobase;

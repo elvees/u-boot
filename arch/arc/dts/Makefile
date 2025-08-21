@@ -8,12 +8,7 @@ dtb-$(CONFIG_TARGET_EMSDP) +=  emsdp.dtb
 dtb-$(CONFIG_TARGET_HSDK) +=  hsdk.dtb hsdk-4xd.dtb
 dtb-$(CONFIG_TARGET_IOT_DEVKIT) +=  iot_devkit.dtb
 
-targets += $(dtb-y)
+include $(srctree)/scripts/Makefile.dts
 
+# Add any required device tree compiler flags here
 DTC_FLAGS += -R 4 -p 0x1000
-
-PHONY += dtbs
-dtbs: $(addprefix $(obj)/, $(dtb-y))
-	@:
-
-clean-files := *.dtb

@@ -3,7 +3,6 @@
  * Copyright (C) 2018 Xilinx, Inc. (Michal Simek)
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <init.h>
 #include <asm/armv7_mpu.h>
@@ -30,7 +29,7 @@ int arch_cpu_init(void)
 /*
  * Perform the low-level reset.
  */
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 	while (1)
 		;

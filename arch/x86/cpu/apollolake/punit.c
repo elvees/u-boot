@@ -3,10 +3,10 @@
  * Copyright 2019 Google LLC
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <spl.h>
+#include <time.h>
 #include <asm/cpu.h>
 #include <asm/cpu_common.h>
 #include <asm/intel_regs.h>
@@ -77,7 +77,7 @@ static int punit_init(struct udevice *dev)
 
 static int apl_punit_probe(struct udevice *dev)
 {
-	if (spl_phase() == PHASE_SPL)
+	if (xpl_phase() == PHASE_SPL)
 		return punit_init(dev);
 
 	return 0;
@@ -93,4 +93,5 @@ U_BOOT_DRIVER(intel_apl_punit) = {
 	.id		= UCLASS_SYSCON,
 	.of_match	= apl_syscon_ids,
 	.probe		= apl_punit_probe,
+	DM_HEADER(<asm/cpu.h>)    /* for X86_SYSCON_PUNIT */
 };

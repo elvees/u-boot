@@ -12,7 +12,6 @@
  *
  */
 
-#include <common.h>
 #include <dm.h>
 #include <panel.h>
 #include <spi.h>
@@ -191,7 +190,7 @@ U_BOOT_DRIVER(hx8238d) = {
 	.name = "hx8238d",
 	.id = UCLASS_PANEL,
 	.of_match = hx8238d_ids,
-	.ofdata_to_platdata = hx8238d_ofdata_to_platdata,
+	.of_to_plat = hx8238d_ofdata_to_platdata,
 	.probe = hx8238d_probe,
-	.priv_auto_alloc_size = sizeof(struct hx8238d_priv),
+	.priv_auto = sizeof(struct hx8238d_priv),
 };

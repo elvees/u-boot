@@ -4,7 +4,6 @@
  * Peng Fan <Peng.Fan@freescale.com>
  */
 
-#include <common.h>
 #include <errno.h>
 #include <i2c.h>
 #include <power/pmic.h>
@@ -23,7 +22,7 @@ int power_pfuze3000_init(unsigned char bus)
 	p->name = name;
 	p->interface = PMIC_I2C;
 	p->number_of_regs = PFUZE3000_NUM_OF_REGS;
-	p->hw.i2c.addr = CONFIG_POWER_PFUZE3000_I2C_ADDR;
+	p->hw.i2c.addr = CFG_POWER_PFUZE3000_I2C_ADDR;
 	p->hw.i2c.tx_num = 1;
 	p->bus = bus;
 

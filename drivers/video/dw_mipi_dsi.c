@@ -9,7 +9,6 @@
  * the Linux Kernel driver drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c.
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dsi_host.h>
 #include <dm.h>
@@ -17,12 +16,12 @@
 #include <panel.h>
 #include <video.h>
 #include <asm/io.h>
-#include <asm/arch/gpio.h>
 #include <dm/device-internal.h>
 #include <dm/device_compat.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/iopoll.h>
+#include <linux/time.h>
 #include <video_bridge.h>
 
 #define HWVER_131			0x31333100	/* IP version 1.31 */
@@ -214,8 +213,6 @@
 
 #define PHY_STATUS_TIMEOUT_US		10000
 #define CMD_PKT_STATUS_TIMEOUT_US	20000
-
-#define MSEC_PER_SEC			1000
 
 struct dw_mipi_dsi {
 	struct mipi_dsi_host dsi_host;
@@ -539,9 +536,9 @@ static void dw_mipi_dsi_dpi_config(struct dw_mipi_dsi *dsi,
 		break;
 	}
 
-	if (device->mode_flags & DISPLAY_FLAGS_VSYNC_HIGH)
+	if (timings->flags & DISPLAY_FLAGS_VSYNC_LOW)
 		val |= VSYNC_ACTIVE_LOW;
-	if (device->mode_flags & DISPLAY_FLAGS_HSYNC_HIGH)
+	if (timings->flags & DISPLAY_FLAGS_HSYNC_LOW)
 		val |= HSYNC_ACTIVE_LOW;
 
 	dsi_write(dsi, DSI_DPI_VCID, DPI_VCID(dsi->channel));
@@ -622,8 +619,8 @@ static void dw_mipi_dsi_line_timer_config(struct dw_mipi_dsi *dsi,
 	htotal = timings->hactive.typ + timings->hfront_porch.typ +
 		 timings->hback_porch.typ + timings->hsync_len.typ;
 
-	hsa = timings->hback_porch.typ;
-	hbp = timings->hsync_len.typ;
+	hsa = timings->hsync_len.typ;
+	hbp = timings->hback_porch.typ;
 
 	/*
 	 * TODO dw drv improvements
@@ -645,9 +642,9 @@ static void dw_mipi_dsi_vertical_timing_config(struct dw_mipi_dsi *dsi,
 	u32 vactive, vsa, vfp, vbp;
 
 	vactive = timings->vactive.typ;
-	vsa =  timings->vback_porch.typ;
+	vsa =  timings->vsync_len.typ;
 	vfp =  timings->vfront_porch.typ;
-	vbp = timings->vsync_len.typ;
+	vbp = timings->vback_porch.typ;
 
 	dsi_write(dsi, DSI_VID_VACTIVE_LINES, vactive);
 	dsi_write(dsi, DSI_VID_VSA_LINES, vsa);
@@ -801,10 +798,19 @@ static int dw_mipi_dsi_init(struct udevice *dev,
 	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
 	device->host = &dsi->dsi_host;
 
-	dsi->base = (void *)dev_read_addr(device->dev);
-	if ((fdt_addr_t)dsi->base == FDT_ADDR_T_NONE) {
+	dsi->base = dev_read_addr_ptr(device->dev);
+	if (!dsi->base) {
 		dev_err(device->dev, "dsi dt register address error\n");
 		return -EINVAL;
+	}
+
+	/*
+	 * The Rockchip based devices don't have px_clk, so simply move
+	 * on.
+	 */
+	if (IS_ENABLED(CONFIG_DISPLAY_ROCKCHIP_DW_MIPI)) {
+		dw_mipi_dsi_bridge_set(dsi, timings);
+		return 0;
 	}
 
 	ret = clk_get_by_name(device->dev, "px_clk", &clk);

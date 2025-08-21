@@ -2,9 +2,10 @@
 /*
  * dts file for Xilinx Versal a2197 RevA System Controller
  *
- * (C) Copyright 2019 - 2020, Xilinx, Inc.
+ * (C) Copyright 2019 - 2022, Xilinx, Inc.
+ * (C) Copyright 2022 - 2023, Advanced Micro Devices, Inc.
  *
- * Michal Simek <michal.simek@xilinx.com>
+ * Michal Simek <michal.simek@amd.com>
  */
 /dts-v1/;
 
@@ -20,10 +21,13 @@
 
 	aliases {
 		ethernet0 = &gem0;
-		gpio0 = &gpio;
 		i2c0 = &i2c0;
 		i2c1 = &i2c1;
 		mmc0 = &sdhci1;
+		nvmem0 = &eeprom;
+		nvmem1 = &eeprom_ebm;
+		nvmem2 = &eeprom_fmc1;
+		nvmem3 = &eeprom_fmc2;
 		rtc0 = &rtc;
 		serial0 = &uart0;
 		serial1 = &dcc;
@@ -32,12 +36,17 @@
 	chosen {
 		bootargs = "earlycon";
 		stdout-path = "serial0:115200n8";
-		xlnx,eeprom = <&eeprom>;
 	};
 
 	memory@0 {
 		device_type = "memory";
 		reg = <0x0 0x0 0x0 0x80000000>;
+	};
+
+	si5332_1: si5332-1 { /* u142 - GEM0 */
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <125000000>;
 	};
 
 	ina226-vccint {
@@ -124,7 +133,6 @@
 
 &uart0 { /* uart0 MIO38-39 */
 	status = "okay";
-	u-boot,dm-pre-reloc;
 };
 
 &sdhci1 { /* sd1 MIO45-51 cd in place */
@@ -134,13 +142,25 @@
 	xlnx,mio-bank = <1>;
 };
 
+/* GEM SGMII */
+&psgtr {
+	status = "okay";
+	/* gem0 */
+	clocks = <&si5332_1>;
+	clock-names = "ref0";
+};
+
 &gem0 {
 	status = "okay";
+	phys = <&psgtr 0 PHY_TYPE_SGMII 0 0>;
 	phy-handle = <&phy0>;
 	phy-mode = "sgmii";
-	is-internal-pcspma;
-	phy0: ethernet-phy@0 { /* u131 M88E1512 */
-		reg = <0>;
+	mdio: mdio {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		phy0: ethernet-phy@0 { /* u131 M88E1512 */
+			reg = <0>;
+		};
 	};
 };
 
@@ -163,30 +183,42 @@
 		  "", "", "", "", "", /* 70 - 74 */
 		  "", "ETH_MDC", "ETH_MDIO", /* 75 - 77, MIO end and EMIO start */
 		  "SYSCTLR_VERSAL_MODE0", "SYSCTLR_VERSAL_MODE1", /* 78 - 79 */
-		  "SYSCTLR_VERSAL_MODE2", "SYSCTLR_VERSAL_MODE3", "SYSCTLR_POR_B_LS", "", "", /* 80 - 84 */
-		  "", "", "", "", "", /* 85 - 89 */
-		  "", "", "", "", "", /* 90 - 94 */
-		  "", "", "", "", "", /* 95 - 99 */
+		  "SYSCTLR_VERSAL_MODE2", "SYSCTLR_VERSAL_MODE3", "SYSCTLR_POR_B_LS", "DC_PRSNT", "", /* 80 - 84 */
+		  "SYSCTLR_JTAG_S0", "SYSCTLR_JTAG_S1", "SYSCTLR_IIC_MUX0_RESET_B", "SYSCTLR_IIC_MUX1_RESET_B", "", /* 85 - 89 */
+		  "SYSCTLR_GPIO0", "SYSCTLR_GPIO1", "SYSCTLR_GPIO2", "SYSCTLR_GPIO3", "SYSCTLR_GPIO4", /* 90 - 94 */
+		  "SYSCTLR_GPIO5", "", "", "", "", /* 95 - 99 */
 		  "", "", "", "", "", /* 100 - 104 */
 		  "", "", "", "", "", /* 105 - 109 */
 		  "", "", "", "", "", /* 110 - 114 */
 		  "", "", "", "", "", /* 115 - 119 */
 		  "", "", "", "", "", /* 120 - 124 */
 		  "", "", "", "", "", /* 125 - 129 */
-		  "", "", "", "", "", /* 130 - 134 */
+		  "PMBUS1_INA226_ALERT", "PMBUS2_INA226_ALERT", "", "", "", /* 130 - 134 */
 		  "", "", "", "", "", /* 135 - 139 */
-		  "", "", "", "", "", /* 140 - 144 */
-		  "", "", "", "", "", /* 145 - 149 */
+		  "PMBUS_ALERT", "", "SYSCTLR_ETH_RESET_B", "SYSCTLR_VCC0V85_TG", "MAX6643_OT_B", /* 140 - 144 */
+		  "MAX6643_FANFINAL_B", "MAX6643_FULLSPD", "", "", "", /* 145 - 149 */
 		  "", "", "", "", "", /* 150 - 154 */
 		  "", "", "", "", "", /* 155 - 159 */
 		  "", "", "", "", "", /* 160 - 164 */
 		  "", "", "", "", "", /* 165 - 169 */
-		  "", "", "", ""; /* 170 - 174 */
+		  "", "", "", ""; /* 170 - 173 */
 };
 
 &i2c0 { /* MIO 34-35 - can't stay here */
 	status = "okay";
 	clock-frequency = <400000>;
+
+	tca6416_u233: gpio@20 { /* u233 */
+		compatible = "ti,tca6416";
+		reg = <0x20>;
+		gpio-controller; /* interrupt not connected */
+		#gpio-cells = <2>;
+		gpio-line-names = "MAX6643_OT_B", "MAX6643_FANFAIL_B", "", "", /* 0 - 3 */
+				"PMBUS2_INA226_ALERT", "", "", "MAX6643_FULLSPD", /* 4 - 7 */
+				"FMCP1_FMC_PRSNT_M2C_B", "FMCP2_FMC_PRSNT_M2C_B", "FMCP1_FMCP_PRSNT_M2C_B", "FMCP2_FMCP_PRSNT_M2C_B", /* 10 - 13 */
+				"VCCINT_VRHOT_B", "8A34001_EXP_RST_B", "PMBUS_ALERT", "PMBUS1_INA226_ALERT"; /* 14 - 17 */
+	};
+
 	i2c-mux@74 { /* u33 */
 		compatible = "nxp,pca9548";
 		#address-cells = <1>;
@@ -278,13 +310,7 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <2>;
-			clock_8t49n287: clock-generator@d8 { /* u39 8T49N240 */
-				#clock-cells = <1>; /* author David Cater <david.cater@idt.com>*/
-				compatible = "idt,8t49n240", "idt,8t49n241"; /* FIXME no driver for 240 */
-				reg = <0xd8>;
-				/* Documentation/devicetree/bindings/clock/idt,idt8t49n24x.txt */
-				/* FIXME there input via J241 Samtec CLK1 and CLK0 from U38 - selection PIN */
-			};
+			/* u39 8T49N240 */
 		};
 		i2c@3 { /* PMBUS2_INA226 */
 			#address-cells = <1>;
@@ -422,13 +448,14 @@
 				factory-fout = <156250000>;
 				clock-frequency = <156250000>;
 				clock-output-names = "si570_zsfp_clk";
+				silabs,skip-recall;
 			};
 		};
 		i2c@6 { /* USER_SI570_1 */
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <6>;
-			si570_user1: clock-generator@5d { /* u205 */
+			si570_user1: clock-generator@5f { /* u205 */
 				#clock-cells = <0>;
 				compatible = "silabs,si570";
 				reg = <0x5f>;
@@ -436,6 +463,7 @@
 				factory-fout = <100000000>;
 				clock-frequency = <100000000>;
 				clock-output-names = "si570_user1";
+				silabs,skip-recall;
 			};
 
 		};
@@ -457,6 +485,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x74>;
+		i2c-mux-idle-disconnect;
 		/* reset-gpios = <&gpio SYSCTLR_IIC_MUX1_RESET_B GPIO_ACTIVE_HIGH>; */
 		dc_i2c: i2c@0 { /* DC_I2C */
 			#address-cells = <1>;
@@ -465,6 +494,7 @@
 			/* Use for storing information about SC board */
 			eeprom: eeprom@54 { /* u34 - m24128 16kB */
 				compatible = "st,24c128", "atmel,24c128";
+				label = "eeprom_cc";
 				reg = <0x54>; /* 0x5c too */
 			};
 			si570_ref_clk: clock-generator@5d { /* u32 */
@@ -475,8 +505,14 @@
 				factory-fout = <33333333>;
 				clock-frequency = <33333333>;
 				clock-output-names = "ref_clk";
+				silabs,skip-recall;
 			};
 			/* and connector J212D */
+			eeprom_ebm: eeprom@52 { /* x-ebm module */
+				compatible = "st,24c128", "atmel,24c128";
+				label = "eeprom_ebm";
+				reg = <0x52>;
+			};
 		};
 		fmc1: i2c@1 { /* FMCP1_IIC */
 			#address-cells = <1>;
@@ -484,6 +520,11 @@
 			reg = <1>;
 			/* FIXME connection to Samtec J51C */
 			/* expected eeprom 0x50 FMC cards */
+			eeprom_fmc1: eeprom@50 {
+				compatible = "st,24c128", "atmel,24c128";
+				label = "eeprom_fmc1";
+				reg = <0x50>;
+			};
 		};
 		fmc2: i2c@2 { /* FMCP2_IIC */
 			#address-cells = <1>;
@@ -491,6 +532,11 @@
 			reg = <2>;
 			/* FIXME connection to Samtec J53C */
 			/* expected eeprom 0x50 FMC cards */
+			eeprom_fmc2: eeprom@50 {
+				compatible = "st,24c128", "atmel,24c128";
+				label = "eeprom_fmc2";
+				reg = <0x50>;
+			};
 		};
 		i2c@3 { /* DDR4_DIMM1 */
 			#address-cells = <1>;
@@ -504,6 +550,7 @@
 				factory-fout = <200000000>;
 				clock-frequency = <200000000>;
 				clock-output-names = "si570_ddrdimm1_clk";
+				silabs,skip-recall;
 			};
 		};
 		i2c@4 { /* LPDDR4_SI570_CLK2 */
@@ -518,6 +565,7 @@
 				factory-fout = <200000000>;
 				clock-frequency = <200000000>;
 				clock-output-names = "si570_lpddr4_clk2";
+				silabs,skip-recall;
 			};
 		};
 		i2c@5 { /* LPDDR4_SI570_CLK1 */
@@ -532,6 +580,7 @@
 				factory-fout = <200000000>;
 				clock-frequency = <200000000>;
 				clock-output-names = "si570_lpddr4_clk1";
+				silabs,skip-recall;
 			};
 		};
 		i2c@6 { /* HSDP_SI570 */
@@ -546,6 +595,7 @@
 				factory-fout = <156250000>;
 				clock-frequency = <156250000>;
 				clock-output-names = "si570_hsdp_clk";
+				silabs,skip-recall;
 			};
 		};
 		i2c@7 { /* 8A34001 - U219B and J310 connector */
@@ -559,6 +609,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x75>;
+		i2c-mux-idle-disconnect;
 		i2c@0 { /* SFP0_IIC */
 			#address-cells = <1>;
 			#size-cells = <0>;

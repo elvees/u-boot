@@ -9,7 +9,6 @@
  * Taken from coreboot itss.c
  */
 
-#include <common.h>
 #include <dm.h>
 #include <dt-structs.h>
 #include <irq.h>
@@ -102,7 +101,6 @@ static int restore_polarities(struct udevice *dev)
 	reg_start = start / IRQS_PER_IPC;
 	reg_end = DIV_ROUND_UP(end, IRQS_PER_IPC);
 
-
 	for (i = reg_start; i < reg_end; i++) {
 		u32 mask;
 		u16 reg;
@@ -153,8 +151,9 @@ static int route_pmc_gpio_gpe(struct udevice *dev, uint pmc_gpe_num)
 
 static int itss_bind(struct udevice *dev)
 {
-	/* This is not set with of-platdata, so set it manually */
-	if (CONFIG_IS_ENABLED(OF_PLATDATA))
+	/* This is not set with basic of-platdata, so set it manually */
+	if (CONFIG_IS_ENABLED(OF_PLATDATA) &&
+	    !CONFIG_IS_ENABLED(OF_PLATDATA_INST))
 		dev->driver_data = X86_IRQT_ITSS;
 
 	return 0;
@@ -212,7 +211,7 @@ static const struct irq_ops itss_ops = {
 #endif
 };
 
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 static const struct udevice_id itss_ids[] = {
 	{ .compatible = "intel,itss", .data = X86_IRQT_ITSS },
 	{ }

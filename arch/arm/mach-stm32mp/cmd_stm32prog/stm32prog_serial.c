@@ -3,24 +3,25 @@
  * Copyright (C) 2020, STMicroelectronics - All Rights Reserved
  */
 
-#include <common.h>
 #include <console.h>
 #include <dm.h>
 #include <dfu.h>
 #include <malloc.h>
 #include <serial.h>
+#include <time.h>
 #include <watchdog.h>
+#include <asm/arch/sys_proto.h>
 #include <dm/lists.h>
 #include <dm/device-internal.h>
 #include <linux/delay.h>
+#include <linux/printk.h>
 #include <asm/global_data.h>
 #include "stm32prog.h"
 
 /* - configuration part -----------------------------*/
 #define USART_BL_VERSION	0x40	/* USART bootloader version V4.0*/
 #define UBOOT_BL_VERSION	0x03	/* bootloader version V0.3*/
-#define DEVICE_ID_BYTE1		0x05	/* MSB byte of device ID*/
-#define DEVICE_ID_BYTE2		0x00	/* LSB byte of device ID*/
+
 #define USART_RAM_BUFFER_SIZE	256	/* Size of USART_RAM_Buf buffer*/
 
 /* - Commands -----------------------------*/
@@ -59,6 +60,9 @@ const u8 cmd_id[] = {
 };
 
 #define NB_CMD sizeof(cmd_id)
+
+/* with 115200 bauds, 20 ms allow to receive the 256 bytes buffer */
+#define TIMEOUT_SERIAL_BUFFER	30
 
 /* DFU support for serial *********************************************/
 static struct dfu_entity *stm32prog_get_entity(struct stm32prog_data *data)
@@ -244,7 +248,7 @@ static int stm32prog_serial_getc_err(void)
 		err = ops->getc(down_serial_dev);
 		if (err == -EAGAIN) {
 			ctrlc();
-			WATCHDOG_RESET();
+			schedule();
 		}
 	} while ((err == -EAGAIN) && (!had_ctrlc()));
 
@@ -264,6 +268,7 @@ static bool stm32prog_serial_get_buffer(u8 *buffer, u32 *count)
 {
 	struct dm_serial_ops *ops = serial_get_ops(down_serial_dev);
 	int err;
+	ulong start = get_timer(0);
 
 	do {
 		err = ops->getc(down_serial_dev);
@@ -272,7 +277,11 @@ static bool stm32prog_serial_get_buffer(u8 *buffer, u32 *count)
 			*count -= 1;
 		} else if (err == -EAGAIN) {
 			ctrlc();
-			WATCHDOG_RESET();
+			schedule();
+			if (get_timer(start) > TIMEOUT_SERIAL_BUFFER) {
+				err = -ETIMEDOUT;
+				break;
+			}
 		} else {
 			break;
 		}
@@ -292,58 +301,7 @@ static void stm32prog_serial_putc(u8 w_byte)
 }
 
 /* Helper function ************************************************/
-
-static u8 stm32prog_header(struct stm32prog_data *data)
-{
-	u8 ret;
-	u8 boot = 0;
-	struct dfu_entity *dfu_entity;
-	u64 size = 0;
-
-	dfu_entity = stm32prog_get_entity(data);
-	if (!dfu_entity)
-		return -ENODEV;
-
-	printf("\nSTM32 download write %s\n", dfu_entity->name);
-
-	/* force cleanup to avoid issue with previous read */
-	dfu_transaction_cleanup(dfu_entity);
-
-	ret = stm32prog_header_check(data->header_data,
-				     &data->header);
-
-	/* no header : max size is partition size */
-	if (ret) {
-		dfu_entity->get_medium_size(dfu_entity, &size);
-		data->header.image_length = size;
-	}
-
-	/**** Flash the header if necessary for boot partition */
-	if (data->phase < PHASE_FIRST_USER)
-		boot = 1;
-
-	/* write header if boot partition */
-	if (boot) {
-		if (ret) {
-			stm32prog_err("invalid header (error %d)", ret);
-		} else {
-			ret = stm32prog_write(data,
-					      (u8 *)data->header_data,
-					      BL_HEADER_SIZE);
-		}
-	} else {
-		if (ret)
-			printf("  partition without checksum\n");
-		ret = 0;
-	}
-
-	free(data->header_data);
-	data->header_data = NULL;
-
-	return ret;
-}
-
-static u8 stm32prog_start(struct stm32prog_data *data, u32 address)
+static u8 stm32prog_start(struct stm32prog_data *data, uintptr_t address)
 {
 	u8 ret = 0;
 	struct dfu_entity *dfu_entity;
@@ -389,23 +347,6 @@ static u8 stm32prog_start(struct stm32prog_data *data, u32 address)
 		data->dfu_seq = 0;
 
 		printf("\n  received length = 0x%x\n", data->cursor);
-		if (data->header.present) {
-			if (data->cursor !=
-			    (data->header.image_length + BL_HEADER_SIZE)) {
-				stm32prog_err("transmission interrupted (length=0x%x expected=0x%x)",
-					      data->cursor,
-					      data->header.image_length +
-					      BL_HEADER_SIZE);
-				return -EIO;
-			}
-			if (data->header.image_checksum != data->checksum) {
-				stm32prog_err("invalid checksum received (0x%x expected 0x%x)",
-					      data->checksum,
-					      data->header.image_checksum);
-				return -EIO;
-			}
-			printf("\n  checksum OK (0x%x)\n", data->checksum);
-		}
 
 		/* update DFU with received flashlayout */
 		if (data->phase == PHASE_FLASHLAYOUT)
@@ -413,7 +354,7 @@ static u8 stm32prog_start(struct stm32prog_data *data, u32 address)
 	} else {
 		void (*entry)(void) = (void *)address;
 
-		printf("## Starting application at 0x%x ...\n", address);
+		printf("## Starting application at 0x%p ...\n", (void *)address);
 		(*entry)();
 		printf("## Application terminated\n");
 		ret = -ENOEXEC;
@@ -426,11 +367,11 @@ static u8 stm32prog_start(struct stm32prog_data *data, u32 address)
  * get_address() - Get address if it is valid
  *
  * @tmp_xor:		Current xor value to update
- * @return The address area
+ * Return: The address area
  */
-static u32 get_address(u8 *tmp_xor)
+static uintptr_t get_address(u8 *tmp_xor)
 {
-	u32 address = 0x0;
+	uintptr_t address = 0x0;
 	u8 data;
 
 	data = stm32prog_serial_getc();
@@ -496,10 +437,12 @@ static void get_version_command(struct stm32prog_data *data)
  */
 static void get_id_command(struct stm32prog_data *data)
 {
+	u32 cpu = get_cpu_dev();
+
 	/* Send Device IDCode */
 	stm32prog_serial_putc(0x1);
-	stm32prog_serial_putc(DEVICE_ID_BYTE1);
-	stm32prog_serial_putc(DEVICE_ID_BYTE2);
+	stm32prog_serial_putc((cpu >> 8) & 0xFF);
+	stm32prog_serial_putc(cpu & 0xFF);
 	stm32prog_serial_result(ACK_BYTE);
 }
 
@@ -520,7 +463,7 @@ static void get_phase_command(struct stm32prog_data *data)
 		length = strlen(err_msg);
 	}
 	if (phase == PHASE_FLASHLAYOUT)
-		destination = STM32_DDR_BASE;
+		destination = CONFIG_SYS_LOAD_ADDR;
 
 	stm32prog_serial_putc(length + 5);           /* Total length */
 	stm32prog_serial_putc(phase & 0xFF);         /* partition ID */
@@ -545,7 +488,7 @@ static void get_phase_command(struct stm32prog_data *data)
  */
 static void read_memory_command(struct stm32prog_data *data)
 {
-	u32 address = 0x0;
+	uintptr_t address = 0x0;
 	u8 rcv_data = 0x0, tmp_xor = 0x0;
 	u32 counter = 0x0;
 
@@ -590,7 +533,7 @@ static void read_memory_command(struct stm32prog_data *data)
  */
 static void start_command(struct stm32prog_data *data)
 {
-	u32 address = 0;
+	uintptr_t address = 0;
 	u8 tmp_xor = 0x0;
 	u8 ret, rcv_data;
 
@@ -604,8 +547,7 @@ static void start_command(struct stm32prog_data *data)
 		return;
 	}
 	/* validate partition */
-	ret = stm32prog_start(data,
-			      address);
+	ret = stm32prog_start(data, address);
 
 	if (ret)
 		stm32prog_serial_result(ABORT_BYTE);
@@ -628,14 +570,12 @@ static void download_command(struct stm32prog_data *data)
 	u32 counter = 0x0, codesize = 0x0;
 	u8 *ramaddress = 0;
 	u8 rcv_data = 0x0;
-	struct image_header_s *image_header = &data->header;
 	u32 cursor = data->cursor;
 	long size = 0;
 	u8 operation;
 	u32 packet_number;
 	u32 result = ACK_BYTE;
 	u8 ret;
-	unsigned int i;
 	bool error;
 	int rcv;
 
@@ -669,13 +609,8 @@ static void download_command(struct stm32prog_data *data)
 	if (packet_number == 0) {
 		/* erase: re-initialize the image_header struct */
 		data->packet_number = 0;
-		if (data->header_data)
-			memset(data->header_data, 0, BL_HEADER_SIZE);
-		else
-			data->header_data = calloc(1, BL_HEADER_SIZE);
 		cursor = 0;
 		data->cursor = 0;
-		data->checksum = 0;
 		/*idx = cursor;*/
 	} else {
 		data->packet_number++;
@@ -723,7 +658,7 @@ static void download_command(struct stm32prog_data *data)
 		printf("transmission error on packet %d, byte %d\n",
 		       packet_number, codesize - counter);
 		/* waiting end of packet before flush & NACK */
-		mdelay(30);
+		mdelay(TIMEOUT_SERIAL_BUFFER);
 		data->packet_number--;
 		result = NACK_BYTE;
 		goto end;
@@ -741,80 +676,33 @@ static void download_command(struct stm32prog_data *data)
 		/* wait to be sure that all data are received
 		 * in the FIFO before flush
 		 */
-		mdelay(30);
+		mdelay(TIMEOUT_SERIAL_BUFFER);
 		data->packet_number--;
 		result = NACK_BYTE;
 		goto end;
 	}
 
-	/* Update current position in buffer */
-	data->cursor += codesize;
+	switch (operation) {
+	case PHASE_OTP:
+		size = codesize;
+		ret = stm32prog_otp_write(data, cursor, data->buffer, &size);
+		break;
 
-	if (operation == PHASE_OTP) {
-		size = data->cursor - cursor;
-		/* no header for OTP */
-		if (stm32prog_otp_write(data, cursor,
-					data->buffer, &size))
-			result = ABORT_BYTE;
-		goto end;
+	case PHASE_PMIC:
+		size = codesize;
+		ret = stm32prog_pmic_write(data, cursor, data->buffer, &size);
+		break;
+
+	default:
+		ret = stm32prog_write(data, data->buffer, codesize);
+		break;
 	}
 
-	if (operation == PHASE_PMIC) {
-		size = data->cursor - cursor;
-		/* no header for PMIC */
-		if (stm32prog_pmic_write(data, cursor,
-					 data->buffer, &size))
-			result = ABORT_BYTE;
-		goto end;
-	}
-
-	if (cursor < BL_HEADER_SIZE) {
-		/* size = portion of header in this chunck */
-		if (data->cursor >= BL_HEADER_SIZE)
-			size = BL_HEADER_SIZE - cursor;
-		else
-			size = data->cursor - cursor;
-		memcpy((void *)((u32)(data->header_data) + cursor),
-		       data->buffer, size);
-		cursor += size;
-
-		if (cursor == BL_HEADER_SIZE) {
-			/* Check and Write the header */
-			if (stm32prog_header(data)) {
-				result = ABORT_BYTE;
-				goto end;
-			}
-		} else {
-			goto end;
-		}
-	}
-
-	if (image_header->present) {
-		if (data->cursor <= BL_HEADER_SIZE)
-			goto end;
-		/* compute checksum on payload */
-		for (i = (unsigned long)size; i < codesize; i++)
-			data->checksum += data->buffer[i];
-
-		if (data->cursor >
-		    image_header->image_length + BL_HEADER_SIZE) {
-			log_err("expected size exceeded\n");
-			result = ABORT_BYTE;
-			goto end;
-		}
-
-		/* write data (payload) */
-		ret = stm32prog_write(data,
-				      &data->buffer[size],
-				      codesize - size);
-	} else {
-		/* write all */
-		ret = stm32prog_write(data,
-				      data->buffer,
-				      codesize);
-	}
 	if (ret)
 		result = ABORT_BYTE;
+	else
+		/* Update current position in buffer */
+		data->cursor += codesize;
 
 end:
 	stm32prog_serial_result(result);
@@ -903,7 +791,7 @@ error:
  * stm32prog_serial_loop() - USART bootloader Loop routine
  *
  * @data:		Current command context
- * @return true if reset is needed after loop
+ * Return: true if reset is needed after loop
  */
 bool stm32prog_serial_loop(struct stm32prog_data *data)
 {
@@ -964,7 +852,7 @@ bool stm32prog_serial_loop(struct stm32prog_data *data)
 			stm32prog_serial_result(ACK_BYTE);
 			cmd_func[counter](data);
 		}
-		WATCHDOG_RESET();
+		schedule();
 	}
 
 	/* clean device */

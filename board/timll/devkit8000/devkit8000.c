@@ -15,7 +15,7 @@
  *	Syed Mohammed Khasim <khasim@ti.com>
  *
  */
-#include <common.h>
+#include <config.h>
 #include <dm.h>
 #include <env.h>
 #include <init.h>
@@ -76,10 +76,11 @@ int board_init(void)
 }
 
 /* Configure GPMC registers for DM9000 */
+#define DM9000_BASE	0x2c000000
 static void gpmc_dm9000_config(void)
 {
 	enable_gpmc_cs_config(gpmc_net_config, &gpmc_cfg->cs[6],
-		CONFIG_DM9000_BASE, GPMC_SIZE_16M);
+		DM9000_BASE, GPMC_SIZE_16M);
 }
 
 /*
@@ -100,9 +101,7 @@ int misc_init_r(void)
 #endif
 
 #ifdef CONFIG_DRIVER_DM9000
-	/* Configure GPMC registers for DM9000 */
-	enable_gpmc_cs_config(gpmc_net_config, &gpmc_cfg->cs[6],
-			CONFIG_DM9000_BASE, GPMC_SIZE_16M);
+	gpmc_dm9000_config();
 
 	/* Use OMAP DIE_ID as MAC address */
 	if (!eth_env_get_enetaddr("ethaddr", enetaddr)) {
@@ -148,7 +147,7 @@ void board_mmc_power_init(void)
 }
 #endif
 
-#if defined(CONFIG_DRIVER_DM9000) & !defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_DRIVER_DM9000) & !defined(CONFIG_XPL_BUILD)
 /*
  * Routine: board_eth_init
  * Description: Setting up the Ethernet hardware.

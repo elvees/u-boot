@@ -15,7 +15,6 @@
  * this file might be covered by the GNU General Public License.
  */
 
-#include <common.h>
 #include <dm.h>
 #include <serial.h>
 
@@ -51,7 +50,7 @@
 #define status_dcc(x)	\
 		__asm__ volatile ("mrc p14, 0, %0, c14, c0, 0\n" : "=r" (x))
 
-#elif defined(CONFIG_CPU_ARMV8)
+#elif defined(CONFIG_ARM64)
 /*
  * ARMV8
  */

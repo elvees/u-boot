@@ -4,7 +4,6 @@
  * Niel Fourie, DENX Software Engineering, lusus@denx.de.
  */
 
-#include <common.h>
 #include <blk.h>
 #include <command.h>
 #include <dm.h>
@@ -36,7 +35,7 @@ static int do_lsblk(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv
 				continue;
 			desc = dev_get_uclass_plat(udev);
 			printf("%c %s %u", i ? ',' : ':',
-			       blk_get_if_type_name(desc->if_type),
+			       blk_get_uclass_name(desc->uclass_id),
 			       desc->devnum);
 			i++;
 		}

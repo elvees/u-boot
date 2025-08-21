@@ -5,13 +5,13 @@
  * Based on code from the coreboot file of the same name
  */
 
-#include <common.h>
 #include <cpu.h>
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
 #include <malloc.h>
 #include <qfw.h>
+#include <time.h>
 #include <asm/atomic.h>
 #include <asm/cpu.h>
 #include <asm/global_data.h>
@@ -69,12 +69,12 @@ DECLARE_GLOBAL_DATA_PTR;
  * CPUS are numbered sequentially from 0 using the device tree:
  *
  *	cpus {
- *		u-boot,dm-pre-reloc;
+ *		bootph-all;
  *		#address-cells = <1>;
  *		#size-cells = <0>;
  *
  *		cpu@0 {
- *			u-boot,dm-pre-reloc;
+ *			bootph-all;
  *			device_type = "cpu";
  *			compatible = "intel,apl-cpu";
  *			reg = <0>;
@@ -164,12 +164,12 @@ static inline void barrier_wait(atomic_t *b)
 {
 	while (atomic_read(b) == 0)
 		asm("pause");
-	mfence();
+	mb();
 }
 
 static inline void release_barrier(atomic_t *b)
 {
-	mfence();
+	mb();
 	atomic_set(b, 1);
 }
 
@@ -423,7 +423,7 @@ static int apic_wait_timeout(int total_delay, const char *msg)
  *
  * @num_aps: Number of APs we expect to find
  * @ap_count: Initially zero. Incremented by this function for each AP found
- * @return 0 if all APs were set up correctly or there are none to set up,
+ * Return: 0 if all APs were set up correctly or there are none to set up,
  *	-ENOSPC if the SIPI vector is too high in memory,
  *	-ETIMEDOUT if the ICR is busy or the second SIPI fails to complete
  *	-EIO if not all APs check in correctly
@@ -536,7 +536,7 @@ static int bsp_do_flight_plan(struct udevice *cpu, struct mp_flight_plan *plan,
  *
  * @devp: If non-NULL, returns CPU device corresponding to the BSP
  * @cpu_countp: If non-NULL, returns the total number of CPUs
- * @return CPU number of the BSP, or -ve on error. If multiprocessing is not
+ * Return: CPU number of the BSP, or -ve on error. If multiprocessing is not
  *	enabled, returns 0
  */
 static int get_bsp(struct udevice **devp, int *cpu_countp)
@@ -573,7 +573,7 @@ static int get_bsp(struct udevice **devp, int *cpu_countp)
  * pointer to new instructions
  *
  * @slot: Pointer to the AP's callback slot
- * @return value of that pointer
+ * Return: value of that pointer
  */
 static struct mp_callback *read_callback(struct mp_callback **slot)
 {
@@ -610,7 +610,7 @@ static void store_callback(struct mp_callback **slot, struct mp_callback *val)
  * @num_cpus: The number of CPUs in the system (= number of APs + 1)
  * @expire_ms: Timeout to wait for all APs to finish, in milliseconds, or 0 for
  *	no timeout
- * @return 0 if OK, -ETIMEDOUT if one or more APs failed to respond in time
+ * Return: 0 if OK, -ETIMEDOUT if one or more APs failed to respond in time
  */
 static int run_ap_work(struct mp_callback *callback, struct udevice *bsp,
 		       int num_cpus, uint expire_ms)
@@ -631,7 +631,7 @@ static int run_ap_work(struct mp_callback *callback, struct udevice *bsp,
 		if (cur_cpu != i)
 			store_callback(&ap_callbacks[i], callback);
 	}
-	mfence();
+	mb();
 
 	/* Wait for all the APs to signal back that call has been accepted. */
 	start = get_timer(0);
@@ -656,7 +656,7 @@ static int run_ap_work(struct mp_callback *callback, struct udevice *bsp,
 	} while (cpus_accepted != num_aps);
 
 	/* Make sure we can see any data written by the APs */
-	mfence();
+	mb();
 
 	return 0;
 }
@@ -670,7 +670,7 @@ static int run_ap_work(struct mp_callback *callback, struct udevice *bsp,
  *
  * @cpu: CPU that is waiting
  * @unused: Optional argument provided by struct mp_flight_record, not used here
- * @return Does not return
+ * Return: Does not return
  */
 static int ap_wait_for_instruction(struct udevice *cpu, void *unused)
 {
@@ -692,7 +692,7 @@ static int ap_wait_for_instruction(struct udevice *cpu, void *unused)
 
 		/* Copy to local variable before using the value */
 		memcpy(&lcb, cb, sizeof(lcb));
-		mfence();
+		mb();
 		if (lcb.logical_cpu_number == MP_SELECT_ALL ||
 		    lcb.logical_cpu_number == MP_SELECT_APS ||
 		    dev_seq(cpu) == lcb.logical_cpu_number)

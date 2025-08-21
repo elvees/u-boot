@@ -4,24 +4,20 @@
  *
  * Board functions for Bosch Guardian
  *
- * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
+ * Copyright (C) 2011, Texas Instruments, Incorporated - https://www.ti.com/
  * Copyright (C) 2018 Robert Bosch Power Tools GmbH
  */
 
-#include <common.h>
-#include <cpsw.h>
+#include <config.h>
 #include <dm.h>
-#include <env.h>
 #include <env_internal.h>
 #include <errno.h>
 #include <i2c.h>
-#include <init.h>
 #include <led.h>
-#include <miiphy.h>
 #include <panel.h>
+#include <linux/delay.h>
 #include <asm/global_data.h>
 #include <power/tps65217.h>
-#include <power/tps65910.h>
 #include <spl.h>
 #include <watchdog.h>
 #include <asm/arch/clock.h>
@@ -29,18 +25,22 @@
 #include <asm/arch/ddr_defs.h>
 #include <asm/arch/gpio.h>
 #include <asm/arch/hardware.h>
-#include <asm/arch/mem.h>
-#include <asm/arch/mmc_host_def.h>
+#include <asm/arch/mem-guardian.h>
 #include <asm/arch/omap.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/emif.h>
 #include <asm/gpio.h>
 #include <asm/io.h>
+#include <jffs2/load_kernel.h>
+#include <mtd.h>
+#include <nand.h>
+#include <video.h>
+#include <video_console.h>
 #include "board.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT)
 static struct ctrl_dev *cdev = (struct ctrl_dev *)CTRL_DEVICE_BASE;
 
 static const struct ddr_data ddr3_data = {
@@ -75,7 +75,7 @@ static struct emif_regs ddr3_emif_reg_data = {
 const struct dpll_params dpll_ddr = {
 		400, OSC - 1, 1, -1, -1, -1, -1};
 
-void am33xx_spl_board_init(void)
+void spl_board_init(void)
 {
 	int mpu_vdd;
 	int usb_cur_lim;
@@ -83,7 +83,8 @@ void am33xx_spl_board_init(void)
 	/* Get the frequency */
 	dpll_mpu_opp100.m = am335x_get_efuse_mpu_max_freq(cdev);
 
-	if (i2c_probe(TPS65217_CHIP_PM))
+	/* Initialize for Power Management */
+	if (power_tps65217_init(0))
 		return;
 
 	/*
@@ -142,7 +143,6 @@ void am33xx_spl_board_init(void)
 const struct dpll_params *get_dpll_ddr_params(void)
 {
 	enable_i2c0_pin_mux();
-	i2c_init(CONFIG_SYS_OMAP24_I2C_SPEED, CONFIG_SYS_OMAP24_I2C_SLAVE);
 
 	return &dpll_ddr;
 }
@@ -182,7 +182,7 @@ int board_init(void)
 	hw_watchdog_init();
 #endif
 
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE + 0x100;
 
 #ifdef CONFIG_MTD_RAW_NAND
 	gpmc_init();
@@ -193,26 +193,10 @@ int board_init(void)
 #ifdef CONFIG_BOARD_LATE_INIT
 static void set_bootmode_env(void)
 {
-	char *boot_device_name = NULL;
 	char *boot_mode_gpio = "gpio@44e07000_14";
 	int   ret;
-	int   value;
 
 	struct gpio_desc boot_mode_desc;
-
-	switch (gd->arch.omap_boot_device) {
-	case BOOT_DEVICE_NAND:
-		boot_device_name = "nand";
-		break;
-	case BOOT_DEVICE_USBETH:
-		boot_device_name = "usbeth";
-		break;
-	default:
-		break;
-	}
-
-	if (boot_device_name)
-		env_set("boot_device", boot_device_name);
 
 	ret = dm_gpio_lookup_name(boot_mode_gpio, &boot_mode_desc);
 	if (ret) {
@@ -226,20 +210,69 @@ static void set_bootmode_env(void)
 		goto err;
 	}
 
-	value = dm_gpio_get_value(&boot_mode_desc);
-	value ? env_set("swi_status", "0") : env_set("swi_status", "1");
+	dm_gpio_set_dir_flags(&boot_mode_desc, GPIOD_IS_IN);
+	udelay(10);
+
+	ret = dm_gpio_get_value(&boot_mode_desc);
+	if (ret == 0) {
+		env_set("swi_status", "1");
+	} else if (ret == 1) {
+		env_set("swi_status", "0");
+	} else {
+		printf("swi status gpio error\n");
+		goto err;
+	}
+
 	return;
 
 err:
 	env_set("swi_status", "err");
 }
 
+void lcdbacklight_en(void)
+{
+	unsigned long brightness = env_get_ulong("backlight_brightness", 10, 50);
+
+	if (brightness > 99 || brightness == 0)
+		brightness = 99;
+
+	/*
+	 * Brightness range:
+	 * WLEDCTRL2 DUTY[6:0]
+	 *
+	 * 000 0000b = 1%
+	 * 000 0001b = 2%
+	 * ...
+	 * 110 0010b = 99%
+	 * 110 0011b = 100%
+	 *
+	 */
+
+	tps65217_reg_write(TPS65217_PROT_LEVEL_NONE, TPS65217_WLEDCTRL2,
+			   brightness, 0xFF);
+	tps65217_reg_write(TPS65217_PROT_LEVEL_NONE, TPS65217_WLEDCTRL1,
+			   brightness != 0 ? 0x0A : 0x02, 0xFF);
+}
+
 int board_late_init(void)
 {
-#ifdef CONFIG_LED_GPIO
-	led_default_state();
-#endif
+	int ret;
+	struct udevice *cdev;
+
 	set_bootmode_env();
+
+	ret = uclass_get_device(UCLASS_PANEL, 0, &cdev);
+	if (ret) {
+		debug("video panel not found: %d\n", ret);
+		return ret;
+	}
+
+	/* Initialize to enable backlight */
+	if (power_tps65217_init(0))
+		return 0;
+
+	lcdbacklight_en();
+
 	return 0;
 }
 #endif /* CONFIG_BOARD_LATE_INIT */

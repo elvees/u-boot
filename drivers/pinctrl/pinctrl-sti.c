@@ -6,7 +6,6 @@
  * Author(s): Patrice Chotard, <patrice.chotard@foss.st.com> for STMicroelectronics.
  */
 
-#include <common.h>
 #include <bitfield.h>
 #include <dm.h>
 #include <errno.h>
@@ -17,6 +16,7 @@
 #include <dm/pinctrl.h>
 #include <linux/bug.h>
 #include <linux/libfdt.h>
+#include <linux/printk.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -207,7 +207,6 @@ void sti_pin_configure(struct udevice *dev, struct sti_pin_desc *pin_desc)
 	else
 		generic_clear_bit(bit, sysconfreg);
 }
-
 
 static int sti_pinctrl_set_state(struct udevice *dev, struct udevice *config)
 {

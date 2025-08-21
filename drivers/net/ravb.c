@@ -8,7 +8,6 @@
  * Based on the SuperH Ethernet driver.
  */
 
-#include <common.h>
 #include <clk.h>
 #include <cpu_func.h>
 #include <dm.h>
@@ -24,6 +23,7 @@
 #include <asm/io.h>
 #include <asm/global_data.h>
 #include <asm/gpio.h>
+#include <reset.h>
 
 /* Registers */
 #define RAVB_REG_CCC		0x000
@@ -31,6 +31,7 @@
 #define RAVB_REG_CSR		0x00C
 #define RAVB_REG_APSR		0x08C
 #define RAVB_REG_RCR		0x090
+#define RAVB_REG_RTC		0x0B4
 #define RAVB_REG_TGC		0x300
 #define RAVB_REG_TCCR		0x304
 #define RAVB_REG_RIC0		0x360
@@ -44,6 +45,7 @@
 #define RAVB_REG_GECMR		0x5b0
 #define RAVB_REG_MAHR		0x5c0
 #define RAVB_REG_MALR		0x5c8
+#define RAVB_REG_CSR0		0x800
 
 #define CCC_OPC_CONFIG		BIT(0)
 #define CCC_OPC_OPERATION	BIT(1)
@@ -52,6 +54,7 @@
 #define CSR_OPS			0x0000000F
 #define CSR_OPS_CONFIG		BIT(1)
 
+#define APSR_RDM		BIT(13)
 #define APSR_TDM		BIT(14)
 
 #define TCCR_TSRQ0		BIT(0)
@@ -64,13 +67,23 @@
 #define PIR_MDC			BIT(0)
 
 #define ECMR_TRCCM		BIT(26)
+#define ECMR_RCPT		BIT(25)
 #define ECMR_RZPF		BIT(20)
 #define ECMR_PFR		BIT(18)
 #define ECMR_RXF		BIT(17)
+#define ECMR_TXF		BIT(16)
 #define ECMR_RE			BIT(6)
 #define ECMR_TE			BIT(5)
 #define ECMR_DM			BIT(1)
+#define ECMR_PRM		BIT(0)
 #define ECMR_CHG_DM		(ECMR_TRCCM | ECMR_RZPF | ECMR_PFR | ECMR_RXF)
+
+#define CSR0_RPE		BIT(5)
+#define CSR0_TPE		BIT(4)
+
+#define GECMR_SPEED_10M		(0 << 4)
+#define GECMR_SPEED_100M	(1 << 4)
+#define GECMR_SPEED_1G		(2 << 4)
 
 /* DMA Descriptors */
 #define RAVB_NUM_BASE_DESC		16
@@ -107,6 +120,13 @@
 
 #define RAVB_TX_TIMEOUT_MS		1000
 
+struct ravb_device_ops {
+	void (*mac_init)(struct udevice *dev);
+	void (*dmac_init)(struct udevice *dev);
+	void (*config)(struct udevice *dev);
+	bool has_reset;
+};
+
 struct ravb_desc {
 	u32	ctrl;
 	u32	dptr;
@@ -129,8 +149,8 @@ struct ravb_priv {
 	struct phy_device	*phydev;
 	struct mii_dev		*bus;
 	void __iomem		*iobase;
-	struct clk		clk;
-	struct gpio_desc	reset_gpio;
+	struct clk_bulk		clks;
+	struct reset_ctl	rst;
 };
 
 static inline void ravb_flush_dcache(u32 addr, u32 len)
@@ -182,7 +202,7 @@ static int ravb_recv(struct udevice *dev, int flags, uchar **packetp)
 {
 	struct ravb_priv *eth = dev_get_priv(dev);
 	struct ravb_rxdesc *desc = &eth->rx_desc[eth->rx_desc_idx];
-	int len;
+	int len = 0;
 	u8 *packet;
 
 	/* Check if the rx descriptor is ready */
@@ -191,12 +211,11 @@ static int ravb_recv(struct udevice *dev, int flags, uchar **packetp)
 		return -EAGAIN;
 
 	/* Check for errors */
-	if (desc->data.ctrl & RAVB_RX_DESC_MSC_RX_ERR_MASK) {
+	if (desc->data.ctrl & RAVB_RX_DESC_MSC_RX_ERR_MASK)
 		desc->data.ctrl &= ~RAVB_RX_DESC_MSC_MASK;
-		return -EAGAIN;
-	}
+	else
+		len = desc->data.ctrl & RAVB_DESC_DS_MASK;
 
-	len = desc->data.ctrl & RAVB_DESC_DS_MASK;
 	packet = (u8 *)(uintptr_t)desc->data.dptr;
 	ravb_invalidate_dcache((uintptr_t)packet, len);
 
@@ -309,20 +328,11 @@ static int ravb_phy_config(struct udevice *dev)
 	struct ravb_priv *eth = dev_get_priv(dev);
 	struct eth_pdata *pdata = dev_get_plat(dev);
 	struct phy_device *phydev;
-	int mask = 0xffffffff, reg;
+	int reg;
 
-	if (dm_gpio_is_valid(&eth->reset_gpio)) {
-		dm_gpio_set_value(&eth->reset_gpio, 1);
-		mdelay(20);
-		dm_gpio_set_value(&eth->reset_gpio, 0);
-		mdelay(1);
-	}
-
-	phydev = phy_find_by_mask(eth->bus, mask, pdata->phy_interface);
+	phydev = phy_connect(eth->bus, -1, dev, pdata->phy_interface);
 	if (!phydev)
 		return -ENODEV;
-
-	phy_connect_dev(phydev, dev);
 
 	eth->phydev = phydev;
 
@@ -359,23 +369,50 @@ static int ravb_write_hwaddr(struct udevice *dev)
 }
 
 /* E-MAC init function */
-static int ravb_mac_init(struct ravb_priv *eth)
+static void ravb_mac_init(struct udevice *dev)
 {
+	struct ravb_device_ops *device_ops =
+		(struct ravb_device_ops *)dev_get_driver_data(dev);
+	struct ravb_priv *eth = dev_get_priv(dev);
+
+	device_ops->mac_init(dev);
+
+	/*
+	 * Set receive frame length
+	 *
+	 * The length set here describes the frame from the destination address
+	 * up to and including the CRC data. However only the frame data,
+	 * excluding the CRC, are transferred to memory. To allow for the
+	 * largest frames add the CRC length to the maximum Rx descriptor size.
+	 */
+	writel(RFLR_RFL_MIN + ETH_FCS_LEN, eth->iobase + RAVB_REG_RFLR);
+}
+
+static void ravb_mac_init_rcar(struct udevice *dev)
+{
+	struct ravb_priv *eth = dev_get_priv(dev);
+
 	/* Disable MAC Interrupt */
 	writel(0, eth->iobase + RAVB_REG_ECSIPR);
+}
 
-	/* Recv frame limit set register */
-	writel(RFLR_RFL_MIN, eth->iobase + RAVB_REG_RFLR);
+static void ravb_mac_init_rzg2l(struct udevice *dev)
+{
+	struct ravb_priv *eth = dev_get_priv(dev);
 
-	return 0;
+	setbits_32(eth->iobase + RAVB_REG_ECMR,
+		   ECMR_PRM | ECMR_RXF | ECMR_TXF | ECMR_RCPT |
+		   ECMR_TE | ECMR_RE | ECMR_RZPF |
+		   (eth->phydev->duplex ? ECMR_DM : 0));
 }
 
 /* AVB-DMAC init function */
 static int ravb_dmac_init(struct udevice *dev)
 {
+	struct ravb_device_ops *device_ops =
+		(struct ravb_device_ops *)dev_get_driver_data(dev);
 	struct ravb_priv *eth = dev_get_priv(dev);
-	struct eth_pdata *pdata = dev_get_plat(dev);
-	int ret = 0;
+	int ret;
 
 	/* Set CONFIG mode */
 	ret = ravb_reset(dev);
@@ -391,6 +428,18 @@ static int ravb_dmac_init(struct udevice *dev)
 	/* Set little endian */
 	clrbits_le32(eth->iobase + RAVB_REG_CCC, CCC_BOC);
 
+	device_ops->dmac_init(dev);
+	return 0;
+}
+
+static void ravb_dmac_init_rcar(struct udevice *dev)
+{
+	struct ravb_priv *eth = dev_get_priv(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
+	int mode = 0;
+	unsigned int delay;
+	bool explicit_delay = false;
+
 	/* AVB rx set */
 	writel(0x18000001, eth->iobase + RAVB_REG_RCR);
 
@@ -398,34 +447,75 @@ static int ravb_dmac_init(struct udevice *dev)
 	writel(0x00222210, eth->iobase + RAVB_REG_TGC);
 
 	/* Delay CLK: 2ns (not applicable on R-Car E3/D3) */
-	if ((rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A77990) ||
-	    (rmobile_get_cpu_type() == RMOBILE_CPU_TYPE_R8A77995))
-		return 0;
+	if ((renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A77990) ||
+	    (renesas_get_cpu_type() == RENESAS_CPU_TYPE_R8A77995))
+		return;
 
-	if ((pdata->phy_interface == PHY_INTERFACE_MODE_RGMII_ID) ||
-	    (pdata->phy_interface == PHY_INTERFACE_MODE_RGMII_TXID))
-		writel(APSR_TDM, eth->iobase + RAVB_REG_APSR);
+	if (!dev_read_u32(dev, "rx-internal-delay-ps", &delay)) {
+		/* Valid values are 0 and 1800, according to DT bindings */
+		if (delay) {
+			mode |= APSR_RDM;
+			explicit_delay = true;
+		}
+	}
 
-	return 0;
+	if (!dev_read_u32(dev, "tx-internal-delay-ps", &delay)) {
+		/* Valid values are 0 and 2000, according to DT bindings */
+		if (delay) {
+			mode |= APSR_TDM;
+			explicit_delay = true;
+		}
+	}
+
+	if (!explicit_delay) {
+		if (pdata->phy_interface == PHY_INTERFACE_MODE_RGMII_ID ||
+		    pdata->phy_interface == PHY_INTERFACE_MODE_RGMII_RXID)
+			mode |= APSR_RDM;
+
+		if (pdata->phy_interface == PHY_INTERFACE_MODE_RGMII_ID ||
+		    pdata->phy_interface == PHY_INTERFACE_MODE_RGMII_TXID)
+			mode |= APSR_TDM;
+	}
+
+	writel(mode, eth->iobase + RAVB_REG_APSR);
+}
+
+static void ravb_dmac_init_rzg2l(struct udevice *dev)
+{
+	struct ravb_priv *eth = dev_get_priv(dev);
+
+	/* Set Max Frame Length (RTC) */
+	writel(0x7ffc0000 | RFLR_RFL_MIN, eth->iobase + RAVB_REG_RTC);
 }
 
 static int ravb_config(struct udevice *dev)
 {
+	struct ravb_device_ops *device_ops =
+		(struct ravb_device_ops *)dev_get_driver_data(dev);
 	struct ravb_priv *eth = dev_get_priv(dev);
 	struct phy_device *phy = eth->phydev;
-	u32 mask = ECMR_CHG_DM | ECMR_RE | ECMR_TE;
 	int ret;
 
 	/* Configure AVB-DMAC register */
 	ravb_dmac_init(dev);
 
 	/* Configure E-MAC registers */
-	ravb_mac_init(eth);
+	ravb_mac_init(dev);
 	ravb_write_hwaddr(dev);
 
 	ret = phy_startup(phy);
 	if (ret)
 		return ret;
+
+	device_ops->config(dev);
+	return 0;
+}
+
+static void ravb_config_rcar(struct udevice *dev)
+{
+	struct ravb_priv *eth = dev_get_priv(dev);
+	struct phy_device *phy = eth->phydev;
+	u32 mask = ECMR_CHG_DM | ECMR_RE | ECMR_TE;
 
 	/* Set the transfer speed */
 	if (phy->speed == 100)
@@ -438,8 +528,22 @@ static int ravb_config(struct udevice *dev)
 		mask |= ECMR_DM;
 
 	writel(mask, eth->iobase + RAVB_REG_ECMR);
+}
 
-	return 0;
+static void ravb_config_rzg2l(struct udevice *dev)
+{
+	struct ravb_priv *eth = dev_get_priv(dev);
+	struct phy_device *phy = eth->phydev;
+
+	writel(CSR0_TPE | CSR0_RPE, eth->iobase + RAVB_REG_CSR0);
+
+	/* Set the transfer speed */
+	if (phy->speed == 10)
+		writel(GECMR_SPEED_10M, eth->iobase + RAVB_REG_GECMR);
+	else if (phy->speed == 100)
+		writel(GECMR_SPEED_100M, eth->iobase + RAVB_REG_GECMR);
+	else if (phy->speed == 1000)
+		writel(GECMR_SPEED_1G, eth->iobase + RAVB_REG_GECMR);
 }
 
 static int ravb_start(struct udevice *dev)
@@ -473,116 +577,28 @@ static void ravb_stop(struct udevice *dev)
 	ravb_reset(dev);
 }
 
-static int ravb_probe(struct udevice *dev)
+/* Bitbang MDIO access */
+static int ravb_bb_mdio_active(struct mii_dev *miidev)
 {
-	struct eth_pdata *pdata = dev_get_plat(dev);
-	struct ravb_priv *eth = dev_get_priv(dev);
-	struct ofnode_phandle_args phandle_args;
-	struct mii_dev *mdiodev;
-	void __iomem *iobase;
-	int ret;
-
-	iobase = map_physmem(pdata->iobase, 0x1000, MAP_NOCACHE);
-	eth->iobase = iobase;
-
-	ret = clk_get_by_index(dev, 0, &eth->clk);
-	if (ret < 0)
-		goto err_mdio_alloc;
-
-	ret = dev_read_phandle_with_args(dev, "phy-handle", NULL, 0, 0, &phandle_args);
-	if (!ret) {
-		gpio_request_by_name_nodev(phandle_args.node, "reset-gpios", 0,
-					   &eth->reset_gpio, GPIOD_IS_OUT);
-	}
-
-	if (!dm_gpio_is_valid(&eth->reset_gpio)) {
-		gpio_request_by_name(dev, "reset-gpios", 0, &eth->reset_gpio,
-				     GPIOD_IS_OUT);
-	}
-
-	mdiodev = mdio_alloc();
-	if (!mdiodev) {
-		ret = -ENOMEM;
-		goto err_mdio_alloc;
-	}
-
-	mdiodev->read = bb_miiphy_read;
-	mdiodev->write = bb_miiphy_write;
-	bb_miiphy_buses[0].priv = eth;
-	snprintf(mdiodev->name, sizeof(mdiodev->name), dev->name);
-
-	ret = mdio_register(mdiodev);
-	if (ret < 0)
-		goto err_mdio_register;
-
-	eth->bus = miiphy_get_dev_by_name(dev->name);
-
-	/* Bring up PHY */
-	ret = clk_enable(&eth->clk);
-	if (ret)
-		goto err_mdio_register;
-
-	ret = ravb_reset(dev);
-	if (ret)
-		goto err_mdio_reset;
-
-	ret = ravb_phy_config(dev);
-	if (ret)
-		goto err_mdio_reset;
-
-	return 0;
-
-err_mdio_reset:
-	clk_disable(&eth->clk);
-err_mdio_register:
-	mdio_free(mdiodev);
-err_mdio_alloc:
-	unmap_physmem(eth->iobase, MAP_NOCACHE);
-	return ret;
-}
-
-static int ravb_remove(struct udevice *dev)
-{
-	struct ravb_priv *eth = dev_get_priv(dev);
-
-	clk_disable(&eth->clk);
-
-	free(eth->phydev);
-	mdio_unregister(eth->bus);
-	mdio_free(eth->bus);
-	if (dm_gpio_is_valid(&eth->reset_gpio))
-		dm_gpio_free(dev, &eth->reset_gpio);
-	unmap_physmem(eth->iobase, MAP_NOCACHE);
-
-	return 0;
-}
-
-int ravb_bb_init(struct bb_miiphy_bus *bus)
-{
-	return 0;
-}
-
-int ravb_bb_mdio_active(struct bb_miiphy_bus *bus)
-{
-	struct ravb_priv *eth = bus->priv;
+	struct ravb_priv *eth = miidev->priv;
 
 	setbits_le32(eth->iobase + RAVB_REG_PIR, PIR_MMD);
 
 	return 0;
 }
 
-int ravb_bb_mdio_tristate(struct bb_miiphy_bus *bus)
+static int ravb_bb_mdio_tristate(struct mii_dev *miidev)
 {
-	struct ravb_priv *eth = bus->priv;
+	struct ravb_priv *eth = miidev->priv;
 
 	clrbits_le32(eth->iobase + RAVB_REG_PIR, PIR_MMD);
 
 	return 0;
 }
 
-int ravb_bb_set_mdio(struct bb_miiphy_bus *bus, int v)
+static int ravb_bb_set_mdio(struct mii_dev *miidev, int v)
 {
-	struct ravb_priv *eth = bus->priv;
+	struct ravb_priv *eth = miidev->priv;
 
 	if (v)
 		setbits_le32(eth->iobase + RAVB_REG_PIR, PIR_MDO);
@@ -592,18 +608,18 @@ int ravb_bb_set_mdio(struct bb_miiphy_bus *bus, int v)
 	return 0;
 }
 
-int ravb_bb_get_mdio(struct bb_miiphy_bus *bus, int *v)
+static int ravb_bb_get_mdio(struct mii_dev *miidev, int *v)
 {
-	struct ravb_priv *eth = bus->priv;
+	struct ravb_priv *eth = miidev->priv;
 
 	*v = (readl(eth->iobase + RAVB_REG_PIR) & PIR_MDI) >> 3;
 
 	return 0;
 }
 
-int ravb_bb_set_mdc(struct bb_miiphy_bus *bus, int v)
+static int ravb_bb_set_mdc(struct mii_dev *miidev, int v)
 {
-	struct ravb_priv *eth = bus->priv;
+	struct ravb_priv *eth = miidev->priv;
 
 	if (v)
 		setbits_le32(eth->iobase + RAVB_REG_PIR, PIR_MDC);
@@ -613,26 +629,131 @@ int ravb_bb_set_mdc(struct bb_miiphy_bus *bus, int v)
 	return 0;
 }
 
-int ravb_bb_delay(struct bb_miiphy_bus *bus)
+static int ravb_bb_delay(struct mii_dev *miidev)
 {
 	udelay(10);
 
 	return 0;
 }
 
-struct bb_miiphy_bus bb_miiphy_buses[] = {
-	{
-		.name		= "ravb",
-		.init		= ravb_bb_init,
-		.mdio_active	= ravb_bb_mdio_active,
-		.mdio_tristate	= ravb_bb_mdio_tristate,
-		.set_mdio	= ravb_bb_set_mdio,
-		.get_mdio	= ravb_bb_get_mdio,
-		.set_mdc	= ravb_bb_set_mdc,
-		.delay		= ravb_bb_delay,
-	},
+static const struct bb_miiphy_bus_ops ravb_bb_miiphy_bus_ops = {
+	.mdio_active	= ravb_bb_mdio_active,
+	.mdio_tristate	= ravb_bb_mdio_tristate,
+	.set_mdio	= ravb_bb_set_mdio,
+	.get_mdio	= ravb_bb_get_mdio,
+	.set_mdc	= ravb_bb_set_mdc,
+	.delay		= ravb_bb_delay,
 };
-int bb_miiphy_buses_num = ARRAY_SIZE(bb_miiphy_buses);
+
+static int ravb_bb_miiphy_read(struct mii_dev *miidev, int addr,
+			       int devad, int reg)
+{
+	return bb_miiphy_read(miidev, &ravb_bb_miiphy_bus_ops,
+			      addr, devad, reg);
+}
+
+static int ravb_bb_miiphy_write(struct mii_dev *miidev, int addr,
+				int devad, int reg, u16 value)
+{
+	return bb_miiphy_write(miidev, &ravb_bb_miiphy_bus_ops,
+			       addr, devad, reg, value);
+}
+
+static int ravb_probe(struct udevice *dev)
+{
+	struct ravb_device_ops *device_ops =
+		(struct ravb_device_ops *)dev_get_driver_data(dev);
+	struct eth_pdata *pdata = dev_get_plat(dev);
+	struct ravb_priv *eth = dev_get_priv(dev);
+	struct mii_dev *mdiodev;
+	void __iomem *iobase;
+	int ret;
+
+	iobase = map_physmem(pdata->iobase, 0x1000, MAP_NOCACHE);
+	eth->iobase = iobase;
+
+	ret = clk_get_bulk(dev, &eth->clks);
+	if (ret < 0)
+		goto err_clk_get;
+
+	mdiodev = mdio_alloc();
+	if (!mdiodev) {
+		ret = -ENOMEM;
+		goto err_mdio_alloc;
+	}
+
+	mdiodev->read = ravb_bb_miiphy_read;
+	mdiodev->write = ravb_bb_miiphy_write;
+	mdiodev->priv = eth;
+	snprintf(mdiodev->name, sizeof(mdiodev->name), dev->name);
+
+	ret = mdio_register(mdiodev);
+	if (ret < 0)
+		goto err_mdio_register;
+
+	eth->bus = mdiodev;
+
+	/* Bring up PHY */
+	ret = clk_enable_bulk(&eth->clks);
+	if (ret)
+		goto err_clk_enable;
+
+	if (device_ops->has_reset) {
+		ret = reset_get_by_index(dev, 0, &eth->rst);
+		if (ret < 0)
+			goto err_clk_enable;
+
+		ret = reset_deassert(&eth->rst);
+		if (ret < 0)
+			goto err_reset_deassert;
+	}
+
+	ret = ravb_reset(dev);
+	if (ret)
+		goto err_ravb_reset;
+
+	ret = ravb_phy_config(dev);
+	if (ret)
+		goto err_ravb_reset;
+
+	return 0;
+
+err_ravb_reset:
+	if (device_ops->has_reset)
+		reset_assert(&eth->rst);
+err_reset_deassert:
+	if (device_ops->has_reset)
+		reset_free(&eth->rst);
+err_clk_enable:
+	mdio_unregister(mdiodev);
+err_mdio_register:
+	mdio_free(mdiodev);
+err_mdio_alloc:
+	clk_release_bulk(&eth->clks);
+err_clk_get:
+	unmap_physmem(eth->iobase, MAP_NOCACHE);
+	return ret;
+}
+
+static int ravb_remove(struct udevice *dev)
+{
+	struct ravb_device_ops *device_ops =
+		(struct ravb_device_ops *)dev_get_driver_data(dev);
+	struct ravb_priv *eth = dev_get_priv(dev);
+
+	if (device_ops->has_reset) {
+		reset_assert(&eth->rst);
+		reset_free(&eth->rst);
+	}
+	clk_release_bulk(&eth->clks);
+
+	free(eth->phydev);
+	mdio_unregister(eth->bus);
+	mdio_free(eth->bus);
+	unmap_physmem(eth->iobase, MAP_NOCACHE);
+
+	return 0;
+}
 
 static const struct eth_ops ravb_ops = {
 	.start			= ravb_start,
@@ -646,39 +767,44 @@ static const struct eth_ops ravb_ops = {
 int ravb_of_to_plat(struct udevice *dev)
 {
 	struct eth_pdata *pdata = dev_get_plat(dev);
-	const char *phy_mode;
-	const fdt32_t *cell;
-	int ret = 0;
 
 	pdata->iobase = dev_read_addr(dev);
-	pdata->phy_interface = -1;
-	phy_mode = fdt_getprop(gd->fdt_blob, dev_of_offset(dev), "phy-mode",
-			       NULL);
-	if (phy_mode)
-		pdata->phy_interface = phy_get_interface_by_name(phy_mode);
-	if (pdata->phy_interface == -1) {
-		debug("%s: Invalid PHY interface '%s'\n", __func__, phy_mode);
+
+	pdata->phy_interface = dev_read_phy_mode(dev);
+	if (pdata->phy_interface == PHY_INTERFACE_MODE_NA)
 		return -EINVAL;
-	}
 
-	pdata->max_speed = 1000;
-	cell = fdt_getprop(gd->fdt_blob, dev_of_offset(dev), "max-speed", NULL);
-	if (cell)
-		pdata->max_speed = fdt32_to_cpu(*cell);
+	pdata->max_speed = dev_read_u32_default(dev, "max-speed", 1000);
 
-	sprintf(bb_miiphy_buses[0].name, dev->name);
-
-	return ret;
+	return 0;
 }
 
+static const struct ravb_device_ops ravb_device_ops_rcar = {
+	.mac_init = ravb_mac_init_rcar,
+	.dmac_init = ravb_dmac_init_rcar,
+	.config = ravb_config_rcar,
+};
+
+static const struct ravb_device_ops ravb_device_ops_rzg2l = {
+	.mac_init = ravb_mac_init_rzg2l,
+	.dmac_init = ravb_dmac_init_rzg2l,
+	.config = ravb_config_rzg2l,
+	.has_reset = true,
+};
+
 static const struct udevice_id ravb_ids[] = {
-	{ .compatible = "renesas,etheravb-r8a7795" },
-	{ .compatible = "renesas,etheravb-r8a7796" },
-	{ .compatible = "renesas,etheravb-r8a77965" },
-	{ .compatible = "renesas,etheravb-r8a77970" },
-	{ .compatible = "renesas,etheravb-r8a77990" },
-	{ .compatible = "renesas,etheravb-r8a77995" },
-	{ .compatible = "renesas,etheravb-rcar-gen3" },
+	{
+		.compatible = "renesas,etheravb-rcar-gen3",
+		.data = (ulong)&ravb_device_ops_rcar,
+	},
+	{
+		.compatible = "renesas,etheravb-rcar-gen4",
+		.data = (ulong)&ravb_device_ops_rcar,
+	},
+	{
+		.compatible = "renesas,rzg2l-gbeth",
+		.data = (ulong)&ravb_device_ops_rzg2l,
+	},
 	{ }
 };
 

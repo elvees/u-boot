@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright 2016-2019 NXP Semiconductors
+/* Copyright 2016-2019, 2021 NXP
  */
-#include <common.h>
 #include <clock_legacy.h>
 #include <fdt_support.h>
 #include <init.h>
@@ -12,6 +11,7 @@
 #include <asm/arch/ls102xa_soc.h>
 #include <asm/arch/fsl_serdes.h>
 #include <asm/global_data.h>
+#include <asm/sections.h>
 #include <linux/delay.h>
 #include "../common/sleep.h"
 #include <fsl_validate.h>
@@ -27,8 +27,8 @@ DECLARE_GLOBAL_DATA_PTR;
 
 static void ddrmc_init(void)
 {
-#if (!defined(CONFIG_SPL) || defined(CONFIG_SPL_BUILD))
-	struct ccsr_ddr *ddr = (struct ccsr_ddr *)CONFIG_SYS_FSL_DDR_ADDR;
+#if (!defined(CONFIG_SPL) || defined(CONFIG_XPL_BUILD))
+	struct ccsr_ddr *ddr = (struct ccsr_ddr *)CFG_SYS_FSL_DDR_ADDR;
 	u32 temp_sdram_cfg, tmp;
 
 	out_be32(&ddr->sdram_cfg, DDR_SDRAM_CFG);
@@ -47,7 +47,7 @@ static void ddrmc_init(void)
 	if (is_warm_boot()) {
 		out_be32(&ddr->sdram_cfg_2,
 			 DDR_SDRAM_CFG_2 & ~SDRAM_CFG2_D_INIT);
-		out_be32(&ddr->init_addr, CONFIG_SYS_SDRAM_BASE);
+		out_be32(&ddr->init_addr, CFG_SYS_SDRAM_BASE);
 		out_be32(&ddr->init_ext_addr, (1 << 31));
 
 		/* DRAM VRef will not be trained */
@@ -105,7 +105,7 @@ static void ddrmc_init(void)
 		out_be32(&ddr->sdram_cfg_2, temp_sdram_cfg);
 	}
 #endif
-#endif /* !defined(CONFIG_SPL) || defined(CONFIG_SPL_BUILD) */
+#endif /* !defined(CONFIG_SPL) || defined(CONFIG_XPL_BUILD) */
 }
 
 int dram_init(void)
@@ -116,7 +116,7 @@ int dram_init(void)
 
 	gd->ram_size = get_ram_size((void *)PHYS_SDRAM, PHYS_SDRAM_SIZE);
 
-#if defined(CONFIG_DEEP_SLEEP) && !defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_DEEP_SLEEP) && !defined(CONFIG_XPL_BUILD)
 	fsl_dp_resume();
 #endif
 
@@ -130,7 +130,7 @@ int board_eth_init(struct bd_info *bis)
 
 int board_early_init_f(void)
 {
-	struct ccsr_scfg *scfg = (struct ccsr_scfg *)CONFIG_SYS_FSL_SCFG_ADDR;
+	struct ccsr_scfg *scfg = (struct ccsr_scfg *)CFG_SYS_FSL_SCFG_ADDR;
 
 #ifdef CONFIG_TSEC_ENET
 	/*
@@ -156,7 +156,7 @@ int board_early_init_f(void)
 	return 0;
 }
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 void board_init_f(ulong dummy)
 {
 	void (*second_uboot)(void);
@@ -166,10 +166,9 @@ void board_init_f(ulong dummy)
 
 	get_clocks();
 
-#if defined(CONFIG_DEEP_SLEEP)
-	if (is_warm_boot())
-		fsl_dp_disable_console();
-#endif
+	if (CONFIG_IS_ENABLED(DEEP_SLEEP))
+		if (is_warm_boot())
+			fsl_dp_disable_console();
 
 	preloader_console_init();
 
@@ -187,9 +186,11 @@ void board_init_f(ulong dummy)
 	 * it from SD since it has already been reserved in memory
 	 * in last boot.
 	 */
-	if (is_warm_boot()) {
-		second_uboot = (void (*)(void))CONFIG_SYS_TEXT_BASE;
-		second_uboot();
+	if (CONFIG_IS_ENABLED(DEEP_SLEEP)) {
+		if (is_warm_boot()) {
+			second_uboot = (void (*)(void))CONFIG_TEXT_BASE;
+			second_uboot();
+		}
 	}
 
 	board_init_r(NULL, 0);
@@ -214,7 +215,7 @@ int board_init(void)
 	return 0;
 }
 
-#if defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_XPL_BUILD)
 void spl_board_init(void)
 {
 	ls102xa_smmu_stream_id_init();
@@ -238,10 +239,7 @@ int misc_init_r(void)
 #ifdef CONFIG_FSL_DEVICE_DISABLE
 	device_disable(devdis_tbl, ARRAY_SIZE(devdis_tbl));
 #endif
-
-#ifdef CONFIG_FSL_CAAM
-	return sec_init();
-#endif
+	return 0;
 }
 #endif
 

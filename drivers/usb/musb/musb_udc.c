@@ -37,7 +37,6 @@
  * -------------------------------------------------------------------------
  */
 
-#include <common.h>
 #include <hang.h>
 #include <serial.h>
 #include <usbdevice.h>
@@ -269,7 +268,7 @@ static void musb_peri_ep0_set_address(void)
 				      __PRETTY_FUNCTION__, udc_device->address);
 	} else {
 		if (debug_level > 0)
-			serial_printf("ERROR : %s Address missmatch "
+			serial_printf("ERROR : %s Address mismatch "
 				      "sw %d vs hw %d\n",
 				      __PRETTY_FUNCTION__,
 				      udc_device->address, faddr);

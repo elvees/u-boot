@@ -4,7 +4,6 @@
  * Scott McNutt <smcnutt@psyent.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <serial.h>
@@ -134,7 +133,7 @@ static inline void _debug_uart_init(void)
 
 static inline void _debug_uart_putc(int ch)
 {
-	struct altera_jtaguart_regs *regs = (void *)CONFIG_DEBUG_UART_BASE;
+	struct altera_jtaguart_regs *regs = (void *)CONFIG_VAL(DEBUG_UART_BASE);
 
 	while (1) {
 		u32 st = readl(&regs->control);

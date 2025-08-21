@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2015 Freescale Semiconductor, Inc.
+ * Copyright 2021-2022 NXP
  */
 
-#include <common.h>
+#include <config.h>
 #include <dm.h>
-#include <flash.h>
 #include <fsl_validate.h>
 #include <fsl_secboot_err.h>
 #include <fsl_sfp.h>
@@ -19,6 +19,7 @@
 #ifdef CONFIG_ARCH_LS1021A
 #include <asm/arch/immap_ls102xa.h>
 #endif
+#include <dm/lists.h>
 
 #define SHA256_BITS	256
 #define SHA256_BYTES	(256/8)
@@ -28,7 +29,7 @@
 #define CHECK_KEY_LEN(key_len)	(((key_len) == 2 * KEY_SIZE_BYTES / 4) || \
 				 ((key_len) == 2 * KEY_SIZE_BYTES / 2) || \
 				 ((key_len) == 2 * KEY_SIZE_BYTES))
-#if defined(CONFIG_FSL_ISBC_KEY_EXT)
+#if CONFIG_IS_ENABLED(FSL_ISBC_KEY_EXT)
 /* Global data structure */
 static struct fsl_secboot_glb glb;
 #endif
@@ -62,7 +63,7 @@ self:
 	goto self;
 }
 
-#if defined(CONFIG_FSL_ISBC_KEY_EXT)
+#if CONFIG_IS_ENABLED(FSL_ISBC_KEY_EXT)
 static u32 check_ie(struct fsl_secboot_img_priv *img)
 {
 	if (img->hdr.ie_flag & IE_FLAG_MASK)
@@ -78,11 +79,13 @@ static u32 check_ie(struct fsl_secboot_img_priv *img)
  * address
  */
 #if defined(CONFIG_MPC85xx)
+#include <flash.h>
+
 int get_csf_base_addr(u32 *csf_addr, u32 *flash_base_addr)
 {
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_MPC85xx_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_MPC85xx_GUTS_ADDR);
 	u32 csf_hdr_addr = in_be32(&gur->scratchrw[0]);
-	u32 csf_flash_offset = csf_hdr_addr & ~(CONFIG_SYS_PBI_FLASH_BASE);
+	u32 csf_flash_offset = csf_hdr_addr & ~(CFG_SYS_PBI_FLASH_BASE);
 	u32 flash_addr, addr;
 	int found = 0;
 	int i = 0;
@@ -111,7 +114,7 @@ int get_csf_base_addr(u32 *csf_addr, u32 *flash_base_addr)
  */
 int get_csf_base_addr(u32 *csf_addr, u32 *flash_base_addr)
 {
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	u32 csf_hdr_addr = in_be32(&gur->scratchrw[0]);
 
 	if (memcmp((u8 *)(uintptr_t)csf_hdr_addr,
@@ -127,7 +130,7 @@ int get_csf_base_addr(u32 *csf_addr, u32 *flash_base_addr)
 #if defined(CONFIG_ESBC_HDR_LS)
 static int get_ie_info_addr(uintptr_t *ie_addr)
 {
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	/* For LS-CH3, the address of IE Table is
 	 * stated in Scratch13 and scratch14 of DCFG.
 	 * Bootrom validates this table while validating uboot.
@@ -157,7 +160,7 @@ static int get_ie_info_addr(uintptr_t *ie_addr)
 	 */
 #if defined(CONFIG_FSL_TRUST_ARCH_v1) && defined(CONFIG_FSL_CORENET)
 	sg_tbl = (struct fsl_secboot_sg_table *)
-		 (((u32)hdr->psgtable & ~(CONFIG_SYS_PBI_FLASH_BASE)) +
+		 (((u32)hdr->psgtable & ~(CFG_SYS_PBI_FLASH_BASE)) +
 		  flash_base_addr);
 #else
 	sg_tbl = (struct fsl_secboot_sg_table *)(uintptr_t)(csf_addr +
@@ -167,7 +170,7 @@ static int get_ie_info_addr(uintptr_t *ie_addr)
 	/* IE Key Table is the first entry in the SG Table */
 #if defined(CONFIG_MPC85xx)
 	*ie_addr = (uintptr_t)((sg_tbl->src_addr &
-			~(CONFIG_SYS_PBI_FLASH_BASE)) +
+			~(CFG_SYS_PBI_FLASH_BASE)) +
 			flash_base_addr);
 #else
 	*ie_addr = (uintptr_t)sg_tbl->src_addr;
@@ -185,7 +188,7 @@ static u32 check_srk(struct fsl_secboot_img_priv *img)
 {
 #ifdef CONFIG_ESBC_HDR_LS
 	/* In LS, No SRK Flag as SRK is always present if IE not present*/
-#if defined(CONFIG_FSL_ISBC_KEY_EXT)
+#if CONFIG_IS_ENABLED(FSL_ISBC_KEY_EXT)
 	return !check_ie(img);
 #endif
 	return 1;
@@ -200,7 +203,7 @@ static u32 check_srk(struct fsl_secboot_img_priv *img)
 /* This function returns ospr's key_revoc values.*/
 static u32 get_key_revoc(void)
 {
-	struct ccsr_sfp_regs *sfp_regs = (void *)(CONFIG_SYS_SFP_ADDR);
+	struct ccsr_sfp_regs *sfp_regs = (void *)(CFG_SYS_SFP_ADDR);
 	return (sfp_in32(&sfp_regs->ospr) & OSPR_KEY_REVOC_MASK) >>
 		OSPR_KEY_REVOC_SHIFT;
 }
@@ -275,7 +278,7 @@ static u32 read_validate_single_key(struct fsl_secboot_img_priv *img)
 }
 #endif /* CONFIG_ESBC_HDR_LS */
 
-#if defined(CONFIG_FSL_ISBC_KEY_EXT)
+#if CONFIG_IS_ENABLED(FSL_ISBC_KEY_EXT)
 
 static void install_ie_tbl(uintptr_t ie_tbl_addr,
 		struct fsl_secboot_img_priv *img)
@@ -324,7 +327,6 @@ static u32 read_validate_ie_tbl(struct fsl_secboot_img_priv *img)
 }
 #endif
 
-
 /* This function return length of public key.*/
 static inline u32 get_key_len(struct fsl_secboot_img_priv *img)
 {
@@ -339,7 +341,7 @@ static inline u32 get_key_len(struct fsl_secboot_img_priv *img)
  */
 static void fsl_secboot_header_verification_failure(void)
 {
-	struct ccsr_sfp_regs *sfp_regs = (void *)(CONFIG_SYS_SFP_ADDR);
+	struct ccsr_sfp_regs *sfp_regs = (void *)(CFG_SYS_SFP_ADDR);
 
 	/* 29th bit of OSPR is ITS */
 	u32 its = sfp_in32(&sfp_regs->ospr) >> 2;
@@ -364,7 +366,7 @@ static void fsl_secboot_header_verification_failure(void)
  */
 static void fsl_secboot_image_verification_failure(void)
 {
-	struct ccsr_sfp_regs *sfp_regs = (void *)(CONFIG_SYS_SFP_ADDR);
+	struct ccsr_sfp_regs *sfp_regs = (void *)(CFG_SYS_SFP_ADDR);
 
 	u32 its = (sfp_in32(&sfp_regs->ospr) & ITS_MASK) >> ITS_BIT;
 
@@ -394,7 +396,7 @@ static void fsl_secboot_bootscript_parse_failure(void)
  */
 void fsl_secboot_handle_error(int error)
 {
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 	const struct fsl_secboot_errcode *e;
 
 	for (e = fsl_secboot_errcodes; e->errcode != ERROR_ESBC_CLIENT_MAX;
@@ -431,7 +433,7 @@ void fsl_secboot_handle_error(int error)
 	case ERROR_ESBC_CLIENT_HEADER_INVALID_KEY_NUM:
 	case ERROR_ESBC_CLIENT_HEADER_INV_SRK_ENTRY_KEYLEN:
 #endif
-#if defined(CONFIG_FSL_ISBC_KEY_EXT)
+#if CONFIG_IS_ENABLED(FSL_ISBC_KEY_EXT)
 	/*@fallthrough@*/
 	case ERROR_ESBC_CLIENT_HEADER_IE_KEY_REVOKED:
 	case ERROR_ESBC_CLIENT_HEADER_INVALID_IE_NUM_ENTRY:
@@ -500,7 +502,6 @@ static int calc_img_key_hash(struct fsl_secboot_img_priv *img)
 	ret = algo->hash_init(algo, &ctx);
 	if (ret)
 		return ret;
-
 	/* Update hash for ESBC key */
 #ifdef CONFIG_KEY_REVOCATION
 	if (check_srk(img)) {
@@ -515,12 +516,12 @@ static int calc_img_key_hash(struct fsl_secboot_img_priv *img)
 			img->img_key, img->key_len, 1);
 	if (ret)
 		return ret;
-
 	/* Copy hash at destination buffer */
 	ret = algo->hash_finish(algo, ctx, hash_val, algo->digest_size);
-	if (ret)
+	if (ret) {
+		free(ctx);
 		return ret;
-
+	}
 	for (i = 0; i < SHA256_BYTES; i++)
 		img->img_key_hash[i] = hash_val[i];
 
@@ -569,7 +570,7 @@ static int calc_esbchdr_esbc_hash(struct fsl_secboot_img_priv *img)
 		key_hash = 1;
 	}
 #endif
-#if defined(CONFIG_FSL_ISBC_KEY_EXT)
+#if CONFIG_IS_ENABLED(FSL_ISBC_KEY_EXT)
 	if (!key_hash && check_ie(img))
 		key_hash = 1;
 #endif
@@ -583,9 +584,10 @@ static int calc_esbchdr_esbc_hash(struct fsl_secboot_img_priv *img)
 #endif
 	if (ret)
 		return ret;
-	if (!key_hash)
+	if (!key_hash) {
+		free(ctx);
 		return ERROR_KEY_TABLE_NOT_FOUND;
-
+	}
 	/* Update hash for actual Image */
 	ret = algo->hash_update(algo, ctx,
 		(u8 *)(*(img->img_addr_ptr)), img->img_size, 1);
@@ -594,9 +596,10 @@ static int calc_esbchdr_esbc_hash(struct fsl_secboot_img_priv *img)
 
 	/* Copy hash at destination buffer */
 	ret = algo->hash_finish(algo, ctx, hash_val, algo->digest_size);
-	if (ret)
+	if (ret) {
+		free(ctx);
 		return ret;
-
+	}
 	return 0;
 }
 
@@ -701,7 +704,7 @@ static int read_validate_esbc_client_header(struct fsl_secboot_img_priv *img)
 	}
 #endif
 
-#if defined(CONFIG_FSL_ISBC_KEY_EXT)
+#if CONFIG_IS_ENABLED(FSL_ISBC_KEY_EXT)
 	if (!key_found && check_ie(img)) {
 		ret = read_validate_ie_tbl(img);
 		if (ret != 0)
@@ -767,7 +770,7 @@ static inline int str2longbe(const char *p, ulong *num)
 	if (!p) {
 		return 0;
 	} else {
-		tmp = simple_strtoul(p, &endptr, 16);
+		tmp = hextoul(p, &endptr);
 		if (sizeof(ulong) == 4)
 			*num = cpu_to_be32(tmp);
 		else
@@ -804,6 +807,13 @@ static int calculate_cmp_img_sig(struct fsl_secboot_img_priv *img)
 	prop.num_bits = key_len * 8;
 	prop.exp_len = key_len;
 
+#if defined(CONFIG_XPL_BUILD)
+	ret = device_bind_driver(NULL, "fsl_rsa_mod_exp", "fsl_rsa_mod_exp", NULL);
+	if (ret) {
+		printf("Couldn't bind fsl_rsa_mod_exp driver (%d)\n", ret);
+		return -EINVAL;
+	}
+#endif
 	ret = uclass_get_device(UCLASS_MOD_EXP, 0, &mod_exp_dev);
 	if (ret) {
 		printf("RSA: Can't find Modular Exp implementation\n");
@@ -840,13 +850,12 @@ static int secboot_init(struct fsl_secboot_img_priv **img_ptr)
 		return -ENOMEM;
 	memset(img, 0, sizeof(struct fsl_secboot_img_priv));
 
-#if defined(CONFIG_FSL_ISBC_KEY_EXT)
+#if CONFIG_IS_ENABLED(FSL_ISBC_KEY_EXT)
 	if (glb.ie_addr)
 		img->ie_addr = glb.ie_addr;
 #endif
 	return 0;
 }
-
 
 /* haddr - Address of the header of image to be validated.
  * arg_hash_str - Option hash string. If provided, this
@@ -860,7 +869,7 @@ static int secboot_init(struct fsl_secboot_img_priv **img_ptr)
 int fsl_secboot_validate(uintptr_t haddr, char *arg_hash_str,
 			uintptr_t *img_addr_ptr)
 {
-	struct ccsr_sfp_regs *sfp_regs = (void *)(CONFIG_SYS_SFP_ADDR);
+	struct ccsr_sfp_regs *sfp_regs = (void *)(CFG_SYS_SFP_ADDR);
 	ulong hash[SHA256_BYTES/sizeof(ulong)];
 	char hash_str[NUM_HEX_CHARS + 1];
 	struct fsl_secboot_img_priv *img;
@@ -869,7 +878,7 @@ int fsl_secboot_validate(uintptr_t haddr, char *arg_hash_str,
 	int ret, i, hash_cmd = 0;
 	u32 srk_hash[8];
 
-	if (arg_hash_str != NULL) {
+	if (strlen(arg_hash_str) != 0) {
 		const char *cp = arg_hash_str;
 		int i = 0;
 
@@ -941,7 +950,7 @@ int fsl_secboot_validate(uintptr_t haddr, char *arg_hash_str,
 	else
 		ret = memcmp(srk_hash, img->img_key_hash, SHA256_BYTES);
 
-#if defined(CONFIG_FSL_ISBC_KEY_EXT)
+#if CONFIG_IS_ENABLED(FSL_ISBC_KEY_EXT)
 	if (!hash_cmd && check_ie(img))
 		ret = 0;
 #endif

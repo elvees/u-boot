@@ -87,7 +87,6 @@
  *
  ****************************************************************************/
 
-#include <common.h>
 #include <asm/ptrace.h>
 
 #include <kgdb.h>
@@ -447,7 +446,6 @@ handle_exception (struct pt_regs *regs)
 			}
 			break;
 
-
 		case 'k':    /* kill the program, actually return to monitor */
 			kd.extype = KGDBEXIT_KILL;
 			*regs = entry_regs;
@@ -527,15 +525,18 @@ handle_exception (struct pt_regs *regs)
  * kgdb_init must be called *after* the
  * monitor is relocated into ram
  */
-void
-kgdb_init(void)
+int kgdb_init(void)
 {
+	puts("KGDB:  ");
+
 	kgdb_serial_init();
 	debugger_exception_handler = handle_exception;
 	initialized = 1;
 
 	putDebugStr("kgdb ready\n");
 	puts("ready\n");
+
+	return 0;
 }
 
 void

@@ -1,8 +1,5 @@
 if ARCH_SUNXI
 
-config SPL_LDSCRIPT
-	default "arch/arm/cpu/armv7/sunxi/u-boot-spl.lds" if !ARM64
-
 config IDENT_STRING
 	default " Allwinner Technology"
 
@@ -55,49 +52,78 @@ config DRAM_SUN50I_H616
 	  like H616.
 
 if DRAM_SUN50I_H616
-config DRAM_SUN50I_H616_WRITE_LEVELING
-	bool "H616 DRAM write leveling"
-	---help---
-	  Select this when DRAM on your H616 board needs write leveling.
-
-config DRAM_SUN50I_H616_READ_CALIBRATION
-	bool "H616 DRAM read calibration"
-	---help---
-	  Select this when DRAM on your H616 board needs read calibration.
-
-config DRAM_SUN50I_H616_READ_TRAINING
-	bool "H616 DRAM read training"
-	---help---
-	  Select this when DRAM on your H616 board needs read training.
-
-config DRAM_SUN50I_H616_WRITE_TRAINING
-	bool "H616 DRAM write training"
-	---help---
-	  Select this when DRAM on your H616 board needs write training.
-
-config DRAM_SUN50I_H616_BIT_DELAY_COMPENSATION
-	bool "H616 DRAM bit delay compensation"
-	---help---
-	  Select this when DRAM on your H616 board needs bit delay
-	  compensation.
-
-config DRAM_SUN50I_H616_UNKNOWN_FEATURE
-	bool "H616 DRAM unknown feature"
-	---help---
-	  Select this when DRAM on your H616 board needs this unknown
-	  feature.
-endif
-
-config SUN6I_P2WI
-	bool "Allwinner sun6i internal P2WI controller"
+config DRAM_SUNXI_DX_ODT
+	hex "DRAM DX ODT parameter"
 	help
-	  If you say yes to this option, support will be included for the
-	  P2WI (Push/Pull 2 Wire Interface) controller embedded in some sunxi
-	  SOCs.
-	  The P2WI looks like an SMBus controller (which supports only byte
-	  accesses), except that it only supports one slave device.
-	  This interface is used to connect to specific PMIC devices (like the
-	  AXP221).
+	  DX ODT value from vendor DRAM settings.
+
+config DRAM_SUNXI_DX_DRI
+	hex "DRAM DX DRI parameter"
+	help
+	  DX DRI value from vendor DRAM settings.
+
+config DRAM_SUNXI_CA_DRI
+	hex "DRAM CA DRI parameter"
+	help
+	  CA DRI value from vendor DRAM settings.
+
+config DRAM_SUNXI_ODT_EN
+	hex "DRAM ODT EN parameter"
+	default 0x1
+	help
+	  ODT EN value from vendor DRAM settings.
+
+config DRAM_SUNXI_TPR0
+	hex "DRAM TPR0 parameter"
+	default 0x0
+	help
+	  TPR0 value from vendor DRAM settings.
+
+config DRAM_SUNXI_TPR2
+	hex "DRAM TPR2 parameter"
+	default 0x0
+	help
+	  TPR2 value from vendor DRAM settings.
+
+config DRAM_SUNXI_TPR6
+	hex "DRAM TPR6 parameter"
+	default 0x3300c080
+	help
+	  TPR6 value from vendor DRAM settings.
+
+config DRAM_SUNXI_TPR10
+	hex "DRAM TPR10 parameter"
+	help
+	  TPR10 value from vendor DRAM settings. It tells which features
+	  should be configured, like write leveling, read calibration, etc.
+
+config DRAM_SUNXI_TPR11
+	hex "DRAM TPR11 parameter"
+	default 0x0
+	help
+	  TPR11 value from vendor DRAM settings.
+
+config DRAM_SUNXI_TPR12
+	hex "DRAM TPR12 parameter"
+	default 0x0
+	help
+	  TPR12 value from vendor DRAM settings.
+
+choice
+	prompt "DRAM PHY pin mapping selection"
+	default DRAM_SUNXI_PHY_ADDR_MAP_0
+
+config DRAM_SUNXI_PHY_ADDR_MAP_0
+	bool "DRAM PHY address map 0"
+	help
+	  This pin mapping selection should be used by the H313, H616, H618.
+
+config DRAM_SUNXI_PHY_ADDR_MAP_1
+	bool "DRAM PHY address map 1"
+	help
+	  This pin mapping selection should be used by the H700.
+endchoice
+endif
 
 config SUN6I_PRCM
 	bool
@@ -106,29 +132,66 @@ config SUN6I_PRCM
 	  in A31 SoC.
 
 config AXP_PMIC_BUS
-	bool "Sunxi AXP PMIC bus access helpers"
+	bool
+	select DM_PMIC if DM_I2C
+	select PMIC_AXP if DM_I2C
 	help
 	  Select this PMIC bus access helpers for Sunxi platform PRCM or other
 	  AXP family PMIC devices.
 
-config SUN8I_RSB
-	bool "Allwinner sunXi Reduced Serial Bus Driver"
-	help
-	  Say y here to enable support for Allwinner's Reduced Serial Bus
-	  (RSB) support. This controller is responsible for communicating
-	  with various RSB based devices, such as AXP223, AXP8XX PMICs,
-	  and AC100/AC200 ICs.
-
 config SUNXI_SRAM_ADDRESS
 	hex
 	default 0x10000 if MACH_SUN9I || MACH_SUN50I || MACH_SUN50I_H5
-	default 0x20000 if SUN50I_GEN_H6
+	default 0x20000 if SUN50I_GEN_H6 || SUNXI_GEN_NCAT2
 	default 0x0
 	---help---
 	Older Allwinner SoCs have their mask boot ROM mapped just below 4GB,
 	with the first SRAM region being located at address 0.
 	Some newer SoCs map the boot ROM at address 0 instead and move the
 	SRAM to a different address.
+
+config SUNXI_RVBAR_ADDRESS
+	hex
+	depends on ARM64
+	default 0x09010040 if SUN50I_GEN_H6
+	default 0x017000a0
+	---help---
+	The read-only RVBAR system register holds the address of the first
+	instruction to execute after a reset. Allwinner cores provide a
+	writable MMIO backing store for this register, to allow to set the
+	entry point when switching to AArch64. This store is on different
+	addresses, depending on the SoC.
+
+config SUNXI_RVBAR_ALTERNATIVE
+	hex
+	depends on ARM64
+	default 0x08100040 if MACH_SUN50I_H616
+	default SUNXI_RVBAR_ADDRESS
+	---help---
+	The H616 die exists in at least two variants, with one having the
+	RVBAR registers at a different address. If the SoC variant ID
+	(stored in SRAM_VER_REG[7:0]) is not 0, we need to use the
+	other address.
+	Set this alternative address to the same as the normal address
+	for all other SoCs, so the content of the SRAM_VER_REG becomes
+	irrelevant there, and we can use the same code.
+
+config SUNXI_BL31_BASE
+	hex
+	default 0x00044000 if MACH_SUN50I || MACH_SUN50I_H5
+	default 0x00104000 if MACH_SUN50I_H6
+	default 0x40000000 if MACH_SUN50I_H616
+	default 0x0
+	help
+	  Address where BL31 (TF-A) is loaded, or zero if BL31 is not used.
+
+config SUNXI_SCP_BASE
+	hex
+	default 0x00050000 if MACH_SUN50I || MACH_SUN50I_H5
+	default 0x00114000 if MACH_SUN50I_H6
+	default 0x0
+	help
+	  Address where SCP firmware is loaded, or zero if it is not used.
 
 config SUNXI_A64_TIMER_ERRATUM
 	bool
@@ -151,10 +214,19 @@ config SUNXI_GEN_SUN6I
 config SUN50I_GEN_H6
 	bool
 	select FIT
-	select SPL_LOAD_FIT
+	select SPL_LOAD_FIT if SPL
+	select MMC_SUNXI_HAS_NEW_MODE
 	select SUPPORT_SPL
 	---help---
 	Select this for sunxi SoCs which have H6 like peripherals, clocks
+	and memory map.
+
+config SUNXI_GEN_NCAT2
+	bool
+	select MMC_SUNXI_HAS_NEW_MODE
+	select SUPPORT_SPL
+	---help---
+	Select this for sunxi SoCs which have D1 like peripherals, clocks
 	and memory map.
 
 config SUNXI_DRAM_DW
@@ -181,8 +253,6 @@ endif
 
 config MACH_SUNXI_H3_H5
 	bool
-	select DM_I2C
-	select PHY_SUN4I_USB
 	select SUNXI_DE2
 	select SUNXI_DRAM_DW
 	select SUNXI_DRAM_DW_32BIT
@@ -190,34 +260,44 @@ config MACH_SUNXI_H3_H5
 	select SUPPORT_SPL
 
 # TODO: try out A80's 8GiB DRAM space
-# TODO: H616 supports 4 GiB DRAM space
 config SUNXI_DRAM_MAX_SIZE
 	hex
-	default 0xC0000000 if MACH_SUN50I || MACH_SUN50I_H5 || MACH_SUN50I_H6 || MACH_SUN50I_H616
+	default 0x100000000 if MACH_SUN50I_H616
+	default 0xC0000000 if MACH_SUN50I || MACH_SUN50I_H5 || MACH_SUN50I_H6
 	default 0x80000000
 
 choice
 	prompt "Sunxi SoC Variant"
 	optional
 
+config MACH_SUNIV
+	bool "suniv (Allwinner F1C100s/F1C200s/F1C600/R6)"
+	select CPU_ARM926EJS
+	select SUNXI_GEN_SUN6I
+	select SUPPORT_SPL
+	select SKIP_LOWLEVEL_INIT_ONLY
+	select SPL_SKIP_LOWLEVEL_INIT_ONLY
+	imply OF_UPSTREAM
+
 config MACH_SUN4I
 	bool "sun4i (Allwinner A10)"
 	select CPU_V7A
-	select ARM_CORTEX_CPU_IS_UP
-	select PHY_SUN4I_USB
 	select DRAM_SUN4I
 	select SUNXI_GEN_SUN4I
 	select SUPPORT_SPL
+	imply SPL_SYS_I2C_LEGACY
+	imply SYS_I2C_LEGACY
+	imply OF_UPSTREAM
 
 config MACH_SUN5I
 	bool "sun5i (Allwinner A13)"
 	select CPU_V7A
-	select ARM_CORTEX_CPU_IS_UP
 	select DRAM_SUN4I
-	select PHY_SUN4I_USB
 	select SUNXI_GEN_SUN4I
 	select SUPPORT_SPL
-	imply CONS_INDEX_2 if !DM_SERIAL
+	imply SPL_SYS_I2C_LEGACY
+	imply SYS_I2C_LEGACY
+	imply OF_UPSTREAM
 
 config MACH_SUN6I
 	bool "sun6i (Allwinner A31)"
@@ -225,12 +305,13 @@ config MACH_SUN6I
 	select CPU_V7_HAS_NONSEC
 	select CPU_V7_HAS_VIRT
 	select ARCH_SUPPORT_PSCI
+	select SPL_ARMV7_SET_CORTEX_SMPEN
 	select DRAM_SUN6I
-	select PHY_SUN4I_USB
-	select SUN6I_P2WI
+	select SPL_I2C if SPL
 	select SUN6I_PRCM
 	select SUNXI_GEN_SUN6I
 	select SUPPORT_SPL
+	select SYS_I2C_SUN6I_P2WI
 	select ARMV7_BOOT_SEC_DEFAULT if OLD_SUNXI_KERNEL_COMPAT
 
 config MACH_SUN7I
@@ -239,11 +320,13 @@ config MACH_SUN7I
 	select CPU_V7_HAS_NONSEC
 	select CPU_V7_HAS_VIRT
 	select ARCH_SUPPORT_PSCI
+	select SPL_ARMV7_SET_CORTEX_SMPEN
 	select DRAM_SUN4I
-	select PHY_SUN4I_USB
 	select SUNXI_GEN_SUN4I
 	select SUPPORT_SPL
 	select ARMV7_BOOT_SEC_DEFAULT if OLD_SUNXI_KERNEL_COMPAT
+	imply SPL_SYS_I2C_LEGACY
+	imply SYS_I2C_LEGACY
 
 config MACH_SUN8I_A23
 	bool "sun8i (Allwinner A23)"
@@ -252,11 +335,11 @@ config MACH_SUN8I_A23
 	select CPU_V7_HAS_VIRT
 	select ARCH_SUPPORT_PSCI
 	select DRAM_SUN8I_A23
-	select PHY_SUN4I_USB
+	select SPL_I2C if SPL
 	select SUNXI_GEN_SUN6I
 	select SUPPORT_SPL
+	select SYS_I2C_SUN8I_RSB
 	select ARMV7_BOOT_SEC_DEFAULT if OLD_SUNXI_KERNEL_COMPAT
-	imply CONS_INDEX_5 if !DM_SERIAL
 
 config MACH_SUN8I_A33
 	bool "sun8i (Allwinner A33)"
@@ -265,21 +348,22 @@ config MACH_SUN8I_A33
 	select CPU_V7_HAS_VIRT
 	select ARCH_SUPPORT_PSCI
 	select DRAM_SUN8I_A33
-	select PHY_SUN4I_USB
+	select SPL_I2C if SPL
 	select SUNXI_GEN_SUN6I
 	select SUPPORT_SPL
+	select SYS_I2C_SUN8I_RSB
 	select ARMV7_BOOT_SEC_DEFAULT if OLD_SUNXI_KERNEL_COMPAT
-	imply CONS_INDEX_5 if !DM_SERIAL
 
 config MACH_SUN8I_A83T
 	bool "sun8i (Allwinner A83T)"
 	select CPU_V7A
 	select DRAM_SUN8I_A83T
-	select PHY_SUN4I_USB
+	select SPL_I2C if SPL
 	select SUNXI_GEN_SUN6I
 	select MMC_SUNXI_HAS_NEW_MODE
 	select MMC_SUNXI_HAS_MODE_SWITCH
 	select SUPPORT_SPL
+	select SYS_I2C_SUN8I_RSB
 
 config MACH_SUN8I_H3
 	bool "sun8i (Allwinner H3)"
@@ -297,10 +381,24 @@ config MACH_SUN8I_R40
 	select CPU_V7_HAS_VIRT
 	select ARCH_SUPPORT_PSCI
 	select SUNXI_GEN_SUN6I
+	select MMC_SUNXI_HAS_NEW_MODE
 	select SUPPORT_SPL
 	select SUNXI_DRAM_DW
 	select SUNXI_DRAM_DW_32BIT
-	select PHY_SUN4I_USB
+	imply SPL_SYS_I2C_LEGACY
+
+config MACH_SUN8I_R528
+	bool "sun8i (Allwinner R528)"
+	select CPU_V7A
+	select CPU_V7_HAS_NONSEC
+	select CPU_V7_HAS_VIRT
+	select ARCH_SUPPORT_PSCI
+	select SPL_ARMV7_SET_CORTEX_SMPEN
+	select SUNXI_GEN_NCAT2
+	select SUNXI_NEW_PINCTRL
+	select MMC_SUNXI_HAS_NEW_MODE
+	select SUPPORT_SPL
+	select DRAM_SUN20I_D1
 
 config MACH_SUN8I_V3S
 	bool "sun8i (Allwinner V3/V3s/S3/S3L)"
@@ -317,20 +415,16 @@ config MACH_SUN8I_V3S
 config MACH_SUN9I
 	bool "sun9i (Allwinner A80)"
 	select CPU_V7A
+	select SPL_ARMV7_SET_CORTEX_SMPEN
 	select DRAM_SUN9I
+	select SPL_I2C if SPL
 	select SUN6I_PRCM
 	select SUNXI_GEN_SUN6I
-	select SUN8I_RSB
 	select SUPPORT_SPL
 
 config MACH_SUN50I
 	bool "sun50i (Allwinner A64)"
 	select ARM64
-	select SPI
-	select DM_I2C
-	select DM_SPI if SPI
-	select DM_SPI_FLASH
-	select PHY_SUN4I_USB
 	select SUN6I_PRCM
 	select SUNXI_DE2
 	select SUNXI_GEN_SUN6I
@@ -339,20 +433,20 @@ config MACH_SUN50I
 	select SUNXI_DRAM_DW
 	select SUNXI_DRAM_DW_32BIT
 	select FIT
-	select SPL_LOAD_FIT
+	select SPL_LOAD_FIT if SPL
 	select SUNXI_A64_TIMER_ERRATUM
 
 config MACH_SUN50I_H5
 	bool "sun50i (Allwinner H5)"
 	select ARM64
 	select MACH_SUNXI_H3_H5
+	select MMC_SUNXI_HAS_NEW_MODE
 	select FIT
-	select SPL_LOAD_FIT
+	select SPL_LOAD_FIT if SPL
 
 config MACH_SUN50I_H6
 	bool "sun50i (Allwinner H6)"
 	select ARM64
-	select PHY_SUN4I_USB
 	select DRAM_SUN50I_H6
 	select SUN50I_GEN_H6
 
@@ -361,13 +455,17 @@ config MACH_SUN50I_H616
 	select ARM64
 	select DRAM_SUN50I_H616
 	select SUN50I_GEN_H6
+	imply OF_UPSTREAM
+
+config MACH_SUN50I_A133
+	bool "sun50i (Allwinner A133)"
 
 endchoice
 
 # The sun8i SoCs share a lot, this helps to avoid a lot of "if A23 || A33"
 config MACH_SUN8I
 	bool
-	select SUN8I_RSB
+	select SPL_ARMV7_SET_CORTEX_SMPEN if !ARM64
 	select SUN6I_PRCM
 	default y if MACH_SUN8I_A23
 	default y if MACH_SUN8I_A33
@@ -399,7 +497,7 @@ config ARM_BOOT_HOOK_RMR
 	This allows both the SPL and the U-Boot proper to be entered in
 	either mode and switch to AArch64 if needed.
 
-if SUNXI_DRAM_DW || DRAM_SUN50I_H6
+if SUNXI_DRAM_DW || DRAM_SUN50I_H6 || DRAM_SUN50I_H616
 config SUNXI_DRAM_DDR3
 	bool
 
@@ -407,6 +505,9 @@ config SUNXI_DRAM_DDR2
 	bool
 
 config SUNXI_DRAM_LPDDR3
+	bool
+
+config SUNXI_DRAM_LPDDR4
 	bool
 
 choice
@@ -443,6 +544,30 @@ config SUNXI_DRAM_H6_DDR3_1333
 	---help---
 	This option is the DDR3 timing used by the boot0 on H6 TV boxes
 	which use a DDR3-1333 timing.
+
+config SUNXI_DRAM_H616_LPDDR3
+	bool "LPDDR3 DRAM chips on the H616 DRAM controller"
+	select SUNXI_DRAM_LPDDR3
+	depends on DRAM_SUN50I_H616
+	help
+	  This option is the LPDDR3 timing used by the stock boot0 by
+	  Allwinner.
+
+config SUNXI_DRAM_H616_LPDDR4
+	bool "LPDDR4 DRAM chips on the H616 DRAM controller"
+	select SUNXI_DRAM_LPDDR4
+	depends on DRAM_SUN50I_H616
+	help
+	  This option is the LPDDR4 timing used by the stock boot0 by
+	  Allwinner.
+
+config SUNXI_DRAM_H616_DDR3_1333
+	bool "DDR3-1333 boot0 timings on the H616 DRAM controller"
+	select SUNXI_DRAM_DDR3
+	depends on DRAM_SUN50I_H616
+	help
+	  This option is the DDR3 timing used by the boot0 on H616 TV boxes
+	  which use a DDR3-1333 timing.
 
 config SUNXI_DRAM_DDR2_V3S
 	bool "DDR2 found in V3s chip"
@@ -501,12 +626,12 @@ config DRAM_ZQ
 
 config DRAM_ODT_EN
 	bool "sunxi dram odt enable"
+	depends on !MACH_SUN50I_H616
 	default y if MACH_SUN8I_A23
 	default y if MACH_SUNXI_H3_H5
 	default y if MACH_SUN8I_R40
 	default y if MACH_SUN50I
 	default y if MACH_SUN50I_H6
-	default y if MACH_SUN50I_H616
 	---help---
 	Select this to enable dram odt (on die termination).
 
@@ -520,7 +645,7 @@ config DRAM_EMR1
 
 config DRAM_TPR3
 	hex "sunxi dram tpr3 value"
-	default 0
+	default 0x0
 	---help---
 	Set the dram controller tpr3 parameter. This parameter configures
 	the delay on the command lane and also phase shifts, which are
@@ -531,7 +656,7 @@ config DRAM_TPR3
 
 config DRAM_DQS_GATING_DELAY
 	hex "sunxi dram dqs_gating_delay value"
-	default 0
+	default 0x0
 	---help---
 	Set the dram controller dqs_gating_delay parmeter. Each byte
 	encodes the DQS gating delay for each byte lane. The delay
@@ -590,22 +715,20 @@ config DRAM_ODT_CORRECTION
 endif
 
 config SYS_CLK_FREQ
-	default 1008000000 if MACH_SUN4I
-	default 1008000000 if MACH_SUN5I
-	default 1008000000 if MACH_SUN6I
-	default 912000000 if MACH_SUN7I
+	default 408000000 if MACH_SUNIV
 	default 816000000 if MACH_SUN50I || MACH_SUN50I_H5
-	default 1008000000 if MACH_SUN8I
-	default 1008000000 if MACH_SUN9I
 	default 888000000 if MACH_SUN50I_H6
-	default 1008000000 if MACH_SUN50I_H616
+	default 912000000 if MACH_SUN7I
+	default 1008000000
 
 config SYS_CONFIG_NAME
+	default "suniv" if MACH_SUNIV
 	default "sun4i" if MACH_SUN4I
 	default "sun5i" if MACH_SUN5I
 	default "sun6i" if MACH_SUN6I
 	default "sun7i" if MACH_SUN7I
 	default "sun8i" if MACH_SUN8I
+	default "sun8i" if MACH_SUN8I_R528
 	default "sun9i" if MACH_SUN9I
 	default "sun50i" if MACH_SUN50I
 	default "sun50i" if MACH_SUN50I_H6
@@ -617,9 +740,20 @@ config SYS_BOARD
 config SYS_SOC
 	default "sunxi"
 
+config SUNXI_MINIMUM_DRAM_MB
+	int "minimum DRAM size"
+	default 32 if MACH_SUNIV
+	default 64 if MACH_SUN8I_V3S
+	default 256
+	---help---
+	Minimum DRAM size expected on the board. Traditionally we assumed
+	256 MB, so that U-Boot would load at 160MB. With co-packaged DRAM
+	we have smaller sizes, though, so that U-Boot's own load address and
+	the default payload addresses must be shifted down.
+	This is expected to be fixed by the SoC selection.
+
 config UART0_PORT_F
 	bool "UART0 on MicroSD breakout board"
-	default n
 	---help---
 	Repurpose the SD card slot for getting access to the UART0 serial
 	console. Primarily useful only for low level u-boot debugging on
@@ -630,63 +764,15 @@ config UART0_PORT_F
 
 config OLD_SUNXI_KERNEL_COMPAT
 	bool "Enable workarounds for booting old kernels"
-	default n
 	---help---
 	Set this to enable various workarounds for old kernels, this results in
 	sub-optimal settings for newer kernels, only enable if needed.
 
-config MACPWR
-	string "MAC power pin"
-	default ""
-	help
-	  Set the pin used to power the MAC. This takes a string in the format
-	  understood by sunxi_name_to_gpio, e.g. PH1 for pin 1 of port H.
-
-config MMC0_CD_PIN
-	string "Card detect pin for mmc0"
-	default "PF6" if MACH_SUN8I_A83T || MACH_SUNXI_H3_H5 || MACH_SUN50I
-	default ""
+config MMC1_PINS_PH
+	bool "Pins for mmc1 are on Port H"
+	depends on MACH_SUN4I || MACH_SUN7I || MACH_SUN8I_R40
 	---help---
-	Set the card detect pin for mmc0, leave empty to not use cd. This
-	takes a string in the format understood by sunxi_name_to_gpio, e.g.
-	PH1 for pin 1 of port H.
-
-config MMC1_CD_PIN
-	string "Card detect pin for mmc1"
-	default ""
-	---help---
-	See MMC0_CD_PIN help text.
-
-config MMC2_CD_PIN
-	string "Card detect pin for mmc2"
-	default ""
-	---help---
-	See MMC0_CD_PIN help text.
-
-config MMC3_CD_PIN
-	string "Card detect pin for mmc3"
-	default ""
-	---help---
-	See MMC0_CD_PIN help text.
-
-config MMC1_PINS
-	string "Pins for mmc1"
-	default ""
-	---help---
-	Set the pins used for mmc1, when applicable. This takes a string in the
-	format understood by sunxi_name_to_gpio_bank, e.g. PH for port H.
-
-config MMC2_PINS
-	string "Pins for mmc2"
-	default ""
-	---help---
-	See MMC1_PINS help text.
-
-config MMC3_PINS
-	string "Pins for mmc3"
-	default ""
-	---help---
-	See MMC1_PINS help text.
+	Select this option for boards where mmc1 uses the Port H pinmux.
 
 config MMC_SUNXI_SLOT_EXTRA
 	int "mmc extra slot number"
@@ -695,58 +781,6 @@ config MMC_SUNXI_SLOT_EXTRA
 	sunxi builds always enable mmc0, some boards also have a second sdcard
 	slot or emmc on mmc1 - mmc3. Setting this to 1, 2 or 3 will enable
 	support for this.
-
-config INITIAL_USB_SCAN_DELAY
-	int "delay initial usb scan by x ms to allow builtin devices to init"
-	default 0
-	---help---
-	Some boards have on board usb devices which need longer than the
-	USB spec's 1 second to connect from board powerup. Set this config
-	option to a non 0 value to add an extra delay before the first usb
-	bus scan.
-
-config USB0_VBUS_PIN
-	string "Vbus enable pin for usb0 (otg)"
-	default ""
-	---help---
-	Set the Vbus enable pin for usb0 (otg). This takes a string in the
-	format understood by sunxi_name_to_gpio, e.g. PH1 for pin 1 of port H.
-
-config USB0_VBUS_DET
-	string "Vbus detect pin for usb0 (otg)"
-	default ""
-	---help---
-	Set the Vbus detect pin for usb0 (otg). This takes a string in the
-	format understood by sunxi_name_to_gpio, e.g. PH1 for pin 1 of port H.
-
-config USB0_ID_DET
-	string "ID detect pin for usb0 (otg)"
-	default ""
-	---help---
-	Set the ID detect pin for usb0 (otg). This takes a string in the
-	format understood by sunxi_name_to_gpio, e.g. PH1 for pin 1 of port H.
-
-config USB1_VBUS_PIN
-	string "Vbus enable pin for usb1 (ehci0)"
-	default "PH6" if MACH_SUN4I || MACH_SUN7I
-	default "PH27" if MACH_SUN6I
-	---help---
-	Set the Vbus enable pin for usb1 (ehci0, usb0 is the otg). This takes
-	a string in the format understood by sunxi_name_to_gpio, e.g.
-	PH1 for pin 1 of port H.
-
-config USB2_VBUS_PIN
-	string "Vbus enable pin for usb2 (ehci1)"
-	default "PH3" if MACH_SUN4I || MACH_SUN7I
-	default "PH24" if MACH_SUN6I
-	---help---
-	See USB1_VBUS_PIN help text.
-
-config USB3_VBUS_PIN
-	string "Vbus enable pin for usb3 (ehci2)"
-	default ""
-	---help---
-	See USB1_VBUS_PIN help text.
 
 config I2C0_ENABLE
 	bool "Enable I2C/TWI controller 0"
@@ -761,26 +795,9 @@ config I2C0_ENABLE
 
 config I2C1_ENABLE
 	bool "Enable I2C/TWI controller 1"
-	default n
 	select CMD_I2C
 	---help---
 	See I2C0_ENABLE help text.
-
-config I2C2_ENABLE
-	bool "Enable I2C/TWI controller 2"
-	default n
-	select CMD_I2C
-	---help---
-	See I2C0_ENABLE help text.
-
-if MACH_SUN6I || MACH_SUN7I
-config I2C3_ENABLE
-	bool "Enable I2C/TWI controller 3"
-	default n
-	select CMD_I2C
-	---help---
-	See I2C0_ENABLE help text.
-endif
 
 if SUNXI_GEN_SUN6I || SUN50I_GEN_H6
 config R_I2C_ENABLE
@@ -792,20 +809,20 @@ config R_I2C_ENABLE
 	Set this to y to enable the I2C controller which is part of the PRCM.
 endif
 
-if MACH_SUN7I
-config I2C4_ENABLE
-	bool "Enable I2C/TWI controller 4"
-	default n
-	select CMD_I2C
-	---help---
-	See I2C0_ENABLE help text.
-endif
-
 config AXP_GPIO
 	bool "Enable support for gpio-s on axp PMICs"
-	default n
+	depends on AXP_PMIC_BUS
 	---help---
 	Say Y here to enable support for the gpio pins of the axp PMIC ICs.
+
+config AXP_DISABLE_BOOT_ON_POWERON
+	bool "Disable device boot on power plug-in"
+	depends on AXP209_POWER || AXP221_POWER || AXP809_POWER || AXP818_POWER
+	---help---
+	  Say Y here to prevent the device from booting up because of a plug-in
+	  event. When set, the device will boot into the SPL briefly to
+	  determine why it was powered on, and if it was determined because of
+	  a plug-in event instead of a button press event it will shut back off.
 
 config VIDEO_SUNXI
 	bool "Enable graphical uboot console on HDMI, LCD or VGA"
@@ -816,17 +833,20 @@ config VIDEO_SUNXI
 	depends on !MACH_SUN9I
 	depends on !MACH_SUN50I
 	depends on !SUN50I_GEN_H6
+	depends on !SUNXI_GEN_NCAT2
 	select VIDEO
+	select DISPLAY
+	imply VIDEO_DAMAGE
 	imply VIDEO_DT_SIMPLEFB
 	default y
 	---help---
-	Say Y here to add support for using a cfb console on the HDMI, LCD
-	or VGA output found on most sunxi devices. See doc/README.video for
-	info on how to select the video output and mode.
+	Say Y here to add support for using a graphical console on the HDMI,
+	LCD or VGA output found on older sunxi devices. This will also provide
+	a simple_framebuffer device for Linux.
 
 config VIDEO_HDMI
 	bool "HDMI output support"
-	depends on VIDEO_SUNXI && !MACH_SUN8I
+	depends on VIDEO_SUNXI && !MACH_SUN8I && !MACH_SUNIV
 	default y
 	---help---
 	Say Y here to add support for outputting video over HDMI.
@@ -834,14 +854,12 @@ config VIDEO_HDMI
 config VIDEO_VGA
 	bool "VGA output support"
 	depends on VIDEO_SUNXI && (MACH_SUN4I || MACH_SUN7I)
-	default n
 	---help---
 	Say Y here to add support for outputting video over VGA.
 
 config VIDEO_VGA_VIA_LCD
 	bool "VGA via LCD controller support"
 	depends on VIDEO_SUNXI && (MACH_SUN5I || MACH_SUN6I || MACH_SUN8I)
-	default n
 	---help---
 	Say Y here to add support for external DACs connected to the parallel
 	LCD interface driving a VGA connector, such as found on the
@@ -850,7 +868,6 @@ config VIDEO_VGA_VIA_LCD
 config VIDEO_VGA_VIA_LCD_FORCE_SYNC_ACTIVE_HIGH
 	bool "Force sync active high for VGA via LCD controller support"
 	depends on VIDEO_VGA_VIA_LCD
-	default n
 	---help---
 	Say Y here if you've a board which uses opendrain drivers for the vga
 	hsync and vsync signals. Opendrain drivers cannot generate steep enough
@@ -868,7 +885,6 @@ config VIDEO_VGA_EXTERNAL_DAC_EN
 config VIDEO_COMPOSITE
 	bool "Composite video output support"
 	depends on VIDEO_SUNXI && (MACH_SUN4I || MACH_SUN5I || MACH_SUN7I)
-	default n
 	---help---
 	Say Y here to add support for outputting composite video.
 
@@ -884,10 +900,11 @@ config VIDEO_LCD_MODE
 
 config VIDEO_LCD_DCLK_PHASE
 	int "LCD panel display clock phase"
-	depends on VIDEO_SUNXI || DM_VIDEO
+	depends on VIDEO_SUNXI || VIDEO
 	default 1
+	range 0 3
 	---help---
-	Select LCD panel display clock phase shift, range 0-3.
+	Select LCD panel display clock phase shift
 
 config VIDEO_LCD_POWER
 	string "LCD panel power enable pin"
@@ -932,28 +949,17 @@ config VIDEO_LCD_BL_PWM_ACTIVE_LOW
 config VIDEO_LCD_PANEL_I2C
 	bool "LCD panel needs to be configured via i2c"
 	depends on VIDEO_SUNXI
-	default n
-	select CMD_I2C
+	select DM_I2C_GPIO
 	---help---
 	Say y here if the LCD panel needs to be configured via i2c. This
 	will add a bitbang i2c controller using gpios to talk to the LCD.
 
-config VIDEO_LCD_PANEL_I2C_SDA
-	string "LCD panel i2c interface SDA pin"
+config VIDEO_LCD_PANEL_I2C_NAME
+	string "LCD panel i2c interface node name"
 	depends on VIDEO_LCD_PANEL_I2C
-	default "PG12"
+	default "i2c"
 	---help---
-	Set the SDA pin for the LCD i2c interface. This takes a string in the
-	format understood by sunxi_name_to_gpio, e.g. PH1 for pin 1 of port H.
-
-config VIDEO_LCD_PANEL_I2C_SCL
-	string "LCD panel i2c interface SCL pin"
-	depends on VIDEO_LCD_PANEL_I2C
-	default "PG10"
-	---help---
-	Set the SCL pin for the LCD i2c interface. This takes a string in the
-	format understood by sunxi_name_to_gpio, e.g. PH1 for pin 1 of port H.
-
+	Set the device tree node name for the LCD i2c interface.
 
 # Note only one of these may be selected at a time! But hidden choices are
 # not supported by Kconfig
@@ -965,13 +971,13 @@ config VIDEO_LCD_IF_LVDS
 
 config SUNXI_DE2
 	bool
-	default n
 
 config VIDEO_DE2
 	bool "Display Engine 2 video driver"
 	depends on SUNXI_DE2
-	select DM_VIDEO
+	select VIDEO
 	select DISPLAY
+	select VIDEO_DW_HDMI
 	imply VIDEO_DT_SIMPLEFB
 	default y
 	---help---
@@ -1026,14 +1032,6 @@ config VIDEO_LCD_TL059WV5C0
 
 endchoice
 
-config SATAPWR
-	string "SATA power pin"
-	default ""
-	help
-	  Set the pins used to power the SATA. This takes a string in the
-	  format understood by sunxi_name_to_gpio, e.g. PH1 for pin 1 of
-	  port H.
-
 config GMAC_TX_DELAY
 	int "GMAC Transmit Clock Delay Chain"
 	default 0
@@ -1041,6 +1039,7 @@ config GMAC_TX_DELAY
 	Set the GMAC Transmit Clock Delay Chain value.
 
 config SPL_STACK_R_ADDR
+	default 0x81e00000 if MACH_SUNIV
 	default 0x4fe00000 if MACH_SUN4I
 	default 0x4fe00000 if MACH_SUN5I
 	default 0x4fe00000 if MACH_SUN6I
@@ -1049,10 +1048,11 @@ config SPL_STACK_R_ADDR
 	default 0x2fe00000 if MACH_SUN9I
 	default 0x4fe00000 if MACH_SUN50I
 	default 0x4fe00000 if SUN50I_GEN_H6
+	default 0x4fe00000 if SUNXI_GEN_NCAT2
 
 config SPL_SPI_SUNXI
 	bool "Support for SPI Flash on Allwinner SoCs in SPL"
-	depends on MACH_SUN4I || MACH_SUN5I || MACH_SUN7I || MACH_SUNXI_H3_H5 || MACH_SUN50I || MACH_SUN8I_R40 || MACH_SUN50I_H6
+	depends on MACH_SUN4I || MACH_SUN5I || MACH_SUN7I || MACH_SUNXI_H3_H5 || MACH_SUN50I || MACH_SUN8I_R40 || MACH_SUN8I_V3S || SUN50I_GEN_H6 || MACH_SUNIV || SUNXI_GEN_NCAT2
 	help
 	  Enable support for SPI Flash. This option allows SPL to read from
 	  sunxi SPI Flash. It uses the same method as the boot ROM, so does
@@ -1085,5 +1085,16 @@ config BLUETOOTH_DT_DEVICE_FIXUP
 	  default address.
 	  The used address is "bdaddr" if set, and "ethaddr" with the LSB
 	  flipped elsewise.
+
+config CHIP_DIP_SCAN
+	bool "Enable DIPs detection for CHIP board"
+	select SUPPORT_EXTENSION_SCAN
+	select W1
+	select W1_GPIO
+	select W1_EEPROM
+	select W1_EEPROM_DS24XXX
+	select CMD_EXTENSION
+
+source "board/sunxi/Kconfig"
 
 endif

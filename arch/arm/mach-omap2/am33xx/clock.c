@@ -5,9 +5,8 @@
  * Clock initialization for AM33XX boards.
  * Derived from OMAP4 boards
  *
- * Copyright (C) 2013, Texas Instruments, Incorporated - http://www.ti.com/
+ * Copyright (C) 2013, Texas Instruments, Incorporated - https://www.ti.com/
  */
-#include <common.h>
 #include <hang.h>
 #include <init.h>
 #include <log.h>
@@ -213,7 +212,6 @@ void do_disable_clocks(u32 *const *clk_domains,
 			u8 wait_for_disable)
 {
 	u32 i, max = 100;
-
 
 	/* Clock modules that need to be put in SW_DISABLE */
 	for (i = 0; (i < max) && clk_modules_disable && clk_modules_disable[i];

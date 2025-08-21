@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2019-2020 Linaro Limited
+ * Copyright (C) 2019-2022 Linaro Limited
  */
-#include <common.h>
+
+#define LOG_CATEGORY UCLASS_RESET
+
 #include <dm.h>
 #include <errno.h>
 #include <reset-uclass.h>
 #include <scmi_agent.h>
+#include <scmi_agent-uclass.h>
 #include <scmi_protocols.h>
 #include <asm/types.h>
 
@@ -23,7 +26,7 @@ static int scmi_reset_set_level(struct reset_ctl *rst, bool assert_not_deassert)
 					  in, out);
 	int ret;
 
-	ret = devm_scmi_process_msg(rst->dev->parent, &msg);
+	ret = devm_scmi_process_msg(rst->dev, &msg);
 	if (ret)
 		return ret;
 
@@ -55,27 +58,34 @@ static int scmi_reset_request(struct reset_ctl *rst)
 	 * We don't really care about the attribute, just check
 	 * the reset domain exists.
 	 */
-	ret = devm_scmi_process_msg(rst->dev->parent, &msg);
+	ret = devm_scmi_process_msg(rst->dev, &msg);
 	if (ret)
 		return ret;
 
 	return scmi_to_linux_errno(out.status);
 }
 
-static int scmi_reset_rfree(struct reset_ctl *rst)
-{
-	return 0;
-}
-
 static const struct reset_ops scmi_reset_domain_ops = {
 	.request	= scmi_reset_request,
-	.rfree		= scmi_reset_rfree,
 	.rst_assert	= scmi_reset_assert,
 	.rst_deassert	= scmi_reset_deassert,
 };
+
+static int scmi_reset_probe(struct udevice *dev)
+{
+	return devm_scmi_of_get_channel(dev);
+}
 
 U_BOOT_DRIVER(scmi_reset_domain) = {
 	.name = "scmi_reset_domain",
 	.id = UCLASS_RESET,
 	.ops = &scmi_reset_domain_ops,
+	.probe = scmi_reset_probe,
 };
+
+static struct scmi_proto_match match[] = {
+	{ .proto_id = SCMI_PROTOCOL_ID_RESET_DOMAIN },
+	{ /* Sentinel */ }
+};
+
+U_BOOT_SCMI_PROTO_DRIVER(scmi_reset_domain, match);

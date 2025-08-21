@@ -7,7 +7,6 @@
  * Author: Neil Armstrong <narmstron@baylibre.com>
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <malloc.h>
@@ -18,10 +17,14 @@
 #include <bitfield.h>
 #include <generic-phy.h>
 #include <linux/delay.h>
+#include <linux/printk.h>
 
 #include <linux/bitops.h>
 #include <linux/compat.h>
 #include <linux/bitfield.h>
+
+#define PHY_TYPE_PCIE           2
+#define PHY_TYPE_USB3           4
 
 #define PHY_R0							0x00
 	#define PHY_R0_PCIE_POWER_STATE				GENMASK(4, 0)
@@ -54,6 +57,8 @@
 	#define PHY_R5_PHY_CR_DATA_OUT				GENMASK(15, 0)
 	#define PHY_R5_PHY_CR_ACK				BIT(16)
 	#define PHY_R5_PHY_BS_OUT				BIT(17)
+
+#define PCIE_RESET_DELAY					500
 
 struct phy_g12a_usb3_pcie_priv {
 	struct regmap		*regmap;
@@ -202,8 +207,6 @@ static int phy_meson_g12a_usb3_init(struct phy *phy)
 	unsigned int data;
 	int ret;
 
-	/* TOFIX Handle PCIE mode */
-
 	ret = reset_assert_bulk(&priv->resets);
 	udelay(1);
 	ret |= reset_deassert_bulk(&priv->resets);
@@ -296,9 +299,79 @@ static int phy_meson_g12a_usb3_exit(struct phy *phy)
 	return reset_assert_bulk(&priv->resets);
 }
 
+static int phy_meson_g12a_usb3_pcie_init(struct phy *phy)
+{
+	if (phy->id == PHY_TYPE_USB3)
+		return phy_meson_g12a_usb3_init(phy);
+
+	return 0;
+}
+
+static int phy_meson_g12a_usb3_pcie_exit(struct phy *phy)
+{
+	if (phy->id == PHY_TYPE_USB3)
+		return phy_meson_g12a_usb3_exit(phy);
+
+	return 0;
+}
+
+static int phy_meson_g12a_usb3_pcie_power_on(struct phy *phy)
+{
+	struct phy_g12a_usb3_pcie_priv *priv = dev_get_priv(phy->dev);
+
+	if (phy->id == PHY_TYPE_USB3)
+		return 0;
+
+	regmap_update_bits(priv->regmap, PHY_R0,
+			   PHY_R0_PCIE_POWER_STATE,
+			   FIELD_PREP(PHY_R0_PCIE_POWER_STATE, 0x1c));
+
+	return 0;
+}
+
+static int phy_meson_g12a_usb3_pcie_power_off(struct phy *phy)
+{
+	struct phy_g12a_usb3_pcie_priv *priv = dev_get_priv(phy->dev);
+
+	if (phy->id == PHY_TYPE_USB3)
+		return 0;
+
+	regmap_update_bits(priv->regmap, PHY_R0,
+			   PHY_R0_PCIE_POWER_STATE,
+			   FIELD_PREP(PHY_R0_PCIE_POWER_STATE, 0x1d));
+
+	return 0;
+}
+
+static int phy_meson_g12a_usb3_pcie_reset(struct phy *phy)
+{
+	struct phy_g12a_usb3_pcie_priv *priv = dev_get_priv(phy->dev);
+	int ret;
+
+	if (phy->id == PHY_TYPE_USB3)
+		return 0;
+
+	ret = reset_assert_bulk(&priv->resets);
+	if (ret)
+		return ret;
+
+	udelay(PCIE_RESET_DELAY);
+
+	ret = reset_deassert_bulk(&priv->resets);
+	if (ret)
+		return ret;
+
+	udelay(PCIE_RESET_DELAY);
+
+	return 0;
+}
+
 struct phy_ops meson_g12a_usb3_pcie_phy_ops = {
-	.init = phy_meson_g12a_usb3_init,
-	.exit = phy_meson_g12a_usb3_exit,
+	.init = phy_meson_g12a_usb3_pcie_init,
+	.exit = phy_meson_g12a_usb3_pcie_exit,
+	.power_on = phy_meson_g12a_usb3_pcie_power_on,
+	.power_off = phy_meson_g12a_usb3_pcie_power_off,
+	.reset = phy_meson_g12a_usb3_pcie_reset,
 };
 
 int meson_g12a_usb3_pcie_phy_probe(struct udevice *dev)
@@ -324,7 +397,6 @@ int meson_g12a_usb3_pcie_phy_probe(struct udevice *dev)
 	ret = clk_enable(&priv->clk);
 	if (ret && ret != -ENOENT && ret != -ENOTSUPP) {
 		pr_err("failed to enable PHY clock\n");
-		clk_free(&priv->clk);
 		return ret;
 	}
 #endif

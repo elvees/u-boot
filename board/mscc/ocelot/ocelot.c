@@ -3,7 +3,7 @@
  * Copyright (c) 2018 Microsemi Corporation
  */
 
-#include <common.h>
+#include <config.h>
 #include <image.h>
 #include <init.h>
 #include <log.h>
@@ -16,6 +16,7 @@
 #include <wait_bit.h>
 #include <miiphy.h>
 #include <linux/bitops.h>
+#include <linux/printk.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -77,11 +78,7 @@ int board_early_init_r(void)
 			ICPU_GENERAL_CTRL_IF_SI_OWNER(2));
 
 	/* Address of boot parameters */
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE;
-
-	/* LED setup */
-	if (IS_ENABLED(CONFIG_LED))
-		led_default_state();
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE;
 
 	return 0;
 }

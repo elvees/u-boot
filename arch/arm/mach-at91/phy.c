@@ -11,7 +11,7 @@
  * Copyright (C) 2013 DENX Software Engineering, hs@denx.de
  */
 
-#include <common.h>
+#include <time.h>
 #include <asm/hardware.h>
 #include <asm/io.h>
 #include <linux/delay.h>
@@ -42,7 +42,7 @@ void at91_phy_reset(void)
 	/* Wait for end of hardware reset */
 	while (!(readl(&rstc->sr) & AT91_RSTC_SR_NRSTL)) {
 		/* avoid shutdown by watchdog */
-		WATCHDOG_RESET();
+		schedule();
 		mdelay(10);
 
 		/* timeout for not getting stuck in an endless loop */

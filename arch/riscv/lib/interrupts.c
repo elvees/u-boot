@@ -9,25 +9,31 @@
  * Copyright (C) 2019 Sean Anderson <seanga2@gmail.com>
  */
 
-#include <common.h>
+#include <linux/compat.h>
 #include <efi_loader.h>
 #include <hang.h>
+#include <interrupt.h>
 #include <irq_func.h>
 #include <asm/global_data.h>
 #include <asm/ptrace.h>
 #include <asm/system.h>
 #include <asm/encoding.h>
+#include <semihosting.h>
 
 DECLARE_GLOBAL_DATA_PTR;
+
+void set_resume(struct resume_data *data)
+{
+	gd->arch.resume = data;
+}
 
 static void show_efi_loaded_images(uintptr_t epc)
 {
 	efi_print_image_infos((void *)epc);
 }
 
-static void show_regs(struct pt_regs *regs)
+static void __maybe_unused show_regs(struct pt_regs *regs)
 {
-#ifdef CONFIG_SHOW_REGS
 	printf("\nSP:  " REG_FMT " GP:  " REG_FMT " TP:  " REG_FMT "\n",
 	       regs->sp, regs->gp, regs->tp);
 	printf("T0:  " REG_FMT " T1:  " REG_FMT " T2:  " REG_FMT "\n",
@@ -48,7 +54,65 @@ static void show_regs(struct pt_regs *regs)
 	       regs->s10, regs->s11, regs->t3);
 	printf("T4:  " REG_FMT " T5:  " REG_FMT " T6:  " REG_FMT "\n",
 	       regs->t4, regs->t5, regs->t6);
-#endif
+}
+
+static void __maybe_unused show_backtrace(struct pt_regs *regs)
+{
+	uintptr_t *fp = (uintptr_t *)regs->s0;
+	unsigned count = 0;
+	ulong ra;
+
+	printf("\nbacktrace:\n");
+
+	/* there are a few entry points where the s0 register is
+	 * set to gd, so to avoid changing those, just abort if
+	 * the value is the same */
+	while (fp != NULL && fp != (uintptr_t *)gd) {
+		ra = fp[-1];
+		printf("%3d: FP: " REG_FMT " RA: " REG_FMT,
+		       count, (ulong)fp, ra);
+
+		if (gd && gd->flags & GD_FLG_RELOC)
+			printf(" - RA: " REG_FMT " reloc adjusted\n",
+			ra - gd->reloc_off);
+		else
+			printf("\n");
+
+		fp = (uintptr_t *)fp[-2];
+		count++;
+	}
+}
+
+/**
+ * instr_len() - get instruction length
+ *
+ * @i:		low 16 bits of the instruction
+ * Return:	number of u16 in instruction
+ */
+static int instr_len(u16 i)
+{
+	if ((i & 0x03) != 0x03)
+		return 1;
+	/* Instructions with more than 32 bits are not yet specified */
+	return 2;
+}
+
+/**
+ * show_code() - display code leading to exception
+ *
+ * @epc:	program counter
+ */
+static void show_code(ulong epc)
+{
+	u16 *pos = (u16 *)(epc & ~1UL);
+	int i, len = instr_len(*pos);
+
+	printf("\nCode: ");
+	for (i = -8; i; ++i)
+		printf("%04x ", pos[i]);
+	printf("(");
+	for (i = 0; i < len; ++i)
+		printf("%04x%s", pos[i], i + 1 == len ? ")\n" : " ");
 }
 
 static void _exit_trap(ulong code, ulong epc, ulong tval, struct pt_regs *regs)
@@ -72,6 +136,11 @@ static void _exit_trap(ulong code, ulong epc, ulong tval, struct pt_regs *regs)
 		"Store/AMO page fault",
 	};
 
+	if (gd->arch.resume) {
+		gd->arch.resume->code = code;
+		longjmp(gd->arch.resume->jump, 1);
+	}
+
 	if (code < ARRAY_SIZE(exception_code))
 		printf("Unhandled exception: %s\n", exception_code[code]);
 	else
@@ -84,7 +153,11 @@ static void _exit_trap(ulong code, ulong epc, ulong tval, struct pt_regs *regs)
 		printf("EPC: " REG_FMT " RA: " REG_FMT " reloc adjusted\n",
 		       epc - gd->reloc_off, regs->ra - gd->reloc_off);
 
-	show_regs(regs);
+	if (CONFIG_IS_ENABLED(SHOW_REGS))
+		show_regs(regs);
+	if (CONFIG_IS_ENABLED(FRAMEPOINTER))
+		show_backtrace(regs);
+	show_code(epc);
 	show_efi_loaded_images(epc);
 	panic("\n");
 }
@@ -115,6 +188,29 @@ ulong handle_trap(ulong cause, ulong epc, ulong tval, struct pt_regs *regs)
 
 	/* An UEFI application may have changed gd. Restore U-Boot's gd. */
 	efi_restore_gd();
+
+	if (cause == CAUSE_BREAKPOINT &&
+	    CONFIG_IS_ENABLED(SEMIHOSTING_FALLBACK)) {
+		ulong pre_addr = epc - 4, post_addr = epc + 4;
+
+		/* Check for prior and post addresses to be in same page. */
+		if ((pre_addr & ~(PAGE_SIZE - 1)) ==
+			(post_addr & ~(PAGE_SIZE - 1))) {
+			u32 pre = *(u32 *)pre_addr;
+			u32 post = *(u32 *)post_addr;
+
+			/* Check for semihosting, i.e.:
+			 * slli    zero,zero,0x1f
+			 * ebreak
+			 * srai    zero,zero,0x7
+			 */
+			if (pre == 0x01f01013 && post == 0x40705013) {
+				disable_semihosting();
+				epc += 4;
+				return epc;
+			}
+		}
+	}
 
 	is_irq = (cause & MCAUSE_INT);
 	irq = (cause & ~MCAUSE_INT);

@@ -5,7 +5,9 @@
  *  Copyright (c) 2017 Leif Lindholm
  */
 
-#include <common.h>
+#define LOG_CATEGORY LOGC_EFI
+
+#include <efi_device_path.h>
 #include <efi_loader.h>
 
 const efi_guid_t efi_guid_device_path_utilities_protocol =
@@ -22,7 +24,7 @@ const efi_guid_t efi_guid_device_path_utilities_protocol =
  * for details.
  *
  * @device_path		device path
- * @return		size in bytes
+ * Return:		size in bytes
  */
 static efi_uintn_t EFIAPI get_device_path_size(
 	const struct efi_device_path *device_path)
@@ -30,7 +32,7 @@ static efi_uintn_t EFIAPI get_device_path_size(
 	efi_uintn_t sz = 0;
 
 	EFI_ENTRY("%pD", device_path);
-	/* size includes the END node: */
+	/* size includes the EFI_DP_END node: */
 	if (device_path)
 		sz = efi_dp_size(device_path) + sizeof(struct efi_device_path);
 	return EFI_EXIT(sz);
@@ -50,7 +52,7 @@ static efi_uintn_t EFIAPI get_device_path_size(
  * for details.
  *
  * @device_path		device path
- * @return		copy of the device path
+ * Return:		copy of the device path
  */
 static struct efi_device_path * EFIAPI duplicate_device_path(
 	const struct efi_device_path *device_path)
@@ -70,14 +72,14 @@ static struct efi_device_path * EFIAPI duplicate_device_path(
  *
  * @src1		1st device path
  * @src2		2nd device path
- * @return		concatenated device path
+ * Return:		concatenated device path
  */
 static struct efi_device_path * EFIAPI append_device_path(
 	const struct efi_device_path *src1,
 	const struct efi_device_path *src2)
 {
 	EFI_ENTRY("%pD, %pD", src1, src2);
-	return EFI_EXIT(efi_dp_append(src1, src2));
+	return EFI_EXIT(efi_dp_concat(src1, src2, 0));
 }
 
 /*
@@ -91,7 +93,7 @@ static struct efi_device_path * EFIAPI append_device_path(
  *
  * @device_path		device path
  * @device_node		device node
- * @return		concatenated device path
+ * Return:		concatenated device path
  */
 static struct efi_device_path * EFIAPI append_device_node(
 	const struct efi_device_path *device_path,
@@ -112,7 +114,7 @@ static struct efi_device_path * EFIAPI append_device_node(
  *
  * @device_path			1st device path
  * @device_path_instance	2nd device path
- * @return			concatenated device path
+ * Return:			concatenated device path
  */
 static struct efi_device_path * EFIAPI append_device_path_instance(
 	const struct efi_device_path *device_path,
@@ -134,7 +136,7 @@ static struct efi_device_path * EFIAPI append_device_path_instance(
  *
  * @device_path_instance	next device path instance
  * @device_path_instance_size	size of the device path instance
- * @return			concatenated device path
+ * Return:			concatenated device path
  */
 static struct efi_device_path * EFIAPI get_next_device_path_instance(
 	struct efi_device_path **device_path_instance,
@@ -156,7 +158,7 @@ static struct efi_device_path * EFIAPI get_next_device_path_instance(
  *
  * @device_path		device path
  * @device_node		device node
- * @return		concatenated device path
+ * Return:		concatenated device path
  */
 static bool EFIAPI is_device_path_multi_instance(
 	const struct efi_device_path *device_path)
@@ -177,7 +179,7 @@ static bool EFIAPI is_device_path_multi_instance(
  * @node_type		node type
  * @node_sub_type	node sub type
  * @node_length		node length
- * @return		device path node
+ * Return:		device path node
  */
 static struct efi_device_path * EFIAPI create_device_node(
 	uint8_t node_type, uint8_t node_sub_type, uint16_t node_length)

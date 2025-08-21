@@ -6,7 +6,6 @@
  * based on source code of Shlomi Gridish
  */
 
-#include <common.h>
 #include <malloc.h>
 #include <command.h>
 #include <asm/global_data.h>
@@ -23,6 +22,9 @@
 #ifdef CONFIG_ARM64
 #include <asm/armv8/mmu.h>
 #include <asm/arch/cpu.h>
+#endif
+#ifdef CONFIG_PPC
+#include <asm/ppc.h>
 #endif
 
 #define MPC85xx_DEVDISR_QE_DISABLE	0x1
@@ -119,12 +121,10 @@ static void qe_sdma_init(void)
  */
 static u8 thread_snum[] = {
 /* Evthreads 16-29 are not supported in MPC8309 */
-#if !defined(CONFIG_ARCH_MPC8309)
 	0x04, 0x05, 0x0c, 0x0d,
 	0x14, 0x15, 0x1c, 0x1d,
 	0x24, 0x25, 0x2c, 0x2d,
 	0x34, 0x35,
-#endif
 	0x88, 0x89, 0x98, 0x99,
 	0xa8, 0xa9, 0xb8, 0xb9,
 	0xc8, 0xc9, 0xd8, 0xd9,
@@ -187,7 +187,7 @@ void qe_init(uint qe_base)
 		 * which do not have ROM in QE.
 		 */
 		qe_upload_firmware((const void *)(CONFIG_SYS_QE_FW_ADDR +
-				   CONFIG_SYS_FSL_IFC_BASE));
+				   CFG_SYS_FSL_IFC_BASE));
 
 		/* enable the microcode in IRAM */
 		out_be32(&qe_immr->iram.iready, QE_IRAM_READY);
@@ -236,11 +236,11 @@ void u_qe_init(void)
 
 	if (src == BOOT_SOURCE_IFC_NOR)
 		addr = (void *)(CONFIG_SYS_QE_FW_ADDR +
-				CONFIG_SYS_FSL_IFC_BASE);
+				CFG_SYS_FSL_IFC_BASE);
 
 	if (src == BOOT_SOURCE_QSPI_NOR)
 		addr = (void *)(CONFIG_SYS_QE_FW_ADDR +
-				CONFIG_SYS_FSL_QSPI_BASE);
+				CFG_SYS_FSL_QSPI_BASE);
 
 	if (src == BOOT_SOURCE_SD_MMC) {
 		int dev = CONFIG_SYS_MMC_ENV_DEV;
@@ -469,9 +469,9 @@ int qe_upload_firmware(const struct qe_firmware *firmware)
 	const struct qe_header *hdr;
 #ifdef CONFIG_DEEP_SLEEP
 #ifdef CONFIG_ARCH_LS1021A
-	struct ccsr_gur __iomem *gur = (void *)CONFIG_SYS_FSL_GUTS_ADDR;
+	struct ccsr_gur __iomem *gur = (void *)CFG_SYS_FSL_GUTS_ADDR;
 #else
-	ccsr_gur_t *gur = (void *)(CONFIG_SYS_MPC85xx_GUTS_ADDR);
+	ccsr_gur_t *gur = (void *)(CFG_SYS_MPC85xx_GUTS_ADDR);
 #endif
 #endif
 	if (!firmware) {
@@ -609,9 +609,9 @@ int u_qe_upload_firmware(const struct qe_firmware *firmware)
 	const struct qe_header *hdr;
 #ifdef CONFIG_DEEP_SLEEP
 #ifdef CONFIG_ARCH_LS1021A
-	struct ccsr_gur __iomem *gur = (void *)CONFIG_SYS_FSL_GUTS_ADDR;
+	struct ccsr_gur __iomem *gur = (void *)CFG_SYS_FSL_GUTS_ADDR;
 #else
-	ccsr_gur_t __iomem *gur = (void *)(CONFIG_SYS_MPC85xx_GUTS_ADDR);
+	ccsr_gur_t __iomem *gur = (void *)(CFG_SYS_MPC85xx_GUTS_ADDR);
 #endif
 #endif
 	if (!firmware) {
@@ -720,9 +720,9 @@ int u_qe_firmware_resume(const struct qe_firmware *firmware, qe_map_t *qe_immrr)
 	const u32 *code;
 #ifdef CONFIG_DEEP_SLEEP
 #ifdef CONFIG_PPC
-	ccsr_gur_t __iomem *gur = (void *)(CONFIG_SYS_MPC85xx_GUTS_ADDR);
+	ccsr_gur_t __iomem *gur = (void *)(CFG_SYS_MPC85xx_GUTS_ADDR);
 #else
-	struct ccsr_gur __iomem *gur = (void *)CONFIG_SYS_FSL_GUTS_ADDR;
+	struct ccsr_gur __iomem *gur = (void *)CFG_SYS_FSL_GUTS_ADDR;
 #endif
 #endif
 
@@ -794,7 +794,7 @@ static int qe_cmd(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		return cmd_usage(cmdtp);
 
 	if (strcmp(argv[1], "fw") == 0) {
-		addr = simple_strtoul(argv[2], NULL, 16);
+		addr = hextoul(argv[2], NULL);
 
 		if (!addr) {
 			printf("Invalid address\n");
@@ -807,7 +807,7 @@ static int qe_cmd(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 		 */
 
 		if (argc > 3) {
-			ulong length = simple_strtoul(argv[3], NULL, 16);
+			ulong length = hextoul(argv[3], NULL);
 			struct qe_firmware *firmware = (void *)addr;
 
 			if (length != be32_to_cpu(firmware->header.length)) {

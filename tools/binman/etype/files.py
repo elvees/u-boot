@@ -11,11 +11,13 @@ import os
 
 from binman.etype.section import Entry_section
 from dtoc import fdt_util
-from patman import tools
+from u_boot_pylib import tools
 
+# This is imported if needed
+state = None
 
 class Entry_files(Entry_section):
-    """Entry containing a set of files
+    """A set of files arranged in a section
 
     Properties / Entry arguments:
         - pattern: Filename pattern to match the files to include
@@ -34,6 +36,9 @@ class Entry_files(Entry_section):
         from binman import state
 
         super().__init__(section, etype, node)
+
+    def ReadNode(self):
+        super().ReadNode()
         self._pattern = fdt_util.GetString(self._node, 'pattern')
         if not self._pattern:
             self.Raise("Missing 'pattern' property")
@@ -43,8 +48,8 @@ class Entry_files(Entry_section):
         self._require_matches = fdt_util.GetBool(self._node,
                                                 'require-matches')
 
-    def ExpandEntries(self):
-        files = tools.GetInputFilenameGlob(self._pattern)
+    def gen_entries(self):
+        files = tools.get_input_filename_glob(self._pattern)
         if self._require_matches and not files:
             self.Raise("Pattern '%s' matched no files" % self._pattern)
         for fname in files:
@@ -61,4 +66,4 @@ class Entry_files(Entry_section):
                 state.AddInt(subnode, 'align', self._files_align)
 
         # Read entries again, now that we have some
-        self._ReadEntries()
+        self.ReadEntries()

@@ -11,7 +11,6 @@
  * exceptions
  */
 
-#include <common.h>
 #include <asm/global_data.h>
 #include <asm/ptrace.h>
 #include <command.h>
@@ -74,7 +73,6 @@ void show_regs(struct pt_regs *regs)
 		}
 	}
 }
-
 
 static void _exception(int signr, struct pt_regs *regs)
 {
@@ -192,7 +190,6 @@ void SoftEmuException(struct pt_regs *regs)
 	panic("Software Emulation Exception");
 }
 
-
 void UnknownException(struct pt_regs *regs)
 {
 #if defined(CONFIG_CMD_KGDB)
@@ -204,15 +201,8 @@ void UnknownException(struct pt_regs *regs)
 	_exception(0, regs);
 }
 
-#if defined(CONFIG_CMD_BEDBUG)
-extern void do_bedbug_breakpoint(struct pt_regs *);
-#endif
-
 void DebugException(struct pt_regs *regs)
 {
 	printf("Debugger trap at @ %lx\n", regs->nip );
 	show_regs(regs);
-#if defined(CONFIG_CMD_BEDBUG)
-	do_bedbug_breakpoint( regs );
-#endif
 }

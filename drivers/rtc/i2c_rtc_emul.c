@@ -13,7 +13,6 @@
  * time-keeping. It does not change the system time.
  */
 
-#include <common.h>
 #include <dm.h>
 #include <i2c.h>
 #include <log.h>
@@ -27,25 +26,6 @@
 #else
 #define debug_buffer(x, ...)
 #endif
-
-/**
- * struct sandbox_i2c_rtc_plat_data - platform data for the RTC
- *
- * @base_time:		Base system time when RTC device was bound
- * @offset:		RTC offset from current system time
- * @use_system_time:	true to use system time, false to use @base_time
- * @reg:		Register values
- */
-struct sandbox_i2c_rtc_plat_data {
-	long base_time;
-	long offset;
-	bool use_system_time;
-	u8 reg[REG_COUNT];
-};
-
-struct sandbox_i2c_rtc {
-	unsigned int offset_secs;
-};
 
 long sandbox_i2c_rtc_set_offset(struct udevice *dev, bool use_system_time,
 				int offset)
@@ -222,8 +202,17 @@ static int sandbox_i2c_rtc_bind(struct udevice *dev)
 	return 0;
 }
 
+static int sandbox_i2c_rtc_probe(struct udevice *dev)
+{
+	const u8 mac[] = { 0x02, 0x00, 0x11, 0x22, 0x33, 0x48 };
+	struct sandbox_i2c_rtc_plat_data *plat = dev_get_plat(dev);
+
+	memcpy(&plat->reg[0x40], mac, sizeof(mac));
+	return 0;
+}
+
 static const struct udevice_id sandbox_i2c_rtc_ids[] = {
-	{ .compatible = "sandbox,i2c-rtc" },
+	{ .compatible = "sandbox,i2c-rtc-emul" },
 	{ }
 };
 
@@ -232,6 +221,7 @@ U_BOOT_DRIVER(sandbox_i2c_rtc_emul) = {
 	.id		= UCLASS_I2C_EMUL,
 	.of_match	= sandbox_i2c_rtc_ids,
 	.bind		= sandbox_i2c_rtc_bind,
+	.probe		= sandbox_i2c_rtc_probe,
 	.priv_auto	= sizeof(struct sandbox_i2c_rtc),
 	.plat_auto	= sizeof(struct sandbox_i2c_rtc_plat_data),
 	.ops		= &sandbox_i2c_rtc_emul_ops,

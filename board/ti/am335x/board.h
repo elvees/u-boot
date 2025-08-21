@@ -4,11 +4,13 @@
  *
  * TI AM335x boards information header
  *
- * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
+ * Copyright (C) 2011, Texas Instruments, Incorporated - https://www.ti.com/
  */
 
 #ifndef _BOARD_H_
 #define _BOARD_H_
+
+#include <linux/string.h>
 
 /**
  * AM335X (EMIF_4D) EMIF REG_COS_COUNT_1, REG_COS_COUNT_2, and
@@ -41,6 +43,11 @@ static inline int board_is_pb(void)
 static inline int board_is_bbg1(void)
 {
 	return board_is_bone_lt() && !strncmp(board_ti_get_rev(), "BBG1", 4);
+}
+
+static inline int board_is_bbge(void)
+{
+	return board_is_bone_lt() && !strncmp(board_ti_get_rev(), "BBGE", 4);
 }
 
 static inline int board_is_bben(void)
@@ -93,5 +100,6 @@ void enable_uart3_pin_mux(void);
 void enable_uart4_pin_mux(void);
 void enable_uart5_pin_mux(void);
 void enable_i2c0_pin_mux(void);
+void enable_i2c2_pin_mux(void);
 void enable_board_pin_mux(void);
 #endif

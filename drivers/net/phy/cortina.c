@@ -8,7 +8,6 @@
  */
 
 #include <config.h>
-#include <common.h>
 #include <log.h>
 #include <malloc.h>
 #include <linux/ctype.h>
@@ -17,12 +16,11 @@
 #include <linux/err.h>
 #include <phy.h>
 #include <cortina.h>
-#ifdef CONFIG_SYS_CORTINA_FW_IN_NAND
 #include <nand.h>
-#elif defined(CONFIG_SYS_CORTINA_FW_IN_SPIFLASH)
 #include <spi_flash.h>
-#elif defined(CONFIG_SYS_CORTINA_FW_IN_MMC)
 #include <mmc.h>
+#ifdef CONFIG_ARM64
+#include <asm/arch/cpu.h>
 #endif
 
 #ifndef CONFIG_PHYLIB_10G
@@ -124,6 +122,11 @@ struct cortina_reg_config cortina_reg_cfg[] = {
 	{VILLA_LINE_SDS_COMMON_STX0_TX_OUTPUT_CTRLB, 0xc01E},
 };
 
+__weak ulong *cs4340_get_fw_addr(void)
+{
+	return (ulong *)CONFIG_CORTINA_FW_ADDR;
+}
+
 void cs4340_upload_firmware(struct phy_device *phydev)
 {
 	char line_temp[0x50] = {0};
@@ -132,34 +135,88 @@ void cs4340_upload_firmware(struct phy_device *phydev)
 	int i, line_cnt = 0, column_cnt = 0;
 	struct cortina_reg_config fw_temp;
 	char *addr = NULL;
+	ulong cortina_fw_addr = (ulong)cs4340_get_fw_addr();
 
+#ifdef CONFIG_TFABOOT
+	enum boot_src src = get_boot_src();
+
+	if (src == BOOT_SOURCE_IFC_NOR) {
+		addr = (char *)cortina_fw_addr;
+	} else if (src == BOOT_SOURCE_IFC_NAND) {
+		int ret;
+		size_t fw_length = CONFIG_CORTINA_FW_LENGTH;
+
+		addr = malloc(CONFIG_CORTINA_FW_LENGTH);
+		ret = nand_read(get_nand_dev_by_index(0),
+					   (loff_t)cortina_fw_addr,	&fw_length, (u_char *)addr);
+		if (ret == -EUCLEAN) {
+			printf("NAND read of Cortina firmware at 0x%lx failed %d\n",
+				   cortina_fw_addr, ret);
+		}
+	} else if (src == BOOT_SOURCE_QSPI_NOR) {
+		int ret;
+		struct spi_flash *ucode_flash;
+
+		addr = malloc(CONFIG_CORTINA_FW_LENGTH);
+		ucode_flash = spi_flash_probe(CONFIG_SF_DEFAULT_BUS, CONFIG_SF_DEFAULT_CS,
+									 CONFIG_SF_DEFAULT_SPEED, CONFIG_SF_DEFAULT_MODE);
+		if (!ucode_flash) {
+			puts("SF: probe for Cortina ucode failed\n");
+		} else {
+			ret = spi_flash_read(ucode_flash, cortina_fw_addr,
+								CONFIG_CORTINA_FW_LENGTH, addr);
+			if (ret)
+				puts("SF: read for Cortina ucode failed\n");
+			spi_flash_free(ucode_flash);
+		}
+	} else if (src == BOOT_SOURCE_SD_MMC) {
+		int dev = CONFIG_SYS_MMC_ENV_DEV;
+		u32 cnt = CONFIG_CORTINA_FW_LENGTH / 512;
+		u32 blk = cortina_fw_addr / 512;
+		struct mmc *mmc = find_mmc_device(CONFIG_SYS_MMC_ENV_DEV);
+
+		if (!mmc) {
+			puts("Failed to find MMC device for Cortina ucode\n");
+		} else {
+			addr = malloc(CONFIG_CORTINA_FW_LENGTH);
+			printf("MMC read: dev # %u, block # %u, count %u ...\n",
+				  dev, blk, cnt);
+			mmc_init(mmc);
+#ifdef CONFIG_BLK
+			(void)blk_dread(mmc_get_blk_desc(mmc), blk, cnt, addr);
+#else
+			(void)mmc->block_dev.block_read(&mmc->block_dev, blk, cnt, addr);
+#endif
+		}
+	}
+#else /* CONFIG_TFABOOT */
 #if defined(CONFIG_SYS_CORTINA_FW_IN_NOR) || \
 	defined(CONFIG_SYS_CORTINA_FW_IN_REMOTE)
 
-	addr = (char *)CONFIG_CORTINA_FW_ADDR;
+	addr = (char *)cortina_fw_addr;
 #elif defined(CONFIG_SYS_CORTINA_FW_IN_NAND)
 	int ret;
 	size_t fw_length = CONFIG_CORTINA_FW_LENGTH;
 
 	addr = malloc(CONFIG_CORTINA_FW_LENGTH);
 	ret = nand_read(get_nand_dev_by_index(0),
-			(loff_t)CONFIG_CORTINA_FW_ADDR,
+			(loff_t)cortina_fw_addr,
 			&fw_length, (u_char *)addr);
 	if (ret == -EUCLEAN) {
-		printf("NAND read of Cortina firmware at 0x%x failed %d\n",
-		       CONFIG_CORTINA_FW_ADDR, ret);
+		printf("NAND read of Cortina firmware at 0x%lx failed %d\n",
+		       cortina_fw_addr, ret);
 	}
 #elif defined(CONFIG_SYS_CORTINA_FW_IN_SPIFLASH)
 	int ret;
 	struct spi_flash *ucode_flash;
 
 	addr = malloc(CONFIG_CORTINA_FW_LENGTH);
-	ucode_flash = spi_flash_probe(CONFIG_ENV_SPI_BUS, CONFIG_ENV_SPI_CS,
-				CONFIG_ENV_SPI_MAX_HZ, CONFIG_ENV_SPI_MODE);
+	ucode_flash = spi_flash_probe(CONFIG_SF_DEFAULT_BUS, CONFIG_SF_DEFAULT_CS,
+				CONFIG_SF_DEFAULT_SPEED, CONFIG_SF_DEFAULT_MODE);
 	if (!ucode_flash) {
 		puts("SF: probe for Cortina ucode failed\n");
 	} else {
-		ret = spi_flash_read(ucode_flash, CONFIG_CORTINA_FW_ADDR,
+		ret = spi_flash_read(ucode_flash, cortina_fw_addr,
 				     CONFIG_CORTINA_FW_LENGTH, addr);
 		if (ret)
 			puts("SF: read for Cortina ucode failed\n");
@@ -168,7 +225,7 @@ void cs4340_upload_firmware(struct phy_device *phydev)
 #elif defined(CONFIG_SYS_CORTINA_FW_IN_MMC)
 	int dev = CONFIG_SYS_MMC_ENV_DEV;
 	u32 cnt = CONFIG_CORTINA_FW_LENGTH / 512;
-	u32 blk = CONFIG_CORTINA_FW_ADDR / 512;
+	u32 blk = cortina_fw_addr / 512;
 	struct mmc *mmc = find_mmc_device(CONFIG_SYS_MMC_ENV_DEV);
 
 	if (!mmc) {
@@ -187,6 +244,7 @@ void cs4340_upload_firmware(struct phy_device *phydev)
 #endif
 	}
 #endif
+#endif
 
 	while (*addr != 'Q') {
 		i = 0;
@@ -195,7 +253,7 @@ void cs4340_upload_firmware(struct phy_device *phydev)
 			line_temp[i++] = *addr++;
 			if (0x50 < i) {
 				printf("Not found Cortina PHY ucode at 0x%p\n",
-				       (char *)CONFIG_CORTINA_FW_ADDR);
+				       (char *)cortina_fw_addr);
 				return;
 			}
 		}
@@ -323,7 +381,7 @@ int cs4223_startup(struct phy_device *phydev)
 	return 0;
 }
 
-struct phy_driver cs4340_driver = {
+U_BOOT_PHY_DRIVER(cs4340) = {
 	.name = "Cortina CS4315/CS4340",
 	.uid = PHY_UID_CS4340,
 	.mask = 0xfffffff0,
@@ -337,7 +395,7 @@ struct phy_driver cs4340_driver = {
 	.shutdown = &gen10g_shutdown,
 };
 
-struct phy_driver cs4223_driver = {
+U_BOOT_PHY_DRIVER(cs4223) = {
 	.name = "Cortina CS4223",
 	.uid = PHY_UID_CS4223,
 	.mask = 0x0ffff00f,
@@ -349,13 +407,6 @@ struct phy_driver cs4223_driver = {
 	.startup = &cs4223_startup,
 	.shutdown = &gen10g_shutdown,
 };
-
-int phy_cortina_init(void)
-{
-	phy_register(&cs4340_driver);
-	phy_register(&cs4223_driver);
-	return 0;
-}
 
 int get_phy_id(struct mii_dev *bus, int addr, int devad, u32 *phy_id)
 {

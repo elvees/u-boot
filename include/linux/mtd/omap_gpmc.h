@@ -8,6 +8,11 @@
 #ifndef __ASM_OMAP_GPMC_H
 #define __ASM_OMAP_GPMC_H
 
+#include <linux/types.h>
+
+/* Maximum Number of Chip Selects */
+#define GPMC_CS_NUM	8
+
 #define GPMC_BUF_EMPTY	0
 #define GPMC_BUF_FULL	1
 #define GPMC_MAX_SECTORS	8

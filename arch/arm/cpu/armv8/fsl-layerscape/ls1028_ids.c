@@ -3,9 +3,9 @@
  * Copyright 2019 NXP
  */
 
-#include <common.h>
 #include <fdt_support.h>
 #include <log.h>
+#include <asm/arch/stream_id_lsch3.h>
 #include <asm/arch-fsl-layerscape/immap_lsch3.h>
 #include <asm/arch-fsl-layerscape/fsl_icid.h>
 #include <asm/arch-fsl-layerscape/fsl_portals.h>
@@ -18,7 +18,7 @@ struct icid_id_table icid_tbl[] = {
 	SET_SATA_ICID(1, "fsl,ls1028a-ahci", FSL_SATA1_STREAM_ID),
 	SET_EDMA_ICID(FSL_EDMA_STREAM_ID),
 	SET_QDMA_ICID("fsl,ls1028a-qdma", FSL_DMA_STREAM_ID),
-	SET_GPU_ICID("fsl,ls1028a-gpu", FSL_GPU_STREAM_ID),
+	SET_GPU_ICID("vivante,gc", FSL_GPU_STREAM_ID),
 	SET_DISPLAY_ICID(FSL_DISPLAY_STREAM_ID),
 #ifdef CONFIG_FSL_CAAM
 	SET_SEC_JR_ICID_ENTRY(0, FSL_SEC_JR1_STREAM_ID),

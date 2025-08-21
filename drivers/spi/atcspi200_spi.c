@@ -6,7 +6,6 @@
  * Author: Rick Chen (rick@andestech.com)
  */
 
-#include <common.h>
 #include <clk.h>
 #include <log.h>
 #include <malloc.h>
@@ -81,7 +80,7 @@ struct nds_spi_slave {
 	unsigned int	freq;
 	ulong		clock;
 	unsigned int	mode;
-	u8 		num_cs;
+	u8		num_cs;
 	unsigned int	mtiming;
 	size_t		cmd_len;
 	u8		cmd_buf[16];
@@ -187,7 +186,6 @@ static int __nspi_espi_rx(struct nds_spi_slave *ns, void *din, unsigned int byte
 	return bytes;
 }
 
-
 static int __atcspi200_spi_xfer(struct nds_spi_slave *ns,
 		unsigned int bitlen,  const void *data_out, void *data_in,
 		unsigned long flags)
@@ -201,7 +199,7 @@ static int __atcspi200_spi_xfer(struct nds_spi_slave *ns,
 		size_t cmd_len = ns->cmd_len;
 		unsigned long data_len = bitlen / 8;
 		int rf_cnt;
-		int ret = 0;
+		int ret = 0, timeout = 0;
 
 		max_tran_len = ns->max_transfer_length;
 		switch (flags) {
@@ -243,11 +241,12 @@ static int __atcspi200_spi_xfer(struct nds_spi_slave *ns,
 			ns->tran_len = tran_len;
 			num_blks = DIV_ROUND_UP(tran_len , CHUNK_SIZE);
 			num_bytes = (tran_len) % CHUNK_SIZE;
+			timeout = SPI_TIMEOUT;
 			if(num_bytes == 0)
 				num_bytes = CHUNK_SIZE;
 			__atcspi200_spi_start(ns);
 
-			while (num_blks) {
+			while (num_blks && (timeout--)) {
 				event = in_le32(&ns->regs->status);
 				if ((event & TXEPTY) && (data_out)) {
 					__nspi_espi_tx(ns, dout);
@@ -268,6 +267,11 @@ static int __atcspi200_spi_xfer(struct nds_spi_slave *ns,
 						num_blks -= CHUNK_SIZE;
 						din = (unsigned char *)din + rx_bytes;
 					}
+				}
+
+				if (!timeout) {
+					debug("spi_xfer: %s() timeout\n", __func__);
+					break;
 				}
 			}
 
@@ -315,7 +319,7 @@ static int atcspi200_spi_claim_bus(struct udevice *dev)
 	struct udevice *bus = dev->parent;
 	struct nds_spi_slave *ns = dev_get_priv(bus);
 
-	if (slave_plat->cs >= ns->num_cs) {
+	if (slave_plat->cs[0] >= ns->num_cs) {
 		printf("Invalid SPI chipselect\n");
 		return -EINVAL;
 	}
@@ -356,7 +360,6 @@ static int atcspi200_spi_get_clk(struct udevice *bus)
 		return -EINVAL;
 
 	ns->clock = clk_rate;
-	clk_free(&clk);
 
 	return 0;
 }

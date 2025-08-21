@@ -12,6 +12,12 @@
 #ifndef __ASSEMBLY__
 #include "compiler.h"
 
+/* Flag param bits for bootelf() function */
+typedef struct {
+	unsigned phdr      : 1; /* load via program (not section) headers */
+	unsigned autostart : 1; /* Start ELF after loading */
+} Bootelf_flags;
+
 /* This version doesn't work for 64-bit ABIs - Erik */
 
 /* These typedefs need to be handled better */
@@ -188,14 +194,14 @@ typedef struct {
 #define EM_NDR1		57		/* Denso NDR1 microprocessor */
 #define EM_STARCORE	58		/* Motorola Start*Core processor */
 #define EM_ME16		59		/* Toyota ME16 processor */
-#define EM_ST100	60		/* STMicroelectronic ST100 processor */
+#define EM_ST100	60		/* STMicroelectronics ST100 processor */
 #define EM_TINYJ	61		/* Advanced Logic Corp. Tinyj emb.fam*/
 #define EM_X86_64	62		/* AMD x86-64 */
 #define EM_PDSP		63		/* Sony DSP Processor */
 /* RESERVED 64,65 for future use */
 #define EM_FX66		66		/* Siemens FX66 microcontroller */
 #define EM_ST9PLUS	67		/* STMicroelectronics ST9+ 8/16 mc */
-#define EM_ST7		68		/* STmicroelectronics ST7 8 bit mc */
+#define EM_ST7		68		/* STMicroelectronics ST7 8 bit mc */
 #define EM_68HC16	69		/* Motorola MC68HC16 microcontroller */
 #define EM_68HC11	70		/* Motorola MC68HC11 microcontroller */
 #define EM_68HC08	71		/* Motorola MC68HC08 microcontroller */
@@ -359,6 +365,15 @@ typedef struct {
 	unsigned char	st_other;	/* 0 - no defined meaning */
 	Elf32_Half	st_shndx;	/* section header index */
 } Elf32_Sym;
+
+typedef struct {
+	Elf64_Word	st_name;	/* name - index into string table */
+	unsigned char	st_info;	/* type and binding */
+	unsigned char	st_other;	/* 0 - no defined meaning */
+	Elf64_Half	st_shndx;	/* section header index */
+	Elf64_Addr	st_value;	/* symbol value */
+	Elf64_Xword	st_size;	/* symbol size */
+} Elf64_Sym;
 
 /* Symbol table index */
 #define STN_UNDEF	0		/* undefined */
@@ -691,6 +706,10 @@ unsigned long elf_hash(const unsigned char *name);
 #define R_RISCV_RELATIVE	3
 
 #ifndef __ASSEMBLY__
+unsigned long bootelf_exec(ulong (*entry)(int, char * const[]),
+			   int argc, char *const argv[]);
+unsigned long bootelf(unsigned long addr, Bootelf_flags flags,
+		      int argc, char *const argv[]);
 int valid_elf_image(unsigned long addr);
 unsigned long load_elf64_image_phdr(unsigned long addr);
 unsigned long load_elf64_image_shdr(unsigned long addr);

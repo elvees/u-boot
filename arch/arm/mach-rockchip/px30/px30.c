@@ -2,18 +2,25 @@
 /*
  * Copyright (c) 2017 Rockchip Electronics Co., Ltd
  */
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
+#include <fdt_support.h>
 #include <init.h>
+#include <spl.h>
 #include <asm/armv8/mmu.h>
-#include <asm/io.h>
+#include <asm/arch-rockchip/bootrom.h>
 #include <asm/arch-rockchip/grf_px30.h>
 #include <asm/arch-rockchip/hardware.h>
 #include <asm/arch-rockchip/uart.h>
 #include <asm/arch-rockchip/clock.h>
 #include <asm/arch-rockchip/cru_px30.h>
 #include <dt-bindings/clock/px30-cru.h>
+
+const char * const boot_devices[BROM_LAST_BOOTSOURCE + 1] = {
+	[BROM_BOOTSOURCE_EMMC] = "/mmc@ff390000",
+	[BROM_BOOTSOURCE_SPINOR] = "/spi@ff3a0000/flash@0",
+	[BROM_BOOTSOURCE_SD] = "/mmc@ff370000",
+};
 
 static struct mm_region px30_mem_map[] = {
 	{
@@ -41,6 +48,7 @@ struct mm_region *mem_map = px30_mem_map;
 #define PMUGRF_BASE			0xff010000
 #define GRF_BASE			0xff140000
 #define CRU_BASE			0xff2b0000
+#define PMUCRU_BASE			0xff2bc000
 #define VIDEO_PHY_BASE			0xff2e0000
 #define SERVICE_CORE_ADDR		0xff508000
 #define DDR_FW_BASE			0xff534000
@@ -50,6 +58,57 @@ struct mm_region *mem_map = px30_mem_map;
 #define QOS_PRIORITY			0x08
 
 #define QOS_PRIORITY_LEVEL(h, l)	((((h) & 3) << 8) | ((l) & 3))
+
+/* GRF_GPIO1AL_IOMUX */
+enum {
+	GPIO1A3_SHIFT		= 12,
+	GPIO1A3_MASK		= 0xf << GPIO1A3_SHIFT,
+	GPIO1A3_GPIO		= 0,
+	GPIO1A3_FLASH_D3,
+	GPIO1A3_EMMC_D3,
+	GPIO1A3_SFC_SIO3,
+
+	GPIO1A2_SHIFT		= 8,
+	GPIO1A2_MASK		= 0xf << GPIO1A2_SHIFT,
+	GPIO1A2_GPIO		= 0,
+	GPIO1A2_FLASH_D2,
+	GPIO1A2_EMMC_D2,
+	GPIO1A2_SFC_SIO2,
+
+	GPIO1A1_SHIFT		= 4,
+	GPIO1A1_MASK		= 0xf << GPIO1A1_SHIFT,
+	GPIO1A1_GPIO		= 0,
+	GPIO1A1_FLASH_D1,
+	GPIO1A1_EMMC_D1,
+	GPIO1A1_SFC_SIO1,
+
+	GPIO1A0_SHIFT		= 0,
+	GPIO1A0_MASK		= 0xf << GPIO1A0_SHIFT,
+	GPIO1A0_GPIO		= 0,
+	GPIO1A0_FLASH_D0,
+	GPIO1A0_EMMC_D0,
+	GPIO1A0_SFC_SIO0,
+};
+
+/* GRF_GPIO1AH_IOMUX */
+enum {
+	GPIO1A4_SHIFT		= 0,
+	GPIO1A4_MASK		= 0xf << GPIO1A4_SHIFT,
+	GPIO1A4_GPIO		= 0,
+	GPIO1A4_FLASH_D4,
+	GPIO1A4_EMMC_D4,
+	GPIO1A4_SFC_CSN0,
+};
+
+/* GRF_GPIO1BL_IOMUX */
+enum {
+	GPIO1B1_SHIFT		= 4,
+	GPIO1B1_MASK		= 0xf << GPIO1B1_SHIFT,
+	GPIO1B1_GPIO		= 0,
+	GPIO1B1_FLASH_RDY,
+	GPIO1B1_EMMC_CLKOUT,
+	GPIO1B1_SFC_CLK,
+};
 
 /* GRF_GPIO1BH_IOMUX */
 enum {
@@ -147,6 +206,21 @@ enum {
 	GPIO3A1_UART5_RX	= 4,
 };
 
+/* PMUGRF_GPIO0BL_IOMUX */
+enum {
+	GPIO0B3_SHIFT		= 6,
+	GPIO0B3_MASK		= 0x3 << GPIO0B3_SHIFT,
+	GPIO0B3_GPIO		= 0,
+	GPIO0B3_UART0_RX,
+	GPIO0B3_PMU_DEBUG1,
+
+	GPIO0B2_SHIFT		= 4,
+	GPIO0B2_MASK		= 0x3 << GPIO0B2_SHIFT,
+	GPIO0B2_GPIO		= 0,
+	GPIO0B2_UART0_TX,
+	GPIO0B2_PMU_DEBUG0,
+};
+
 /* PMUGRF_GPIO0CL_IOMUX */
 enum {
 	GPIO0C1_SHIFT		= 2,
@@ -167,9 +241,10 @@ enum {
 int arch_cpu_init(void)
 {
 	static struct px30_grf * const grf = (void *)GRF_BASE;
+	static struct px30_cru * const cru = (void *)CRU_BASE;
 	u32 __maybe_unused val;
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 	/* We do some SoC one time setting here. */
 	/* Disable the ddr secure region setting to make it non-secure */
 	writel(0x0, DDR_FW_BASE + FW_DDR_CON);
@@ -193,6 +268,19 @@ int arch_cpu_init(void)
 		     GPIO1D4_SDMMC_D2 << GPIO1D4_SHIFT);
 #endif
 
+#ifdef CONFIG_ROCKCHIP_SFC
+	rk_clrsetreg(&grf->gpio1al_iomux,
+		     GPIO1A3_MASK | GPIO1A2_MASK | GPIO1A1_MASK | GPIO1A0_MASK,
+		     GPIO1A3_SFC_SIO3 << GPIO1A3_SHIFT |
+		     GPIO1A2_SFC_SIO2 << GPIO1A2_SHIFT |
+		     GPIO1A1_SFC_SIO1 << GPIO1A1_SHIFT |
+		     GPIO1A0_SFC_SIO0 << GPIO1A0_SHIFT);
+	rk_clrsetreg(&grf->gpio1ah_iomux, GPIO1A4_MASK,
+		     GPIO1A4_SFC_CSN0 << GPIO1A4_SHIFT);
+	rk_clrsetreg(&grf->gpio1bl_iomux, GPIO1B1_MASK,
+		     GPIO1B1_SFC_CLK << GPIO1B1_SHIFT);
+#endif
+
 #endif
 
 	/* Enable PD_VO (default disable at reset) */
@@ -205,6 +293,9 @@ int arch_cpu_init(void)
 	/* Clear the force_jtag */
 	rk_clrreg(&grf->cpu_con[1], 1 << 7);
 
+	/* Make TSADC and WDT trigger a first global reset */
+	clrsetbits_le32(&cru->glb_rst_con, 0x3, 0x3);
+
 	return 0;
 }
 
@@ -212,12 +303,26 @@ int arch_cpu_init(void)
 void board_debug_uart_init(void)
 {
 #if defined(CONFIG_DEBUG_UART_BASE) && \
-	(CONFIG_DEBUG_UART_BASE == 0xff168000) && \
-	(CONFIG_DEBUG_UART_CHANNEL != 1)
+	(((CONFIG_DEBUG_UART_BASE == 0xff168000) && \
+	(CONFIG_DEBUG_UART_CHANNEL != 1)) || \
+	CONFIG_DEBUG_UART_BASE == 0xff030000)
 	static struct px30_pmugrf * const pmugrf = (void *)PMUGRF_BASE;
 #endif
+#if !defined(CONFIG_DEBUG_UART_BASE) || \
+	(CONFIG_DEBUG_UART_BASE != 0xff158000 && \
+	 CONFIG_DEBUG_UART_BASE != 0xff168000 && \
+	 CONFIG_DEBUG_UART_BASE != 0xff178000 && \
+	 CONFIG_DEBUG_UART_BASE != 0xff030000) || \
+	(defined(CONFIG_DEBUG_UART_BASE) && \
+	 (CONFIG_DEBUG_UART_BASE == 0xff158000 || \
+	  CONFIG_DEBUG_UART_BASE == 0xff168000 || \
+	  CONFIG_DEBUG_UART_BASE == 0xff178000))
 	static struct px30_grf * const grf = (void *)GRF_BASE;
 	static struct px30_cru * const cru = (void *)CRU_BASE;
+#endif
+#if defined(CONFIG_DEBUG_UART_BASE) && CONFIG_DEBUG_UART_BASE == 0xff030000
+	static struct px30_pmucru * const pmucru = (void *)PMUCRU_BASE;
+#endif
 
 #if defined(CONFIG_DEBUG_UART_BASE) && (CONFIG_DEBUG_UART_BASE == 0xff158000)
 	/* uart_sel_clk default select 24MHz */
@@ -282,6 +387,19 @@ void board_debug_uart_init(void)
 		     GPIO3A2_MASK | GPIO3A1_MASK,
 		     GPIO3A2_UART5_TX << GPIO3A2_SHIFT |
 		     GPIO3A1_UART5_RX << GPIO3A1_SHIFT);
+#elif defined(CONFIG_DEBUG_UART_BASE) && (CONFIG_DEBUG_UART_BASE == 0xff030000)
+	/* uart_sel_clk default select 24MHz */
+	rk_clrsetreg(&pmucru->pmu_clksel_con[3],
+		     UART0_PLL_SEL_MASK | UART0_DIV_CON_MASK,
+		     UART0_PLL_SEL_24M << UART0_PLL_SEL_SHIFT | 0);
+	rk_clrsetreg(&pmucru->pmu_clksel_con[4],
+		     UART0_CLK_SEL_MASK,
+		     UART0_CLK_SEL_UART0 << UART0_CLK_SEL_SHIFT);
+
+	rk_clrsetreg(&pmugrf->gpio0bl_iomux,
+		     GPIO0B3_MASK | GPIO0B2_MASK,
+		     GPIO0B3_UART0_RX << GPIO0B3_SHIFT |
+		     GPIO0B2_UART0_TX << GPIO0B2_SHIFT);
 #else
 	/* GRF_IOFUNC_CON0 */
 	enum {

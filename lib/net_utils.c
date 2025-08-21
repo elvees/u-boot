@@ -9,8 +9,9 @@
  * Copyright 2009 Dirk Behme, dirk.behme@googlemail.com
  */
 
-#include <common.h>
 #include <net.h>
+#include <net6.h>
+#include <vsprintf.h>
 
 struct in_addr string_to_ip(const char *s)
 {
@@ -23,7 +24,7 @@ struct in_addr string_to_ip(const char *s)
 		return addr;
 
 	for (addr.s_addr = 0, i = 0; i < 4; ++i) {
-		ulong val = s ? simple_strtoul(s, &e, 10) : 0;
+		ulong val = s ? dectoul(s, &e) : 0;
 		if (val > 255) {
 			addr.s_addr = 0;
 			return addr;
@@ -43,6 +44,125 @@ struct in_addr string_to_ip(const char *s)
 	return addr;
 }
 
+#if IS_ENABLED(CONFIG_IPV6)
+int string_to_ip6(const char *str, size_t len, struct in6_addr *addr)
+{
+	int colon_count = 0;
+	int found_double_colon = 0;
+	int xstart = 0;		/* first zero (double colon) */
+	int section_num = 7;	/* num words the double colon represents */
+	int i;
+	const char *s = str;
+	const char *const e = s + len;
+	struct in_addr zero_ip = {.s_addr = 0};
+
+	if (!str)
+		return -1;
+
+	/* First pass, verify the syntax and locate the double colon */
+	while (s < e) {
+		while (s < e && isxdigit((int)*s))
+			s++;
+		if (*s == '\0')
+			break;
+		if (*s != ':') {
+			if (*s == '.' && section_num >= 2) {
+				struct in_addr v4;
+
+				while (s != str && *(s - 1) != ':')
+					--s;
+				v4 = string_to_ip(s);
+				if (memcmp(&zero_ip, &v4,
+					   sizeof(struct in_addr)) != 0) {
+					section_num -= 2;
+					break;
+				}
+			}
+			/* This could be a valid address */
+			break;
+		}
+		if (s == str) {
+			/* The address begins with a colon */
+			if (*++s != ':')
+				/* Must start with a double colon or a number */
+				goto out_err;
+		} else {
+			s++;
+			if (found_double_colon)
+				section_num--;
+			else
+				xstart++;
+		}
+
+		if (*s == ':') {
+			if (found_double_colon)
+				/* Two double colons are not allowed */
+				goto out_err;
+			found_double_colon = 1;
+			section_num -= xstart;
+			s++;
+		}
+
+		if (++colon_count == 7)
+			/* Found all colons */
+			break;
+		++s;
+	}
+
+	if (colon_count == 0)
+		goto out_err;
+	if (*--s == ':')
+		section_num++;
+
+	/* Second pass, read the address */
+	s = str;
+	for (i = 0; i < 8; i++) {
+		int val = 0;
+		char *end;
+
+		if (found_double_colon &&
+		    i >= xstart && i < xstart + section_num) {
+			addr->s6_addr16[i] = 0;
+			continue;
+		}
+		while (*s == ':')
+			s++;
+
+		if (i == 6 && isdigit((int)*s)) {
+			struct in_addr v4 = string_to_ip(s);
+
+			if (memcmp(&zero_ip, &v4,
+				   sizeof(struct in_addr)) != 0) {
+				/* Ending with :IPv4-address */
+				addr->s6_addr32[3] = v4.s_addr;
+				break;
+			}
+		}
+
+		val = simple_strtoul(s, &end, 16);
+		if (end != e && *end != '\0' && *end != ':')
+			goto out_err;
+		addr->s6_addr16[i] = htons(val);
+		s = end;
+	}
+	return 0;
+
+out_err:
+	return -1;
+}
+#endif
+
+void ip_to_string(struct in_addr x, char *s)
+{
+	x.s_addr = ntohl(x.s_addr);
+	sprintf(s, "%d.%d.%d.%d",
+		(int) ((x.s_addr >> 24) & 0xff),
+		(int) ((x.s_addr >> 16) & 0xff),
+		(int) ((x.s_addr >> 8) & 0xff),
+		(int) ((x.s_addr >> 0) & 0xff)
+	);
+}
+
 void string_to_enetaddr(const char *addr, uint8_t *enetaddr)
 {
 	char *end;
@@ -52,7 +172,7 @@ void string_to_enetaddr(const char *addr, uint8_t *enetaddr)
 		return;
 
 	for (i = 0; i < 6; ++i) {
-		enetaddr[i] = addr ? simple_strtoul(addr, &end, 16) : 0;
+		enetaddr[i] = addr ? hextoul(addr, &end) : 0;
 		if (addr)
 			addr = (*end) ? end + 1 : end;
 	}

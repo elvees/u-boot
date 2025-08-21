@@ -13,10 +13,8 @@
 #include <asm/global_data.h>
 #include <asm/gpio.h>
 #include <asm/mach-imx/iomux-v3.h>
-#include <asm/mach-imx/mxc_i2c.h>
+#include <asm/mach-imx/boot_mode.h>
 #include <asm/io.h>
-#include <common.h>
-#include <i2c.h>
 #include <miiphy.h>
 #include <power/pmic.h>
 #include <power/pfuze3000_pmic.h>
@@ -27,26 +25,10 @@ DECLARE_GLOBAL_DATA_PTR;
 #define UART_PAD_CTRL  (PAD_CTL_DSE_3P3V_49OHM | \
 	PAD_CTL_PUS_PU100KOHM | PAD_CTL_HYS)
 
-#define I2C_PAD_CTRL    (PAD_CTL_DSE_3P3V_32OHM | PAD_CTL_SRE_SLOW | \
-	PAD_CTL_HYS | PAD_CTL_PUE | PAD_CTL_PUS_PU100KOHM)
-
-#ifdef CONFIG_SYS_I2C_MXC
-#define PC MUX_PAD_CTRL(I2C_PAD_CTRL)
-
-/* I2C4 for PMIC */
-static struct i2c_pads_info i2c_pad_info4 = {
-	.scl = {
-		.i2c_mode = MX7D_PAD_SAI1_RX_SYNC__I2C4_SCL | PC,
-		.gpio_mode = MX7D_PAD_SAI1_RX_SYNC__GPIO6_IO16 | PC,
-		.gp = IMX_GPIO_NR(6, 16),
-	},
-	.sda = {
-		.i2c_mode = MX7D_PAD_SAI1_RX_BCLK__I2C4_SDA | PC,
-		.gpio_mode = MX7D_PAD_SAI1_RX_BCLK__GPIO6_IO17 | PC,
-		.gp = IMX_GPIO_NR(6, 17),
-	},
-};
-#endif
+#define PICO_MMC0 0
+#define PICO_MMC0_BLK 2
+#define PICO_MMC1 1
+#define PICO_MMC1_BLK 0
 
 int dram_init(void)
 {
@@ -60,50 +42,43 @@ int dram_init(void)
 	return 0;
 }
 
-#ifdef CONFIG_POWER
-#define I2C_PMIC	3
+#if CONFIG_IS_ENABLED(DM_PMIC)
 int power_init_board(void)
 {
-	struct pmic *p;
+	struct udevice *dev;
+	int reg, rev_id;
 	int ret;
-	unsigned int reg, rev_id;
 
-	ret = power_pfuze3000_init(I2C_PMIC);
-	if (ret)
+	ret = pmic_get("pfuze3000@8", &dev);
+	if (ret == -ENODEV)
+		return 0;
+	if (ret != 0)
 		return ret;
 
-	p = pmic_get("PFUZE3000");
-	ret = pmic_probe(p);
-	if (ret) {
-		printf("Warning:  Cannot find PMIC PFUZE3000\n");
-		printf("\tPower consumption is not optimized.\n");
-		return 0;
-	}
-
-	pmic_reg_read(p, PFUZE3000_DEVICEID, &reg);
-	pmic_reg_read(p, PFUZE3000_REVID, &rev_id);
-	printf("PMIC:  PFUZE3000 DEV_ID=0x%x REV_ID=0x%x\n", reg, rev_id);
+	reg = pmic_reg_read(dev, PFUZE3000_DEVICEID);
+	rev_id = pmic_reg_read(dev, PFUZE3000_REVID);
+	printf("PMIC: PFUZE3000 DEV_ID=0x%x REV_ID=0x%x\n", reg, rev_id);
 
 	/* disable Low Power Mode during standby mode */
-	pmic_reg_read(p, PFUZE3000_LDOGCTL, &reg);
+	reg = pmic_reg_read(dev, PFUZE3000_LDOGCTL);
 	reg |= 0x1;
-	pmic_reg_write(p, PFUZE3000_LDOGCTL, reg);
+	pmic_reg_write(dev, PFUZE3000_LDOGCTL, reg);
 
 	/* SW1A/1B mode set to APS/APS */
 	reg = 0x8;
-	pmic_reg_write(p, PFUZE3000_SW1AMODE, reg);
-	pmic_reg_write(p, PFUZE3000_SW1BMODE, reg);
+	pmic_reg_write(dev, PFUZE3000_SW1AMODE, reg);
+	pmic_reg_write(dev, PFUZE3000_SW1BMODE, reg);
 
 	/* SW1A/1B standby voltage set to 1.025V */
 	reg = 0xd;
-	pmic_reg_write(p, PFUZE3000_SW1ASTBY, reg);
-	pmic_reg_write(p, PFUZE3000_SW1BSTBY, reg);
+	pmic_reg_write(dev, PFUZE3000_SW1ASTBY, reg);
+	pmic_reg_write(dev, PFUZE3000_SW1BSTBY, reg);
 
 	/* decrease SW1B normal voltage to 0.975V */
-	pmic_reg_read(p, PFUZE3000_SW1BVOLT, &reg);
+	reg = pmic_reg_read(dev, PFUZE3000_SW1BVOLT);
 	reg &= ~0x1f;
 	reg |= PFUZE3000_SW1AB_SETP(975);
-	pmic_reg_write(p, PFUZE3000_SW1BVOLT, reg);
+	pmic_reg_write(dev, PFUZE3000_SW1BVOLT, reg);
 
 	return 0;
 }
@@ -131,32 +106,6 @@ static int setup_fec(void)
 
 	return set_clk_enet(ENET_125MHZ);
 }
-
-int board_phy_config(struct phy_device *phydev)
-{
-	unsigned short val;
-
-	/* To enable AR8035 ouput a 125MHz clk from CLK_25M */
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x7);
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xe, 0x8016);
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x4007);
-
-	val = phy_read(phydev, MDIO_DEVAD_NONE, 0xe);
-	val &= 0xffe7;
-	val |= 0x18;
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xe, val);
-
-	/* introduce tx clock delay */
-	phy_write(phydev, MDIO_DEVAD_NONE, 0x1d, 0x5);
-	val = phy_read(phydev, MDIO_DEVAD_NONE, 0x1e);
-	val |= 0x0100;
-	phy_write(phydev, MDIO_DEVAD_NONE, 0x1e, val);
-
-	if (phydev->drv->config)
-		phydev->drv->config(phydev);
-
-	return 0;
-}
 #endif
 
 static void setup_iomux_uart(void)
@@ -168,14 +117,10 @@ int board_early_init_f(void)
 {
 	setup_iomux_uart();
 
-#ifdef CONFIG_SYS_I2C_MXC
-	setup_i2c(3, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info4);
-#endif
-
 	return 0;
 }
 
-#ifdef CONFIG_DM_VIDEO
+#ifdef CONFIG_VIDEO
 void setup_lcd(void)
 {
 	gpio_request(IMX_GPIO_NR(1, 11), "lcd_brightness");
@@ -192,7 +137,7 @@ int board_init(void)
 	/* address of boot parameters */
 	gd->bd->bi_boot_params = PHYS_SDRAM + 0x100;
 
-#ifdef CONFIG_DM_VIDEO
+#ifdef CONFIG_VIDEO
 	setup_lcd();
 #endif
 #ifdef CONFIG_FEC_MXC
@@ -209,6 +154,12 @@ int board_late_init(void)
 	imx_iomux_v3_setup_multiple_pads(wdog_pads, ARRAY_SIZE(wdog_pads));
 
 	set_wdog_reset(wdog);
+
+#if CONFIG_IS_ENABLED(FSL_ESDHC_IMX)
+#if CONFIG_IS_ENABLED(ENV_IS_IN_MMC) || CONFIG_IS_ENABLED(ENV_IS_NOWHERE)
+	board_late_mmc_env_init();
+#endif /* CONFIG_ENV_IS_IN_MMC or CONFIG_ENV_IS_NOWHERE */
+#endif
 
 	/*
 	 * Do not assert internal WDOG_RESET_B_DEB(controlled by bit 4),
@@ -245,3 +196,52 @@ int board_ehci_hcd_init(int port)
 	return 0;
 }
 
+#if CONFIG_IS_ENABLED(FSL_ESDHC_IMX)
+#if CONFIG_IS_ENABLED(ENV_IS_IN_MMC) || CONFIG_IS_ENABLED(ENV_IS_NOWHERE)
+int board_mmc_get_env_dev(int devno)
+{
+	int dev_env = 0;
+
+	switch (get_boot_device()) {
+	case SD3_BOOT:
+	case MMC3_BOOT:
+		env_set("bootdev", "MMC3");
+		dev_env = PICO_MMC0;
+		break;
+	case SD1_BOOT:
+		env_set("bootdev", "SD1");
+		dev_env = PICO_MMC1;
+		break;
+	default:
+		printf("Wrong boot device!");
+	}
+
+	return dev_env;
+}
+
+int mmc_map_to_kernel_blk(int dev_no)
+{
+	int blk_no = 0;
+
+	switch (dev_no) {
+	case PICO_MMC0:
+		blk_no = PICO_MMC0_BLK;
+		break;
+	case PICO_MMC1:
+		blk_no = PICO_MMC1_BLK;
+		break;
+	default:
+		printf("Invalid MMC device!");
+	}
+
+	return blk_no;
+}
+#endif
+
+#if CONFIG_IS_ENABLED(ENV_IS_NOWHERE)
+int mmc_get_env_dev(void)
+{
+	return board_mmc_get_env_dev(0);
+}
+#endif
+#endif /* CONFIG_FSL_ESDHC_IMX */

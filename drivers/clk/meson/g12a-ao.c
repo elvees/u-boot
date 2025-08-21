@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0+
 
-#include <common.h>
 #include <log.h>
 #include <asm/io.h>
 #include <clk-uclass.h>
@@ -28,13 +27,7 @@ static int meson_set_gate(struct clk *clk, bool on)
 	struct meson_clk *priv = dev_get_priv(clk->dev);
 	struct meson_gate *gate;
 
-	if (clk->id >= ARRAY_SIZE(gates))
-		return -ENOENT;
-
 	gate = &gates[clk->id];
-
-	if (gate->reg == 0)
-		return 0;
 
 	regmap_update_bits(priv->map, gate->reg,
 			   BIT(gate->bit), on ? BIT(gate->bit) : 0);
@@ -63,9 +56,18 @@ static int meson_clk_probe(struct udevice *dev)
 	return 0;
 }
 
+static int meson_clk_request(struct clk *clk)
+{
+	if (clk->id >= ARRAY_SIZE(gates))
+		return -ENOENT;
+
+	return 0;
+}
+
 static struct clk_ops meson_clk_ops = {
 	.disable	= meson_clk_disable,
 	.enable		= meson_clk_enable,
+	.request	= meson_clk_request,
 };
 
 static const struct udevice_id meson_clk_ids[] = {
@@ -73,7 +75,7 @@ static const struct udevice_id meson_clk_ids[] = {
 	{ }
 };
 
-U_BOOT_DRIVER(meson_clk_axg) = {
+U_BOOT_DRIVER(meson_clk_g12a_ao) = {
 	.name		= "meson_clk_g12a_ao",
 	.id		= UCLASS_CLK,
 	.of_match	= meson_clk_ids,

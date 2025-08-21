@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2015
- * Texas Instruments Incorporated - http://www.ti.com/
+ * Texas Instruments Incorporated - https://www.ti.com/
  */
 #define pr_fmt(fmt) "%s: " fmt, __func__
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
 #include <remoteproc.h>
 #include <asm/io.h>
+#include <linux/printk.h>
 
 /**
  * enum sandbox_state - different device states
@@ -308,7 +308,7 @@ static int sandbox_testproc_ping(struct udevice *dev)
  * @dev:	device to operate upon
  * @da:		device address
  * @size:	Size of the memory region @da is pointing to
- * @return converted virtual address
+ * Return: converted virtual address
  */
 static void *sandbox_testproc_device_to_virt(struct udevice *dev, ulong da,
 					     ulong size)

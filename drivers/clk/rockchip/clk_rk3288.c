@@ -3,7 +3,6 @@
  * (C) Copyright 2015 Google, Inc
  */
 
-#include <common.h>
 #include <bitfield.h>
 #include <clk-uclass.h>
 #include <div64.h>
@@ -15,7 +14,6 @@
 #include <mapmem.h>
 #include <syscon.h>
 #include <asm/global_data.h>
-#include <asm/io.h>
 #include <asm/arch-rockchip/clock.h>
 #include <asm/arch-rockchip/cru.h>
 #include <asm/arch-rockchip/grf_rk3288.h>
@@ -225,7 +223,7 @@ static int rkclk_configure_ddr(struct rockchip_cru *cru, struct rk3288_grf *grf,
 	return 0;
 }
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 #define VCO_MAX_KHZ	2200000
 #define VCO_MIN_KHZ	440000
 #define FREF_MAX_KHZ	2200000
@@ -423,7 +421,7 @@ static ulong rockchip_i2s_set_clk(struct rockchip_cru *cru, uint gclk_rate,
 
 	return rockchip_i2s_get_clk(cru, gclk_rate);
 }
-#endif /* CONFIG_SPL_BUILD */
+#endif /* CONFIG_XPL_BUILD */
 
 static void rkclk_init(struct rockchip_cru *cru, struct rk3288_grf *grf)
 {
@@ -778,6 +776,7 @@ static ulong rk3288_clk_get_rate(struct clk *clk)
 	case PCLK_I2C5:
 		return gclk_rate;
 	case PCLK_PWM:
+	case PCLK_RKPWM:
 		return PD_BUS_PCLK_HZ;
 	case SCLK_SARADC:
 		new_rate = rockchip_saradc_get_clk(priv->cru);
@@ -820,7 +819,7 @@ static ulong rk3288_clk_set_rate(struct clk *clk, ulong rate)
 	case SCLK_SPI2:
 		new_rate = rockchip_spi_set_clk(cru, gclk_rate, clk->id, rate);
 		break;
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 	case SCLK_I2S0:
 		new_rate = rockchip_i2s_set_clk(cru, gclk_rate, rate);
 		break;
@@ -904,11 +903,11 @@ static int __maybe_unused rk3288_gmac_set_parent(struct clk *clk, struct clk *pa
 	int ret;
 
 	/*
-	 * If the requested parent is in the same clock-controller and
-	 * the id is SCLK_MAC_PLL ("mac_pll_src"), switch to the internal
-	 * clock.
+	 * If the requested parent is in the same clock-controller the
+	 * likely parent is the unexported SCLK_MAC_PLL ("mac_pll_src"),
+	 * switch to the internal clock.
 	 */
-	if ((parent->dev == clk->dev) && (parent->id == SCLK_MAC_PLL)) {
+	if (parent->dev == clk->dev) {
 		debug("%s: switching GAMC to SCLK_MAC_PLL\n", __func__);
 		rk_clrsetreg(&cru->cru_clksel_con[21], RMII_EXTCLK_MASK, 0);
 		return 0;
@@ -950,18 +949,18 @@ static int __maybe_unused rk3288_clk_set_parent(struct clk *clk, struct clk *par
 static struct clk_ops rk3288_clk_ops = {
 	.get_rate	= rk3288_clk_get_rate,
 	.set_rate	= rk3288_clk_set_rate,
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	.set_parent	= rk3288_clk_set_parent,
 #endif
 };
 
 static int rk3288_clk_of_to_plat(struct udevice *dev)
 {
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
-	struct rk3288_clk_priv *priv = dev_get_priv(dev);
+	if (CONFIG_IS_ENABLED(OF_REAL)) {
+		struct rk3288_clk_priv *priv = dev_get_priv(dev);
 
-	priv->cru = dev_read_addr_ptr(dev);
-#endif
+		priv->cru = dev_read_addr_ptr(dev);
+	}
 
 	return 0;
 }
@@ -974,7 +973,7 @@ static int rk3288_clk_probe(struct udevice *dev)
 	priv->grf = syscon_get_first_range(ROCKCHIP_SYSCON_GRF);
 	if (IS_ERR(priv->grf))
 		return PTR_ERR(priv->grf);
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 #if CONFIG_IS_ENABLED(OF_PLATDATA)
 	struct rk3288_clk_plat *plat = dev_get_plat(dev);
 
@@ -1026,7 +1025,7 @@ static int rk3288_clk_bind(struct udevice *dev)
 	ret = offsetof(struct rockchip_cru, cru_softrst_con[0]);
 	ret = rockchip_reset_bind(dev, ret, 12);
 	if (ret)
-		debug("Warning: software reset driver bind faile\n");
+		debug("Warning: software reset driver bind failed\n");
 #endif
 
 	return 0;

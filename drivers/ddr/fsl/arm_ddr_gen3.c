@@ -5,7 +5,7 @@
  * Derived from mpc85xx_ddr_gen3.c, removed all workarounds
  */
 
-#include <common.h>
+#include <config.h>
 #include <log.h>
 #include <asm/io.h>
 #include <fsl_ddr_sdram.h>
@@ -18,7 +18,6 @@
 #if (CONFIG_CHIP_SELECTS_PER_CTRL > 4)
 #error Invalid setting for CONFIG_CHIP_SELECTS_PER_CTRL
 #endif
-
 
 /*
  * regs has the to-be-set values for DDR controller registers
@@ -40,16 +39,16 @@ void fsl_ddr_set_memctl_regs(const fsl_ddr_cfg_regs_t *regs,
 
 	switch (ctrl_num) {
 	case 0:
-		ddr = (void *)CONFIG_SYS_FSL_DDR_ADDR;
+		ddr = (void *)CFG_SYS_FSL_DDR_ADDR;
 		break;
-#if defined(CONFIG_SYS_FSL_DDR2_ADDR) && (CONFIG_SYS_NUM_DDR_CTLRS > 1)
+#if defined(CFG_SYS_FSL_DDR2_ADDR) && (CONFIG_SYS_NUM_DDR_CTLRS > 1)
 	case 1:
-		ddr = (void *)CONFIG_SYS_FSL_DDR2_ADDR;
+		ddr = (void *)CFG_SYS_FSL_DDR2_ADDR;
 		break;
 #endif
-#if defined(CONFIG_SYS_FSL_DDR3_ADDR) && (CONFIG_SYS_NUM_DDR_CTLRS > 2)
+#if defined(CFG_SYS_FSL_DDR3_ADDR) && (CONFIG_SYS_NUM_DDR_CTLRS > 2)
 	case 2:
-		ddr = (void *)CONFIG_SYS_FSL_DDR3_ADDR;
+		ddr = (void *)CFG_SYS_FSL_DDR3_ADDR;
 		break;
 #endif
 #if defined(CONFIG_SYS_FSL_DDR4_ADDR) && (CONFIG_SYS_NUM_DDR_CTLRS > 3)
@@ -130,7 +129,7 @@ void fsl_ddr_set_memctl_regs(const fsl_ddr_cfg_regs_t *regs,
 	if (is_warm_boot()) {
 		ddr_out32(&ddr->sdram_cfg_2,
 			  regs->ddr_sdram_cfg_2 & ~SDRAM_CFG2_D_INIT);
-		ddr_out32(&ddr->init_addr, CONFIG_SYS_SDRAM_BASE);
+		ddr_out32(&ddr->init_addr, CFG_SYS_SDRAM_BASE);
 		ddr_out32(&ddr->init_ext_addr, DDR_INIT_ADDR_EXT_UIA);
 
 		/* DRAM VRef will not be trained */

@@ -3,7 +3,6 @@
  * Copyright (c) 2013 Google, Inc
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <dt-structs.h>
@@ -41,10 +40,18 @@ static uint rockchip_dwmmc_get_mmc_clk(struct dwmci_host *host, uint freq)
 	struct rockchip_dwmmc_priv *priv = dev_get_priv(dev);
 	int ret;
 
+	/*
+	 * The clock frequency chosen here affects CLKDIV in the dw_mmc core.
+	 * That can be either 0 or 1, but it must be set to 1 for eMMC DDR52
+	 * 8-bit mode.  It will be set to 0 for all other modes.
+	 */
+	if (host->mmc->selected_mode == MMC_DDR_52 && host->mmc->bus_width == 8)
+		freq *= 2;
+
 	ret = clk_set_rate(&priv->clk, freq);
 	if (ret < 0) {
 		debug("%s: err=%d\n", __func__, ret);
-		return ret;
+		return 0;
 	}
 
 	return freq;
@@ -52,9 +59,11 @@ static uint rockchip_dwmmc_get_mmc_clk(struct dwmci_host *host, uint freq)
 
 static int rockchip_dwmmc_of_to_plat(struct udevice *dev)
 {
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
 	struct rockchip_dwmmc_priv *priv = dev_get_priv(dev);
 	struct dwmci_host *host = &priv->host;
+
+	if (!CONFIG_IS_ENABLED(OF_REAL))
+		return 0;
 
 	host->name = dev->name;
 	host->ioaddr = dev_read_addr_ptr(dev);
@@ -71,10 +80,10 @@ static int rockchip_dwmmc_of_to_plat(struct udevice *dev)
 	priv->fifo_depth = dev_read_u32_default(dev, "fifo-depth", 0);
 
 	if (priv->fifo_depth < 0)
-		return -EINVAL;
+		return log_msg_ret("rkp", -EINVAL);
 	priv->fifo_mode = dev_read_bool(dev, "fifo-mode");
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 	if (!priv->fifo_mode)
 		priv->fifo_mode = dev_read_bool(dev, "u-boot,spl-fifo-mode");
 #endif
@@ -87,7 +96,7 @@ static int rockchip_dwmmc_of_to_plat(struct udevice *dev)
 		int val = dev_read_u32_default(dev, "max-frequency", -EINVAL);
 
 		if (val < 0)
-			return val;
+			return log_msg_ret("rkc", val);
 
 		priv->minmax[0] = 400000;  /* 400 kHz */
 		priv->minmax[1] = val;
@@ -95,7 +104,7 @@ static int rockchip_dwmmc_of_to_plat(struct udevice *dev)
 		debug("%s: 'clock-freq-min-max' property was deprecated.\n",
 		      __func__);
 	}
-#endif
+
 	return 0;
 }
 
@@ -117,25 +126,20 @@ static int rockchip_dwmmc_probe(struct udevice *dev)
 	host->priv = dev;
 	host->dev_index = 0;
 	priv->fifo_depth = dtplat->fifo_depth;
-	priv->fifo_mode = 0;
+	priv->fifo_mode = dtplat->u_boot_spl_fifo_mode;
 	priv->minmax[0] = 400000;  /*  400 kHz */
 	priv->minmax[1] = dtplat->max_frequency;
 
-	ret = clk_get_by_driver_info(dev, dtplat->clocks, &priv->clk);
-	if (ret < 0)
-		return ret;
+	ret = clk_get_by_phandle(dev, &dtplat->clocks[1], &priv->clk);
 #else
-	ret = clk_get_by_index(dev, 0, &priv->clk);
-	if (ret < 0)
-		return ret;
+	ret = clk_get_by_index(dev, 1, &priv->clk);
 #endif
-	host->fifoth_val = MSIZE(0x2) |
-		RX_WMARK(priv->fifo_depth / 2 - 1) |
-		TX_WMARK(priv->fifo_depth / 2);
-
+	if (ret < 0 && ret != -ENOSYS)
+		return log_msg_ret("clk", ret);
+	host->fifo_depth = priv->fifo_depth;
 	host->fifo_mode = priv->fifo_mode;
 
-#ifdef CONFIG_MMC_PWRSEQ
+#if CONFIG_IS_ENABLED(MMC_PWRSEQ)
 	/* Enable power if needed */
 	ret = mmc_pwrseq_get_power(dev, &plat->cfg);
 	if (!ret) {
@@ -150,6 +154,10 @@ static int rockchip_dwmmc_probe(struct udevice *dev)
 	host->mmc->dev = dev;
 	upriv->mmc = host->mmc;
 
+	/* Hosts capable of 8-bit can also do 4 bits */
+	if (host->buswidth == 8)
+		plat->cfg.host_caps |= MMC_MODE_4BIT;
+
 	return dwmci_probe(dev);
 }
 
@@ -163,6 +171,7 @@ static int rockchip_dwmmc_bind(struct udevice *dev)
 static const struct udevice_id rockchip_dwmmc_ids[] = {
 	{ .compatible = "rockchip,rk2928-dw-mshc" },
 	{ .compatible = "rockchip,rk3288-dw-mshc" },
+	{ .compatible = "rockchip,rk3576-dw-mshc" },
 	{ }
 };
 
@@ -178,5 +187,6 @@ U_BOOT_DRIVER(rockchip_rk3288_dw_mshc) = {
 	.plat_auto	= sizeof(struct rockchip_mmc_plat),
 };
 
+DM_DRIVER_ALIAS(rockchip_rk3288_dw_mshc, rockchip_rk2928_dw_mshc)
 DM_DRIVER_ALIAS(rockchip_rk3288_dw_mshc, rockchip_rk3328_dw_mshc)
 DM_DRIVER_ALIAS(rockchip_rk3288_dw_mshc, rockchip_rk3368_dw_mshc)

@@ -4,7 +4,7 @@
  *
  * Copyright (C) 2018 EETS GmbH - http://www.eets.ch/
  *
- * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2011 Texas Instruments Incorporated - https://www.ti.com/
  */
 
 #ifndef __CONFIG_PDU001_H
@@ -13,9 +13,6 @@
 #include <configs/ti_am335x_common.h>
 
 /* Using 32K of volatile storage for environment */
-
-#define MACH_TYPE_PDU001	5075
-#define CONFIG_MACH_TYPE	MACH_TYPE_PDU001
 
 /* Clock Defines */
 #define V_OSCK			24000000  /* Clock output from T2 */
@@ -35,21 +32,7 @@
 	#define CONSOLE_DEV "ttyO5"
 #endif
 
-#define CONFIG_BOOTCOMMAND \
-	"run eval_boot_device;" \
-	"part uuid mmc ${mmc_boot}:${root_fs_partition} root_fs_partuuid;" \
-	"setenv bootargs console=${console} " \
-	"vt.global_cursor_default=0 " \
-	"root=PARTUUID=${root_fs_partuuid} " \
-	"rootfstype=ext4 " \
-	"rootwait " \
-	"rootdelay=1;" \
-	"fatload mmc ${mmc_boot} ${fdtaddr} ${fdtfile};" \
-	"fatload mmc ${mmc_boot} ${loadaddr} ${bootfile};" \
-	"bootz ${loadaddr} - ${fdtaddr}"
-
-#ifndef CONFIG_SPL_BUILD
-#define CONFIG_EXTRA_ENV_SETTINGS \
+#define CFG_EXTRA_ENV_SETTINGS \
 	DEFAULT_LINUX_BOOT_ENV \
 	"fdtfile=am335x-pdu001.dtb\0" \
 	"bootfile=zImage\0" \
@@ -65,14 +48,13 @@
 			"reset;" \
 		"fi;" \
 	"\0"
-#endif
 
 /* NS16550 Configuration */
-#define CONFIG_SYS_NS16550_COM1	UART0_BASE
-#define CONFIG_SYS_NS16550_COM2	UART1_BASE
-#define CONFIG_SYS_NS16550_COM3	UART2_BASE
-#define CONFIG_SYS_NS16550_COM4	UART3_BASE
-#define CONFIG_SYS_NS16550_COM5	UART4_BASE
-#define CONFIG_SYS_NS16550_COM6	UART5_BASE
+#define CFG_SYS_NS16550_COM1	UART0_BASE
+#define CFG_SYS_NS16550_COM2	UART1_BASE
+#define CFG_SYS_NS16550_COM3	UART2_BASE
+#define CFG_SYS_NS16550_COM4	UART3_BASE
+#define CFG_SYS_NS16550_COM5	UART4_BASE
+#define CFG_SYS_NS16550_COM6	UART5_BASE
 
 #endif	/* ! __CONFIG_PDU001_H */

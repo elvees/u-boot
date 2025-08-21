@@ -3,57 +3,109 @@
  * Copyright 2017 Google, Inc
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_WDT
+
+#include <cyclic.h>
+#include <div64.h>
 #include <dm.h>
 #include <errno.h>
 #include <hang.h>
 #include <log.h>
+#include <sysreset.h>
 #include <time.h>
 #include <wdt.h>
 #include <asm/global_data.h>
 #include <dm/device-internal.h>
 #include <dm/lists.h>
+#include <linux/kernel.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
 #define WATCHDOG_TIMEOUT_SECS	(CONFIG_WATCHDOG_TIMEOUT_MSECS / 1000)
 
-/*
- * Reset every 1000ms, or however often is required as indicated by a
- * hw_margin_ms property.
- */
-static ulong reset_period = 1000;
+struct wdt_priv {
+	/* The udevice owning this wdt_priv. */
+	struct udevice *dev;
+	/* Timeout, in seconds, to configure this device to. */
+	u32 timeout;
+	/*
+	 * Time, in milliseconds, between calling the device's ->reset()
+	 * method from schedule().
+	 */
+	ulong reset_period;
+	/*
+	 * Next time (as returned by get_timer(0)) to call
+	 * ->reset().
+	 */
+	ulong next_reset;
+	/* Whether watchdog_start() has been called on the device. */
+	bool running;
+	/* autostart */
+	bool autostart;
+
+	struct cyclic_info cyclic;
+};
+
+static void wdt_cyclic(struct cyclic_info *c)
+{
+	struct wdt_priv *priv = container_of(c, struct wdt_priv, cyclic);
+	struct udevice *dev = priv->dev;
+
+	if (!device_active(dev))
+		return;
+
+	if (!priv->running)
+		return;
+
+	wdt_reset(dev);
+}
+
+static void init_watchdog_dev(struct udevice *dev)
+{
+	struct wdt_priv *priv;
+	int ret;
+
+	priv = dev_get_uclass_priv(dev);
+
+	if (IS_ENABLED(CONFIG_SYSRESET_WATCHDOG_AUTO)) {
+		ret = sysreset_register_wdt(dev);
+		if (ret)
+			printf("WDT:   Failed to register %s for sysreset\n",
+			       dev->name);
+	}
+
+	if (!priv->autostart) {
+		printf("WDT:   Not starting %s\n", dev->name);
+		return;
+	}
+
+	ret = wdt_start(dev, priv->timeout * 1000, 0);
+	if (ret != 0) {
+		printf("WDT:   Failed to start %s\n", dev->name);
+		return;
+	}
+}
 
 int initr_watchdog(void)
 {
-	u32 timeout = WATCHDOG_TIMEOUT_SECS;
+	struct udevice *dev;
+	struct uclass *uc;
+	int ret;
 
-	/*
-	 * Init watchdog: This will call the probe function of the
-	 * watchdog driver, enabling the use of the device
-	 */
-	if (uclass_get_device_by_seq(UCLASS_WDT, 0,
-				     (struct udevice **)&gd->watchdog_dev)) {
-		debug("WDT:   Not found by seq!\n");
-		if (uclass_get_device(UCLASS_WDT, 0,
-				      (struct udevice **)&gd->watchdog_dev)) {
-			printf("WDT:   Not found!\n");
-			return 0;
+	ret = uclass_get(UCLASS_WDT, &uc);
+	if (ret) {
+		log_debug("Error getting UCLASS_WDT: %d\n", ret);
+		return 0;
+	}
+
+	uclass_foreach_dev(dev, uc) {
+		ret = device_probe(dev);
+		if (ret) {
+			log_debug("Error probing %s: %d\n", dev->name, ret);
+			continue;
 		}
+		init_watchdog_dev(dev);
 	}
-
-	if (CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)) {
-		timeout = dev_read_u32_default(gd->watchdog_dev, "timeout-sec",
-					       WATCHDOG_TIMEOUT_SECS);
-		reset_period = dev_read_u32_default(gd->watchdog_dev,
-						    "hw_margin_ms",
-						    4 * reset_period) / 4;
-	}
-
-	wdt_start(gd->watchdog_dev, timeout * 1000, 0);
-	gd->flags |= GD_FLG_WDT_READY;
-	printf("WDT:   Started with%s servicing (%ds timeout)\n",
-	       IS_ENABLED(CONFIG_WATCHDOG) ? "" : "out", timeout);
 
 	return 0;
 }
@@ -61,21 +113,82 @@ int initr_watchdog(void)
 int wdt_start(struct udevice *dev, u64 timeout_ms, ulong flags)
 {
 	const struct wdt_ops *ops = device_get_ops(dev);
+	int ret;
 
 	if (!ops->start)
 		return -ENOSYS;
 
-	return ops->start(dev, timeout_ms, flags);
+	ret = ops->start(dev, timeout_ms, flags);
+	if (ret == 0) {
+		struct wdt_priv *priv = dev_get_uclass_priv(dev);
+		char str[16];
+
+		memset(str, 0, 16);
+		if (IS_ENABLED(CONFIG_WATCHDOG)) {
+			if (priv->running)
+				cyclic_unregister(&priv->cyclic);
+
+			/* Register the watchdog driver as a cyclic function */
+			cyclic_register(&priv->cyclic, wdt_cyclic,
+					priv->reset_period * 1000,
+					dev->name);
+
+			snprintf(str, 16, "every %ldms", priv->reset_period);
+		}
+
+		priv->running = true;
+		printf("WDT:   Started %s with%s servicing %s (%ds timeout)\n",
+		       dev->name, IS_ENABLED(CONFIG_WATCHDOG) ? "" : "out",
+		       str, (u32)lldiv(timeout_ms, 1000));
+	}
+
+	return ret;
 }
 
 int wdt_stop(struct udevice *dev)
 {
 	const struct wdt_ops *ops = device_get_ops(dev);
+	int ret;
 
 	if (!ops->stop)
 		return -ENOSYS;
 
-	return ops->stop(dev);
+	ret = ops->stop(dev);
+	if (ret == 0) {
+		struct wdt_priv *priv = dev_get_uclass_priv(dev);
+
+		if (IS_ENABLED(CONFIG_WATCHDOG) && priv->running)
+			cyclic_unregister(&priv->cyclic);
+
+		priv->running = false;
+	}
+
+	return ret;
+}
+
+int wdt_stop_all(void)
+{
+	struct wdt_priv *priv;
+	struct udevice *dev;
+	struct uclass *uc;
+	int ret, err;
+
+	ret = uclass_get(UCLASS_WDT, &uc);
+	if (ret)
+		return ret;
+
+	uclass_foreach_dev(dev, uc) {
+		if (!device_active(dev))
+			continue;
+		priv = dev_get_uclass_priv(dev);
+		if (!priv->running)
+			continue;
+		err = wdt_stop(dev);
+		if (!ret)
+			ret = err;
+	}
+
+	return ret;
 }
 
 int wdt_reset(struct udevice *dev)
@@ -98,10 +211,8 @@ int wdt_expire_now(struct udevice *dev, ulong flags)
 	if (ops->expire_now) {
 		return ops->expire_now(dev, flags);
 	} else {
-		if (!ops->start)
-			return -ENOSYS;
+		ret = wdt_start(dev, 1, flags);
 
-		ret = ops->start(dev, 1, flags);
 		if (ret < 0)
 			return ret;
 
@@ -111,55 +222,44 @@ int wdt_expire_now(struct udevice *dev, ulong flags)
 	return ret;
 }
 
-#if defined(CONFIG_WATCHDOG)
-/*
- * Called by macro WATCHDOG_RESET. This function be called *very* early,
- * so we need to make sure, that the watchdog driver is ready before using
- * it in this function.
- */
-void watchdog_reset(void)
+static int wdt_pre_probe(struct udevice *dev)
 {
-	static ulong next_reset;
-	ulong now;
+	u32 timeout = WATCHDOG_TIMEOUT_SECS;
+	/*
+	 * Reset every 1000ms, or however often is required as
+	 * indicated by a hw_margin_ms property.
+	 */
+	ulong reset_period = 1000;
+	bool autostart = IS_ENABLED(CONFIG_WATCHDOG_AUTOSTART);
+	struct wdt_priv *priv;
 
-	/* Exit if GD is not ready or watchdog is not initialized yet */
-	if (!gd || !(gd->flags & GD_FLG_WDT_READY))
-		return;
-
-	/* Do not reset the watchdog too often */
-	now = get_timer(0);
-	if (time_after(now, next_reset)) {
-		next_reset = now + reset_period;
-		wdt_reset(gd->watchdog_dev);
+	if (CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)) {
+		timeout = dev_read_u32_default(dev, "timeout-sec", timeout);
+		reset_period = dev_read_u32_default(dev, "hw_margin_ms",
+						    4 * reset_period) / 4;
+		if (dev_read_bool(dev, "u-boot,noautostart"))
+			autostart = false;
+		else if (dev_read_bool(dev, "u-boot,autostart"))
+			autostart = true;
 	}
-}
-#endif
+	priv = dev_get_uclass_priv(dev);
+	priv->dev = dev;
+	priv->timeout = timeout;
+	priv->reset_period = reset_period;
+	priv->autostart = autostart;
+	/*
+	 * Pretend this device was last reset "long" ago so the first
+	 * schedule() will actually call its ->reset method.
+	 */
+	priv->next_reset = get_timer(0);
 
-static int wdt_post_bind(struct udevice *dev)
-{
-#if defined(CONFIG_NEEDS_MANUAL_RELOC)
-	struct wdt_ops *ops = (struct wdt_ops *)device_get_ops(dev);
-	static int reloc_done;
-
-	if (!reloc_done) {
-		if (ops->start)
-			ops->start += gd->reloc_off;
-		if (ops->stop)
-			ops->stop += gd->reloc_off;
-		if (ops->reset)
-			ops->reset += gd->reloc_off;
-		if (ops->expire_now)
-			ops->expire_now += gd->reloc_off;
-
-		reloc_done++;
-	}
-#endif
 	return 0;
 }
 
 UCLASS_DRIVER(wdt) = {
-	.id		= UCLASS_WDT,
-	.name		= "watchdog",
-	.flags		= DM_UC_FLAG_SEQ_ALIAS,
-	.post_bind	= wdt_post_bind,
+	.id			= UCLASS_WDT,
+	.name			= "watchdog",
+	.flags			= DM_UC_FLAG_SEQ_ALIAS,
+	.pre_probe		= wdt_pre_probe,
+	.per_device_auto	= sizeof(struct wdt_priv),
 };

@@ -4,7 +4,6 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
 #include <debug_uart.h>
 #include <dm.h>
 #include <efi.h>
@@ -23,6 +22,9 @@ struct serial_efi_priv {
 	struct efi_input_key key;
 	bool have_key;
 };
+
+/* Convert a lower-case character to its ctrl-char equivalent */
+#define CTL_CH(c)		((c) - 'a' + 1)
 
 int serial_efi_setbrg(struct udevice *dev, int baudrate)
 {
@@ -49,6 +51,7 @@ static int serial_efi_get_key(struct serial_efi_priv *priv)
 static int serial_efi_getc(struct udevice *dev)
 {
 	struct serial_efi_priv *priv = dev_get_priv(dev);
+	char conv_scan[10] = {0, 'p', 'n', 'f', 'b', 'a', 'e', 0, 8};
 	int ret, ch;
 
 	ret = serial_efi_get_key(priv);
@@ -63,8 +66,11 @@ static int serial_efi_getc(struct udevice *dev)
 	 * key scan code of 8. Handle this so that backspace works correctly
 	 * in the U-Boot command line.
 	 */
-	if (!ch && priv->key.scan_code == 8)
-		ch = 8;
+	if (!ch && priv->key.scan_code < sizeof(conv_scan)) {
+		ch = conv_scan[priv->key.scan_code];
+		if (ch >= 'a')
+			ch -= 'a' - 1;
+	}
 	debug(" [%x %x %x] ", ch, priv->key.unicode_char, priv->key.scan_code);
 
 	return ch;

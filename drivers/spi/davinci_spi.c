@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2009 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2009 Texas Instruments Incorporated - https://www.ti.com/
  *
  * Driver for SPI controller on DaVinci. Based on atmel_spi.c
  * by Atmel Corporation
@@ -8,7 +8,7 @@
  * Copyright (C) 2007 Atmel Corporation
  */
 
-#include <common.h>
+#include <config.h>
 #include <log.h>
 #include <spi.h>
 #include <malloc.h>
@@ -129,9 +129,6 @@ static int davinci_spi_read(struct davinci_spi_slave *ds, unsigned int len,
 	while (readl(&ds->regs->buf) & SPIBUF_TXFULL_MASK)
 		;
 
-	/* preload the TX buffer to avoid clock starvation */
-	writel(data1_reg_val, &ds->regs->dat1);
-
 	/* keep reading 1 byte until only 1 byte left */
 	while ((len--) > 1)
 		*rxp++ = davinci_spi_xfer_data(ds, data1_reg_val);
@@ -158,12 +155,6 @@ static int davinci_spi_write(struct davinci_spi_slave *ds, unsigned int len,
 	/* wait till TXFULL is deasserted */
 	while (readl(&ds->regs->buf) & SPIBUF_TXFULL_MASK)
 		;
-
-	/* preload the TX buffer to avoid clock starvation */
-	if (len > 2) {
-		writel(data1_reg_val | *txp++, &ds->regs->dat1);
-		len--;
-	}
 
 	/* keep writing 1 byte until only 1 byte left */
 	while ((len--) > 1)
@@ -207,7 +198,6 @@ static int davinci_spi_read_write(struct davinci_spi_slave *ds, unsigned
 	return 0;
 }
 
-
 static int __davinci_spi_claim_bus(struct davinci_spi_slave *ds, int cs)
 {
 	unsigned int mode = 0, scalar;
@@ -225,7 +215,7 @@ static int __davinci_spi_claim_bus(struct davinci_spi_slave *ds, int cs)
 		SPIPC0_DOFUN_MASK | SPIPC0_DIFUN_MASK), &ds->regs->pc0);
 
 	/* setup format */
-	scalar = ((CONFIG_SYS_SPI_CLK / ds->freq) - 1) & 0xFF;
+	scalar = ((CFG_SYS_SPI_CLK / ds->freq) - 1) & 0xFF;
 
 	/*
 	 * Use following format:
@@ -314,7 +304,7 @@ static int davinci_spi_set_speed(struct udevice *bus, uint max_hz)
 	struct davinci_spi_slave *ds = dev_get_priv(bus);
 
 	debug("%s speed %u\n", __func__, max_hz);
-	if (max_hz > CONFIG_SYS_SPI_CLK / 2)
+	if (max_hz > CFG_SYS_SPI_CLK / 2)
 		return -EINVAL;
 
 	ds->freq = max_hz;
@@ -339,13 +329,13 @@ static int davinci_spi_claim_bus(struct udevice *dev)
 	struct udevice *bus = dev->parent;
 	struct davinci_spi_slave *ds = dev_get_priv(bus);
 
-	if (slave_plat->cs >= ds->num_cs) {
+	if (slave_plat->cs[0] >= ds->num_cs) {
 		printf("Invalid SPI chipselect\n");
 		return -EINVAL;
 	}
 	ds->half_duplex = slave_plat->mode & SPI_PREAMBLE;
 
-	return __davinci_spi_claim_bus(ds, slave_plat->cs);
+	return __davinci_spi_claim_bus(ds, slave_plat->cs[0]);
 }
 
 static int davinci_spi_release_bus(struct udevice *dev)
@@ -364,11 +354,11 @@ static int davinci_spi_xfer(struct udevice *dev, unsigned int bitlen,
 	struct udevice *bus = dev->parent;
 	struct davinci_spi_slave *ds = dev_get_priv(bus);
 
-	if (slave->cs >= ds->num_cs) {
+	if (slave->cs[0] >= ds->num_cs) {
 		printf("Invalid SPI chipselect\n");
 		return -EINVAL;
 	}
-	ds->cur_cs = slave->cs;
+	ds->cur_cs = slave->cs[0];
 
 	return __davinci_spi_xfer(ds, bitlen, dout, din, flags);
 }
@@ -391,7 +381,7 @@ static int davinci_spi_probe(struct udevice *bus)
 	return 0;
 }
 
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 static int davinci_ofdata_to_platadata(struct udevice *bus)
 {
 	struct davinci_spi_plat *plat = dev_get_plat(bus);
@@ -418,7 +408,7 @@ static const struct udevice_id davinci_spi_ids[] = {
 U_BOOT_DRIVER(davinci_spi) = {
 	.name = "davinci_spi",
 	.id = UCLASS_SPI,
-#if CONFIG_IS_ENABLED(OF_CONTROL) && !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	.of_match = davinci_spi_ids,
 	.of_to_plat = davinci_ofdata_to_platadata,
 	.plat_auto	= sizeof(struct davinci_spi_plat),

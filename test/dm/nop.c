@@ -2,11 +2,10 @@
 /*
  * Test for the NOP uclass
  *
- * (C) Copyright 2019 - Texas Instruments Incorporated - http://www.ti.com/
+ * (C) Copyright 2019 - Texas Instruments Incorporated - https://www.ti.com/
  * Jean-Jacques Hiblot <jjhiblot@ti.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <dm/ofnode.h>
 #include <dm/lists.h>
@@ -25,7 +24,7 @@ static int noptest_bind(struct udevice *parent)
 		const char *bind_flag = ofnode_read_string(ofnode, "bind");
 
 		if (bind_flag && (strcmp(bind_flag, "True") == 0))
-			lists_bind_fdt(parent, ofnode, &dev, false);
+			lists_bind_fdt(parent, ofnode, &dev, NULL, false);
 		ofnode = dev_read_next_subnode(ofnode);
 	}
 
@@ -70,5 +69,4 @@ static int dm_test_nop(struct unit_test_state *uts)
 
 	return 0;
 }
-
-DM_TEST(dm_test_nop, UT_TESTF_FLAT_TREE | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_nop, UTF_FLAT_TREE | UTF_SCAN_FDT);

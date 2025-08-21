@@ -4,7 +4,7 @@
  * Copyright (C) 2019 Stefan Roese <sr@denx.de>
  */
 
-#include <common.h>
+#include <config.h>
 #include <debug_uart.h>
 #include <env.h>
 #include <init.h>
@@ -23,9 +23,6 @@ static void at91_prepare_cpu_var(void)
 int board_late_init(void)
 {
 	at91_prepare_cpu_var();
-
-	if (IS_ENABLED(CONFIG_LED))
-		led_default_state();
 
 	return 0;
 }
@@ -48,15 +45,15 @@ int board_early_init_f(void)
 int board_init(void)
 {
 	/* Address of boot parameters */
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE + 0x100;
 
 	return 0;
 }
 
 int dram_init(void)
 {
-	gd->ram_size = get_ram_size((void *)CONFIG_SYS_SDRAM_BASE,
-				    CONFIG_SYS_SDRAM_SIZE);
+	gd->ram_size = get_ram_size((void *)CFG_SYS_SDRAM_BASE,
+				    CFG_SYS_SDRAM_SIZE);
 
 	return 0;
 }

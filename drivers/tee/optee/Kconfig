@@ -19,7 +19,7 @@ config OPTEE_TA_AVB
 	default y
 	help
 	  Enables support for the AVB Trusted Application (TA) in OP-TEE.
-	  The TA can support the "avb" subcommands "read_rb", "write"rb"
+	  The TA can support the "avb" subcommands "read_rb", "write_rb"
 	  and "is_unlocked".
 
 config OPTEE_TA_RPC_TEST
@@ -30,6 +30,20 @@ config OPTEE_TA_RPC_TEST
 	  Enables support for RPC test trusted application emulation, which
 	  permits to test reverse RPC calls to TEE supplicant. Should
 	  be used only in sandbox env.
+
+config OPTEE_TA_SCP03
+	bool "Support SCP03 TA"
+	default y
+	help
+	  Enables support for controlling (enabling, provisioning) the
+	  Secure Channel Protocol 03 operation in the OP-TEE SCP03 TA.
+
+config OPTEE_SERVICE_DISCOVERY
+	bool "OP-TEE service discovery"
+	default y
+	help
+	  This implements automated driver binding of OP-TEE service drivers by
+	  requesting OP-TEE firmware to enumerate its hosted services.
 
 endmenu
 

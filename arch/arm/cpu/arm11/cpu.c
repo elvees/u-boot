@@ -14,12 +14,12 @@
  * CPU specific code
  */
 
-#include <common.h>
 #include <command.h>
 #include <cpu_func.h>
 #include <irq_func.h>
 #include <asm/cache.h>
 #include <asm/system.h>
+#include <asm/arm11.h>
 
 static void cache_flush(void);
 
@@ -41,6 +41,11 @@ int cleanup_before_linux (void)
 	cache_flush();
 
 	return 0;
+}
+
+void allow_unaligned(void)
+{
+	arm11_arch_cp15_allow_unaligned();
 }
 
 static void cache_flush(void)
@@ -110,4 +115,16 @@ void enable_caches(void)
 	dcache_enable();
 #endif
 }
+#endif
+
+#if !CONFIG_IS_ENABLED(SYS_ICACHE_OFF)
+/* Invalidate entire I-cache */
+void invalidate_icache_all(void)
+{
+	unsigned long i = 0;
+
+	asm ("mcr p15, 0, %0, c7, c5, 0" : : "r" (i));
+}
+#else
+void invalidate_icache_all(void) {}
 #endif

@@ -7,7 +7,7 @@
  * Yasushi SHOJI <yashi@atmark-techno.com>
  */
 
-#include <common.h>
+#include <bootm.h>
 #include <bootstage.h>
 #include <command.h>
 #include <cpu_func.h>
@@ -15,7 +15,6 @@
 #include <fdt_support.h>
 #include <hang.h>
 #include <image.h>
-#include <lmb.h>
 #include <log.h>
 #include <asm/cache.h>
 #include <asm/global_data.h>
@@ -24,46 +23,7 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-static ulong get_sp(void)
-{
-	ulong ret;
-
-	asm("addik %0, r1, 0" : "=r"(ret) : );
-	return ret;
-}
-
-void arch_lmb_reserve(struct lmb *lmb)
-{
-	ulong sp, bank_end;
-	int bank;
-
-	/*
-	 * Booting a (Linux) kernel image
-	 *
-	 * Allocate space for command line and board info - the
-	 * address should be as high as possible within the reach of
-	 * the kernel (see CONFIG_SYS_BOOTMAPSZ settings), but in unused
-	 * memory, which means far enough below the current stack
-	 * pointer.
-	 */
-	sp = get_sp();
-	debug("## Current stack ends at 0x%08lx ", sp);
-
-	/* adjust sp by 4K to be safe */
-	sp -= 4096;
-	for (bank = 0; bank < CONFIG_NR_DRAM_BANKS; bank++) {
-		if (sp < gd->bd->bi_dram[bank].start)
-			continue;
-		bank_end = gd->bd->bi_dram[bank].start +
-			gd->bd->bi_dram[bank].size;
-		if (sp >= bank_end)
-			continue;
-		lmb_reserve(lmb, sp, bank_end - sp);
-		break;
-	}
-}
-
-static void boot_jump_linux(bootm_headers_t *images, int flag)
+static void boot_jump_linux(struct bootm_headers *images, int flag)
 {
 	void (*thekernel)(char *cmdline, ulong rd, ulong dt);
 	ulong dt = (ulong)images->ft_addr;
@@ -83,9 +43,7 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 	       "(fake run for tracing)" : "");
 	bootstage_mark_name(BOOTSTAGE_ID_BOOTM_HANDOFF, "start_kernel");
 
-#ifdef XILINX_USE_DCACHE
-	flush_cache(0, XILINX_DCACHE_BYTE_SIZE);
-#endif
+	flush_cache_all();
 
 	if (!fake) {
 		/*
@@ -99,9 +57,9 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 	}
 }
 
-static void boot_prep_linux(bootm_headers_t *images)
+static void boot_prep_linux(struct bootm_headers *images)
 {
-	if (IMAGE_ENABLE_OF_LIBFDT && images->ft_len) {
+	if (CONFIG_IS_ENABLED(OF_LIBFDT) && IS_ENABLED(CONFIG_LMB) && images->ft_len) {
 		debug("using: FDT\n");
 		if (image_setup_linux(images)) {
 			printf("FDT creation failed! hanging...");
@@ -110,9 +68,10 @@ static void boot_prep_linux(bootm_headers_t *images)
 	}
 }
 
-int do_bootm_linux(int flag, int argc, char *const argv[],
-		   bootm_headers_t *images)
+int do_bootm_linux(int flag, struct bootm_info *bmi)
 {
+	struct bootm_headers *images = bmi->images;
+
 	images->cmdline_start = (ulong)env_get("bootargs");
 
 	/* cmdline init is the part of 'prep' and nothing to do for 'bdt' */

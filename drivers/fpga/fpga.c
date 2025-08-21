@@ -5,18 +5,12 @@
  */
 
 /* Generic FPGA support */
-#include <common.h>             /* core U-Boot definitions */
 #include <init.h>
 #include <log.h>
 #include <xilinx.h>             /* xilinx specific definitions */
 #include <altera.h>             /* altera specific definitions */
 #include <lattice.h>
 #include <dm/device_compat.h>
-
-/* Local definitions */
-#ifndef CONFIG_MAX_FPGA_DEVICES
-#define CONFIG_MAX_FPGA_DEVICES		5
-#endif
 
 /* Local static data */
 static int next_desc = FPGA_INVALID_DEVICE;
@@ -36,13 +30,12 @@ static void fpga_no_sup(char *fn, char *msg)
 		printf("No FPGA support!\n");
 }
 
-
 /* fpga_get_desc
  *	map a device number to a descriptor
  */
-const fpga_desc *const fpga_get_desc(int devnum)
+const fpga_desc *fpga_get_desc(int devnum)
 {
-	fpga_desc *desc = (fpga_desc *)NULL;
+	const fpga_desc *desc = NULL;
 
 	if ((devnum >= 0) && (devnum < next_desc)) {
 		desc = &desc_table[devnum];
@@ -57,8 +50,8 @@ const fpga_desc *const fpga_get_desc(int devnum)
  * fpga_validate
  *	generic parameter checking code
  */
-const fpga_desc *const fpga_validate(int devnum, const void *buf,
-				     size_t bsize, char *fn)
+const fpga_desc *fpga_validate(int devnum, const void *buf,
+			       size_t bsize, char *fn)
 {
 	const fpga_desc *desc = fpga_get_desc(devnum);
 
@@ -67,7 +60,7 @@ const fpga_desc *const fpga_validate(int devnum, const void *buf,
 
 	if (!buf) {
 		printf("%s: Null buffer.\n", fn);
-		return (fpga_desc * const)NULL;
+		return NULL;
 	}
 	return desc;
 }
@@ -79,7 +72,7 @@ const fpga_desc *const fpga_validate(int devnum, const void *buf,
 static int fpga_dev_info(int devnum)
 {
 	int ret_val = FPGA_FAIL; /* assume failure */
-	const fpga_desc * const desc = fpga_get_desc(devnum);
+	const fpga_desc *desc = fpga_get_desc(devnum);
 
 	if (desc) {
 		debug("%s: Device Descriptor @ 0x%p\n",
@@ -220,7 +213,7 @@ int fpga_fsload(int devnum, const void *buf, size_t size,
 }
 #endif
 
-#if defined(CONFIG_CMD_FPGA_LOAD_SECURE)
+#if CONFIG_IS_ENABLED(FPGA_LOAD_SECURE)
 int fpga_loads(int devnum, const void *buf, size_t size,
 	       struct fpga_secure_info *fpga_sec_info)
 {
@@ -249,12 +242,29 @@ int fpga_loads(int devnum, const void *buf, size_t size,
 }
 #endif
 
+static int fpga_load_event_notify(const void *buf, size_t bsize, int result)
+{
+	if (CONFIG_IS_ENABLED(EVENT)) {
+		struct event_fpga_load load = {
+			.buf = buf,
+			.bsize = bsize,
+			.result = result
+		};
+
+		return event_notify(EVT_FPGA_LOAD, &load, sizeof(load));
+	}
+
+	return 0;
+}
+
 /*
  * Generic multiplexing code
  */
-int fpga_load(int devnum, const void *buf, size_t bsize, bitstream_type bstype)
+int fpga_load(int devnum, const void *buf, size_t bsize, bitstream_type bstype,
+	      int flags)
 {
 	int ret_val = FPGA_FAIL;           /* assume failure */
+	int ret_notify;
 	const fpga_desc *desc = fpga_validate(devnum, buf, bsize,
 					      (char *)__func__);
 
@@ -263,7 +273,7 @@ int fpga_load(int devnum, const void *buf, size_t bsize, bitstream_type bstype)
 		case fpga_xilinx:
 #if defined(CONFIG_FPGA_XILINX)
 			ret_val = xilinx_load(desc->devdesc, buf, bsize,
-					      bstype);
+					      bstype, flags);
 #else
 			fpga_no_sup((char *)__func__, "Xilinx devices");
 #endif
@@ -287,6 +297,10 @@ int fpga_load(int devnum, const void *buf, size_t bsize, bitstream_type bstype)
 			       __func__, desc->devtype);
 		}
 	}
+
+	ret_notify = fpga_load_event_notify(buf, bsize, ret_val);
+	if (ret_notify)
+		return ret_notify;
 
 	return ret_val;
 }
@@ -356,3 +370,29 @@ int fpga_info(int devnum)
 
 	return fpga_dev_info(devnum);
 }
+
+#if CONFIG_IS_ENABLED(FPGA_LOAD_SECURE)
+int fpga_compatible2flag(int devnum, const char *compatible)
+{
+	const fpga_desc *desc = fpga_get_desc(devnum);
+
+	if (!desc)
+		return 0;
+
+	switch (desc->devtype) {
+#if defined(CONFIG_FPGA_XILINX)
+	case fpga_xilinx:
+	{
+		xilinx_desc *xdesc = (xilinx_desc *)desc->devdesc;
+
+		if (xdesc->operations && xdesc->operations->str2flag)
+			return xdesc->operations->str2flag(xdesc, compatible);
+	}
+#endif
+	default:
+		break;
+	}
+
+	return 0;
+}
+#endif

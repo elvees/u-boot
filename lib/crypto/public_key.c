@@ -13,6 +13,7 @@
 #include <linux/bug.h>
 #include <linux/compat.h>
 #include <linux/err.h>
+#include <linux/printk.h>
 #else
 #include <linux/module.h>
 #include <linux/export.h>
@@ -50,38 +51,7 @@ static void public_key_describe(const struct key *asymmetric_key,
 }
 #endif
 
-/*
- * Destroy a public key algorithm key.
- */
-void public_key_free(struct public_key *key)
-{
-	if (key) {
-		kfree(key->key);
-		kfree(key->params);
-		kfree(key);
-	}
-}
-EXPORT_SYMBOL_GPL(public_key_free);
-
 #ifdef __UBOOT__
-/*
- * from <linux>/crypto/asymmetric_keys/signature.c
- *
- * Destroy a public key signature.
- */
-void public_key_signature_free(struct public_key_signature *sig)
-{
-	int i;
-
-	if (sig) {
-		for (i = 0; i < ARRAY_SIZE(sig->auth_ids); i++)
-			free(sig->auth_ids[i]);
-		free(sig->s);
-		free(sig->digest);
-		free(sig);
-	}
-}
-EXPORT_SYMBOL_GPL(public_key_signature_free);
 
 /**
  * public_key_verify_signature - Verify a signature using a public key.
@@ -97,6 +67,7 @@ int public_key_verify_signature(const struct public_key *pkey,
 				const struct public_key_signature *sig)
 {
 	struct image_sign_info info;
+	char algo[256];
 	int ret;
 
 	pr_devel("==>%s()\n", __func__);
@@ -108,30 +79,26 @@ int public_key_verify_signature(const struct public_key *pkey,
 		return -EINVAL;
 
 	memset(&info, '\0', sizeof(info));
+	memset(algo, 0, sizeof(algo));
 	info.padding = image_get_padding_algo("pkcs-1.5");
-	/*
-	 * Note: image_get_[checksum|crypto]_algo takes a string
-	 * argument like "<checksum>,<crypto>"
-	 * TODO: support other hash algorithms
-	 */
-	if (strcmp(sig->pkey_algo, "rsa") || (sig->s_size * 8) != 2048) {
-		pr_warn("Encryption is not RSA2048: %s%d\n",
-			sig->pkey_algo, sig->s_size * 8);
+	if (strcmp(sig->pkey_algo, "rsa")) {
+		pr_err("Encryption is not RSA: %s\n", sig->pkey_algo);
 		return -ENOPKG;
 	}
-	if (!strcmp(sig->hash_algo, "sha1")) {
-		info.checksum = image_get_checksum_algo("sha1,rsa2048");
-		info.name = "sha1,rsa2048";
-	} else if (!strcmp(sig->hash_algo, "sha256")) {
-		info.checksum = image_get_checksum_algo("sha256,rsa2048");
-		info.name = "sha256,rsa2048";
-	} else {
-		pr_warn("unknown msg digest algo: %s\n", sig->hash_algo);
-		return -ENOPKG;
-	}
+	ret = snprintf(algo, sizeof(algo), "%s,%s%d", sig->hash_algo,
+		       sig->pkey_algo, sig->s_size * 8);
+
+	if (ret >= sizeof(algo))
+		return -EINVAL;
+
+	info.checksum = image_get_checksum_algo((const char *)algo);
+	info.name = (const char *)algo;
 	info.crypto = image_get_crypto_algo(info.name);
-	if (IS_ERR(info.checksum) || IS_ERR(info.crypto))
+	if (!info.checksum || !info.crypto) {
+		pr_err("<%s> not supported on image_get_(checksum|crypto)_algo()\n",
+		       algo);
 		return -ENOPKG;
+	}
 
 	info.key = pkey->key;
 	info.keylen = pkey->keylen;

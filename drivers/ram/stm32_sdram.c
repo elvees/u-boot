@@ -6,7 +6,6 @@
 
 #define LOG_CATEGORY UCLASS_RAM
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <init.h>
@@ -16,6 +15,7 @@
 #include <dm/device_compat.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
+#include <linux/printk.h>
 
 #define MEM_MODE_MASK	GENMASK(2, 0)
 #define SWP_FMC_OFFSET 10
@@ -268,6 +268,7 @@ static int stm32_fmc_of_to_plat(struct udevice *dev)
 	u32 swp_fmc;
 	ofnode bank_node;
 	char *bank_name;
+	char _bank_name[128] = {0};
 	u8 bank = 0;
 	int ret;
 
@@ -285,7 +286,7 @@ static int stm32_fmc_of_to_plat(struct udevice *dev)
 		} else {
 			dev_dbg(dev, "cannot find st,mem_remap property\n");
 		}
-		
+
 		swp_fmc = dev_read_u32_default(dev, "st,swp_fmc", NOT_FOUND);
 		if (swp_fmc != NOT_FOUND) {
 			/* set fmc swapping selection */
@@ -300,6 +301,8 @@ static int stm32_fmc_of_to_plat(struct udevice *dev)
 	dev_for_each_subnode(bank_node, dev) {
 		/* extract the bank index from DT */
 		bank_name = (char *)ofnode_get_name(bank_node);
+		strlcpy(_bank_name, bank_name, sizeof(_bank_name));
+		bank_name = (char *)_bank_name;
 		strsep(&bank_name, "@");
 		if (!bank_name) {
 			pr_err("missing sdram bank index");
@@ -330,7 +333,6 @@ static int stm32_fmc_of_to_plat(struct udevice *dev)
 			return -EINVAL;
 		}
 
-
 		params->bank_params[bank].sdram_timing =
 			(struct stm32_sdram_timing *)
 			 ofnode_read_u8_array_ptr(bank_node,
@@ -342,7 +344,6 @@ static int stm32_fmc_of_to_plat(struct udevice *dev)
 			      ofnode_get_name(bank_node));
 			return -EINVAL;
 		}
-
 
 		bank_params->sdram_ref_count = ofnode_read_u32_default(bank_node,
 						"st,sdram-refcount", 8196);

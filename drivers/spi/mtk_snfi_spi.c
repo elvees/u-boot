@@ -5,7 +5,6 @@
  * Author: Weijie Gao <weijie.gao@mediatek.com>
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <errno.h>
@@ -64,8 +63,7 @@ static int mtk_snfi_adjust_op_size(struct spi_slave *slave,
 	 * or the output+input data must not exceed the GPRAM size.
 	 */
 
-	nbytes = sizeof(op->cmd.opcode) + op->addr.nbytes +
-		op->dummy.nbytes;
+	nbytes = op->cmd.nbytes + op->addr.nbytes + op->dummy.nbytes;
 
 	if (nbytes + op->data.nbytes <= SNFI_GPRAM_SIZE)
 		return 0;
@@ -154,7 +152,7 @@ static void mtk_snfi_copy_to_gpram(struct mtk_snfi_priv *priv,
 
 	/*
 	 * The output data will always be copied to the beginning of
-	 * the GPRAM. Uses word write for better performace.
+	 * the GPRAM. Uses word write for better performance.
 	 *
 	 * Trailing bytes in the last word are not cared.
 	 */
@@ -181,7 +179,7 @@ static void mtk_snfi_copy_from_gpram(struct mtk_snfi_priv *priv, u8 *cache,
 
 	/*
 	 * Read aligned data from GPRAM to buffer first.
-	 * Uses word read for better performace.
+	 * Uses word read for better performance.
 	 */
 	i = 0;
 	while (pos < end) {
@@ -203,7 +201,7 @@ static int mtk_snfi_exec_op(struct spi_slave *slave,
 	int addr_sh;
 	int ret;
 
-	WATCHDOG_RESET();
+	schedule();
 
 	ret = mtk_snfi_mac_reset(priv);
 	if (ret)

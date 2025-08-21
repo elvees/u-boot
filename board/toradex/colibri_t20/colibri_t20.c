@@ -3,7 +3,8 @@
  *  Copyright (C) 2012 Lucas Stach
  */
 
-#include <common.h>
+#include <env.h>
+#include <fdt_support.h>
 #include <init.h>
 #include <log.h>
 #include <asm/arch/clock.h>
@@ -68,19 +69,27 @@ int arch_misc_init(void)
 	return 0;
 }
 
-int checkboard(void)
-{
-	printf("Model: Toradex Colibri T20 %dMB V%s\n",
-	       (gd->ram_size == 0x10000000) ? 256 : 512,
-	       (get_nand_dev_by_index(0)->erasesize >> 10 == 512) ?
-	       ((gd->ram_size == 0x10000000) ? "1.1B" : "1.1C") : "1.2A");
-
-	return 0;
-}
-
 #if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)
 int ft_board_setup(void *blob, struct bd_info *bd)
 {
+	u8 enetaddr[6];
+
+	/* MAC addr */
+	if (eth_env_get_enetaddr("ethaddr", enetaddr)) {
+		int err = fdt_find_and_setprop(blob,
+					       "/usb@7d004000/ethernet@1",
+					       "local-mac-address", enetaddr, 6, 0);
+
+		/* Older device trees might have used a different node name */
+		if (err < 0)
+			err = fdt_find_and_setprop(blob,
+						   "/usb@7d004000/asix@1",
+						   "local-mac-address", enetaddr, 6, 0);
+
+		if (err >= 0)
+			puts("   MAC address updated...\n");
+	}
+
 	return ft_common_board_setup(blob, bd);
 }
 #endif
@@ -138,7 +147,7 @@ void pin_mux_usb(void)
 }
 #endif
 
-#ifdef CONFIG_VIDEO_TEGRA20
+#ifdef CONFIG_VIDEO_TEGRA
 /*
  * Routine: pin_mux_display
  * Description: setup the pin muxes/tristate values for the LCD interface)

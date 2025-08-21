@@ -3,7 +3,6 @@
  * Copyright (C) 2014 Stefan Roese <sr@denx.de>
  */
 
-#include <common.h>
 #include <init.h>
 #include <miiphy.h>
 #include <asm/global_data.h>
@@ -112,13 +111,13 @@ int board_early_init_f(void)
 	/*
 	 * Setup some board specific mbus address windows
 	 */
-	mbus_dt_setup_win(&mbus_state, DEV_CS0_BASE, 16 << 20,
+	mbus_dt_setup_win(DEV_CS0_BASE, 16 << 20,
 			  CPU_TARGET_DEVICEBUS_BOOTROM_SPI, CPU_ATTR_DEV_CS0);
-	mbus_dt_setup_win(&mbus_state, DEV_CS1_BASE, 16 << 20,
+	mbus_dt_setup_win(DEV_CS1_BASE, 16 << 20,
 			  CPU_TARGET_DEVICEBUS_BOOTROM_SPI, CPU_ATTR_DEV_CS1);
-	mbus_dt_setup_win(&mbus_state, DEV_CS2_BASE, 16 << 20,
+	mbus_dt_setup_win(DEV_CS2_BASE, 16 << 20,
 			  CPU_TARGET_DEVICEBUS_BOOTROM_SPI, CPU_ATTR_DEV_CS2);
-	mbus_dt_setup_win(&mbus_state, DEV_CS3_BASE, 16 << 20,
+	mbus_dt_setup_win(DEV_CS3_BASE, 16 << 20,
 			  CPU_TARGET_DEVICEBUS_BOOTROM_SPI, CPU_ATTR_DEV_CS3);
 
 	return 0;

@@ -6,7 +6,6 @@
  */
 
 #include <config.h>
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <mmc.h>
@@ -474,7 +473,6 @@ int davinci_mmc_init(struct bd_info *bis, struct davinci_mmc *host)
 }
 #else
 
-
 static int davinci_mmc_probe(struct udevice *dev)
 {
 	struct mmc_uclass_priv *upriv = dev_get_uclass_priv(dev);
@@ -506,7 +504,7 @@ static int davinci_mmc_of_to_plat(struct udevice *dev)
 	struct davinci_mmc_plat *plat = dev_get_plat(dev);
 	struct mmc_config *cfg = &plat->cfg;
 
-	plat->reg_base = (struct davinci_mmc_regs *)dev_read_addr(dev);
+	plat->reg_base = dev_read_addr_ptr(dev);
 	cfg->f_min = 200000;
 	cfg->f_max = 25000000;
 	cfg->voltages = MMC_VDD_32_33 | MMC_VDD_33_34,

@@ -6,7 +6,6 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
 #include <bloblist.h>
 #include <command.h>
 #include <asm/global_data.h>
@@ -29,9 +28,9 @@ static int do_bloblist_list(struct cmd_tbl *cmdtp, int flag, int argc,
 	return 0;
 }
 
-static char bloblist_help_text[] =
+U_BOOT_LONGHELP(bloblist,
 	"info   - show information about the bloblist\n"
-	"bloblist list   - list blobs in the bloblist";
+	"bloblist list   - list blobs in the bloblist");
 
 U_BOOT_CMD_WITH_SUBCMDS(bloblist, "Bloblists", bloblist_help_text,
 	U_BOOT_SUBCMD_MKENT(info, 1, 1, do_bloblist_info),

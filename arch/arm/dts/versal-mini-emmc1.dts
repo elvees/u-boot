@@ -4,8 +4,8 @@
  *
  * (C) Copyright 2018-2019, Xilinx, Inc.
  *
- * Siva Durga Prasad <siva.durga.paladugu@xilinx.com>
- * Michal Simek <michal.simek@xilinx.com>
+ * Siva Durga Prasad Paladugu <siva.durga.prasad.paladugu@amd.com>
+ * Michal Simek <michal.simek@amd.com>
  */
 
 /dts-v1/;
@@ -25,11 +25,11 @@
 	dcc: dcc {
 		compatible = "arm,dcc";
 		status = "okay";
-		u-boot,dm-pre-reloc;
+		bootph-all;
 	};
 
-	amba: amba {
-		u-boot,dm-pre-reloc;
+	amba: axi {
+		bootph-all;
 		compatible = "simple-bus";
 		#address-cells = <0x2>;
 		#size-cells = <0x2>;
@@ -40,14 +40,15 @@
 			status = "okay";
 			non-removable;
 			disable-wp;
+			no-sd;
+			no-sdio;
+			cap-mmc-hw-reset;
 			bus-width = <8>;
 			reg = <0x0 0xf1050000 0x0 0x10000>;
 			clock-names = "clk_xin", "clk_ahb";
 			clocks = <&clk200 &clk200>;
-			xlnx,device_id = <1>;
 			no-1-8-v;
 			xlnx,mio-bank = <0>;
-			#stream-id-cells = <1>;
 		};
 	};
 

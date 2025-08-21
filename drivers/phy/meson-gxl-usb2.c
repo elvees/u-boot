@@ -7,20 +7,17 @@
  * Author: Neil Armstrong <narmstron@baylibre.com>
  */
 
-#include <common.h>
 #include <malloc.h>
 #include <asm/io.h>
 #include <bitfield.h>
+#include <clk.h>
 #include <dm.h>
 #include <errno.h>
 #include <generic-phy.h>
 #include <regmap.h>
 #include <linux/delay.h>
-#include <power/regulator.h>
-#include <clk.h>
+#include <linux/printk.h>
 #include <linux/usb/otg.h>
-
-#include <asm/arch/usb-gx.h>
 
 #include <linux/bitops.h>
 #include <linux/compat.h>
@@ -101,9 +98,6 @@
 
 struct phy_meson_gxl_usb2_priv {
 	struct regmap		*regmap;
-#if CONFIG_IS_ENABLED(DM_REGULATOR)
-	struct udevice		*phy_supply;
-#endif
 #if CONFIG_IS_ENABLED(CLK)
 	struct clk		clk;
 #endif
@@ -125,33 +119,40 @@ static void phy_meson_gxl_usb2_reset(struct phy_meson_gxl_usb2_priv *priv)
 	udelay(RESET_COMPLETE_TIME);
 }
 
-void phy_meson_gxl_usb2_set_mode(struct phy *phy, enum usb_dr_mode mode)
+static int phy_meson_gxl_usb2_set_mode(struct phy *phy, enum phy_mode mode, int submode)
 {
 	struct udevice *dev = phy->dev;
 	struct phy_meson_gxl_usb2_priv *priv = dev_get_priv(dev);
 	uint val;
 
+	if (submode)
+		return -EOPNOTSUPP;
+
 	regmap_read(priv->regmap, U2P_R0, &val);
 
 	switch (mode) {
-	case USB_DR_MODE_UNKNOWN:
-	case USB_DR_MODE_HOST:
-	case USB_DR_MODE_OTG:
+	case PHY_MODE_USB_DEVICE:
+		val &= ~U2P_R0_DM_PULLDOWN;
+		val &= ~U2P_R0_DP_PULLDOWN;
+		val |= U2P_R0_ID_PULLUP;
+		break;
+
+	case PHY_MODE_USB_HOST:
+	case PHY_MODE_USB_OTG:
 		val |= U2P_R0_DM_PULLDOWN;
 		val |= U2P_R0_DP_PULLDOWN;
 		val &= ~U2P_R0_ID_PULLUP;
 		break;
 
-	case USB_DR_MODE_PERIPHERAL:
-		val &= ~U2P_R0_DM_PULLDOWN;
-		val &= ~U2P_R0_DP_PULLDOWN;
-		val |= U2P_R0_ID_PULLUP;
-		break;
+	default:
+		return -EINVAL;
 	}
 
 	regmap_write(priv->regmap, U2P_R0, val);
 
 	phy_meson_gxl_usb2_reset(priv);
+
+	return 0;
 }
 
 static int phy_meson_gxl_usb2_power_on(struct phy *phy)
@@ -165,15 +166,7 @@ static int phy_meson_gxl_usb2_power_on(struct phy *phy)
 	val &= ~U2P_R0_POWER_ON_RESET;
 	regmap_write(priv->regmap, U2P_R0, val);
 
-	phy_meson_gxl_usb2_set_mode(phy, USB_DR_MODE_HOST);
-
-#if CONFIG_IS_ENABLED(DM_REGULATOR)
-	if (priv->phy_supply) {
-		int ret = regulator_set_enable(priv->phy_supply, true);
-		if (ret)
-			return ret;
-	}
-#endif
+	phy_meson_gxl_usb2_set_mode(phy, PHY_MODE_USB_HOST, 0);
 
 	return 0;
 }
@@ -189,22 +182,13 @@ static int phy_meson_gxl_usb2_power_off(struct phy *phy)
 	val |= U2P_R0_POWER_ON_RESET;
 	regmap_write(priv->regmap, U2P_R0, val);
 
-#if CONFIG_IS_ENABLED(DM_REGULATOR)
-	if (priv->phy_supply) {
-		int ret = regulator_set_enable(priv->phy_supply, false);
-		if (ret) {
-			pr_err("Error disabling PHY supply\n");
-			return ret;
-		}
-	}
-#endif
-
 	return 0;
 }
 
 struct phy_ops meson_gxl_usb2_phy_ops = {
 	.power_on = phy_meson_gxl_usb2_power_on,
 	.power_off = phy_meson_gxl_usb2_power_off,
+	.set_mode = phy_meson_gxl_usb2_set_mode,
 };
 
 int meson_gxl_usb2_phy_probe(struct udevice *dev)
@@ -224,15 +208,6 @@ int meson_gxl_usb2_phy_probe(struct udevice *dev)
 	ret = clk_enable(&priv->clk);
 	if (ret && ret != -ENOSYS && ret != -ENOTSUPP) {
 		pr_err("failed to enable PHY clock\n");
-		clk_free(&priv->clk);
-		return ret;
-	}
-#endif
-
-#if CONFIG_IS_ENABLED(DM_REGULATOR)
-	ret = device_get_supply_regulator(dev, "phy-supply", &priv->phy_supply);
-	if (ret && ret != -ENOENT) {
-		pr_err("Failed to get PHY regulator\n");
 		return ret;
 	}
 #endif

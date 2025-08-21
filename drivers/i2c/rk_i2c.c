@@ -6,7 +6,6 @@
  * Peter, Software Engineering, <superpeter.cai@gmail.com>.
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <errno.h>
@@ -342,7 +341,7 @@ static int rockchip_i2c_xfer(struct udevice *bus, struct i2c_msg *msg,
 			     int nmsgs)
 {
 	struct rk_i2c *i2c = dev_get_priv(bus);
-	int ret;
+	int ret = 0;
 
 	debug("i2c_xfer: %d messages\n", nmsgs);
 	for (; nmsgs > 0; nmsgs--, msg++) {
@@ -356,14 +355,15 @@ static int rockchip_i2c_xfer(struct udevice *bus, struct i2c_msg *msg,
 		}
 		if (ret) {
 			debug("i2c_write: error sending\n");
-			return -EREMOTEIO;
+			ret = -EREMOTEIO;
+			break;
 		}
 	}
 
 	rk_i2c_send_stop_bit(i2c);
 	rk_i2c_disable(i2c);
 
-	return 0;
+	return ret;
 }
 
 int rockchip_i2c_set_bus_speed(struct udevice *bus, unsigned int speed)

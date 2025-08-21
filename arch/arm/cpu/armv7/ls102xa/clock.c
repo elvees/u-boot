@@ -3,7 +3,7 @@
  * Copyright 2014 Freescale Semiconductor, Inc.
  */
 
-#include <common.h>
+#include <config.h>
 #include <clock_legacy.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
@@ -13,14 +13,10 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#ifndef CONFIG_SYS_FSL_NUM_CC_PLLS
-#define CONFIG_SYS_FSL_NUM_CC_PLLS      2
-#endif
-
 void get_sys_info(struct sys_info *sys_info)
 {
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
-	struct ccsr_clk *clk = (void *)(CONFIG_SYS_FSL_LS1_CLK_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_clk *clk = (void *)(CFG_SYS_FSL_LS1_CLK_ADDR);
 	unsigned int cpu;
 	const u8 core_cplx_pll[6] = {
 		[0] = 0,	/* CC1 PPL / 1 */
@@ -39,11 +35,11 @@ void get_sys_info(struct sys_info *sys_info)
 	uint i;
 	uint freq_c_pll[CONFIG_SYS_FSL_NUM_CC_PLLS];
 	uint ratio[CONFIG_SYS_FSL_NUM_CC_PLLS];
-	unsigned long sysclk = CONFIG_SYS_CLK_FREQ;
+	unsigned long sysclk = get_board_sys_clk();
 
 	sys_info->freq_systembus = sysclk;
-#ifdef CONFIG_DDR_CLK_FREQ
-	sys_info->freq_ddrbus = CONFIG_DDR_CLK_FREQ;
+#if defined(CONFIG_DYNAMIC_DDR_CLK_FREQ) || defined(CONFIG_STATIC_DDR_CLK_FREQ)
+	sys_info->freq_ddrbus = get_board_ddr_clk();
 #else
 	sys_info->freq_ddrbus = sysclk;
 #endif

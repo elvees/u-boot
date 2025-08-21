@@ -2,11 +2,10 @@
 /*
  * OMAP USB2 PHY LAYER
  *
- * Copyright (C) 2018 Texas Instruments Incorporated - http://www.ti.com
+ * Copyright (C) 2018 Texas Instruments Incorporated - https://www.ti.com
  * Written by Jean-Jacques Hiblot <jjhiblot@ti.com>
  */
 
-#include <common.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <dm.h>

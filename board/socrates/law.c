@@ -9,7 +9,7 @@
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  */
 
-#include <common.h>
+#include <config.h>
 #include <asm/fsl_law.h>
 #include <asm/mmu.h>
 
@@ -30,12 +30,12 @@
  */
 
 struct law_entry law_table[] = {
-	SET_LAW(CONFIG_SYS_DDR_SDRAM_BASE, LAW_SIZE_512M, LAW_TRGT_IF_DDR),
-	SET_LAW(CONFIG_SYS_LBC_FLASH_BASE, LAW_SIZE_64M, LAW_TRGT_IF_LBC),
-#if defined(CONFIG_SYS_FPGA_BASE)
-	SET_LAW(CONFIG_SYS_FPGA_BASE, LAW_SIZE_1M, LAW_TRGT_IF_LBC),
+	SET_LAW(CFG_SYS_DDR_SDRAM_BASE, LAW_SIZE_512M, LAW_TRGT_IF_DDR),
+	SET_LAW(CFG_SYS_LBC_FLASH_BASE, LAW_SIZE_64M, LAW_TRGT_IF_LBC),
+#if defined(CFG_SYS_FPGA_BASE)
+	SET_LAW(CFG_SYS_FPGA_BASE, LAW_SIZE_1M, LAW_TRGT_IF_LBC),
 #endif
-	SET_LAW(CONFIG_SYS_LIME_BASE, LAW_SIZE_64M, LAW_TRGT_IF_LBC),
+	SET_LAW(CFG_SYS_LIME_BASE, LAW_SIZE_64M, LAW_TRGT_IF_LBC),
 };
 
 int num_law_entries = ARRAY_SIZE(law_table);

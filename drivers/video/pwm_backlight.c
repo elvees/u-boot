@@ -6,7 +6,6 @@
 
 #define LOG_CATEGORY UCLASS_PANEL_BACKLIGHT
 
-#include <common.h>
 #include <dm.h>
 #include <backlight.h>
 #include <log.h>
@@ -14,6 +13,7 @@
 #include <pwm.h>
 #include <asm/gpio.h>
 #include <linux/delay.h>
+#include <linux/math64.h>
 #include <power/regulator.h>
 
 /**
@@ -59,13 +59,22 @@ struct pwm_backlight_priv {
 
 static int set_pwm(struct pwm_backlight_priv *priv)
 {
+	u64 width;
 	uint duty_cycle;
 	int ret;
 
-	duty_cycle = priv->period_ns * (priv->cur_level - priv->min_level) /
-		(priv->max_level - priv->min_level);
-	ret = pwm_set_config(priv->pwm, priv->channel, priv->period_ns,
-			     duty_cycle);
+	if (priv->period_ns) {
+		width = priv->period_ns * (priv->cur_level - priv->min_level);
+		duty_cycle = div_u64(width,
+				     (priv->max_level - priv->min_level));
+		ret = pwm_set_config(priv->pwm, priv->channel, priv->period_ns,
+				     duty_cycle);
+	} else {
+		/* PWM driver will internally scale these like the above. */
+		ret = pwm_set_config(priv->pwm, priv->channel,
+				     priv->max_level - priv->min_level,
+				     priv->cur_level - priv->min_level);
+	}
 	if (ret)
 		return log_ret(ret);
 
@@ -90,8 +99,8 @@ static int enable_sequence(struct udevice *dev, int seq)
 			plat = dev_get_uclass_plat(priv->reg);
 			log_debug("Enable '%s', regulator '%s'/'%s'\n",
 				  dev->name, priv->reg->name, plat->name);
-			ret = regulator_set_enable(priv->reg, true);
-			if (ret) {
+			ret = regulator_set_enable_if_allowed(priv->reg, true);
+			if (ret && ret != -ENOSYS) {
 				log_debug("Cannot enable regulator for PWM '%s'\n",
 					  dev->name);
 				return log_ret(ret);
@@ -171,11 +180,10 @@ static int pwm_backlight_set_brightness(struct udevice *dev, int percent)
 	}
 	if (disable) {
 		dm_gpio_set_value(&priv->enable, 0);
-		if (priv->reg) {
-			ret = regulator_set_enable(priv->reg, false);
-			if (ret)
-				return log_ret(ret);
-		}
+		ret = regulator_set_enable_if_allowed(priv->reg, false);
+		if (ret && ret != -ENOSYS)
+			return log_ret(ret);
+
 		priv->enabled = false;
 	}
 
@@ -213,10 +221,11 @@ static int pwm_backlight_of_to_plat(struct udevice *dev)
 		log_debug("Cannot get PWM: ret=%d\n", ret);
 		return log_ret(ret);
 	}
-	if (args.args_count < 2)
+	if (args.args_count < 1)
 		return log_msg_ret("Not enough arguments to pwm\n", -EINVAL);
 	priv->channel = args.args[0];
-	priv->period_ns = args.args[1];
+	if (args.args_count > 1)
+		priv->period_ns = args.args[1];
 	if (args.args_count > 2)
 		priv->polarity = args.args[2];
 
@@ -227,8 +236,10 @@ static int pwm_backlight_of_to_plat(struct udevice *dev)
 		priv->levels = malloc(len);
 		if (!priv->levels)
 			return log_ret(-ENOMEM);
-		dev_read_u32_array(dev, "brightness-levels", priv->levels,
-				   count);
+		ret = dev_read_u32_array(dev, "brightness-levels", priv->levels,
+					 count);
+		if (ret)
+			return log_msg_ret("levels", ret);
 		priv->num_levels = count;
 		priv->default_level = priv->levels[index];
 		priv->max_level = priv->levels[count - 1];
@@ -238,7 +249,6 @@ static int pwm_backlight_of_to_plat(struct udevice *dev)
 	}
 	priv->cur_level = priv->default_level;
 	log_debug("done\n");
-
 
 	return 0;
 }

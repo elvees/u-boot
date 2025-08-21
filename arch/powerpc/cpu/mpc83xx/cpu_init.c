@@ -3,9 +3,9 @@
  * Copyright (C) 2004-2009 Freescale Semiconductor, Inc.
  */
 
-#include <common.h>
 #include <asm-offsets.h>
 #include <mpc83xx.h>
+#include <system-constants.h>
 #include <ioports.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
@@ -18,6 +18,8 @@
 #ifdef CONFIG_QE
 #include <fsl_qe.h>
 #endif
+#include <asm/ppc.h>
+#include <asm/fsl_lbc.h>
 
 #include "lblaw/lblaw.h"
 #include "elbc/elbc.h"
@@ -76,10 +78,10 @@ void cpu_init_f (volatile immap_t * im)
 #ifdef CONFIG_SYS_SCCR_TSECCM /* all TSEC's clock mode */
 		SCCR_TSECCM |
 #endif
-#ifdef CONFIG_SYS_SCCR_TSEC1CM /* TSEC1 clock mode */
+#ifdef CFG_SYS_SCCR_TSEC1CM /* TSEC1 clock mode */
 		SCCR_TSEC1CM |
 #endif
-#ifdef CONFIG_SYS_SCCR_TSEC2CM /* TSEC2 clock mode */
+#ifdef CFG_SYS_SCCR_TSEC2CM /* TSEC2 clock mode */
 		SCCR_TSEC2CM |
 #endif
 #ifdef CONFIG_SYS_SCCR_TSEC1ON /* TSEC1 clock switch */
@@ -91,10 +93,10 @@ void cpu_init_f (volatile immap_t * im)
 #ifdef CONFIG_SYS_SCCR_USBMPHCM /* USB MPH clock mode */
 		SCCR_USBMPHCM |
 #endif
-#ifdef CONFIG_SYS_SCCR_USBDRCM /* USB DR clock mode */
+#ifdef CFG_SYS_SCCR_USBDRCM /* USB DR clock mode */
 		SCCR_USBDRCM |
 #endif
-#ifdef CONFIG_SYS_SCCR_SATACM /* SATA controller clock mode */
+#ifdef CFG_SYS_SCCR_SATACM /* SATA controller clock mode */
 		SCCR_SATACM |
 #endif
 		0;
@@ -114,11 +116,11 @@ void cpu_init_f (volatile immap_t * im)
 #ifdef CONFIG_SYS_SCCR_TSECCM /* all TSEC's clock mode */
 		(CONFIG_SYS_SCCR_TSECCM << SCCR_TSECCM_SHIFT) |
 #endif
-#ifdef CONFIG_SYS_SCCR_TSEC1CM /* TSEC1 clock mode */
-		(CONFIG_SYS_SCCR_TSEC1CM << SCCR_TSEC1CM_SHIFT) |
+#ifdef CFG_SYS_SCCR_TSEC1CM /* TSEC1 clock mode */
+		(CFG_SYS_SCCR_TSEC1CM << SCCR_TSEC1CM_SHIFT) |
 #endif
-#ifdef CONFIG_SYS_SCCR_TSEC2CM /* TSEC2 clock mode */
-		(CONFIG_SYS_SCCR_TSEC2CM << SCCR_TSEC2CM_SHIFT) |
+#ifdef CFG_SYS_SCCR_TSEC2CM /* TSEC2 clock mode */
+		(CFG_SYS_SCCR_TSEC2CM << SCCR_TSEC2CM_SHIFT) |
 #endif
 #ifdef CONFIG_SYS_SCCR_TSEC1ON /* TSEC1 clock switch */
 		(CONFIG_SYS_SCCR_TSEC1ON << SCCR_TSEC1ON_SHIFT) |
@@ -129,16 +131,16 @@ void cpu_init_f (volatile immap_t * im)
 #ifdef CONFIG_SYS_SCCR_USBMPHCM /* USB MPH clock mode */
 		(CONFIG_SYS_SCCR_USBMPHCM << SCCR_USBMPHCM_SHIFT) |
 #endif
-#ifdef CONFIG_SYS_SCCR_USBDRCM /* USB DR clock mode */
-		(CONFIG_SYS_SCCR_USBDRCM << SCCR_USBDRCM_SHIFT) |
+#ifdef CFG_SYS_SCCR_USBDRCM /* USB DR clock mode */
+		(CFG_SYS_SCCR_USBDRCM << SCCR_USBDRCM_SHIFT) |
 #endif
-#ifdef CONFIG_SYS_SCCR_SATACM /* SATA controller clock mode */
-		(CONFIG_SYS_SCCR_SATACM << SCCR_SATACM_SHIFT) |
+#ifdef CFG_SYS_SCCR_SATACM /* SATA controller clock mode */
+		(CFG_SYS_SCCR_SATACM << SCCR_SATACM_SHIFT) |
 #endif
 		0;
 
 	/* Pointer is writable since we allocated a register for it */
-	gd = (gd_t *) (CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_GBL_DATA_OFFSET);
+	gd = (gd_t *)SYS_INIT_SP_ADDR;
 
 	/* global data region was cleared in start.S */
 
@@ -174,26 +176,26 @@ void cpu_init_f (volatile immap_t * im)
 	setbits_be32(&im->sysconf.spcr, SPCR_TBEN);
 
 	/* System General Purpose Register */
-#ifdef CONFIG_SYS_SICRH
+#ifdef CFG_SYS_SICRH
 #if defined(CONFIG_ARCH_MPC834X) || defined(CONFIG_ARCH_MPC8313)
 	/* regarding to MPC34x manual rev.1 bits 28..29 must be preserved */
-	__raw_writel((im->sysconf.sicrh & 0x0000000C) | CONFIG_SYS_SICRH,
+	__raw_writel((im->sysconf.sicrh & 0x0000000C) | CFG_SYS_SICRH,
 		     &im->sysconf.sicrh);
 #else
-	__raw_writel(CONFIG_SYS_SICRH, &im->sysconf.sicrh);
+	__raw_writel(CFG_SYS_SICRH, &im->sysconf.sicrh);
 #endif
 #endif
-#ifdef CONFIG_SYS_SICRL
-	__raw_writel(CONFIG_SYS_SICRL, &im->sysconf.sicrl);
+#ifdef CFG_SYS_SICRL
+	__raw_writel(CFG_SYS_SICRL, &im->sysconf.sicrl);
 #endif
-#ifdef CONFIG_SYS_GPR1
-	__raw_writel(CONFIG_SYS_GPR1, &im->sysconf.gpr1);
+#ifdef CFG_SYS_GPR1
+	__raw_writel(CFG_SYS_GPR1, &im->sysconf.gpr1);
 #endif
-#ifdef CONFIG_SYS_DDRCDR /* DDR control driver register */
-	__raw_writel(CONFIG_SYS_DDRCDR, &im->sysconf.ddrcdr);
+#ifdef CFG_SYS_DDRCDR /* DDR control driver register */
+	__raw_writel(CFG_SYS_DDRCDR, &im->sysconf.ddrcdr);
 #endif
-#ifdef CONFIG_SYS_OBIR /* Output buffer impedance register */
-	__raw_writel(CONFIG_SYS_OBIR, &im->sysconf.obir);
+#ifdef CFG_SYS_OBIR /* Output buffer impedance register */
+	__raw_writel(CFG_SYS_OBIR, &im->sysconf.obir);
 #endif
 
 #if !defined(CONFIG_PINCTRL)
@@ -207,61 +209,24 @@ void cpu_init_f (volatile immap_t * im)
 	init_early_memctl_regs();
 
 	/* Local Access window setup */
-#if defined(CONFIG_SYS_LBLAWBAR0_PRELIM) && defined(CONFIG_SYS_LBLAWAR0_PRELIM)
-	im->sysconf.lblaw[0].bar = CONFIG_SYS_LBLAWBAR0_PRELIM;
-	im->sysconf.lblaw[0].ar = CONFIG_SYS_LBLAWAR0_PRELIM;
+#if defined(CFG_SYS_LBLAWBAR0_PRELIM) && defined(CFG_SYS_LBLAWAR0_PRELIM)
+	im->sysconf.lblaw[0].bar = CFG_SYS_LBLAWBAR0_PRELIM;
+	im->sysconf.lblaw[0].ar = CFG_SYS_LBLAWAR0_PRELIM;
 #else
-#error	CONFIG_SYS_LBLAWBAR0_PRELIM & CONFIG_SYS_LBLAWAR0_PRELIM must be defined
+#error	CFG_SYS_LBLAWBAR0_PRELIM & CFG_SYS_LBLAWAR0_PRELIM must be defined
 #endif
 
-#if defined(CONFIG_SYS_LBLAWBAR1_PRELIM) && defined(CONFIG_SYS_LBLAWAR1_PRELIM)
-	im->sysconf.lblaw[1].bar = CONFIG_SYS_LBLAWBAR1_PRELIM;
-	im->sysconf.lblaw[1].ar = CONFIG_SYS_LBLAWAR1_PRELIM;
+#if defined(CFG_SYS_LBLAWBAR1_PRELIM) && defined(CFG_SYS_LBLAWAR1_PRELIM)
+	im->sysconf.lblaw[1].bar = CFG_SYS_LBLAWBAR1_PRELIM;
+	im->sysconf.lblaw[1].ar = CFG_SYS_LBLAWAR1_PRELIM;
 #endif
-#if defined(CONFIG_SYS_LBLAWBAR2_PRELIM) && defined(CONFIG_SYS_LBLAWAR2_PRELIM)
-	im->sysconf.lblaw[2].bar = CONFIG_SYS_LBLAWBAR2_PRELIM;
-	im->sysconf.lblaw[2].ar = CONFIG_SYS_LBLAWAR2_PRELIM;
+#if defined(CFG_SYS_LBLAWBAR2_PRELIM) && defined(CFG_SYS_LBLAWAR2_PRELIM)
+	im->sysconf.lblaw[2].bar = CFG_SYS_LBLAWBAR2_PRELIM;
+	im->sysconf.lblaw[2].ar = CFG_SYS_LBLAWAR2_PRELIM;
 #endif
-#if defined(CONFIG_SYS_LBLAWBAR3_PRELIM) && defined(CONFIG_SYS_LBLAWAR3_PRELIM)
-	im->sysconf.lblaw[3].bar = CONFIG_SYS_LBLAWBAR3_PRELIM;
-	im->sysconf.lblaw[3].ar = CONFIG_SYS_LBLAWAR3_PRELIM;
-#endif
-#if defined(CONFIG_SYS_LBLAWBAR4_PRELIM) && defined(CONFIG_SYS_LBLAWAR4_PRELIM)
-	im->sysconf.lblaw[4].bar = CONFIG_SYS_LBLAWBAR4_PRELIM;
-	im->sysconf.lblaw[4].ar = CONFIG_SYS_LBLAWAR4_PRELIM;
-#endif
-#if defined(CONFIG_SYS_LBLAWBAR5_PRELIM) && defined(CONFIG_SYS_LBLAWAR5_PRELIM)
-	im->sysconf.lblaw[5].bar = CONFIG_SYS_LBLAWBAR5_PRELIM;
-	im->sysconf.lblaw[5].ar = CONFIG_SYS_LBLAWAR5_PRELIM;
-#endif
-#if defined(CONFIG_SYS_LBLAWBAR6_PRELIM) && defined(CONFIG_SYS_LBLAWAR6_PRELIM)
-	im->sysconf.lblaw[6].bar = CONFIG_SYS_LBLAWBAR6_PRELIM;
-	im->sysconf.lblaw[6].ar = CONFIG_SYS_LBLAWAR6_PRELIM;
-#endif
-#if defined(CONFIG_SYS_LBLAWBAR7_PRELIM) && defined(CONFIG_SYS_LBLAWAR7_PRELIM)
-	im->sysconf.lblaw[7].bar = CONFIG_SYS_LBLAWBAR7_PRELIM;
-	im->sysconf.lblaw[7].ar = CONFIG_SYS_LBLAWAR7_PRELIM;
-#endif
-#ifdef CONFIG_SYS_GPIO1_PRELIM
-	im->gpio[0].dat = CONFIG_SYS_GPIO1_DAT;
-	im->gpio[0].dir = CONFIG_SYS_GPIO1_DIR;
-#endif
-#ifdef CONFIG_SYS_GPIO2_PRELIM
-	im->gpio[1].dat = CONFIG_SYS_GPIO2_DAT;
-	im->gpio[1].dir = CONFIG_SYS_GPIO2_DIR;
-#endif
-#if defined(CONFIG_USB_EHCI_FSL) && defined(CONFIG_ARCH_MPC831X)
-	uint32_t temp;
-	struct usb_ehci *ehci = (struct usb_ehci *)CONFIG_SYS_FSL_USB1_ADDR;
-
-	/* Configure interface. */
-	setbits_be32(&ehci->control, REFSEL_16MHZ | UTMI_PHY_EN);
-
-	/* Wait for clock to stabilize */
-	do {
-		temp = __raw_readl(&ehci->control);
-		udelay(1000);
-	} while (!(temp & PHY_CLK_VALID));
+#if defined(CFG_SYS_LBLAWBAR3_PRELIM) && defined(CFG_SYS_LBLAWAR3_PRELIM)
+	im->sysconf.lblaw[3].bar = CFG_SYS_LBLAWBAR3_PRELIM;
+	im->sysconf.lblaw[3].ar = CFG_SYS_LBLAWAR3_PRELIM;
 #endif
 }
 

@@ -9,6 +9,7 @@
 #include <asm-offsets.h>
 #include <linux/linkage.h>
 #include <asm/assembler.h>
+#include <system-constants.h>
 
 /*
  * This file handles the target-independent stages of the U-Boot
@@ -90,16 +91,19 @@ clbss_l:cmp	r0, r1			/* while not at end of BSS */
 
 ENTRY(_main)
 
+/* Call arch_very_early_init before initializing C runtime environment. */
+#if CONFIG_IS_ENABLED(ARCH_VERY_EARLY_INIT)
+	bl	arch_very_early_init
+#endif
+
 /*
  * Set up initial C runtime environment and call board_init_f(0).
  */
 
-#if defined(CONFIG_TPL_BUILD) && defined(CONFIG_TPL_NEEDS_SEPARATE_STACK)
-	ldr	r0, =(CONFIG_TPL_STACK)
-#elif defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_STACK)
-	ldr	r0, =(CONFIG_SPL_STACK)
+#if CONFIG_IS_ENABLED(HAVE_INIT_STACK)
+	ldr	r0, =CONFIG_VAL(STACK)
 #else
-	ldr	r0, =(CONFIG_SYS_INIT_SP_ADDR)
+	ldr	r0, =(SYS_INIT_SP_ADDR)
 #endif
 	bic	r0, r0, #7	/* 8-byte alignment for ABI compliance */
 	mov	sp, r0
@@ -109,14 +113,18 @@ ENTRY(_main)
 	mov	r9, r0
 	bl	board_init_f_init_reserve
 
-#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_EARLY_BSS)
+#if defined(CONFIG_DEBUG_UART) && CONFIG_IS_ENABLED(SERIAL)
+	bl	debug_uart_init
+#endif
+
+#if defined(CONFIG_XPL_BUILD) && defined(CONFIG_SPL_EARLY_BSS)
 	CLEAR_BSS
 #endif
 
 	mov	r0, #0
 	bl	board_init_f
 
-#if ! defined(CONFIG_SPL_BUILD)
+#if ! defined(CONFIG_XPL_BUILD)
 
 /*
  * Set up intermediate environment (new sp and gd) and call
@@ -130,6 +138,19 @@ ENTRY(_main)
 	ldr	r9, [r9, #GD_NEW_GD]		/* r9 <- gd->new_gd */
 
 	adr	lr, here
+#if defined(CONFIG_POSITION_INDEPENDENT)
+	adr	r0, _main
+	ldr	r1, _start_ofs
+	add	r0, r1
+	ldr	r1, =CONFIG_TEXT_BASE
+	sub	r1, r0
+	add	lr, r1
+#if defined(CONFIG_SYS_RELOC_GD_ENV_ADDR)
+	ldr	r0, [r9, #GD_ENV_ADDR]		/* r0 = gd->env_addr */
+	add	r0, r0, r1
+	str	r0, [r9, #GD_ENV_ADDR]
+#endif
+#endif
 	ldr	r0, [r9, #GD_RELOC_OFF]		/* r0 = gd->reloc_off */
 	add	lr, lr, r0
 #if defined(CONFIG_CPU_V7M)
@@ -148,13 +169,13 @@ here:
 
 	bl	c_runtime_cpu_setup	/* we still call old routine here */
 #endif
-#if !defined(CONFIG_SPL_BUILD) || CONFIG_IS_ENABLED(FRAMEWORK)
+#if !defined(CONFIG_XPL_BUILD) || CONFIG_IS_ENABLED(FRAMEWORK)
 
-#if !defined(CONFIG_SPL_BUILD) || !defined(CONFIG_SPL_EARLY_BSS)
+#if !defined(CONFIG_XPL_BUILD) || !defined(CONFIG_SPL_EARLY_BSS)
 	CLEAR_BSS
 #endif
 
-# ifdef CONFIG_SPL_BUILD
+# ifdef CONFIG_XPL_BUILD
 	/* Use a DRAM stack for the rest of SPL, if requested */
 	bl	spl_relocate_stack_gd
 	cmp	r0, #0
@@ -162,7 +183,7 @@ here:
 	movne	r9, r0
 # endif
 
-#if ! defined(CONFIG_SPL_BUILD)
+#if ! defined(CONFIG_XPL_BUILD)
 	bl coloured_LED_init
 	bl red_led_on
 #endif
@@ -180,3 +201,6 @@ here:
 #endif
 
 ENDPROC(_main)
+
+_start_ofs:
+	.word	_start - _main

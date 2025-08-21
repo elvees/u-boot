@@ -5,7 +5,6 @@
  */
 
 #include <clk.h>
-#include <common.h>
 #include <hang.h>
 #include <init.h>
 #include <spl.h>
@@ -31,9 +30,9 @@ void board_init_f(ulong dummy)
 
 u32 spl_boot_device(void)
 {
-#if defined(CONFIG_SPL_SPI_SUPPORT)
+#if defined(CONFIG_SPL_SPI)
 	return BOOT_DEVICE_SPI;
-#elif defined(CONFIG_SPL_MMC_SUPPORT)
+#elif defined(CONFIG_SPL_MMC)
 	return BOOT_DEVICE_MMC1;
 #elif defined(CONFIG_SPL_NAND_SUPPORT)
 	return BOOT_DEVICE_NAND;

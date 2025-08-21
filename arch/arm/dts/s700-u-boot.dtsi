@@ -5,7 +5,7 @@
 
 /{
 	soc {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 
 		gmac:  ethernet@e0220000 {
 			compatible = "actions,s700-ethernet";
@@ -19,13 +19,23 @@
 			status = "okay";
                 };
 
+		mmc0: mmc@e0210000 {
+			compatible = "actions,s700-mmc", "actions,owl-mmc";
+			reg = <0x0 0xe0210000 0x0 0x4000>;
+			interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&cmu CLK_SD0>;
+			dmas = <&dma 2>;
+			dma-names = "mmc";
+			bus-width = <4>;
+			status = "okay";
+		};
 	};
 };
 
 &uart3 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &cmu {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };

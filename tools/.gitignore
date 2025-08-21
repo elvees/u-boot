@@ -6,6 +6,7 @@
 /dumpimage
 /easylogo/easylogo
 /envcrc
+/fdt_add_pubkey
 /fdtgrep
 /file2include
 /fit_check_sign
@@ -30,11 +31,14 @@
 /mxsboot
 /ncb
 /prelink-riscv
+/preload_check_sign
+/printinitialenv
 /proftool
 /relocate-rela
 /spl_size_limit
 /sunxi-spl-image-builder
-/ubsha1
+/generated/**/*.c
 /update_octeon_header
 /version.h
 /xway-swap-bytes
+/boot

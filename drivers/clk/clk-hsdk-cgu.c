@@ -9,7 +9,6 @@
  * warranty of any kind, whether express or implied.
  */
 
-#include <common.h>
 #include <clk-uclass.h>
 #include <div64.h>
 #include <dm.h>
@@ -19,6 +18,7 @@
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <asm/arcregs.h>
+#include <linux/printk.h>
 
 #include <dt-bindings/clock/snps,hsdk-cgu.h>
 
@@ -718,7 +718,7 @@ static ulong hsdk_cgu_set_rate(struct clk *sclk, ulong rate)
 	if (clk->map[sclk->id].set_rate)
 		return clk->map[sclk->id].set_rate(sclk, rate);
 
-	return -ENOTSUPP;
+	return -EINVAL;
 }
 
 static int hsdk_cgu_disable(struct clk *sclk)
@@ -731,7 +731,7 @@ static int hsdk_cgu_disable(struct clk *sclk)
 	if (clk->map[sclk->id].disable)
 		return clk->map[sclk->id].disable(sclk);
 
-	return -ENOTSUPP;
+	return -EINVAL;
 }
 
 static const struct clk_ops hsdk_cgu_ops = {
@@ -753,11 +753,11 @@ static int hsdk_cgu_clk_probe(struct udevice *dev)
 	else
 		hsdk_clk->map = hsdk_4xd_clk_map;
 
-	hsdk_clk->cgu_regs = (void __iomem *)devfdt_get_addr_index(dev, 0);
+	hsdk_clk->cgu_regs = devfdt_get_addr_index_ptr(dev, 0);
 	if (!hsdk_clk->cgu_regs)
 		return -EINVAL;
 
-	hsdk_clk->creg_regs = (void __iomem *)devfdt_get_addr_index(dev, 1);
+	hsdk_clk->creg_regs = devfdt_get_addr_index_ptr(dev, 1);
 	if (!hsdk_clk->creg_regs)
 		return -EINVAL;
 

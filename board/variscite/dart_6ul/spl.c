@@ -4,7 +4,7 @@
  * Copyright (C) 2019 Parthiban Nallathambi <parthitce@gmail.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <init.h>
 #include <spl.h>
 #include <asm/arch/clock.h>
@@ -12,6 +12,7 @@
 #include <asm/arch/mx6-ddr.h>
 #include <asm/arch/mx6-pins.h>
 #include <asm/arch/crm_regs.h>
+#include <asm/sections.h>
 #include <fsl_esdhc_imx.h>
 
 #define UART_PAD_CTRL  (PAD_CTL_PKE | PAD_CTL_PUE |		\
@@ -159,7 +160,7 @@ int board_mmc_init(struct bd_info *bis)
 {
 	int i, ret;
 
-	for (i = 0; i < CONFIG_SYS_FSL_USDHC_NUM; i++) {
+	for (i = 0; i < CFG_SYS_FSL_USDHC_NUM; i++) {
 		switch (i) {
 		case 0:
 			SETUP_IOMUX_PADS(usdhc1_pads);

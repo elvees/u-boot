@@ -9,7 +9,6 @@
  * SPDX-License-Identifier:	GPL-2.0+
  */
 
-#include <common.h>
 #ifdef CONFIG_SPL_BUILD
 #include <spl.h>
 #include <asm/arch/ddr.h>

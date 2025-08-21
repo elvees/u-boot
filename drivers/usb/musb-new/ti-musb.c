@@ -5,13 +5,13 @@
  * (C) Copyright 2016
  *     Texas Instruments Incorporated, <www.ti.com>
  */
-#include <common.h>
 #include <command.h>
 #include <console.h>
 #include <dm.h>
 #include <log.h>
 #include <malloc.h>
 #include <asm/global_data.h>
+#include <linux/printk.h>
 #include <linux/usb/otg.h>
 #include <dm/device-internal.h>
 #include <dm/lists.h>
@@ -88,7 +88,7 @@ static int ti_musb_of_to_plat(struct udevice *dev)
 	int usb_index;
 	struct musb_hdrc_config *musb_config;
 
-	plat->base = (void *)devfdt_get_addr_index(dev, 1);
+	plat->base = devfdt_get_addr_index_ptr(dev, 1);
 
 	phys = fdtdec_lookup_phandle(fdt, node, "phys");
 	ctrl_mod = fdtdec_lookup_phandle(fdt, phys, "ti,ctrl_mod");
@@ -233,15 +233,6 @@ static int ti_musb_peripheral_of_to_plat(struct udevice *dev)
 }
 #endif
 
-int dm_usb_gadget_handle_interrupts(struct udevice *dev)
-{
-	struct ti_musb_peripheral *priv = dev_get_priv(dev);
-
-	priv->periph->isr(0, priv->periph);
-
-	return 0;
-}
-
 static int ti_musb_peripheral_probe(struct udevice *dev)
 {
 	struct ti_musb_peripheral *priv = dev_get_priv(dev);
@@ -269,15 +260,28 @@ static int ti_musb_peripheral_remove(struct udevice *dev)
 	return 0;
 }
 
+static int ti_musb_gadget_handle_interrupts(struct udevice *dev)
+{
+	struct ti_musb_peripheral *priv = dev_get_priv(dev);
+
+	priv->periph->isr(0, priv->periph);
+
+	return 0;
+}
+
+static const struct usb_gadget_generic_ops ti_musb_gadget_ops = {
+	.handle_interrupts	= ti_musb_gadget_handle_interrupts,
+};
+
 U_BOOT_DRIVER(ti_musb_peripheral) = {
 	.name	= "ti-musb-peripheral",
 	.id	= UCLASS_USB_GADGET_GENERIC,
 #if CONFIG_IS_ENABLED(OF_CONTROL)
 	.of_to_plat = ti_musb_peripheral_of_to_plat,
 #endif
+	.ops	= &ti_musb_gadget_ops,
 	.probe = ti_musb_peripheral_probe,
 	.remove = ti_musb_peripheral_remove,
-	.ops	= &musb_usb_ops,
 	.plat_auto	= sizeof(struct ti_musb_plat),
 	.priv_auto	= sizeof(struct ti_musb_peripheral),
 	.flags = DM_FLAG_PRE_RELOC,

@@ -8,7 +8,8 @@
  * Based on ahci-uclass.c
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_SCSI
+
 #include <dm.h>
 #include <scsi.h>
 

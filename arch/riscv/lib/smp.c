@@ -4,12 +4,12 @@
  * Lukas Auer <lukas.auer@aisec.fraunhofer.de>
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <asm/barrier.h>
 #include <asm/global_data.h>
 #include <asm/smp.h>
+#include <linux/printk.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -27,7 +27,7 @@ static int send_ipi_many(struct ipi_data *ipi, int wait)
 
 	ofnode_for_each_subnode(node, cpus) {
 		/* skip if hart is marked as not available in the device tree */
-		if (!ofnode_is_available(node))
+		if (!ofnode_is_enabled(node))
 			continue;
 
 		/* read hart ID of CPU */
@@ -45,10 +45,12 @@ static int send_ipi_many(struct ipi_data *ipi, int wait)
 			continue;
 		}
 
-#ifndef CONFIG_XIP
+#if !CONFIG_IS_ENABLED(XIP)
+#ifdef CONFIG_AVAILABLE_HARTS
 		/* skip if hart is not available */
 		if (!(gd->arch.available_harts & (1 << reg)))
 			continue;
+#endif
 #endif
 
 		gd->arch.ipi[reg].addr = ipi->addr;

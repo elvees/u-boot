@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2018 NXP
+ * Copyright 2018, 2021 NXP
  */
 
-#include <common.h>
 #include <clk.h>
 #include <cpu.h>
 #include <cpu_func.h>
 #include <dm.h>
+#include <event.h>
 #include <init.h>
 #include <log.h>
 #include <asm/cache.h>
@@ -18,13 +18,15 @@
 #include <errno.h>
 #include <spl.h>
 #include <thermal.h>
-#include <asm/arch/sci/sci.h>
+#include <firmware/imx/sci/sci.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/arch-imx/cpu.h>
 #include <asm/armv8/cpu.h>
 #include <asm/armv8/mmu.h>
 #include <asm/setup.h>
 #include <asm/mach-imx/boot_mode.h>
+#include <power-domain.h>
+#include <elf.h>
 #include <spl.h>
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -42,13 +44,56 @@ struct pass_over_info_t *get_pass_over_info(void)
 	return p;
 }
 
+static char *get_reset_cause(void)
+{
+	sc_pm_reset_reason_t reason;
+
+	if (sc_pm_reset_reason(-1, &reason))
+		return "Unknown reset";
+
+	switch (reason) {
+	case SC_PM_RESET_REASON_POR:
+		return "POR";
+	case SC_PM_RESET_REASON_JTAG:
+		return "JTAG reset ";
+	case SC_PM_RESET_REASON_SW:
+		return "Software reset";
+	case SC_PM_RESET_REASON_WDOG:
+		return "Watchdog reset";
+	case SC_PM_RESET_REASON_LOCKUP:
+		return "SCU lockup reset";
+	case SC_PM_RESET_REASON_SNVS:
+		return "SNVS reset";
+	case SC_PM_RESET_REASON_TEMP:
+		return "Temp panic reset";
+	case SC_PM_RESET_REASON_MSI:
+		return "MSI reset";
+	case SC_PM_RESET_REASON_UECC:
+		return "ECC reset";
+	case SC_PM_RESET_REASON_SCFW_WDOG:
+		return "SCFW watchdog reset";
+	case SC_PM_RESET_REASON_ROM_WDOG:
+		return "SCU ROM watchdog reset";
+	case SC_PM_RESET_REASON_SECO:
+		return "SECO reset";
+	case SC_PM_RESET_REASON_SCFW_FAULT:
+		return "SCFW fault reset";
+	default:
+		return "Unknown reset";
+	}
+}
+
+__weak void reset_cpu(void)
+{
+}
+
 int arch_cpu_init(void)
 {
-#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_RECOVER_DATA_SECTION)
+#if defined(CONFIG_XPL_BUILD) && defined(CONFIG_SPL_RECOVER_DATA_SECTION)
 	spl_save_restore_data();
 #endif
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 	struct pass_over_info_t *pass_over;
 
 	if (is_soc_rev(CHIP_REV_A)) {
@@ -66,7 +111,7 @@ int arch_cpu_init(void)
 	return 0;
 }
 
-int arch_cpu_init_dm(void)
+static int imx8_init_mu(void)
 {
 	struct udevice *devp;
 	int node, ret;
@@ -88,6 +133,204 @@ int arch_cpu_init_dm(void)
 
 	return 0;
 }
+EVENT_SPY_SIMPLE(EVT_DM_POST_INIT_F, imx8_init_mu);
+
+#if defined(CONFIG_ARCH_MISC_INIT)
+int arch_misc_init(void)
+{
+	if (IS_ENABLED(CONFIG_FSL_CAAM)) {
+		struct udevice *dev;
+		int ret;
+
+		ret = uclass_get_device_by_driver(UCLASS_MISC, DM_DRIVER_GET(caam_jr), &dev);
+		if (ret)
+			printf("Failed to initialize caam_jr: %d\n", ret);
+	}
+
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_IMX_BOOTAUX
+
+#ifdef CONFIG_IMX8QM
+int arch_auxiliary_core_up(u32 core_id, ulong boot_private_data)
+{
+	sc_rsrc_t core_rsrc, mu_rsrc;
+	sc_faddr_t tcml_addr;
+	u32 tcml_size = SZ_128K;
+	ulong addr;
+	int ret;
+
+	switch (core_id) {
+	case 0:
+		core_rsrc = SC_R_M4_0_PID0;
+		tcml_addr = 0x34FE0000;
+		mu_rsrc = SC_R_M4_0_MU_1A;
+		break;
+	case 1:
+		core_rsrc = SC_R_M4_1_PID0;
+		tcml_addr = 0x38FE0000;
+		mu_rsrc = SC_R_M4_1_MU_1A;
+		break;
+	default:
+		printf("Not support this core boot up, ID:%u\n", core_id);
+		return -EINVAL;
+	}
+
+	addr = (sc_faddr_t)boot_private_data;
+
+	if (addr >= tcml_addr && addr <= tcml_addr + tcml_size) {
+		printf("Wrong image address 0x%lx, should not in TCML\n",
+		       addr);
+		return -EINVAL;
+	}
+
+	printf("Power on M4 and MU\n");
+
+	ret = sc_pm_set_resource_power_mode(-1, core_rsrc, SC_PM_PW_MODE_ON);
+	if (ret)
+		return ret;
+
+	ret = sc_pm_set_resource_power_mode(-1, mu_rsrc, SC_PM_PW_MODE_ON);
+	if (ret)
+		return -EIO;
+
+	printf("Copy M4 image from 0x%lx to TCML 0x%lx\n", addr, (ulong)tcml_addr);
+
+	if (addr != tcml_addr)
+		memcpy((void *)tcml_addr, (void *)addr, tcml_size);
+
+	printf("Start M4 %u\n", core_id);
+	ret = sc_pm_cpu_start(-1, core_rsrc, true, tcml_addr);
+	if (ret)
+		return -EIO;
+
+	printf("bootaux complete\n");
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_IMX8QXP
+int arch_auxiliary_core_up(u32 core_id, ulong boot_private_data)
+{
+	sc_rsrc_t core_rsrc, mu_rsrc = SC_R_NONE;
+	sc_faddr_t aux_core_ram;
+	u32 size;
+	ulong addr;
+	int ret;
+
+	switch (core_id) {
+	case 0:
+		core_rsrc = SC_R_M4_0_PID0;
+		aux_core_ram = 0x34FE0000;
+		mu_rsrc = SC_R_M4_0_MU_1A;
+		size = SZ_128K;
+		break;
+	case 1:
+		core_rsrc = SC_R_DSP;
+		aux_core_ram = 0x596f8000;
+		size = SZ_2K;
+		break;
+	default:
+		printf("Not support this core boot up, ID:%u\n", core_id);
+		return -EINVAL;
+	}
+
+	addr = (sc_faddr_t)boot_private_data;
+
+	if (addr >= aux_core_ram && addr <= aux_core_ram + size) {
+		printf("Wrong image address 0x%lx, should not in aux core ram\n",
+		       addr);
+		return -EINVAL;
+	}
+
+	printf("Power on aux core %d\n", core_id);
+
+	ret = sc_pm_set_resource_power_mode(-1, core_rsrc, SC_PM_PW_MODE_ON);
+	if (ret)
+		return ret;
+
+	if (mu_rsrc != SC_R_NONE) {
+		ret = sc_pm_set_resource_power_mode(-1, mu_rsrc, SC_PM_PW_MODE_ON);
+		if (ret)
+			return -EIO;
+	}
+
+	if (core_id == 1) {
+		struct power_domain pd;
+
+		ret = sc_pm_clock_enable(-1, core_rsrc, SC_PM_CLK_PER, true, false);
+		if (ret) {
+			printf("Error enable clock\n");
+			return ret;
+		}
+
+		if (!imx8_power_domain_lookup_name("audio_sai0", &pd)) {
+			if (power_domain_on(&pd)) {
+				printf("Error power on SAI0\n");
+				return -EIO;
+			}
+		}
+
+		if (!imx8_power_domain_lookup_name("audio_ocram", &pd)) {
+			if (power_domain_on(&pd)) {
+				printf("Error power on HIFI RAM\n");
+				return -EIO;
+			}
+		}
+	}
+
+	printf("Copy image from 0x%lx to 0x%lx\n", addr, (ulong)aux_core_ram);
+	if (core_id == 0) {
+		/* M4 use bin file */
+		memcpy((void *)aux_core_ram, (void *)addr, size);
+	} else {
+		/* HIFI use elf file */
+		if (!valid_elf_image(addr))
+			return -1;
+		addr = load_elf_image_shdr(addr);
+	}
+
+	printf("Start %s\n", core_id == 0 ? "M4" : "HIFI");
+
+	ret = sc_pm_cpu_start(-1, core_rsrc, true, aux_core_ram);
+	if (ret)
+		return ret;
+
+	printf("bootaux complete\n");
+	return 0;
+}
+#endif
+
+int arch_auxiliary_core_check_up(u32 core_id)
+{
+	sc_rsrc_t core_rsrc;
+	sc_pm_power_mode_t power_mode;
+
+	switch (core_id) {
+	case 0:
+		core_rsrc = SC_R_M4_0_PID0;
+		break;
+#ifdef CONFIG_IMX8QM
+	case 1:
+		core_rsrc = SC_R_M4_1_PID0;
+		break;
+#endif
+	default:
+		printf("Not support this core, ID:%u\n", core_id);
+		return 0;
+	}
+
+	if (sc_pm_get_resource_power_mode(-1, core_rsrc, &power_mode))
+		return 0;
+
+	if (power_mode != SC_PM_PW_MODE_OFF)
+		return 1;
+
+	return 0;
+}
+#endif
 
 int print_bootinfo(void)
 {
@@ -129,6 +372,8 @@ int print_bootinfo(void)
 		printf("Unknown device %u\n", bt_dev);
 		break;
 	}
+
+	printf("Reset cause: %s\n", get_reset_cause());
 
 	return 0;
 }
@@ -172,12 +417,12 @@ enum boot_device get_boot_device(void)
 	return boot_dev;
 }
 
-#ifdef CONFIG_SERIAL_TAG
+#ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
 #define FUSE_UNIQUE_ID_WORD0 16
 #define FUSE_UNIQUE_ID_WORD1 17
 void get_board_serial(struct tag_serialnr *serialnr)
 {
-	sc_err_t err;
+	int err;
 	u32 val1 = 0, val2 = 0;
 	u32 word1, word2;
 
@@ -188,20 +433,20 @@ void get_board_serial(struct tag_serialnr *serialnr)
 	word2 = FUSE_UNIQUE_ID_WORD1;
 
 	err = sc_misc_otp_fuse_read(-1, word1, &val1);
-	if (err != SC_ERR_NONE) {
+	if (err) {
 		printf("%s fuse %d read error: %d\n", __func__, word1, err);
 		return;
 	}
 
 	err = sc_misc_otp_fuse_read(-1, word2, &val2);
-	if (err != SC_ERR_NONE) {
+	if (err) {
 		printf("%s fuse %d read error: %d\n", __func__, word2, err);
 		return;
 	}
 	serialnr->low = val1;
 	serialnr->high = val2;
 }
-#endif /*CONFIG_SERIAL_TAG*/
+#endif /*CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG*/
 
 #ifdef CONFIG_ENV_IS_IN_MMC
 __weak int board_mmc_get_env_dev(int devno)
@@ -283,7 +528,6 @@ phys_size_t get_effective_memsize(void)
 	board_mem_get_layout(&phys_sdram_1_start, &phys_sdram_1_size,
 			     &phys_sdram_2_start, &phys_sdram_2_size);
 
-
 	end1 = (sc_faddr_t)phys_sdram_1_start + phys_sdram_1_size;
 	for (mr = 0; mr < 64; mr++) {
 		err = get_owned_memreg(mr, &start, &end);
@@ -295,8 +539,8 @@ phys_size_t get_effective_memsize(void)
 
 			/* Find the memory region runs the U-Boot */
 			if (start >= phys_sdram_1_start && start <= end1 &&
-			    (start <= CONFIG_SYS_TEXT_BASE &&
-			    end >= CONFIG_SYS_TEXT_BASE)) {
+			    (start <= CONFIG_TEXT_BASE &&
+			    end >= CONFIG_TEXT_BASE)) {
 				if ((end + 1) <=
 				    ((sc_faddr_t)phys_sdram_1_start +
 				    phys_sdram_1_size))
@@ -462,7 +706,6 @@ static u64 get_block_size(sc_faddr_t addr_start, sc_faddr_t addr_end)
 
 	board_mem_get_layout(&phys_sdram_1_start, &phys_sdram_1_size,
 			     &phys_sdram_2_start, &phys_sdram_2_size);
-
 
 	end1 = (sc_faddr_t)phys_sdram_1_start + phys_sdram_1_size;
 	end2 = (sc_faddr_t)phys_sdram_2_start + phys_sdram_2_size;

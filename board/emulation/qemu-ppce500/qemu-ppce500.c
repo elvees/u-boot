@@ -4,16 +4,19 @@
  * Copyright (C) 2021, Bin Meng <bmeng.cn@gmail.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <command.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <env.h>
+#include <event.h>
 #include <init.h>
 #include <log.h>
 #include <net.h>
 #include <pci.h>
 #include <time.h>
+#include <dm/simple_bus.h>
+#include <dm/uclass-internal.h>
 #include <asm/global_data.h>
 #include <asm/processor.h>
 #include <asm/mmu.h>
@@ -30,12 +33,16 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+/* Virtual address range for PCI region maps */
+#define SYS_PCI_MAP_START	0x80000000
+#define SYS_PCI_MAP_END		0xe0000000
+
 static void *get_fdt_virt(void)
 {
 	if (gd->flags & GD_FLG_RELOC)
 		return (void *)gd->fdt_blob;
 	else
-		return (void *)CONFIG_SYS_TMPVIRT;
+		return (void *)CFG_SYS_TMPVIRT;
 }
 
 static uint64_t get_fdt_phys(void)
@@ -99,7 +106,7 @@ static int pci_map_region(phys_addr_t paddr, phys_size_t size, ulong *pmap_addr)
 	map_addr += size - 1;
 	map_addr &= ~(size - 1);
 
-	if (map_addr + size >= CONFIG_SYS_PCI_MAP_END)
+	if (map_addr + size >= SYS_PCI_MAP_END)
 		return -1;
 
 	/* Map virtual memory for range */
@@ -107,6 +114,17 @@ static int pci_map_region(phys_addr_t paddr, phys_size_t size, ulong *pmap_addr)
 	*pmap_addr = map_addr + size;
 
 	return 0;
+}
+
+static void platform_bus_map_region(ulong map_addr, phys_addr_t paddr,
+				    phys_size_t size)
+{
+	/* Align map_addr */
+	map_addr += size - 1;
+	map_addr &= ~(size - 1);
+
+	/* Map virtual memory for range */
+	assert(!tlb_map_range(map_addr, paddr, size, TLB_MAP_IO));
 }
 
 int misc_init_r(void)
@@ -124,7 +142,7 @@ int misc_init_r(void)
 	pci_get_regions(dev, &io, &mem, &pre);
 
 	/* Start MMIO and PIO range maps above RAM */
-	map_addr = CONFIG_SYS_PCI_MAP_START;
+	map_addr = SYS_PCI_MAP_START;
 
 	/* Map MMIO range */
 	ret = pci_map_region(mem->phys_start, mem->size, &map_addr);
@@ -146,12 +164,28 @@ int misc_init_r(void)
 	 * U-Boot is relocated to RAM already, let's delete the temporary FDT
 	 * virtual-physical mapping that was used in the pre-relocation phase.
 	 */
-	disable_tlb(find_tlb_idx((void *)CONFIG_SYS_TMPVIRT, 1));
+	disable_tlb(find_tlb_idx((void *)CFG_SYS_TMPVIRT, 1));
+
+	/*
+	 * Detect the presence of the platform bus node, and
+	 * create a virtual memory mapping for it.
+	 */
+	for (ret = uclass_find_first_device(UCLASS_SIMPLE_BUS, &dev);
+	     dev;
+	     ret = uclass_find_next_device(&dev)) {
+		if (device_is_compatible(dev, "qemu,platform")) {
+			struct simple_bus_plat *plat = dev_get_uclass_plat(dev);
+
+			platform_bus_map_region(CONFIG_PLATFORM_BUS_MAP_ADDR,
+						plat->target, plat->size);
+			break;
+		}
+	}
 
 	return 0;
 }
 
-int last_stage_init(void)
+static int last_stage_init(void)
 {
 	void *fdt = get_fdt_virt();
 	int len = 0;
@@ -171,6 +205,7 @@ int last_stage_init(void)
 
 	return 0;
 }
+EVENT_SPY_SIMPLE(EVT_LAST_STAGE_INIT, last_stage_init);
 
 static uint64_t get_linear_ram_size(void)
 {
@@ -215,7 +250,7 @@ void init_tlbs(void)
 	init_used_tlb_cams();
 
 	/* Create a dynamic AS=0 CCSRBAR mapping */
-	assert(!tlb_map_range(CONFIG_SYS_CCSRBAR, CONFIG_SYS_CCSRBAR_PHYS,
+	assert(!tlb_map_range(CFG_SYS_CCSRBAR, CFG_SYS_CCSRBAR_PHYS,
 			      1024 * 1024, TLB_MAP_IO));
 
 	/* Create a RAM map that spans all accessible RAM */
@@ -285,7 +320,7 @@ ulong get_bus_freq(ulong dummy)
 int cpu_numcores(void)
 {
 	/*
-	 * The QEMU u-boot target only needs to drive the first core,
+	 * The QEMU U-Boot target only needs to drive the first core,
 	 * spinning and device tree nodes get driven by QEMU itself
 	 */
 	return 1;
@@ -299,17 +334,14 @@ u32 cpu_mask(void)
 	return (1 << cpu_numcores()) - 1;
 }
 
-/**
- * Return the virtual address of FDT that was passed by QEMU
- *
- * @return virtual address of FDT received from QEMU in r3 register
- */
-void *board_fdt_blob_setup(void)
+int board_fdt_blob_setup(void **fdtp)
 {
-	return get_fdt_virt();
+	*fdtp = get_fdt_virt();
+
+	return 0;
 }
 
-/* See CONFIG_SYS_NS16550_CLK in arch/powerpc/include/asm/config.h */
+/* See CFG_SYS_NS16550_CLK in arch/powerpc/include/asm/config.h */
 int get_serial_clock(void)
 {
 	return get_bus_freq(0);

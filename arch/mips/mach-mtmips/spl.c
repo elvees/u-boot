@@ -5,7 +5,6 @@
  * Author: Weijie Gao <weijie.gao@mediatek.com>
  */
 
-#include <common.h>
 #include <init.h>
 #include <spl.h>
 #include <asm/sections.h>
@@ -17,7 +16,7 @@ void __noreturn board_init_f(ulong dummy)
 {
 	spl_init();
 
-#ifdef CONFIG_SPL_SERIAL_SUPPORT
+#ifdef CONFIG_SPL_SERIAL
 	/*
 	 * mtmips_spl_serial_init() is useful if debug uart is enabled,
 	 * or DM based serial is not enabled.

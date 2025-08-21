@@ -4,7 +4,7 @@
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  */
 
-#include <common.h>
+#include <config.h>
 #include <irq_func.h>
 
 /*
@@ -19,7 +19,7 @@
 #include <post.h>
 #include "cpu_asm.h"
 
-#if CONFIG_POST & CONFIG_SYS_POST_CPU
+#if CFG_POST & CFG_SYS_POST_CPU
 
 extern void cpu_post_exec_22 (ulong *code, ulong *cr, ulong *res, ulong op1,
     ulong op2);

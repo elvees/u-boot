@@ -3,6 +3,37 @@ menu "Environment"
 config ENV_SUPPORT
 	def_bool y
 
+config ENV_SOURCE_FILE
+	string "Environment file to use"
+	default ""
+	help
+	  This sets the basename to use to generate the default environment.
+	  This a text file as described in doc/usage/environment.rst
+
+	  The file must be in the board directory and have a .env extension, so
+	  the resulting filename is typically
+	  board/<vendor>/<board>/<CONFIG_ENV_SOURCE_FILE>.env
+
+	  If the file is not present, an error is produced.
+
+	  If this CONFIG is empty, U-Boot uses CONFIG SYS_BOARD as a default, if
+	  the file board/<vendor>/<board>/<SYS_BOARD>.env exists. Otherwise the
+	  environment is assumed to come from the ad-hoc
+	  CFG_EXTRA_ENV_SETTINGS #define
+
+config ENV_CALLBACK_LIST_STATIC
+	string "Static callbacks list"
+	default ""
+	help
+	  The environment callbacks are associated with variables in a
+	  static list. Define this list in the following format:
+
+	  entry = variable_name[:callback_name]
+	  list = entry[,list]
+
+	  If the callback name is not specified, then the callback is deleted.
+	  Spaces are also allowed anywhere in the list.
+
 config SAVEENV
 	def_bool y if CMD_SAVEENV
 
@@ -12,20 +43,48 @@ config ENV_OVERWRITE
 	  Use this to permit overriding of certain environmental variables
 	  like Ethernet and Serial
 
-config ENV_IS_NOWHERE
-	bool "Environment is not stored"
-	default y if !ENV_IS_IN_EEPROM && !ENV_IS_IN_EXT4 && \
+config OVERWRITE_ETHADDR_ONCE
+	bool "Enable overwriting ethaddr environment variables once"
+	depends on !ENV_OVERWRITE
+	help
+	  Enable this to allow for the ethaddr environment variables to be
+	  overwritten one time per boot, only. This allows for a default
+	  to be installed in the environment, which can be changed exactly ONCE
+	  by the user.
+
+config ENV_MIN_ENTRIES
+	int "Minimum number of entries in the environment hashtable"
+	default 64
+	help
+	  Minimum number of entries in the hash table that is used internally
+	  to store the environment settings.
+
+config ENV_MAX_ENTRIES
+	int "Maximum number of entries in the environment hashtable"
+	default 512
+	help
+	  Maximum number of entries in the hash table that is used internally
+	  to store the environment settings. The default setting is supposed to
+	  be generous and should work in most cases. This setting can be used
+	  to tune behaviour; see lib/hashtable.c for details.
+
+config ENV_IS_DEFAULT
+	def_bool y if !ENV_IS_IN_EEPROM && !ENV_IS_IN_EXT4 && \
 		     !ENV_IS_IN_FAT && !ENV_IS_IN_FLASH && \
 		     !ENV_IS_IN_MMC && !ENV_IS_IN_NAND && \
 		     !ENV_IS_IN_NVRAM && !ENV_IS_IN_ONENAND && \
 		     !ENV_IS_IN_REMOTE && !ENV_IS_IN_SPI_FLASH && \
-		     !ENV_IS_IN_UBI
+		     !ENV_IS_IN_UBI && !ENV_IS_IN_MTD
+	select ENV_IS_NOWHERE
+
+config ENV_IS_NOWHERE
+	bool "Environment is not stored"
 	help
-	  Define this if you don't want to or can't have an environment stored
+	  Define this if you don't care whether or not an environment is stored
 	  on a storage medium. In this case the environment will still exist
-	  while U-Boot is running, but once U-Boot exits it will not be
-	  stored. U-Boot will therefore always start up with a default
-	  environment.
+	  while U-Boot is running, but once U-Boot exits it may not be
+	  stored. If no other ENV_IS_IN_ is defined, U-Boot will always start
+	  up with the default environment.
 
 config ENV_IS_IN_EEPROM
 	bool "Environment in EEPROM"
@@ -43,17 +102,6 @@ config ENV_IS_IN_EEPROM
 	  Note that we consider the length of the address field to
 	  still be one byte because the extra address bits are hidden
 	  in the chip address.
-
-	  - CONFIG_ENV_EEPROM_IS_ON_I2C
-	  define this, if you have I2C and SPI activated, and your
-	  EEPROM, which holds the environment, is on the I2C bus.
-
-	  - CONFIG_I2C_ENV_EEPROM_BUS
-	  if you have an Environment on an EEPROM reached over
-	  I2C muxes, you can define here, how to reach this
-	  EEPROM. For example:
-
-	  #define CONFIG_I2C_ENV_EEPROM_BUS	  1
 
 	  EEPROM which holds the environment, is reached over
 	  a pca9547 i2c mux with address 0x70, channel 3.
@@ -82,10 +130,10 @@ config ENV_IS_IN_FLASH
 	depends on !CHAIN_OF_TRUST
 	default y if ARCH_CINTEGRATOR
 	default y if ARCH_INTEGRATOR_CP
-	default y if M548x || M547x || M5282 || MCF547x_8x
+	default y if M548x || M547x || M5282
 	default y if MCF532x || MCF52x2
 	default y if MPC86xx || MPC83xx
-	default y if ARCH_MPC8572 || ARCH_MPC8548 || ARCH_MPC8641
+	default y if ARCH_MPC8548
 	default y if SH && !CPU_SH4
 	help
 	  Define this if you have a flash device which you want to use for the
@@ -110,7 +158,7 @@ config ENV_IS_IN_FLASH
 	   type flash chips the second sector can be used: the offset
 	   for this sector is given here.
 
-	   CONFIG_ENV_OFFSET is used relative to CONFIG_SYS_FLASH_BASE.
+	   CONFIG_ENV_OFFSET is used relative to CFG_SYS_FLASH_BASE.
 
 	  CONFIG_ENV_ADDR:
 
@@ -204,8 +252,20 @@ config ENV_IS_IN_MMC
 	  This value may also be positive or negative; this is handled in the
 	  same way as CONFIG_ENV_OFFSET.
 
+	  In case CONFIG_SYS_MMC_ENV_PART is 1 (i.e. environment in eMMC boot
+	  partition) then setting CONFIG_ENV_OFFSET_REDUND to the same value
+	  as CONFIG_ENV_OFFSET makes use of the second eMMC boot partition for
+	  the redundant environment copy.
+
 	  This value is also in units of bytes, but must also be aligned to
 	  an MMC sector boundary.
+
+	  CONFIG_ENV_MMC_USE_DT (optional):
+
+	  These define forces the configuration by the config node in device
+	  tree with partition name: "u-boot,mmc-env-partition" or with
+	  offset: "u-boot,mmc-env-offset", "u-boot,mmc-env-offset-redundant".
+	  CONFIG_ENV_OFFSET and CONFIG_ENV_OFFSET_REDUND are not used.
 
 config ENV_IS_IN_NAND
 	bool "Environment in a NAND device"
@@ -229,14 +289,6 @@ config ENV_IS_IN_NAND
 	  during a "saveenv" operation.	 CONFIG_ENV_OFFSET_REDUND must be
 	  aligned to an erase block boundary.
 
-	  - CONFIG_ENV_RANGE (optional):
-
-	  Specifies the length of the region in which the environment
-	  can be written.  This should be a multiple of the NAND device's
-	  block size.  Specifying a range with more erase blocks than
-	  are needed to hold CONFIG_ENV_SIZE allows bad blocks within
-	  the range to be avoided.
-
 	  - CONFIG_ENV_OFFSET_OOB (optional):
 
 	  Enables support for dynamically retrieving the offset of the
@@ -244,6 +296,16 @@ config ENV_IS_IN_NAND
 	  "nand env.oob" command can be used to record this offset.
 	  Currently, CONFIG_ENV_OFFSET_REDUND is not supported when
 	  using CONFIG_ENV_OFFSET_OOB.
+
+config ENV_RANGE
+	hex "Length of the region in which the environment can be written"
+	depends on ENV_IS_IN_NAND
+	range ENV_SIZE 0x7fffffff
+	default ENV_SIZE
+	help
+	  This should be a multiple of the NAND device's block size.
+	  Specifying a range with more erase blocks than are needed to hold
+	  CONFIG_ENV_SIZE allows bad blocks within the range to be avoided.
 
 config ENV_IS_IN_NVRAM
 	bool "Environment in a non-volatile RAM"
@@ -263,7 +325,7 @@ config ENV_IS_IN_NVRAM
 
 config ENV_IS_IN_ONENAND
 	bool "Environment is in OneNAND"
-	depends on !CHAIN_OF_TRUST
+	depends on !CHAIN_OF_TRUST && CMD_ONENAND
 	help
 	  Define this if you want to put your local device's environment in
 	  OneNAND.
@@ -293,7 +355,7 @@ config ENV_IS_IN_REMOTE
 
 config ENV_IS_IN_SPI_FLASH
 	bool "Environment is in SPI flash"
-	depends on !CHAIN_OF_TRUST && SPI
+	depends on !CHAIN_OF_TRUST && (SPI_FLASH || DM_SPI_FLASH)
 	default y if ARMADA_XP
 	default y if INTEL_BAYTRAIL
 	default y if INTEL_BRASWELL
@@ -301,6 +363,7 @@ config ENV_IS_IN_SPI_FLASH
 	default y if NORTHBRIDGE_INTEL_IVYBRIDGE
 	default y if INTEL_QUARK
 	default y if INTEL_QUEENSBAY
+	default y if ARCH_SUNXI
 	help
 	  Define this if you have a SPI Flash memory device which you
 	  want to use for the environment.
@@ -324,54 +387,64 @@ config ENV_IS_IN_SPI_FLASH
 	  during a "saveenv" operation. CONFIG_ENV_OFFSET_REDUND must be
 	  aligned to an erase sector boundary.
 
-config USE_ENV_SPI_BUS
-	bool "SPI flash bus for environment"
+config ENV_IS_IN_MTD
+	bool "Environment is in MTD flash"
+	depends on !CHAIN_OF_TRUST && MTD
+	default y if ARCH_AIROHA
+	help
+	  Define this if you have a MTD Flash memory device which you
+	  want to use for the environment.
+
+	  - CONFIG_ENV_MTD_DEV:
+
+	  Specifies which SPI NAND device the environment is stored in.
+
+	  - CONFIG_ENV_OFFSET:
+	  - CONFIG_ENV_SIZE:
+
+	  These two #defines specify the offset and size of the
+	  environment area within the MTD Flash.
+	  CONFIG_ENV_OFFSET must be aligned to an erase sector boundary.
+
+config ENV_SECT_SIZE_AUTO
+	bool "Use automatically detected sector size"
 	depends on ENV_IS_IN_SPI_FLASH
 	help
-	  Force the SPI bus for environment.
-	  If not defined, use CONFIG_SF_DEFAULT_BUS.
+	  Some boards exist in multiple variants, with different
+	  flashes having different sector sizes. In such cases, you
+	  can select this option to make U-Boot use the actual sector
+	  size when figuring out how much to erase, which can thus be
+	  more efficient on the flashes with smaller erase size. Since
+	  the environment must always be aligned on a sector boundary,
+	  CONFIG_ENV_OFFSET must be aligned to the largest of the
+	  different sector sizes, and CONFIG_ENV_SECT_SIZE should be
+	  set to that value.
 
 config ENV_SPI_BUS
 	int "Value of SPI flash bus for environment"
-	depends on USE_ENV_SPI_BUS
+	depends on ENV_IS_IN_SPI_FLASH
+	default SF_DEFAULT_BUS
 	help
 	  Value the SPI bus and chip select for environment.
 
-config USE_ENV_SPI_CS
-	bool "SPI flash chip select for environment"
-	depends on ENV_IS_IN_SPI_FLASH
-	help
-	  Force the SPI chip select for environment.
-	  If not defined, use CONFIG_SF_DEFAULT_CS.
-
 config ENV_SPI_CS
 	int "Value of SPI flash chip select for environment"
-	depends on USE_ENV_SPI_CS
+	depends on ENV_IS_IN_SPI_FLASH
+	default SF_DEFAULT_CS
 	help
 	  Value of the SPI chip select for environment.
 
-config USE_ENV_SPI_MAX_HZ
-	bool "SPI flash max frequency for environment"
-	depends on ENV_IS_IN_SPI_FLASH
-	help
-	  Force the SPI max work clock for environment.
-	  If not defined, use CONFIG_SF_DEFAULT_SPEED.
-
 config ENV_SPI_MAX_HZ
 	int "Value of SPI flash max frequency for environment"
-	depends on USE_ENV_SPI_MAX_HZ
+	depends on ENV_IS_IN_SPI_FLASH
+	default SF_DEFAULT_SPEED
 	help
 	  Value of the SPI max work clock for environment.
 
-config USE_ENV_SPI_MODE
-	bool "SPI flash mode for environment"
-	depends on ENV_IS_IN_SPI_FLASH
-	help
-	  Force the SPI work mode for environment.
-
 config ENV_SPI_MODE
 	hex "Value of SPI flash work mode for environment"
-	depends on USE_ENV_SPI_MODE
+	depends on ENV_IS_IN_SPI_FLASH
+	default SF_DEFAULT_MODE
 	help
 	  Value of the SPI work mode for environment.
 	  See include/spi.h for value.
@@ -431,9 +504,8 @@ config ENV_FAT_DEVICE_AND_PART
 	string "Device and partition for where to store the environemt in FAT"
 	depends on ENV_IS_IN_FAT
 	default "0:1" if TI_COMMON_CMD_OPTIONS
-	default "0:auto" if ARCH_ZYNQ || ARCH_ZYNQMP
-	default "0:auto" if ARCH_SUNXI && MMC_SUNXI_SLOT_EXTRA = -1
-	default "1:auto" if ARCH_SUNXI && MMC_SUNXI_SLOT_EXTRA != -1
+	default "0:auto" if ARCH_ZYNQ || ARCH_ZYNQMP || ARCH_VERSAL || ARCH_VERSAL_NET || ARCH_VERSAL2
+	default ":auto" if ARCH_SUNXI
 	default "0" if ARCH_AT91
 	help
 	  Define this to a string to specify the partition of the device. It can
@@ -461,6 +533,14 @@ config ENV_FAT_FILE
 	help
 	  It's a string of the FAT file name. This file use to store the
 	  environment.
+
+config ENV_FAT_FILE_REDUND
+	string "Name of the FAT file to use for the environment"
+	depends on ENV_IS_IN_FAT && SYS_REDUNDAND_ENVIRONMENT
+	default "uboot-redund.env"
+	help
+	  It's a string of the FAT file name. This file use to store the
+	  redundant environment.
 
 config ENV_EXT4_INTERFACE
 	string "Name of the block device for the environment"
@@ -501,8 +581,8 @@ config ENV_EXT4_FILE
 config ENV_ADDR
 	hex "Environment address"
 	depends on ENV_IS_IN_FLASH || ENV_IS_IN_NVRAM || ENV_IS_IN_ONENAND || \
-		     ENV_IS_IN_REMOTE || ENV_IS_IN_SPI_FLASH
-	default 0x0 if ENV_IS_IN_SPI_FLASH
+		     ENV_IS_IN_REMOTE || ENV_IS_IN_SPI_FLASH || ENV_IS_IN_MTD
+	default 0x0 if ENV_IS_IN_SPI_FLASH || ENV_IS_IN_MTD
 	help
 	  Offset from the start of the device (or partition)
 
@@ -516,35 +596,48 @@ config ENV_ADDR_REDUND
 config ENV_OFFSET
 	hex "Environment offset"
 	depends on ENV_IS_IN_EEPROM || ENV_IS_IN_MMC || ENV_IS_IN_NAND || \
-		    ENV_IS_IN_SPI_FLASH
+		    ENV_IS_IN_SPI_FLASH || ENV_IS_IN_MTD
 	default 0x3f8000 if ARCH_ROCKCHIP && ENV_IS_IN_MMC
 	default 0x140000 if ARCH_ROCKCHIP && ENV_IS_IN_SPI_FLASH
-	default 0x88000 if ARCH_SUNXI
+	default 0xF0000 if ARCH_SUNXI
 	default 0xE0000 if ARCH_ZYNQ
 	default 0x1E00000 if ARCH_ZYNQMP
-	default 0x7F40000 if ARCH_VERSAL
-	default 0 if ARC
+	default 0x7F40000 if ARCH_VERSAL || ARCH_VERSAL_NET || ARCH_VERSAL2
+	default 0x0 if ARC
 	default 0x140000 if ARCH_AT91
 	default 0x260000 if ARCH_OMAP2PLUS
 	default 0x1080000 if MICROBLAZE && ENV_IS_IN_SPI_FLASH
 	help
-	  Offset from the start of the device (or partition)
+	  Offset from the start of the device (or partition).
+
+	  This offset may be interpreted differently depending on the chosen
+	  ENV_IS_IN_* options. For example, for ENV_IS_IN_MMC=y, this offset may
+	  be negative to indicate an offset backwards from the end of the
+	  partition. See the relevant help messages for more details.
 
 config ENV_OFFSET_REDUND
 	hex "Redundant environment offset"
 	depends on (ENV_IS_IN_EEPROM || ENV_IS_IN_MMC || ENV_IS_IN_NAND || \
 		    ENV_IS_IN_SPI_FLASH) && SYS_REDUNDAND_ENVIRONMENT
+	default 0x10C0000 if MICROBLAZE
+	default 0x0
 	help
 	  Offset from the start of the device (or partition) of the redundant
 	  environment location.
 
+	  This offset may be interpreted differently depending on the chosen
+	  ENV_IS_IN_* options. For example, for ENV_IS_IN_MMC=y, this offset may
+	  be negative to indicate an offset backwards from the end of the
+	  partition. See the relevant help messages for more details.
+
 config ENV_SIZE
 	hex "Environment Size"
 	default 0x40000 if ENV_IS_IN_SPI_FLASH && ARCH_ZYNQMP
-	default 0x20000 if ARCH_SUNXI || ARCH_ZYNQ || ARCH_OMAP2PLUS || ARCH_AT91
+	default 0x20000 if ARCH_ZYNQ || ARCH_OMAP2PLUS || ARCH_AT91
+	default 0x10000 if ARCH_SUNXI
 	default 0x8000 if ARCH_ROCKCHIP && ENV_IS_IN_MMC
 	default 0x2000 if ARCH_ROCKCHIP && ENV_IS_IN_SPI_FLASH
-	default 0x8000 if ARCH_ZYNQMP || ARCH_VERSAL
+	default 0x8000 if ARCH_ZYNQMP || ARCH_VERSAL || ARCH_VERSAL_NET || ARCH_VERSAL2
 	default 0x4000 if ARC
 	default 0x1f000
 	help
@@ -554,9 +647,10 @@ config ENV_SECT_SIZE
 	hex "Environment Sector-Size"
 	depends on ENV_IS_IN_FLASH || ENV_IS_IN_SPI_FLASH
 	default 0x2000 if ARCH_ROCKCHIP
-	default 0x40000 if ARCH_ZYNQMP || ARCH_VERSAL
+	default 0x40000 if ARCH_ZYNQMP || ARCH_VERSAL || ARCH_VERSAL_NET || ARCH_VERSAL2
 	default 0x20000 if ARCH_ZYNQ || ARCH_OMAP2PLUS || ARCH_AT91
 	default 0x20000 if MICROBLAZE && ENV_IS_IN_SPI_FLASH
+	default 0x10000 if ARCH_SUNXI && ENV_IS_IN_SPI_FLASH
 	help
 	  Size of the sector containing the environment.
 
@@ -591,10 +685,16 @@ config SYS_RELOC_GD_ENV_ADDR
 	  Relocate the early env_addr pointer so we know it is not inside
 	  the binary. Some systems need this and for the rest, it doesn't hurt.
 
+config ENV_MTD_DEV
+	string "mtd device name"
+	depends on ENV_IS_IN_MTD
+	help
+	  MTD device name on the platform where the environment is stored.
+
 config SYS_MMC_ENV_DEV
 	int "mmc device number"
-	depends on ENV_IS_IN_MMC || ENV_IS_IN_FAT || SYS_LS_PPA_FW_IN_MMC || \
-		CMD_MVEBU_BUBT || FMAN_ENET || QE
+	depends on ENV_IS_IN_MMC || ENV_IS_IN_FAT || ENV_IS_IN_EXT4 || \
+		CMD_MVEBU_BUBT || FMAN_ENET || QE || PHY_CORTINA
 	default 0
 	help
 	  MMC device number on the platform where the environment is stored.
@@ -610,12 +710,33 @@ config SYS_MMC_ENV_PART
 	  partition 0 or the first boot partition, which is 1 or some other defined
 	  partition.
 
+config USE_ENV_MMC_PARTITION
+	bool "use the mmc environment partition name"
+	depends on ENV_IS_IN_MMC
+
+config ENV_MMC_PARTITION
+	string "mmc environment partition name"
+	depends on USE_ENV_MMC_PARTITION
+	help
+	  MMC partition name used to save environment variables.
+	  If this variable is unset, u-boot will try to get the env partition name
+	  from the device-tree's /config node.
+
+config ENV_MMC_USE_DT
+	bool "Read partition name and offset in DT"
+	depends on ENV_IS_IN_MMC && OF_CONTROL
+	help
+	  Only use the device tree to get the environment location in MMC
+	  device, with partition name or with offset.
+	  The 2 defines CONFIG_ENV_OFFSET, CONFIG_ENV_OFFSET_REDUND
+	  are not used as fallback.
+
 config USE_DEFAULT_ENV_FILE
 	bool "Create default environment from file"
 	help
 	  Normally, the default environment is automatically generated
 	  based on the settings of various CONFIG_* options, as well
-	  as the CONFIG_EXTRA_ENV_SETTINGS. By selecting this option,
+	  as the CFG_EXTRA_ENV_SETTINGS. By selecting this option,
 	  you can instead define the entire default environment in an
 	  external file.
 
@@ -647,9 +768,26 @@ config DELAY_ENVIRONMENT
 	  later by U-Boot code. With CONFIG_OF_CONTROL this is instead
 	  controlled by the value of /config/load-environment.
 
+config ENV_IMPORT_FDT
+	bool "Amend environment by FDT properties"
+	depends on OF_CONTROL
+	help
+	  If selected, after the environment has been loaded from its
+	  persistent location, the "env_fdt_path" variable is looked
+	  up and used as a path to a node in the control DTB. The
+	  property/value pairs in that node is then used to update the
+	  run-time environment. This can be useful to use the same
+	  U-Boot binary with different board variants.
+
+config ENV_FDT_PATH
+	string "Default value for env_fdt_path variable"
+	depends on ENV_IMPORT_FDT
+	default "/config/environment"
+	help
+	  The initial value of the env_fdt_path variable.
+
 config ENV_APPEND
 	bool "Always append the environment with new data"
-	default n
 	help
 	  If defined, the environment hash table is only ever appended with new
 	  data, but the existing hash table can never be dropped and reloaded
@@ -658,7 +796,7 @@ config ENV_APPEND
 
 config ENV_WRITEABLE_LIST
 	bool "Permit write access only to listed variables"
-	default n
+	select ENV_APPEND
 	help
 	  If defined, only environment variables which explicitly set the 'w'
 	  writeable flag can be written and modified at runtime. No variables
@@ -666,7 +804,6 @@ config ENV_WRITEABLE_LIST
 
 config ENV_ACCESS_IGNORE_FORCE
 	bool "Block forced environment operations"
-	default n
 	help
 	  If defined, don't allow the -f switch to env set override variable
 	  access flags.
@@ -785,6 +922,51 @@ config TPL_ENV_IS_IN_FLASH
 	  Similar to ENV_IS_IN_FLASH, used for TPL environment.
 
 endif
+
+if VPL_ENV_SUPPORT
+
+config VPL_ENV_IS_NOWHERE
+	bool "VPL Environment is not stored"
+	default y if ENV_IS_NOWHERE
+	help
+	  Similar to ENV_IS_NOWHERE, used for VPL environment.
+
+endif  # VPL_ENV_SUPPORT
+
+config USE_BOOTFILE
+	bool "Add a 'bootfile' environment variable"
+	help
+	  The "bootfile" variable is used in some cases to allow for
+	  controlling what file U-Boot will attempt to load and boot.  To set
+	  this, enable this option and set the value in the next question.
+
+config BOOTFILE
+	string "'bootfile' environment variable value"
+	depends on USE_BOOTFILE
+	help
+	  The value to set the "bootfile" variable to.
+
+config USE_ETHPRIME
+	bool "Add an 'ethprime' environment variable"
+	help
+	  The "ethprime" variable is used in some cases to control which
+	  network interface is used first.
+
+config ETHPRIME
+	string "'ethprime' environment variable value"
+	depends on USE_ETHPRIME
+	help
+	  The value to set the "ethprime" variable to.
+
+config USE_HOSTNAME
+	bool "Set a default 'hostname' value in the environment"
+	default y if X86
+
+config HOSTNAME
+	string "Value of the default 'hostname' value in the environment"
+	depends on USE_HOSTNAME
+	default "x86" if X86
+	default "unknown"
 
 config VERSION_VARIABLE
 	bool "Add a 'ver' environment variable with the U-Boot version"

@@ -19,40 +19,24 @@
 /*
  * Memory configuration
  */
-#define CONFIG_SYS_MONITOR_BASE		CONFIG_SYS_TEXT_BASE
 
-#define CONFIG_SYS_DDR_SDRAM_BASE	0x80000000
-#define CONFIG_SYS_SDRAM_BASE		CONFIG_SYS_DDR_SDRAM_BASE
-#define CONFIG_SYS_SDRAM_SIZE		SZ_1G
-
-#define CONFIG_SYS_INIT_SP_ADDR		\
-	(CONFIG_SYS_SDRAM_BASE + 0x1000 - GENERATED_GBL_DATA_SIZE)
-
-#define CONFIG_SYS_MALLOC_LEN		SZ_2M
-#define CONFIG_SYS_BOOTM_LEN		SZ_128M
-#define CONFIG_SYS_LOAD_ADDR		0x82000000
+#define CFG_SYS_DDR_SDRAM_BASE	0x80000000
+#define CFG_SYS_SDRAM_BASE		CFG_SYS_DDR_SDRAM_BASE
+#define CFG_SYS_SDRAM_SIZE		SZ_1G
 
 /*
  * UART configuration
  */
-#define CONFIG_SYS_NS16550_SERIAL
-#define CONFIG_SYS_NS16550_CLK		33330000
-#define CONFIG_SYS_NS16550_MEM32
+#define CFG_SYS_NS16550_CLK		33330000
 
 /*
  * Ethernet PHY configuration
  */
 
 /*
- * USB 1.1 configuration
- */
-#define CONFIG_USB_OHCI_NEW
-#define CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS 1
-
-/*
  * Environment settings
  */
-#define CONFIG_EXTRA_ENV_SETTINGS \
+#define CFG_EXTRA_ENV_SETTINGS \
 	"upgrade=if mmc rescan && " \
 		"fatload mmc 0:1 ${loadaddr} u-boot-update.scr && " \
 		"iminfo ${loadaddr} && source ${loadaddr}; then; else echo " \
@@ -102,14 +86,7 @@ setenv core_iccm_1 0x6; setenv core_dccm_1 0x6; \
 setenv core_iccm_2 0x10; setenv core_dccm_2 0x10; \
 setenv core_iccm_3 0x6; setenv core_dccm_3 0x6;\0"
 
-/*
- * Environment configuration
- */
-#define CONFIG_BOOTFILE			"uImage"
-#define CONFIG_LOADADDR			CONFIG_SYS_LOAD_ADDR
-
 /* Cli configuration */
-#define CONFIG_SYS_CBSIZE		SZ_2K
 
 /*
  * Callback configuration

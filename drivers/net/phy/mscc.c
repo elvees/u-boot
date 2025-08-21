@@ -15,10 +15,12 @@
 #include <time.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
+#include <linux/printk.h>
 
 /* Microsemi PHY ID's */
 #define PHY_ID_VSC8530                  0x00070560
 #define PHY_ID_VSC8531                  0x00070570
+#define PHY_ID_VSC8502			0x00070630
 #define PHY_ID_VSC8540                  0x00070760
 #define PHY_ID_VSC8541                  0x00070770
 #define PHY_ID_VSC8574			0x000704a0
@@ -1513,7 +1515,51 @@ static int vsc8584_config(struct phy_device *phydev)
 	return vsc8584_config_init(phydev);
 }
 
-static struct phy_driver VSC8530_driver = {
+static int vsc8502_config(struct phy_device *phydev)
+{
+	bool rgmii_rx_delay = false, rgmii_tx_delay = false;
+	u16 reg = 0;
+	int ret;
+
+	/* Assume nothing needs to be done for the default GMII/MII mode */
+	if (!phy_interface_is_rgmii(phydev))
+		return 0;
+
+	/* Set Extended PHY Control 1 register to RGMII */
+	phy_write(phydev, MDIO_DEVAD_NONE, MSCC_PHY_EXT_PHY_CNTL_1_REG,
+		  BIT(13) | BIT(12));
+
+	/* Soft reset required after changing PHY mode from the default
+	 * of GMII/MII
+	 */
+	ret = mscc_phy_soft_reset(phydev);
+	if (ret)
+		return ret;
+
+	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID ||
+	    phydev->interface == PHY_INTERFACE_MODE_RGMII_ID)
+		rgmii_rx_delay = true;
+	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID ||
+	    phydev->interface == PHY_INTERFACE_MODE_RGMII_ID)
+		rgmii_tx_delay = true;
+
+	phy_write(phydev, MDIO_DEVAD_NONE, MSCC_EXT_PAGE_ACCESS,
+		  MSCC_PHY_PAGE_EXT2);
+
+	if (rgmii_rx_delay)
+		reg |= VSC_PHY_RGMII_DELAY_2000_PS << RGMII_RX_CLK_DELAY_POS;
+	if (rgmii_tx_delay)
+		reg |= VSC_PHY_RGMII_DELAY_2000_PS << RGMII_TX_CLK_DELAY_POS;
+
+	phy_write(phydev, MDIO_DEVAD_NONE, MSCC_PHY_RGMII_CNTL_REG, reg);
+
+	phy_write(phydev, MDIO_DEVAD_NONE, MSCC_EXT_PAGE_ACCESS,
+		  MSCC_PHY_PAGE_STD);
+
+	return 0;
+}
+
+U_BOOT_PHY_DRIVER(vsc8530) = {
 	.name = "Microsemi VSC8530",
 	.uid = PHY_ID_VSC8530,
 	.mask = 0x000ffff0,
@@ -1523,7 +1569,7 @@ static struct phy_driver VSC8530_driver = {
 	.shutdown = &genphy_shutdown,
 };
 
-static struct phy_driver VSC8531_driver = {
+U_BOOT_PHY_DRIVER(vsc8531) = {
 	.name = "Microsemi VSC8531",
 	.uid = PHY_ID_VSC8531,
 	.mask = 0x000ffff0,
@@ -1533,7 +1579,17 @@ static struct phy_driver VSC8531_driver = {
 	.shutdown = &genphy_shutdown,
 };
 
-static struct phy_driver VSC8540_driver = {
+U_BOOT_PHY_DRIVER(vsc8502) = {
+	.name = "Microsemi VSC8502",
+	.uid = PHY_ID_VSC8502,
+	.mask = 0x000ffff0,
+	.features = PHY_GBIT_FEATURES,
+	.config = &vsc8502_config,
+	.startup = &mscc_startup,
+	.shutdown = &genphy_shutdown,
+};
+
+U_BOOT_PHY_DRIVER(vsc8540) = {
 	.name = "Microsemi VSC8540",
 	.uid = PHY_ID_VSC8540,
 	.mask = 0x000ffff0,
@@ -1543,7 +1599,7 @@ static struct phy_driver VSC8540_driver = {
 	.shutdown = &genphy_shutdown,
 };
 
-static struct phy_driver VSC8541_driver = {
+U_BOOT_PHY_DRIVER(vsc8541) = {
 	.name = "Microsemi VSC8541",
 	.uid = PHY_ID_VSC8541,
 	.mask = 0x000ffff0,
@@ -1553,7 +1609,7 @@ static struct phy_driver VSC8541_driver = {
 	.shutdown = &genphy_shutdown,
 };
 
-static struct phy_driver VSC8574_driver = {
+U_BOOT_PHY_DRIVER(vsc8574) = {
 	.name = "Microsemi VSC8574",
 	.uid = PHY_ID_VSC8574,
 	.mask = 0x000ffff0,
@@ -1563,7 +1619,7 @@ static struct phy_driver VSC8574_driver = {
 	.shutdown = &genphy_shutdown,
 };
 
-static struct phy_driver VSC8584_driver = {
+U_BOOT_PHY_DRIVER(vsc8584) = {
 	.name = "Microsemi VSC8584",
 	.uid = PHY_ID_VSC8584,
 	.mask = 0x000ffff0,
@@ -1572,15 +1628,3 @@ static struct phy_driver VSC8584_driver = {
 	.startup = &mscc_startup,
 	.shutdown = &genphy_shutdown,
 };
-
-int phy_mscc_init(void)
-{
-	phy_register(&VSC8530_driver);
-	phy_register(&VSC8531_driver);
-	phy_register(&VSC8540_driver);
-	phy_register(&VSC8541_driver);
-	phy_register(&VSC8574_driver);
-	phy_register(&VSC8584_driver);
-
-	return 0;
-}

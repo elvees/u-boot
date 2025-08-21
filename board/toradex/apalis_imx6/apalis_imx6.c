@@ -6,7 +6,7 @@
  * copied from nitrogen6x
  */
 
-#include <common.h>
+#include <config.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <image.h>
@@ -30,11 +30,13 @@
 #include <asm/mach-imx/iomux-v3.h>
 #include <asm/mach-imx/sata.h>
 #include <asm/mach-imx/video.h>
+#include <asm/sections.h>
 #include <dm/device-internal.h>
 #include <dm/platform_data/serial_mxc.h>
 #include <dwc_ahsata.h>
 #include <env.h>
 #include <fsl_esdhc_imx.h>
+#include <i2c.h>
 #include <imx_thermal.h>
 #include <micrel.h>
 #include <miiphy.h>
@@ -76,10 +78,12 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define APALIS_IMX6_SATA_INIT_RETRIES	10
 
+#define I2C_PWR	1
+
 int dram_init(void)
 {
 	/* use the DDR controllers configured size */
-	gd->ram_size = get_ram_size((void *)CONFIG_SYS_SDRAM_BASE,
+	gd->ram_size = get_ram_size((void *)CFG_SYS_SDRAM_BASE,
 				    (ulong)imx_ddr_size());
 
 	return 0;
@@ -95,7 +99,7 @@ iomux_v3_cfg_t const uart1_pads_dte[] = {
 	MX6_PAD_CSI0_DAT11__UART1_TX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL),
 };
 
-#if defined(CONFIG_FSL_ESDHC_IMX) && defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_FSL_ESDHC_IMX) && defined(CONFIG_XPL_BUILD)
 /* Apalis MMC1 */
 iomux_v3_cfg_t const usdhc1_pads[] = {
 	MX6_PAD_SD1_CLK__SD1_CLK   | MUX_PAD_CTRL(USDHC_PAD_CTRL),
@@ -138,7 +142,7 @@ iomux_v3_cfg_t const usdhc3_pads[] = {
 	MX6_PAD_SD3_DAT7__SD3_DATA7 | MUX_PAD_CTRL(USDHC_EMMC_PAD_CTRL),
 	MX6_PAD_SD3_RST__GPIO7_IO08 | MUX_PAD_CTRL(WEAK_PULLUP) | MUX_MODE_SION,
 };
-#endif /* CONFIG_FSL_ESDHC_IMX & CONFIG_SPL_BUILD */
+#endif /* CONFIG_FSL_ESDHC_IMX & CONFIG_XPL_BUILD */
 
 int mx6_rgmii_rework(struct phy_device *phydev)
 {
@@ -304,25 +308,12 @@ static void setup_dtemode_uart(void)
 	clrbits_le32((u32 *)(UART4_BASE + UCR3), UCR3_DCD | UCR3_RI);
 	clrbits_le32((u32 *)(UART5_BASE + UCR3), UCR3_DCD | UCR3_RI);
 }
-static void setup_dcemode_uart(void)
-{
-	clrbits_le32((u32 *)(UART1_BASE + UFCR), UFCR_DCEDTE);
-	clrbits_le32((u32 *)(UART2_BASE + UFCR), UFCR_DCEDTE);
-	clrbits_le32((u32 *)(UART4_BASE + UFCR), UFCR_DCEDTE);
-	clrbits_le32((u32 *)(UART5_BASE + UFCR), UFCR_DCEDTE);
-}
 
 static void setup_iomux_dte_uart(void)
 {
 	setup_dtemode_uart();
 	imx_iomux_v3_setup_multiple_pads(uart1_pads_dte,
 					 ARRAY_SIZE(uart1_pads_dte));
-}
-static void setup_iomux_dce_uart(void)
-{
-	setup_dcemode_uart();
-	imx_iomux_v3_setup_multiple_pads(uart1_pads_dce,
-					 ARRAY_SIZE(uart1_pads_dce));
 }
 
 #ifdef CONFIG_USB_EHCI_MX6
@@ -333,9 +324,9 @@ int board_ehci_hcd_init(int port)
 }
 #endif
 
-#if defined(CONFIG_FSL_ESDHC_IMX) && defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_FSL_ESDHC_IMX) && defined(CONFIG_XPL_BUILD)
 /* use the following sequence: eMMC, MMC1, SD1 */
-struct fsl_esdhc_cfg usdhc_cfg[CONFIG_SYS_FSL_USDHC_NUM] = {
+struct fsl_esdhc_cfg usdhc_cfg[CFG_SYS_FSL_USDHC_NUM] = {
 	{USDHC3_BASE_ADDR},
 	{USDHC1_BASE_ADDR},
 	{USDHC2_BASE_ADDR},
@@ -403,7 +394,7 @@ int board_mmc_init(struct bd_info *bis)
 
 	return fsl_esdhc_initialize(bis, &usdhc_cfg[0]);
 }
-#endif /* CONFIG_FSL_ESDHC_IMX & CONFIG_SPL_BUILD */
+#endif /* CONFIG_FSL_ESDHC_IMX & CONFIG_XPL_BUILD */
 
 int board_phy_config(struct phy_device *phydev)
 {
@@ -475,10 +466,12 @@ static iomux_v3_cfg_t const rgb_pads[] = {
 	MX6_PAD_EIM_D31__IPU1_DISP1_DATA20 | MUX_PAD_CTRL(OUTPUT_RGB),
 };
 
+#ifdef CONFIG_IMX_HDMI
 static void do_enable_hdmi(struct display_info_t const *dev)
 {
 	imx_enable_hdmi_phy();
 }
+#endif
 
 static void enable_lvds(struct display_info_t const *dev)
 {
@@ -508,7 +501,9 @@ static int detect_default(struct display_info_t const *dev)
 	return 1;
 }
 
-struct display_info_t const displays[] = {{
+struct display_info_t const displays[] = {
+#ifdef CONFIG_IMX_HDMI
+{
 	.bus	= -1,
 	.addr	= 0,
 	.pixfmt	= IPU_PIX_FMT_RGB24,
@@ -528,7 +523,9 @@ struct display_info_t const displays[] = {{
 		.vsync_len      = 10,
 		.sync           = FB_SYNC_EXT,
 		.vmode          = FB_VMODE_NONINTERLACED
-} }, {
+} },
+#endif
+{
 	.bus	= -1,
 	.addr	= 0,
 	.di	= 1,
@@ -598,7 +595,11 @@ static void setup_display(void)
 	int reg;
 
 	enable_ipu_clock();
+
+#ifdef CONFIG_IMX_HDMI
 	imx_setup_hdmi();
+#endif
+
 	/* Turn on LDB0,IPU,IPU DI0 clocks */
 	reg = __raw_readl(&mxc_ccm->CCGR3);
 	reg |= MXC_CCM_CCGR3_LDB_DI0_MASK;
@@ -665,11 +666,8 @@ int board_early_init_f(void)
 {
 	imx_iomux_v3_setup_multiple_pads(pwr_intb_pads,
 					 ARRAY_SIZE(pwr_intb_pads));
-#ifndef CONFIG_TDX_APALIS_IMX6_V1_0
 	setup_iomux_dte_uart();
-#else
-	setup_iomux_dce_uart();
-#endif
+
 	return 0;
 }
 
@@ -704,69 +702,60 @@ int board_init(void)
 	return 0;
 }
 
+static bool is_som_variant_1_2(void)
+{
+	struct udevice *bus;
+	struct udevice *i2c_dev;
+	int ret;
+
+	ret = uclass_get_device_by_seq(UCLASS_I2C, I2C_PWR, &bus);
+	if (ret) {
+		printf("Failed to get I2C_PWR\n");
+		return false;
+	}
+
+	/* V1.2 uses the TLA2024 at 0x49 instead of the STMPE811 at 0x41 */
+	ret = dm_i2c_probe(bus, 0x49, 0, &i2c_dev);
+
+	return (bool)!ret;
+}
+
+static void select_dt_from_module_version(void)
+{
+	if (is_som_variant_1_2())
+		env_set("variant", "-v1.2");
+	else
+		env_set("variant", "");
+}
+
 #ifdef CONFIG_BOARD_LATE_INIT
 int board_late_init(void)
 {
-#if defined(CONFIG_REVISION_TAG) && \
-    defined(CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG)
+#if defined(CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG)
 	char env_str[256];
 	u32 rev;
 
-	rev = get_board_rev();
+	select_dt_from_module_version();
+
+	rev = get_board_revision();
 	snprintf(env_str, ARRAY_SIZE(env_str), "%.4x", rev);
 	env_set("board_rev", env_str);
+#endif /* CONFIG_BOARD_LATE_INIT */
 
-#ifndef CONFIG_TDX_APALIS_IMX6_V1_0
-	if ((rev & 0xfff0) == 0x0100) {
-		char *fdt_env;
-
-		/* reconfigure the UART to DCE mode dynamically if on V1.0 HW */
-		setup_iomux_dce_uart();
-
-		/* if using the default device tree, use version for V1.0 HW */
-		fdt_env = env_get("fdt_file");
-		if ((fdt_env != NULL) && (strcmp(FDT_FILE, fdt_env) == 0)) {
-			env_set("fdt_file", FDT_FILE_V1_0);
-			printf("patching fdt_file to " FDT_FILE_V1_0 "\n");
-#ifndef CONFIG_ENV_IS_NOWHERE
-			env_save();
-#endif
+	if (IS_ENABLED(CONFIG_USB) && is_boot_from_usb()) {
+		env_set("bootdelay", "0");
+		if (IS_ENABLED(CONFIG_CMD_USB_SDP)) {
+			printf("Serial Downloader recovery mode, using sdp command\n");
+			env_set("bootcmd", "sdp 0");
+		} else if (IS_ENABLED(CONFIG_CMD_FASTBOOT)) {
+			printf("Fastboot recovery mode, using fastboot command\n");
+			env_set("bootcmd", "fastboot usb 0");
 		}
 	}
-#endif /* CONFIG_TDX_APALIS_IMX6_V1_0 */
-#endif /* CONFIG_REVISION_TAG */
-
-#ifdef CONFIG_CMD_USB_SDP
-	if (is_boot_from_usb()) {
-		printf("Serial Downloader recovery mode, using sdp command\n");
-		env_set("bootdelay", "0");
-		env_set("bootcmd", "sdp 0");
-	}
-#endif /* CONFIG_CMD_USB_SDP */
 
 	return 0;
 }
 #endif /* CONFIG_BOARD_LATE_INIT */
-
-int checkboard(void)
-{
-	char it[] = " IT";
-	int minc, maxc;
-
-	switch (get_cpu_temp_grade(&minc, &maxc)) {
-	case TEMP_AUTOMOTIVE:
-	case TEMP_INDUSTRIAL:
-		break;
-	case TEMP_EXTCOMMERCIAL:
-	default:
-		it[0] = 0;
-	};
-	printf("Model: Toradex Apalis iMX6 %s %s%s\n",
-	       is_cpu_type(MXC_CPU_MX6D) ? "Dual" : "Quad",
-	       (gd->ram_size == 0x80000000) ? "2GB" :
-	       (gd->ram_size == 0x40000000) ? "1GB" : "512MB", it);
-	return 0;
-}
 
 #if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)
 int ft_board_setup(void *blob, struct bd_info *bd)
@@ -800,250 +789,12 @@ void ldo_mode_set(int ldo_bypass)
 }
 #endif
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 #include <spl.h>
 #include <linux/libfdt.h>
 #include "asm/arch/mx6q-ddr.h"
 #include "asm/arch/iomux.h"
 #include "asm/arch/crm_regs.h"
-
-static int mx6_com_dcd_table[] = {
-/* ddr-setup.cfg */
-MX6_IOM_DRAM_SDQS0, 0x00000030,
-MX6_IOM_DRAM_SDQS1, 0x00000030,
-MX6_IOM_DRAM_SDQS2, 0x00000030,
-MX6_IOM_DRAM_SDQS3, 0x00000030,
-MX6_IOM_DRAM_SDQS4, 0x00000030,
-MX6_IOM_DRAM_SDQS5, 0x00000030,
-MX6_IOM_DRAM_SDQS6, 0x00000030,
-MX6_IOM_DRAM_SDQS7, 0x00000030,
-
-MX6_IOM_GRP_B0DS, 0x00000030,
-MX6_IOM_GRP_B1DS, 0x00000030,
-MX6_IOM_GRP_B2DS, 0x00000030,
-MX6_IOM_GRP_B3DS, 0x00000030,
-MX6_IOM_GRP_B4DS, 0x00000030,
-MX6_IOM_GRP_B5DS, 0x00000030,
-MX6_IOM_GRP_B6DS, 0x00000030,
-MX6_IOM_GRP_B7DS, 0x00000030,
-MX6_IOM_GRP_ADDDS, 0x00000030,
-/* 40 Ohm drive strength for cs0/1,sdba2,cke0/1,sdwe */
-MX6_IOM_GRP_CTLDS, 0x00000030,
-
-MX6_IOM_DRAM_DQM0, 0x00020030,
-MX6_IOM_DRAM_DQM1, 0x00020030,
-MX6_IOM_DRAM_DQM2, 0x00020030,
-MX6_IOM_DRAM_DQM3, 0x00020030,
-MX6_IOM_DRAM_DQM4, 0x00020030,
-MX6_IOM_DRAM_DQM5, 0x00020030,
-MX6_IOM_DRAM_DQM6, 0x00020030,
-MX6_IOM_DRAM_DQM7, 0x00020030,
-
-MX6_IOM_DRAM_CAS, 0x00020030,
-MX6_IOM_DRAM_RAS, 0x00020030,
-MX6_IOM_DRAM_SDCLK_0, 0x00020030,
-MX6_IOM_DRAM_SDCLK_1, 0x00020030,
-
-MX6_IOM_DRAM_RESET, 0x00020030,
-MX6_IOM_DRAM_SDCKE0, 0x00003000,
-MX6_IOM_DRAM_SDCKE1, 0x00003000,
-
-MX6_IOM_DRAM_SDODT0, 0x00003030,
-MX6_IOM_DRAM_SDODT1, 0x00003030,
-
-/* (differential input) */
-MX6_IOM_DDRMODE_CTL, 0x00020000,
-/* (differential input) */
-MX6_IOM_GRP_DDRMODE, 0x00020000,
-/* disable ddr pullups */
-MX6_IOM_GRP_DDRPKE, 0x00000000,
-MX6_IOM_DRAM_SDBA2, 0x00000000,
-/* 40 Ohm drive strength for cs0/1,sdba2,cke0/1,sdwe */
-MX6_IOM_GRP_DDR_TYPE, 0x000C0000,
-
-/* Read data DQ Byte0-3 delay */
-MX6_MMDC_P0_MPRDDQBY0DL, 0x33333333,
-MX6_MMDC_P0_MPRDDQBY1DL, 0x33333333,
-MX6_MMDC_P0_MPRDDQBY2DL, 0x33333333,
-MX6_MMDC_P0_MPRDDQBY3DL, 0x33333333,
-MX6_MMDC_P1_MPRDDQBY0DL, 0x33333333,
-MX6_MMDC_P1_MPRDDQBY1DL, 0x33333333,
-MX6_MMDC_P1_MPRDDQBY2DL, 0x33333333,
-MX6_MMDC_P1_MPRDDQBY3DL, 0x33333333,
-
-/*
- * MDMISC	mirroring	interleaved (row/bank/col)
- */
-MX6_MMDC_P0_MDMISC, 0x00081740,
-
-/*
- * MDSCR	con_req
- */
-MX6_MMDC_P0_MDSCR, 0x00008000,
-
-/* 1066mhz_4x128mx16.cfg */
-
-MX6_MMDC_P0_MDPDC, 0x00020036,
-MX6_MMDC_P0_MDCFG0, 0x555A7954,
-MX6_MMDC_P0_MDCFG1, 0xDB328F64,
-MX6_MMDC_P0_MDCFG2, 0x01FF00DB,
-MX6_MMDC_P0_MDRWD, 0x000026D2,
-MX6_MMDC_P0_MDOR, 0x005A1023,
-MX6_MMDC_P0_MDOTC, 0x09555050,
-MX6_MMDC_P0_MDPDC, 0x00025576,
-MX6_MMDC_P0_MDASP, 0x00000027,
-MX6_MMDC_P0_MDCTL, 0x831A0000,
-MX6_MMDC_P0_MDSCR, 0x04088032,
-MX6_MMDC_P0_MDSCR, 0x00008033,
-MX6_MMDC_P0_MDSCR, 0x00428031,
-MX6_MMDC_P0_MDSCR, 0x19308030,
-MX6_MMDC_P0_MDSCR, 0x04008040,
-MX6_MMDC_P0_MPZQHWCTRL, 0xA1390003,
-MX6_MMDC_P1_MPZQHWCTRL, 0xA1390003,
-MX6_MMDC_P0_MDREF, 0x00005800,
-MX6_MMDC_P0_MPODTCTRL, 0x00000000,
-MX6_MMDC_P1_MPODTCTRL, 0x00000000,
-
-MX6_MMDC_P0_MPDGCTRL0, 0x432A0338,
-MX6_MMDC_P0_MPDGCTRL1, 0x03260324,
-MX6_MMDC_P1_MPDGCTRL0, 0x43340344,
-MX6_MMDC_P1_MPDGCTRL1, 0x031E027C,
-
-MX6_MMDC_P0_MPRDDLCTL, 0x33272D2E,
-MX6_MMDC_P1_MPRDDLCTL, 0x2F312B37,
-
-MX6_MMDC_P0_MPWRDLCTL, 0x3A35433C,
-MX6_MMDC_P1_MPWRDLCTL, 0x4336453F,
-
-MX6_MMDC_P0_MPWLDECTRL0, 0x0009000E,
-MX6_MMDC_P0_MPWLDECTRL1, 0x0018000B,
-MX6_MMDC_P1_MPWLDECTRL0, 0x00060015,
-MX6_MMDC_P1_MPWLDECTRL1, 0x0006000E,
-
-MX6_MMDC_P0_MPMUR0, 0x00000800,
-MX6_MMDC_P1_MPMUR0, 0x00000800,
-MX6_MMDC_P0_MDSCR, 0x00000000,
-MX6_MMDC_P0_MAPSR, 0x00011006,
-};
-
-static int mx6_it_dcd_table[] = {
-/* ddr-setup.cfg */
-MX6_IOM_DRAM_SDQS0, 0x00000030,
-MX6_IOM_DRAM_SDQS1, 0x00000030,
-MX6_IOM_DRAM_SDQS2, 0x00000030,
-MX6_IOM_DRAM_SDQS3, 0x00000030,
-MX6_IOM_DRAM_SDQS4, 0x00000030,
-MX6_IOM_DRAM_SDQS5, 0x00000030,
-MX6_IOM_DRAM_SDQS6, 0x00000030,
-MX6_IOM_DRAM_SDQS7, 0x00000030,
-
-MX6_IOM_GRP_B0DS, 0x00000030,
-MX6_IOM_GRP_B1DS, 0x00000030,
-MX6_IOM_GRP_B2DS, 0x00000030,
-MX6_IOM_GRP_B3DS, 0x00000030,
-MX6_IOM_GRP_B4DS, 0x00000030,
-MX6_IOM_GRP_B5DS, 0x00000030,
-MX6_IOM_GRP_B6DS, 0x00000030,
-MX6_IOM_GRP_B7DS, 0x00000030,
-MX6_IOM_GRP_ADDDS, 0x00000030,
-/* 40 Ohm drive strength for cs0/1,sdba2,cke0/1,sdwe */
-MX6_IOM_GRP_CTLDS, 0x00000030,
-
-MX6_IOM_DRAM_DQM0, 0x00020030,
-MX6_IOM_DRAM_DQM1, 0x00020030,
-MX6_IOM_DRAM_DQM2, 0x00020030,
-MX6_IOM_DRAM_DQM3, 0x00020030,
-MX6_IOM_DRAM_DQM4, 0x00020030,
-MX6_IOM_DRAM_DQM5, 0x00020030,
-MX6_IOM_DRAM_DQM6, 0x00020030,
-MX6_IOM_DRAM_DQM7, 0x00020030,
-
-MX6_IOM_DRAM_CAS, 0x00020030,
-MX6_IOM_DRAM_RAS, 0x00020030,
-MX6_IOM_DRAM_SDCLK_0, 0x00020030,
-MX6_IOM_DRAM_SDCLK_1, 0x00020030,
-
-MX6_IOM_DRAM_RESET, 0x00020030,
-MX6_IOM_DRAM_SDCKE0, 0x00003000,
-MX6_IOM_DRAM_SDCKE1, 0x00003000,
-
-MX6_IOM_DRAM_SDODT0, 0x00003030,
-MX6_IOM_DRAM_SDODT1, 0x00003030,
-
-/* (differential input) */
-MX6_IOM_DDRMODE_CTL, 0x00020000,
-/* (differential input) */
-MX6_IOM_GRP_DDRMODE, 0x00020000,
-/* disable ddr pullups */
-MX6_IOM_GRP_DDRPKE, 0x00000000,
-MX6_IOM_DRAM_SDBA2, 0x00000000,
-/* 40 Ohm drive strength for cs0/1,sdba2,cke0/1,sdwe */
-MX6_IOM_GRP_DDR_TYPE, 0x000C0000,
-
-/* Read data DQ Byte0-3 delay */
-MX6_MMDC_P0_MPRDDQBY0DL, 0x33333333,
-MX6_MMDC_P0_MPRDDQBY1DL, 0x33333333,
-MX6_MMDC_P0_MPRDDQBY2DL, 0x33333333,
-MX6_MMDC_P0_MPRDDQBY3DL, 0x33333333,
-MX6_MMDC_P1_MPRDDQBY0DL, 0x33333333,
-MX6_MMDC_P1_MPRDDQBY1DL, 0x33333333,
-MX6_MMDC_P1_MPRDDQBY2DL, 0x33333333,
-MX6_MMDC_P1_MPRDDQBY3DL, 0x33333333,
-
-/*
- * MDMISC	mirroring	interleaved (row/bank/col)
- */
-MX6_MMDC_P0_MDMISC, 0x00081740,
-
-/*
- * MDSCR	con_req
- */
-MX6_MMDC_P0_MDSCR, 0x00008000,
-
-/* 1066mhz_4x256mx16.cfg */
-
-MX6_MMDC_P0_MDPDC, 0x00020036,
-MX6_MMDC_P0_MDCFG0, 0x898E78f5,
-MX6_MMDC_P0_MDCFG1, 0xff328f64,
-MX6_MMDC_P0_MDCFG2, 0x01FF00DB,
-MX6_MMDC_P0_MDRWD, 0x000026D2,
-MX6_MMDC_P0_MDOR, 0x008E1023,
-MX6_MMDC_P0_MDOTC, 0x09444040,
-MX6_MMDC_P0_MDPDC, 0x00025576,
-MX6_MMDC_P0_MDASP, 0x00000047,
-MX6_MMDC_P0_MDCTL, 0x841A0000,
-MX6_MMDC_P0_MDSCR, 0x02888032,
-MX6_MMDC_P0_MDSCR, 0x00008033,
-MX6_MMDC_P0_MDSCR, 0x00048031,
-MX6_MMDC_P0_MDSCR, 0x19408030,
-MX6_MMDC_P0_MDSCR, 0x04008040,
-MX6_MMDC_P0_MPZQHWCTRL, 0xA1390003,
-MX6_MMDC_P1_MPZQHWCTRL, 0xA1390003,
-MX6_MMDC_P0_MDREF, 0x00007800,
-MX6_MMDC_P0_MPODTCTRL, 0x00022227,
-MX6_MMDC_P1_MPODTCTRL, 0x00022227,
-
-MX6_MMDC_P0_MPDGCTRL0, 0x03300338,
-MX6_MMDC_P0_MPDGCTRL1, 0x03240324,
-MX6_MMDC_P1_MPDGCTRL0, 0x03440350,
-MX6_MMDC_P1_MPDGCTRL1, 0x032C0308,
-
-MX6_MMDC_P0_MPRDDLCTL, 0x40363C3E,
-MX6_MMDC_P1_MPRDDLCTL, 0x3C3E3C46,
-
-MX6_MMDC_P0_MPWRDLCTL, 0x403E463E,
-MX6_MMDC_P1_MPWRDLCTL, 0x4A384C46,
-
-MX6_MMDC_P0_MPWLDECTRL0, 0x0009000E,
-MX6_MMDC_P0_MPWLDECTRL1, 0x0018000B,
-MX6_MMDC_P1_MPWLDECTRL0, 0x00060015,
-MX6_MMDC_P1_MPWLDECTRL1, 0x0006000E,
-
-MX6_MMDC_P0_MPMUR0, 0x00000800,
-MX6_MMDC_P1_MPMUR0, 0x00000800,
-MX6_MMDC_P0_MDSCR, 0x00000000,
-MX6_MMDC_P0_MAPSR, 0x00011006,
-};
 
 static void ccgr_init(void)
 {
@@ -1060,41 +811,232 @@ static void ccgr_init(void)
 /*
  * Setup CCM_CCOSR register as follows:
  *
- * cko1_en  = 1	   --> CKO1 enabled
- * cko1_div = 111  --> divide by 8
- * cko1_sel = 1011 --> ahb_clk_root
+ * clko2_en  = 1     --> CKO2 enabled
+ * clko2_div = 000   --> divide by 1
+ * clko2_sel = 01110 --> osc_clk (24MHz)
  *
- * This sets CKO1 at ahb_clk_root/8 = 132/8 = 16.5 MHz
+ * clk_out_sel = 1   --> Output CKO2 to CKO1
+ *
+ * This sets both CLKO2/CLKO1 output to 24MHz,
+ * CLKO1 configuration not relevant because of clk_out_sel
+ * (CLKO1 set to default)
  */
-	writel(0x000000FB, &ccm->ccosr);
+	writel(0x010E0101, &ccm->ccosr);
 }
 
-static void ddr_init(int *table, int size)
-{
-	int i;
+#define PAD_CTL_INPUT_DDR BIT(17)
 
-	for (i = 0; i < size / 2 ; i++)
-		writel(table[2 * i + 1], table[2 * i]);
+struct mx6dq_iomux_ddr_regs mx6_ddr_ioregs = {
+	/* Differential input, 40 ohm DSE */
+	.dram_sdclk_0 = PAD_CTL_DSE_40ohm | PAD_CTL_INPUT_DDR,
+	.dram_sdclk_1 = PAD_CTL_DSE_40ohm | PAD_CTL_INPUT_DDR,
+	.dram_cas = PAD_CTL_DSE_40ohm | PAD_CTL_INPUT_DDR,
+	.dram_ras = PAD_CTL_DSE_40ohm | PAD_CTL_INPUT_DDR,
+	.dram_reset = PAD_CTL_DSE_40ohm | PAD_CTL_INPUT_DDR,
+
+	/* SDKE[0:1]: BIT(12) and BIT(13) are reserved and set at reset */
+	.dram_sdcke0 = 0x00003000,
+	.dram_sdcke1 = 0x00003000,
+
+	.dram_sdba2 = 0x00000000,
+
+	/* ODT[0:1]: 40 ohm DSE, BIT(12) and BIT(13) are reserved and set at reset */
+	.dram_sdodt0 = PAD_CTL_DSE_40ohm | 0x00003000,
+	.dram_sdodt1 = PAD_CTL_DSE_40ohm | 0x00003000,
+
+	/* SDQS[0:7]: 40 ohm DSE, Pull/Keeper Disabled, ODT Disabled */
+	.dram_sdqs0 = PAD_CTL_DSE_40ohm,
+	.dram_sdqs1 = PAD_CTL_DSE_40ohm,
+	.dram_sdqs2 = PAD_CTL_DSE_40ohm,
+	.dram_sdqs3 = PAD_CTL_DSE_40ohm,
+	.dram_sdqs4 = PAD_CTL_DSE_40ohm,
+	.dram_sdqs5 = PAD_CTL_DSE_40ohm,
+	.dram_sdqs6 = PAD_CTL_DSE_40ohm,
+	.dram_sdqs7 = PAD_CTL_DSE_40ohm,
+
+	/* DQM[0:7]: Differential input, 40 ohm DSE, Pull/Keeper Disabled, ODT Disabled */
+	.dram_dqm0 = PAD_CTL_DSE_40ohm | PAD_CTL_INPUT_DDR,
+	.dram_dqm1 = PAD_CTL_DSE_40ohm | PAD_CTL_INPUT_DDR,
+	.dram_dqm2 = PAD_CTL_DSE_40ohm | PAD_CTL_INPUT_DDR,
+	.dram_dqm3 = PAD_CTL_DSE_40ohm | PAD_CTL_INPUT_DDR,
+	.dram_dqm4 = PAD_CTL_DSE_40ohm | PAD_CTL_INPUT_DDR,
+	.dram_dqm5 = PAD_CTL_DSE_40ohm | PAD_CTL_INPUT_DDR,
+	.dram_dqm6 = PAD_CTL_DSE_40ohm | PAD_CTL_INPUT_DDR,
+	.dram_dqm7 = PAD_CTL_DSE_40ohm | PAD_CTL_INPUT_DDR,
+};
+
+struct mx6dq_iomux_grp_regs mx6_grp_ioregs = {
+	/* DDR3 */
+	.grp_ddr_type = 0x000C0000,
+
+	/* SDQS[0:7]: Differential input */
+	.grp_ddrmode_ctl = PAD_CTL_INPUT_DDR,
+
+	/* DATA[0:63]: Pull/Keeper disabled */
+	.grp_ddrpke = 0,
+
+	/* ADDR[0:16], SDBA[0:1]: 40 ohm DSE */
+	.grp_addds = PAD_CTL_DSE_40ohm,
+
+	/* CS0/CS1/SDBA2/CKE0/CKE1/SDWE: 40 ohm DSE */
+	.grp_ctlds = PAD_CTL_DSE_40ohm,
+
+	/* DATA[0:63]: Differential input */
+	.grp_ddrmode = PAD_CTL_INPUT_DDR,
+
+	/* DATA[0:63]: 40 ohm DSE */
+	.grp_b0ds = PAD_CTL_DSE_40ohm,
+	.grp_b1ds = PAD_CTL_DSE_40ohm,
+	.grp_b2ds = PAD_CTL_DSE_40ohm,
+	.grp_b3ds = PAD_CTL_DSE_40ohm,
+	.grp_b4ds = PAD_CTL_DSE_40ohm,
+	.grp_b5ds = PAD_CTL_DSE_40ohm,
+	.grp_b6ds = PAD_CTL_DSE_40ohm,
+	.grp_b7ds = PAD_CTL_DSE_40ohm,
+};
+
+struct mx6_ddr_sysinfo sysinfo = {
+	.dsize = 2,         /* width of data bus: 2=64 */
+	.cs_density = 32,   /* full range so that get_mem_size() works, 32Gb per CS */
+	.ncs = 1,
+	.cs1_mirror = 0,
+	.rtt_wr = 2,        /* Dynamic ODT, RZQ/2 */
+	.rtt_nom = 0,       /* Disabled */
+	.walat = 0,         /* Write additional latency */
+	.ralat = 5,         /* Read additional latency */
+	.mif3_mode = 3,     /* Command prediction working mode */
+	.bi_on = 1,         /* Bank interleaving enabled */
+	.sde_to_rst = 0x10, /* 14 cycles, 200us (JEDEC default) */
+	.rst_to_cke = 0x23, /* 33 cycles, 500us (JEDEC default) */
+	.pd_fast_exit = 1,  /* enable precharge power-down fast exit */
+	.ddr_type = DDR_TYPE_DDR3,
+	.refsel = 1,        /* Refresh cycles at 32KHz */
+	.refr = 3,          /* 4 refresh commands per refresh cycle */
+};
+
+static const struct mx6_mmdc_calibration mx6_mmdc_calib = {
+	.p0_mpwldectrl0 = 0x0009000E,
+	.p0_mpwldectrl1 = 0x0018000B,
+	.p1_mpwldectrl0 = 0x00060015,
+	.p1_mpwldectrl1 = 0x0006000E,
+	.p0_mpdgctrl0 = 0x432A0338,
+	.p0_mpdgctrl1 = 0x03260324,
+	.p1_mpdgctrl0 = 0x43340344,
+	.p1_mpdgctrl1 = 0x031E027C,
+	.p0_mprddlctl = 0x33272D2E,
+	.p1_mprddlctl = 0x2F312B37,
+	.p0_mpwrdlctl = 0x3A35433C,
+	.p1_mpwrdlctl = 0x4336453F,
+};
+
+static const struct mx6_ddr3_cfg ddr3_cfg = {
+	.mem_speed = 1066,
+	.density = 2,
+	.width = 16,
+	.banks = 8,
+	.rowaddr = 14,
+	.coladdr = 10,
+	.pagesz = 2,
+	.trcd = 1312,
+	.trcmin = 4812,
+	.trasmin = 3500,
+	.SRT = 0,
+};
+
+struct mx6_ddr_sysinfo sysinfo_it = {
+	.dsize = 2,         /* width of data bus: 2=64 */
+	.cs_density = 32,   /* full range so that get_mem_size() works, 32Gb per CS */
+	.ncs = 1,
+	.cs1_mirror = 0,
+	.rtt_wr = 1,        /* Dynamic ODT, RZQ/4 */
+	.rtt_nom = 1,       /* RZQ/4 */
+	.walat = 0,         /* Write additional latency */
+	.ralat = 5,         /* Read additional latency */
+	.mif3_mode = 3,     /* Command prediction working mode */
+	.bi_on = 1,         /* Bank interleaving enabled */
+	.sde_to_rst = 0x10, /* 14 cycles, 200us (JEDEC default) */
+	.rst_to_cke = 0x23, /* 33 cycles, 500us (JEDEC default) */
+	.pd_fast_exit = 1,  /* enable precharge power-down fast exit */
+	.ddr_type = DDR_TYPE_DDR3,
+	.refsel = 1,        /* Refresh cycles at 32KHz */
+	.refr = 7,          /* 8 refresh commands per refresh cycle */
+};
+
+static const struct mx6_mmdc_calibration mx6_mmdc_calib_it = {
+	.p0_mpwldectrl0 = 0x0009000E,
+	.p0_mpwldectrl1 = 0x0018000B,
+	.p1_mpwldectrl0 = 0x00060015,
+	.p1_mpwldectrl1 = 0x0006000E,
+	.p0_mpdgctrl0 = 0x03300338,
+	.p0_mpdgctrl1 = 0x03240324,
+	.p1_mpdgctrl0 = 0x03440350,
+	.p1_mpdgctrl1 = 0x032C0308,
+	.p0_mprddlctl = 0x40363C3E,
+	.p1_mprddlctl = 0x3C3E3C46,
+	.p0_mpwrdlctl = 0x403E463E,
+	.p1_mpwrdlctl = 0x4A384C46,
+};
+
+static const struct mx6_ddr3_cfg ddr3_cfg_it = {
+	.mem_speed = 1066,
+	.density = 4,
+	.width = 16,
+	.banks = 8,
+	.rowaddr = 15,
+	.coladdr = 10,
+	.pagesz = 2,
+	.trcd = 1312,
+	.trcmin = 4812,
+	.trasmin = 3500,
+	.SRT = 1,
+};
+
+/* Perform DDR DRAM calibration */
+static void spl_dram_perform_cal(const struct mx6_ddr_sysinfo *ddr_sysinfo)
+{
+#ifdef CONFIG_MX6_DDRCAL
+	int err;
+
+	err = mmdc_do_write_level_calibration(ddr_sysinfo);
+	if (err)
+		printf("error %d from write level calibration\n", err);
+	err = mmdc_do_dqs_calibration(ddr_sysinfo);
+	if (err)
+		printf("error %d from dqs calibration\n", err);
+#endif
 }
 
 static void spl_dram_init(void)
 {
-	int minc, maxc;
+	bool temp_grade_it;
 
-	switch (get_cpu_temp_grade(&minc, &maxc)) {
+	switch (get_cpu_temp_grade(NULL, NULL)) {
 	case TEMP_COMMERCIAL:
 	case TEMP_EXTCOMMERCIAL:
 		puts("Commercial temperature grade DDR3 timings.\n");
-		ddr_init(mx6_com_dcd_table, ARRAY_SIZE(mx6_com_dcd_table));
+		temp_grade_it = false;
 		break;
 	case TEMP_INDUSTRIAL:
 	case TEMP_AUTOMOTIVE:
 	default:
 		puts("Industrial temperature grade DDR3 timings.\n");
-		ddr_init(mx6_it_dcd_table, ARRAY_SIZE(mx6_it_dcd_table));
+		temp_grade_it = true;
 		break;
 	};
+
+	mx6dq_dram_iocfg(64, &mx6_ddr_ioregs, &mx6_grp_ioregs);
+
+	if (temp_grade_it)
+		mx6_dram_cfg(&sysinfo_it, &mx6_mmdc_calib_it, &ddr3_cfg_it);
+	else
+		mx6_dram_cfg(&sysinfo, &mx6_mmdc_calib, &ddr3_cfg);
+
 	udelay(100);
+
+	if (temp_grade_it)
+		spl_dram_perform_cal(&sysinfo_it);
+	else
+		spl_dram_perform_cal(&sysinfo);
 }
 
 void board_init_f(ulong dummy)
@@ -1114,10 +1056,8 @@ void board_init_f(ulong dummy)
 	/* UART clocks enabled and gd valid - init serial console */
 	preloader_console_init();
 
-#ifndef CONFIG_TDX_APALIS_IMX6_V1_0
 	/* Make sure we use dte mode */
 	setup_dtemode_uart();
-#endif
 
 	/* DDR initialization */
 	spl_dram_init();
@@ -1139,11 +1079,11 @@ int board_fit_config_name_match(const char *name)
 }
 #endif
 
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 }
 
-#endif /* CONFIG_SPL_BUILD */
+#endif /* CONFIG_XPL_BUILD */
 
 static struct mxc_serial_plat mxc_serial_plat = {
 	.reg = (struct mxc_uart *)UART1_BASE,

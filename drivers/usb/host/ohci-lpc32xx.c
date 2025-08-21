@@ -7,7 +7,6 @@
  * Copyright (c) 2015 Tyco Fire Protection Products.
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <init.h>
@@ -69,7 +68,7 @@ struct otg_regs {
 #define OTG1_DM_PULLDOWN		(1 << 3)
 #define OTG1_VBUS_DRV			(1 << 5)
 
-#define ISP1301_I2C_ADDR		CONFIG_USB_ISP1301_I2C_ADDR
+#define ISP1301_I2C_ADDR		CFG_USB_ISP1301_I2C_ADDR
 
 #define ISP1301_I2C_MODE_CONTROL_1_SET		0x04
 #define ISP1301_I2C_MODE_CONTROL_1_CLR		0x05
@@ -95,10 +94,6 @@ static int isp1301_set_value(struct udevice *dev, int reg, u8 value)
 
 static void isp1301_configure(struct udevice *dev)
 {
-#if !CONFIG_IS_ENABLED(DM_I2C)
-	i2c_set_bus_num(I2C_2);
-#endif
-
 	/*
 	 * LPC32XX only supports DAT_SE0 USB mode
 	 * This sequence is important

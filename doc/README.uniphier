@@ -104,7 +104,7 @@ U-Boot serves as a non-secure boot loader loaded by [ARM Trusted Firmware],
 so you need to provide the `u-boot.bin` to the build command of ARM Trusted
 Firmware.
 
-[ARM Trusted Firmware]: https://github.com/ARM-software/arm-trusted-firmware
+[ARM Trusted Firmware]: https://github.com/TrustedFirmware-A/trusted-firmware-a
 
 
 Verified Boot
@@ -336,7 +336,7 @@ Deployment for Distro Boot
 --------------------------
 
 UniPhier SoC family boot the kernel in a generic manner as described in
-doc/README.distro .
+doc/develop/distro.rst.
 
 To boot the kernel, you need to deploy necesssary components to a file
 system on one of your block devices (eMMC, NAND, USB drive, etc.).

@@ -4,9 +4,10 @@
  * Kamil Lulko, <kamil.lulko@gmail.com>
  */
 
-#include <common.h>
+#include <stdio.h>
 #include <cpu_func.h>
 #include <irq_func.h>
+#include <vsprintf.h>
 
 /*
  * Upon exception entry ARMv7-M processors automatically save stack
@@ -59,7 +60,7 @@ void dump_regs(struct autosave_regs *regs)
 void bad_mode(void)
 {
 	panic("Resetting CPU ...\n");
-	reset_cpu(0);
+	reset_cpu();
 }
 
 void do_hard_fault(struct autosave_regs *autosave_regs)

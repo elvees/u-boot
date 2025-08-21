@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0
 /**
- * ufs-uclass.c - Universal Flash Subsystem (UFS) Uclass driver
+ * ufs-uclass.c - Universal Flash Storage (UFS) Uclass driver
  *
- * Copyright (C) 2019 Texas Instruments Incorporated - http://www.ti.com
+ * Copyright (C) 2019 Texas Instruments Incorporated - https://www.ti.com
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_UFS
+
 #include "ufs.h"
 #include <dm.h>
 

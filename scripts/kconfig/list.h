@@ -20,11 +20,9 @@
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
 	(type *)( (char *)__mptr - offsetof(type,member) );})
 
-
 struct list_head {
 	struct list_head *next, *prev;
 };
-
 
 #define LIST_HEAD_INIT(name) { &(name), &(name) }
 
@@ -48,7 +46,7 @@ struct list_head {
  */
 #define list_for_each_entry(pos, head, member)				\
 	for (pos = list_entry((head)->next, typeof(*pos), member);	\
-	     &pos->member != (head); 	\
+	     &pos->member != (head);	\
 	     pos = list_entry(pos->member.next, typeof(*pos), member))
 
 /**

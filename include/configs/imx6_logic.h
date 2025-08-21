@@ -8,35 +8,25 @@
 #ifndef __IMX6LOGIC_CONFIG_H
 #define __IMX6LOGIC_CONFIG_H
 
-#define CONFIG_MXC_UART_BASE   UART1_BASE
+#define CFG_MXC_UART_BASE   UART1_BASE
 #define CONSOLE_DEV            "ttymxc0"
-
-#ifdef CONFIG_SPL
-#include "imx6_spl.h"
-#endif
 
 #include "mx6_common.h"
 
-/* Size of malloc() pool */
-#define CONFIG_SYS_MALLOC_LEN          (10 * SZ_1M)
-
 /* MMC Configs */
-#define CONFIG_SYS_FSL_ESDHC_ADDR      0
-#define CONFIG_SYS_FSL_USDHC_NUM       2
-
+#define CFG_SYS_FSL_ESDHC_ADDR      0
+#define CFG_SYS_FSL_USDHC_NUM       2
 
 /* Ethernet Configs */
-#define CONFIG_FEC_XCV_TYPE            RMII
-#define CONFIG_ETHPRIME                "FEC"
-#define CONFIG_FEC_MXC_PHYADDR         0
+#define CFG_FEC_MXC_PHYADDR         0
 
-#define CONFIG_EXTRA_ENV_SETTINGS \
+#define CFG_EXTRA_ENV_SETTINGS \
 	"script=boot.scr\0" \
 	"image=zImage\0" \
 	"bootm_size=0x10000000\0" \
 	"fdt_addr_r=0x14000000\0" \
 	"ramdisk_addr_r=0x14080000\0" \
-	"kernel_addr_r=" __stringify(CONFIG_LOADADDR) "\0" \
+	"kernel_addr_r=" __stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
 	"ramdisk_file=rootfs.cpio.uboot\0" \
 	"boot_fdt=try\0" \
 	"ip_dyn=yes\0" \
@@ -111,56 +101,21 @@
 		"fi; " \
 	"fi; " \
 	"else run netboot; fi"
-#define CONFIG_BOOTCOMMAND \
-	"run autoboot"
-
-#define CONFIG_ARP_TIMEOUT     200UL
 
 /* Physical Memory Map */
 #define PHYS_SDRAM                     MMDC0_ARB_BASE_ADDR
-#define CONFIG_SYS_SDRAM_BASE          PHYS_SDRAM
-#define CONFIG_SYS_INIT_RAM_ADDR       IRAM_BASE_ADDR
-#define CONFIG_SYS_INIT_RAM_SIZE       IRAM_SIZE
-
-#define CONFIG_SYS_INIT_SP_OFFSET \
-	(CONFIG_SYS_INIT_RAM_SIZE - GENERATED_GBL_DATA_SIZE)
-#define CONFIG_SYS_INIT_SP_ADDR \
-	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
+#define CFG_SYS_SDRAM_BASE          PHYS_SDRAM
+#define CFG_SYS_INIT_RAM_ADDR       IRAM_BASE_ADDR
+#define CFG_SYS_INIT_RAM_SIZE       IRAM_SIZE
 
 /* Environment organization */
 
 /* NAND stuff */
-#define CONFIG_SYS_MAX_NAND_DEVICE     1
-#define CONFIG_SYS_NAND_BASE           0x40000000
-#define CONFIG_SYS_NAND_5_ADDR_CYCLE
-#define CONFIG_SYS_NAND_ONFI_DETECTION
-#define CONFIG_SYS_NAND_U_BOOT_START	CONFIG_SYS_TEXT_BASE
-#define CONFIG_SYS_NAND_U_BOOT_OFFS	0x200000
-#define CONFIG_SYS_NAND_SPL_KERNEL_OFFS 0x00500000
-
-/* MTD device */
-
-/* DMA stuff, needed for GPMI/MXS NAND support */
-
-/* EEPROM  contains serial no, MAC addr and other Logic PD info */
-#define CONFIG_I2C_EEPROM
-
-/* USB Configs */
-#ifdef CONFIG_CMD_USB
-#define CONFIG_EHCI_HCD_INIT_AFTER_RESET
-#define CONFIG_MXC_USB_PORTSC		(PORT_PTS_UTMI | PORT_PTS_PTW)
-#define CONFIG_MXC_USB_FLAGS		0
-#define CONFIG_USB_MAX_CONTROLLER_COUNT	1 /* Enabled USB controller number */
-#endif
+#define CFG_SYS_NAND_BASE           0x40000000
+#define CFG_SYS_NAND_U_BOOT_START	CONFIG_TEXT_BASE
 
 /* Falcon Mode */
-#define CONFIG_SPL_FS_LOAD_ARGS_NAME	"args"
-#define CONFIG_SPL_FS_LOAD_KERNEL_NAME	"uImage"
-#define CONFIG_SYS_SPL_ARGS_ADDR       0x18000000
 
 /* Falcon Mode - MMC support: args@1MB kernel@2MB */
-#define CONFIG_SYS_MMCSD_RAW_MODE_ARGS_SECTOR  0x800   /* 1MB */
-#define CONFIG_SYS_MMCSD_RAW_MODE_ARGS_SECTORS (CONFIG_CMD_SPL_WRITE_SIZE / 512)
-#define CONFIG_SYS_MMCSD_RAW_MODE_KERNEL_SECTOR        0x1000  /* 2MB */
 
 #endif                         /* __IMX6LOGIC_CONFIG_H */

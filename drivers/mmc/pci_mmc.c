@@ -4,7 +4,6 @@
  * Copyright (C) 2014, Bin Meng <bmeng.cn@gmail.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
@@ -50,9 +49,10 @@ static int pci_mmc_probe(struct udevice *dev)
 	desc = mmc_get_blk_desc(&plat->mmc);
 	desc->removable = !(plat->cfg.host_caps & MMC_CAP_NONREMOVABLE);
 
-	host->ioaddr = (void *)dm_pci_map_bar(dev, PCI_BASE_ADDRESS_0,
-					      PCI_REGION_MEM);
+	host->ioaddr = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_0, 0, 0,
+				      PCI_REGION_TYPE, PCI_REGION_MEM);
 	host->name = dev->name;
+	host->cd_gpio = priv->cd_gpio;
 	host->mmc = &plat->mmc;
 	host->mmc->dev = dev;
 	ret = sdhci_setup_cfg(&plat->cfg, host, 0, 0);
@@ -68,8 +68,11 @@ static int pci_mmc_of_to_plat(struct udevice *dev)
 {
 	if (CONFIG_IS_ENABLED(DM_GPIO)) {
 		struct pci_mmc_priv *priv = dev_get_priv(dev);
+		int ret;
 
-		gpio_request_by_name(dev, "cd-gpios", 0, &priv->cd_gpio, GPIOD_IS_IN);
+		ret = gpio_request_by_name(dev, "cd-gpios", 0, &priv->cd_gpio,
+					   GPIOD_IS_IN);
+		log_debug("cd-gpio %s done, ret=%d\n", dev->name, ret);
 	}
 
 	return 0;
@@ -82,6 +85,7 @@ static int pci_mmc_bind(struct udevice *dev)
 	return sdhci_bind(dev, &plat->mmc, &plat->cfg);
 }
 
+__maybe_unused
 static int pci_mmc_acpi_fill_ssdt(const struct udevice *dev,
 				  struct acpi_ctx *ctx)
 {
@@ -134,7 +138,9 @@ static int pci_mmc_acpi_fill_ssdt(const struct udevice *dev,
 }
 
 struct acpi_ops pci_mmc_acpi_ops = {
+#ifdef CONFIG_ACPIGEN
 	.fill_ssdt	= pci_mmc_acpi_fill_ssdt,
+#endif
 };
 
 static const struct udevice_id pci_mmc_match[] = {

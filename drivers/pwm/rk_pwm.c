@@ -4,7 +4,6 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
 #include <clk.h>
 #include <div64.h>
 #include <dm.h>
@@ -30,7 +29,7 @@ struct rockchip_pwm_data {
 };
 
 struct rk_pwm_priv {
-	fdt_addr_t base;
+	uintptr_t base;
 	ulong freq;
 	u32 conf_polarity;
 	const struct rockchip_pwm_data *data;
@@ -147,7 +146,7 @@ static int rk_pwm_probe(struct udevice *dev)
 	priv->data = (struct rockchip_pwm_data *)dev_get_driver_data(dev);
 
 	if (priv->data->supports_polarity)
-		priv->conf_polarity = PWM_DUTY_POSTIVE | PWM_INACTIVE_POSTIVE;
+		priv->conf_polarity = PWM_DUTY_POSTIVE | PWM_INACTIVE_NEGATIVE;
 
 	return 0;
 }

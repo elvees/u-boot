@@ -3,7 +3,6 @@
  * Copyright (C) 2016 Marek Vasut <marex@denx.de>
  */
 
-#include <common.h>
 #include <clock_legacy.h>
 #include <command.h>
 #include <hang.h>
@@ -328,8 +327,8 @@ int do_ar934x_showclk(struct cmd_tbl *cmdtp, int flag, int argc,
 {
 	ar934x_update_clock();
 	printf("CPU:       %8ld MHz\n", gd->cpu_clk / 1000000);
-	printf("Memory:    %8ld MHz\n", gd->mem_clk / 1000000);
-	printf("AHB:       %8ld MHz\n", gd->bus_clk / 1000000);
+	printf("Memory:    %8d MHz\n", gd->mem_clk / 1000000);
+	printf("AHB:       %8d MHz\n", gd->bus_clk / 1000000);
 	return 0;
 }
 

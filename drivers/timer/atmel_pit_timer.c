@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2017 Microchip Corporation
- * 		      Wenyou.Yang <wenyou.yang@microchip.com>
+ *		      Wenyou.Yang <wenyou.yang@microchip.com>
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <timer.h>

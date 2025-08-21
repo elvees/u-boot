@@ -4,15 +4,16 @@
  *
  */
 
-#include <common.h>
-#include <hang.h>
-#include <wait_bit.h>
+#include <asm/arch/clock_manager.h>
+#include <asm/arch/mailbox_s10.h>
+#include <asm/arch/smc_api.h>
+#include <asm/arch/system_manager.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
-#include <asm/arch/mailbox_s10.h>
-#include <asm/arch/system_manager.h>
 #include <asm/secure.h>
 #include <asm/system.h>
+#include <hang.h>
+#include <wait_bit.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -88,6 +89,8 @@ static __always_inline int mbox_write_cmd_buffer(u32 *cin, u32 data,
 			MBOX_WRITE_CMD_BUF(data, (*cin)++);
 			*cin %= MBOX_CMD_BUFFER_SIZE;
 			MBOX_WRITEL(*cin, MBOX_CIN);
+			if (is_cmdbuf_overflow)
+				*is_cmdbuf_overflow = 0;
 			break;
 		}
 		timeout--;
@@ -95,10 +98,6 @@ static __always_inline int mbox_write_cmd_buffer(u32 *cin, u32 data,
 
 	if (!timeout)
 		return -ETIMEDOUT;
-
-	/* Wait for the SDM to drain the FIFO command buffer */
-	if (is_cmdbuf_overflow && *is_cmdbuf_overflow)
-		return mbox_wait_for_cmdbuf_empty(*cin);
 
 	return 0;
 }
@@ -125,13 +124,11 @@ static __always_inline int mbox_fill_cmd_circular_buff(u32 header, u32 len,
 			return ret;
 	}
 
-	/* If SDM doorbell is not triggered after the last data is
-	 * written into mailbox FIFO command buffer, trigger the
-	 * SDM doorbell again to ensure SDM able to read the remaining
-	 * data.
+	/*
+	 * Always trigger the SDM doorbell at the end to ensure SDM able to read
+	 * the remaining data.
 	 */
-	if (!is_cmdbuf_overflow)
-		MBOX_WRITEL(1, MBOX_DOORBELL_TO_SDM);
+	MBOX_WRITEL(1, MBOX_DOORBELL_TO_SDM);
 
 	return 0;
 }
@@ -384,10 +381,10 @@ int mbox_qspi_open(void)
 	if (ret)
 		goto error;
 
-	/* We are getting QSPI ref clock and set into sysmgr boot register */
-	printf("QSPI: Reference clock at %d Hz\n", resp_buf[0]);
-	writel(resp_buf[0],
-	       socfpga_get_sysmgr_addr() + SYSMGR_SOC64_BOOT_SCRATCH_COLD0);
+	/* Store QSPI controller ref clock frequency */
+	ret = cm_set_qspi_controller_clk_hz(resp_buf[0]);
+	if (ret)
+		goto error;
 
 	return 0;
 
@@ -400,7 +397,7 @@ error:
 
 int mbox_reset_cold(void)
 {
-#if !defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_ATF)
+#if !defined(CONFIG_XPL_BUILD) && defined(CONFIG_SPL_ATF)
 	psci_system_reset();
 #else
 	int ret;
@@ -476,6 +473,17 @@ int __secure mbox_send_cmd_psci(u8 id, u32 cmd, u8 is_indirect, u32 len,
 {
 	return mbox_send_cmd_common_retry(id, cmd, is_indirect, len, arg,
 					  urgent, resp_buf_len, resp_buf);
+}
+
+int mbox_hps_stage_notify(u32 execution_stage)
+{
+#if !defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_ATF)
+	return smc_send_mailbox(MBOX_HPS_STAGE_NOTIFY, 1, &execution_stage,
+				0, 0, NULL);
+#else
+	return mbox_send_cmd(MBOX_ID_UBOOT, MBOX_HPS_STAGE_NOTIFY,
+			     MBOX_CMD_DIRECT, 1, &execution_stage, 0, 0, NULL);
+#endif
 }
 
 int mbox_send_cmd_only(u8 id, u32 cmd, u8 is_indirect, u32 len, u32 *arg)

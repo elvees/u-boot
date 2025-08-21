@@ -4,7 +4,7 @@
  *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
  */
 
-#include <common.h>
+#include <errno.h>
 #include <linux/libfdt.h>
 #include <asm/spin_table.h>
 

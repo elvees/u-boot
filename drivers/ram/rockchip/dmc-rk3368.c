@@ -3,7 +3,7 @@
  * (C) Copyright 2017 Theobroma Systems Design und Consulting GmbH
  */
 
-#include <common.h>
+#include <config.h>
 #include <clk.h>
 #include <dm.h>
 #include <hang.h>
@@ -13,16 +13,17 @@
 #include <ram.h>
 #include <regmap.h>
 #include <syscon.h>
-#include <asm/io.h>
 #include <asm/arch-rockchip/clock.h>
 #include <asm/arch-rockchip/cru_rk3368.h>
 #include <asm/arch-rockchip/grf_rk3368.h>
+#include <asm/arch-rockchip/hardware.h>
 #include <asm/arch-rockchip/ddr_rk3368.h>
 #include <asm/arch-rockchip/sdram.h>
 #include <asm/arch-rockchip/sdram_rk3288.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/err.h>
+#include <linux/printk.h>
 
 struct dram_info {
 	struct ram_info info;
@@ -109,7 +110,7 @@ enum {
 	PCTL_STAT_MSK = 7,
 	INIT_MEM = 0,
 	CONFIG,
-	CONFIG_REQ,
+	CFG_REQ,
 	ACCESS,
 	ACCESS_REQ,
 	LOW_POWER,
@@ -136,7 +137,6 @@ enum {
 	((0 << 9) | (1 << 6) | (0 << 2))
 #define DDR3_MR2_TWL(n) \
 	(((n - 5) & 0x7) << 3)
-
 
 #ifdef CONFIG_TPL_BUILD
 
@@ -523,7 +523,6 @@ static int pctl_calc_timings(struct rk3368_sdram_params *params,
 	pctl_timing->tckesr = pctl_timing->tcke + 1;  /* JESD-79: tCKE + 1tCK */
 	pctl_timing->tdpd = 0;    /* RK3368 TRM: "allowed values for DDR3: 0" */
 
-
 	/*
 	 * The controller can represent tFAW as 4x, 5x or 6x tRRD only.
 	 * We want to use the smallest multiplier that satisfies the tFAW
@@ -617,12 +616,12 @@ static int sdram_col_row_detect(struct udevice *dev)
 
 	/* Detect col */
 	for (col = 11; col >= 9; col--) {
-		writel(0, CONFIG_SYS_SDRAM_BASE);
-		addr = CONFIG_SYS_SDRAM_BASE +
+		writel(0, CFG_SYS_SDRAM_BASE);
+		addr = CFG_SYS_SDRAM_BASE +
 			(1 << (col + params->chan.bw - 1));
 		writel(test_pattern, addr);
 		if ((readl(addr) == test_pattern) &&
-		    (readl(CONFIG_SYS_SDRAM_BASE) == 0))
+		    (readl(CFG_SYS_SDRAM_BASE) == 0))
 			break;
 	}
 
@@ -637,11 +636,11 @@ static int sdram_col_row_detect(struct udevice *dev)
 
 	/* Detect row*/
 	for (row = 16; row >= 12; row--) {
-		writel(0, CONFIG_SYS_SDRAM_BASE);
-		addr = CONFIG_SYS_SDRAM_BASE + (1 << (row + 15 - 1));
+		writel(0, CFG_SYS_SDRAM_BASE);
+		addr = CFG_SYS_SDRAM_BASE + (1 << (row + 15 - 1));
 		writel(test_pattern, addr);
 		if ((readl(addr) == test_pattern) &&
-		    (readl(CONFIG_SYS_SDRAM_BASE) == 0))
+		    (readl(CFG_SYS_SDRAM_BASE) == 0))
 			break;
 	}
 
@@ -883,13 +882,13 @@ static int rk3368_dmc_of_to_plat(struct udevice *dev)
 {
 	int ret = 0;
 
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
-	struct rk3368_sdram_params *plat = dev_get_plat(dev);
+	if (CONFIG_IS_ENABLED(OF_REAL)) {
+		struct rk3368_sdram_params *plat = dev_get_plat(dev);
 
-	ret = regmap_init_mem(dev_ofnode(dev), &plat->map);
-	if (ret)
-		return ret;
-#endif
+		ret = regmap_init_mem(dev_ofnode(dev), &plat->map);
+		if (ret)
+			return ret;
+	}
 
 	return ret;
 }
@@ -985,7 +984,6 @@ static int rk3368_dmc_get_info(struct udevice *dev, struct ram_info *info)
 static struct ram_ops rk3368_dmc_ops = {
 	.get_info = rk3368_dmc_get_info,
 };
-
 
 static const struct udevice_id rk3368_dmc_ids[] = {
 	{ .compatible = "rockchip,rk3368-dmc" },

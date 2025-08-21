@@ -7,7 +7,6 @@
  * Author: Eric Nelson <eric@nelint.com>
  */
 
-#include <common.h>
 #include <init.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/global_data.h>
@@ -30,4 +29,3 @@ int dram_init(void)
 	gd->ram_size = imx_ddr_size();
 	return 0;
 }
-

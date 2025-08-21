@@ -3,7 +3,6 @@
  * Copyright 2012 Freescale Semiconductor, Inc.
  */
 
-#include <common.h>
 #include <log.h>
 #include <asm/fsl_serdes.h>
 #include <asm/immap_85xx.h>
@@ -21,10 +20,10 @@ static u8 serdes1_prtcl_map[SERDES_PRCTL_COUNT];
 #ifdef CONFIG_SYS_FSL_SRDS_2
 static u8 serdes2_prtcl_map[SERDES_PRCTL_COUNT];
 #endif
-#ifdef CONFIG_SYS_FSL_SRDS_3
+#ifdef CFG_SYS_FSL_SRDS_3
 static u8 serdes3_prtcl_map[SERDES_PRCTL_COUNT];
 #endif
-#ifdef CONFIG_SYS_FSL_SRDS_4
+#ifdef CFG_SYS_FSL_SRDS_4
 static u8 serdes4_prtcl_map[SERDES_PRCTL_COUNT];
 #endif
 
@@ -104,13 +103,13 @@ int is_serdes_configured(enum srds_prtcl device)
 
 	ret |= serdes2_prtcl_map[device];
 #endif
-#ifdef CONFIG_SYS_FSL_SRDS_3
+#ifdef CFG_SYS_FSL_SRDS_3
 	if (!serdes3_prtcl_map[NONE])
 		fsl_serdes_init();
 
 	ret |= serdes3_prtcl_map[device];
 #endif
-#ifdef CONFIG_SYS_FSL_SRDS_4
+#ifdef CFG_SYS_FSL_SRDS_4
 	if (!serdes4_prtcl_map[NONE])
 		fsl_serdes_init();
 
@@ -122,7 +121,7 @@ int is_serdes_configured(enum srds_prtcl device)
 
 int serdes_get_first_lane(u32 sd, enum srds_prtcl device)
 {
-	const ccsr_gur_t *gur = (void __iomem *)(CONFIG_SYS_MPC85xx_GUTS_ADDR);
+	const ccsr_gur_t *gur = (void __iomem *)(CFG_SYS_MPC85xx_GUTS_ADDR);
 	u32 cfg = in_be32(&gur->rcwsr[4]);
 	int i;
 
@@ -139,13 +138,13 @@ int serdes_get_first_lane(u32 sd, enum srds_prtcl device)
 		cfg >>= FSL_CORENET2_RCWSR4_SRDS2_PRTCL_SHIFT;
 		break;
 #endif
-#ifdef CONFIG_SYS_FSL_SRDS_3
+#ifdef CFG_SYS_FSL_SRDS_3
 	case FSL_SRDS_3:
 		cfg &= FSL_CORENET2_RCWSR4_SRDS3_PRTCL;
 		cfg >>= FSL_CORENET2_RCWSR4_SRDS3_PRTCL_SHIFT;
 		break;
 #endif
-#ifdef CONFIG_SYS_FSL_SRDS_4
+#ifdef CFG_SYS_FSL_SRDS_4
 	case FSL_SRDS_4:
 		cfg &= FSL_CORENET2_RCWSR4_SRDS4_PRTCL;
 		cfg >>= FSL_CORENET2_RCWSR4_SRDS4_PRTCL_SHIFT;
@@ -193,7 +192,7 @@ int serdes_get_first_lane(u32 sd, enum srds_prtcl device)
 void serdes_init(u32 sd, u32 sd_addr, u32 sd_prctl_mask, u32 sd_prctl_shift,
 		u8 serdes_prtcl_map[SERDES_PRCTL_COUNT])
 {
-	ccsr_gur_t *gur = (void __iomem *)(CONFIG_SYS_MPC85xx_GUTS_ADDR);
+	ccsr_gur_t *gur = (void __iomem *)(CFG_SYS_MPC85xx_GUTS_ADDR);
 	u32 cfg;
 	int lane;
 
@@ -203,7 +202,7 @@ void serdes_init(u32 sd, u32 sd_addr, u32 sd_prctl_mask, u32 sd_prctl_shift,
 	memset(serdes_prtcl_map, 0, sizeof(u8) * SERDES_PRCTL_COUNT);
 #ifdef CONFIG_SYS_FSL_ERRATUM_A007186
 	struct ccsr_sfp_regs  __iomem *sfp_regs =
-			(struct ccsr_sfp_regs __iomem *)(CONFIG_SYS_SFP_ADDR);
+			(struct ccsr_sfp_regs __iomem *)(CFG_SYS_SFP_ADDR);
 	u32 pll_num, pll_status, bc, dc, fc, pll_cr_upd, pll_cr0, pll_cr1;
 	u32 bc_status, fc_status, dc_status, pll_sr2;
 	serdes_corenet_t  __iomem *srds_regs = (void *)sd_addr;
@@ -351,28 +350,28 @@ void fsl_serdes_init(void)
 
 #ifdef CONFIG_SYS_FSL_SRDS_1
 	serdes_init(FSL_SRDS_1,
-		    CONFIG_SYS_FSL_CORENET_SERDES_ADDR,
+		    CFG_SYS_FSL_CORENET_SERDES_ADDR,
 		    FSL_CORENET2_RCWSR4_SRDS1_PRTCL,
 		    FSL_CORENET2_RCWSR4_SRDS1_PRTCL_SHIFT,
 		    serdes1_prtcl_map);
 #endif
 #ifdef CONFIG_SYS_FSL_SRDS_2
 	serdes_init(FSL_SRDS_2,
-		    CONFIG_SYS_FSL_CORENET_SERDES_ADDR + FSL_SRDS_2 * 0x1000,
+		    CFG_SYS_FSL_CORENET_SERDES_ADDR + FSL_SRDS_2 * 0x1000,
 		    FSL_CORENET2_RCWSR4_SRDS2_PRTCL,
 		    FSL_CORENET2_RCWSR4_SRDS2_PRTCL_SHIFT,
 		    serdes2_prtcl_map);
 #endif
-#ifdef CONFIG_SYS_FSL_SRDS_3
+#ifdef CFG_SYS_FSL_SRDS_3
 	serdes_init(FSL_SRDS_3,
-		    CONFIG_SYS_FSL_CORENET_SERDES_ADDR + FSL_SRDS_3 * 0x1000,
+		    CFG_SYS_FSL_CORENET_SERDES_ADDR + FSL_SRDS_3 * 0x1000,
 		    FSL_CORENET2_RCWSR4_SRDS3_PRTCL,
 		    FSL_CORENET2_RCWSR4_SRDS3_PRTCL_SHIFT,
 		    serdes3_prtcl_map);
 #endif
-#ifdef CONFIG_SYS_FSL_SRDS_4
+#ifdef CFG_SYS_FSL_SRDS_4
 	serdes_init(FSL_SRDS_4,
-		    CONFIG_SYS_FSL_CORENET_SERDES_ADDR + FSL_SRDS_4 * 0x1000,
+		    CFG_SYS_FSL_CORENET_SERDES_ADDR + FSL_SRDS_4 * 0x1000,
 		    FSL_CORENET2_RCWSR4_SRDS4_PRTCL,
 		    FSL_CORENET2_RCWSR4_SRDS4_PRTCL_SHIFT,
 		    serdes4_prtcl_map);
@@ -392,11 +391,10 @@ const char *serdes_clock_to_string(u32 clock)
 	case SRDS_PLLCR0_RFCK_SEL_161_13:
 		return "161.1328123";
 	default:
-#if defined(CONFIG_TARGET_T4240QDS) || defined(CONFIG_TARGET_T4160QDS)
+#if defined(CONFIG_TARGET_T4240QDS)
 		return "???";
 #else
 		return "122.88";
 #endif
 	}
 }
-

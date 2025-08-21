@@ -5,13 +5,13 @@
  * Copyright (C) 2016 Google, Inc
  */
 
-#include <common.h>
 #include <bios_emul.h>
 #include <bootstage.h>
 #include <dm.h>
 #include <init.h>
 #include <log.h>
-#include <vbe.h>
+#include <time.h>
+#include <vesa.h>
 #include <video.h>
 #include <asm/cpu.h>
 #include <asm/global_data.h>
@@ -318,7 +318,6 @@ err:
 	debug("%s: ret=%d\n", __func__, ret);
 	return ret;
 };
-
 
 static unsigned long gtt_read(struct broadwell_igd_priv *priv,
 			      unsigned long reg)
@@ -681,7 +680,7 @@ static int broadwell_igd_probe(struct udevice *dev)
 	debug("%s: is_broadwell=%d\n", __func__, is_broadwell);
 	ret = igd_pre_init(dev, is_broadwell);
 	if (!ret) {
-		ret = vbe_setup_video(dev, broadwell_igd_int15_handler);
+		ret = vesa_setup_video(dev, broadwell_igd_int15_handler);
 		if (ret)
 			debug("failed to run video BIOS: %d\n", ret);
 	}
@@ -693,13 +692,9 @@ static int broadwell_igd_probe(struct udevice *dev)
 
 	/* Use write-combining for the graphics memory, 256MB */
 	fbbase = IS_ENABLED(CONFIG_VIDEO_COPY) ? plat->copy_base : plat->base;
-	ret = mtrr_add_request(MTRR_TYPE_WRCOMB, fbbase, 256 << 20);
-	if (!ret)
-		ret = mtrr_commit(true);
-	if (ret && ret != -ENOSYS) {
-		printf("Failed to add MTRR: Display will be slow (err %d)\n",
-		       ret);
-	}
+	ret = mtrr_set_next_var(MTRR_TYPE_WRCOMB, fbbase, 256 << 20);
+	if (ret)
+		printf("Failed to add MTRR: Display will be slow (err %d)\n", ret);
 
 	debug("fb=%lx, size %x, display size=%d %d %d\n", plat->base,
 	      plat->size, uc_priv->xsize, uc_priv->ysize, uc_priv->bpix);

@@ -49,7 +49,7 @@
 	gpio-keys {
 		compatible = "gpio-keys";
 		autorepeat;
-		K1 {
+		key {
 			label = "K1";
 			gpios = <&gpio0 0x32 0x1>;
 			linux,code = <0x66>;
@@ -64,7 +64,7 @@
 };
 
 &qspi {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 	status = "okay";
 };
 
@@ -78,17 +78,17 @@
 };
 
 &sdhci0 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 	status = "okay";
 };
 
 &uart0 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 	status = "okay";
 };
 
 &uart1 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 	status = "okay";
 };
 
@@ -112,7 +112,7 @@
 	};
 
 	accelerometer@53 {
-		compatible = "adi,adxl345", "adxl345", "adi,adxl34x", "adxl34x";
+		compatible = "adi,adxl345";
 		reg = <0x53>;
 		interrupt-parent = <&intc>;
 		interrupts = <0x0 0x1e 0x4>;

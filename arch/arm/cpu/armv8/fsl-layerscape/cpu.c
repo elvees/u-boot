@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2017-2020 NXP
+ * Copyright 2017-2021 NXP
  * Copyright 2014-2015 Freescale Semiconductor, Inc.
  */
 
-#include <common.h>
+#include <config.h>
+#include <clock_legacy.h>
 #include <cpu_func.h>
 #include <env.h>
-#include <fsl_ddr_sdram.h>
 #include <init.h>
 #include <hang.h>
+#include <lmb.h>
 #include <log.h>
 #include <net.h>
 #include <vsprintf.h>
@@ -17,6 +18,7 @@
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/ptrace.h>
+#include <linux/arm-smccc.h>
 #include <linux/errno.h>
 #include <asm/system.h>
 #include <fm_eth.h>
@@ -35,6 +37,7 @@
 #endif
 #include <asm/armv8/sec_firmware.h>
 #ifdef CONFIG_SYS_FSL_DDR
+#include <fsl_ddr_sdram.h>
 #include <fsl_ddr.h>
 #endif
 #include <asm/arch/clock.h>
@@ -48,6 +51,7 @@
 #endif
 #endif
 #include <linux/mii.h>
+#include <dm.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -88,38 +92,38 @@ static struct cpu_type cpu_type_list[] = {
 #define EARLY_PGTABLE_SIZE 0x5000
 static struct mm_region early_map[] = {
 #ifdef CONFIG_FSL_LSCH3
-	{ CONFIG_SYS_FSL_CCSR_BASE, CONFIG_SYS_FSL_CCSR_BASE,
-	  CONFIG_SYS_FSL_CCSR_SIZE,
+	{ CFG_SYS_FSL_CCSR_BASE, CFG_SYS_FSL_CCSR_BASE,
+	  CFG_SYS_FSL_CCSR_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_FSL_OCRAM_BASE, CONFIG_SYS_FSL_OCRAM_BASE,
+	{ CFG_SYS_FSL_OCRAM_BASE, CFG_SYS_FSL_OCRAM_BASE,
 	  SYS_FSL_OCRAM_SPACE_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_NORMAL) | PTE_BLOCK_NON_SHARE
 	},
-	{ CONFIG_SYS_FSL_QSPI_BASE1, CONFIG_SYS_FSL_QSPI_BASE1,
-	  CONFIG_SYS_FSL_QSPI_SIZE1,
+	{ CFG_SYS_FSL_QSPI_BASE1, CFG_SYS_FSL_QSPI_BASE1,
+	  CFG_SYS_FSL_QSPI_SIZE1,
 	  PTE_BLOCK_MEMTYPE(MT_NORMAL) | PTE_BLOCK_NON_SHARE},
 #ifdef CONFIG_FSL_IFC
 	/* For IFC Region #1, only the first 4MB is cache-enabled */
-	{ CONFIG_SYS_FSL_IFC_BASE1, CONFIG_SYS_FSL_IFC_BASE1,
-	  CONFIG_SYS_FSL_IFC_SIZE1_1,
+	{ CFG_SYS_FSL_IFC_BASE1, CFG_SYS_FSL_IFC_BASE1,
+	  CFG_SYS_FSL_IFC_SIZE1_1,
 	  PTE_BLOCK_MEMTYPE(MT_NORMAL) | PTE_BLOCK_NON_SHARE
 	},
-	{ CONFIG_SYS_FSL_IFC_BASE1 + CONFIG_SYS_FSL_IFC_SIZE1_1,
-	  CONFIG_SYS_FSL_IFC_BASE1 + CONFIG_SYS_FSL_IFC_SIZE1_1,
-	  CONFIG_SYS_FSL_IFC_SIZE1 - CONFIG_SYS_FSL_IFC_SIZE1_1,
+	{ CFG_SYS_FSL_IFC_BASE1 + CFG_SYS_FSL_IFC_SIZE1_1,
+	  CFG_SYS_FSL_IFC_BASE1 + CFG_SYS_FSL_IFC_SIZE1_1,
+	  CFG_SYS_FSL_IFC_SIZE1 - CFG_SYS_FSL_IFC_SIZE1_1,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) | PTE_BLOCK_NON_SHARE
 	},
-	{ CONFIG_SYS_FLASH_BASE, CONFIG_SYS_FSL_IFC_BASE1,
-	  CONFIG_SYS_FSL_IFC_SIZE1,
+	{ CFG_SYS_FLASH_BASE, CFG_SYS_FSL_IFC_BASE1,
+	  CFG_SYS_FSL_IFC_SIZE1,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) | PTE_BLOCK_NON_SHARE
 	},
 #endif
-	{ CONFIG_SYS_FSL_DRAM_BASE1, CONFIG_SYS_FSL_DRAM_BASE1,
-	  CONFIG_SYS_FSL_DRAM_SIZE1,
+	{ CFG_SYS_FSL_DRAM_BASE1, CFG_SYS_FSL_DRAM_BASE1,
+	  CFG_SYS_FSL_DRAM_SIZE1,
 #if defined(CONFIG_TFABOOT) || \
-	(defined(CONFIG_SPL) && !defined(CONFIG_SPL_BUILD))
+	(defined(CONFIG_SPL) && !defined(CONFIG_XPL_BUILD))
 	  PTE_BLOCK_MEMTYPE(MT_NORMAL) |
 #else	/* Start with nGnRnE and PXN and UXN to prevent speculative access */
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) | PTE_BLOCK_PXN | PTE_BLOCK_UXN |
@@ -127,66 +131,66 @@ static struct mm_region early_map[] = {
 	  PTE_BLOCK_OUTER_SHARE | PTE_BLOCK_NS
 	},
 #ifdef CONFIG_FSL_IFC
-	/* Map IFC region #2 up to CONFIG_SYS_FLASH_BASE for NAND boot */
-	{ CONFIG_SYS_FSL_IFC_BASE2, CONFIG_SYS_FSL_IFC_BASE2,
-	  CONFIG_SYS_FLASH_BASE - CONFIG_SYS_FSL_IFC_BASE2,
+	/* Map IFC region #2 up to CFG_SYS_FLASH_BASE for NAND boot */
+	{ CFG_SYS_FSL_IFC_BASE2, CFG_SYS_FSL_IFC_BASE2,
+	  CFG_SYS_FLASH_BASE - CFG_SYS_FSL_IFC_BASE2,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) | PTE_BLOCK_NON_SHARE
 	},
 #endif
-	{ CONFIG_SYS_FSL_DCSR_BASE, CONFIG_SYS_FSL_DCSR_BASE,
-	  CONFIG_SYS_FSL_DCSR_SIZE,
+	{ CFG_SYS_FSL_DCSR_BASE, CFG_SYS_FSL_DCSR_BASE,
+	  CFG_SYS_FSL_DCSR_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_FSL_DRAM_BASE2, CONFIG_SYS_FSL_DRAM_BASE2,
-	  CONFIG_SYS_FSL_DRAM_SIZE2,
+	{ CFG_SYS_FSL_DRAM_BASE2, CFG_SYS_FSL_DRAM_BASE2,
+	  CFG_SYS_FSL_DRAM_SIZE2,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) | PTE_BLOCK_PXN | PTE_BLOCK_UXN |
 	  PTE_BLOCK_OUTER_SHARE | PTE_BLOCK_NS
 	},
-#ifdef CONFIG_SYS_FSL_DRAM_BASE3
-	{ CONFIG_SYS_FSL_DRAM_BASE3, CONFIG_SYS_FSL_DRAM_BASE3,
-	  CONFIG_SYS_FSL_DRAM_SIZE3,
+#ifdef CFG_SYS_FSL_DRAM_BASE3
+	{ CFG_SYS_FSL_DRAM_BASE3, CFG_SYS_FSL_DRAM_BASE3,
+	  CFG_SYS_FSL_DRAM_SIZE3,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) | PTE_BLOCK_PXN | PTE_BLOCK_UXN |
 	  PTE_BLOCK_OUTER_SHARE | PTE_BLOCK_NS
 	},
 #endif
 #elif defined(CONFIG_FSL_LSCH2)
-	{ CONFIG_SYS_FSL_CCSR_BASE, CONFIG_SYS_FSL_CCSR_BASE,
-	  CONFIG_SYS_FSL_CCSR_SIZE,
+	{ CFG_SYS_FSL_CCSR_BASE, CFG_SYS_FSL_CCSR_BASE,
+	  CFG_SYS_FSL_CCSR_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_FSL_OCRAM_BASE, CONFIG_SYS_FSL_OCRAM_BASE,
+	{ CFG_SYS_FSL_OCRAM_BASE, CFG_SYS_FSL_OCRAM_BASE,
 	  SYS_FSL_OCRAM_SPACE_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_NORMAL) | PTE_BLOCK_NON_SHARE
 	},
-	{ CONFIG_SYS_FSL_DCSR_BASE, CONFIG_SYS_FSL_DCSR_BASE,
-	  CONFIG_SYS_FSL_DCSR_SIZE,
+	{ CFG_SYS_FSL_DCSR_BASE, CFG_SYS_FSL_DCSR_BASE,
+	  CFG_SYS_FSL_DCSR_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_FSL_QSPI_BASE, CONFIG_SYS_FSL_QSPI_BASE,
-	  CONFIG_SYS_FSL_QSPI_SIZE,
+	{ CFG_SYS_FSL_QSPI_BASE, CFG_SYS_FSL_QSPI_BASE,
+	  CFG_SYS_FSL_QSPI_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) | PTE_BLOCK_NON_SHARE
 	},
 #ifdef CONFIG_FSL_IFC
-	{ CONFIG_SYS_FSL_IFC_BASE, CONFIG_SYS_FSL_IFC_BASE,
-	  CONFIG_SYS_FSL_IFC_SIZE,
+	{ CFG_SYS_FSL_IFC_BASE, CFG_SYS_FSL_IFC_BASE,
+	  CFG_SYS_FSL_IFC_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) | PTE_BLOCK_NON_SHARE
 	},
 #endif
-	{ CONFIG_SYS_FSL_DRAM_BASE1, CONFIG_SYS_FSL_DRAM_BASE1,
-	  CONFIG_SYS_FSL_DRAM_SIZE1,
+	{ CFG_SYS_FSL_DRAM_BASE1, CFG_SYS_FSL_DRAM_BASE1,
+	  CFG_SYS_FSL_DRAM_SIZE1,
 #if defined(CONFIG_TFABOOT) || \
-	(defined(CONFIG_SPL) && !defined(CONFIG_SPL_BUILD))
+	(defined(CONFIG_SPL) && !defined(CONFIG_XPL_BUILD))
 	  PTE_BLOCK_MEMTYPE(MT_NORMAL) |
 #else	/* Start with nGnRnE and PXN and UXN to prevent speculative access */
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) | PTE_BLOCK_PXN | PTE_BLOCK_UXN |
 #endif
 	  PTE_BLOCK_OUTER_SHARE | PTE_BLOCK_NS
 	},
-	{ CONFIG_SYS_FSL_DRAM_BASE2, CONFIG_SYS_FSL_DRAM_BASE2,
-	  CONFIG_SYS_FSL_DRAM_SIZE2,
+	{ CFG_SYS_FSL_DRAM_BASE2, CFG_SYS_FSL_DRAM_BASE2,
+	  CFG_SYS_FSL_DRAM_SIZE2,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) | PTE_BLOCK_PXN | PTE_BLOCK_UXN |
 	  PTE_BLOCK_OUTER_SHARE | PTE_BLOCK_NS
 	},
@@ -196,84 +200,84 @@ static struct mm_region early_map[] = {
 
 static struct mm_region final_map[] = {
 #ifdef CONFIG_FSL_LSCH3
-	{ CONFIG_SYS_FSL_CCSR_BASE, CONFIG_SYS_FSL_CCSR_BASE,
-	  CONFIG_SYS_FSL_CCSR_SIZE,
+	{ CFG_SYS_FSL_CCSR_BASE, CFG_SYS_FSL_CCSR_BASE,
+	  CFG_SYS_FSL_CCSR_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_FSL_OCRAM_BASE, CONFIG_SYS_FSL_OCRAM_BASE,
+	{ CFG_SYS_FSL_OCRAM_BASE, CFG_SYS_FSL_OCRAM_BASE,
 	  SYS_FSL_OCRAM_SPACE_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_NORMAL) | PTE_BLOCK_NON_SHARE
 	},
-	{ CONFIG_SYS_FSL_DRAM_BASE1, CONFIG_SYS_FSL_DRAM_BASE1,
-	  CONFIG_SYS_FSL_DRAM_SIZE1,
+	{ CFG_SYS_FSL_DRAM_BASE1, CFG_SYS_FSL_DRAM_BASE1,
+	  CFG_SYS_FSL_DRAM_SIZE1,
 	  PTE_BLOCK_MEMTYPE(MT_NORMAL) |
 	  PTE_BLOCK_OUTER_SHARE | PTE_BLOCK_NS
 	},
-	{ CONFIG_SYS_FSL_QSPI_BASE1, CONFIG_SYS_FSL_QSPI_BASE1,
-	  CONFIG_SYS_FSL_QSPI_SIZE1,
+	{ CFG_SYS_FSL_QSPI_BASE1, CFG_SYS_FSL_QSPI_BASE1,
+	  CFG_SYS_FSL_QSPI_SIZE1,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_FSL_QSPI_BASE2, CONFIG_SYS_FSL_QSPI_BASE2,
-	  CONFIG_SYS_FSL_QSPI_SIZE2,
+	{ CFG_SYS_FSL_QSPI_BASE2, CFG_SYS_FSL_QSPI_BASE2,
+	  CFG_SYS_FSL_QSPI_SIZE2,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
 #ifdef CONFIG_FSL_IFC
-	{ CONFIG_SYS_FSL_IFC_BASE2, CONFIG_SYS_FSL_IFC_BASE2,
-	  CONFIG_SYS_FSL_IFC_SIZE2,
+	{ CFG_SYS_FSL_IFC_BASE2, CFG_SYS_FSL_IFC_BASE2,
+	  CFG_SYS_FSL_IFC_SIZE2,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
 #endif
-	{ CONFIG_SYS_FSL_DCSR_BASE, CONFIG_SYS_FSL_DCSR_BASE,
-	  CONFIG_SYS_FSL_DCSR_SIZE,
+	{ CFG_SYS_FSL_DCSR_BASE, CFG_SYS_FSL_DCSR_BASE,
+	  CFG_SYS_FSL_DCSR_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_FSL_MC_BASE, CONFIG_SYS_FSL_MC_BASE,
-	  CONFIG_SYS_FSL_MC_SIZE,
+	{ CFG_SYS_FSL_MC_BASE, CFG_SYS_FSL_MC_BASE,
+	  CFG_SYS_FSL_MC_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_FSL_NI_BASE, CONFIG_SYS_FSL_NI_BASE,
-	  CONFIG_SYS_FSL_NI_SIZE,
+	{ CFG_SYS_FSL_NI_BASE, CFG_SYS_FSL_NI_BASE,
+	  CFG_SYS_FSL_NI_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
 	/* For QBMAN portal, only the first 64MB is cache-enabled */
-	{ CONFIG_SYS_FSL_QBMAN_BASE, CONFIG_SYS_FSL_QBMAN_BASE,
-	  CONFIG_SYS_FSL_QBMAN_SIZE_1,
+	{ CFG_SYS_FSL_QBMAN_BASE, CFG_SYS_FSL_QBMAN_BASE,
+	  CFG_SYS_FSL_QBMAN_SIZE_1,
 	  PTE_BLOCK_MEMTYPE(MT_NORMAL) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN | PTE_BLOCK_NS
 	},
-	{ CONFIG_SYS_FSL_QBMAN_BASE + CONFIG_SYS_FSL_QBMAN_SIZE_1,
-	  CONFIG_SYS_FSL_QBMAN_BASE + CONFIG_SYS_FSL_QBMAN_SIZE_1,
-	  CONFIG_SYS_FSL_QBMAN_SIZE - CONFIG_SYS_FSL_QBMAN_SIZE_1,
+	{ CFG_SYS_FSL_QBMAN_BASE + CFG_SYS_FSL_QBMAN_SIZE_1,
+	  CFG_SYS_FSL_QBMAN_BASE + CFG_SYS_FSL_QBMAN_SIZE_1,
+	  CFG_SYS_FSL_QBMAN_SIZE - CFG_SYS_FSL_QBMAN_SIZE_1,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_PCIE1_PHYS_ADDR, CONFIG_SYS_PCIE1_PHYS_ADDR,
-	  CONFIG_SYS_PCIE1_PHYS_SIZE,
+	{ CFG_SYS_PCIE1_PHYS_ADDR, CFG_SYS_PCIE1_PHYS_ADDR,
+	  CFG_SYS_PCIE1_PHYS_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_PCIE2_PHYS_ADDR, CONFIG_SYS_PCIE2_PHYS_ADDR,
-	  CONFIG_SYS_PCIE2_PHYS_SIZE,
+	{ CFG_SYS_PCIE2_PHYS_ADDR, CFG_SYS_PCIE2_PHYS_ADDR,
+	  CFG_SYS_PCIE2_PHYS_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-#ifdef CONFIG_SYS_PCIE3_PHYS_ADDR
-	{ CONFIG_SYS_PCIE3_PHYS_ADDR, CONFIG_SYS_PCIE3_PHYS_ADDR,
-	  CONFIG_SYS_PCIE3_PHYS_SIZE,
+#ifdef CFG_SYS_PCIE3_PHYS_ADDR
+	{ CFG_SYS_PCIE3_PHYS_ADDR, CFG_SYS_PCIE3_PHYS_ADDR,
+	  CFG_SYS_PCIE3_PHYS_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
 #endif
-#ifdef CONFIG_SYS_PCIE4_PHYS_ADDR
-	{ CONFIG_SYS_PCIE4_PHYS_ADDR, CONFIG_SYS_PCIE4_PHYS_ADDR,
-	  CONFIG_SYS_PCIE4_PHYS_SIZE,
+#ifdef CFG_SYS_PCIE4_PHYS_ADDR
+	{ CFG_SYS_PCIE4_PHYS_ADDR, CFG_SYS_PCIE4_PHYS_ADDR,
+	  CFG_SYS_PCIE4_PHYS_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
@@ -292,29 +296,29 @@ static struct mm_region final_map[] = {
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
 #endif
-	{ CONFIG_SYS_FSL_WRIOP1_BASE, CONFIG_SYS_FSL_WRIOP1_BASE,
-	  CONFIG_SYS_FSL_WRIOP1_SIZE,
+	{ CFG_SYS_FSL_WRIOP1_BASE, CFG_SYS_FSL_WRIOP1_BASE,
+	  CFG_SYS_FSL_WRIOP1_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_FSL_AIOP1_BASE, CONFIG_SYS_FSL_AIOP1_BASE,
-	  CONFIG_SYS_FSL_AIOP1_SIZE,
+	{ CFG_SYS_FSL_AIOP1_BASE, CFG_SYS_FSL_AIOP1_BASE,
+	  CFG_SYS_FSL_AIOP1_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_FSL_PEBUF_BASE, CONFIG_SYS_FSL_PEBUF_BASE,
-	  CONFIG_SYS_FSL_PEBUF_SIZE,
+	{ CFG_SYS_FSL_PEBUF_BASE, CFG_SYS_FSL_PEBUF_BASE,
+	  CFG_SYS_FSL_PEBUF_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_FSL_DRAM_BASE2, CONFIG_SYS_FSL_DRAM_BASE2,
-	  CONFIG_SYS_FSL_DRAM_SIZE2,
+	{ CFG_SYS_FSL_DRAM_BASE2, CFG_SYS_FSL_DRAM_BASE2,
+	  CFG_SYS_FSL_DRAM_SIZE2,
 	  PTE_BLOCK_MEMTYPE(MT_NORMAL) |
 	  PTE_BLOCK_OUTER_SHARE | PTE_BLOCK_NS
 	},
-#ifdef CONFIG_SYS_FSL_DRAM_BASE3
-	{ CONFIG_SYS_FSL_DRAM_BASE3, CONFIG_SYS_FSL_DRAM_BASE3,
-	  CONFIG_SYS_FSL_DRAM_SIZE3,
+#ifdef CFG_SYS_FSL_DRAM_BASE3
+	{ CFG_SYS_FSL_DRAM_BASE3, CFG_SYS_FSL_DRAM_BASE3,
+	  CFG_SYS_FSL_DRAM_SIZE3,
 	  PTE_BLOCK_MEMTYPE(MT_NORMAL) |
 	  PTE_BLOCK_OUTER_SHARE | PTE_BLOCK_NS
 	},
@@ -325,70 +329,70 @@ static struct mm_region final_map[] = {
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_FSL_CCSR_BASE, CONFIG_SYS_FSL_CCSR_BASE,
-	  CONFIG_SYS_FSL_CCSR_SIZE,
+	{ CFG_SYS_FSL_CCSR_BASE, CFG_SYS_FSL_CCSR_BASE,
+	  CFG_SYS_FSL_CCSR_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_FSL_OCRAM_BASE, CONFIG_SYS_FSL_OCRAM_BASE,
+	{ CFG_SYS_FSL_OCRAM_BASE, CFG_SYS_FSL_OCRAM_BASE,
 	  SYS_FSL_OCRAM_SPACE_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_NORMAL) | PTE_BLOCK_NON_SHARE
 	},
-	{ CONFIG_SYS_FSL_DCSR_BASE, CONFIG_SYS_FSL_DCSR_BASE,
-	  CONFIG_SYS_FSL_DCSR_SIZE,
+	{ CFG_SYS_FSL_DCSR_BASE, CFG_SYS_FSL_DCSR_BASE,
+	  CFG_SYS_FSL_DCSR_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_FSL_QSPI_BASE, CONFIG_SYS_FSL_QSPI_BASE,
-	  CONFIG_SYS_FSL_QSPI_SIZE,
+	{ CFG_SYS_FSL_QSPI_BASE, CFG_SYS_FSL_QSPI_BASE,
+	  CFG_SYS_FSL_QSPI_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
 #ifdef CONFIG_FSL_IFC
-	{ CONFIG_SYS_FSL_IFC_BASE, CONFIG_SYS_FSL_IFC_BASE,
-	  CONFIG_SYS_FSL_IFC_SIZE,
+	{ CFG_SYS_FSL_IFC_BASE, CFG_SYS_FSL_IFC_BASE,
+	  CFG_SYS_FSL_IFC_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) | PTE_BLOCK_NON_SHARE
 	},
 #endif
-	{ CONFIG_SYS_FSL_DRAM_BASE1, CONFIG_SYS_FSL_DRAM_BASE1,
-	  CONFIG_SYS_FSL_DRAM_SIZE1,
+	{ CFG_SYS_FSL_DRAM_BASE1, CFG_SYS_FSL_DRAM_BASE1,
+	  CFG_SYS_FSL_DRAM_SIZE1,
 	  PTE_BLOCK_MEMTYPE(MT_NORMAL) |
 	  PTE_BLOCK_OUTER_SHARE | PTE_BLOCK_NS
 	},
-	{ CONFIG_SYS_FSL_QBMAN_BASE, CONFIG_SYS_FSL_QBMAN_BASE,
-	  CONFIG_SYS_FSL_QBMAN_SIZE,
+	{ CFG_SYS_FSL_QBMAN_BASE, CFG_SYS_FSL_QBMAN_BASE,
+	  CFG_SYS_FSL_QBMAN_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_FSL_DRAM_BASE2, CONFIG_SYS_FSL_DRAM_BASE2,
-	  CONFIG_SYS_FSL_DRAM_SIZE2,
+	{ CFG_SYS_FSL_DRAM_BASE2, CFG_SYS_FSL_DRAM_BASE2,
+	  CFG_SYS_FSL_DRAM_SIZE2,
 	  PTE_BLOCK_MEMTYPE(MT_NORMAL) |
 	  PTE_BLOCK_OUTER_SHARE | PTE_BLOCK_NS
 	},
-	{ CONFIG_SYS_PCIE1_PHYS_ADDR, CONFIG_SYS_PCIE1_PHYS_ADDR,
-	  CONFIG_SYS_PCIE1_PHYS_SIZE,
+	{ CFG_SYS_PCIE1_PHYS_ADDR, CFG_SYS_PCIE1_PHYS_ADDR,
+	  CFG_SYS_PCIE1_PHYS_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-	{ CONFIG_SYS_PCIE2_PHYS_ADDR, CONFIG_SYS_PCIE2_PHYS_ADDR,
-	  CONFIG_SYS_PCIE2_PHYS_SIZE,
+	{ CFG_SYS_PCIE2_PHYS_ADDR, CFG_SYS_PCIE2_PHYS_ADDR,
+	  CFG_SYS_PCIE2_PHYS_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
-#ifdef CONFIG_SYS_PCIE3_PHYS_ADDR
-	{ CONFIG_SYS_PCIE3_PHYS_ADDR, CONFIG_SYS_PCIE3_PHYS_ADDR,
-	  CONFIG_SYS_PCIE3_PHYS_SIZE,
+#ifdef CFG_SYS_PCIE3_PHYS_ADDR
+	{ CFG_SYS_PCIE3_PHYS_ADDR, CFG_SYS_PCIE3_PHYS_ADDR,
+	  CFG_SYS_PCIE3_PHYS_SIZE,
 	  PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 	  PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN
 	},
 #endif
-	{ CONFIG_SYS_FSL_DRAM_BASE3, CONFIG_SYS_FSL_DRAM_BASE3,
-	  CONFIG_SYS_FSL_DRAM_SIZE3,
+	{ CFG_SYS_FSL_DRAM_BASE3, CFG_SYS_FSL_DRAM_BASE3,
+	  CFG_SYS_FSL_DRAM_SIZE3,
 	  PTE_BLOCK_MEMTYPE(MT_NORMAL) |
 	  PTE_BLOCK_OUTER_SHARE | PTE_BLOCK_NS
 	},
 #endif
-#ifdef CONFIG_SYS_MEM_RESERVE_SECURE
+#ifdef CFG_SYS_MEM_RESERVE_SECURE
 	{},	/* space holder for secure mem */
 #endif
 	{},
@@ -398,7 +402,7 @@ struct mm_region *mem_map = early_map;
 
 void cpu_name(char *name)
 {
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	unsigned int i, svr, ver;
 
 	svr = gur_in32(&gur->svr);
@@ -427,7 +431,7 @@ void cpu_name(char *name)
 #if !CONFIG_IS_ENABLED(SYS_DCACHE_OFF)
 /*
  * To start MMU before DDR is available, we create MMU table in SRAM.
- * The base address of SRAM is CONFIG_SYS_FSL_OCRAM_BASE. We use three
+ * The base address of SRAM is CFG_SYS_FSL_OCRAM_BASE. We use three
  * levels of translation tables here to cover 40-bit address space.
  * We use 4KB granule size, with 40 bits physical address, T0SZ=24
  * Address above EARLY_PGTABLE_SIZE (0x5000) is free for other purpose.
@@ -440,9 +444,9 @@ static inline void early_mmu_setup(void)
 
 	/* global data is already setup, no allocation yet */
 	if (el == 3)
-		gd->arch.tlb_addr = CONFIG_SYS_FSL_OCRAM_BASE;
+		gd->arch.tlb_addr = CFG_SYS_FSL_OCRAM_BASE;
 	else
-		gd->arch.tlb_addr = CONFIG_SYS_DDR_SDRAM_BASE;
+		gd->arch.tlb_addr = CFG_SYS_DDR_SDRAM_BASE;
 	gd->arch.tlb_fillptr = gd->arch.tlb_addr;
 	gd->arch.tlb_size = EARLY_PGTABLE_SIZE;
 
@@ -451,7 +455,7 @@ static inline void early_mmu_setup(void)
 
 	/* point TTBR to the new table */
 	set_ttbr_tcr_mair(el, gd->arch.tlb_addr,
-			  get_tcr(el, NULL, NULL) &
+			  get_tcr(NULL, NULL) &
 			  ~(TCR_ORGN_MASK | TCR_IRGN_MASK),
 			  MEMORY_ATTRIBUTES);
 
@@ -463,7 +467,7 @@ static void fix_pcie_mmu_map(void)
 #ifdef CONFIG_ARCH_LS2080A
 	unsigned int i;
 	u32 svr, ver;
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 
 	svr = gur_in32(&gur->svr);
 	ver = SVR_SOC_VER(svr);
@@ -474,25 +478,25 @@ static void fix_pcie_mmu_map(void)
 	    (ver == SVR_LS2081A) || (ver == SVR_LS2041A)) {
 		for (i = 0; i < ARRAY_SIZE(final_map); i++) {
 			switch (final_map[i].phys) {
-			case CONFIG_SYS_PCIE1_PHYS_ADDR:
+			case CFG_SYS_PCIE1_PHYS_ADDR:
 				final_map[i].phys = 0x2000000000ULL;
 				final_map[i].virt = 0x2000000000ULL;
 				final_map[i].size = 0x800000000ULL;
 				break;
-			case CONFIG_SYS_PCIE2_PHYS_ADDR:
+			case CFG_SYS_PCIE2_PHYS_ADDR:
 				final_map[i].phys = 0x2800000000ULL;
 				final_map[i].virt = 0x2800000000ULL;
 				final_map[i].size = 0x800000000ULL;
 				break;
-#ifdef CONFIG_SYS_PCIE3_PHYS_ADDR
-			case CONFIG_SYS_PCIE3_PHYS_ADDR:
+#ifdef CFG_SYS_PCIE3_PHYS_ADDR
+			case CFG_SYS_PCIE3_PHYS_ADDR:
 				final_map[i].phys = 0x3000000000ULL;
 				final_map[i].virt = 0x3000000000ULL;
 				final_map[i].size = 0x800000000ULL;
 				break;
 #endif
-#ifdef CONFIG_SYS_PCIE4_PHYS_ADDR
-			case CONFIG_SYS_PCIE4_PHYS_ADDR:
+#ifdef CFG_SYS_PCIE4_PHYS_ADDR
+			case CFG_SYS_PCIE4_PHYS_ADDR:
 				final_map[i].phys = 0x3800000000ULL;
 				final_map[i].virt = 0x3800000000ULL;
 				final_map[i].size = 0x800000000ULL;
@@ -533,13 +537,13 @@ static inline void final_mmu_setup(void)
 		 * table.
 		 */
 		switch (final_map[index].virt) {
-		case CONFIG_SYS_FSL_DRAM_BASE1:
+		case CFG_SYS_FSL_DRAM_BASE1:
 			final_map[index].virt = gd->bd->bi_dram[0].start;
 			final_map[index].phys = gd->bd->bi_dram[0].start;
 			final_map[index].size = gd->bd->bi_dram[0].size;
 			break;
-#ifdef CONFIG_SYS_FSL_DRAM_BASE2
-		case CONFIG_SYS_FSL_DRAM_BASE2:
+#ifdef CFG_SYS_FSL_DRAM_BASE2
+		case CFG_SYS_FSL_DRAM_BASE2:
 #if (CONFIG_NR_DRAM_BANKS >= 2)
 			final_map[index].virt = gd->bd->bi_dram[1].start;
 			final_map[index].phys = gd->bd->bi_dram[1].start;
@@ -549,8 +553,8 @@ static inline void final_mmu_setup(void)
 #endif
 		break;
 #endif
-#ifdef CONFIG_SYS_FSL_DRAM_BASE3
-		case CONFIG_SYS_FSL_DRAM_BASE3:
+#ifdef CFG_SYS_FSL_DRAM_BASE3
+		case CFG_SYS_FSL_DRAM_BASE3:
 #if (CONFIG_NR_DRAM_BANKS >= 3)
 			final_map[index].virt = gd->bd->bi_dram[2].start;
 			final_map[index].phys = gd->bd->bi_dram[2].start;
@@ -565,7 +569,7 @@ static inline void final_mmu_setup(void)
 		}
 	}
 
-#ifdef CONFIG_SYS_MEM_RESERVE_SECURE
+#ifdef CFG_SYS_MEM_RESERVE_SECURE
 	if (gd->arch.secure_ram & MEM_RESERVE_SECURE_MAINTAINED) {
 		if (el == 3) {
 			/*
@@ -577,7 +581,7 @@ static inline void final_mmu_setup(void)
 			gd->arch.tlb_addr = gd->arch.secure_ram & ~0xfff;
 			final_map[index].virt = gd->arch.secure_ram & ~0x3;
 			final_map[index].phys = final_map[index].virt;
-			final_map[index].size = CONFIG_SYS_MEM_RESERVE_SECURE;
+			final_map[index].size = CFG_SYS_MEM_RESERVE_SECURE;
 			final_map[index].attrs = PTE_BLOCK_OUTER_SHARE;
 			gd->arch.secure_ram |= MEM_RESERVE_SECURE_SECURED;
 			tlb_addr_save = gd->arch.tlb_addr;
@@ -606,7 +610,7 @@ static inline void final_mmu_setup(void)
 	invalidate_icache_all();
 
 	/* point TTBR to the new table */
-	set_ttbr_tcr_mair(el, gd->arch.tlb_addr, get_tcr(el, NULL, NULL),
+	set_ttbr_tcr_mair(el, gd->arch.tlb_addr, get_tcr(NULL, NULL),
 			  MEMORY_ATTRIBUTES);
 
 	set_sctlr(get_sctlr() | CR_M);
@@ -757,7 +761,7 @@ enum boot_src __get_boot_src(u32 porsr1)
 	}
 #endif
 
-	if (CONFIG_IS_ENABLED(SYS_FSL_ERRATUM_A010539) && !rcw_src)
+	if (IS_ENABLED(CONFIG_SYS_FSL_ERRATUM_A010539) && !rcw_src)
 		src = BOOT_SOURCE_QSPI_NOR;
 
 	debug("%s: src 0x%x\n", __func__, src);
@@ -766,21 +770,19 @@ enum boot_src __get_boot_src(u32 porsr1)
 
 enum boot_src get_boot_src(void)
 {
-	struct pt_regs regs;
+	struct arm_smccc_res res;
 	u32 porsr1 = 0;
 
 #if defined(CONFIG_FSL_LSCH3)
 	u32 __iomem *dcfg_ccsr = (u32 __iomem *)DCFG_BASE;
 #elif defined(CONFIG_FSL_LSCH2)
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 #endif
 
 	if (current_el() == 2) {
-		regs.regs[0] = SIP_SVC_RCW;
-
-		smc_call(&regs);
-		if (!regs.regs[0])
-			porsr1 = regs.regs[1];
+		arm_smccc_smc(SIP_SVC_RCW, 0, 0, 0, 0, 0, 0, 0, &res);
+		if (!res.a0)
+			porsr1 = res.a1;
 	}
 
 	if (current_el() == 3 || !porsr1) {
@@ -817,7 +819,7 @@ int mmc_get_env_dev(void)
 }
 #endif
 
-enum env_location env_get_location(enum env_operation op, int prio)
+enum env_location arch_env_get_location(enum env_operation op, int prio)
 {
 	enum boot_src src = get_boot_src();
 	enum env_location env_loc = ENVL_NOWHERE;
@@ -862,7 +864,7 @@ enum env_location env_get_location(enum env_operation op, int prio)
 
 u32 initiator_type(u32 cluster, int init_id)
 {
-	struct ccsr_gur *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	u32 idx = (cluster >> (init_id * 8)) & TP_CLUSTER_INIT_MASK;
 	u32 type = 0;
 
@@ -875,7 +877,7 @@ u32 initiator_type(u32 cluster, int init_id)
 
 u32 cpu_pos_mask(void)
 {
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	int i = 0;
 	u32 cluster, type, mask = 0;
 
@@ -896,7 +898,7 @@ u32 cpu_pos_mask(void)
 
 u32 cpu_mask(void)
 {
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	int i = 0, count = 0;
 	u32 cluster, type, mask = 0;
 
@@ -929,7 +931,7 @@ int cpu_numcores(void)
 int fsl_qoriq_core_to_cluster(unsigned int core)
 {
 	struct ccsr_gur __iomem *gur =
-		(void __iomem *)(CONFIG_SYS_FSL_GUTS_ADDR);
+		(void __iomem *)(CFG_SYS_FSL_GUTS_ADDR);
 	int i = 0, count = 0;
 	u32 cluster;
 
@@ -953,7 +955,7 @@ int fsl_qoriq_core_to_cluster(unsigned int core)
 u32 fsl_qoriq_core_to_type(unsigned int core)
 {
 	struct ccsr_gur __iomem *gur =
-		(void __iomem *)(CONFIG_SYS_FSL_GUTS_ADDR);
+		(void __iomem *)(CFG_SYS_FSL_GUTS_ADDR);
 	int i = 0, count = 0;
 	u32 cluster, type;
 
@@ -978,7 +980,7 @@ u32 fsl_qoriq_core_to_type(unsigned int core)
 #ifndef CONFIG_FSL_LSCH3
 uint get_svr(void)
 {
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 
 	return gur_in32(&gur->svr);
 }
@@ -987,7 +989,7 @@ uint get_svr(void)
 #ifdef CONFIG_DISPLAY_CPUINFO
 int print_cpuinfo(void)
 {
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	struct sys_info sysinfo;
 	char buf[32];
 	unsigned int i, core;
@@ -1054,16 +1056,13 @@ int cpu_eth_init(struct bd_info *bis)
 {
 	int error = 0;
 
-#if defined(CONFIG_FSL_MC_ENET) && !defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_FSL_MC_ENET) && !defined(CONFIG_XPL_BUILD)
 	error = fsl_mc_ldpaa_init(bis);
-#endif
-#ifdef CONFIG_FMAN_ENET
-	fm_standard_init(bis);
 #endif
 	return error;
 }
 
-static inline int check_psci(void)
+int check_psci(void)
 {
 	unsigned int psci_ver;
 
@@ -1079,9 +1078,9 @@ static void config_core_prefetch(void)
 	char *buf = NULL;
 	char buffer[HWCONFIG_BUFFER_SIZE];
 	const char *prefetch_arg = NULL;
+	struct arm_smccc_res res;
 	size_t arglen;
 	unsigned int mask;
-	struct pt_regs regs;
 
 	if (env_get_f("hwconfig", buffer, sizeof(buffer)) > 0)
 		buf = buffer;
@@ -1099,11 +1098,10 @@ static void config_core_prefetch(void)
 		}
 
 #define SIP_PREFETCH_DISABLE_64 0xC200FF13
-		regs.regs[0] = SIP_PREFETCH_DISABLE_64;
-		regs.regs[1] = mask;
-		smc_call(&regs);
+		arm_smccc_smc(SIP_PREFETCH_DISABLE_64, mask, 0, 0, 0, 0, 0, 0,
+			      &res);
 
-		if (regs.regs[0])
+		if (res.a0)
 			printf("Prefetch disable config failed for mask ");
 		else
 			printf("Prefetch disable config passed for mask ");
@@ -1147,7 +1145,7 @@ int arch_early_init_r(void)
 #endif
 #ifdef CONFIG_SYS_FSL_HAS_RGMII
 	/* some dpmacs in armv8a based freescale layerscape SOCs can be
-	 * configured via both serdes(sgmii, xfi, xlaui etc) bits and via
+	 * configured via both serdes(sgmii, 10gbase-r, xlaui etc) bits and via
 	 * EC*_PMUX(rgmii) bits in RCW.
 	 * e.g. dpmac 17 and 18 in LX2160A can be configured as SGMII from
 	 * serdes bits and as RGMII via EC1_PMUX/EC2_PMUX bits
@@ -1179,9 +1177,9 @@ int arch_early_init_r(void)
 
 int timer_init(void)
 {
-	u32 __iomem *cntcr = (u32 *)CONFIG_SYS_FSL_TIMER_ADDR;
+	u32 __iomem *cntcr = (u32 *)CFG_SYS_FSL_TIMER_ADDR;
 #ifdef CONFIG_FSL_LSCH3
-	u32 __iomem *cltbenr = (u32 *)CONFIG_SYS_FSL_PMU_CLTBENR;
+	u32 __iomem *cltbenr = (u32 *)CFG_SYS_FSL_PMU_CLTBENR;
 #endif
 #if defined(CONFIG_ARCH_LS2080A) || defined(CONFIG_ARCH_LS1088A) || \
 	defined(CONFIG_ARCH_LS1028A)
@@ -1229,9 +1227,10 @@ int timer_init(void)
 	return 0;
 }
 
-__efi_runtime_data u32 __iomem *rstcr = (u32 *)CONFIG_SYS_FSL_RST_ADDR;
+#if !CONFIG_IS_ENABLED(SYSRESET)
+__efi_runtime_data u32 __iomem *rstcr = (u32 *)CFG_SYS_FSL_RST_ADDR;
 
-void __efi_runtime reset_cpu(ulong addr)
+void __efi_runtime reset_cpu(void)
 {
 #if defined(CONFIG_ARCH_LX2160A) || defined(CONFIG_ARCH_LX2162A)
 	/* clear the RST_REQ_MSK and SW_RST_REQ */
@@ -1248,6 +1247,7 @@ void __efi_runtime reset_cpu(ulong addr)
 	scfg_out32(rstcr, val);
 #endif
 }
+#endif
 
 #if defined(CONFIG_EFI_LOADER) && !defined(CONFIG_PSCI_RESET)
 
@@ -1260,7 +1260,7 @@ void __efi_runtime EFIAPI efi_reset_system(
 	case EFI_RESET_COLD:
 	case EFI_RESET_WARM:
 	case EFI_RESET_PLATFORM_SPECIFIC:
-		reset_cpu(0);
+		reset_cpu();
 		break;
 	case EFI_RESET_SHUTDOWN:
 		/* Nothing we can do */
@@ -1286,7 +1286,7 @@ phys_size_t board_reserve_ram_top(phys_size_t ram_size)
 {
 	phys_size_t ram_top = ram_size;
 
-#if defined(CONFIG_FSL_MC_ENET) && !defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_FSL_MC_ENET) && !defined(CONFIG_XPL_BUILD)
 	ram_top = mc_get_dram_block_size();
 	if (ram_top > ram_size)
 		return ram_size + ram_top;
@@ -1309,22 +1309,22 @@ phys_size_t get_effective_memsize(void)
 	 * allocated from first region. If the memory extends to  the second
 	 * region (or the third region if applicable), Management Complex (MC)
 	 * memory should be put into the highest region, i.e. the end of DDR
-	 * memory. CONFIG_MAX_MEM_MAPPED is set to the size of first region so
+	 * memory. CFG_MAX_MEM_MAPPED is set to the size of first region so
 	 * U-Boot doesn't relocate itself into higher address. Should DDR be
 	 * configured to skip the first region, this function needs to be
 	 * adjusted.
 	 */
-	if (gd->ram_size > CONFIG_MAX_MEM_MAPPED) {
-		ea_size = CONFIG_MAX_MEM_MAPPED;
+	if (gd->ram_size > CFG_MAX_MEM_MAPPED) {
+		ea_size = CFG_MAX_MEM_MAPPED;
 		rem = gd->ram_size - ea_size;
 	} else {
 		ea_size = gd->ram_size;
 	}
 
-#ifdef CONFIG_SYS_MEM_RESERVE_SECURE
+#ifdef CFG_SYS_MEM_RESERVE_SECURE
 	/* Check if we have enough space for secure memory */
-	if (ea_size > CONFIG_SYS_MEM_RESERVE_SECURE)
-		ea_size -= CONFIG_SYS_MEM_RESERVE_SECURE;
+	if (ea_size > CFG_SYS_MEM_RESERVE_SECURE)
+		ea_size -= CFG_SYS_MEM_RESERVE_SECURE;
 	else
 		printf("Error: No enough space for secure memory.\n");
 #endif
@@ -1343,25 +1343,20 @@ phys_size_t get_effective_memsize(void)
 #ifdef CONFIG_TFABOOT
 phys_size_t tfa_get_dram_size(void)
 {
-	struct pt_regs regs;
-	phys_size_t dram_size = 0;
+	struct arm_smccc_res res;
 
-	regs.regs[0] = SMC_DRAM_BANK_INFO;
-	regs.regs[1] = -1;
-
-	smc_call(&regs);
-	if (regs.regs[0])
+	arm_smccc_smc(SMC_DRAM_BANK_INFO, -1, 0, 0, 0, 0, 0, 0, &res);
+	if (res.a0)
 		return 0;
 
-	dram_size = regs.regs[1];
-	return dram_size;
+	return res.a1;
 }
 
 static int tfa_dram_init_banksize(void)
 {
 	int i = 0, ret = 0;
-	struct pt_regs regs;
 	phys_size_t dram_size = tfa_get_dram_size();
+	struct arm_smccc_res res;
 
 	debug("dram_size %llx\n", dram_size);
 
@@ -1369,19 +1364,15 @@ static int tfa_dram_init_banksize(void)
 		return -EINVAL;
 
 	do {
-		regs.regs[0] = SMC_DRAM_BANK_INFO;
-		regs.regs[1] = i;
-
-		smc_call(&regs);
-		if (regs.regs[0]) {
+		arm_smccc_smc(SMC_DRAM_BANK_INFO, i, 0, 0, 0, 0, 0, 0, &res);
+		if (res.a0) {
 			ret = -EINVAL;
 			break;
 		}
 
-		debug("bank[%d]: start %lx, size %lx\n", i, regs.regs[1],
-		      regs.regs[2]);
-		gd->bd->bi_dram[i].start = regs.regs[1];
-		gd->bd->bi_dram[i].size = regs.regs[2];
+		debug("bank[%d]: start %lx, size %lx\n", i, res.a1, res.a2);
+		gd->bd->bi_dram[i].start = res.a1;
+		gd->bd->bi_dram[i].size = res.a2;
 
 		dram_size -= gd->bd->bi_dram[i].size;
 
@@ -1391,7 +1382,7 @@ static int tfa_dram_init_banksize(void)
 	if (i > 0)
 		ret = 0;
 
-#if defined(CONFIG_RESV_RAM) && !defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_RESV_RAM) && !defined(CONFIG_XPL_BUILD)
 	/* Assign memory for MC */
 #ifdef CONFIG_SYS_DDR_BLOCK3_BASE
 	if (gd->bd->bi_dram[2].size >=
@@ -1440,7 +1431,7 @@ int dram_init_banksize(void)
 	 * gd->arch.secure_ram should be done to avoid running it repeatedly.
 	 */
 
-#ifdef CONFIG_SYS_MEM_RESERVE_SECURE
+#ifdef CFG_SYS_MEM_RESERVE_SECURE
 	if (gd->arch.secure_ram & MEM_RESERVE_SECURE_MAINTAINED) {
 		debug("No need to run again, skip %s\n", __func__);
 
@@ -1448,12 +1439,12 @@ int dram_init_banksize(void)
 	}
 #endif
 
-	gd->bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
-	if (gd->ram_size > CONFIG_SYS_DDR_BLOCK1_SIZE) {
-		gd->bd->bi_dram[0].size = CONFIG_SYS_DDR_BLOCK1_SIZE;
-		gd->bd->bi_dram[1].start = CONFIG_SYS_DDR_BLOCK2_BASE;
+	gd->bd->bi_dram[0].start = CFG_SYS_SDRAM_BASE;
+	if (gd->ram_size > CFG_SYS_DDR_BLOCK1_SIZE) {
+		gd->bd->bi_dram[0].size = CFG_SYS_DDR_BLOCK1_SIZE;
+		gd->bd->bi_dram[1].start = CFG_SYS_DDR_BLOCK2_BASE;
 		gd->bd->bi_dram[1].size = gd->ram_size -
-					  CONFIG_SYS_DDR_BLOCK1_SIZE;
+					  CFG_SYS_DDR_BLOCK1_SIZE;
 #ifdef CONFIG_SYS_DDR_BLOCK3_BASE
 		if (gd->bi_dram[1].size > CONFIG_SYS_DDR_BLOCK2_SIZE) {
 			gd->bd->bi_dram[2].start = CONFIG_SYS_DDR_BLOCK3_BASE;
@@ -1465,19 +1456,19 @@ int dram_init_banksize(void)
 	} else {
 		gd->bd->bi_dram[0].size = gd->ram_size;
 	}
-#ifdef CONFIG_SYS_MEM_RESERVE_SECURE
+#ifdef CFG_SYS_MEM_RESERVE_SECURE
 	if (gd->bd->bi_dram[0].size >
-				CONFIG_SYS_MEM_RESERVE_SECURE) {
+				CFG_SYS_MEM_RESERVE_SECURE) {
 		gd->bd->bi_dram[0].size -=
-				CONFIG_SYS_MEM_RESERVE_SECURE;
+				CFG_SYS_MEM_RESERVE_SECURE;
 		gd->arch.secure_ram = gd->bd->bi_dram[0].start +
 				      gd->bd->bi_dram[0].size;
 		gd->arch.secure_ram |= MEM_RESERVE_SECURE_MAINTAINED;
-		gd->ram_size -= CONFIG_SYS_MEM_RESERVE_SECURE;
+		gd->ram_size -= CFG_SYS_MEM_RESERVE_SECURE;
 	}
-#endif	/* CONFIG_SYS_MEM_RESERVE_SECURE */
+#endif	/* CFG_SYS_MEM_RESERVE_SECURE */
 
-#if defined(CONFIG_RESV_RAM) && !defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_RESV_RAM) && !defined(CONFIG_XPL_BUILD)
 	/* Assign memory for MC */
 #ifdef CONFIG_SYS_DDR_BLOCK3_BASE
 	if (gd->bd->bi_dram[2].size >=
@@ -1527,7 +1518,7 @@ int dram_init_banksize(void)
 	}
 #endif
 
-#ifdef CONFIG_SYS_MEM_RESERVE_SECURE
+#ifdef CFG_SYS_MEM_RESERVE_SECURE
 	debug("%s is called. gd->ram_size is reduced to %lu\n",
 	      __func__, (ulong)gd->ram_size);
 #endif
@@ -1535,8 +1526,8 @@ int dram_init_banksize(void)
 	return 0;
 }
 
-#if CONFIG_IS_ENABLED(EFI_LOADER)
-void efi_add_known_memory(void)
+#if CONFIG_IS_ENABLED(LMB_ARCH_MEM_MAP)
+void lmb_arch_add_memory(void)
 {
 	int i;
 	phys_addr_t ram_start;
@@ -1558,8 +1549,7 @@ void efi_add_known_memory(void)
 		    gd->arch.resv_ram < ram_start + ram_size)
 			ram_size = gd->arch.resv_ram - ram_start;
 #endif
-		efi_add_memory_map(ram_start, ram_size,
-				   EFI_CONVENTIONAL_MEMORY);
+		lmb_add(ram_start, ram_size);
 	}
 }
 #endif
@@ -1576,9 +1566,9 @@ void update_early_mmu_table(void)
 	if (!gd->arch.tlb_addr)
 		return;
 
-	if (gd->ram_size <= CONFIG_SYS_FSL_DRAM_SIZE1) {
+	if (gd->ram_size <= CFG_SYS_FSL_DRAM_SIZE1) {
 		mmu_change_region_attr(
-					CONFIG_SYS_SDRAM_BASE,
+					CFG_SYS_SDRAM_BASE,
 					gd->ram_size,
 					PTE_BLOCK_MEMTYPE(MT_NORMAL)	|
 					PTE_BLOCK_OUTER_SHARE		|
@@ -1586,8 +1576,8 @@ void update_early_mmu_table(void)
 					PTE_TYPE_VALID);
 	} else {
 		mmu_change_region_attr(
-					CONFIG_SYS_SDRAM_BASE,
-					CONFIG_SYS_DDR_BLOCK1_SIZE,
+					CFG_SYS_SDRAM_BASE,
+					CFG_SYS_DDR_BLOCK1_SIZE,
 					PTE_BLOCK_MEMTYPE(MT_NORMAL)	|
 					PTE_BLOCK_OUTER_SHARE		|
 					PTE_BLOCK_NS			|
@@ -1596,10 +1586,10 @@ void update_early_mmu_table(void)
 #ifndef CONFIG_SYS_DDR_BLOCK2_SIZE
 #error "Missing CONFIG_SYS_DDR_BLOCK2_SIZE"
 #endif
-		if (gd->ram_size - CONFIG_SYS_DDR_BLOCK1_SIZE >
+		if (gd->ram_size - CFG_SYS_DDR_BLOCK1_SIZE >
 		    CONFIG_SYS_DDR_BLOCK2_SIZE) {
 			mmu_change_region_attr(
-					CONFIG_SYS_DDR_BLOCK2_BASE,
+					CFG_SYS_DDR_BLOCK2_BASE,
 					CONFIG_SYS_DDR_BLOCK2_SIZE,
 					PTE_BLOCK_MEMTYPE(MT_NORMAL)	|
 					PTE_BLOCK_OUTER_SHARE		|
@@ -1608,7 +1598,7 @@ void update_early_mmu_table(void)
 			mmu_change_region_attr(
 					CONFIG_SYS_DDR_BLOCK3_BASE,
 					gd->ram_size -
-					CONFIG_SYS_DDR_BLOCK1_SIZE -
+					CFG_SYS_DDR_BLOCK1_SIZE -
 					CONFIG_SYS_DDR_BLOCK2_SIZE,
 					PTE_BLOCK_MEMTYPE(MT_NORMAL)	|
 					PTE_BLOCK_OUTER_SHARE		|
@@ -1618,9 +1608,9 @@ void update_early_mmu_table(void)
 #endif
 		{
 			mmu_change_region_attr(
-					CONFIG_SYS_DDR_BLOCK2_BASE,
+					CFG_SYS_DDR_BLOCK2_BASE,
 					gd->ram_size -
-					CONFIG_SYS_DDR_BLOCK1_SIZE,
+					CFG_SYS_DDR_BLOCK1_SIZE,
 					PTE_BLOCK_MEMTYPE(MT_NORMAL)	|
 					PTE_BLOCK_OUTER_SHARE		|
 					PTE_BLOCK_NS			|
@@ -1631,11 +1621,13 @@ void update_early_mmu_table(void)
 
 __weak int dram_init(void)
 {
+#ifdef CONFIG_SYS_FSL_DDR
 	fsl_initdram();
 #if (!defined(CONFIG_SPL) && !defined(CONFIG_TFABOOT)) || \
-	defined(CONFIG_SPL_BUILD)
+	defined(CONFIG_XPL_BUILD)
 	/* This will break-before-make MMU for DDR */
 	update_early_mmu_table();
+#endif
 #endif
 
 	return 0;
@@ -1649,6 +1641,14 @@ __weak int serdes_misc_init(void)
 
 int arch_misc_init(void)
 {
+	if (IS_ENABLED(CONFIG_FSL_CAAM)) {
+		struct udevice *dev;
+		int ret;
+
+		ret = uclass_get_device_by_driver(UCLASS_MISC, DM_DRIVER_GET(caam_jr), &dev);
+		if (ret)
+			printf("Failed to initialize caam_jr: %d\n", ret);
+	}
 	serdes_misc_init();
 
 	return 0;

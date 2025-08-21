@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2014-2015 Freescale Semiconductor, Inc.
- * Copyright 2020 NXP
+ * Copyright 2020-2021 NXP
  */
 
-#include <common.h>
+#include <config.h>
 #include <clock_legacy.h>
 #include <efi_loader.h>
 #include <log.h>
@@ -161,14 +161,9 @@ void fsl_fdt_disable_usb(void *blob)
 	 * controller is used, SYSCLK must meet the additional requirement
 	 * of 100 MHz.
 	 */
-	if (CONFIG_SYS_CLK_FREQ != 100000000) {
-		off = fdt_node_offset_by_compatible(blob, -1, "snps,dwc3");
-		while (off != -FDT_ERR_NOTFOUND) {
+	if (get_board_sys_clk() != 100000000)
+		fdt_for_each_node_by_compatible(off, blob, -1, "snps,dwc3")
 			fdt_status_disabled(blob, off);
-			off = fdt_node_offset_by_compatible(blob, off,
-							    "snps,dwc3");
-		}
-	}
 }
 
 #ifdef CONFIG_HAS_FEATURE_GIC64K_ALIGN
@@ -176,9 +171,9 @@ static void fdt_fixup_gic(void *blob)
 {
 	int offset, err;
 	u64 reg[8];
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	unsigned int val;
-	struct ccsr_scfg __iomem *scfg = (void *)CONFIG_SYS_FSL_SCFG_ADDR;
+	struct ccsr_scfg __iomem *scfg = (void *)CFG_SYS_FSL_SCFG_ADDR;
 	int align_64k = 0;
 
 	val = gur_in32(&gur->svr);
@@ -360,7 +355,7 @@ static int _fdt_fixup_pci_msi(void *blob, const char *name, int rev)
 
 static void fdt_fixup_msi(void *blob)
 {
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	unsigned int rev;
 
 	rev = gur_in32(&gur->svr);
@@ -391,6 +386,10 @@ void fdt_fixup_remove_jr(void *blob)
 	int crypto_node = fdt_path_offset(blob, "crypto");
 	u64 jr_offset, used_jr;
 	fdt32_t *reg;
+
+	/* Return if crypto node not found */
+	if (crypto_node < 0)
+		return;
 
 	used_jr = sec_firmware_used_jobring_offset();
 	fdt_support_default_count_cells(blob, crypto_node, &addr_cells, NULL);
@@ -427,7 +426,7 @@ static void fdt_disable_multimedia(void *blob, unsigned int svr)
 		fdt_status_disabled(blob, off);
 
 	/* Disable GPU node */
-	off = fdt_node_offset_by_compatible(blob, -1, "fsl,ls1028a-gpu");
+	off = fdt_node_offset_by_compatible(blob, -1, "vivante,gc");
 	if (off != -FDT_ERR_NOTFOUND)
 		fdt_status_disabled(blob, off);
 }
@@ -478,9 +477,154 @@ static bool crypto_is_disabled(unsigned int svr)
 	return false;
 }
 
+#ifdef CONFIG_FSL_PFE
+void pfe_set_firmware_in_fdt(void *blob, int pfenode, void *pfw, char *pename,
+			     unsigned int len)
+{
+	int rc, fwnode;
+	unsigned int phandle;
+	char subnode_str[32], prop_str[32], phandle_str[32], s[64];
+
+	sprintf(subnode_str, "pfe-%s-firmware", pename);
+	sprintf(prop_str, "fsl,pfe-%s-firmware", pename);
+	sprintf(phandle_str, "fsl,%s-firmware", pename);
+
+	/*Add PE FW to fdt.*/
+	/* Increase the size of the fdt to make room for the node. */
+	rc = fdt_increase_size(blob, len);
+	if (rc < 0) {
+		printf("Unable to make room for %s firmware: %s\n", pename,
+		       fdt_strerror(rc));
+		return;
+	}
+
+	/* Create the firmware node. */
+	fwnode = fdt_add_subnode(blob, pfenode, subnode_str);
+	if (fwnode < 0) {
+		fdt_get_path(blob, pfenode, s, sizeof(s));
+		printf("Could not add firmware node to %s: %s\n", s,
+		       fdt_strerror(fwnode));
+		return;
+	}
+
+	rc = fdt_setprop_string(blob, fwnode, "compatible", prop_str);
+	if (rc < 0) {
+		fdt_get_path(blob, fwnode, s, sizeof(s));
+		printf("Could not add compatible property to node %s: %s\n", s,
+		       fdt_strerror(rc));
+		return;
+	}
+
+	rc = fdt_setprop_u32(blob, fwnode, "length", len);
+	if (rc < 0) {
+		fdt_get_path(blob, fwnode, s, sizeof(s));
+		printf("Could not add compatible property to node %s: %s\n", s,
+		       fdt_strerror(rc));
+		return;
+	}
+
+	/*create phandle and set the property*/
+	phandle = fdt_create_phandle(blob, fwnode);
+	if (!phandle) {
+		fdt_get_path(blob, fwnode, s, sizeof(s));
+		printf("Could not add phandle property to node %s: %s\n", s,
+		       fdt_strerror(rc));
+		return;
+	}
+
+	rc = fdt_setprop(blob, fwnode, phandle_str, pfw, len);
+	if (rc < 0) {
+		fdt_get_path(blob, fwnode, s, sizeof(s));
+		printf("Could not add firmware property to node %s: %s\n", s,
+		       fdt_strerror(rc));
+		return;
+	}
+}
+
+void fdt_fixup_pfe_firmware(void *blob)
+{
+	int pfenode;
+	unsigned int len_class = 0, len_tmu = 0, len_util = 0;
+	const char *p;
+	void *pclassfw, *ptmufw, *putilfw;
+
+	/* The first PFE we find, will contain the actual firmware. */
+	pfenode = fdt_node_offset_by_compatible(blob, -1, "fsl,pfe");
+	if (pfenode < 0)
+		/* Exit silently if there are no PFE devices */
+		return;
+
+	/* If we already have a firmware node, then also exit silently. */
+	if (fdt_node_offset_by_compatible(blob, -1,
+					  "fsl,pfe-class-firmware") > 0)
+		return;
+
+	/* If the environment variable is not set, then exit silently */
+	p = env_get("class_elf_firmware");
+	if (!p)
+		return;
+
+	pclassfw = (void *)hextoul(p, NULL);
+	if (!pclassfw)
+		return;
+
+	p = env_get("class_elf_size");
+	if (!p)
+		return;
+	len_class = hextoul(p, NULL);
+
+	/* If the environment variable is not set, then exit silently */
+	p = env_get("tmu_elf_firmware");
+	if (!p)
+		return;
+
+	ptmufw = (void *)hextoul(p, NULL);
+	if (!ptmufw)
+		return;
+
+	p = env_get("tmu_elf_size");
+	if (!p)
+		return;
+	len_tmu = hextoul(p, NULL);
+
+	if (len_class == 0 || len_tmu == 0) {
+		printf("PFE FW corrupted. CLASS FW size %d, TMU FW size %d\n",
+		       len_class, len_tmu);
+		return;
+	}
+
+	/*Add CLASS FW to fdt.*/
+	pfe_set_firmware_in_fdt(blob, pfenode, pclassfw, "class", len_class);
+
+	/*Add TMU FW to fdt.*/
+	pfe_set_firmware_in_fdt(blob, pfenode, ptmufw, "tmu", len_tmu);
+
+	/* Util PE firmware is handled separately as it is not a usual case*/
+	p = env_get("util_elf_firmware");
+	if (!p)
+		return;
+
+	putilfw = (void *)hextoul(p, NULL);
+	if (!putilfw)
+		return;
+
+	p = env_get("util_elf_size");
+	if (!p)
+		return;
+	len_util = hextoul(p, NULL);
+
+	if (len_util) {
+		printf("PFE Util PE firmware is not added to FDT.\n");
+		return;
+	}
+
+	pfe_set_firmware_in_fdt(blob, pfenode, putilfw, "util", len_util);
+}
+#endif
+
 void ft_cpu_setup(void *blob, struct bd_info *bd)
 {
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	unsigned int svr = gur_in32(&gur->svr);
 
 	/* delete crypto node if not on an E-processor */
@@ -495,7 +639,7 @@ void ft_cpu_setup(void *blob, struct bd_info *bd)
 		fdt_fixup_kaslr(blob);
 #endif
 
-		sec = (void __iomem *)CONFIG_SYS_FSL_SEC_ADDR;
+		sec = (void __iomem *)CFG_SYS_FSL_SEC_ADDR;
 		fdt_fixup_crypto_node(blob, sec_in32(&sec->secvid_ms));
 	}
 #endif
@@ -506,11 +650,11 @@ void ft_cpu_setup(void *blob, struct bd_info *bd)
 
 #ifdef CONFIG_SYS_NS16550
 	do_fixup_by_compat_u32(blob, "fsl,ns16550",
-			       "clock-frequency", CONFIG_SYS_NS16550_CLK, 1);
+			       "clock-frequency", CFG_SYS_NS16550_CLK, 1);
 #endif
 
 	do_fixup_by_path_u32(blob, "/sysclk", "clock-frequency",
-			     CONFIG_SYS_CLK_FREQ, 1);
+			     get_board_sys_clk(), 1);
 
 #ifdef CONFIG_GIC_V3_ITS
 	ls_gic_rd_tables_init(blob);
@@ -531,8 +675,11 @@ void ft_cpu_setup(void *blob, struct bd_info *bd)
 			       "clock-frequency", get_qman_freq(), 1);
 #endif
 
-#ifdef CONFIG_SYS_DPAA_FMAN
+#ifdef CONFIG_FMAN_ENET
 	fdt_fixup_fman_firmware(blob);
+#endif
+#ifdef CONFIG_FSL_PFE
+	fdt_fixup_pfe_firmware(blob);
 #endif
 #ifndef CONFIG_ARCH_LS1012A
 	fsl_fdt_disable_usb(blob);

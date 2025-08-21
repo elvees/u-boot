@@ -2,11 +2,10 @@
 /*
  * mux.c
  *
- * Copyright (C) 2011, Texas Instruments, Incorporated - http://www.ti.com/
+ * Copyright (C) 2011, Texas Instruments, Incorporated - https://www.ti.com/
  * Copyright (C) 2018 Robert Bosch Power Tools GmbH
  */
 
-#include <common.h>
 #include <i2c.h>
 #include <asm/arch/hardware.h>
 #include <asm/arch/mux.h>
@@ -28,8 +27,9 @@ static struct module_pin_mux i2c0_pin_mux[] = {
 
 static struct module_pin_mux guardian_interfaces_pin_mux[] = {
 	{OFFSET(mcasp0_ahclkx), (MODE(7) | PULLDOWN_EN)},
+	{OFFSET(mii1_txen),     (MODE(7) | PULLDOWN_EN)},
 	{OFFSET(mcasp0_aclkx),  (MODE(7) | PULLUP_EN)},
-	{OFFSET(mii1_txd0),     (MODE(7) | PULLUP_EN)},
+	{OFFSET(mdio_clk),      (MODE(7) | PULLUP_EN)},
 	{OFFSET(uart1_rxd),     (MODE(7) | RXACTIVE | PULLUDDIS)},
 	{OFFSET(uart1_txd),     (MODE(7) | PULLUDDIS)},
 	{OFFSET(mii1_crs),      (MODE(7) | PULLDOWN_EN)},

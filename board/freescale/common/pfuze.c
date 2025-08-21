@@ -3,7 +3,6 @@
  * Copyright 2014 Freescale Semiconductor, Inc.
  */
 
-#include <common.h>
 #include <errno.h>
 #include <power/pmic.h>
 #include <power/pfuze100_pmic.h>
@@ -91,7 +90,7 @@ struct pmic *pfuze_common_init(unsigned char i2cbus)
 
 	return p;
 }
-#else
+#elif defined(CONFIG_DM_PMIC)
 int pfuze_mode_init(struct udevice *dev, u32 mode)
 {
 	unsigned char offset, i, switch_num;

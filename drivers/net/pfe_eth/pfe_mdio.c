@@ -3,7 +3,7 @@
  * Copyright 2015-2016 Freescale Semiconductor, Inc.
  * Copyright 2017 NXP
  */
-#include <common.h>
+#include <config.h>
 #include <dm.h>
 #include <log.h>
 #include <malloc.h>
@@ -161,9 +161,8 @@ static void pfe_configure_serdes(struct pfe_eth_dev *priv)
 	int value, sgmii_2500 = 0;
 	struct gemac_s *gem = priv->gem;
 
-	if (gem->phy_mode == PHY_INTERFACE_MODE_SGMII_2500)
+	if (gem->phy_mode == PHY_INTERFACE_MODE_2500BASEX)
 		sgmii_2500 = 1;
-
 
 	/* PCS configuration done with corresponding GEMAC */
 	bus.priv = gem_info[priv->gemac_port].gemac_base;
@@ -213,14 +212,14 @@ int pfe_phy_configure(struct pfe_eth_dev *priv, int dev_id, int phy_id)
 	struct phy_device *phydev = NULL;
 	struct udevice *dev = priv->dev;
 	struct gemac_s *gem = priv->gem;
-	struct ccsr_scfg *scfg = (struct ccsr_scfg *)CONFIG_SYS_FSL_SCFG_ADDR;
+	struct ccsr_scfg *scfg = (struct ccsr_scfg *)CFG_SYS_FSL_SCFG_ADDR;
 
 	if (!gem->bus)
 		return -1;
 
 	/* Configure SGMII  PCS */
 	if (gem->phy_mode == PHY_INTERFACE_MODE_SGMII ||
-	    gem->phy_mode == PHY_INTERFACE_MODE_SGMII_2500) {
+	    gem->phy_mode == PHY_INTERFACE_MODE_2500BASEX) {
 		out_be32(&scfg->mdioselcr, 0x00000000);
 		pfe_configure_serdes(priv);
 	}

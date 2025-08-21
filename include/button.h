@@ -37,6 +37,14 @@ struct button_ops {
 	 * @return button state button_state_t, or -ve on error
 	 */
 	enum button_state_t (*get_state)(struct udevice *dev);
+
+	/**
+	 * get_code() - get linux event code of a button
+	 *
+	 * @dev:	button device to change
+	 * @return button code, or -ENODATA on error
+	 */
+	int (*get_code)(struct udevice *dev);
 };
 
 #define button_get_ops(dev)	((struct button_ops *)(dev)->driver->ops)
@@ -46,7 +54,7 @@ struct button_ops {
  *
  * @label:	button label to look up
  * @devp:	Returns the associated device, if found
- * @return 0 if found, -ENODEV if not found, other -ve on error
+ * Return: 0 if found, -ENODEV if not found, other -ve on error
  */
 int button_get_by_label(const char *label, struct udevice **devp);
 
@@ -54,8 +62,25 @@ int button_get_by_label(const char *label, struct udevice **devp);
  * button_get_state() - get the state of a button
  *
  * @dev:	button device to change
- * @return button state button_state_t, or -ve on error
+ * Return: button state button_state_t, or -ve on error
  */
 enum button_state_t button_get_state(struct udevice *dev);
+
+/**
+ * button_get_code() - get linux event code of a button
+ *
+ * @dev:	button device to change
+ * @return button code, or -ve on error
+ */
+int button_get_code(struct udevice *dev);
+
+#if IS_ENABLED(CONFIG_BUTTON_CMD)
+/* Process button command mappings specified in the environment,
+ * running the commands for buttons which are pressed
+ */
+void process_button_cmds(void);
+#else
+static inline void process_button_cmds(void) {}
+#endif /* CONFIG_BUTTON_CMD */
 
 #endif

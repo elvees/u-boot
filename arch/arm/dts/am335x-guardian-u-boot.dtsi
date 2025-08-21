@@ -8,12 +8,12 @@
 
 / {
 	ocp {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 	};
 };
 
 &l4_wkup {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &l4_per {
@@ -21,57 +21,68 @@
 	segment@300000 {
 
 		target-module@e000 {
-			u-boot,dm-pre-reloc;
+			bootph-all;
 
 			lcdc: lcdc@0 {
-				u-boot,dm-pre-reloc;
+				bootph-all;
 			};
 		};
 	};
 };
 
 &mmc1 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &mmc1_pins {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &scm {
-	u-boot,dm-pre-reloc;
+	bootph-all;
+};
+
+&spi0 {
+	lcd0: display@0 {
+		compatible = "himax,hx8238d";
+		pinctrl-names = "default";
+		pinctrl-0 = <&lcd0_pins>;
+		reg = <0>;
+		label = "lcd";
+		spi-max-frequency = <100000>;
+	};
 };
 
 &uart0 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &uart0_pins {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &usb {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &usb_ctrl_mod {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &usb0 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &usb0_phy {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &am33xx_pinmux {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 
 	lcd0_pins: pinmux_lcd0_pins {
 		pinctrl-single,pins = <
-			AM33XX_IOPAD(0x908, PIN_OUTPUT_PULLUP   | MUX_MODE7)
+			AM33XX_PADCONF(AM335X_PIN_MII1_COL, PIN_OUTPUT_PULLUP, MUX_MODE7)
 		>;
 	};
 };

@@ -2,12 +2,12 @@
 /*
  * BTRFS filesystem implementation for U-Boot
  *
- * 2017 Marek Behun, CZ.NIC, marek.behun@nic.cz
+ * 2017 Marek Behún, CZ.NIC, kabel@kernel.org
  */
 
 #include <config.h>
 #include <malloc.h>
-#include <uuid.h>
+#include <u-boot/uuid.h>
 #include <linux/time.h>
 #include "btrfs.h"
 #include "crypto/hash.h"
@@ -23,7 +23,7 @@ static int show_dir(struct btrfs_root *root, struct extent_buffer *eb,
 	struct btrfs_key key;
 	static const char* dir_item_str[] = {
 		[BTRFS_FT_REG_FILE]	= "   ",
-		[BTRFS_FT_DIR] 		= "DIR",
+		[BTRFS_FT_DIR]		= "DIR",
 		[BTRFS_FT_CHRDEV]	= "CHR",
 		[BTRFS_FT_BLKDEV]	= "BLK",
 		[BTRFS_FT_FIFO]		= "FIF",
@@ -193,7 +193,7 @@ int btrfs_size(const char *file, loff_t *size)
 	ret = btrfs_lookup_path(fs_info->fs_root, BTRFS_FIRST_FREE_OBJECTID,
 				file, &root, &ino, &type, 40);
 	if (ret < 0) {
-		printf("Cannot lookup file %s\n", file);
+		debug("Cannot lookup file %s\n", file);
 		return ret;
 	}
 	if (type != BTRFS_FT_REG_FILE) {
@@ -228,7 +228,7 @@ int btrfs_read(const char *file, void *buf, loff_t offset, loff_t len,
 {
 	struct btrfs_fs_info *fs_info = current_fs_info;
 	struct btrfs_root *root;
-	loff_t real_size = 0;
+	loff_t real_size;
 	u64 ino;
 	u8 type;
 	int ret;
@@ -246,16 +246,13 @@ int btrfs_read(const char *file, void *buf, loff_t offset, loff_t len,
 		return -EINVAL;
 	}
 
-	if (!len) {
-		ret = btrfs_size(file, &real_size);
-		if (ret < 0) {
-			error("Failed to get inode size: %s", file);
-			return ret;
-		}
-		len = real_size;
+	ret = btrfs_size(file, &real_size);
+	if (ret < 0) {
+		error("Failed to get inode size: %s", file);
+		return ret;
 	}
 
-	if (len > real_size - offset)
+	if (!len || len > real_size - offset)
 		len = real_size - offset;
 
 	ret = btrfs_file_read(root, ino, offset, len, buf);

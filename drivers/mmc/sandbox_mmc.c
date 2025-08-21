@@ -4,28 +4,32 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <fdtdec.h>
 #include <log.h>
+#include <malloc.h>
 #include <mmc.h>
+#include <os.h>
 #include <asm/test.h>
 
 struct sandbox_mmc_plat {
 	struct mmc_config cfg;
 	struct mmc mmc;
+	const char *fname;
 };
 
-#define MMC_CSIZE 0
-#define MMC_CMULT 8 /* 8 because the card is high-capacity */
-#define MMC_BL_LEN_SHIFT 10
-#define MMC_BL_LEN BIT(MMC_BL_LEN_SHIFT)
-#define MMC_CAPACITY (((MMC_CSIZE + 1) << (MMC_CMULT + 2)) \
-		      * MMC_BL_LEN) /* 1 MiB */
+#define MMC_CMULT		8 /* 8 because the card is high-capacity */
+#define MMC_BL_LEN_SHIFT	10
+#define MMC_BL_LEN		BIT(MMC_BL_LEN_SHIFT)
+
+/* Granularity of priv->csize - this is 1MB */
+#define SIZE_MULTIPLE		((1 << (MMC_CMULT + 2)) * MMC_BL_LEN)
 
 struct sandbox_mmc_priv {
-	u8 buf[MMC_CAPACITY];
+	char *buf;
+	int csize;	/* CSIZE value to report */
+	int size;
 };
 
 /**
@@ -38,7 +42,6 @@ static int sandbox_mmc_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 				struct mmc_data *data)
 {
 	struct sandbox_mmc_priv *priv = dev_get_priv(dev);
-	struct mmc *mmc = mmc_get_mmc_dev(dev);
 	static ulong erase_start, erase_end;
 
 	switch (cmd->cmdidx) {
@@ -60,8 +63,8 @@ static int sandbox_mmc_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 	case MMC_CMD_SEND_CSD:
 		cmd->response[0] = 0;
 		cmd->response[1] = (MMC_BL_LEN_SHIFT << 16) |
-				   ((MMC_CSIZE >> 16) & 0x3f);
-		cmd->response[2] = (MMC_CSIZE & 0xffff) << 16;
+				   ((priv->csize >> 16) & 0x3f);
+		cmd->response[2] = (priv->csize & 0xffff) << 16;
 		cmd->response[3] = 0;
 		break;
 	case SD_CMD_SWITCH_FUNC: {
@@ -92,10 +95,15 @@ static int sandbox_mmc_send_cmd(struct udevice *dev, struct mmc_cmd *cmd,
 	case SD_CMD_ERASE_WR_BLK_END:
 		erase_end = cmd->cmdarg;
 		break;
-	case MMC_CMD_ERASE:
+#if CONFIG_IS_ENABLED(MMC_WRITE)
+	case MMC_CMD_ERASE: {
+		struct mmc *mmc = mmc_get_mmc_dev(dev);
+
 		memset(&priv->buf[erase_start * mmc->write_bl_len], '\0',
 		       (erase_end - erase_start + 1) * mmc->write_bl_len);
 		break;
+	}
+#endif
 	case SD_CMD_APP_SEND_OP_COND:
 		cmd->response[0] = OCR_BUSY | OCR_HCS;
 		cmd->response[1] = 0;
@@ -136,14 +144,69 @@ static const struct dm_mmc_ops sandbox_mmc_ops = {
 	.get_cd = sandbox_mmc_get_cd,
 };
 
-int sandbox_mmc_probe(struct udevice *dev)
+static int sandbox_mmc_of_to_plat(struct udevice *dev)
 {
 	struct sandbox_mmc_plat *plat = dev_get_plat(dev);
+	struct mmc_config *cfg = &plat->cfg;
+	struct blk_desc *blk;
+	int ret;
+
+	plat->fname = dev_read_string(dev, "filename");
+
+	ret = mmc_of_parse(dev, cfg);
+	if (ret)
+		return ret;
+	blk = mmc_get_blk_desc(&plat->mmc);
+	if (blk)
+		blk->removable = !(cfg->host_caps & MMC_CAP_NONREMOVABLE);
+
+	return 0;
+}
+
+static int sandbox_mmc_probe(struct udevice *dev)
+{
+	struct sandbox_mmc_plat *plat = dev_get_plat(dev);
+	struct sandbox_mmc_priv *priv = dev_get_priv(dev);
+	int ret;
+
+	if (plat->fname) {
+		ret = os_map_file(plat->fname, OS_O_RDWR | OS_O_CREAT,
+				  (void **)&priv->buf, &priv->size);
+		if (ret) {
+			log_err("%s: Unable to map file '%s'\n", dev->name,
+				plat->fname);
+			return ret;
+		}
+		priv->csize = priv->size / SIZE_MULTIPLE - 1;
+	} else {
+		priv->csize = 0;
+		priv->size = (priv->csize + 1) * SIZE_MULTIPLE; /* 1 MiB */
+
+		priv->buf = calloc(1, priv->size);
+		if (!priv->buf) {
+			log_err("%s: Not enough memory (%x bytes)\n",
+				dev->name, priv->size);
+			return -ENOMEM;
+		}
+	}
 
 	return mmc_init(&plat->mmc);
 }
 
-int sandbox_mmc_bind(struct udevice *dev)
+static int sandbox_mmc_remove(struct udevice *dev)
+{
+	struct sandbox_mmc_plat *plat = dev_get_plat(dev);
+	struct sandbox_mmc_priv *priv = dev_get_priv(dev);
+
+	if (plat->fname)
+		os_unmap(priv->buf, priv->size);
+	else
+		free(priv->buf);
+
+	return 0;
+}
+
+static int sandbox_mmc_bind(struct udevice *dev)
 {
 	struct sandbox_mmc_plat *plat = dev_get_plat(dev);
 	struct mmc_config *cfg = &plat->cfg;
@@ -158,7 +221,7 @@ int sandbox_mmc_bind(struct udevice *dev)
 	return mmc_bind(dev, &plat->mmc, cfg);
 }
 
-int sandbox_mmc_unbind(struct udevice *dev)
+static int sandbox_mmc_unbind(struct udevice *dev)
 {
 	mmc_unbind(dev);
 
@@ -177,7 +240,9 @@ U_BOOT_DRIVER(mmc_sandbox) = {
 	.ops		= &sandbox_mmc_ops,
 	.bind		= sandbox_mmc_bind,
 	.unbind		= sandbox_mmc_unbind,
+	.of_to_plat	= sandbox_mmc_of_to_plat,
 	.probe		= sandbox_mmc_probe,
+	.remove		= sandbox_mmc_remove,
 	.priv_auto = sizeof(struct sandbox_mmc_priv),
 	.plat_auto = sizeof(struct sandbox_mmc_plat),
 };

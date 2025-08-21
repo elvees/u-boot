@@ -13,7 +13,7 @@ ENTRY(lowlevel_init)
 	mov	x29, lr			/* Save LR */
 
 #if defined(CONFIG_GICV2) || defined(CONFIG_GICV3)
-#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_ATF)
+#if defined(CONFIG_XPL_BUILD) && defined(CONFIG_SPL_ATF)
 wait_for_atf:
 	ldr	x4, =CPU_RELEASE_ADDR
 	ldr	x5, [x4]
@@ -38,7 +38,7 @@ slave_wait_atf:
 #endif
 
 #ifdef CONFIG_ARMV8_MULTIENTRY
-	branch_if_master x0, x1, 2f
+	branch_if_master x0, 2f
 
 	/*
 	 * Slave should wait for master clearing spin table.

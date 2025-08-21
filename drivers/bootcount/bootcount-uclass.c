@@ -3,11 +3,13 @@
  * (C) Copyright 2018 Theobroma Systems Design und Consulting GmbH
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_BOOTCOUNT
+
 #include <dm.h>
 #include <errno.h>
 #include <bootcount.h>
 #include <log.h>
+#include <linux/printk.h>
 
 int dm_bootcount_get(struct udevice *dev, u32 *bootcount)
 {

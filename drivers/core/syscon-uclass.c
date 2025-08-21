@@ -6,7 +6,6 @@
 
 #define LOG_CATEGORY UCLASS_SYSCON
 
-#include <common.h>
 #include <log.h>
 #include <syscon.h>
 #include <dm.h>
@@ -49,17 +48,30 @@ static int syscon_pre_probe(struct udevice *dev)
 	if (device_get_uclass_id(dev->parent) == UCLASS_PCI)
 		return 0;
 
+#if CONFIG_IS_ENABLED(OF_PLATDATA)
 	/*
 	 * With OF_PLATDATA we really have no way of knowing the format of
 	 * the device-specific platform data. So we assume that it starts with
-	 * a 'reg' member, and this holds a single address and size. Drivers
-	 * using OF_PLATDATA will need to ensure that this is true.
+	 * a 'reg' member that holds a single address and size. Drivers
+	 * using OF_PLATDATA will need to ensure that this is true. In case of
+	 * odd reg structures other then the syscon_base_plat structure
+	 * below the regmap must be defined in the individual syscon driver.
 	 */
-#if CONFIG_IS_ENABLED(OF_PLATDATA)
+	struct syscon_base_plat {
+		phys_addr_t reg[2];
+	};
+
 	struct syscon_base_plat *plat = dev_get_plat(dev);
 
-	return regmap_init_mem_plat(dev, plat->reg, ARRAY_SIZE(plat->reg),
-					&priv->regmap);
+	/*
+	 * Return if the regmap is already defined in the individual
+	 * syscon driver.
+	 */
+	if (priv->regmap)
+		return 0;
+
+	return regmap_init_mem_plat(dev, plat->reg, sizeof(plat->reg[0]),
+				    ARRAY_SIZE(plat->reg) / 2, &priv->regmap);
 #else
 	return regmap_init_mem(dev_ofnode(dev), &priv->regmap);
 #endif
@@ -186,7 +198,7 @@ static const struct udevice_id generic_syscon_ids[] = {
 U_BOOT_DRIVER(generic_syscon) = {
 	.name	= "syscon",
 	.id	= UCLASS_SYSCON,
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	.bind           = dm_scan_fdt_dev,
 #endif
 	.of_match = generic_syscon_ids,

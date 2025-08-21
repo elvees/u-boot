@@ -3,7 +3,6 @@
  * Copyright (C) 2019 Broadcom
  */
 
-#include <common.h>
 #include <dm.h>
 #include <generic-phy.h>
 #include <asm/io.h>
@@ -143,8 +142,8 @@ static int sr_pcie_phy_probe(struct udevice *dev)
 
 	core->dev = dev;
 
-	core->base = (void __iomem *)devfdt_get_addr_name(dev, "reg_base");
-	core->cdru = (void __iomem *)devfdt_get_addr_name(dev, "cdru_base");
+	core->base = (void __iomem *)dev_read_addr_name_ptr(dev, "reg_base");
+	core->cdru = (void __iomem *)dev_read_addr_name_ptr(dev, "cdru_base");
 	debug("ip base %p\n", core->base);
 	debug("cdru base %p\n", core->cdru);
 

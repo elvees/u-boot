@@ -5,38 +5,71 @@
  *  Copyright (C) 2018, Bin Meng <bmeng.cn@gmail.com>
  */
 
-#include <common.h>
+#define LOG_CATEGORY LOGC_EFI
+
+#include <bloblist.h>
 #include <efi_loader.h>
 #include <log.h>
+#include <mapmem.h>
 #include <acpi/acpi_table.h>
+#include <asm/global_data.h>
+
+DECLARE_GLOBAL_DATA_PTR;
 
 static const efi_guid_t acpi_guid = EFI_ACPI_TABLE_GUID;
 
 /*
  * Install the ACPI table as a configuration table.
  *
- * @return	status code
+ * Return:	status code
  */
 efi_status_t efi_acpi_register(void)
 {
-	/* Map within the low 32 bits, to allow for 32bit ACPI tables */
-	u64 acpi = U32_MAX;
+	ulong addr, start, end;
 	efi_status_t ret;
 
-	/* Reserve 64kiB page for ACPI */
-	ret = efi_allocate_pages(EFI_ALLOCATE_MAX_ADDRESS,
-				 EFI_ACPI_RECLAIM_MEMORY, 16, &acpi);
-	if (ret != EFI_SUCCESS)
-		return ret;
-
 	/*
-	 * Generate ACPI tables - we know that efi_allocate_pages() returns
-	 * a 4k-aligned address, so it is safe to assume that
-	 * write_acpi_tables() will write the table at that address.
+	 * The bloblist is already marked reserved. For now, we don't bother
+	 * marking it with EFI_ACPI_RECLAIM_MEMORY since we would need to cut a
+	 * hole in the EFI_BOOT_SERVICES_CODE region added by
+	 * add_u_boot_and_runtime(). At some point that function could create a
+	 * more detailed map.
 	 */
-	write_acpi_tables(acpi);
+	if (IS_ENABLED(CONFIG_BLOBLIST_TABLES)) {
+		int size;
+		void *tab = bloblist_get_blob(BLOBLISTT_ACPI_TABLES, &size);
+
+		if (!tab)
+			return EFI_NOT_FOUND;
+		addr = map_to_sysmem(tab);
+
+		ret = efi_add_memory_map(addr, size,
+					 EFI_ACPI_RECLAIM_MEMORY);
+		if (ret != EFI_SUCCESS)
+			return ret;
+	} else {
+		/* Mark space used for tables */
+		start = ALIGN_DOWN(gd->arch.table_start, EFI_PAGE_MASK);
+		end = ALIGN(gd->arch.table_end, EFI_PAGE_MASK);
+		ret = efi_add_memory_map(start, end - start,
+					 EFI_ACPI_RECLAIM_MEMORY);
+		if (ret != EFI_SUCCESS)
+			return ret;
+		if (gd->arch.table_start_high) {
+			start = ALIGN_DOWN(gd->arch.table_start_high,
+					   EFI_PAGE_MASK);
+			end = ALIGN(gd->arch.table_end_high, EFI_PAGE_MASK);
+			ret = efi_add_memory_map(start, end - start,
+						 EFI_ACPI_RECLAIM_MEMORY);
+			if (ret != EFI_SUCCESS)
+				return ret;
+		}
+
+		addr = gd_acpi_start();
+	}
+	log_debug("EFI using ACPI tables at %lx\n", addr);
 
 	/* And expose them to our EFI payload */
 	return efi_install_configuration_table(&acpi_guid,
-					       (void *)(uintptr_t)acpi);
+					       (void *)(ulong)addr);
 }

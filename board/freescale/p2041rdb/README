@@ -98,10 +98,7 @@ enabled in relative defconfig file,
 1. CONFIG_DEFAULT_DEVICE_TREE="p2041rdb" (Change default device tree name if required)
 2. CONFIG_OF_CONTROL
 3. CONFIG_MPC85XX_HAVE_RESET_VECTOR if reset vector is located at
-   CONFIG_RESET_VECTOR_ADDRESS - 0xffc
-
-If device tree support is enabled in defconfig, use 'u-boot-with-dtb.bin'
-instead of u-boot.bin for all boot.
+   CFG_RESET_VECTOR_ADDRESS - 0xffc
 
 CPLD command
 ============

@@ -15,6 +15,9 @@
 
 /**********************************************************************/
 
+#define PORT_BOOTPS	67		/* BOOTP server UDP port */
+#define PORT_BOOTPC	68		/* BOOTP client UDP port */
+
 /*
  *	BOOTP header.
  */
@@ -61,7 +64,6 @@ struct bootp_hdr {
 /* bootp.c */
 extern u32	bootp_id;		/* ID of cur BOOTP request	*/
 extern int	bootp_try;
-
 
 /* Send a BOOTP request */
 void bootp_reset(void);

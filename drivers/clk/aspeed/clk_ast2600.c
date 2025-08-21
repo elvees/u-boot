@@ -3,7 +3,6 @@
  * Copyright (C) ASPEED Technology Inc.
  */
 
-#include <common.h>
 #include <clk-uclass.h>
 #include <dm.h>
 #include <asm/io.h>
@@ -19,11 +18,11 @@ DECLARE_GLOBAL_DATA_PTR;
 #define CLKIN_25M 25000000UL
 
 /* MAC Clock Delay settings */
-#define MAC12_DEF_DELAY_1G		0x0041b75d
-#define MAC12_DEF_DELAY_100M	0x00417410
-#define MAC12_DEF_DELAY_10M		0x00417410
-#define MAC34_DEF_DELAY_1G		0x0010438a
-#define MAC34_DEF_DELAY_100M	0x00104208
+#define MAC12_DEF_DELAY_1G		0x0028a410
+#define MAC12_DEF_DELAY_100M		0x00410410
+#define MAC12_DEF_DELAY_10M		0x00410410
+#define MAC34_DEF_DELAY_1G		0x00104208
+#define MAC34_DEF_DELAY_100M		0x00104208
 #define MAC34_DEF_DELAY_10M		0x00104208
 
 /*
@@ -471,7 +470,7 @@ static ulong ast2600_clk_get_rate(struct clk *clk)
 		rate = ast2600_get_uart_huxclk_rate(priv->scu);
 		break;
 	default:
-		debug("can't get clk rate\n");
+		debug("%s: unknown clk %ld\n", __func__, clk->id);
 		return -ENOENT;
 	}
 
@@ -481,7 +480,7 @@ static ulong ast2600_clk_get_rate(struct clk *clk)
 /**
  * @brief	lookup PLL divider config by input/output rate
  * @param[in]	*pll - PLL descriptor
- * @return	true - if PLL divider config is found, false - else
+ * Return:	true - if PLL divider config is found, false - else
  * The function caller shall fill "pll->in" and "pll->out",
  * then this function will search the lookup table
  * to find a valid PLL divider configuration.
@@ -538,7 +537,7 @@ static uint32_t ast2600_configure_pll(struct ast2600_scu *scu,
 	}
 
 	p_cfg->reg.b.bypass = 0;
-	p_cfg->reg.b.off = 1;
+	p_cfg->reg.b.off = 0;
 	p_cfg->reg.b.reset = 1;
 
 	reg = readl(addr);
@@ -549,7 +548,6 @@ static uint32_t ast2600_configure_pll(struct ast2600_scu *scu,
 	/* write extend parameter */
 	writel(p_cfg->ext_reg, addr_ext);
 	udelay(100);
-	p_cfg->reg.b.off = 0;
 	p_cfg->reg.b.reset = 0;
 	reg &= ~GENMASK(25, 0);
 	reg |= p_cfg->reg.w;
@@ -1013,6 +1011,46 @@ static ulong ast2600_enable_usbbhclk(struct ast2600_scu *scu)
 	return 0;
 }
 
+static ulong ast2600_enable_haceclk(struct ast2600_scu *scu)
+{
+	uint32_t reset_bit;
+	uint32_t clkgate_bit;
+
+	/* share the same reset control bit with ACRY */
+	reset_bit = BIT(ASPEED_RESET_HACE);
+	clkgate_bit = SCU_CLKGATE1_HACE;
+
+	/*
+	 * we don't do reset assertion here as HACE
+	 * shares the same reset control with ACRY
+	 */
+	writel(clkgate_bit, &scu->clkgate_clr1);
+	mdelay(20);
+	writel(reset_bit, &scu->modrst_clr1);
+
+	return 0;
+}
+
+static ulong ast2600_enable_rsaclk(struct ast2600_scu *scu)
+{
+	uint32_t reset_bit;
+	uint32_t clkgate_bit;
+
+	/* same reset control bit with HACE */
+	reset_bit = BIT(ASPEED_RESET_HACE);
+	clkgate_bit = SCU_CLKGATE1_ACRY;
+
+	/*
+	 * we don't do reset assertion here as HACE
+	 * shares the same reset control with ACRY
+	 */
+	writel(clkgate_bit, &scu->clkgate_clr1);
+	mdelay(20);
+	writel(reset_bit, &scu->modrst_clr1);
+
+	return 0;
+}
+
 static int ast2600_clk_enable(struct clk *clk)
 {
 	struct ast2600_clk_priv *priv = dev_get_priv(clk->dev);
@@ -1033,13 +1071,13 @@ static int ast2600_clk_enable(struct clk *clk)
 	case ASPEED_CLK_GATE_SDCLK:
 		ast2600_enable_sdclk(priv->scu);
 		break;
-	case ASPEED_CLK_GATE_SDEXTCLK:
+	case ASPEED_CLK_SDIO:
 		ast2600_enable_extsdclk(priv->scu);
 		break;
 	case ASPEED_CLK_GATE_EMMCCLK:
 		ast2600_enable_emmcclk(priv->scu);
 		break;
-	case ASPEED_CLK_GATE_EMMCEXTCLK:
+	case ASPEED_CLK_EMMC:
 		ast2600_enable_extemmcclk(priv->scu);
 		break;
 	case ASPEED_CLK_GATE_FSICLK:
@@ -1051,18 +1089,85 @@ static int ast2600_clk_enable(struct clk *clk)
 	case ASPEED_CLK_GATE_USBPORT2CLK:
 		ast2600_enable_usbbhclk(priv->scu);
 		break;
+	case ASPEED_CLK_GATE_YCLK:
+		ast2600_enable_haceclk(priv->scu);
+		break;
+	case ASPEED_CLK_GATE_RSACLK:
+		ast2600_enable_rsaclk(priv->scu);
+		break;
 	default:
-		pr_err("can't enable clk\n");
+		debug("%s: unknown clk %ld\n", __func__, clk->id);
 		return -ENOENT;
 	}
 
 	return 0;
 }
 
+struct aspeed_clks {
+	ulong id;
+	const char *name;
+};
+
+#if IS_ENABLED(CONFIG_CMD_CLK)
+static struct aspeed_clks aspeed_clk_names[] = {
+	{ ASPEED_CLK_HPLL, "hpll" },
+	{ ASPEED_CLK_MPLL, "mpll" },
+	{ ASPEED_CLK_APLL, "apll" },
+	{ ASPEED_CLK_EPLL, "epll" },
+	{ ASPEED_CLK_DPLL, "dpll" },
+	{ ASPEED_CLK_AHB, "hclk" },
+	{ ASPEED_CLK_APB1, "pclk1" },
+	{ ASPEED_CLK_APB2, "pclk2" },
+	{ ASPEED_CLK_BCLK, "bclk" },
+	{ ASPEED_CLK_UARTX, "uxclk" },
+	{ ASPEED_CLK_HUARTX, "huxclk" },
+};
+
+static void ast2600_clk_dump(struct udevice *dev)
+{
+	struct clk clk;
+	unsigned long rate;
+	int i, ret;
+
+	printf("Clk\t\tHz\n");
+
+	for (i = 0; i < ARRAY_SIZE(aspeed_clk_names); i++) {
+		clk.id = aspeed_clk_names[i].id;
+		ret = clk_request(dev, &clk);
+		if (ret < 0) {
+			debug("%s clk_request() failed: %d\n", __func__, ret);
+			continue;
+		}
+
+		ret = clk_get_rate(&clk);
+		rate = ret;
+
+		if (ret == -EINVAL) {
+			printf("clk ID %lu not supported yet\n",
+			       aspeed_clk_names[i].id);
+			continue;
+		}
+		if (ret < 0) {
+			printf("%s %lu: get_rate err: %d\n", __func__,
+			       aspeed_clk_names[i].id, ret);
+			continue;
+		}
+
+		printf("%s(%3lu):\t%lu\n", aspeed_clk_names[i].name,
+		       aspeed_clk_names[i].id, rate);
+	}
+
+	return 0;
+}
+#endif
+
 struct clk_ops ast2600_clk_ops = {
 	.get_rate = ast2600_clk_get_rate,
 	.set_rate = ast2600_clk_set_rate,
 	.enable = ast2600_clk_enable,
+#if IS_ENABLED(CONFIG_CMD_CLK)
+	.dump = ast2600_clk_dump,
+#endif
 };
 
 static int ast2600_clk_probe(struct udevice *dev)
@@ -1090,70 +1195,6 @@ static int ast2600_clk_bind(struct udevice *dev)
 	ret = device_bind_driver(gd->dm_root, "ast_sysreset", "reset", &dev);
 	if (ret)
 		debug("Warning: No reset driver: ret=%d\n", ret);
-
-	return 0;
-}
-
-struct aspeed_clks {
-	ulong id;
-	const char *name;
-};
-
-static struct aspeed_clks aspeed_clk_names[] = {
-	{ ASPEED_CLK_HPLL, "hpll" },
-	{ ASPEED_CLK_MPLL, "mpll" },
-	{ ASPEED_CLK_APLL, "apll" },
-	{ ASPEED_CLK_EPLL, "epll" },
-	{ ASPEED_CLK_DPLL, "dpll" },
-	{ ASPEED_CLK_AHB, "hclk" },
-	{ ASPEED_CLK_APB1, "pclk1" },
-	{ ASPEED_CLK_APB2, "pclk2" },
-	{ ASPEED_CLK_BCLK, "bclk" },
-	{ ASPEED_CLK_UARTX, "uxclk" },
-	{ ASPEED_CLK_HUARTX, "huxclk" },
-};
-
-int soc_clk_dump(void)
-{
-	struct udevice *dev;
-	struct clk clk;
-	unsigned long rate;
-	int i, ret;
-
-	ret = uclass_get_device_by_driver(UCLASS_CLK, DM_DRIVER_GET(aspeed_scu),
-					  &dev);
-	if (ret)
-		return ret;
-
-	printf("Clk\t\tHz\n");
-
-	for (i = 0; i < ARRAY_SIZE(aspeed_clk_names); i++) {
-		clk.id = aspeed_clk_names[i].id;
-		ret = clk_request(dev, &clk);
-		if (ret < 0) {
-			debug("%s clk_request() failed: %d\n", __func__, ret);
-			continue;
-		}
-
-		ret = clk_get_rate(&clk);
-		rate = ret;
-
-		clk_free(&clk);
-
-		if (ret == -ENOTSUPP) {
-			printf("clk ID %lu not supported yet\n",
-			       aspeed_clk_names[i].id);
-			continue;
-		}
-		if (ret < 0) {
-			printf("%s %lu: get_rate err: %d\n", __func__,
-			       aspeed_clk_names[i].id, ret);
-			continue;
-		}
-
-		printf("%s(%3lu):\t%lu\n", aspeed_clk_names[i].name,
-		       aspeed_clk_names[i].id, rate);
-	}
 
 	return 0;
 }

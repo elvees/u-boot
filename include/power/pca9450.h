@@ -54,6 +54,25 @@ enum {
 	PCA9450_REG_NUM,
 };
 
-int power_pca9450_init(unsigned char bus);
+#define PCA9450_REG_PWRCTRL_TOFF_DEB    BIT(5)
+
+int power_pca9450_init(unsigned char bus, unsigned char addr);
+
+enum {
+	NXP_CHIP_TYPE_PCA9450A = 0,
+	NXP_CHIP_TYPE_PCA9450BC,
+	NXP_CHIP_TYPE_PCA9451A,
+	NXP_CHIP_TYPE_PCA9452,
+	NXP_CHIP_TYPE_AMOUNT
+};
+
+#define PCA9450_DVS_BUCK_RUN_MASK	0x7f
+#define PCA9450_LDO12_MASK		0x07
+#define PCA9450_LDO34_MASK		0x1f
+#define PCA9450_LDO5_MASK		0x0f
+
+#define PCA9450_PMIC_RESET_WDOG_B_CFG_MASK		0xc0
+#define PCA9450_PMIC_RESET_WDOG_B_CFG_WARM		0x40
+#define PCA9450_PMIC_RESET_WDOG_B_CFG_COLD_LDO12	0x80
 
 #endif

@@ -2,6 +2,9 @@
 /*
  * Hello world EFI application
  *
+ * Copyright (c) 2016 Google, Inc
+ * Written by Simon Glass <sjg@chromium.org>
+ *
  * Copyright 2020, Heinrich Schuchardt <xypron.glpk@gmx.de>
  *
  * This test program is used to test the invocation of an EFI application.
@@ -29,28 +32,107 @@ static struct efi_system_table *systable;
 static struct efi_boot_services *boottime;
 static struct efi_simple_text_output_protocol *con_out;
 
+/*
+ * Print an unsigned 32bit value as decimal number to an u16 string
+ *
+ * @value:	value to be printed
+ * @buf:	pointer to buffer address
+ *		on return position of terminating zero word
+ */
+static void uint2dec(u32 value, u16 **buf)
+{
+	u16 *pos = *buf;
+	int i;
+	u16 c;
+	u64 f;
+
+	/*
+	 * Increment by .5 and multiply with
+	 * (2 << 60) / 1,000,000,000 = 0x44B82FA0.9B5A52CC
+	 * to move the first digit to bit 60-63.
+	 */
+	f = 0x225C17D0;
+	f += (0x9B5A52DULL * value) >> 28;
+	f += 0x44B82FA0ULL * value;
+
+	for (i = 0; i < 10; ++i) {
+		/* Write current digit */
+		c = f >> 60;
+		if (c || pos != *buf)
+			*pos++ = c + '0';
+		/* Eliminate current digit */
+		f &= 0xfffffffffffffff;
+		/* Get next digit */
+		f *= 0xaULL;
+	}
+	if (pos == *buf)
+		*pos++ = '0';
+	*pos = 0;
+	*buf = pos;
+}
+
+/**
+ * Print an unsigned 32bit value as hexadecimal number to an u16 string
+ *
+ * @value:	value to be printed
+ * @buf:	pointer to buffer address
+ *		on return position of terminating zero word
+ */
+static void uint2hex(u32 value, u16 **buf)
+{
+	u16 *pos = *buf;
+	int i;
+	u16 c;
+
+	for (i = 0; i < 8; ++i) {
+		/* Write current digit */
+		c = value >> 28;
+		value <<= 4;
+		if (c < 10)
+			c += '0';
+		else
+			c += 'a' - 10;
+		*pos++ = c;
+	}
+	*pos = 0;
+	*buf = pos;
+}
+
 /**
  * print_uefi_revision() - print UEFI revision number
  */
 static void print_uefi_revision(void)
 {
-	u16 rev[] = L"0.0.0";
+	u16 rev[13] = {0};
+	u16 *buf = rev;
+	u16 digit;
 
-	rev[0] = (systable->hdr.revision >> 16) + '0';
-	rev[4] = systable->hdr.revision & 0xffff;
-	for (; rev[4] >= 10;) {
-		rev[4] -= 10;
-		++rev[2];
+	uint2dec(systable->hdr.revision >> 16, &buf);
+	*buf++ = '.';
+	uint2dec(systable->hdr.revision & 0xffff, &buf);
+
+	/* Minor revision is only to be shown if non-zero */
+	digit = *--buf;
+	if (digit == '0') {
+		*buf = 0;
+	} else {
+		*buf++ = '.';
+		*buf = digit;
 	}
-	/* Third digit is only to be shown if non-zero */
-	if (rev[4])
-		rev[4] += '0';
-	else
-		rev[3] = 0;
 
-	con_out->output_string(con_out, L"Running on UEFI ");
+	con_out->output_string(con_out, u"Running on UEFI ");
 	con_out->output_string(con_out, rev);
-	con_out->output_string(con_out, L"\r\n");
+	con_out->output_string(con_out, u"\r\n");
+
+	con_out->output_string(con_out, u"Firmware vendor: ");
+	con_out->output_string(con_out, systable->fw_vendor);
+	con_out->output_string(con_out, u"\r\n");
+
+	buf = rev;
+	uint2hex(systable->fw_revision, &buf);
+	con_out->output_string(con_out, u"Firmware revision: ");
+	con_out->output_string(con_out, rev);
+	con_out->output_string(con_out, u"\r\n");
 }
 
 /**
@@ -65,15 +147,15 @@ static void print_config_tables(void)
 		if (!memcmp(&systable->tables[i].guid, &fdt_guid,
 			    sizeof(efi_guid_t)))
 			con_out->output_string
-					(con_out, L"Have device tree\r\n");
+					(con_out, u"Have device tree\r\n");
 		if (!memcmp(&systable->tables[i].guid, &acpi_guid,
 			    sizeof(efi_guid_t)))
 			con_out->output_string
-					(con_out, L"Have ACPI 2.0 table\r\n");
+					(con_out, u"Have ACPI 2.0 table\r\n");
 		if (!memcmp(&systable->tables[i].guid, &smbios_guid,
 			    sizeof(efi_guid_t)))
 			con_out->output_string
-					(con_out, L"Have SMBIOS table\r\n");
+					(con_out, u"Have SMBIOS table\r\n");
 	}
 }
 
@@ -83,16 +165,16 @@ static void print_config_tables(void)
  * @systable:	system table
  * @con_out:	simple text output protocol
  */
-void print_load_options(struct efi_loaded_image *loaded_image)
+static void print_load_options(struct efi_loaded_image *loaded_image)
 {
 	/* Output the load options */
-	con_out->output_string(con_out, L"Load options: ");
+	con_out->output_string(con_out, u"Load options: ");
 	if (loaded_image->load_options_size && loaded_image->load_options)
 		con_out->output_string(con_out,
 				       (u16 *)loaded_image->load_options);
 	else
-		con_out->output_string(con_out, L"<none>");
-	con_out->output_string(con_out, L"\r\n");
+		con_out->output_string(con_out, u"<none>");
+	con_out->output_string(con_out, u"\r\n");
 }
 
 /**
@@ -101,6 +183,7 @@ void print_load_options(struct efi_loaded_image *loaded_image)
  * @device_path:	device path to print
  * @dp2txt:		device path to text protocol
  */
+static
 efi_status_t print_device_path(struct efi_device_path *device_path,
 			       struct efi_device_path_to_text_protocol *dp2txt)
 {
@@ -108,21 +191,21 @@ efi_status_t print_device_path(struct efi_device_path *device_path,
 	efi_status_t ret;
 
 	if (!device_path) {
-		con_out->output_string(con_out, L"<none>\r\n");
+		con_out->output_string(con_out, u"<none>\r\n");
 		return EFI_SUCCESS;
 	}
 
 	string = dp2txt->convert_device_path_to_text(device_path, true, false);
 	if (!string) {
 		con_out->output_string
-			(con_out, L"Cannot convert device path to text\r\n");
+			(con_out, u"Cannot convert device path to text\r\n");
 		return EFI_OUT_OF_RESOURCES;
 	}
 	con_out->output_string(con_out, string);
-	con_out->output_string(con_out, L"\r\n");
+	con_out->output_string(con_out, u"\r\n");
 	ret = boottime->free_pool(string);
 	if (ret != EFI_SUCCESS) {
-		con_out->output_string(con_out, L"Cannot free pool memory\r\n");
+		con_out->output_string(con_out, u"Cannot free pool memory\r\n");
 		return ret;
 	}
 	return EFI_SUCCESS;
@@ -133,7 +216,7 @@ efi_status_t print_device_path(struct efi_device_path *device_path,
  *
  * @handle:	handle of the loaded image
  * @systab:	system table
- * @return:	status code
+ * Return:	status code
  */
 efi_status_t EFIAPI efi_main(efi_handle_t handle,
 			     struct efi_system_table *systab)
@@ -148,17 +231,19 @@ efi_status_t EFIAPI efi_main(efi_handle_t handle,
 	con_out = systable->con_out;
 
 	/* UEFI requires CR LF */
-	con_out->output_string(con_out, L"Hello, world!\r\n");
+	con_out->output_string(con_out, u"Hello, world!\r\n");
 
 	print_uefi_revision();
 	print_config_tables();
 
 	/* Get the loaded image protocol */
-	ret = boottime->handle_protocol(handle, &loaded_image_guid,
-					(void **)&loaded_image);
+	ret = boottime->open_protocol(handle, &loaded_image_guid,
+				      (void **)&loaded_image, NULL, NULL,
+				      EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+
 	if (ret != EFI_SUCCESS) {
 		con_out->output_string
-			(con_out, L"Cannot open loaded image protocol\r\n");
+			(con_out, u"Cannot open loaded image protocol\r\n");
 		goto out;
 	}
 	print_load_options(loaded_image);
@@ -168,28 +253,29 @@ efi_status_t EFIAPI efi_main(efi_handle_t handle,
 					NULL, (void **)&device_path_to_text);
 	if (ret != EFI_SUCCESS) {
 		con_out->output_string
-			(con_out, L"Cannot open device path to text protocol\r\n");
+			(con_out, u"Cannot open device path to text protocol\r\n");
 		goto out;
 	}
-	if (!loaded_image->device_handle) {
-		con_out->output_string
-			(con_out, L"Missing device handle\r\n");
-		goto out;
-	}
-	ret = boottime->handle_protocol(loaded_image->device_handle,
-					&device_path_guid,
-					(void **)&device_path);
-	if (ret != EFI_SUCCESS) {
-		con_out->output_string
-			(con_out, L"Missing device path for device handle\r\n");
-		goto out;
-	}
-	con_out->output_string(con_out, L"Boot device: ");
-	ret = print_device_path(device_path, device_path_to_text);
+	con_out->output_string(con_out, u"File path: ");
+	ret = print_device_path(loaded_image->file_path, device_path_to_text);
 	if (ret != EFI_SUCCESS)
 		goto out;
-	con_out->output_string(con_out, L"File path: ");
-	ret = print_device_path(loaded_image->file_path, device_path_to_text);
+	if (!loaded_image->device_handle) {
+		con_out->output_string
+			(con_out, u"Missing device handle\r\n");
+		goto out;
+	}
+	ret = boottime->open_protocol(loaded_image->device_handle,
+				      &device_path_guid,
+				      (void **)&device_path, NULL, NULL,
+				      EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+	if (ret != EFI_SUCCESS) {
+		con_out->output_string
+			(con_out, u"Missing device path for device handle\r\n");
+		goto out;
+	}
+	con_out->output_string(con_out, u"Boot device: ");
+	ret = print_device_path(device_path, device_path_to_text);
 	if (ret != EFI_SUCCESS)
 		goto out;
 

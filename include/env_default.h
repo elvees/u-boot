@@ -7,8 +7,11 @@
  * Andreas Heppel <aheppel@sysgo.de>
  */
 
+#include <config.h>
 #include <env_callback.h>
 #include <linux/stringify.h>
+
+#include <generated/environment.h>
 
 #ifdef DEFAULT_ENV_INSTANCE_EMBEDDED
 env_t embedded_environment __UBOOT_ENV_SECTION__(environment) = {
@@ -19,10 +22,10 @@ env_t embedded_environment __UBOOT_ENV_SECTION__(environment) = {
 	{
 #elif defined(DEFAULT_ENV_INSTANCE_STATIC)
 static char default_environment[] = {
-#elif defined(DEFAULT_ENV_IS_RW)
-uchar default_environment[] = {
+#elif defined(CONFIG_DEFAULT_ENV_IS_RW)
+char default_environment[] = {
 #else
-const uchar default_environment[] = {
+const char default_environment[] = {
 #endif
 #ifndef CONFIG_USE_DEFAULT_ENV_FILE
 #ifdef	CONFIG_ENV_CALLBACK_LIST_DEFAULT
@@ -37,16 +40,10 @@ const uchar default_environment[] = {
 #ifdef	CONFIG_BOOTCOMMAND
 	"bootcmd="	CONFIG_BOOTCOMMAND		"\0"
 #endif
-#ifdef	CONFIG_RAMBOOTCOMMAND
-	"ramboot="	CONFIG_RAMBOOTCOMMAND		"\0"
-#endif
-#ifdef	CONFIG_NFSBOOTCOMMAND
-	"nfsboot="	CONFIG_NFSBOOTCOMMAND		"\0"
-#endif
 #if defined(CONFIG_BOOTDELAY)
 	"bootdelay="	__stringify(CONFIG_BOOTDELAY)	"\0"
 #endif
-#if defined(CONFIG_BAUDRATE) && (CONFIG_BAUDRATE >= 0)
+#if !defined(CONFIG_OF_SERIAL_BAUD) && defined(CONFIG_BAUDRATE) && (CONFIG_BAUDRATE >= 0)
 	"baudrate="	__stringify(CONFIG_BAUDRATE)	"\0"
 #endif
 #ifdef	CONFIG_LOADS_ECHO
@@ -55,38 +52,35 @@ const uchar default_environment[] = {
 #ifdef	CONFIG_ETHPRIME
 	"ethprime="	CONFIG_ETHPRIME			"\0"
 #endif
-#ifdef	CONFIG_IPADDR
-	"ipaddr="	__stringify(CONFIG_IPADDR)	"\0"
+#ifdef	CONFIG_USE_IPADDR
+	"ipaddr="	CONFIG_IPADDR			"\0"
 #endif
-#ifdef	CONFIG_SERVERIP
-	"serverip="	__stringify(CONFIG_SERVERIP)	"\0"
+#ifdef	CONFIG_USE_SERVERIP
+	"serverip="	CONFIG_SERVERIP			"\0"
 #endif
-#ifdef	CONFIG_SYS_AUTOLOAD
-	"autoload="	CONFIG_SYS_AUTOLOAD		"\0"
+#ifdef	CONFIG_SYS_DISABLE_AUTOLOAD
+	"autoload=0\0"
 #endif
-#ifdef	CONFIG_PREBOOT
+#ifdef	CONFIG_PREBOOT_DEFINED
 	"preboot="	CONFIG_PREBOOT			"\0"
 #endif
-#ifdef	CONFIG_ROOTPATH
+#ifdef	CONFIG_USE_ROOTPATH
 	"rootpath="	CONFIG_ROOTPATH			"\0"
 #endif
-#ifdef	CONFIG_GATEWAYIP
-	"gatewayip="	__stringify(CONFIG_GATEWAYIP)	"\0"
+#ifdef	CONFIG_USE_GATEWAYIP
+	"gatewayip="	CONFIG_GATEWAYIP		"\0"
 #endif
-#ifdef	CONFIG_NETMASK
-	"netmask="	__stringify(CONFIG_NETMASK)	"\0"
+#ifdef	CONFIG_USE_NETMASK
+	"netmask="	CONFIG_NETMASK			"\0"
 #endif
-#ifdef	CONFIG_HOSTNAME
-	"hostname="	CONFIG_HOSTNAME	"\0"
+#ifdef	CONFIG_USE_HOSTNAME
+	"hostname="	CONFIG_HOSTNAME			"\0"
 #endif
-#ifdef	CONFIG_BOOTFILE
+#ifdef CONFIG_USE_BOOTFILE
 	"bootfile="	CONFIG_BOOTFILE			"\0"
 #endif
-#ifdef	CONFIG_LOADADDR
-	"loadaddr="	__stringify(CONFIG_LOADADDR)	"\0"
-#endif
-#if defined(CONFIG_PCI_BOOTDELAY) && (CONFIG_PCI_BOOTDELAY > 0)
-	"pcidelay="	__stringify(CONFIG_PCI_BOOTDELAY)"\0"
+#ifdef	CONFIG_SYS_LOAD_ADDR
+	"loadaddr="	__stringify(CONFIG_SYS_LOAD_ADDR)"\0"
 #endif
 #ifdef	CONFIG_ENV_VARS_UBOOT_CONFIG
 	"arch="		CONFIG_SYS_ARCH			"\0"
@@ -103,12 +97,43 @@ const uchar default_environment[] = {
 #ifdef CONFIG_SYS_SOC
 	"soc="		CONFIG_SYS_SOC			"\0"
 #endif
+#ifdef CONFIG_USB_HOST
+	"usb_ignorelist="
+#ifdef CONFIG_USB_KEYBOARD
+	/* Ignore Yubico devices. Currently only a single USB keyboard device is
+	 * supported and the emulated HID keyboard Yubikeys present is useless
+	 * as keyboard.
+	 */
+	"0x1050:*,"
+#endif
+	"\0"
+#endif
+#ifdef CONFIG_ENV_IMPORT_FDT
+	"env_fdt_path="	CONFIG_ENV_FDT_PATH		"\0"
+#endif
 #endif
 #if defined(CONFIG_BOOTCOUNT_BOOTLIMIT) && (CONFIG_BOOTCOUNT_BOOTLIMIT > 0)
 	"bootlimit="	__stringify(CONFIG_BOOTCOUNT_BOOTLIMIT)"\0"
 #endif
-#ifdef	CONFIG_EXTRA_ENV_SETTINGS
-	CONFIG_EXTRA_ENV_SETTINGS
+#ifdef CONFIG_BOOTCOUNT_ALTBOOTCMD
+	"altbootcmd="	CONFIG_BOOTCOUNT_ALTBOOTCMD            "\0"
+#endif
+#ifdef CONFIG_MTDIDS_DEFAULT
+	 "mtdids="	CONFIG_MTDIDS_DEFAULT		"\0"
+#endif
+#ifdef CONFIG_MTDPARTS_DEFAULT
+	"mtdparts="	CONFIG_MTDPARTS_DEFAULT		"\0"
+#endif
+#ifdef CONFIG_EXTRA_ENV_TEXT
+	/* This is created in the Makefile */
+	CONFIG_EXTRA_ENV_TEXT
+#endif
+#ifdef	CFG_EXTRA_ENV_SETTINGS
+	CFG_EXTRA_ENV_SETTINGS
+#endif
+#ifdef CONFIG_OF_SERIAL_BAUD
+	/* Padding for baudrate at the end when environment is writable */
+	"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 #endif
 	"\0"
 #else /* CONFIG_USE_DEFAULT_ENV_FILE */
@@ -118,3 +143,9 @@ const uchar default_environment[] = {
 	}
 #endif
 };
+
+#if !defined(USE_HOSTCC) && !defined(DEFAULT_ENV_INSTANCE_EMBEDDED)
+#include <env_internal.h>
+static_assert(sizeof(default_environment) <= ENV_SIZE,
+	      "Default environment is too large");
+#endif

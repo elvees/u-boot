@@ -8,14 +8,15 @@ The soft SPI node requires the following properties:
 
 Mandatory properties:
 compatible: "spi-gpio"
-cs-gpios: GPIOs to use for SPI chip select (output)
-gpio-sck: GPIO to use for SPI clock (output)
+cs-gpios: GPIOs to use for SPI chip select (output), not required if num-chipselects = <0>
+sck-gpios: GPIO to use for SPI clock (output)
 And at least one of:
-gpio-mosi: GPIO to use for SPI MOSI line (output)
-gpio-miso: GPIO to use for SPI MISO line (input)
+mosi-gpios: GPIO to use for SPI MOSI line (output)
+miso-gpios: GPIO to use for SPI MISO line (input)
 
-Optional propertie:
+Optional properties:
 spi-delay-us: Number of microseconds of delay between each CS transition
+num-chipselects: Number of chipselect lines
 
 The GPIOs should be specified as required by the GPIO controller referenced.
 The first cell holds the phandle of the controller and the second cell
@@ -27,9 +28,9 @@ Example:
 	soft-spi {
 		compatible = "spi-gpio";
 		cs-gpios = <&gpio 235 0>;	/* Y43 */
-		gpio-sck = <&gpio 225 0>;	/* Y31 */
-		gpio-mosi = <&gpio 227 0>;	/* Y33 */
-		gpio-miso = <&gpio 224 0>;	/* Y30 */
+		sck-gpios = <&gpio 225 0>;	/* Y31 */
+		mosi-gpios = <&gpio 227 0>;	/* Y33 */
+		miso-gpios = <&gpio 224 0>;	/* Y30 */
 		spi-delay-us = <1>;
 		#address-cells = <1>;
 		#size-cells = <0>;

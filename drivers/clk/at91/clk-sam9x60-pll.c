@@ -11,7 +11,6 @@
  */
 
 #include <asm/processor.h>
-#include <common.h>
 #include <clk-uclass.h>
 #include <div64.h>
 #include <dm.h>
@@ -439,4 +438,3 @@ U_BOOT_DRIVER(at91_sam9x60_frac_pll_clk) = {
 	.ops = &sam9x60_frac_pll_ops,
 	.flags = DM_FLAG_PRE_RELOC,
 };
-

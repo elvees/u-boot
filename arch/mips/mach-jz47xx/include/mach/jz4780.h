@@ -60,7 +60,7 @@
 
 /* PLL setup */
 #define JZ4780_SYS_EXTAL	48000000
-#define JZ4780_SYS_MEM_SPEED	(CONFIG_SYS_MHZ * 1000000)
+#define JZ4780_SYS_MEM_SPEED	(1200 * 1000000)
 #define JZ4780_SYS_MEM_DIV	3
 #define JZ4780_SYS_AUDIO_SPEED	(768 * 1000000)
 
@@ -94,7 +94,7 @@ void jz4780_efuse_init(u32 ahb2_rate);
 
 void jz4780_tcu_wdt_start(void);
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 int jz_mmc_init(void __iomem *base);
 #endif
 

@@ -20,7 +20,7 @@ generic syntax.
 interface
         The interface used to access the partition's device, like ``mmc`` or
         ``scsi``. For a full list of supported interfaces, consult the
-        ``if_typename_str`` array in ``drivers/block/blk-uclass.c``
+        ``uclass_idname_str`` array in ``drivers/block/blk-uclass.c``
 
 devnum
         The device number. This defaults to 0.
@@ -44,9 +44,20 @@ partname
                 <devtype><devletter><partnum>
 
         devtype
-                A device type like ``mmcsd`` or ``hd``. See the
-                ``part_set_generic_name`` function in ``disk/part.c`` for a
-                complete list.
+                The devtype field is set in dependence of the device class:
+
+                ======= ===============
+                devtype device class
+                ======= ===============
+                hd      IDE or SATA
+                sd      SCSI
+                usbd    USB
+                mmcsd   eMMC or SD-card
+                xx      others
+                ======= ===============
+
+                See the ``part_set_generic_name`` function in ``disk/part.c``
+                for the complete list.
 
         devletter
                 The device number as an offset from ``a``. For example, device

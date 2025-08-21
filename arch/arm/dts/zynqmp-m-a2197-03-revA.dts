@@ -4,7 +4,7 @@
  *
  * (C) Copyright 2019, Xilinx, Inc.
  *
- * Michal Simek <michal.simek@xilinx.com>
+ * Michal Simek <michal.simek@amd.com>
  */
 /dts-v1/;
 
@@ -19,11 +19,11 @@
 
 	aliases {
 		ethernet0 = &gem0;
-		gpio0 = &gpio;
 		i2c0 = &i2c0;
 		i2c1 = &i2c1;
 		mmc0 = &sdhci0;
 		mmc1 = &sdhci1;
+		nvmem0 = &eeprom;
 		rtc0 = &rtc;
 		serial0 = &uart0;
 		serial1 = &uart1;
@@ -36,7 +36,6 @@
 	chosen {
 		bootargs = "earlycon";
 		stdout-path = "serial0:115200n8";
-		xlnx,eeprom = <&eeprom>;
 	};
 
 	memory@0 {
@@ -68,13 +67,14 @@
 
 &qspi {
 	status = "okay";
-	is-dual = <1>;
+	num-cs = <2>;
 	flash@0 {
 		compatible = "m25p80", "jedec,spi-nor"; /* 32MB */
+		reg = <0>, <1>;
+		parallel-memories = /bits/ 64 <0x4000000 0x4000000>; /* 64MB */
 		#address-cells = <1>;
 		#size-cells = <1>;
-		reg = <0x0>;
-		spi-tx-bus-width = <1>;
+		spi-tx-bus-width = <4>;
 		spi-rx-bus-width = <4>;
 		spi-max-frequency = <108000000>;
 	};
@@ -84,22 +84,23 @@
 	status = "okay";
 	non-removable;
 	disable-wp;
+	no-sd;
+	no-sdio;
+	cap-mmc-hw-reset;
 	bus-width = <8>;
 	xlnx,mio-bank = <0>; /* FIXME tap delay */
 };
 
 &uart0 { /* uart0 MIO38-39 */
 	status = "okay";
-	u-boot,dm-pre-reloc;
 };
 
 &uart1 { /* uart1 MIO40-41 */
 	status = "okay";
-	u-boot,dm-pre-reloc;
 };
 
 &sdhci1 { /* sd1 MIO45-51 cd in place */
-	status = "disable";
+	status = "disabled";
 	no-1-8-v;
 	disable-wp;
 	xlnx,mio-bank = <1>;
@@ -109,9 +110,13 @@
 	status = "okay";
 	phy-handle = <&phy0>;
 	phy-mode = "sgmii";
-	phy-reset-gpios = <&gpio 142 GPIO_ACTIVE_LOW>;
-	phy0: ethernet-phy@0 { /* marwell m88e1512 - SGMII */
-		reg = <0>;
+	mdio: mdio {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reset-gpios = <&gpio 142 GPIO_ACTIVE_LOW>;
+		phy0: ethernet-phy@0 { /* marwell m88e1512 - SGMII */
+			reg = <0>;
+		};
 	};
 };
 
@@ -133,9 +138,9 @@
 		  "USB1_DIR", "USB1_DATA2", "USB1_NXT", "USB1_DATA0", "USB1_DATA1", /* 65 - 69 */
 		  "USB1_STP", "USB1_DATA3", "USB1_DATA4", "USB1_DATA5", "USB1_DATA6", /* 70 - 74 */
 		  "USB1_DATA7", "ETH_MDC", "ETH_MDIO", /* 75 - 77, MIO end and EMIO start */
-		  "", "", "", "", "", /* 78 - 79 */
+		  "", "", /* 78 - 79 */
 		  "", "", "", "", "", /* 80 - 84 */
-		  "", "", "", "", "", /* 85 -89 */
+		  "", "", "", "", "", /* 85 - 89 */
 		  "", "", "", "", "", /* 90 - 94 */
 		  "", "", "", "", "", /* 95 - 99 */
 		  "", "", "", "", "", /* 100 - 104 */
@@ -152,7 +157,7 @@
 		  "", "", "", "", "", /* 155 - 159 */
 		  "", "", "", "", "", /* 160 - 164 */
 		  "", "", "", "", "", /* 165 - 169 */
-		  "", "", "", ""; /* 170 - 174 */
+		  "", "", "", ""; /* 170 - 173 */
 };
 
 &i2c0 { /* MIO 34-35 - can't stay here */
@@ -193,9 +198,9 @@
 				compatible = "ti,tps544b25";
 				reg = <0x1e>;
 			};
-			reg_vpp_2v5_ddr4: tps544@1x { /* u3007 */
+			reg_vcc1v2_ddr4: tps544@18 { /* u3022 */
 				compatible = "ti,tps544b25";
-				reg = <0x17>; /* FIXME wrong in schematics */
+				reg = <0x18>;
 			};
 		};
 		i2c@1 { /* PMBUS_INA226 */
@@ -242,9 +247,9 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <2>;
-			reg_vccint: tps53681@c0 { /* u69 */
+			reg_vccint: tps53681@60 { /* u69 - 0xc0 */
 				compatible = "ti,tps53681", "ti,tps53679";
-				reg = <0xc0>;
+				reg = <0x60>;
 			};
 			reg_vcc_pmc: tps544@7 { /* u80 */
 				compatible = "ti,tps544b25";
@@ -290,7 +295,7 @@
 		i2c@3 { /* MEM PMBUS - FIXME bug in schematics */
 			#address-cells = <1>;
 			#size-cells = <0>;
-			/* reg = <3>; */
+			reg = <3>;
 		};
 		i2c@4 { /* LP_I2C_SM */
 			#address-cells = <1>;
@@ -339,9 +344,10 @@
 				compatible = "silabs,si570";
 				reg = <0x5d>; /* FIXME addr */
 				temperature-stability = <50>;
-				factory-fout = <156250000>; /* FIXME every chip can be different */
+				factory-fout = <33333333>;
 				clock-frequency = <33333333>;
 				clock-output-names = "REF_CLK"; /* FIXME */
+				silabs,skip-recall;
 			};
 			/* Connection via Samtec U20D */
 			/* Use for storing information about X-PRC card */
@@ -358,25 +364,25 @@
 				#gpio-cells = <2>;
 				gpio-line-names = "sw4_1", "sw4_2", "sw4_3", "sw4_4",
 						  "", "", "", "";
-				gtr_sel0 {
+				gtr-sel0-hog {
 					gpio-hog;
 					gpios = <0 0>;
 					input; /* FIXME add meaning */
 					line-name = "sw4_1";
 				};
-				gtr_sel1 {
+				gtr-sel1-hog {
 					gpio-hog;
 					gpios = <1 0>;
 					input; /* FIXME add meaning */
 					line-name = "sw4_2";
 				};
-				gtr_sel2 {
+				gtr-sel2-hog {
 					gpio-hog;
 					gpios = <2 0>;
 					input; /* FIXME add meaning */
 					line-name = "sw4_3";
 				};
-				gtr_sel3 {
+				gtr-sel3-hog {
 					gpio-hog;
 					gpios = <3 0>;
 					input; /* FIXME add meaning */
@@ -459,8 +465,6 @@
 
 &usb0 {
 	status = "okay";
-	xlnx,usb-polarity = <0>;
-	xlnx,usb-reset-mode = <0>;
 };
 
 &dwc3_0 {
@@ -472,8 +476,6 @@
 
 &usb1 {
 	status = "disabled"; /* not at mem board */
-	xlnx,usb-polarity = <0>;
-	xlnx,usb-reset-mode = <0>;
 };
 
 &dwc3_1 {

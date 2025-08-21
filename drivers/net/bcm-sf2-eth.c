@@ -3,12 +3,12 @@
  * Copyright 2014 Broadcom Corporation.
  */
 
-#include <common.h>
 #include <log.h>
 #include <malloc.h>
 #include <net.h>
 #include <config.h>
 #include <linux/delay.h>
+#include <linux/printk.h>
 
 #include <phy.h>
 #include <miiphy.h>
@@ -250,7 +250,7 @@ int bcm_sf2_eth_register(struct bd_info *bis, u8 dev_num)
 
 	if (!mdiodev)
 		return -ENOMEM;
-	strncpy(mdiodev->name, dev->name, MDIO_NAME_LEN);
+	strlcpy(mdiodev->name, dev->name, MDIO_NAME_LEN);
 	mdiodev->read = eth->miiphy_read;
 	mdiodev->write = eth->miiphy_write;
 

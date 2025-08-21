@@ -5,7 +5,6 @@
  * Copyright 2019 Siemens AG
  *
  */
-#include <common.h>
 #include <command.h>
 #include <dm.h>
 #include <env.h>
@@ -22,12 +21,13 @@
 #include <asm/gpio.h>
 #include <asm/arch/imx8-pins.h>
 #include <asm/arch/iomux.h>
-#include <asm/arch/sci/sci.h>
 #include <asm/arch/sys_proto.h>
 #ifndef CONFIG_SPL
 #include <asm/arch-imx8/clock.h>
 #endif
 #include <linux/delay.h>
+#include "../common/board.h"
+#include "../common/eeprom.h"
 #include "../common/factoryset.h"
 
 #define GPIO_PAD_CTRL \
@@ -64,8 +64,7 @@ int board_early_init_f(void)
 	sc_pm_clock_rate_t rate = SC_80MHZ;
 	int ret;
 
-	ret = sc_pm_setup_uart(SC_R_UART_0, rate);
-	ret |= sc_pm_setup_uart(SC_R_UART_2, rate);
+	ret = sc_pm_setup_uart(SC_R_UART_2, rate);
 	if (ret)
 		return ret;
 
@@ -73,6 +72,40 @@ int board_early_init_f(void)
 
 	return 0;
 }
+
+#ifndef CONFIG_XPL_BUILD
+void board_mem_get_layout(u64 *phys_sdram_1_start,
+			  u64 *phys_sdram_1_size,
+			  u64 *phys_sdram_2_start,
+			  u64 *phys_sdram_2_size)
+{
+	sc_faddr_t addr_start, addr_end;
+	sc_faddr_t sdram_1_size, sdram_2_size;
+	sc_err_t sc_err;
+
+	sc_err = sc_rm_get_memreg_info(-1, 6, &addr_start, &addr_end);
+	if (sc_err == SC_ERR_NONE) {
+		if (addr_end < 0x100000000) {
+			/* only lower RAM available */
+			sdram_1_size = (addr_end + 1) - PHYS_SDRAM_1;
+			sdram_2_size = 0;
+		} else {
+			/* lower RAM (2 GB) und upper RAM available */
+			sdram_1_size = SZ_2G;
+			sdram_2_size = (addr_end + 1) - PHYS_SDRAM_2;
+		}
+	} else {
+		/* Get default in case it would fail */
+		sdram_1_size = PHYS_SDRAM_1_SIZE;
+		sdram_2_size = PHYS_SDRAM_2_SIZE;
+	}
+
+	*phys_sdram_1_start = PHYS_SDRAM_1;
+	*phys_sdram_1_size = sdram_1_size;
+	*phys_sdram_2_start = PHYS_SDRAM_2;
+	*phys_sdram_2_size = sdram_2_size;
+}
+#endif /* ! CONFIG_XPL_BUILD */
 
 #define ENET_PHY_RESET	IMX_GPIO_NR(0, 3)
 #define ENET_TEST_1	IMX_GPIO_NR(0, 8)
@@ -147,7 +180,7 @@ static void enet_device_phy_reset(void)
 int setup_gpr_fec(void)
 {
 	sc_ipc_t ipc_handle = -1;
-	sc_err_t err = 0;
+	int err = 0;
 	unsigned int test;
 
 	/*
@@ -156,14 +189,14 @@ int setup_gpr_fec(void)
 	 *	0: internal clock
 	 *	1: external clock --->  your choice for RMII
 	 *
-	 * CLKDIV_SEL: it controls a div by 2 on the internal clock path à
-	 *	it should be don’t care when using external clock
+	 * CLKDIV_SEL: it controls a div by 2 on the internal clock path a
+	 *	it should be don't care when using external clock
 	 *	0: non-divided clock
 	 *	1: clock divided by 2
 	 * 50_DISABLE or 125_DISABLE:
-	 *	it’s used to disable the clock tree going outside the chip
+	 *	it's used to disable the clock tree going outside the chip
 	 *	when reference clock is generated internally.
-	 *	It should be don’t care when reference clock is provided
+	 *	It should be don't care when reference clock is provided
 	 *	externally.
 	 *	0: clock is enabled
 	 *	1: clock is disabled
@@ -175,35 +208,35 @@ int setup_gpr_fec(void)
 	 */
 
 	err = sc_misc_set_control(ipc_handle, SC_R_ENET_1, SC_C_TXCLK, 1);
-	if (err != SC_ERR_NONE)
+	if (err)
 		printf("Error in setting up SC_C %d\n\r", SC_C_TXCLK);
 
 	sc_misc_get_control(ipc_handle, SC_R_ENET_1, SC_C_TXCLK, &test);
 	debug("TEST SC_C %d-->%d\n\r", SC_C_TXCLK, test);
 
 	err = sc_misc_set_control(ipc_handle, SC_R_ENET_1, SC_C_CLKDIV, 0);
-	if (err != SC_ERR_NONE)
+	if (err)
 		printf("Error in setting up SC_C %d\n\r", SC_C_CLKDIV);
 
 	sc_misc_get_control(ipc_handle, SC_R_ENET_1, SC_C_CLKDIV, &test);
 	debug("TEST SC_C %d-->%d\n\r", SC_C_CLKDIV, test);
 
 	err = sc_misc_set_control(ipc_handle, SC_R_ENET_1, SC_C_DISABLE_50, 0);
-	if (err != SC_ERR_NONE)
+	if (err)
 		printf("Error in setting up SC_C %d\n\r", SC_C_DISABLE_50);
 
 	sc_misc_get_control(ipc_handle, SC_R_ENET_1, SC_C_TXCLK, &test);
 	debug("TEST SC_C %d-->%d\n\r", SC_C_DISABLE_50, test);
 
 	err = sc_misc_set_control(ipc_handle, SC_R_ENET_1, SC_C_DISABLE_125, 1);
-	if (err != SC_ERR_NONE)
+	if (err)
 		printf("Error in setting up SC_C %d\n\r", SC_C_DISABLE_125);
 
 	sc_misc_get_control(ipc_handle, SC_R_ENET_1, SC_C_TXCLK, &test);
 	debug("TEST SC_C %d-->%d\n\r", SC_C_DISABLE_125, test);
 
 	err = sc_misc_set_control(ipc_handle, SC_R_ENET_1, SC_C_SEL_125, 1);
-	if (err != SC_ERR_NONE)
+	if (err)
 		printf("Error in setting up SC_C %d\n\r", SC_C_SEL_125);
 
 	sc_misc_get_control(ipc_handle, SC_R_ENET_1, SC_C_SEL_125, &test);
@@ -232,21 +265,17 @@ static int setup_fec(void)
 	return 0;
 }
 
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 }
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 /* LED's */
 static int board_led_init(void)
 {
 	struct udevice *bus, *dev;
 	u8 pca_led[2] = { 0x00, 0x00 };
 	int ret;
-
-	/* init all GPIO LED's */
-	if (IS_ENABLED(CONFIG_LED))
-		led_default_state();
 
 	/* enable all leds on PCA9552 */
 	ret = uclass_get_device_by_seq(UCLASS_I2C, PCA9552_1_I2C_BUS, &bus);
@@ -270,17 +299,13 @@ static int board_led_init(void)
 	mdelay(1);
 	return ret;
 }
-#endif /* !CONFIG_SPL_BUILD */
+#endif /* !CONFIG_XPL_BUILD */
 
 int checkboard(void)
 {
 	puts("Board: Capricorn\n");
 
-	/*
-	 * Running build_info() doesn't work with current SCFW blob.
-	 * Uncomment below call when new blob is available.
-	 */
-	/*build_info();*/
+	build_info();
 
 	print_bootinfo();
 	return 0;
@@ -288,6 +313,32 @@ int checkboard(void)
 
 int board_init(void)
 {
+	struct chip_data eeprom_data = {};
+	char module_name[16];
+	int ret;
+
+	ret = siemens_ee_setup();
+	if (ret) {
+		printf("'siemens_ee_setup' failed, ret: %d\n", ret);
+		goto skip;
+	}
+
+	/* Get module name from EEPROM */
+	siemens_ee_read_data(SIEMENS_EE_ADDR_DDR3, module_name,
+			     sizeof(module_name));
+	printf("CPU module: %s\n", module_name);
+
+	ret = siemens_ee_read_data(SIEMENS_EE_ADDR_CHIP,
+				   (uchar *)&eeprom_data,
+				   sizeof(eeprom_data));
+	if (ret) {
+		printf("'siemens_ee_read_data' failed, ret: %d\n", ret);
+		goto skip;
+	}
+
+	printf("HW Version: %s\n", eeprom_data.shwver);
+skip:
+
 	setup_fec();
 	return 0;
 }
@@ -340,14 +391,12 @@ void board_late_mmc_env_init(void)
 	run_command(cmd, 0);
 }
 
-#ifndef CONFIG_SPL_BUILD
-int factoryset_read_eeprom(int i2c_addr);
-
+#ifndef CONFIG_XPL_BUILD
 static int load_parameters_from_factoryset(void)
 {
 	int ret;
 
-	ret = factoryset_read_eeprom(EEPROM_I2C_ADDR);
+	ret = factoryset_read_eeprom(SIEMENS_EE_I2C_ADDR);
 	if (ret)
 		return ret;
 
@@ -450,4 +499,4 @@ U_BOOT_CMD(
 	"Reset eth phy",
 	"[print]"
 );
-#endif /* ! CONFIG_SPL_BUILD */
+#endif /* ! CONFIG_XPL_BUILD */

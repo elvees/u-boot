@@ -4,7 +4,6 @@
  * Mario Six, Guntermann & Drunck GmbH, mario.six@gdsys.cc
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <dm/test.h>
@@ -17,43 +16,53 @@
 static int dm_test_sysinfo(struct unit_test_state *uts)
 {
 	struct udevice *sysinfo;
-	bool called_detect;
+	bool called_detect = false;
 	char str[64];
 	int i;
+	void *data = NULL;
+	size_t data_size = 0;
+	u32 gdata[] = {0xabcdabcd, 0xdeadbeef};
 
 	ut_assertok(sysinfo_get(&sysinfo));
 	ut_assert(sysinfo);
 
-	sysinfo_get_bool(sysinfo, BOOL_CALLED_DETECT, &called_detect);
+	ut_asserteq(-EPERM, sysinfo_get_bool(sysinfo, BOOL_CALLED_DETECT,
+					     &called_detect));
 	ut_assert(!called_detect);
 
 	sysinfo_detect(sysinfo);
 
-	sysinfo_get_bool(sysinfo, BOOL_CALLED_DETECT, &called_detect);
+	ut_assertok(sysinfo_get_bool(sysinfo, BOOL_CALLED_DETECT,
+				     &called_detect));
 	ut_assert(called_detect);
 
-	sysinfo_get_str(sysinfo, STR_VACATIONSPOT, sizeof(str), str);
+	ut_assertok(sysinfo_get_str(sysinfo, STR_VACATIONSPOT, sizeof(str),
+				    str));
 	ut_assertok(strcmp(str, "R'lyeh"));
 
-	sysinfo_get_int(sysinfo, INT_TEST1, &i);
+	ut_assertok(sysinfo_get_int(sysinfo, INT_TEST1, &i));
 	ut_asserteq(0, i);
 
-	sysinfo_get_int(sysinfo, INT_TEST2, &i);
+	ut_assertok(sysinfo_get_int(sysinfo, INT_TEST2, &i));
 	ut_asserteq(100, i);
 
-	sysinfo_get_str(sysinfo, STR_VACATIONSPOT, sizeof(str), str);
+	ut_assertok(sysinfo_get_str(sysinfo, STR_VACATIONSPOT, sizeof(str),
+				    str));
 	ut_assertok(strcmp(str, "Carcosa"));
 
-	sysinfo_get_int(sysinfo, INT_TEST1, &i);
+	ut_assertok(sysinfo_get_int(sysinfo, INT_TEST1, &i));
 	ut_asserteq(1, i);
 
-	sysinfo_get_int(sysinfo, INT_TEST2, &i);
+	ut_assertok(sysinfo_get_int(sysinfo, INT_TEST2, &i));
 	ut_asserteq(99, i);
 
-	sysinfo_get_str(sysinfo, STR_VACATIONSPOT, sizeof(str), str);
+	ut_assertok(sysinfo_get_str(sysinfo, STR_VACATIONSPOT, sizeof(str),
+				    str));
 	ut_assertok(strcmp(str, "Yuggoth"));
+
+	ut_assertok(sysinfo_get_data(sysinfo, DATA_TEST, &data, &data_size));
+	ut_assertok(memcmp(gdata, data, data_size));
 
 	return 0;
 }
-
-DM_TEST(dm_test_sysinfo, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_sysinfo, UTF_SCAN_PDATA | UTF_SCAN_FDT);

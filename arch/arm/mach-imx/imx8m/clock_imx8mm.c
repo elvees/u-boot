@@ -5,7 +5,6 @@
  * Peng Fan <peng.fan@nxp.com>
  */
 
-#include <common.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/sys_proto.h>
@@ -15,12 +14,21 @@
 #include <errno.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
+#include <phy.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
 static struct anamix_pll *ana_pll = (struct anamix_pll *)ANATOP_BASE_ADDR;
 
 static u32 get_root_clk(enum clk_root_index clock_id);
+
+#ifdef CONFIG_IMX_HAB
+void hab_caam_clock_enable(unsigned char enable)
+{
+	/* The CAAM clock is always on for iMX8M */
+}
+#endif
+
 void enable_ocotp_clk(unsigned char enable)
 {
 	clock_enable(CCGR_OCOTP, !!enable);
@@ -28,25 +36,33 @@ void enable_ocotp_clk(unsigned char enable)
 
 int enable_i2c_clk(unsigned char enable, unsigned i2c_num)
 {
-	/* 0 - 3 is valid i2c num */
-	if (i2c_num > 3)
+	u8 i2c_ccgr[] = {
+			CCGR_I2C1, CCGR_I2C2, CCGR_I2C3, CCGR_I2C4,
+#if (IS_ENABLED(CONFIG_IMX8MP))
+			CCGR_I2C5_8MP, CCGR_I2C6_8MP
+#endif
+	};
+
+	if (i2c_num >= ARRAY_SIZE(i2c_ccgr))
 		return -EINVAL;
 
-	clock_enable(CCGR_I2C1 + i2c_num, !!enable);
+	clock_enable(i2c_ccgr[i2c_num], !!enable);
 
 	return 0;
 }
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 static struct imx_int_pll_rate_table imx8mm_fracpll_tbl[] = {
 	PLL_1443X_RATE(1000000000U, 250, 3, 1, 0),
+	PLL_1443X_RATE(933000000U, 311, 4, 1, 0),
+	PLL_1443X_RATE(900000000U, 300, 8, 0, 0),
 	PLL_1443X_RATE(800000000U, 300, 9, 0, 0),
 	PLL_1443X_RATE(750000000U, 250, 8, 0, 0),
 	PLL_1443X_RATE(650000000U, 325, 3, 2, 0),
 	PLL_1443X_RATE(600000000U, 300, 3, 2, 0),
 	PLL_1443X_RATE(594000000U, 99, 1, 2, 0),
 	PLL_1443X_RATE(400000000U, 300, 9, 1, 0),
-	PLL_1443X_RATE(266666667U, 400, 9, 2, 0),
+	PLL_1443X_RATE(266000000U, 400, 9, 2, 0),
 	PLL_1443X_RATE(167000000U, 334, 3, 4, 0),
 	PLL_1443X_RATE(100000000U, 300, 9, 3, 0),
 };
@@ -64,7 +80,7 @@ static int fracpll_configure(enum pll_clocks pll, u32 freq)
 	}
 
 	if (i == ARRAY_SIZE(imx8mm_fracpll_tbl)) {
-		printf("No matched freq table %u\n", freq);
+		printf("%s: No matched freq table %u\n", __func__, freq);
 		return -EINVAL;
 	}
 
@@ -74,7 +90,6 @@ static int fracpll_configure(enum pll_clocks pll, u32 freq)
 	case ANATOP_DRAM_PLL:
 		setbits_le32(GPC_BASE_ADDR + 0xEC, 1 << 7);
 		setbits_le32(GPC_BASE_ADDR + 0xF8, 1 << 5);
-		writel(SRC_DDR1_ENABLE_MASK, SRC_BASE_ADDR + 0x1004);
 
 		pll_base = &ana_pll->dram_pll_gnrl_ctl;
 		break;
@@ -140,7 +155,7 @@ void dram_enable_bypass(ulong clk_val)
 	}
 
 	if (i == ARRAY_SIZE(imx8mm_dram_bypass_tbl)) {
-		printf("No matched freq table %lu\n", clk_val);
+		printf("%s: No matched freq table %lu\n", __func__, clk_val);
 		return;
 	}
 
@@ -166,10 +181,19 @@ void dram_disable_bypass(void)
 }
 #endif
 
-int intpll_configure(enum pll_clocks pll, ulong freq)
+__weak int board_imx_intpll_override(enum pll_clocks pll, ulong *freq)
+{
+	return 0;
+}
+
+static int intpll_configure(enum pll_clocks pll, ulong freq)
 {
 	void __iomem *pll_gnrl_ctl, __iomem *pll_div_ctl;
 	u32 pll_div_ctl_val, pll_clke_masks;
+	int ret = board_imx_intpll_override(pll, &freq);
+
+	if (ret)
+		return ret;
 
 	switch (pll) {
 	case ANATOP_SYSTEM_PLL1:
@@ -236,9 +260,29 @@ int intpll_configure(enum pll_clocks pll, ulong freq)
 			INTPLL_PRE_DIV_VAL(3) | INTPLL_POST_DIV_VAL(1);
 		break;
 	case MHZ(1200):
-		/* 24 * 0xc8 / 2 / 2 ^ 1 */
+		/* 24 * 0x12c / 3 / 2 ^ 1 */
+		pll_div_ctl_val = INTPLL_MAIN_DIV_VAL(0x12c) |
+			INTPLL_PRE_DIV_VAL(3) | INTPLL_POST_DIV_VAL(1);
+		break;
+	case MHZ(1400):
+		/* 24 * 0x15e / 3 / 2 ^ 1 */
+		pll_div_ctl_val = INTPLL_MAIN_DIV_VAL(0x15e) |
+			INTPLL_PRE_DIV_VAL(3) | INTPLL_POST_DIV_VAL(1);
+		break;
+	case MHZ(1500):
+		/* 24 * 0x177 / 3 / 2 ^ 1 */
+		pll_div_ctl_val = INTPLL_MAIN_DIV_VAL(0x177) |
+			INTPLL_PRE_DIV_VAL(3) | INTPLL_POST_DIV_VAL(1);
+		break;
+	case MHZ(1600):
+		/* 24 * 0xc8 / 3 / 2 ^ 0 */
 		pll_div_ctl_val = INTPLL_MAIN_DIV_VAL(0xc8) |
-			INTPLL_PRE_DIV_VAL(2) | INTPLL_POST_DIV_VAL(1);
+			INTPLL_PRE_DIV_VAL(3) | INTPLL_POST_DIV_VAL(0);
+		break;
+	case MHZ(1800):
+		/* 24 * 0xe1 / 3 / 2 ^ 0 */
+		pll_div_ctl_val = INTPLL_MAIN_DIV_VAL(0xe1) |
+			INTPLL_PRE_DIV_VAL(3) | INTPLL_POST_DIV_VAL(0);
 		break;
 	case MHZ(2000):
 		/* 24 * 0xfa / 3 / 2 ^ 0 */
@@ -638,7 +682,7 @@ static u32 decode_fracpll(enum clk_root_src frac_pll)
 		pll_fdiv_ctl1 = readl(&ana_pll->video_pll1_fdiv_ctl1);
 		break;
 	default:
-		printf("Not supported\n");
+		printf("Unsupported clk_root_src %d\n", frac_pll);
 		return 0;
 	}
 
@@ -790,141 +834,115 @@ u32 mxc_get_clock(enum mxc_clock clk)
 	return 0;
 }
 
-#ifdef CONFIG_DWC_ETH_QOS
-int set_clk_eqos(enum enet_freq type)
+#if defined(CONFIG_IMX8MP) && defined(CONFIG_DWC_ETH_QOS)
+static int imx8mp_eqos_interface_init(struct udevice *dev,
+				      phy_interface_t interface_type)
 {
-	u32 target;
-	u32 enet1_ref;
+	struct iomuxc_gpr_base_regs *gpr =
+		(struct iomuxc_gpr_base_regs *)IOMUXC_GPR_BASE_ADDR;
 
-	switch (type) {
-	case ENET_125MHZ:
-		enet1_ref = ENET1_REF_CLK_ROOT_FROM_PLL_ENET_MAIN_125M_CLK;
+	clrbits_le32(&gpr->gpr[1],
+		     IOMUXC_GPR_GPR1_GPR_ENET_QOS_INTF_SEL_MASK |
+		     IOMUXC_GPR_GPR1_GPR_ENET_QOS_RGMII_EN |
+		     IOMUXC_GPR_GPR1_GPR_ENET_QOS_CLK_TX_CLK_SEL |
+		     IOMUXC_GPR_GPR1_GPR_ENET_QOS_CLK_GEN_EN);
+
+	switch (interface_type) {
+	case PHY_INTERFACE_MODE_MII:
+		setbits_le32(&gpr->gpr[1],
+			     IOMUXC_GPR_GPR1_GPR_ENET_QOS_CLK_GEN_EN |
+			     IOMUXC_GPR_GPR1_GPR_ENET_QOS_INTF_SEL_MII);
 		break;
-	case ENET_50MHZ:
-		enet1_ref = ENET1_REF_CLK_ROOT_FROM_PLL_ENET_MAIN_50M_CLK;
+	case PHY_INTERFACE_MODE_RMII:
+		setbits_le32(&gpr->gpr[1],
+			     IOMUXC_GPR_GPR1_GPR_ENET_QOS_CLK_TX_CLK_SEL |
+			     IOMUXC_GPR_GPR1_GPR_ENET_QOS_CLK_GEN_EN |
+			     IOMUXC_GPR_GPR1_GPR_ENET_QOS_INTF_SEL_RMII);
 		break;
-	case ENET_25MHZ:
-		enet1_ref = ENET1_REF_CLK_ROOT_FROM_PLL_ENET_MAIN_25M_CLK;
+	case PHY_INTERFACE_MODE_RGMII:
+	case PHY_INTERFACE_MODE_RGMII_ID:
+	case PHY_INTERFACE_MODE_RGMII_RXID:
+	case PHY_INTERFACE_MODE_RGMII_TXID:
+		setbits_le32(&gpr->gpr[1],
+			     IOMUXC_GPR_GPR1_GPR_ENET_QOS_RGMII_EN |
+			     IOMUXC_GPR_GPR1_GPR_ENET_QOS_CLK_GEN_EN |
+			     IOMUXC_GPR_GPR1_GPR_ENET_QOS_INTF_SEL_RGMII);
 		break;
 	default:
 		return -EINVAL;
 	}
 
-	/* disable the clock first */
-	clock_enable(CCGR_QOS_ETHENET, 0);
-	clock_enable(CCGR_SDMA2, 0);
-
-	/* set enet axi clock 266Mhz */
-	target = CLK_ROOT_ON | ENET_AXI_CLK_ROOT_FROM_SYS1_PLL_266M |
-		 CLK_ROOT_PRE_DIV(CLK_ROOT_PRE_DIV1) |
-		 CLK_ROOT_POST_DIV(CLK_ROOT_POST_DIV1);
-	clock_set_target_val(ENET_AXI_CLK_ROOT, target);
-
-	target = CLK_ROOT_ON | enet1_ref |
-		 CLK_ROOT_PRE_DIV(CLK_ROOT_PRE_DIV1) |
-		 CLK_ROOT_POST_DIV(CLK_ROOT_POST_DIV1);
-	clock_set_target_val(ENET_QOS_CLK_ROOT, target);
-
-	target = CLK_ROOT_ON |
-		ENET1_TIME_CLK_ROOT_FROM_PLL_ENET_MAIN_100M_CLK |
-		CLK_ROOT_PRE_DIV(CLK_ROOT_PRE_DIV1) |
-		CLK_ROOT_POST_DIV(CLK_ROOT_POST_DIV4);
-	clock_set_target_val(ENET_QOS_TIMER_CLK_ROOT, target);
-
-	/* enable clock */
-	clock_enable(CCGR_QOS_ETHENET, 1);
-	clock_enable(CCGR_SDMA2, 1);
-
 	return 0;
 }
-
-int imx_eqos_txclk_set_rate(u32 rate)
+#else
+static int imx8mp_eqos_interface_init(struct udevice *dev,
+				      phy_interface_t interface_type)
 {
-	u32 val;
-	u32 eqos_post_div;
-
-	/* disable the clock first */
-	clock_enable(CCGR_QOS_ETHENET, 0);
-	clock_enable(CCGR_SDMA2, 0);
-
-	switch (rate) {
-	case 125000000:
-		eqos_post_div = 1;
-		break;
-	case 25000000:
-		eqos_post_div = 125000000 / 25000000;
-		break;
-	case 2500000:
-		eqos_post_div = 125000000 / 2500000;
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	clock_get_target_val(ENET_QOS_CLK_ROOT, &val);
-	val &= ~(CLK_ROOT_PRE_DIV_MASK | CLK_ROOT_POST_DIV_MASK);
-	val |= CLK_ROOT_PRE_DIV(CLK_ROOT_PRE_DIV1) |
-	       CLK_ROOT_POST_DIV(eqos_post_div - 1);
-	clock_set_target_val(ENET_QOS_CLK_ROOT, val);
-
-	/* enable clock */
-	clock_enable(CCGR_QOS_ETHENET, 1);
-	clock_enable(CCGR_SDMA2, 1);
-
 	return 0;
-}
-
-u32 imx_get_eqos_csr_clk(void)
-{
-	return get_root_clk(ENET_AXI_CLK_ROOT);
 }
 #endif
 
 #ifdef CONFIG_FEC_MXC
-int set_clk_enet(enum enet_freq type)
+static int imx8mp_fec_interface_init(struct udevice *dev,
+				     phy_interface_t interface_type,
+				     bool mx8mp)
 {
-	u32 target;
-	u32 enet1_ref;
+	/* i.MX8MP has extra RGMII_EN bit in IOMUXC GPR1 register */
+	const u32 rgmii_en = mx8mp ? IOMUXC_GPR_GPR1_GPR_ENET1_RGMII_EN : 0;
+	struct iomuxc_gpr_base_regs *gpr =
+		(struct iomuxc_gpr_base_regs *)IOMUXC_GPR_BASE_ADDR;
 
-	switch (type) {
-	case ENET_125MHZ:
-		enet1_ref = ENET1_REF_CLK_ROOT_FROM_PLL_ENET_MAIN_125M_CLK;
+	clrbits_le32(&gpr->gpr[1],
+		     rgmii_en |
+		     IOMUXC_GPR_GPR1_GPR_ENET1_TX_CLK_SEL);
+
+	switch (interface_type) {
+	case PHY_INTERFACE_MODE_MII:
+	case PHY_INTERFACE_MODE_RMII:
+		setbits_le32(&gpr->gpr[1], IOMUXC_GPR_GPR1_GPR_ENET1_TX_CLK_SEL);
 		break;
-	case ENET_50MHZ:
-		enet1_ref = ENET1_REF_CLK_ROOT_FROM_PLL_ENET_MAIN_50M_CLK;
-		break;
-	case ENET_25MHZ:
-		enet1_ref = ENET1_REF_CLK_ROOT_FROM_PLL_ENET_MAIN_25M_CLK;
+	case PHY_INTERFACE_MODE_RGMII:
+	case PHY_INTERFACE_MODE_RGMII_ID:
+	case PHY_INTERFACE_MODE_RGMII_RXID:
+	case PHY_INTERFACE_MODE_RGMII_TXID:
+		setbits_le32(&gpr->gpr[1], rgmii_en);
 		break;
 	default:
 		return -EINVAL;
 	}
 
-	/* disable the clock first */
-	clock_enable(CCGR_ENET1, 0);
-	clock_enable(CCGR_SIM_ENET, 0);
-
-	/* set enet axi clock 266Mhz */
-	target = CLK_ROOT_ON | ENET_AXI_CLK_ROOT_FROM_SYS1_PLL_266M |
-		 CLK_ROOT_PRE_DIV(CLK_ROOT_PRE_DIV1) |
-		 CLK_ROOT_POST_DIV(CLK_ROOT_POST_DIV1);
-	clock_set_target_val(ENET_AXI_CLK_ROOT, target);
-
-	target = CLK_ROOT_ON | enet1_ref |
-		 CLK_ROOT_PRE_DIV(CLK_ROOT_PRE_DIV1) |
-		 CLK_ROOT_POST_DIV(CLK_ROOT_POST_DIV1);
-	clock_set_target_val(ENET_REF_CLK_ROOT, target);
-
-	target = CLK_ROOT_ON |
-		ENET1_TIME_CLK_ROOT_FROM_PLL_ENET_MAIN_100M_CLK |
-		CLK_ROOT_PRE_DIV(CLK_ROOT_PRE_DIV1) |
-		CLK_ROOT_POST_DIV(CLK_ROOT_POST_DIV4);
-	clock_set_target_val(ENET_TIMER_CLK_ROOT, target);
-
-	/* enable clock */
-	clock_enable(CCGR_SIM_ENET, 1);
-	clock_enable(CCGR_ENET1, 1);
-
+	return 0;
+}
+#else
+static int imx8mp_fec_interface_init(struct udevice *dev,
+				     phy_interface_t interface_type,
+				     bool mx8mp)
+{
 	return 0;
 }
 #endif
+
+int board_interface_eth_init(struct udevice *dev, phy_interface_t interface_type)
+{
+	if (IS_ENABLED(CONFIG_IMX8MM) &&
+	    IS_ENABLED(CONFIG_FEC_MXC) &&
+	    device_is_compatible(dev, "fsl,imx8mm-fec"))
+		return imx8mp_fec_interface_init(dev, interface_type, false);
+
+	if (IS_ENABLED(CONFIG_IMX8MN) &&
+	    IS_ENABLED(CONFIG_FEC_MXC) &&
+	    device_is_compatible(dev, "fsl,imx8mn-fec"))
+		return imx8mp_fec_interface_init(dev, interface_type, false);
+
+	if (IS_ENABLED(CONFIG_IMX8MP) &&
+	    IS_ENABLED(CONFIG_FEC_MXC) &&
+	    device_is_compatible(dev, "fsl,imx8mp-fec"))
+		return imx8mp_fec_interface_init(dev, interface_type, true);
+
+	if (IS_ENABLED(CONFIG_IMX8MP) &&
+	    IS_ENABLED(CONFIG_DWC_ETH_QOS) &&
+	    device_is_compatible(dev, "nxp,imx8mp-dwmac-eqos"))
+		return imx8mp_eqos_interface_init(dev, interface_type);
+
+	return -EINVAL;
+}

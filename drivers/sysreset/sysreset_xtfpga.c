@@ -5,7 +5,7 @@
  * (C) Copyright 2016 Cadence Design Systems Inc.
  */
 
-#include <common.h>
+#include <config.h>
 #include <dm.h>
 #include <errno.h>
 #include <sysreset.h>
@@ -15,8 +15,8 @@ static int xtfpga_reset_request(struct udevice *dev, enum sysreset_t type)
 {
 	switch (type) {
 	case SYSRESET_COLD:
-		writel(CONFIG_SYS_FPGAREG_RESET_CODE,
-		       CONFIG_SYS_FPGAREG_RESET);
+		writel(CFG_SYS_FPGAREG_RESET_CODE,
+		       CFG_SYS_FPGAREG_RESET);
 		break;
 	default:
 		return -EPROTONOSUPPORT;

@@ -9,7 +9,8 @@
  * Copyright (C) 2011 Google Inc.
  */
 
-#include <common.h>
+#define LOG_CATEGORY	UCLASS_RAM
+
 #include <dm.h>
 #include <errno.h>
 #include <fdtdec.h>
@@ -44,7 +45,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define CMOS_OFFSET_MRC_SEED_S3		156
 #define CMOS_OFFSET_MRC_SEED_CHK	160
 
-ulong board_get_usable_ram_top(ulong total_size)
+phys_addr_t board_get_usable_ram_top(phys_size_t total_size)
 {
 	return mrc_common_board_get_usable_ram_top(total_size);
 }
@@ -213,7 +214,7 @@ static int copy_spd(struct udevice *dev, struct pei_data *peid)
 
 	ret = mrc_locate_spd(dev, sizeof(peid->spd_data[0]), &data);
 	if (ret) {
-		debug("%s: Could not locate SPD (ret=%d)\n", __func__, ret);
+		log_debug("Could not locate SPD (err=%d)\n", ret);
 		return ret;
 	}
 

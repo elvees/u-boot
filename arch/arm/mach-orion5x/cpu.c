@@ -8,7 +8,6 @@
  * Written-by: Prafulla Wadaskar <prafulla@marvell.com>
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <init.h>
 #include <net.h>
@@ -20,7 +19,7 @@
 
 #define BUFLEN	16
 
-void reset_cpu(unsigned long ignored)
+void reset_cpu(void)
 {
 	struct orion5x_cpu_registers *cpureg =
 	    (struct orion5x_cpu_registers *)ORION5X_CPU_REG_BASE;
@@ -236,7 +235,7 @@ int arch_cpu_init(void)
 	/* Enable and invalidate L2 cache in write through mode */
 	invalidate_l2_cache();
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 	orion5x_config_adr_windows();
 #endif
 

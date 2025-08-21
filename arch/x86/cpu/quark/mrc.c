@@ -32,10 +32,9 @@
  * DRAM unit configuration based on Valleyview MRC.
  */
 
-#include <common.h>
-#include <version.h>
 #include <asm/arch/mrc.h>
 #include <asm/arch/msg_port.h>
+#include <asm/u-boot-x86.h>
 #include "mrc_util.h"
 #include "smc.h"
 
@@ -191,8 +190,7 @@ void mrc_init(struct mrc_params *mrc_params)
 {
 	ENTERFN();
 
-	DPF(D_INFO, "MRC Version %04x %s %s\n", MRC_VERSION,
-	    U_BOOT_DATE, U_BOOT_TIME);
+	DPF(D_INFO, "MRC Version %04x\n", MRC_VERSION);
 
 	/* Set up the data structures used by mrc_mem_init() */
 	mrc_adjust_params(mrc_params);

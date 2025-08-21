@@ -2,6 +2,9 @@
 /*
  * Copyright (c) 2019,Softathome
  */
+
+#define OPENSSL_API_COMPAT 0x10101000L
+
 #include "mkimage.h"
 #include <stdio.h>
 #include <string.h>
@@ -80,6 +83,13 @@ int image_aes_add_cipher_data(struct image_cipher_info *info, void *keydest,
 	int parent, node;
 	char name[128];
 	int ret = 0;
+
+	if (!keydest && !info->ivname) {
+		/* At least, store the IV in the FIT image */
+		ret = fdt_setprop(fit, node_noffset, "iv",
+				  info->iv, info->cipher->iv_len);
+		goto done;
+	}
 
 	/* Either create or overwrite the named cipher node */
 	parent = fdt_subnode_offset(keydest, 0, FIT_CIPHER_NODENAME);

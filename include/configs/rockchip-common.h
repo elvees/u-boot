@@ -7,66 +7,14 @@
 #define _ROCKCHIP_COMMON_H_
 #include <linux/sizes.h>
 
-#define CONFIG_SYS_NS16550_MEM32
-
-/* ((CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR - 64) * 512) */
-#define CONFIG_SPL_PAD_TO		8355840
-
-#ifndef CONFIG_SPL_BUILD
-
-/* First try to boot from SD (index 0), then eMMC (index 1) */
-#if CONFIG_IS_ENABLED(CMD_MMC)
-	#define BOOT_TARGET_MMC(func) \
-		func(MMC, mmc, 0) \
-		func(MMC, mmc, 1)
-#else
-	#define BOOT_TARGET_MMC(func)
+#ifndef CFG_CPUID_OFFSET
+#define CFG_CPUID_OFFSET	0x7
 #endif
 
-#if CONFIG_IS_ENABLED(CMD_NVME)
-	#define BOOT_TARGET_NVME(func) func(NVME, nvme, 0)
-#else
-	#define BOOT_TARGET_NVME(func)
-#endif
+#ifndef CONFIG_XPL_BUILD
 
-#if CONFIG_IS_ENABLED(CMD_USB)
-	#define BOOT_TARGET_USB(func) func(USB, usb, 0)
-#else
-	#define BOOT_TARGET_USB(func)
-#endif
-
-#if CONFIG_IS_ENABLED(CMD_PXE)
-	#define BOOT_TARGET_PXE(func) func(PXE, pxe, na)
-#else
-	#define BOOT_TARGET_PXE(func)
-#endif
-
-#if CONFIG_IS_ENABLED(CMD_DHCP)
-	#define BOOT_TARGET_DHCP(func) func(DHCP, dhcp, na)
-#else
-	#define BOOT_TARGET_DHCP(func)
-#endif
-
-#if CONFIG_IS_ENABLED(CMD_SF)
-	#define BOOT_TARGET_SF(func)	func(SF, sf, 0)
-#else
-	#define BOOT_TARGET_SF(func)
-#endif
-
-#ifdef CONFIG_ROCKCHIP_RK3399
-#define BOOT_TARGET_DEVICES(func) \
-	BOOT_TARGET_MMC(func) \
-	BOOT_TARGET_NVME(func) \
-	BOOT_TARGET_USB(func) \
-	BOOT_TARGET_PXE(func) \
-	BOOT_TARGET_DHCP(func) \
-	BOOT_TARGET_SF(func)
-#else
-#define BOOT_TARGET_DEVICES(func) \
-	BOOT_TARGET_MMC(func) \
-	BOOT_TARGET_USB(func) \
-	BOOT_TARGET_PXE(func) \
-	BOOT_TARGET_DHCP(func)
+#ifndef BOOT_TARGETS
+#define BOOT_TARGETS	"mmc1 mmc0 nvme scsi usb pxe dhcp spi"
 #endif
 
 #ifdef CONFIG_ARM64

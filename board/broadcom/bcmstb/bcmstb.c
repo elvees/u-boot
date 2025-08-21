@@ -12,7 +12,6 @@
 #include <time.h>
 #include <asm/global_data.h>
 #include <linux/types.h>
-#include <common.h>
 #include <env.h>
 #include <asm/io.h>
 #include <asm/bootm.h>
@@ -22,7 +21,7 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#define BCMSTB_DATA_SECTION __attribute__((section(".data")))
+#define BCMSTB_DATA_SECTION __section(".data")
 
 struct bcmstb_boot_parameters bcmstb_boot_parameters BCMSTB_DATA_SECTION;
 
@@ -38,12 +37,7 @@ int board_init(void)
 	return 0;
 }
 
-u32 get_board_rev(void)
-{
-	return 0;
-}
-
-void reset_cpu(ulong ignored)
+void reset_cpu(void)
 {
 }
 
@@ -66,13 +60,13 @@ int dram_init_banksize(void)
 
 	/*
 	 * On this SoC, U-Boot is running as an ELF file.  Change the
-	 * relocation address to CONFIG_SYS_TEXT_BASE, so that in
+	 * relocation address to CONFIG_TEXT_BASE, so that in
 	 * setup_reloc, gd->reloc_off works out to 0, effectively
 	 * disabling relocation.  Otherwise U-Boot hangs in the setup
 	 * instructions just before relocate_code in
 	 * arch/arm/lib/crt0.S.
 	 */
-	gd->relocaddr = CONFIG_SYS_TEXT_BASE;
+	gd->relocaddr = CONFIG_TEXT_BASE;
 
 	return 0;
 }
@@ -132,6 +126,14 @@ int board_late_init(void)
 	 * by the prior stage bootloader (bcmstb_boot_parameters.r1)
 	 * because we're using a device tree to boot Linux.
 	 */
+
+	return 0;
+}
+
+int board_fdt_blob_setup(void **fdtp)
+{
+	/* Stored the DTB address there during our init */
+	*fdtp = (void *)prior_stage_fdt_address;
 
 	return 0;
 }

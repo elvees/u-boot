@@ -5,7 +5,6 @@
  * Peng Fan <peng.fan@nxp.com>
  */
 
-#include <common.h>
 #include <command.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/imx-regs.h>
@@ -310,6 +309,13 @@ static u32 get_root_clk(enum clk_root_index clock_id)
 	return root_src_clk / (post_podf + 1) / (pre_podf + 1);
 }
 
+#ifdef CONFIG_IMX_HAB
+void hab_caam_clock_enable(unsigned char enable)
+{
+	/* The CAAM clock is always on for iMX8M */
+}
+#endif
+
 #ifdef CONFIG_MXC_OCOTP
 void enable_ocotp_clk(unsigned char enable)
 {
@@ -352,10 +358,18 @@ unsigned int mxc_get_clock(enum mxc_clock clk)
 		clock_get_target_val(IPG_CLK_ROOT, &val);
 		val = val & 0x3;
 		return get_root_clk(AHB_CLK_ROOT) / (val + 1);
+	case MXC_CSPI_CLK:
+		return get_root_clk(ECSPI1_CLK_ROOT);
 	case MXC_ESDHC_CLK:
 		return get_root_clk(USDHC1_CLK_ROOT);
 	case MXC_ESDHC2_CLK:
 		return get_root_clk(USDHC2_CLK_ROOT);
+	case MXC_I2C_CLK:
+		return get_root_clk(I2C1_CLK_ROOT);
+	case MXC_UART_CLK:
+		return get_root_clk(UART1_CLK_ROOT);
+	case MXC_QSPI_CLK:
+		return get_root_clk(QSPI_CLK_ROOT);
 	default:
 		return get_root_clk(clk);
 	}
@@ -393,6 +407,28 @@ void init_wdog_clk(void)
 	clock_enable(CCGR_WDOG3, 1);
 }
 
+void init_usb_clk(void)
+{
+	if (!is_usb_boot()) {
+		clock_enable(CCGR_USB_CTRL1, 0);
+		clock_enable(CCGR_USB_CTRL2, 0);
+		clock_enable(CCGR_USB_PHY1, 0);
+		clock_enable(CCGR_USB_PHY2, 0);
+		/* 500MHz */
+		clock_set_target_val(USB_BUS_CLK_ROOT, CLK_ROOT_ON |
+				     CLK_ROOT_SOURCE_SEL(1));
+		/* 100MHz */
+		clock_set_target_val(USB_CORE_REF_CLK_ROOT, CLK_ROOT_ON |
+				     CLK_ROOT_SOURCE_SEL(1));
+		/* 100MHz */
+		clock_set_target_val(USB_PHY_REF_CLK_ROOT, CLK_ROOT_ON |
+				     CLK_ROOT_SOURCE_SEL(1));
+		clock_enable(CCGR_USB_CTRL1, 1);
+		clock_enable(CCGR_USB_CTRL2, 1);
+		clock_enable(CCGR_USB_PHY1, 1);
+		clock_enable(CCGR_USB_PHY2, 1);
+	}
+}
 
 void init_nand_clk(void)
 {
@@ -575,7 +611,7 @@ void dram_disable_bypass(void)
 			     CLK_ROOT_PRE_DIV(CLK_ROOT_PRE_DIV5));
 }
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 void dram_pll_init(ulong pll_val)
 {
 	u32 val;
@@ -697,7 +733,6 @@ static int frac_pll_init(u32 pll, enum frac_pll_out_val val)
 	return 0;
 }
 
-
 int clock_init(void)
 {
 	u32 grade;
@@ -756,7 +791,7 @@ int clock_init(void)
 /*
  * Dump some clockes.
  */
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 static int do_imx8m_showclocks(struct cmd_tbl *cmdtp, int flag, int argc,
 			       char *const argv[])
 {

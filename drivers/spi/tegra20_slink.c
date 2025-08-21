@@ -5,7 +5,6 @@
  * Copyright (c) 2010-2013 NVIDIA Corporation
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <time.h>
@@ -30,7 +29,10 @@ DECLARE_GLOBAL_DATA_PTR;
 #define SLINK_CMD_IDLE_SCLK_PULL_LOW	(2 << 24)
 #define SLINK_CMD_IDLE_SCLK_PULL_HIGH	(3 << 24)
 #define SLINK_CMD_IDLE_SCLK_MASK	(3 << 24)
+#define SLINK_CMD_CS_POL3		BIT(23)
+#define SLINK_CMD_CS_POL2		BIT(22)
 #define SLINK_CMD_CK_SDA		BIT(21)
+#define SLINK_CMD_CS_POL1		BIT(20)
 #define SLINK_CMD_CS_POL		BIT(13)
 #define SLINK_CMD_CS_VAL		BIT(12)
 #define SLINK_CMD_CS_SOFT		BIT(11)
@@ -64,6 +66,13 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define SPI_TIMEOUT		1000
 #define TEGRA_SPI_MAX_FREQ	52000000
+
+unsigned int cmd_cs_pol_bit[] = {
+	SLINK_CMD_CS_POL,
+	SLINK_CMD_CS_POL1,
+	SLINK_CMD_CS_POL2,
+	SLINK_CMD_CS_POL3,
+};
 
 struct spi_regs {
 	u32 command;	/* SLINK_COMMAND_0 register  */
@@ -156,6 +165,14 @@ static int tegra30_spi_claim_bus(struct udevice *dev)
 	writel(reg, &regs->status);
 	debug("%s: STATUS = %08x\n", __func__, readl(&regs->status));
 
+	/* Update the polarity bits */
+	if (priv->mode & SPI_CS_HIGH)
+		setbits_le32(&priv->regs->command,
+			     cmd_cs_pol_bit[spi_chip_select(dev)]);
+	else
+		clrbits_le32(&priv->regs->command,
+			     cmd_cs_pol_bit[spi_chip_select(dev)]);
+
 	/* Set master mode and sw controlled CS */
 	reg = readl(&regs->command);
 	reg |= SLINK_CMD_M_S | SLINK_CMD_CS_SOFT;
@@ -208,16 +225,14 @@ static int tegra30_spi_xfer(struct udevice *dev, unsigned int bitlen,
 	u32 reg, tmpdout, tmpdin = 0;
 	const u8 *dout = data_out;
 	u8 *din = data_in;
-	int num_bytes;
-	int ret;
+	int num_bytes, overflow;
+	int ret = 0;
 
 	debug("%s: slave %u:%u dout %p din %p bitlen %u\n",
 	      __func__, dev_seq(bus), spi_chip_select(dev), dout, din, bitlen);
-	if (bitlen % 8)
-		return -1;
-	num_bytes = bitlen / 8;
 
-	ret = 0;
+	num_bytes = DIV_ROUND_UP(bitlen, 8);
+	overflow = bitlen % 8;
 
 	reg = readl(&regs->status);
 	writel(reg, &regs->status);	/* Clear all SPI events via R/W */
@@ -254,8 +269,13 @@ static int tegra30_spi_xfer(struct udevice *dev, unsigned int bitlen,
 
 		num_bytes -= bytes;
 
-		clrsetbits_le32(&regs->command, SLINK_CMD_BIT_LENGTH_MASK,
-				bytes * 8 - 1);
+		if (overflow && !num_bytes)
+			clrsetbits_le32(&regs->command, SLINK_CMD_BIT_LENGTH_MASK,
+					(bytes - 1) * 8 + overflow - 1);
+		else
+			clrsetbits_le32(&regs->command, SLINK_CMD_BIT_LENGTH_MASK,
+					bytes * 8 - 1);
+
 		writel(tmpdout, &regs->tx_fifo);
 		setbits_le32(&regs->command, SLINK_CMD_GO);
 

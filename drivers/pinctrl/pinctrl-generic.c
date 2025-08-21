@@ -3,7 +3,6 @@
  * Copyright (C) 2015  Masahiro Yamada <yamada.masahiro@socionext.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <dm/device_compat.h>
 #include <linux/compat.h>
@@ -23,7 +22,7 @@ static int pinctrl_pin_name_to_selector(struct udevice *dev, const char *pin)
 
 	if (!ops->get_pins_count || !ops->get_pin_name) {
 		dev_dbg(dev, "get_pins_count or get_pin_name missing\n");
-		return -ENOSYS;
+		return -ENOENT;
 	}
 
 	npins = ops->get_pins_count(dev);
@@ -36,7 +35,7 @@ static int pinctrl_pin_name_to_selector(struct udevice *dev, const char *pin)
 			return selector;
 	}
 
-	return -ENOSYS;
+	return -ENOENT;
 }
 
 /**
@@ -54,7 +53,7 @@ static int pinctrl_group_name_to_selector(struct udevice *dev,
 
 	if (!ops->get_groups_count || !ops->get_group_name) {
 		dev_dbg(dev, "get_groups_count or get_group_name missing\n");
-		return -ENOSYS;
+		return -ENOENT;
 	}
 
 	ngroups = ops->get_groups_count(dev);
@@ -67,7 +66,7 @@ static int pinctrl_group_name_to_selector(struct udevice *dev,
 			return selector;
 	}
 
-	return -ENOSYS;
+	return -ENOENT;
 }
 
 #if CONFIG_IS_ENABLED(PINMUX)
@@ -87,7 +86,7 @@ static int pinmux_func_name_to_selector(struct udevice *dev,
 	if (!ops->get_functions_count || !ops->get_function_name) {
 		dev_dbg(dev,
 			"get_functions_count or get_function_name missing\n");
-		return -ENOSYS;
+		return -ENOENT;
 	}
 
 	nfuncs = ops->get_functions_count(dev);
@@ -100,7 +99,7 @@ static int pinmux_func_name_to_selector(struct udevice *dev,
 			return selector;
 	}
 
-	return -ENOSYS;
+	return -ENOENT;
 }
 
 /**
@@ -120,14 +119,14 @@ static int pinmux_enable_setting(struct udevice *dev, bool is_group,
 	if (is_group) {
 		if (!ops->pinmux_group_set) {
 			dev_dbg(dev, "pinmux_group_set op missing\n");
-			return -ENOSYS;
+			return -ENOENT;
 		}
 
 		return ops->pinmux_group_set(dev, selector, func_selector);
 	} else {
 		if (!ops->pinmux_set) {
 			dev_dbg(dev, "pinmux_set op missing\n");
-			return -ENOSYS;
+			return -ENOENT;
 		}
 		return ops->pinmux_set(dev, selector, func_selector);
 	}
@@ -163,7 +162,7 @@ static int pinconf_prop_name_to_param(struct udevice *dev,
 
 	if (!ops->pinconf_num_params || !ops->pinconf_params) {
 		dev_dbg(dev, "pinconf_num_params or pinconf_params missing\n");
-		return -ENOSYS;
+		return -ENOENT;
 	}
 
 	p = ops->pinconf_params;
@@ -177,7 +176,7 @@ static int pinconf_prop_name_to_param(struct udevice *dev,
 		}
 	}
 
-	return -ENOSYS;
+	return -ENOENT;
 }
 
 /**
@@ -199,7 +198,7 @@ static int pinconf_enable_setting(struct udevice *dev, bool is_group,
 	if (is_group) {
 		if (!ops->pinconf_group_set) {
 			dev_dbg(dev, "pinconf_group_set op missing\n");
-			return -ENOSYS;
+			return -ENOENT;
 		}
 
 		return ops->pinconf_group_set(dev, selector, param,
@@ -207,7 +206,7 @@ static int pinconf_enable_setting(struct udevice *dev, bool is_group,
 	} else {
 		if (!ops->pinconf_set) {
 			dev_dbg(dev, "pinconf_set op missing\n");
-			return -ENOSYS;
+			return -ENOENT;
 		}
 		return ops->pinconf_set(dev, selector, param, argument);
 	}
@@ -216,7 +215,7 @@ static int pinconf_enable_setting(struct udevice *dev, bool is_group,
 static int pinconf_prop_name_to_param(struct udevice *dev,
 				      const char *property, u32 *default_value)
 {
-	return -ENOSYS;
+	return -ENOENT;
 }
 
 static int pinconf_enable_setting(struct udevice *dev, bool is_group,
@@ -234,6 +233,24 @@ enum pinmux_subnode_type {
 	PST_PINMUX,
 };
 
+static const char *alloc_name_with_prefix(const char *name, const char *prefix)
+{
+	if (prefix) {
+		char *name_with_prefix = malloc(strlen(prefix) + strlen(name) + 1);
+		if (name_with_prefix)
+			sprintf(name_with_prefix, "%s%s", prefix, name);
+		return name_with_prefix;
+	} else {
+		return name;
+	}
+}
+
+static void free_name_with_prefix(const char *name_with_prefix, const char *prefix)
+{
+	if (prefix)
+		free((char *)name_with_prefix);
+}
+
 /**
  * pinctrl_generic_set_state_one() - set state for a certain pin/group
  * Apply all pin multiplexing and pin configurations specified by @config
@@ -248,9 +265,11 @@ enum pinmux_subnode_type {
  */
 static int pinctrl_generic_set_state_one(struct udevice *dev,
 					 struct udevice *config,
+					 const char *prefix,
 					 enum pinmux_subnode_type subnode_type,
 					 unsigned selector)
 {
+	const char *function_propname;
 	const char *propname;
 	const void *value;
 	struct ofprop property;
@@ -259,18 +278,26 @@ static int pinctrl_generic_set_state_one(struct udevice *dev,
 
 	assert(subnode_type != PST_NONE);
 
+	function_propname = alloc_name_with_prefix("function", prefix);
+	if (!function_propname)
+		return -ENOMEM;
+
 	dev_for_each_property(property, config) {
 		value = dev_read_prop_by_prop(&property, &propname, &len);
-		if (!value)
+		if (!value) {
+			free_name_with_prefix(function_propname, prefix);
 			return -EINVAL;
+		}
 
 		/* pinmux subnodes already have their muxing set */
 		if (subnode_type != PST_PINMUX &&
-		    !strcmp(propname, "function")) {
+		    !strcmp(propname, function_propname)) {
 			func_selector = pinmux_func_name_to_selector(dev,
 								     value);
-			if (func_selector < 0)
+			if (func_selector < 0) {
+				free_name_with_prefix(function_propname, prefix);
 				return func_selector;
+			}
 			ret = pinmux_enable_setting(dev,
 						    subnode_type == PST_GROUP,
 						    selector,
@@ -291,10 +318,13 @@ static int pinctrl_generic_set_state_one(struct udevice *dev,
 						     selector, param, arg);
 		}
 
-		if (ret)
+		if (ret) {
+			free_name_with_prefix(function_propname, prefix);
 			return ret;
+		}
 	}
 
+	free_name_with_prefix(function_propname, prefix);
 	return 0;
 }
 
@@ -309,20 +339,34 @@ static int pinctrl_generic_set_state_one(struct udevice *dev,
  */
 static enum pinmux_subnode_type pinctrl_generic_get_subnode_type(struct udevice *dev,
 								 struct udevice *config,
+								 const char *prefix,
 								 int *count)
 {
 	const struct pinctrl_ops *ops = pinctrl_get_ops(dev);
+	const char *propname;
 
-	*count = dev_read_string_count(config, "pins");
+	propname = alloc_name_with_prefix("pins", prefix);
+	if (!propname)
+		return -ENOMEM;
+	*count = dev_read_string_count(config, propname);
+	free_name_with_prefix(propname, prefix);
 	if (*count >= 0)
 		return PST_PIN;
 
-	*count = dev_read_string_count(config, "groups");
+	propname = alloc_name_with_prefix("groups", prefix);
+	if (!propname)
+		return -ENOMEM;
+	*count = dev_read_string_count(config, propname);
+	free_name_with_prefix(propname, prefix);
 	if (*count >= 0)
 		return PST_GROUP;
 
 	if (ops->pinmux_property_set) {
-		*count = dev_read_size(config, "pinmux");
+		propname = alloc_name_with_prefix("pinmux", prefix);
+		if (!propname)
+			return -ENOMEM;
+		*count = dev_read_size(config, propname);
+		free_name_with_prefix(propname, prefix);
 		if (*count >= 0 && !(*count % sizeof(u32))) {
 			*count /= sizeof(u32);
 			return PST_PINMUX;
@@ -338,23 +382,30 @@ static enum pinmux_subnode_type pinctrl_generic_get_subnode_type(struct udevice 
  *
  * @dev: pin controller device
  * @config: pseudo device pointing to config node
+ * @prefix: device tree property prefix (e.g. vendor specific)
  * @return: 0 on success, or negative error code on failure
  */
 static int pinctrl_generic_set_state_subnode(struct udevice *dev,
-					     struct udevice *config)
+					     struct udevice *config,
+					     const char *prefix)
 {
 	enum pinmux_subnode_type subnode_type;
+	const char *propname;
 	const char *name;
 	int count, selector, i, ret, scratch;
 	const u32 *pinmux_groups = NULL; /* prevent use-uninitialized warning */
 
-	subnode_type = pinctrl_generic_get_subnode_type(dev, config, &count);
+	subnode_type = pinctrl_generic_get_subnode_type(dev, config, prefix, &count);
 
 	debug("%s(%s, %s): count=%d\n", __func__, dev->name, config->name,
 	      count);
 
 	if (subnode_type == PST_PINMUX) {
-		pinmux_groups = dev_read_prop(config, "pinmux", &scratch);
+		propname = alloc_name_with_prefix("pinmux", prefix);
+		if (!propname)
+			return -ENOMEM;
+		pinmux_groups = dev_read_prop(config, propname, &scratch);
+		free_name_with_prefix(propname, prefix);
 		if (!pinmux_groups)
 			return -EINVAL;
 	}
@@ -362,13 +413,21 @@ static int pinctrl_generic_set_state_subnode(struct udevice *dev,
 	for (i = 0; i < count; i++) {
 		switch (subnode_type) {
 		case PST_PIN:
-			ret = dev_read_string_index(config, "pins", i, &name);
+			propname = alloc_name_with_prefix("pins", prefix);
+			if (!propname)
+				return -ENOMEM;
+			ret = dev_read_string_index(config, propname, i, &name);
+			free_name_with_prefix(propname, prefix);
 			if (ret)
 				return ret;
 			selector = pinctrl_pin_name_to_selector(dev, name);
 			break;
 		case PST_GROUP:
-			ret = dev_read_string_index(config, "groups", i, &name);
+			propname = alloc_name_with_prefix("groups", prefix);
+			if (!propname)
+				return -ENOMEM;
+			ret = dev_read_string_index(config, propname, i, &name);
+			free_name_with_prefix(propname, prefix);
 			if (ret)
 				return ret;
 			selector = pinctrl_group_name_to_selector(dev, name);
@@ -390,8 +449,29 @@ static int pinctrl_generic_set_state_subnode(struct udevice *dev,
 		if (selector < 0)
 			return selector;
 
-		ret = pinctrl_generic_set_state_one(dev, config, subnode_type,
-						    selector);
+		ret = pinctrl_generic_set_state_one(dev, config, prefix,
+						    subnode_type, selector);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+int pinctrl_generic_set_state_prefix(struct udevice *dev, struct udevice *config,
+				     const char *prefix)
+{
+	struct udevice *child;
+	int ret;
+
+	ret = pinctrl_generic_set_state_subnode(dev, config, prefix);
+	if (ret)
+		return ret;
+
+	for (device_find_first_child(config, &child);
+	     child;
+	     device_find_next_child(&child)) {
+		ret = pinctrl_generic_set_state_subnode(dev, child, prefix);
 		if (ret)
 			return ret;
 	}
@@ -401,20 +481,5 @@ static int pinctrl_generic_set_state_subnode(struct udevice *dev,
 
 int pinctrl_generic_set_state(struct udevice *dev, struct udevice *config)
 {
-	struct udevice *child;
-	int ret;
-
-	ret = pinctrl_generic_set_state_subnode(dev, config);
-	if (ret)
-		return ret;
-
-	for (device_find_first_child(config, &child);
-	     child;
-	     device_find_next_child(&child)) {
-		ret = pinctrl_generic_set_state_subnode(dev, child);
-		if (ret)
-			return ret;
-	}
-
-	return 0;
+	return pinctrl_generic_set_state_prefix(dev, config, NULL);
 }

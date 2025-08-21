@@ -6,7 +6,7 @@
  * Adapted from the very similar rk3288 ddr init.
  */
 
-#include <common.h>
+#include <config.h>
 #include <clk.h>
 #include <dm.h>
 #include <dt-structs.h>
@@ -17,11 +17,11 @@
 #include <ram.h>
 #include <regmap.h>
 #include <syscon.h>
-#include <asm/io.h>
 #include <asm/arch-rockchip/clock.h>
 #include <asm/arch-rockchip/cru_rk3188.h>
 #include <asm/arch-rockchip/ddr_rk3188.h>
 #include <asm/arch-rockchip/grf_rk3188.h>
+#include <asm/arch-rockchip/hardware.h>
 #include <asm/arch-rockchip/pmu_rk3188.h>
 #include <asm/arch-rockchip/sdram.h>
 #include <asm/arch-rockchip/sdram_rk3288.h>
@@ -84,7 +84,7 @@ const int ddrconf_table[] = {
 #define DQS_GATE_TRAINING_ERROR_RANK0	(1 << 4)
 #define DQS_GATE_TRAINING_ERROR_RANK1	(2 << 4)
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 static void copy_to_reg(u32 *dest, const u32 *src, u32 n)
 {
 	int i;
@@ -638,12 +638,12 @@ static int sdram_col_row_detect(struct dram_info *dram, int channel,
 
 	/* Detect col */
 	for (col = 11; col >= 9; col--) {
-		writel(0, CONFIG_SYS_SDRAM_BASE);
-		addr = CONFIG_SYS_SDRAM_BASE +
+		writel(0, CFG_SYS_SDRAM_BASE);
+		addr = CFG_SYS_SDRAM_BASE +
 			(1 << (col + sdram_params->ch[channel].bw - 1));
 		writel(TEST_PATTEN, addr);
 		if ((readl(addr) == TEST_PATTEN) &&
-		    (readl(CONFIG_SYS_SDRAM_BASE) == 0))
+		    (readl(CFG_SYS_SDRAM_BASE) == 0))
 			break;
 	}
 	if (col == 8) {
@@ -660,11 +660,11 @@ static int sdram_col_row_detect(struct dram_info *dram, int channel,
 	move_to_access_state(chan);
 	/* Detect row, max 15,min13 in rk3188*/
 	for (row = 16; row >= 13; row--) {
-		writel(0, CONFIG_SYS_SDRAM_BASE);
-		addr = CONFIG_SYS_SDRAM_BASE + (1 << (row + 15 - 1));
+		writel(0, CFG_SYS_SDRAM_BASE);
+		addr = CFG_SYS_SDRAM_BASE + (1 << (row + 15 - 1));
 		writel(TEST_PATTEN, addr);
 		if ((readl(addr) == TEST_PATTEN) &&
-		    (readl(CONFIG_SYS_SDRAM_BASE) == 0))
+		    (readl(CFG_SYS_SDRAM_BASE) == 0))
 			break;
 	}
 	if (row == 12) {
@@ -762,7 +762,7 @@ static int sdram_init(struct dram_info *dram,
 		 * CS1, n=2
 		 * CS0 & CS1, n = 3
 		 */
-		sdram_params->ch[channel].rank = 2,
+		sdram_params->ch[channel].rank = 2;
 		clrsetbits_le32(&publ->pgcr, 0xF << 18,
 				(sdram_params->ch[channel].rank | 1) << 18);
 
@@ -816,9 +816,11 @@ static int setup_sdram(struct udevice *dev)
 
 static int rk3188_dmc_of_to_plat(struct udevice *dev)
 {
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
 	struct rk3188_sdram_params *params = dev_get_plat(dev);
 	int ret;
+
+	if (!CONFIG_IS_ENABLED(OF_REAL))
+		return 0;
 
 	/* rk3188 supports only one-channel */
 	params->num_channels = 1;
@@ -846,11 +848,10 @@ static int rk3188_dmc_of_to_plat(struct udevice *dev)
 	ret = regmap_init_mem(dev_ofnode(dev), &params->map);
 	if (ret)
 		return ret;
-#endif
 
 	return 0;
 }
-#endif /* CONFIG_SPL_BUILD */
+#endif /* CONFIG_XPL_BUILD */
 
 #if CONFIG_IS_ENABLED(OF_PLATDATA)
 static int conv_of_plat(struct udevice *dev)
@@ -866,7 +867,7 @@ static int conv_of_plat(struct udevice *dev)
 	memcpy(&plat->base, of_plat->rockchip_sdram_params, sizeof(plat->base));
 	/* rk3188 supports dual-channel, set default channel num to 2 */
 	plat->num_channels = 1;
-	ret = regmap_init_mem_plat(dev, of_plat->reg,
+	ret = regmap_init_mem_plat(dev, of_plat->reg, sizeof(of_plat->reg[0]),
 				   ARRAY_SIZE(of_plat->reg) / 2, &plat->map);
 	if (ret)
 		return ret;
@@ -877,7 +878,7 @@ static int conv_of_plat(struct udevice *dev)
 
 static int rk3188_dmc_probe(struct udevice *dev)
 {
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 	struct rk3188_sdram_params *plat = dev_get_plat(dev);
 	struct regmap *map;
 	struct udevice *dev_clk;
@@ -887,7 +888,7 @@ static int rk3188_dmc_probe(struct udevice *dev)
 
 	priv->pmu = syscon_get_first_range(ROCKCHIP_SYSCON_PMU);
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 #if CONFIG_IS_ENABLED(OF_PLATDATA)
 	ret = conv_of_plat(dev);
 	if (ret)
@@ -918,7 +919,7 @@ static int rk3188_dmc_probe(struct udevice *dev)
 	if (ret)
 		return ret;
 #else
-	priv->info.base = CONFIG_SYS_SDRAM_BASE;
+	priv->info.base = CFG_SYS_SDRAM_BASE;
 	priv->info.size = rockchip_sdram_size(
 				(phys_addr_t)&priv->pmu->sys_reg[2]);
 #endif
@@ -949,12 +950,12 @@ U_BOOT_DRIVER(rockchip_rk3188_dmc) = {
 	.id = UCLASS_RAM,
 	.of_match = rk3188_dmc_ids,
 	.ops = &rk3188_dmc_ops,
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 	.of_to_plat = rk3188_dmc_of_to_plat,
 #endif
 	.probe = rk3188_dmc_probe,
 	.priv_auto	= sizeof(struct dram_info),
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 	.plat_auto	= sizeof(struct rk3188_sdram_params),
 #endif
 };

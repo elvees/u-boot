@@ -4,7 +4,7 @@
  * Copyright (C) 2014-2015  Masahiro Yamada <yamada.masahiro@socionext.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <log.h>
 #include <asm/io.h>
 #include <asm/unaligned.h>
@@ -25,9 +25,9 @@
 #define BANK(x) ((x) << 24)
 
 static void __iomem *denali_flash_mem =
-			(void __iomem *)CONFIG_SYS_NAND_DATA_BASE;
+			(void __iomem *)CFG_SYS_NAND_DATA_BASE;
 static void __iomem *denali_flash_reg =
-			(void __iomem *)CONFIG_SYS_NAND_REGS_BASE;
+			(void __iomem *)CFG_SYS_NAND_REGS_BASE;
 
 static const int flash_bank;
 static int page_size, oob_size, pages_per_block;
@@ -232,6 +232,11 @@ int nand_spl_load_image(uint32_t offs, unsigned int size, void *dst)
 	}
 
 	return 0;
+}
+
+unsigned int nand_page_size(void)
+{
+	return page_size;
 }
 
 void nand_deselect(void) {}

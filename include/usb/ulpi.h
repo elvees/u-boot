@@ -20,8 +20,8 @@
 
 #define ULPI_ERROR	(1 << 8) /* overflow from any register value */
 
-#ifndef CONFIG_USB_ULPI_TIMEOUT
-#define CONFIG_USB_ULPI_TIMEOUT 1000	/* timeout in us */
+#ifndef CFG_USB_ULPI_TIMEOUT
+#define CFG_USB_ULPI_TIMEOUT 1000	/* timeout in us */
 #endif
 
 /*
@@ -115,7 +115,6 @@ int ulpi_suspend(struct ulpi_viewport *ulpi_vp);
  * returns 0 on success, ULPI_ERROR on failure.
  */
 int ulpi_reset(struct ulpi_viewport *ulpi_vp);
-
 
 /* ULPI access methods below must be implemented for each ULPI viewport. */
 
@@ -313,6 +312,5 @@ struct ulpi_regs {
 #define ULPI_CARKIT_PLS_CTRL_RXPLSEN		(1 << 1)
 #define ULPI_CARKIT_PLS_CTRL_SPKRLEFT_BIASEN	(1 << 2)
 #define ULPI_CARKIT_PLS_CTRL_SPKRRIGHT_BIASEN	(1 << 3)
-
 
 #endif /* __USB_ULPI_H__ */

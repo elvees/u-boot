@@ -27,12 +27,7 @@
 #include <asm/arch/clock.h>
 #include "octeontx_bch.h"
 
-#ifdef DEBUG
-# undef CONFIG_LOGLEVEL
-# define CONFIG_LOGLEVEL 8
-#endif
-
-LIST_HEAD(octeontx_bch_devices);
+static LIST_HEAD(octeontx_bch_devices);
 static unsigned int num_vfs = BCH_NR_VF;
 static void *bch_pf;
 static void *bch_vf;
@@ -176,7 +171,8 @@ static int octeontx_pci_bchpf_probe(struct udevice *dev)
 	if (!bch)
 		return -ENOMEM;
 
-	bch->reg_base = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_0, PCI_REGION_MEM);
+	bch->reg_base = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_0, 0, 0,
+				       PCI_REGION_TYPE, PCI_REGION_MEM);
 	bch->dev = dev;
 
 	debug("%s: base address: %p\n", __func__, bch->reg_base);
@@ -218,7 +214,7 @@ static const struct pci_device_id octeontx_bchvf_pci_id_table[] = {
  * @param[out] ecc	8-byte aligned pointer to where ecc data should go
  * @param[in] resp	pointer to where responses will be written.
  *
- * @return Zero on success, negative on failure.
+ * Return: Zero on success, negative on failure.
  */
 int octeontx_bch_encode(struct bch_vf *vf, dma_addr_t block, u16 block_size,
 			u8 bch_level, dma_addr_t ecc, dma_addr_t resp)
@@ -259,7 +255,7 @@ int octeontx_bch_encode(struct bch_vf *vf, dma_addr_t block, u16 block_size,
  *				This should not be the same as block_ecc_in.
  * @param[in] resp		pointer to where responses will be written.
  *
- * @return Zero on success, negative on failure.
+ * Return: Zero on success, negative on failure.
  */
 
 int octeontx_bch_decode(struct bch_vf *vf, dma_addr_t block_ecc_in,
@@ -361,7 +357,8 @@ static int octeontx_pci_bchvf_probe(struct udevice *dev)
 	vf->dev = dev;
 
 	/* Map PF's configuration registers */
-	vf->reg_base = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_0, PCI_REGION_MEM);
+	vf->reg_base = dm_pci_map_bar(dev, PCI_BASE_ADDRESS_0, 0, 0,
+				      PCI_REGION_TYPE, PCI_REGION_MEM);
 	debug("%s: reg base: %p\n", __func__, vf->reg_base);
 
 	err = octeontx_cmd_queue_initialize(dev, QID_BCH, QDEPTH - 1, 0,

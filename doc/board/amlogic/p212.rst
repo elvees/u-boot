@@ -31,6 +31,8 @@ U-Boot compilation
 Image creation
 --------------
 
+For simplified usage, pleaser refer to :doc:`pre-generated-fip` with codename `p212`
+
 Amlogic doesn't provide sources for the firmware and for tools needed
 to create the bootloader image, so it is necessary to obtain them from
 the git tree published by the board vendor:
@@ -48,7 +50,7 @@ the git tree published by the board vendor:
     $ make
     $ export FIPDIR=$PWD/fip
 
-Go back to mainline U-boot source tree then :
+Go back to mainline U-Boot source tree then :
 
 .. code-block:: bash
 

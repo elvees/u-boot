@@ -21,6 +21,8 @@
 #include <unistd.h>
 #include <u-boot/sha1.h>
 
+#include <image.h>
+
 #include "fdt_host.h"
 
 #define ARRAY_SIZE(x)		(sizeof(x) / sizeof((x)[0]))
@@ -37,6 +39,14 @@ struct content_info {
 	const char *fname;
 };
 
+/* FIT auto generation modes */
+enum af_mode {
+	AF_OFF = 0,	/* Needs .its or existing FIT to be provided */
+	AF_HASHED_IMG,	/* Auto FIT with crc32 hashed images subnodes */
+	AF_SIGNED_IMG,	/* Auto FIT with signed images subnodes */
+	AF_SIGNED_CONF,	/* Auto FIT with sha1 images and signed configs */
+};
+
 /*
  * This structure defines all such variables those are initialized by
  * mkimage and dumpimage main core and need to be referred by image
@@ -51,6 +61,7 @@ struct image_tool_params {
 	int pflag;
 	int vflag;
 	int xflag;
+	int Aflag;
 	int skipcpy;
 	int os;
 	int arch;
@@ -67,11 +78,16 @@ struct image_tool_params {
 	const char *outfile;	/* Output filename */
 	const char *keydir;	/* Directory holding private keys */
 	const char *keydest;	/* Destination .dtb for public key */
+	const char *keyfile;	/* Filename of private or public key */
+	const char *keyname;	/* Key name "hint" */
 	const char *comment;	/* Comment to add to signature node */
+	/* Algorithm name to use for hashing/signing or NULL to use the one
+	 * specified in the its */
+	const char *algo_name;
 	int require_keys;	/* 1 to mark signing keys as 'required' */
 	int file_size;		/* Total size of output file */
 	int orig_file_size;	/* Original size for file before padding */
-	bool auto_its;		/* Automatically create the .its file */
+	enum af_mode auto_fit;	/* Automatically create the FIT */
 	int fit_image_type;	/* Image type to put into the FIT */
 	char *fit_ramdisk;	/* Ramdisk file to include */
 	struct content_info *content_head;	/* List of files to include */
@@ -82,6 +98,7 @@ struct image_tool_params {
 	int bl_len;		/* Block length in byte for external data */
 	const char *engine_id;	/* Engine to use for signing */
 	bool reset_timestamp;	/* Reset the timestamp on an existing image */
+	struct image_summary summary;	/* results of signing process */
 };
 
 /*
@@ -115,7 +132,7 @@ struct image_type_params {
 	 */
 	int (*verify_header) (unsigned char *, int, struct image_tool_params *);
 	/* Prints image information abstracting from image header */
-	void (*print_header) (const void *);
+	void (*print_header) (const void *, struct image_tool_params *);
 	/*
 	 * The header or image contents need to be set as per image type to
 	 * be generated using this callback function.
@@ -171,33 +188,19 @@ struct image_type_params *imagetool_get_type(int type);
 /*
  * imagetool_verify_print_header() - verifies the image header
  *
- * Scan registered image types and verify the image_header for each
- * supported image type. If verification is successful, this prints
- * the respective header.
- *
- * @return 0 on success, negative if input image format does not match with
- * any of supported image types
- */
-int imagetool_verify_print_header(
-	void *ptr,
-	struct stat *sbuf,
-	struct image_type_params *tparams,
-	struct image_tool_params *params);
-
-/*
- * imagetool_verify_print_header_by_type() - verifies the image header
- *
  * Verify the image_header for the image type given by tparams.
+ * If tparams is NULL then scan registered image types and verify the
+ * image_header for each supported image type.
  * If verification is successful, this prints the respective header.
  * @ptr: pointer the the image header
  * @sbuf: stat information about the file pointed to by ptr
- * @tparams: image type parameters
+ * @tparams: image type parameters or NULL
  * @params: mkimage parameters
  *
- * @return 0 on success, negative if input image format does not match with
+ * Return: 0 on success, negative if input image format does not match with
  * the given image type
  */
-int imagetool_verify_print_header_by_type(
+int imagetool_verify_print_header(
 	void *ptr,
 	struct stat *sbuf,
 	struct image_type_params *tparams,
@@ -228,7 +231,7 @@ int imagetool_save_subimage(
  *
  * @params:	mkimage parameters
  * @fname:	filename to check
- * @return size of file, or -ve value on error
+ * Return: size of file, or -ve value on error
  */
 int imagetool_get_filesize(struct image_tool_params *params, const char *fname);
 
@@ -242,7 +245,7 @@ int imagetool_get_filesize(struct image_tool_params *params, const char *fname);
  *
  * @cmdname:	command name
  * @fallback:	timestamp to use if SOURCE_DATE_EPOCH isn't set
- * @return timestamp based on SOURCE_DATE_EPOCH
+ * Return: timestamp based on SOURCE_DATE_EPOCH
  */
 time_t imagetool_get_source_date(
 	const char *cmdname,
@@ -252,7 +255,6 @@ time_t imagetool_get_source_date(
  * There is a c file associated with supported image type low level code
  * for ex. default_image.c, fit_image.c
  */
-
 
 void pbl_load_uboot(int fd, struct image_tool_params *mparams);
 int zynqmpbif_copy_image(int fd, struct image_tool_params *mparams);
@@ -270,11 +272,13 @@ int rockchip_copy_image(int fd, struct image_tool_params *mparams);
  *  b) we need a API call to get the respective section symbols */
 #if defined(__MACH__)
 #include <mach-o/getsect.h>
+#include <mach-o/dyld.h>
 
 #define INIT_SECTION(name)  do {					\
 		unsigned long name ## _len;				\
 		char *__cat(pstart_, name) = getsectdata("__DATA",	\
 			#name, &__cat(name, _len));			\
+		__cat(pstart_, name) += _dyld_get_image_vmaddr_slide(0);\
 		char *__cat(pstop_, name) = __cat(pstart_, name) +	\
 			__cat(name, _len);				\
 		__cat(__start_, name) = (void *)__cat(pstart_, name);	\

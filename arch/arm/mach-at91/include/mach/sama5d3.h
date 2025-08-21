@@ -185,13 +185,13 @@
 #define CPU_HAS_PCR
 
 /* Timer */
-#define CONFIG_SYS_TIMER_COUNTER	0xfffffe3c
+#define CFG_SYS_TIMER_COUNTER	0xfffffe3c
 
 /*
  * PMECC table in ROM
  */
-#define ATMEL_PMECC_INDEX_OFFSET_512	0x8000
-#define ATMEL_PMECC_INDEX_OFFSET_1024	0x10000
+#define ATMEL_PMECC_INDEX_OFFSET_512	0x10000
+#define ATMEL_PMECC_INDEX_OFFSET_1024	0x18000
 
 /*
  * SAMA5D3 specific prototypes

@@ -2,13 +2,12 @@
 /*
  * Marvell Armada 37xx SoC Time Base Generator clocks
  *
- * Marek Behun <marek.behun@nic.cz>
+ * Marek Behún <kabel@kernel.org>
  *
  * Based on Linux driver by:
  *   Gregory CLEMENT <gregory.clement@free-electrons.com>
  */
 
-#include <common.h>
 #include <clk-uclass.h>
 #include <clk.h>
 #include <dm.h>
@@ -152,4 +151,5 @@ U_BOOT_DRIVER(armada_37xx_tbg_clk) = {
 	.ops		= &armada_37xx_tbg_clk_ops,
 	.priv_auto	= sizeof(struct a37xx_tbgclk),
 	.probe		= armada_37xx_tbg_clk_probe,
+	.flags		= DM_FLAG_PRE_RELOC,
 };

@@ -5,13 +5,13 @@
  * Command for en/de-crypting block of memory with AES-[128/192/256]-CBC cipher.
  */
 
-#include <common.h>
 #include <command.h>
 #include <uboot_aes.h>
 #include <malloc.h>
 #include <asm/byteorder.h>
 #include <linux/compiler.h>
 #include <mapmem.h>
+#include <vsprintf.h>
 
 u32 aes_get_key_len(char *command)
 {
@@ -55,11 +55,11 @@ static int do_aes(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	else
 		return CMD_RET_USAGE;
 
-	key_addr = simple_strtoul(argv[2], NULL, 16);
-	iv_addr = simple_strtoul(argv[3], NULL, 16);
-	src_addr = simple_strtoul(argv[4], NULL, 16);
-	dst_addr = simple_strtoul(argv[5], NULL, 16);
-	len = simple_strtoul(argv[6], NULL, 16);
+	key_addr = hextoul(argv[2], NULL);
+	iv_addr = hextoul(argv[3], NULL);
+	src_addr = hextoul(argv[4], NULL);
+	dst_addr = hextoul(argv[5], NULL);
+	len = hextoul(argv[6], NULL);
 
 	key_ptr = (uint8_t *)map_sysmem(key_addr, key_len);
 	iv_ptr = (uint8_t *)map_sysmem(iv_addr, 128 / 8);
@@ -88,8 +88,7 @@ static int do_aes(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 }
 
 /***************************************************/
-#ifdef CONFIG_SYS_LONGHELP
-static char aes_help_text[] =
+U_BOOT_LONGHELP(aes,
 	"[.128,.192,.256] enc key iv src dst len - Encrypt block of data $len bytes long\n"
 	"                             at address $src using a key at address\n"
 	"                             $key with initialization vector at address\n"
@@ -101,8 +100,7 @@ static char aes_help_text[] =
 	"                             $key with initialization vector at address\n"
 	"                             $iv. Store the result at address $dst.\n"
 	"                             The $len size must be multiple of 16 bytes.\n"
-	"                             The $key and $iv must be 16 bytes long.";
-#endif
+	"                             The $key and $iv must be 16 bytes long.");
 
 U_BOOT_CMD(
 	aes, 7, 1, do_aes,

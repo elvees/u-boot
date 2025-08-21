@@ -10,7 +10,7 @@
 #ifndef _MUSB_HOST_H
 #define _MUSB_HOST_H
 #ifdef __UBOOT__
-#include "usb-compat.h"
+#include <linux/usb/usb_urb_compat.h>
 #endif
 
 static inline struct usb_hcd *musb_to_hcd(struct musb *musb)
@@ -58,7 +58,6 @@ static inline struct musb_qh *first_qh(struct list_head *q)
 		return NULL;
 	return list_entry(q->next, struct musb_qh, ring);
 }
-
 
 extern void musb_root_disconnect(struct musb *musb);
 

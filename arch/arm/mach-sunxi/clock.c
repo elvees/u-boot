@@ -7,10 +7,8 @@
  * (C) Copyright 2013 Luke Kenneth Casson Leighton <lkcl@lkcl.net>
  */
 
-#include <common.h>
 #include <asm/io.h>
 #include <asm/arch/clock.h>
-#include <asm/arch/gpio.h>
 #include <asm/arch/prcm.h>
 #include <asm/arch/gtbus.h>
 #include <asm/arch/sys_proto.h>
@@ -25,10 +23,8 @@ __weak void gtbus_init(void)
 
 int clock_init(void)
 {
-#ifdef CONFIG_SPL_BUILD
 	clock_init_safe();
 	gtbus_init();
-#endif
 	clock_init_uart();
 	clock_init_sec();
 
@@ -36,7 +32,8 @@ int clock_init(void)
 }
 
 /* These functions are shared between various SoCs so put them here. */
-#if defined CONFIG_SUNXI_GEN_SUN6I && !defined CONFIG_MACH_SUN9I
+#if defined CONFIG_SUNXI_GEN_SUN6I && !defined CONFIG_MACH_SUN9I && \
+	!defined CONFIG_MACH_SUNIV
 int clock_twi_onoff(int port, int state)
 {
 	struct sunxi_ccm_reg *const ccm =

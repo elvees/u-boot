@@ -1,10 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright 2013 Freescale Semiconductor, Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
  */
 
 #ifndef __DTS_VF610_PINFUNC_H
@@ -23,7 +19,6 @@
 #define ALT5	0x5
 #define ALT6	0x6
 #define ALT7	0x7
-
 
 #define VF610_PAD_PTA6__GPIO_0			0x000 0x000 ALT0 0x0
 #define VF610_PAD_PTA6__RMII_CLKOUT		0x000 0x000 ALT1 0x0
@@ -424,7 +419,7 @@
 #define VF610_PAD_PTD29__FTM3_CH2		0x104 0x000 ALT4 0x0
 #define VF610_PAD_PTD29__DSPI2_SIN		0x104 0x000 ALT5 0x0
 #define VF610_PAD_PTD29__DEBUG_OUT11		0x104 0x000 ALT7 0x0
-#define VF610_PAD_PTD28__GPIO_66	 	0x108 0x000 ALT0 0x0
+#define VF610_PAD_PTD28__GPIO_66		0x108 0x000 ALT0 0x0
 #define VF610_PAD_PTD28__FB_AD28		0x108 0x000 ALT1 0x0
 #define VF610_PAD_PTD28__NF_IO12		0x108 0x000 ALT2 0x0
 #define VF610_PAD_PTD28__I2C2_SCL		0x108 0x34C ALT3 0x1
@@ -806,7 +801,6 @@
 #define VF610_PAD_PTE28__EWM_OUT		0x214 0x000 ALT7 0x0
 #define VF610_PAD_PTA7__GPIO_134		0x218 0x000 ALT0 0x0
 #define VF610_PAD_PTA7__VIU_PIX_CLK		0x218 0x3AC ALT1 0x1
-
 #define VF610_PAD_DDR_RESETB			0x21c 0x000 ALT0 0x0
 #define VF610_PAD_DDR_A15__DDR_A_15		0x220 0x000 ALT0 0x0
 #define VF610_PAD_DDR_A14__DDR_A_14		0x224 0x000 ALT0 0x0
@@ -857,4 +851,5 @@
 #define VF610_PAD_DDR_ODT0__DDR_ODT_1		0x2d8 0x000 ALT0 0x0
 #define VF610_PAD_DDR_DDRBYTE1__DDR_DDRBYTE1	0x2dc 0x000 ALT0 0x0
 #define VF610_PAD_DDR_DDRBYTE2__DDR_DDRBYTE2	0x2e0 0x000 ALT0 0x0
+
 #endif

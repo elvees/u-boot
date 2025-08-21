@@ -3,7 +3,6 @@
  * Copyright (C) 2020 Philippe Reynes <philippe.reynes@softathome.com>
  */
 
-#include <common.h>
 #include <button.h>
 #include <dm.h>
 #include <dm/lists.h>
@@ -13,12 +12,16 @@
 
 struct button_gpio_priv {
 	struct gpio_desc gpio;
+	int linux_code;
 };
 
 static enum button_state_t button_gpio_get_state(struct udevice *dev)
 {
 	struct button_gpio_priv *priv = dev_get_priv(dev);
 	int ret;
+
+	if (!priv)
+		return -ENODATA;
 
 	if (!dm_gpio_is_valid(&priv->gpio))
 		return -EREMOTEIO;
@@ -27,6 +30,19 @@ static enum button_state_t button_gpio_get_state(struct udevice *dev)
 		return ret;
 
 	return ret ? BUTTON_ON : BUTTON_OFF;
+}
+
+static int button_gpio_get_code(struct udevice *dev)
+{
+	struct button_gpio_priv *priv = dev_get_priv(dev);
+	if (!priv)
+		return -ENODATA;
+	int code = priv->linux_code;
+
+	if (!code)
+		return -ENODATA;
+
+	return code;
 }
 
 static int button_gpio_probe(struct udevice *dev)
@@ -40,10 +56,12 @@ static int button_gpio_probe(struct udevice *dev)
 		return 0;
 
 	ret = gpio_request_by_name(dev, "gpios", 0, &priv->gpio, GPIOD_IS_IN);
-	if (ret)
+	if (ret || !dm_gpio_is_valid(&priv->gpio))
 		return ret;
 
-	return 0;
+	ret = dev_read_u32(dev, "linux,code", &priv->linux_code);
+
+	return ret;
 }
 
 static int button_gpio_remove(struct udevice *dev)
@@ -85,6 +103,8 @@ static int button_gpio_bind(struct udevice *parent)
 			return ret;
 		uc_plat = dev_get_uclass_plat(dev);
 		uc_plat->label = label;
+		debug("Button '%s' bound to driver '%s'\n", label,
+		      dev->driver->name);
 	}
 
 	return 0;
@@ -92,6 +112,7 @@ static int button_gpio_bind(struct udevice *parent)
 
 static const struct button_ops button_gpio_ops = {
 	.get_state	= button_gpio_get_state,
+	.get_code	= button_gpio_get_code,
 };
 
 static const struct udevice_id button_gpio_ids[] = {

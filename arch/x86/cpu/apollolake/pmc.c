@@ -8,9 +8,8 @@
 
 #define LOG_CATEGORY UCLASS_ACPI_PMC
 
-#include <common.h>
-#include <dt-structs.h>
 #include <dm.h>
+#include <dt-structs.h>
 #include <log.h>
 #include <spl.h>
 #include <acpi/acpi_s3.h>
@@ -107,7 +106,7 @@ int apl_pmc_ofdata_to_uc_plat(struct udevice *dev)
 	struct acpi_pmc_upriv *upriv = dev_get_uclass_priv(dev);
 	struct apl_pmc_plat *plat = dev_get_plat(dev);
 
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	u32 base[6];
 	int size;
 	int ret;
@@ -116,7 +115,7 @@ int apl_pmc_ofdata_to_uc_plat(struct udevice *dev)
 				 ARRAY_SIZE(base));
 	if (ret)
 		return log_msg_ret("Missing/short early-regs", ret);
-	if (spl_phase() == PHASE_TPL) {
+	if (xpl_phase() == PHASE_TPL) {
 		upriv->pmc_bar0 = (void *)base[0];
 		upriv->pmc_bar2 = (void *)base[2];
 
@@ -187,7 +186,7 @@ static int enable_pmcbar(struct udevice *dev)
 
 static int apl_pmc_probe(struct udevice *dev)
 {
-	if (spl_phase() == PHASE_TPL) {
+	if (xpl_phase() == PHASE_TPL) {
 		return enable_pmcbar(dev);
 	} else {
 		struct acpi_pmc_upriv *upriv = dev_get_uclass_priv(dev);
@@ -206,7 +205,7 @@ static const struct acpi_pmc_ops apl_pmc_ops = {
 	.global_reset_set_enable = apl_global_reset_set_enable,
 };
 
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 static const struct udevice_id apl_pmc_ids[] = {
 	{ .compatible = "intel,apl-pmc" },
 	{ }

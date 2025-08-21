@@ -3,17 +3,56 @@
  * Copyright (c) 2017 Tuomas Tynkkynen
  */
 
-#include <common.h>
+#include <config.h>
 #include <cpu_func.h>
 #include <dm.h>
+#include <efi.h>
+#include <efi_loader.h>
 #include <fdtdec.h>
 #include <init.h>
 #include <log.h>
+#include <usb.h>
 #include <virtio_types.h>
 #include <virtio.h>
 
+#include <linux/kernel.h>
+#include <linux/sizes.h>
+
+/* GUIDs for capsule updatable firmware images */
+#define QEMU_ARM_UBOOT_IMAGE_GUID \
+	EFI_GUID(0xf885b085, 0x99f8, 0x45af, 0x84, 0x7d, \
+		 0xd5, 0x14, 0x10, 0x7a, 0x4a, 0x2c)
+
+#define QEMU_ARM64_UBOOT_IMAGE_GUID \
+	EFI_GUID(0x058b7d83, 0x50d5, 0x4c47, 0xa1, 0x95, \
+		 0x60, 0xd8, 0x6a, 0xd3, 0x41, 0xc4)
+
 #ifdef CONFIG_ARM64
 #include <asm/armv8/mmu.h>
+
+#if IS_ENABLED(CONFIG_EFI_HAVE_CAPSULE_SUPPORT)
+struct efi_fw_image fw_images[] = {
+#if defined(CONFIG_TARGET_QEMU_ARM_32BIT)
+	{
+		.image_type_id = QEMU_ARM_UBOOT_IMAGE_GUID,
+		.fw_name = u"Qemu-Arm-UBOOT",
+		.image_index = 1,
+	},
+#elif defined(CONFIG_TARGET_QEMU_ARM_64BIT)
+	{
+		.image_type_id = QEMU_ARM64_UBOOT_IMAGE_GUID,
+		.fw_name = u"Qemu-Arm-UBOOT",
+		.image_index = 1,
+	},
+#endif
+};
+
+struct efi_capsule_update_info update_info = {
+	.num_images = ARRAY_SIZE(fw_images),
+	.images = fw_images,
+};
+
+#endif /* EFI_HAVE_CAPSULE_SUPPORT */
 
 static struct mm_region qemu_arm64_mem_map[] = {
 	{
@@ -76,6 +115,10 @@ int board_late_init(void)
 	 */
 	virtio_init();
 
+	/* start usb so that usb keyboard can be used as input device */
+	if (CONFIG_IS_ENABLED(USB_KEYBOARD))
+		usb_init();
+
 	return 0;
 }
 
@@ -83,6 +126,18 @@ int dram_init(void)
 {
 	if (fdtdec_setup_mem_size_base() != 0)
 		return -EINVAL;
+
+	/*
+	 * When LPAE is enabled (ARMv7),
+	 * 1:1 mapping is created using 2 MB blocks.
+	 *
+	 * In case amount of memory provided to QEMU
+	 * is not multiple of 2 MB, round down the amount
+	 * of available memory to avoid hang during MMU
+	 * initialization.
+	 */
+	if (CONFIG_IS_ENABLED(ARMV7_LPAE))
+		gd->ram_size -= (gd->ram_size % 0x200000);
 
 	return 0;
 }
@@ -94,10 +149,12 @@ int dram_init_banksize(void)
 	return 0;
 }
 
-void *board_fdt_blob_setup(void)
+int board_fdt_blob_setup(void **fdtp)
 {
 	/* QEMU loads a generated DTB for us at the start of RAM. */
-	return (void *)CONFIG_SYS_SDRAM_BASE;
+	*fdtp = (void *)CFG_SYS_SDRAM_BASE;
+
+	return 0;
 }
 
 void enable_caches(void)
@@ -105,48 +162,6 @@ void enable_caches(void)
 	 icache_enable();
 	 dcache_enable();
 }
-
-#if defined(CONFIG_EFI_RNG_PROTOCOL)
-#include <efi_loader.h>
-#include <efi_rng.h>
-
-#include <dm/device-internal.h>
-
-efi_status_t platform_get_rng_device(struct udevice **dev)
-{
-	int ret;
-	efi_status_t status = EFI_DEVICE_ERROR;
-	struct udevice *bus, *devp;
-
-	for (uclass_first_device(UCLASS_VIRTIO, &bus); bus;
-	     uclass_next_device(&bus)) {
-		for (device_find_first_child(bus, &devp); devp;
-		     device_find_next_child(&devp)) {
-			if (device_get_uclass_id(devp) == UCLASS_RNG) {
-				*dev = devp;
-				status = EFI_SUCCESS;
-				break;
-			}
-		}
-	}
-
-	if (status != EFI_SUCCESS) {
-		debug("No rng device found\n");
-		return EFI_DEVICE_ERROR;
-	}
-
-	if (*dev) {
-		ret = device_probe(*dev);
-		if (ret)
-			return EFI_DEVICE_ERROR;
-	} else {
-		debug("Couldn't get child device\n");
-		return EFI_DEVICE_ERROR;
-	}
-
-	return EFI_SUCCESS;
-}
-#endif /* CONFIG_EFI_RNG_PROTOCOL */
 
 #ifdef CONFIG_ARM64
 #define __W	"w"

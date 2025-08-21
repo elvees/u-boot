@@ -3,6 +3,7 @@
  * Copyright (C) 2019 Jagan Teki <jagan@amarulasolutions.com>
  */
 
+#include "binman.dtsi"
 #include "fu540-c000-u-boot.dtsi"
 #include "fu540-hifive-unleashed-a00-ddr.dtsi"
 
@@ -21,15 +22,15 @@
 	};
 
 	memory@80000000 {
-		u-boot,dm-spl;
+		bootph-pre-ram;
 	};
 
 	hfclk {
-		u-boot,dm-spl;
+		bootph-pre-ram;
 	};
 
 	rtcclk {
-		u-boot,dm-spl;
+		bootph-pre-ram;
 	};
 
 };
@@ -39,19 +40,19 @@
 };
 
 &qspi0 {
-	u-boot,dm-spl;
+	bootph-pre-ram;
 
 	flash@0 {
-		u-boot,dm-spl;
+		bootph-pre-ram;
 	};
 };
 
 &qspi2 {
 	mmc@0 {
-		u-boot,dm-spl;
+		bootph-pre-ram;
 	};
 };
 
 &gpio {
-	u-boot,dm-spl;
+	bootph-pre-ram;
 };

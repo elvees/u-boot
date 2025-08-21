@@ -18,7 +18,6 @@
  * src/arch/x86/lib/cpu.c
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <init.h>
 #include <log.h>
@@ -32,12 +31,9 @@
 #include <asm/msr.h>
 #include <asm/mtrr.h>
 #include <asm/processor-flags.h>
+#include <asm/u-boot-x86.h>
 
 DECLARE_GLOBAL_DATA_PTR;
-
-#define CPUID_FEATURE_PAE	BIT(6)
-#define CPUID_FEATURE_PSE36	BIT(17)
-#define CPUID_FEAURE_HTT	BIT(28)
 
 /*
  * Constructor for a conventional segment GDT (or LDT) entry
@@ -160,6 +156,9 @@ void arch_setup_gd(gd_t *new_gd)
 
 	gdt_addr[X86_GDT_ENTRY_16BIT_FLAT_CS] = GDT_ENTRY(0x809b, 0, 0xfffff);
 	gdt_addr[X86_GDT_ENTRY_16BIT_FLAT_DS] = GDT_ENTRY(0x8093, 0, 0xfffff);
+	gdt_addr[X86_GDT_ENTRY_64BIT_CS] = GDT_ENTRY(0xaf9b, 0, 0xfffff);
+	gdt_addr[X86_GDT_ENTRY_64BIT_TS1] = GDT_ENTRY(0x8980, 0, 0xfffff);
+	gdt_addr[X86_GDT_ENTRY_64BIT_TS2] = 0;
 
 	load_gdt(gdt_addr, X86_GDT_NUM_ENTRIES);
 	load_ds(X86_GDT_ENTRY_32BIT_DS);
@@ -263,6 +262,49 @@ static int build_vendor_name(char *vendor_name)
 }
 #endif
 
+int x86_cpu_vendor_info(char *name)
+{
+	uint cpu_device;
+
+	cpu_device = 0;
+
+	/* gcc 7.3 does not want to drop x86_vendors, so use #ifdef */
+#ifndef CONFIG_TPL_BUILD
+	*name = '\0'; /* Unset */
+
+	/* Find the id and vendor_name */
+	if (!has_cpuid()) {
+		/* Its a 486 if we can modify the AC flag */
+		if (flag_is_changeable_p(X86_EFLAGS_AC))
+			cpu_device = 0x00000400; /* 486 */
+		else
+			cpu_device = 0x00000300; /* 386 */
+		if (cpu_device == 0x00000400 && test_cyrix_52div()) {
+			/* If we ever care we can enable cpuid here */
+			memcpy(name, "CyrixInstead", 13);
+
+		/* Detect NexGen with old hypercode */
+		} else if (deep_magic_nexgen_probe()) {
+			memcpy(name, "NexGenDriven", 13);
+		}
+	} else {
+		int cpuid_level;
+
+		cpuid_level = build_vendor_name(name);
+		name[12] = '\0';
+
+		/* Intel-defined flags: level 0x00000001 */
+		if (cpuid_level >= 0x00000001)
+			cpu_device = cpuid_eax(0x00000001);
+		else
+			/* Have CPUID level 0 only unheard of */
+			cpu_device = 0x00000400;
+	}
+#endif /* CONFIG_TPL_BUILD */
+
+	return cpu_device;
+}
+
 static void identify_cpu(struct cpu_device_id *cpu)
 {
 	cpu->device = 0; /* fix gcc 4.4.4 warning */
@@ -271,7 +313,7 @@ static void identify_cpu(struct cpu_device_id *cpu)
 	 * Do a quick and dirty check to save space - Intel and AMD only and
 	 * just the vendor. This is enough for most TPL code.
 	 */
-	if (spl_phase() == PHASE_TPL) {
+	if (xpl_phase() == PHASE_TPL) {
 		struct cpuid_result result;
 
 		result = cpuid(0x00000000);
@@ -289,46 +331,19 @@ static void identify_cpu(struct cpu_device_id *cpu)
 		return;
 	}
 
-/* gcc 7.3 does not want to drop x86_vendors, so use #ifdef */
 #ifndef CONFIG_TPL_BUILD
-	char vendor_name[16];
-	int i;
+	{
+		char vendor_name[16];
+		int i;
 
-	vendor_name[0] = '\0'; /* Unset */
+		cpu->device = x86_cpu_vendor_info(vendor_name);
 
-	/* Find the id and vendor_name */
-	if (!has_cpuid()) {
-		/* Its a 486 if we can modify the AC flag */
-		if (flag_is_changeable_p(X86_EFLAGS_AC))
-			cpu->device = 0x00000400; /* 486 */
-		else
-			cpu->device = 0x00000300; /* 386 */
-		if ((cpu->device == 0x00000400) && test_cyrix_52div()) {
-			memcpy(vendor_name, "CyrixInstead", 13);
-			/* If we ever care we can enable cpuid here */
-		}
-		/* Detect NexGen with old hypercode */
-		else if (deep_magic_nexgen_probe())
-			memcpy(vendor_name, "NexGenDriven", 13);
-	} else {
-		int cpuid_level;
-
-		cpuid_level = build_vendor_name(vendor_name);
-		vendor_name[12] = '\0';
-
-		/* Intel-defined flags: level 0x00000001 */
-		if (cpuid_level >= 0x00000001) {
-			cpu->device = cpuid_eax(0x00000001);
-		} else {
-			/* Have CPUID level 0 only unheard of */
-			cpu->device = 0x00000400;
-		}
-	}
-	cpu->vendor = X86_VENDOR_UNKNOWN;
-	for (i = 0; i < ARRAY_SIZE(x86_vendors); i++) {
-		if (memcmp(vendor_name, x86_vendors[i].name, 12) == 0) {
-			cpu->vendor = x86_vendors[i].vendor;
-			break;
+		cpu->vendor = X86_VENDOR_UNKNOWN;
+		for (i = 0; i < ARRAY_SIZE(x86_vendors); i++) {
+			if (memcmp(vendor_name, x86_vendors[i].name, 12) == 0) {
+				cpu->vendor = x86_vendors[i].vendor;
+				break;
+			}
 		}
 	}
 #endif
@@ -393,37 +408,12 @@ static void setup_identity(void)
 	}
 }
 
-static uint cpu_cpuid_extended_level(void)
-{
-	return cpuid_eax(0x80000000);
-}
-
-int cpu_phys_address_size(void)
-{
-	if (!has_cpuid())
-		return 32;
-
-	if (cpu_cpuid_extended_level() >= 0x80000008)
-		return cpuid_eax(0x80000008) & 0xff;
-
-	if (cpuid_edx(1) & (CPUID_FEATURE_PAE | CPUID_FEATURE_PSE36))
-		return 36;
-
-	return 32;
-}
-
-/* Don't allow PCI region 3 to use memory in the 2-4GB memory hole */
-static void setup_pci_ram_top(void)
-{
-	gd->pci_ram_top = 0x80000000U;
-}
-
 static void setup_mtrr(void)
 {
 	u64 mtrr_cap;
 
 	/* Configure fixed range MTRRs for some legacy regions */
-	if (!gd->arch.has_mtrr)
+	if (!gd->arch.has_mtrr || !ll_boot_init())
 		return;
 
 	mtrr_cap = native_read_msr(MTRR_CAP_MSR);
@@ -469,7 +459,6 @@ int x86_cpu_init_f(void)
 		setup_cpu_features();
 	setup_identity();
 	setup_mtrr();
-	setup_pci_ram_top();
 
 	/* Set up the i8254 timer if required */
 	if (IS_ENABLED(CONFIG_I8254_TIMER))
@@ -483,7 +472,6 @@ int x86_cpu_reinit_f(void)
 	long addr;
 
 	setup_identity();
-	setup_pci_ram_top();
 	addr = locate_coreboot_table();
 	if (addr >= 0) {
 		gd->arch.coreboot_table = addr;
@@ -491,6 +479,11 @@ int x86_cpu_reinit_f(void)
 	}
 
 	return 0;
+}
+
+void x86_get_identity_for_timer(void)
+{
+	setup_identity();
 }
 
 void x86_enable_caches(void)
@@ -572,8 +565,16 @@ int cpu_has_64bit(void)
 		has_long_mode();
 }
 
+/* Base address for page tables used for 64-bit mode */
 #define PAGETABLE_BASE		0x80000
 #define PAGETABLE_SIZE		(6 * 4096)
+
+#define _PRES BIT(0)	/* present */
+#define _RW   BIT(1)	/* write allowed */
+#define _US   BIT(2)	/* user-access allowed */
+#define _A    BIT(5)	/* has been accessed */
+#define _DT   BIT(6)	/* has been written to */
+#define _PS   BIT(7)	/* indicates 2MB page size here */
 
 /**
  * build_pagetable() - build a flat 4GiB page table structure for 64-bti mode
@@ -587,15 +588,17 @@ static void build_pagetable(uint32_t *pgtable)
 	memset(pgtable, '\0', PAGETABLE_SIZE);
 
 	/* Level 4 needs a single entry */
-	pgtable[0] = (ulong)&pgtable[1024] + 7;
+	pgtable[0] = (ulong)&pgtable[1024] + _PRES + _RW + _US + _A;
 
 	/* Level 3 has one 64-bit entry for each GiB of memory */
 	for (i = 0; i < 4; i++)
-		pgtable[1024 + i * 2] = (ulong)&pgtable[2048] + 0x1000 * i + 7;
+		pgtable[1024 + i * 2] = (ulong)&pgtable[2048] + 0x1000 * i +
+			_PRES + _RW + _US + _A;
 
 	/* Level 2 has 2048 64-bit entries, each repesenting 2MiB */
 	for (i = 0; i < 2048; i++)
-		pgtable[2048 + i * 2] = 0x183 + (i << 21UL);
+		pgtable[2048 + i * 2] = _PRES + _RW + _US + _PS + _A +  _DT +
+					 (i << 21UL);
 }
 
 int cpu_jump_to_64bit(ulong setup_base, ulong target)
@@ -614,43 +617,20 @@ int cpu_jump_to_64bit(ulong setup_base, ulong target)
 }
 
 /*
- * Jump from SPL to U-Boot
+ * cpu_jump_to_64bit_uboot() - Jump from SPL to U-Boot
  *
- * This function is work-in-progress with many issues to resolve.
- *
- * It works by setting up several regions:
- *   ptr      - a place to put the code that jumps into 64-bit mode
- *   gdt      - a place to put the global descriptor table
- *   pgtable  - a place to put the page tables
- *
- * The cpu_call64() code is copied from ROM and then manually patched so that
- * it has the correct GDT address in RAM. U-Boot is copied from ROM into
- * its pre-relocation address. Then we jump to the cpu_call64() code in RAM,
- * which changes to 64-bit mode and starts U-Boot.
+ * It works by setting up page tables and calling the code to enter 64-bit long
+ * mode
  */
 int cpu_jump_to_64bit_uboot(ulong target)
 {
-	typedef void (*func_t)(ulong pgtable, ulong setup_base, ulong target);
 	uint32_t *pgtable;
-	func_t func;
-	char *ptr;
 
 	pgtable = (uint32_t *)PAGETABLE_BASE;
-
 	build_pagetable(pgtable);
 
-	extern long call64_stub_size;
-	ptr = malloc(call64_stub_size);
-	if (!ptr) {
-		printf("Failed to allocate the cpu_call64 stub\n");
-		return -ENOMEM;
-	}
-	memcpy(ptr, cpu_call64, call64_stub_size);
-
-	func = (func_t)ptr;
-
 	/* Jump to U-Boot */
-	func((ulong)pgtable, 0, (ulong)target);
+	cpu_call64(PAGETABLE_BASE, 0, (ulong)target);
 
 	return -EFAULT;
 }

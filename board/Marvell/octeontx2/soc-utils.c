@@ -5,7 +5,6 @@
  * https://spdx.org/licenses
  */
 
-#include <common.h>
 #include <dm.h>
 #include <malloc.h>
 #include <errno.h>
@@ -46,4 +45,3 @@ const char *read_board_name(void)
 {
 	return fdt_get_board_model();
 }
-

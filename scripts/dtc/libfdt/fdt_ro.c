@@ -421,7 +421,6 @@ static const struct fdt_property *fdt_get_property_namelen_(const void *fdt,
 	return NULL;
 }
 
-
 const struct fdt_property *fdt_get_property_namelen(const void *fdt,
 						    int offset,
 						    const char *name,
@@ -438,7 +437,6 @@ const struct fdt_property *fdt_get_property_namelen(const void *fdt,
 	return fdt_get_property_namelen_(fdt, offset, name, namelen, lenp,
 					 NULL);
 }
-
 
 const struct fdt_property *fdt_get_property(const void *fdt,
 					    int nodeoffset,
@@ -937,4 +935,10 @@ int fdt_check_full(const void *fdt, size_t bufsize)
 		}
 	}
 }
-#endif
+#else
+int fdt_check_full(const void __always_unused *fdt,
+		   size_t __always_unused bufsize)
+{
+	return 0;
+}
+#endif /* #if !defined(FDT_ASSUME_MASK) || FDT_ASSUME_MASK != 0xff */

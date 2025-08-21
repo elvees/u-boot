@@ -128,7 +128,7 @@ struct ethernet_regs {
 
 	uint32_t res14[7];		/* MBAR_ETH + 0x2E4-2FC */
 
-#if defined(CONFIG_MX25) || defined(CONFIG_MX53) || defined(CONFIG_MX6SL)
+#if defined(CONFIG_MX53) || defined(CONFIG_MX6SL)
 	uint16_t miigsk_cfgr;		/* MBAR_ETH + 0x300 */
 	uint16_t res15[3];		/* MBAR_ETH + 0x302-306 */
 	uint16_t miigsk_enr;		/* MBAR_ETH + 0x308 */
@@ -196,7 +196,7 @@ struct ethernet_regs {
 #define FEC_X_DES_ACTIVE_TDAR		0x01000000
 #define FEC_R_DES_ACTIVE_RDAR		0x01000000
 
-#if defined(CONFIG_MX25) || defined(CONFIG_MX53) || defined(CONFIG_MX6SL)
+#if defined(CONFIG_MX53) || defined(CONFIG_MX6SL)
 /* defines for MIIGSK */
 /* RMII frequency control: 0=50MHz, 1=5MHz */
 #define MIIGSK_CFGR_FRCONT		(1 << 6)
@@ -263,15 +263,14 @@ struct fec_priv {
 	uint32_t reset_delay;
 	uint32_t reset_post_delay;
 #endif
-#ifdef CONFIG_DM_ETH
 	u32 interface;
-#endif
 	struct clk ipg_clk;
 	struct clk ahb_clk;
 	struct clk clk_enet_out;
 	struct clk clk_ref;
 	struct clk clk_ptp;
 	u32 clk_rate;
+	bool promisc;
 };
 
 /**

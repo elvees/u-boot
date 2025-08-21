@@ -3,7 +3,6 @@
  * Copyright (C) 2015 Google, Inc
  */
 
-#include <common.h>
 #include <dm.h>
 #include <fastboot.h>
 #include <fb_mmc.h>
@@ -81,9 +80,9 @@ static int dm_test_fastboot_mmc_part(struct unit_test_state *uts)
 						  &part_info, response));
 	ut_asserteq(0, fastboot_mmc_get_part_info("0.0:0", &fb_dev_desc,
 						  &part_info, response));
-	ut_asserteq(0, fastboot_mmc_get_part_info("1", &fb_dev_desc,
+	ut_asserteq(0, fastboot_mmc_get_part_info("2", &fb_dev_desc,
 						  &part_info, response));
-	ut_asserteq(0, fastboot_mmc_get_part_info("1.0", &fb_dev_desc,
+	ut_asserteq(0, fastboot_mmc_get_part_info("2.0", &fb_dev_desc,
 						  &part_info, response));
 	ut_asserteq(1, fastboot_mmc_get_part_info(":1", &fb_dev_desc,
 						  &part_info, response));
@@ -92,4 +91,4 @@ static int dm_test_fastboot_mmc_part(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_fastboot_mmc_part, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_fastboot_mmc_part, UTF_SCAN_PDATA | UTF_SCAN_FDT);

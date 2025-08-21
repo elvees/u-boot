@@ -3,7 +3,6 @@
  * Copyright 2020 NXP
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <miiphy.h>
@@ -84,7 +83,7 @@ static int dm_fsl_ls_mdio_read(struct udevice *dev, int addr,
 	memac_out_32(&regs->mdio_ctl, mdio_ctl);
 
 	/* Wait till the MDIO write is complete */
-	while ((memac_in_32(&regs->mdio_data)) & MDIO_DATA_BSY)
+	while ((memac_in_32(&regs->mdio_stat)) & MDIO_STAT_BSY)
 		;
 
 	/* Return all Fs if nothing was there */
@@ -107,7 +106,7 @@ static int dm_fsl_ls_mdio_write(struct udevice *dev, int addr, int devad,
 	memac_out_32(&regs->mdio_data, MDIO_DATA(val));
 
 	/* Wait till the MDIO write is complete */
-	while ((memac_in_32(&regs->mdio_data)) & MDIO_DATA_BSY)
+	while ((memac_in_32(&regs->mdio_stat)) & MDIO_STAT_BSY)
 		;
 
 	return 0;
@@ -124,6 +123,9 @@ static int fsl_ls_mdio_probe(struct udevice *dev)
 	struct memac_mdio_controller *regs;
 
 	priv->regs_base = dev_read_addr_ptr(dev);
+	if (!priv->regs_base)
+		return -ENODEV;
+
 	regs = (struct memac_mdio_controller *)(priv->regs_base);
 
 	memac_setbits_32(&regs->mdio_stat,

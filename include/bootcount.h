@@ -6,7 +6,6 @@
 #ifndef _BOOTCOUNT_H__
 #define _BOOTCOUNT_H__
 
-#include <common.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/byteorder.h>
@@ -45,7 +44,7 @@ struct bootcount_ops {
  *
  * @dev:	Device to read from
  * @bootcount:	Place to put the current bootcount
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int dm_bootcount_get(struct udevice *dev, u32 *bootcount);
 
@@ -54,7 +53,7 @@ int dm_bootcount_get(struct udevice *dev, u32 *bootcount);
  *
  * @dev:	Device to read from
  * @bootcount:  Value to be written to the backing storage
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int dm_bootcount_set(struct udevice *dev, u32 bootcount);
 
@@ -66,19 +65,11 @@ void bootcount_store(ulong);
 /**
  * bootcount_load() - load the current bootcount
  *
- * @return bootcount, read from the appropriate location
+ * Return: bootcount, read from the appropriate location
  */
 ulong bootcount_load(void);
 
 #if defined(CONFIG_SPL_BOOTCOUNT_LIMIT) || defined(CONFIG_TPL_BOOTCOUNT_LIMIT) || defined(CONFIG_BOOTCOUNT_LIMIT)
-
-#if !defined(CONFIG_SYS_BOOTCOUNT_LE) && !defined(CONFIG_SYS_BOOTCOUNT_BE)
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-#  define CONFIG_SYS_BOOTCOUNT_LE
-# else
-#  define CONFIG_SYS_BOOTCOUNT_BE
-# endif
-#endif
 
 #ifdef CONFIG_SYS_BOOTCOUNT_LE
 static inline void raw_bootcount_store(volatile u32 *addr, u32 data)
@@ -129,13 +120,13 @@ static inline void bootcount_inc(void)
 		return;
 	}
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 	/* Only increment bootcount when no bootcount support in SPL */
 #if !defined(CONFIG_SPL_BOOTCOUNT_LIMIT) && !defined(CONFIG_TPL_BOOTCOUNT_LIMIT)
 	bootcount_store(++bootcount);
 #endif
 	env_set_ulong("bootcount", bootcount);
-#endif /* !CONFIG_SPL_BUILD */
+#endif /* !CONFIG_XPL_BUILD */
 }
 
 #else

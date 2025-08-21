@@ -4,7 +4,6 @@
  * Author: Eric Nelson <eric@nelint.com>
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <init.h>
 #include <asm/global_data.h>
@@ -425,7 +424,7 @@ void board_init_f(ulong dummy)
 		    is_cpu_type(MXC_CPU_MX6SL)) {
 			printf("cpu type 0x%x doesn't support 64-bit bus\n",
 			       get_cpu_type());
-			reset_cpu(0);
+			reset_cpu();
 		}
 	}
 #ifdef CONFIG_MX6SL

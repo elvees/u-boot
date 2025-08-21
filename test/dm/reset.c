@@ -3,7 +3,6 @@
  * Copyright (c) 2016, NVIDIA CORPORATION.
  */
 
-#include <common.h>
 #include <dm.h>
 #include <dm/device-internal.h>
 #include <log.h>
@@ -24,23 +23,50 @@
 static int dm_test_reset_base(struct unit_test_state *uts)
 {
 	struct udevice *dev;
-	struct reset_ctl reset_method1;
-	struct reset_ctl reset_method2;
+	struct reset_ctl reset_method1, reset_method1_1;
+	struct reset_ctl reset_method2, reset_method2_1;
+	struct reset_ctl reset_method3, reset_method3_1;
+	struct reset_ctl reset_method4, reset_method4_1;
 
 	/* Get the device using the reset device */
 	ut_assertok(uclass_get_device_by_name(UCLASS_MISC, "reset-ctl-test",
 					      &dev));
 
 	/* Get the same reset port in 2 different ways and compare */
-	ut_assertok(reset_get_by_index(dev, 1, &reset_method1));
+	ut_assertok(reset_get_by_index(dev, 0, &reset_method1));
+	ut_assertok(reset_get_by_name(dev, NULL, &reset_method1_1));
+	ut_assertok(reset_get_by_index(dev, 1, &reset_method2));
 	ut_assertok(reset_get_by_index_nodev(dev_ofnode(dev), 1,
-					     &reset_method2));
-	ut_asserteq(reset_method1.id, reset_method2.id);
+					     &reset_method2_1));
+	ut_assertok(reset_get_by_index(dev, 2, &reset_method3));
+	ut_assertok(reset_get_by_index_nodev(dev_ofnode(dev), 2,
+					     &reset_method3_1));
+	ut_assertok(reset_get_by_index(dev, 3, &reset_method4));
+	ut_assertok(reset_get_by_index_nodev(dev_ofnode(dev), 3,
+					     &reset_method4_1));
+
+	ut_asserteq(reset_method1.id, reset_method1_1.id);
+	ut_asserteq(reset_method2.id, reset_method2_1.id);
+	ut_asserteq(reset_method3.id, reset_method3_1.id);
+	ut_asserteq(reset_method4.id, reset_method4_1.id);
+
+	ut_asserteq(true, reset_method1.id != reset_method2.id);
+	ut_asserteq(true, reset_method1.id != reset_method3.id);
+	ut_asserteq(true, reset_method1.id != reset_method4.id);
+	ut_asserteq(true, reset_method2.id != reset_method3.id);
+	ut_asserteq(true, reset_method2.id != reset_method4.id);
+	ut_asserteq(true, reset_method3.id != reset_method4.id);
+
+	ut_asserteq(true, reset_method1_1.id != reset_method2_1.id);
+	ut_asserteq(true, reset_method1_1.id != reset_method3_1.id);
+	ut_asserteq(true, reset_method1_1.id != reset_method4_1.id);
+	ut_asserteq(true, reset_method2_1.id != reset_method3_1.id);
+	ut_asserteq(true, reset_method2_1.id != reset_method4_1.id);
+	ut_asserteq(true, reset_method3_1.id != reset_method4_1.id);
 
 	return 0;
 }
-
-DM_TEST(dm_test_reset_base, UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_reset_base, UTF_SCAN_FDT);
 
 static int dm_test_reset(struct unit_test_state *uts)
 {
@@ -67,7 +93,7 @@ static int dm_test_reset(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_reset, UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_reset, UTF_SCAN_FDT);
 
 static int dm_test_reset_devm(struct unit_test_state *uts)
 {
@@ -92,7 +118,7 @@ static int dm_test_reset_devm(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_reset_devm, UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_reset_devm, UTF_SCAN_FDT);
 
 static int dm_test_reset_bulk(struct unit_test_state *uts)
 {
@@ -122,7 +148,7 @@ static int dm_test_reset_bulk(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_reset_bulk, UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_reset_bulk, UTF_SCAN_FDT);
 
 static int dm_test_reset_bulk_devm(struct unit_test_state *uts)
 {
@@ -154,4 +180,4 @@ static int dm_test_reset_bulk_devm(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_reset_bulk_devm, UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_reset_bulk_devm, UTF_SCAN_FDT);

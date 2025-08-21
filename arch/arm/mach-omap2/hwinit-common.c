@@ -10,8 +10,8 @@
  *	Aneesh V	<aneesh@ti.com>
  *	Steve Sakoman	<steve@sakoman.com>
  */
-#include <common.h>
 #include <debug_uart.h>
+#include <event.h>
 #include <fdtdec.h>
 #include <init.h>
 #include <spl.h>
@@ -113,7 +113,7 @@ static void omap_rev_string(void)
 		puts("\n");
 }
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 void spl_display_print(void)
 {
 	omap_rev_string();
@@ -173,9 +173,9 @@ void __weak init_package_revision(void)
  * done in each of these cases
  * This function is called with SRAM stack.
  */
-void early_system_init(void)
+int early_system_init(void)
 {
-#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_MULTI_DTB_FIT)
+#if defined(CONFIG_XPL_BUILD) && defined(CONFIG_SPL_MULTI_DTB_FIT)
 	int ret;
 	int rescan;
 #endif
@@ -183,19 +183,19 @@ void early_system_init(void)
 	hw_data_init();
 	init_package_revision();
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 	if (warm_reset())
 		force_emif_self_refresh();
 #endif
 	watchdog_init();
 	set_mux_conf_regs();
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 	srcomp_enable();
 	do_io_settings();
 #endif
 	setup_early_clocks();
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 	/*
 	 * Save the boot parameters passed from romcode.
 	 * We cannot delay the saving further than this,
@@ -206,7 +206,7 @@ void early_system_init(void)
 #endif
 	do_board_detect();
 
-#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_MULTI_DTB_FIT)
+#if defined(CONFIG_XPL_BUILD) && defined(CONFIG_SPL_MULTI_DTB_FIT)
 	/*
 	 * Board detection has been done.
 	 * Let us see if another dtb wouldn't be a better match
@@ -224,9 +224,11 @@ void early_system_init(void)
 	debug_uart_init();
 #endif
 	prcm_init();
+
+	return 0;
 }
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 void board_init_f(ulong dummy)
 {
 	early_system_init();
@@ -239,11 +241,7 @@ void board_init_f(ulong dummy)
 }
 #endif
 
-int arch_cpu_init_dm(void)
-{
-	early_system_init();
-	return 0;
-}
+EVENT_SPY_SIMPLE(EVT_DM_POST_INIT_F, early_system_init);
 
 /*
  * Routine: wait_for_command_complete
@@ -269,7 +267,6 @@ void watchdog_init(void)
 	wait_for_command_complete(wd2_base);
 	writel(WD_UNLOCK2, &wd2_base->wspr);
 }
-
 
 /*
  * This function finds the SDRAM size available in the system
@@ -316,7 +313,6 @@ u32 omap_sdram_size(void)
 
 	return total_size;
 }
-
 
 /*
  * Routine: dram_init

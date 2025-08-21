@@ -4,7 +4,7 @@
  * (C) Heiko Schocher, DENX Software Engineering, hs@denx.de.
  *
  * Based on:
- * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2011 Texas Instruments Incorporated - https://www.ti.com/
  */
 #ifndef PMIC_H
 #define PMIC_H
@@ -49,7 +49,6 @@
 #define PMIC_REG_ST_ON_HI_POW		(0x1)
 #define PMIC_REG_ST_OFF_1		(0x2)
 #define PMIC_REG_ST_ON_LOW_POW		(0x3)
-
 
 /* VDD2 & VDD1 voltage selection register. (VDD2_OP_REG & VDD1_OP_REG) */
 #define PMIC_OP_REG_SEL				(0x7F)

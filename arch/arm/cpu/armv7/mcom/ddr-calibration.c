@@ -7,7 +7,6 @@
 #include <asm/arch/ddr.h>
 #include <asm/arch/ddr-calibration.h>
 #include <asm/arch/regs.h>
-#include <common.h>
 
 #ifdef CONFIG_DEBUG_DDR_CALIBRATION
 static void print_cfg(struct ddr_cfg *cfgs)

@@ -7,7 +7,6 @@
  */
 
 #include <bootm.h>
-#include <common.h>
 #include <dm.h>
 #include <init.h>
 #include <log.h>
@@ -40,7 +39,7 @@ u32 get_imx_reset_cause(void)
 	if (reset_cause == -1) {
 		reset_cause = readl(&src_regs->srsr);
 /* preserve the value for U-Boot proper */
-#if !defined(CONFIG_SPL_BUILD)
+#if !defined(CONFIG_XPL_BUILD)
 		writel(reset_cause, &src_regs->srsr);
 #endif
 	}
@@ -48,7 +47,7 @@ u32 get_imx_reset_cause(void)
 	return reset_cause;
 }
 
-#if defined(CONFIG_DISPLAY_CPUINFO) && !defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_DISPLAY_CPUINFO) && !defined(CONFIG_XPL_BUILD)
 static char *get_reset_cause(void)
 {
 	switch (get_imx_reset_cause()) {
@@ -93,7 +92,7 @@ static char *get_reset_cause(void)
 }
 #endif
 
-#if defined(CONFIG_DISPLAY_CPUINFO) && !defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_DISPLAY_CPUINFO) && !defined(CONFIG_XPL_BUILD)
 
 const char *get_imx_type(u32 imxtype)
 {
@@ -106,6 +105,8 @@ const char *get_imx_type(u32 imxtype)
 		return "8MP Lite[4]";	/* Quad-core Lite version of the imx8mp */
 	case MXC_CPU_IMX8MP6:
 		return "8MP[6]";	/* Quad-core version of the imx8mp, NPU fused */
+	case MXC_CPU_IMX8MPUL:
+		return "8MP UltraLite";	/* Quad-core UltraLite version of the imx8mp */
 	case MXC_CPU_IMX8MN:
 		return "8MNano Quad"; /* Quad-core version */
 	case MXC_CPU_IMX8MND:
@@ -117,7 +118,13 @@ const char *get_imx_type(u32 imxtype)
 	case MXC_CPU_IMX8MNDL:
 		return "8MNano DualLite"; /* Dual-core Lite version */
 	case MXC_CPU_IMX8MNSL:
-		return "8MNano SoloLite"; /* Single-core Lite version */
+		return "8MNano SoloLite";/* Single-core Lite version of the imx8mn */
+	case MXC_CPU_IMX8MNUQ:
+		return "8MNano UltraLite Quad";/* Quad-core UltraLite version of the imx8mn */
+	case MXC_CPU_IMX8MNUD:
+		return "8MNano UltraLite Dual";/* Dual-core UltraLite version of the imx8mn */
+	case MXC_CPU_IMX8MNUS:
+		return "8MNano UltraLite Solo";/* Single-core UltraLite version of the imx8mn */
 	case MXC_CPU_IMX8MM:
 		return "8MMQ";	/* Quad-core version of the imx8mm */
 	case MXC_CPU_IMX8MML:
@@ -277,10 +284,6 @@ u32 get_ahb_clk(void)
 
 void arch_preboot_os(void)
 {
-#if defined(CONFIG_PCIE_IMX) && !CONFIG_IS_ENABLED(DM_PCI)
-	imx_pcie_remove();
-#endif
-
 #if defined(CONFIG_IMX_AHCI)
 	struct udevice *dev;
 	int rc;
@@ -306,7 +309,7 @@ void arch_preboot_os(void)
 	/* disable video before launching O/S */
 	ipuv3_fb_shutdown();
 #endif
-#if defined(CONFIG_VIDEO_MXS) && !defined(CONFIG_DM_VIDEO)
+#if defined(CONFIG_VIDEO_MXS) && !defined(CONFIG_VIDEO)
 	lcdif_power_down();
 #endif
 }
@@ -506,3 +509,7 @@ char nxp_board_rev_string(void)
 	return (*rev + nxp_board_rev() - 1);
 }
 #endif
+
+__weak void reset_cpu(void)
+{
+}

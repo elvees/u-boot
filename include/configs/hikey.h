@@ -13,48 +13,22 @@
 
 #include <linux/sizes.h>
 
-#define CONFIG_POWER
-#define CONFIG_POWER_HI6553
-
-#define CONFIG_REMAKE_ELF
-
-#define CONFIG_SYS_BOOTM_LEN		SZ_64M
-
 /* Physical Memory Map */
 
-/* CONFIG_SYS_TEXT_BASE needs to align with where ATF loads bl33.bin */
+/* CONFIG_TEXT_BASE needs to align with where ATF loads bl33.bin */
 
 #define PHYS_SDRAM_1			0x00000000
 
 /* 1008 MB (the last 16Mb are secured for TrustZone by ATF*/
 #define PHYS_SDRAM_1_SIZE		0x3EFFFFFF
 
-#define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM_1
+#define CFG_SYS_SDRAM_BASE		PHYS_SDRAM_1
 
-#define CONFIG_SYS_INIT_RAM_SIZE	0x1000
-
-#define CONFIG_SYS_INIT_SP_ADDR         (CONFIG_SYS_SDRAM_BASE + 0x7fff0)
-
-#define CONFIG_SYS_LOAD_ADDR		(CONFIG_SYS_SDRAM_BASE + 0x80000)
-
-/* Generic Timer Definitions */
-#define COUNTER_FREQUENCY		19000000
+#define CFG_SYS_INIT_RAM_SIZE	0x1000
 
 /* Generic Interrupt Controller Definitions */
 #define GICD_BASE			0xf6801000
 #define GICC_BASE			0xf6802000
-
-/* Size of malloc() pool */
-#define CONFIG_SYS_MALLOC_LEN		(CONFIG_ENV_SIZE + SZ_8M)
-
-#ifdef CONFIG_USB_DWC2
-#define CONFIG_DWC2_ENABLE_DYNAMIC_FIFO
-#endif
-
-#define CONFIG_HIKEY_GPIO
-
-/* BOOTP options */
-#define CONFIG_BOOTP_BOOTFILESIZE
 
 /* Initial environment variables */
 
@@ -68,7 +42,7 @@
 	func(DHCP, dhcp, na)
 #include <config_distro_bootcmd.h>
 
-#define CONFIG_EXTRA_ENV_SETTINGS	\
+#define CFG_EXTRA_ENV_SETTINGS	\
 				"kernel_name=Image\0"	\
 				"kernel_addr_r=0x00080000\0" \
 				"fdtfile=hi6220-hikey.dtb\0" \
@@ -78,9 +52,5 @@
 				BOOTENV
 
 /* Preserve environment on eMMC */
-
-/* Monitor Command Prompt */
-#define CONFIG_SYS_CBSIZE		512	/* Console I/O Buffer Size */
-#define CONFIG_SYS_MAXARGS		64	/* max command args */
 
 #endif /* __HIKEY_H */

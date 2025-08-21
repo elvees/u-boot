@@ -5,13 +5,13 @@
  * This file is based on: drivers/i2c/soft-i2c.c,
  * with added driver-model support and code cleanup.
  */
-#include <common.h>
 #include <errno.h>
 #include <dm.h>
 #include <i2c.h>
 #include <log.h>
 #include <asm/gpio.h>
 #include <linux/delay.h>
+#include <linux/printk.h>
 
 #define DEFAULT_UDELAY	5
 #define RETRIES		0
@@ -48,12 +48,13 @@ static int i2c_gpio_sda_get(struct i2c_gpio_bus *bus)
 static void i2c_gpio_sda_set(struct i2c_gpio_bus *bus, int bit)
 {
 	struct gpio_desc *sda = &bus->gpios[PIN_SDA];
+	ulong flags;
 
 	if (bit)
-		sda->flags = (sda->flags & ~GPIOD_IS_OUT) | GPIOD_IS_IN;
+		flags = GPIOD_IS_IN;
 	else
-		sda->flags = (sda->flags & (~GPIOD_IS_IN & ~GPIOD_IS_OUT_ACTIVE)) | GPIOD_IS_OUT;
-	dm_gpio_set_dir(sda);
+		flags = GPIOD_IS_OUT;
+	dm_gpio_clrset_flags(sda, GPIOD_MASK_DIR, flags);
 }
 
 static void i2c_gpio_scl_set(struct i2c_gpio_bus *bus, int bit)
@@ -62,16 +63,14 @@ static void i2c_gpio_scl_set(struct i2c_gpio_bus *bus, int bit)
 	int count = 0;
 
 	if (bit) {
-		scl->flags = (scl->flags & ~GPIOD_IS_OUT) | GPIOD_IS_IN;
-		dm_gpio_set_dir(scl);
+		dm_gpio_clrset_flags(scl, GPIOD_MASK_DIR, GPIOD_IS_IN);
 		while (!dm_gpio_get_value(scl) && count++ < 100000)
 			udelay(1);
 
 		if (!dm_gpio_get_value(scl))
 			pr_err("timeout waiting on slave to release scl\n");
 	} else {
-		scl->flags = (scl->flags & (~GPIOD_IS_IN & ~GPIOD_IS_OUT_ACTIVE)) | GPIOD_IS_OUT;
-		dm_gpio_set_dir(scl);
+		dm_gpio_clrset_flags(scl, GPIOD_MASK_DIR, GPIOD_IS_OUT);
 	}
 }
 
@@ -79,11 +78,11 @@ static void i2c_gpio_scl_set(struct i2c_gpio_bus *bus, int bit)
 static void i2c_gpio_scl_set_output_only(struct i2c_gpio_bus *bus, int bit)
 {
 	struct gpio_desc *scl = &bus->gpios[PIN_SCL];
-	scl->flags = (scl->flags & (~GPIOD_IS_IN & ~GPIOD_IS_OUT_ACTIVE)) | GPIOD_IS_OUT;
+	ulong flags = GPIOD_IS_OUT;
 
 	if (bit)
-		scl->flags |= GPIOD_IS_OUT_ACTIVE;
-	dm_gpio_set_dir(scl);
+		flags |= GPIOD_IS_OUT_ACTIVE;
+	dm_gpio_clrset_flags(scl, GPIOD_MASK_DIR, flags);
 }
 
 static void i2c_gpio_write_bit(struct i2c_gpio_bus *bus, int delay, uchar bit)
@@ -102,7 +101,7 @@ static int i2c_gpio_read_bit(struct i2c_gpio_bus *bus, int delay)
 
 	bus->set_scl(bus, 1);
 	udelay(delay);
-	value = bus->get_sda(bus);
+	value = bus->get_sda ? bus->get_sda(bus) : 0;
 	udelay(delay);
 	bus->set_scl(bus, 0);
 	udelay(2 * delay);
@@ -257,6 +256,9 @@ static int i2c_gpio_read_data(struct i2c_gpio_bus *bus, uchar chip,
 {
 	unsigned int delay = bus->udelay;
 
+	if (!bus->get_sda)
+		return -EOPNOTSUPP;
+
 	debug("%s: chip %x buffer: %p len %d\n", __func__, chip, buffer, len);
 
 	while (len-- > 0)
@@ -337,15 +339,27 @@ static int i2c_gpio_of_to_plat(struct udevice *dev)
 	struct i2c_gpio_bus *bus = dev_get_priv(dev);
 	int ret;
 
+	/* "gpios" is deprecated and replaced by "sda-gpios" + "scl-gpios". */
 	ret = gpio_request_list_by_name(dev, "gpios", bus->gpios,
 					ARRAY_SIZE(bus->gpios), 0);
+	if (ret == 0) {
+		ret = gpio_request_by_name(dev, "sda-gpios", 0,
+					   &bus->gpios[PIN_SDA], 0);
+		if (ret < 0)
+			goto error;
+		ret = gpio_request_by_name(dev, "scl-gpios", 0,
+					   &bus->gpios[PIN_SCL], 0);
+	}
 	if (ret < 0)
 		goto error;
 
 	bus->udelay = dev_read_u32_default(dev, "i2c-gpio,delay-us",
 					   DEFAULT_UDELAY);
 
-	bus->get_sda = i2c_gpio_sda_get;
+	if (dev_read_bool(dev, "i2c-gpio,sda-output-only"))
+		bus->get_sda = NULL;
+	else
+		bus->get_sda = i2c_gpio_sda_get;
 	bus->set_sda = i2c_gpio_sda_set;
 	if (dev_read_bool(dev, "i2c-gpio,scl-output-only"))
 		bus->set_scl = i2c_gpio_scl_set_output_only;
@@ -354,7 +368,7 @@ static int i2c_gpio_of_to_plat(struct udevice *dev)
 
 	return 0;
 error:
-	pr_err("Can't get %s gpios! Error: %d", dev->name, ret);
+	pr_err("Can't get %s gpios! Error: %d\n", dev->name, ret);
 	return ret;
 }
 

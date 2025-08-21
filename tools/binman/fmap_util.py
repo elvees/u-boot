@@ -10,7 +10,7 @@ import collections
 import struct
 import sys
 
-from patman import tools
+from u_boot_pylib import tools
 
 # constants imported from lib/fmap.h
 FMAP_SIGNATURE = b'__FMAP__'
@@ -45,6 +45,9 @@ FMAP_AREA_NAMES = (
     'flags',
 )
 
+# Flags supported by areas (bits 2:0 are unused so not included here)
+FMAP_AREA_PRESERVE = 1 << 3  # Preserved by any firmware updates
+
 # These are the two data structures supported by flashrom, a header (which
 # appears once at the start) and an area (which is repeated until the end of
 # the list of areas)
@@ -70,7 +73,7 @@ def ConvertName(field_names, fields):
             value: value of that field (string for the ones we support)
     """
     name_index = field_names.index('name')
-    fields[name_index] = tools.ToBytes(NameToFmap(fields[name_index]))
+    fields[name_index] = tools.to_bytes(NameToFmap(fields[name_index]))
 
 def DecodeFmap(data):
     """Decode a flashmap into a header and list of areas

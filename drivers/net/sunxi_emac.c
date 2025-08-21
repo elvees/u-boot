@@ -5,7 +5,6 @@
  * (C) Copyright 2012, Stefan Roese <sr@denx.de>
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <log.h>
@@ -17,7 +16,7 @@
 #include <net.h>
 #include <asm/io.h>
 #include <asm/arch/clock.h>
-#include <asm/arch/gpio.h>
+#include <power/regulator.h>
 
 /* EMAC register  */
 struct emac_regs {
@@ -165,9 +164,8 @@ struct emac_eth_dev {
 	struct mii_dev *bus;
 	struct phy_device *phydev;
 	int link_printed;
-#ifdef CONFIG_DM_ETH
 	uchar rx_buf[EMAC_RX_BUFSIZE];
-#endif
+	struct udevice *phy_reg;
 };
 
 struct emac_rxhdr {
@@ -251,10 +249,10 @@ static int emac_mdio_write(struct mii_dev *bus, int addr, int devad, int reg,
 
 static int sunxi_emac_init_phy(struct emac_eth_dev *priv, void *dev)
 {
-	int ret, mask = 0xffffffff;
+	int ret, mask = -1;
 
 #ifdef CONFIG_PHY_ADDR
-	mask = 1 << CONFIG_PHY_ADDR;
+	mask = CONFIG_PHY_ADDR;
 #endif
 
 	priv->bus = mdio_alloc();
@@ -272,12 +270,10 @@ static int sunxi_emac_init_phy(struct emac_eth_dev *priv, void *dev)
 	if (ret)
 		return ret;
 
-	priv->phydev = phy_find_by_mask(priv->bus, mask,
-					PHY_INTERFACE_MODE_MII);
+	priv->phydev = phy_connect(priv->bus, mask, dev, PHY_INTERFACE_MODE_MII);
 	if (!priv->phydev)
 		return -ENODEV;
 
-	phy_connect_dev(priv->phydev, dev);
 	phy_config(priv->phydev);
 
 	return 0;
@@ -511,14 +507,10 @@ static int sunxi_emac_board_setup(struct udevice *dev,
 	struct sunxi_sramc_regs *sram =
 		(struct sunxi_sramc_regs *)SUNXI_SRAMC_BASE;
 	struct emac_regs *regs = priv->regs;
-	int pin, ret;
+	int ret;
 
 	/* Map SRAM to EMAC */
 	setbits_le32(&sram->ctrl1, 0x5 << 2);
-
-	/* Configure pin mux settings for MII Ethernet */
-	for (pin = SUNXI_GPA(0); pin <= SUNXI_GPA(17); pin++)
-		sunxi_gpio_set_cfgpin(pin, SUNXI_GPA_EMAC);
 
 	/* Set up clock gating */
 	ret = clk_enable(&priv->clk);
@@ -581,6 +573,9 @@ static int sunxi_emac_eth_probe(struct udevice *dev)
 	if (ret)
 		return ret;
 
+	if (priv->phy_reg)
+		regulator_set_enable(priv->phy_reg, true);
+
 	return sunxi_emac_init_phy(priv, dev);
 }
 
@@ -594,8 +589,41 @@ static const struct eth_ops sunxi_emac_eth_ops = {
 static int sunxi_emac_eth_of_to_plat(struct udevice *dev)
 {
 	struct eth_pdata *pdata = dev_get_plat(dev);
+	struct emac_eth_dev *priv = dev_get_priv(dev);
+	struct ofnode_phandle_args args;
+	ofnode phy_node, mdio_node;
+	int ret;
 
 	pdata->iobase = dev_read_addr(dev);
+
+	phy_node = dev_get_phy_node(dev);
+	if (!ofnode_valid(phy_node)) {
+		dev_err(dev, "failed to get PHY node\n");
+		return -ENOENT;
+	}
+	/*
+	 * The PHY regulator is in the MDIO node, not the EMAC or PHY node.
+	 * U-Boot does not have (and does not need) a device driver for the
+	 * MDIO device, so just "pass through" that DT node to get to the
+	 * regulator phandle.
+	 * The PHY regulator is optional, though: ignore if we cannot find
+	 * a phy-supply property.
+	 */
+	mdio_node = ofnode_get_parent(phy_node);
+	ret= ofnode_parse_phandle_with_args(mdio_node, "phy-supply", NULL, 0, 0,
+					    &args);
+	if (ret && ret != -ENOENT) {
+		dev_err(dev, "failed to get PHY supply node\n");
+		return ret;
+	}
+	if (!ret) {
+		ret = uclass_get_device_by_ofnode(UCLASS_REGULATOR, args.node,
+						  &priv->phy_reg);
+		if (ret) {
+			dev_err(dev, "failed to get PHY regulator node\n");
+			return ret;
+		}
+	}
 
 	return 0;
 }

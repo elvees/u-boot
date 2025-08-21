@@ -7,6 +7,10 @@
 
 %module libfdt
 
+%begin %{
+#define PY_SSIZE_T_CLEAN
+%}
+
 %include <stdint.i>
 
 %{
@@ -1010,7 +1014,7 @@ typedef uint32_t fdt32_t;
 	}
 	$1 = (void *)PyByteArray_AsString($input);
         fdt = $1;
-        fdt = fdt; /* avoid unused variable warning */
+        (void)fdt; /* avoid unused variable warning */
 }
 
 /* Some functions do change the device tree, so use void * */
@@ -1021,7 +1025,7 @@ typedef uint32_t fdt32_t;
 	}
 	$1 = PyByteArray_AsString($input);
         fdt = $1;
-        fdt = fdt; /* avoid unused variable warning */
+        (void)fdt; /* avoid unused variable warning */
 }
 
 /* typemap used for fdt_get_property_by_offset() */
@@ -1033,7 +1037,7 @@ typedef uint32_t fdt32_t;
 			fdt_string(fdt1, fdt32_to_cpu($1->nameoff)));
 		buff = PyByteArray_FromStringAndSize(
 			(const char *)($1 + 1), fdt32_to_cpu($1->len));
-		resultobj = SWIG_Python_AppendOutput(resultobj, buff);
+		resultobj = SWIG_AppendOutput(resultobj, buff);
 	}
 }
 
@@ -1072,7 +1076,7 @@ typedef uint32_t fdt32_t;
 
 %typemap(argout) int *depth {
         PyObject *val = Py_BuildValue("i", *arg$argnum);
-        resultobj = SWIG_Python_AppendOutput(resultobj, val);
+        resultobj = SWIG_AppendOutput(resultobj, val);
 }
 
 %apply int *depth { int *depth };
@@ -1088,7 +1092,7 @@ typedef uint32_t fdt32_t;
            if (PyTuple_GET_SIZE(resultobj) == 0)
               resultobj = val;
            else
-              resultobj = SWIG_Python_AppendOutput(resultobj, val);
+              resultobj = SWIG_AppendOutput(resultobj, val);
         }
 }
 

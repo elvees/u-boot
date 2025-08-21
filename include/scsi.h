@@ -7,31 +7,53 @@
  #define _SCSI_H
 
 #include <asm/cache.h>
+#include <bouncebuf.h>
 #include <linux/dma-direction.h>
+#include <part.h>
 
 struct udevice;
 
+/**
+ * struct scsi_cmd - information about a SCSI command to be processed
+ *
+ * @cmd: command
+ * @sense_buf: for request sense
+ * @status: SCSI Status
+ * @target: Target ID
+ * @lun: Target LUN
+ * @cmdlen: command len
+ * @datalen: Total data length
+ * @pdata: pointer to data
+ * @msgout: Messge out buffer (NOT USED)
+ * @msgin: Message in buffer
+ * @sensecmdlen: Sense command len
+ * @sensedatalen: Sense data len
+ * @sensecmd: Sense command
+ * @contr_stat: Controller Status
+ * @trans_bytes: tranfered bytes
+ * @priv: Private value
+ * @dma_dir: Direction of data structure
+ */
 struct scsi_cmd {
-	unsigned char		cmd[16];					/* command				   */
-	/* for request sense */
-	unsigned char		sense_buf[64]
+	unsigned char cmd[16];
+	unsigned char sense_buf[64]
 		__attribute__((aligned(ARCH_DMA_MINALIGN)));
-	unsigned char		status;						/* SCSI Status			 */
-	unsigned char		target;						/* Target ID				 */
-	unsigned char		lun;							/* Target LUN        */
-	unsigned char		cmdlen;						/* command len				*/
-	unsigned long		datalen;					/* Total data length	*/
-	unsigned char	*	pdata;						/* pointer to data		*/
-	unsigned char		msgout[12];				/* Messge out buffer (NOT USED) */
-	unsigned char		msgin[12];				/* Message in buffer	*/
-	unsigned char		sensecmdlen;			/* Sense command len	*/
-	unsigned long		sensedatalen;			/* Sense data len			*/
-	unsigned char		sensecmd[6];			/* Sense command			*/
-	unsigned long		contr_stat;				/* Controller Status	*/
-	unsigned long		trans_bytes;			/* tranfered bytes		*/
+	unsigned char status;
+	unsigned char target;
+	unsigned char lun;
+	unsigned char cmdlen;
+	unsigned long datalen;
+	unsigned char *pdata;
+	unsigned char msgout[12];
+	unsigned char msgin[12];
+	unsigned char sensecmdlen;
+	unsigned long sensedatalen;
+	unsigned char sensecmd[6];
+	unsigned long contr_stat;
+	unsigned long trans_bytes;
 
-	unsigned int		priv;
-	enum dma_data_direction	dma_dir;
+	unsigned int priv;
+	enum dma_data_direction dma_dir;
 };
 
 /*-----------------------------------------------------------
@@ -74,7 +96,6 @@ struct scsi_cmd {
 #define	M_X_WIDE_REQ	(0x03)
 #define	M_X_PPR_REQ	(0x04)
 
-
 /*
 **	Status
 */
@@ -109,7 +130,6 @@ struct scsi_cmd {
 #define SENSE_ABORTED_COMMAND	0xB
 #define SENSE_VOLUME_OVERFLOW	0xD
 #define SENSE_MISCOMPARE			0xE
-
 
 #define SCSI_CHANGE_DEF	0x40		/* Change Definition (Optional) */
 #define SCSI_COMPARE		0x39		/* Compare (O) */
@@ -162,6 +182,85 @@ struct scsi_cmd {
 #define SCSI_WRT_VERIFY	0x2E		/* Write and Verify (O) */
 #define SCSI_WRITE_LONG	0x3F		/* Write Long (O) */
 #define SCSI_WRITE_SAME	0x41		/* Write Same (O) */
+#define SCSI_UNMAP	0x42		/* Write 10-Byte (MANDATORY) */
+
+/**
+ * enum scsi_cmd_phase - current phase of the SCSI protocol
+ *
+ * @SCSIPH_START: Start phase
+ * @SCSIPH_DATA: Data phase
+ * @SCSIPH_STATUS: Status phase
+ */
+enum scsi_cmd_phase {
+	SCSIPH_START,
+	SCSIPH_DATA,
+	SCSIPH_STATUS,
+};
+
+/**
+ * struct scsi_inquiry_resp - holds a SCSI inquiry command
+ *
+ * @type; command type
+ * @flags; command flags
+ * @version; command version
+ * @data_format; data format
+ * @additional_len; additional data length
+ * @spare[3]; spare bytes
+ * @vendor[8]; vendor information
+ * @product[16]; production information
+ * @revision[4]; revision information
+ */
+struct scsi_inquiry_resp {
+	u8 type;
+	u8 flags;
+	u8 version;
+	u8 data_format;
+	u8 additional_len;
+	u8 spare[3];
+	char vendor[8];
+	char product[16];
+	char revision[4];
+};
+
+/**
+ * struct scsi_read_capacity_resp - holds the response to a read-capacity cmd
+ *
+ * @last_block_addr: Logical block address of last block
+ * @block_len: Length of each block in bytes
+ */
+struct scsi_read_capacity_resp {
+	u32 last_block_addr;
+	u32 block_len;
+};
+
+/**
+ * struct scsi_read10_req - holds a SCSI READ10 request
+ *
+ * @cmd; command type
+ * @lun_flags; LUN flags
+ * @lba; Logical block address to start reading from
+ * @spare; spare bytes
+ * @xfer_len: number of blocks to read
+ * @spare2: more spare bytes
+ */
+struct __packed scsi_read10_req {
+	u8 cmd;
+	u8 lun_flags;
+	u32 lba;
+	u8 spare;
+	u16 xfer_len;
+	u8 spare2[3];
+};
+
+/** struct scsi_write10_req - data for the write10 command */
+struct __packed scsi_write10_req {
+	u8 cmd;
+	u8 lun_flags;
+	u32 lba;
+	u8 spare;
+	u16 xfer_len;
+	u8 spare2[3];
+};
 
 /**
  * struct scsi_plat - stores information about SCSI controller
@@ -196,6 +295,24 @@ struct scsi_ops {
 	 * @return 0 if OK, -ve on error
 	 */
 	int (*bus_reset)(struct udevice *dev);
+
+#if IS_ENABLED(CONFIG_BOUNCE_BUFFER)
+	/**
+	 * buffer_aligned() - test memory alignment of block operation buffer
+	 *
+	 * Some devices have limited DMA capabilities and require that the
+	 * buffers passed to them fit specific properties. This optional
+	 * callback can be used to indicate whether a buffer alignment is
+	 * suitable for the device DMA or not, and trigger use of generic
+	 * bounce buffer implementation to help use of unsuitable buffers
+	 * at the expense of performance degradation.
+	 *
+	 * @dev:	Block device associated with the request
+	 * @state:	Bounce buffer state
+	 * @return 1 if OK, 0 if unaligned
+	 */
+	int (*buffer_aligned)(struct udevice *dev, struct bounce_buffer *state);
+#endif	/* CONFIG_BOUNCE_BUFFER */
 };
 
 #define scsi_get_ops(dev)        ((struct scsi_ops *)(dev)->driver->ops)
@@ -207,7 +324,7 @@ extern struct scsi_ops scsi_ops;
  *
  * @dev:	SCSI bus
  * @cmd:	Command to execute
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int scsi_exec(struct udevice *dev, struct scsi_cmd *cmd);
 
@@ -215,7 +332,7 @@ int scsi_exec(struct udevice *dev, struct scsi_cmd *cmd);
  * scsi_bus_reset() - reset the bus
  *
  * @dev:	SCSI bus to reset
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int scsi_bus_reset(struct udevice *dev);
 
@@ -233,11 +350,6 @@ int scsi_scan(bool verbose);
  * @verbose:	true to show information about each device found
  */
 int scsi_scan_dev(struct udevice *dev, bool verbose);
-
-#ifndef CONFIG_DM_SCSI
-void scsi_low_level_init(int busdevfunc);
-void scsi_init(void);
-#endif
 
 #define SCSI_IDENTIFY					0xC0  /* not used */
 

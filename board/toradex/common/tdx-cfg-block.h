@@ -20,6 +20,12 @@ struct toradex_eth_addr {
 	u32 nic:24;
 } __attribute__((__packed__));
 
+struct toradex_som {
+	int pid4;
+	const char *name;
+	int is_enabled;
+};
+
 enum {
 	COLIBRI_PXA270_V1_312MHZ = 1,
 	COLIBRI_PXA270_V1_520MHZ,
@@ -31,7 +37,7 @@ enum {
 	COLIBRI_PXA270_312MHZ,
 	COLIBRI_PXA270_520MHZ,
 	COLIBRI_VF50, /* 10 */
-	COLIBRI_VF61, /* not currently on sale */
+	COLIBRI_VF61,
 	COLIBRI_VF61_IT,
 	COLIBRI_VF50_IT,
 	COLIBRI_IMX6S,
@@ -62,7 +68,7 @@ enum {
 	COLIBRI_IMX7D_EMMC,
 	COLIBRI_IMX6ULL_WIFI_BT_IT, /* 40 */
 	COLIBRI_IMX7D_EPDC,
-	APALIS_TK1_4GB, /* not currently on sale */
+	APALIS_TK1_4GB,
 	COLIBRI_T20_512MB_IT_SETEK,
 	COLIBRI_IMX6ULL_IT,
 	COLIBRI_IMX6ULL_WIFI_BT, /* 45 */
@@ -82,11 +88,48 @@ enum {
 	VERDIN_IMX8MMQ_IT,
 	VERDIN_IMX8MMDL_WIFI_BT_IT, /* 60 */
 	VERDIN_IMX8MPQ,
+	COLIBRI_IMX6ULL_IT_EMMC,
+	VERDIN_IMX8MPQ_IT,
+	VERDIN_IMX8MPQ_2GB_WIFI_BT_IT,
+	VERDIN_IMX8MPQL_IT, /* 65 */
+	VERDIN_IMX8MPQ_8GB_WIFI_BT,
+	APALIS_IMX8QM_8GB_WIFI_BT_IT,
+	VERDIN_IMX8MMQ_WIFI_BT_IT_NO_CAN,
+	VERDIN_AM62Q_WIFI_BT_IT,
+	VERDIN_IMX8MPQ_8GB_WIFI_BT_IT, /* 70 */
+	VERDIN_AM62S_512MB,
+	VERDIN_AM62S_512MB_WIFI_BT_IT,
+	VERDIN_AM62D_1G_ET,
+	VERDIN_AM62D_1G_IT,
+	VERDIN_AM62D_1G_WIFI_BT_IT, /* 75 */
+	VERDIN_AM62Q_2G_WIFI_BT_IT,
+	COLIBRI_IMX6S_NOWINCE,
+	COLIBRI_IMX6S_IT_NOWINCE,
+	COLIBRI_IMX6DL_NOWINCE,
+	COLIBRI_IMX6DL_IT_NOWINCE, /* 80 */
+	COLIBRI_IMX7D_NOWINCE,
+	APALIS_IMX6D_NOWINCE,
+	APALIS_IMX6Q_NOWINCE,
+	APALIS_IMX6D_IT_NOWINCE,
+	APALIS_IMX6Q_IT_NOWINCE, /* 85 */
+	VERDIN_IMX8MMDL_2G_IT,
+	VERDIN_IMX8MMQ_2G_IT_NO_CAN,
+	AQUILA_AM69O_32G_WIFI_BT_IT,
+	VERDIN_IMX95H_8G_WIFI_BT_IT,
+	VERDIN_IMX8MMQ_4G_WIFI_BT_ET, /* 90 */
+	APALIS_IMX8QM_WIFI_BT_IT_1300MHZ,
+	APALIS_IMX8QM_IT_1300MHZ,
+	APALIS_IMX8QP_WIFI_BT_1300MHZ,
+	APALIS_IMX8QP_1300MHZ,
+	APALIS_IMX8QM_8GB_WIFI_BT_IT_1300MHZ, /* 95 */
+	SMARC_IMX95_HEXA_8GB_WB_IT,
+	SMARC_IMX8MPQ_4GB_WB_IT,
 };
 
 enum {
 	DAHLIA = 155,
 	VERDIN_DEVELOPMENT_BOARD = 156,
+	YAVIA = 173,
 };
 
 enum {
@@ -94,8 +137,7 @@ enum {
 	VERDIN_DSI_TO_LVDS_ADAPTER = 159,
 };
 
-extern const char * const toradex_modules[];
-extern const char * const toradex_carrier_boards[];
+extern const struct toradex_som toradex_modules[];
 extern bool valid_cfgblock;
 extern struct toradex_hw tdx_hw_tag;
 extern struct toradex_hw tdx_car_hw_tag;
@@ -105,7 +147,11 @@ extern u32 tdx_car_serial;
 
 int read_tdx_cfg_block(void);
 int read_tdx_cfg_block_carrier(void);
-
+int get_toradex_modules_idx(int pid4);
+const char * const get_toradex_carrier_boards(int pid4);
+const char * const get_toradex_display_adapters(int pid4);
 int try_migrate_tdx_cfg_block_carrier(void);
+
+void get_mac_from_serial(u32 tdx_serial, struct toradex_eth_addr *eth_addr);
 
 #endif /* _TDX_CFG_BLOCK_H */

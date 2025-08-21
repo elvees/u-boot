@@ -376,7 +376,6 @@ struct ethtool_usrip4_spec {
 	__u8    proto;
 };
 
-
 /**
  * struct ethtool_rxfh_indir - command to get or set RX flow hash indirection
  * @cmd: Specific command number - %ETHTOOL_GRXFHINDIR or %ETHTOOL_SRXFHINDIR
@@ -620,6 +619,14 @@ enum ethtool_sfeatures_retval_bits {
 #define SPEED_1000		1000
 #define SPEED_2500		2500
 #define SPEED_10000		10000
+#define SPEED_14000		14000
+#define SPEED_20000		20000
+#define SPEED_25000		25000
+#define SPEED_40000		40000
+#define SPEED_50000		50000
+#define SPEED_56000		56000
+#define SPEED_100000		100000
+#define SPEED_200000		200000
 
 /* Duplex, half or full. */
 #define DUPLEX_HALF		0x00

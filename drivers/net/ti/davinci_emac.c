@@ -21,7 +21,7 @@
  * ver. 1.0: Sep 2005, Anant Gole - Created EMAC version for uBoot.
  * ver  1.1: Nov 2005, Anant Gole - Extended the RX logic for multiple descriptors
  */
-#include <common.h>
+#include <config.h>
 #include <command.h>
 #include <cpu_func.h>
 #include <log.h>
@@ -65,8 +65,8 @@ static inline unsigned long HW_TO_BD(unsigned long x)
 #define emac_gigabit_enable(phy_addr)	/* no gigabit to enable */
 #endif
 
-#if !defined(CONFIG_SYS_EMAC_TI_CLKDIV)
-#define CONFIG_SYS_EMAC_TI_CLKDIV	((EMAC_MDIO_BUS_FREQ / \
+#if !defined(CFG_SYS_EMAC_TI_CLKDIV)
+#define CFG_SYS_EMAC_TI_CLKDIV	((EMAC_MDIO_BUS_FREQ / \
 		EMAC_MDIO_CLOCK_FREQ) - 1)
 #endif
 
@@ -98,17 +98,17 @@ static int			emac_rx_queue_active = 0;
 static unsigned char emac_rx_buffers[EMAC_MAX_RX_BUFFERS * EMAC_RXBUF_SIZE]
 				__aligned(ARCH_DMA_MINALIGN);
 
-#ifndef CONFIG_SYS_DAVINCI_EMAC_PHY_COUNT
-#define CONFIG_SYS_DAVINCI_EMAC_PHY_COUNT	3
+#ifndef CFG_SYS_DAVINCI_EMAC_PHY_COUNT
+#define CFG_SYS_DAVINCI_EMAC_PHY_COUNT	3
 #endif
 
 /* PHY address for a discovered PHY (0xff - not found) */
-static u_int8_t	active_phy_addr[CONFIG_SYS_DAVINCI_EMAC_PHY_COUNT];
+static u_int8_t	active_phy_addr[CFG_SYS_DAVINCI_EMAC_PHY_COUNT];
 
 /* number of PHY found active */
 static u_int8_t	num_phy;
 
-phy_t				phy[CONFIG_SYS_DAVINCI_EMAC_PHY_COUNT];
+phy_t				phy[CFG_SYS_DAVINCI_EMAC_PHY_COUNT];
 
 static int davinci_emac_write_hwaddr(struct udevice *dev)
 {
@@ -144,7 +144,6 @@ static int davinci_emac_write_hwaddr(struct udevice *dev)
 	writel(mac_hi, &adap_emac->MACSRCADDRHI);
 	writel(mac_lo, &adap_emac->MACSRCADDRLO);
 
-
 	return 0;
 }
 
@@ -152,7 +151,7 @@ static void davinci_eth_mdio_enable(void)
 {
 	u_int32_t	clkdiv;
 
-	clkdiv = CONFIG_SYS_EMAC_TI_CLKDIV;
+	clkdiv = CFG_SYS_EMAC_TI_CLKDIV;
 
 	writel((clkdiv & 0xff) |
 	       MDIO_CONTROL_ENABLE |
@@ -176,7 +175,7 @@ static int davinci_eth_phy_detect(void)
 	int		j;
 	unsigned int	count = 0;
 
-	for (i = 0; i < CONFIG_SYS_DAVINCI_EMAC_PHY_COUNT; i++)
+	for (i = 0; i < CFG_SYS_DAVINCI_EMAC_PHY_COUNT; i++)
 		active_phy_addr[i] = 0xff;
 
 	udelay(1000);
@@ -190,7 +189,7 @@ static int davinci_eth_phy_detect(void)
 	for (i = 0, j = 0; i < 32; i++)
 		if (phy_act_state & (1 << i)) {
 			count++;
-			if (count <= CONFIG_SYS_DAVINCI_EMAC_PHY_COUNT) {
+			if (count <= CFG_SYS_DAVINCI_EMAC_PHY_COUNT) {
 				active_phy_addr[j++] = i;
 			} else {
 				printf("%s: to many PHYs detected.\n",
@@ -204,7 +203,6 @@ static int davinci_eth_phy_detect(void)
 
 	return count;
 }
-
 
 /* Read a PHY register via MDIO inteface. Returns 1 on success, 0 otherwise */
 int davinci_eth_phy_read(u_int8_t phy_addr, u_int8_t reg_num, u_int16_t *data)
@@ -378,7 +376,6 @@ static int gen_auto_negotiate(int phy_addr)
 }
 /* End of generic PHY functions */
 
-
 #if defined(CONFIG_MII) || defined(CONFIG_CMD_MII)
 static int davinci_mii_phy_read(struct mii_dev *bus, int addr, int devad,
 				int reg)
@@ -501,7 +498,7 @@ static int davinci_emac_start(struct udevice *dev)
 	writel(1, &adap_emac->RXUNICASTSET);
 
 	/* Init MDIO & get link state */
-	clkdiv = CONFIG_SYS_EMAC_TI_CLKDIV;
+	clkdiv = CFG_SYS_EMAC_TI_CLKDIV;
 	writel((clkdiv & 0xff) | MDIO_CONTROL_ENABLE | MDIO_CONTROL_FAULT,
 	       &adap_mdio->CONTROL);
 
@@ -816,7 +813,7 @@ static int davinci_emac_probe(struct udevice *dev)
 		struct mii_dev *mdiodev = mdio_alloc();
 		if (!mdiodev)
 			return -ENOMEM;
-		strncpy(mdiodev->name, phy[i].name, MDIO_NAME_LEN);
+		strlcpy(mdiodev->name, phy[i].name, MDIO_NAME_LEN);
 		mdiodev->read = davinci_mii_phy_read;
 		mdiodev->write = davinci_mii_phy_write;
 
@@ -833,9 +830,9 @@ static int davinci_emac_probe(struct udevice *dev)
 #endif
 	}
 
-#if defined(CONFIG_TI816X) || (defined(CONFIG_DRIVER_TI_EMAC_USE_RMII) && \
+#if defined(CONFIG_DRIVER_TI_EMAC_USE_RMII) && \
 		defined(CONFIG_MACH_DAVINCI_DA850_EVM) && \
-			!defined(CONFIG_DRIVER_TI_EMAC_RMII_NO_NEGOTIATE))
+			!defined(CONFIG_DRIVER_TI_EMAC_RMII_NO_NEGOTIATE)
 	for (i = 0; i < num_phy; i++) {
 		if (phy[i].is_phy_connected(i))
 			phy[i].auto_negotiate(i);

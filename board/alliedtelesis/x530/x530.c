@@ -3,7 +3,7 @@
  * Copyright (C) 2017 Allied Telesis Labs
  */
 
-#include <common.h>
+#include <config.h>
 #include <command.h>
 #include <dm.h>
 #include <env.h>
@@ -26,8 +26,8 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define MVEBU_DEV_BUS_BASE		(MVEBU_REGISTER(0x10400))
 
-#define CONFIG_NVS_LOCATION		0xf4800000
-#define CONFIG_NVS_SIZE			(512 << 10)
+#define CFG_NVS_LOCATION		0xf4800000
+#define CFG_NVS_SIZE			(512 << 10)
 
 static struct serdes_map board_serdes_map[] = {
 	{PEX0, SERDES_SPEED_5_GBPS, PEX_ROOT_COMPLEX_X1, 0, 0},
@@ -73,6 +73,7 @@ static struct mv_ddr_topology_map board_topology_map = {
 	{0},				/* timing parameters */
 	{ {0} },			/* electrical configuration */
 	{0},				/* electrical parameters */
+	0,				/* ODT configuration */
 	0,				/* Clock enable mask */
 	160				/* Clock delay */
 };
@@ -92,7 +93,7 @@ int board_early_init_f(void)
 	writel(0x55550550, MVEBU_MPP_BASE + 0x0c);
 	writel(0x55555555, MVEBU_MPP_BASE + 0x10);
 	writel(0x00100565, MVEBU_MPP_BASE + 0x14);
-	writel(0x40000000, MVEBU_MPP_BASE + 0x18);
+	writel(0x00000000, MVEBU_MPP_BASE + 0x18);
 	writel(0x00004444, MVEBU_MPP_BASE + 0x1c);
 
 	return 0;
@@ -108,7 +109,7 @@ int board_init(void)
 	gd->bd->bi_boot_params = mvebu_sdram_bar(0) + 0x100;
 
 	/* window for NVS */
-	mbus_dt_setup_win(&mbus_state, CONFIG_NVS_LOCATION, CONFIG_NVS_SIZE,
+	mbus_dt_setup_win(CFG_NVS_LOCATION, CFG_NVS_SIZE,
 			  CPU_TARGET_DEVICEBUS_BOOTROM_SPI, CPU_ATTR_DEV_CS1);
 
 	/* DEV_READYn is not needed for NVS, ignore it when accessing CS1 */
@@ -121,9 +122,8 @@ int board_init(void)
 
 void arch_preboot_os(void)
 {
-#ifdef CONFIG_WATCHDOG
-	wdt_stop(gd->watchdog_dev);
-#endif
+	if (CONFIG_IS_ENABLED(WDT))
+		wdt_stop_all();
 }
 
 static int led_7seg_init(unsigned int segments)

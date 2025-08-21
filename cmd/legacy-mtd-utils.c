@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0+
 
-#include <common.h>
 #include <jffs2/jffs2.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
@@ -85,6 +84,11 @@ int mtd_arg_off_size(int argc, char *const argv[], int *idx, loff_t *off,
 
 	if (*size > *maxsize) {
 		puts("Size exceeds partition or device limit\n");
+		return -1;
+	}
+
+	if (*size == 0) {
+		debug("ERROR: Invalid size 0\n");
 		return -1;
 	}
 

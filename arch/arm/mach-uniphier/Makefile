@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: GPL-2.0+
 
-ifdef CONFIG_SPL_BUILD
+ifdef CONFIG_XPL_BUILD
 
 obj-y += boards.o
 obj-y += spl_board_init.o
 obj-y += memconf.o
 obj-y += bcu/
-obj-$(CONFIG_SPL_MMC_SUPPORT) += mmc-boot-mode.o
+obj-$(CONFIG_SPL_MMC) += mmc-boot-mode.o
 
 else
 

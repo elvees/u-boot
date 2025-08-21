@@ -6,7 +6,6 @@
  */
 
 #include <config.h>
-#include <common.h>
 #include <log.h>
 #include <watchdog.h>
 #include <command.h>
@@ -242,7 +241,7 @@ static int sh_mmcif_multi_read(struct sh_mmcif_host *host,
 		for (i = 0; i < blocksize / 4; i++)
 			*p++ = sh_mmcif_read(&host->regs->ce_data);
 
-		WATCHDOG_RESET();
+		schedule();
 	}
 	return 0;
 }
@@ -309,7 +308,7 @@ static int sh_mmcif_multi_write(struct sh_mmcif_host *host,
 		for (i = 0; i < blocksize / 4; i++)
 			sh_mmcif_write(*p++, &host->regs->ce_data);
 
-		WATCHDOG_RESET();
+		schedule();
 	}
 	return 0;
 }
@@ -523,7 +522,7 @@ static int sh_mmcif_send_cmd_common(struct sh_mmcif_host *host,
 {
 	int ret;
 
-	WATCHDOG_RESET();
+	schedule();
 
 	switch (cmd->cmdidx) {
 	case MMC_CMD_APP_CMD:

@@ -5,7 +5,6 @@
  * Copyright 2010-2011 Freescale Semiconductor, Inc.
  * author Andy Fleming
  */
-#include <common.h>
 #include <phy.h>
 
 /* LXT971 Status 2 registers */
@@ -15,7 +14,6 @@
 #define MIIM_LXT971_SR2_10FDX     0x0200  /*  10 Mbit full duplex selected */
 #define MIIM_LXT971_SR2_100HDX    0x4000  /* 100 Mbit half duplex selected */
 #define MIIM_LXT971_SR2_100FDX    0x4200  /* 100 Mbit full duplex selected */
-
 
 /* LXT971 */
 static int lxt971_parse_status(struct phy_device *phydev)
@@ -58,7 +56,7 @@ static int lxt971_startup(struct phy_device *phydev)
 	return lxt971_parse_status(phydev);
 }
 
-static struct phy_driver LXT971_driver = {
+U_BOOT_PHY_DRIVER(lxt971) = {
 	.name = "LXT971",
 	.uid = 0x1378e0,
 	.mask = 0xfffff0,
@@ -67,10 +65,3 @@ static struct phy_driver LXT971_driver = {
 	.startup = &lxt971_startup,
 	.shutdown = &genphy_shutdown,
 };
-
-int phy_lxt_init(void)
-{
-	phy_register(&LXT971_driver);
-
-	return 0;
-}

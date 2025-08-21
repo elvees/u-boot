@@ -4,7 +4,7 @@
  * (C) Copyright 2014 Cadence Design Systems Inc.
  */
 
-#include <common.h>
+#include <bootm.h>
 #include <bootstage.h>
 #include <command.h>
 #include <cpu_func.h>
@@ -134,8 +134,9 @@ static struct bp_tag *setup_fdt_tag(struct bp_tag *params, void *fdt_start)
  * Boot Linux.
  */
 
-int do_bootm_linux(int flag, int argc, char *argv[], bootm_headers_t *images)
+int do_bootm_linux(int flag, struct bootm_info *bmi)
 {
+	struct bootm_headers *images = bmi->images;
 	struct bp_tag *params, *params_start;
 	ulong initrd_start, initrd_end;
 	char *commandline = env_get("bootargs");
@@ -196,4 +197,3 @@ int do_bootm_linux(int flag, int argc, char *argv[], bootm_headers_t *images)
 
 	return 1;
 }
-

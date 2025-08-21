@@ -6,7 +6,6 @@
  * Parts taken from coreboot
  */
 
-#include <common.h>
 #include <audio_codec.h>
 #include <dm.h>
 #include <log.h>
@@ -38,6 +37,7 @@ static int max98357a_of_to_plat(struct udevice *dev)
 	return 0;
 }
 
+__maybe_unused
 static int max98357a_acpi_fill_ssdt(const struct udevice *dev,
 				    struct acpi_ctx *ctx)
 {
@@ -137,9 +137,11 @@ static int max98357a_acpi_setup_nhlt(const struct udevice *dev,
 #endif
 
 struct acpi_ops max98357a_acpi_ops = {
+#ifdef CONFIG_ACPIGEN
 	.fill_ssdt	= max98357a_acpi_fill_ssdt,
 #ifdef CONFIG_X86
 	.setup_nhlt	= max98357a_acpi_setup_nhlt,
+#endif
 #endif
 };
 

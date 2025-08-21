@@ -4,7 +4,7 @@
  *  NVIDIA Corporation <www.nvidia.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <init.h>
@@ -17,7 +17,7 @@
 #if IS_ENABLED(CONFIG_TEGRA_CLKRST)
 #include <asm/arch/clock.h>
 #endif
-#if IS_ENABLED(CONFIG_TEGRA_PINCTRL)
+#if CONFIG_IS_ENABLED(PINCTRL_TEGRA)
 #include <asm/arch/funcmux.h>
 #endif
 #if IS_ENABLED(CONFIG_TEGRA_MC)
@@ -45,9 +45,9 @@ enum {
 	UART_COUNT = 5,
 };
 
-static bool from_spl __attribute__ ((section(".data")));
+static bool from_spl __section(".data");
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 void save_boot_params(unsigned long r0, unsigned long r1, unsigned long r2,
 		      unsigned long r3)
 {
@@ -77,9 +77,6 @@ bool spl_was_boot_source(void)
 }
 
 #if defined(CONFIG_TEGRA_SUPPORT_NON_SECURE)
-#if !defined(CONFIG_TEGRA124)
-#error tegra_cpu_is_non_secure has only been validated on Tegra124
-#endif
 bool tegra_cpu_is_non_secure(void)
 {
 	/*
@@ -163,7 +160,7 @@ int dram_init(void)
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_TEGRA_PINCTRL)
+#if CONFIG_IS_ENABLED(PINCTRL_TEGRA)
 static int uart_configs[] = {
 #if defined(CONFIG_TEGRA20)
  #if defined(CONFIG_TEGRA_UARTA_UAA_UAB)
@@ -172,6 +169,8 @@ static int uart_configs[] = {
 	FUNCMUX_UART1_GPU,
  #elif defined(CONFIG_TEGRA_UARTA_SDIO1)
 	FUNCMUX_UART1_SDIO1,
+ #elif defined(CONFIG_TEGRA_UARTA_SDB_SDD)
+	FUNCMUX_UART1_SDB_SDD,
  #else
 	FUNCMUX_UART1_IRRX_IRTX,
 #endif
@@ -184,7 +183,7 @@ static int uart_configs[] = {
 	-1,
 	-1,
 	-1,
-	-1,
+	FUNCMUX_UART5_SDMMC1,  /* UARTE */
 #elif defined(CONFIG_TEGRA114)
 	-1,
 	-1,
@@ -235,22 +234,27 @@ static void setup_uarts(int uart_ids)
 
 void board_init_uart_f(void)
 {
-#if IS_ENABLED(CONFIG_TEGRA_PINCTRL)
+#if CONFIG_IS_ENABLED(PINCTRL_TEGRA)
 	int uart_ids = 0;	/* bit mask of which UART ids to enable */
 
 #ifdef CONFIG_TEGRA_ENABLE_UARTA
+#define CFG_SYS_NS16550_COM1	NV_PA_APB_UARTA_BASE
 	uart_ids |= UARTA;
 #endif
 #ifdef CONFIG_TEGRA_ENABLE_UARTB
+#define CFG_SYS_NS16550_COM1	NV_PA_APB_UARTB_BASE
 	uart_ids |= UARTB;
 #endif
 #ifdef CONFIG_TEGRA_ENABLE_UARTC
+#define CFG_SYS_NS16550_COM1	NV_PA_APB_UARTC_BASE
 	uart_ids |= UARTC;
 #endif
 #ifdef CONFIG_TEGRA_ENABLE_UARTD
+#define CFG_SYS_NS16550_COM1	NV_PA_APB_UARTD_BASE
 	uart_ids |= UARTD;
 #endif
 #ifdef CONFIG_TEGRA_ENABLE_UARTE
+#define CFG_SYS_NS16550_COM1	NV_PA_APB_UARTE_BASE
 	uart_ids |= UARTE;
 #endif
 	setup_uarts(uart_ids);
@@ -259,9 +263,9 @@ void board_init_uart_f(void)
 
 #if !CONFIG_IS_ENABLED(OF_CONTROL)
 static struct ns16550_plat ns16550_com1_pdata = {
-	.base = CONFIG_SYS_NS16550_COM1,
+	.base = CFG_SYS_NS16550_COM1,
 	.reg_shift = 2,
-	.clock = CONFIG_SYS_NS16550_CLK,
+	.clock = CFG_SYS_NS16550_CLK,
 	.fcr = UART_FCR_DEFVAL,
 };
 

@@ -102,7 +102,7 @@ static int mt7620_serial_putc(struct udevice *dev, const char ch)
 	writel(ch, &plat->regs->thr);
 
 	if (ch == '\n')
-		WATCHDOG_RESET();
+		schedule();
 
 	return 0;
 }
@@ -145,7 +145,7 @@ static int mt7620_serial_probe(struct udevice *dev)
 	return 0;
 }
 
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 static int mt7620_serial_of_to_plat(struct udevice *dev)
 {
 	struct mt7620_serial_plat *plat = dev_get_plat(dev);
@@ -200,7 +200,7 @@ static const struct dm_serial_ops mt7620_serial_ops = {
 U_BOOT_DRIVER(serial_mt7620) = {
 	.name = "serial_mt7620",
 	.id = UCLASS_SERIAL,
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	.of_match = mt7620_serial_ids,
 	.of_to_plat = mt7620_serial_of_to_plat,
 #endif
@@ -220,7 +220,7 @@ static inline void _debug_uart_init(void)
 {
 	struct mt7620_serial_plat plat;
 
-	plat.regs = (void *)CONFIG_DEBUG_UART_BASE;
+	plat.regs = (void *)CONFIG_VAL(DEBUG_UART_BASE);
 	plat.clock = CONFIG_DEBUG_UART_CLOCK;
 
 	writel(0, &plat.regs->ier);
@@ -233,7 +233,7 @@ static inline void _debug_uart_init(void)
 static inline void _debug_uart_putc(int ch)
 {
 	struct mt7620_serial_regs __iomem *regs =
-		(void *)CONFIG_DEBUG_UART_BASE;
+		(void *)CONFIG_VAL(DEBUG_UART_BASE);
 
 	while (!(readl(&regs->lsr) & UART_LSR_THRE))
 		;

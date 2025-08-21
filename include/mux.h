@@ -10,7 +10,7 @@
  * Copyright (C) 2017 Axentia Technologies AB
  * Author: Peter Rosin <peda@axentia.se>
  *
- * Copyright (C) 2017-2018 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2017-2018 Texas Instruments Incorporated - https://www.ti.com/
  * Jean-Jacques Hiblot <jjhiblot@ti.com>
  */
 
@@ -23,7 +23,7 @@
 struct udevice;
 struct mux_control;
 
-#if CONFIG_IS_ENABLED(MULTIPLEXER)
+#if IS_ENABLED(CONFIG_MULTIPLEXER)
 /**
  * mux_control_states() - Query the number of multiplexer states.
  * @mux: The mux-control to query.
@@ -51,7 +51,7 @@ unsigned int mux_control_states(struct mux_control *mux);
  */
 int __must_check mux_control_select(struct mux_control *mux,
 				    unsigned int state);
-#define mux_control_try_select(mux) mux_control_select(mux)
+#define mux_control_try_select(mux, state) mux_control_select(mux, state)
 
 /**
  * mux_control_deselect() - Deselect the previously selected multiplexer state.
@@ -117,40 +117,40 @@ struct mux_control *devm_mux_control_get(struct udevice *dev,
 int dm_mux_init(void);
 
 #else
-unsigned int mux_control_states(struct mux_control *mux)
+static inline unsigned int mux_control_states(struct mux_control *mux)
 {
 	return -ENOSYS;
 }
 
-int __must_check mux_control_select(struct mux_control *mux,
-				    unsigned int state)
+static inline int __must_check mux_control_select(struct mux_control *mux,
+						  unsigned int state)
 {
 	return -ENOSYS;
 }
 
-#define mux_control_try_select(mux) mux_control_select(mux)
+#define mux_control_try_select(mux, state) mux_control_select(mux, state)
 
-int mux_control_deselect(struct mux_control *mux)
+static inline int mux_control_deselect(struct mux_control *mux)
 {
 	return -ENOSYS;
 }
 
-struct mux_control *mux_control_get(struct udevice *dev, const char *mux_name)
+static inline struct mux_control *mux_control_get(struct udevice *dev, const char *mux_name)
 {
 	return NULL;
 }
 
-void mux_control_put(struct mux_control *mux)
+static inline void mux_control_put(struct mux_control *mux)
 {
 }
 
-struct mux_control *devm_mux_control_get(struct udevice *dev,
-					 const char *mux_name)
+static inline struct mux_control *devm_mux_control_get(struct udevice *dev,
+						       const char *mux_name)
 {
 	return NULL;
 }
 
-int dm_mux_init(void)
+static inline int dm_mux_init(void)
 {
 	return -ENOSYS;
 }

@@ -9,7 +9,8 @@
  * Written by Ramon Fried <ramon.fried@gmail.com>
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_PCI_EP
+
 #include <dm.h>
 #include <errno.h>
 #include <asm/global_data.h>

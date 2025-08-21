@@ -50,7 +50,7 @@ build_xconfig: $(obj)/qconf
 
 localyesconfig localmodconfig: $(obj)/conf
 	$(Q)perl $(srctree)/$(src)/streamline_config.pl --$@ $(srctree) $(Kconfig) > .tmp.config
-	$(Q)if [ -f .config ]; then 					\
+	$(Q)if [ -f .config ]; then					\
 			cmp -s .tmp.config .config ||			\
 			(mv -f .config .config.old.1;			\
 			 mv -f .tmp.config .config;			\
@@ -74,21 +74,7 @@ PHONY += $(simple-targets)
 $(simple-targets): $(obj)/conf
 	$< $(silent) --$@ $(Kconfig)
 
-PHONY += oldnoconfig silentoldconfig savedefconfig defconfig
-
-# oldnoconfig is an alias of olddefconfig, because people already are dependent
-# on its behavior (sets new symbols to their default value but not 'n') with the
-# counter-intuitive name.
-oldnoconfig: olddefconfig
-	@echo "  WARNING: \"oldnoconfig\" target will be removed after Linux 4.19"
-	@echo "            Please use \"olddefconfig\" instead, which is an alias."
-
-# We do not expect manual invokcation of "silentoldcofig" (or "syncconfig").
-silentoldconfig: syncconfig
-	@echo "  WARNING: \"silentoldconfig\" has been renamed to \"syncconfig\""
-	@echo "            and is now an internal implementation detail."
-	@echo "            What you want is probably \"oldconfig\"."
-	@echo "            \"silentoldconfig\" will be removed after Linux 4.19"
+PHONY += savedefconfig defconfig
 
 savedefconfig: $(obj)/conf
 	$< $(silent) --$@=defconfig $(Kconfig)
@@ -107,13 +93,17 @@ endif
 endif
 
 %_defconfig: $(obj)/conf
-	$(Q)$< $(silent) --defconfig=arch/$(SRCARCH)/configs/$@ $(Kconfig)
+	$(Q)$(CPP) -nostdinc -P -I $(srctree) -undef -x assembler-with-cpp $(srctree)/arch/$(SRCARCH)/configs/$@ -o generated_defconfig
+	$(Q)sed -i -e 's/^[[:space:]]//' generated_defconfig
+	$(Q)$< $(silent) --defconfig=generated_defconfig $(Kconfig)
 
 # Added for U-Boot (backward compatibility)
 %_config: %_defconfig
 	@:
 
-configfiles=$(wildcard $(srctree)/kernel/configs/$@ $(srctree)/arch/$(SRCARCH)/configs/$@)
+configfiles=$(wildcard $(srctree)/kernel/configs/$@ \
+		$(srctree)/arch/$(SRCARCH)/configs/$@ \
+		$(shell find $(srctree)/board -name "$@"))
 
 %.config: $(obj)/conf
 	$(if $(call configfiles),, $(error No configuration exists for this target on this architecture))

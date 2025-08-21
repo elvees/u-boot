@@ -6,11 +6,11 @@
 #ifdef BCM_GMAC_DEBUG
 #ifndef DEBUG
 #define DEBUG
+#include <linux/printk.h>
 #endif
 #endif
 
 #include <config.h>
-#include <common.h>
 #include <cpu_func.h>
 #include <log.h>
 #include <malloc.h>

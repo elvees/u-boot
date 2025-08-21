@@ -7,7 +7,6 @@
  */
 
 #include <config.h>
-#include <common.h>
 #include <asm/io.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
@@ -399,11 +398,7 @@ static void cpu_mux_select(int pll)
 			((2 - 1) << CPM_CPCCR_L2DIV_BIT) |
 			((1 - 1) << CPM_CPCCR_CDIV_BIT);
 
-	if (CONFIG_SYS_MHZ >= 1000)
-		clk_ctrl |= (12 - 1) << CPM_CPCCR_PDIV_BIT;
-	else
-		clk_ctrl |= (6 - 1) << CPM_CPCCR_PDIV_BIT;
-
+	clk_ctrl |= (12 - 1) << CPM_CPCCR_PDIV_BIT;
 	clrsetbits_le32(cpm_regs + CPM_CPCCR, 0x00ffffff, clk_ctrl);
 
 	while (readl(cpm_regs + CPM_CPCSR) & (CPM_CPCSR_CDIV_BUSY |

@@ -5,7 +5,6 @@
  * Peng Fan <peng.fan@nxp.com>
  */
 
-#include <common.h>
 #include <log.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
@@ -13,7 +12,7 @@
 #include <dm/lists.h>
 #include <dm/root.h>
 #include <dm/device-internal.h>
-#include <asm/arch/sci/sci.h>
+#include <firmware/imx/sci/sci.h>
 #include <linux/bitops.h>
 #include <linux/iopoll.h>
 #include <misc.h>
@@ -192,7 +191,7 @@ static int imx8_scu_probe(struct udevice *dev)
 	if (addr == FDT_ADDR_T_NONE)
 		return -EINVAL;
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 	plat->base = (struct mu_type *)CONFIG_MU_BASE_SPL;
 #else
 	plat->base = (struct mu_type *)addr;
@@ -219,7 +218,7 @@ static int imx8_scu_bind(struct udevice *dev)
 
 	debug("%s(dev=%p)\n", __func__, dev);
 	ofnode_for_each_subnode(node, dev_ofnode(dev)) {
-		ret = lists_bind_fdt(dev, node, &child, true);
+		ret = lists_bind_fdt(dev, node, &child, NULL, true);
 		if (ret)
 			return ret;
 		debug("bind child dev %s\n", child->name);

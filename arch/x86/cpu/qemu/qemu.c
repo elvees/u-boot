@@ -3,62 +3,32 @@
  * Copyright (C) 2015, Bin Meng <bmeng.cn@gmail.com>
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <init.h>
 #include <pci.h>
 #include <qfw.h>
+#include <dm/platdata.h>
 #include <asm/irq.h>
 #include <asm/post.h>
 #include <asm/processor.h>
 #include <asm/arch/device.h>
 #include <asm/arch/qemu.h>
+#include <asm/u-boot-x86.h>
 
-static bool i440fx;
-
-#ifdef CONFIG_QFW
-
-/* on x86, the qfw registers are all IO ports */
-#define FW_CONTROL_PORT	0x510
-#define FW_DATA_PORT		0x511
-#define FW_DMA_PORT_LOW	0x514
-#define FW_DMA_PORT_HIGH	0x518
-
-static void qemu_x86_fwcfg_read_entry_pio(uint16_t entry,
-		uint32_t size, void *address)
-{
-	uint32_t i = 0;
-	uint8_t *data = address;
-
-	/*
-	 * writting FW_CFG_INVALID will cause read operation to resume at
-	 * last offset, otherwise read will start at offset 0
-	 *
-	 * Note: on platform where the control register is IO port, the
-	 * endianness is little endian.
-	 */
-	if (entry != FW_CFG_INVALID)
-		outw(cpu_to_le16(entry), FW_CONTROL_PORT);
-
-	/* the endianness of data register is string-preserving */
-	while (size--)
-		data[i++] = inb(FW_DATA_PORT);
-}
-
-static void qemu_x86_fwcfg_read_entry_dma(struct fw_cfg_dma_access *dma)
-{
-	/* the DMA address register is big endian */
-	outl(cpu_to_be32((uintptr_t)dma), FW_DMA_PORT_HIGH);
-
-	while (be32_to_cpu(dma->control) & ~FW_CFG_DMA_ERROR)
-		__asm__ __volatile__ ("pause");
-}
-
-static struct fw_cfg_arch_ops fwcfg_x86_ops = {
-	.arch_read_pio = qemu_x86_fwcfg_read_entry_pio,
-	.arch_read_dma = qemu_x86_fwcfg_read_entry_dma
+#if CONFIG_IS_ENABLED(QFW_PIO)
+U_BOOT_DRVINFO(x86_qfw_pio) = {
+	.name = "qfw_pio",
 };
 #endif
+
+static bool is_i440fx(void)
+{
+	u16 device;
+
+	pci_read_config16(PCI_BDF(0, 0, 0), PCI_DEVICE_ID, &device);
+
+	return device == PCI_DEVICE_ID_INTEL_82441;
+}
 
 static void enable_pm_piix(void)
 {
@@ -85,18 +55,19 @@ static void enable_pm_ich9(void)
 	pci_write_config32(ICH9_PM, PMBA, CONFIG_ACPI_PM1_BASE | 1);
 }
 
-static void qemu_chipset_init(void)
+void qemu_chipset_init(void)
 {
-	u16 device, xbcs;
+	bool i440fx;
+	u16 xbcs;
 	int pam, i;
+
+	i440fx = is_i440fx();
 
 	/*
 	 * i440FX and Q35 chipset have different PAM register offset, but with
 	 * the same bitfield layout. Here we determine the offset based on its
 	 * PCI device ID.
 	 */
-	pci_read_config16(PCI_BDF(0, 0, 0), PCI_DEVICE_ID, &device);
-	i440fx = (device == PCI_DEVICE_ID_INTEL_82441);
 	pam = i440fx ? I440FX_PAM : Q35_PAM;
 
 	/*
@@ -132,13 +103,9 @@ static void qemu_chipset_init(void)
 
 		enable_pm_ich9();
 	}
-
-#ifdef CONFIG_QFW
-	qemu_fwcfg_init(&fwcfg_x86_ops);
-#endif
 }
 
-#if !CONFIG_IS_ENABLED(SPL_X86_32BIT_INIT)
+#if CONFIG_IS_ENABLED(X86_32BIT_INIT)
 int arch_cpu_init(void)
 {
 	post_code(POST_CPU_INIT);
@@ -149,12 +116,6 @@ int arch_cpu_init(void)
 int checkcpu(void)
 {
 	return 0;
-}
-
-int print_cpuinfo(void)
-{
-	post_code(POST_CPU_INFO);
-	return default_print_cpuinfo();
 }
 #endif
 
@@ -170,7 +131,7 @@ int mp_determine_pci_dstirq(int bus, int dev, int func, int pirq)
 {
 	u8 irq;
 
-	if (i440fx) {
+	if (is_i440fx()) {
 		/*
 		 * Not like most x86 platforms, the PIRQ[A-D] on PIIX3 are not
 		 * connected to I/O APIC INTPIN#16-19. Instead they are routed

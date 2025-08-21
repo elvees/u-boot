@@ -3,7 +3,6 @@
  * Copyright 2019 Google LLC
  */
 
-#include <common.h>
 #include <dm.h>
 #include <pch.h>
 #include <spl.h>
@@ -13,7 +12,7 @@
 
 static int apl_set_spi_protect(struct udevice *dev, bool protect)
 {
-	if (spl_phase() == PHASE_SPL)
+	if (xpl_phase() == PHASE_SPL)
 		return lpc_set_spi_protect(dev, BIOS_CTRL, protect);
 
 	return 0;
@@ -23,7 +22,7 @@ static const struct pch_ops apl_pch_ops = {
 	.set_spi_protect = apl_set_spi_protect,
 };
 
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 static const struct udevice_id apl_pch_ids[] = {
 	{ .compatible = "intel,apl-pch" },
 	{ }

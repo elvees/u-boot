@@ -25,14 +25,12 @@ ifdef CONFIG_32BIT
 PLATFORM_CPPFLAGS	+= -mabi=32
 KBUILD_LDFLAGS		+= -m $(32bit-emul)
 OBJCOPYFLAGS		+= -O $(32bit-bfd)
-CONFIG_STANDALONE_LOAD_ADDR	?= 0x80200000
 endif
 
 ifdef CONFIG_64BIT
 PLATFORM_CPPFLAGS	+= -mabi=64
 KBUILD_LDFLAGS		+= -m$(64bit-emul)
 OBJCOPYFLAGS		+= -O $(64bit-bfd)
-CONFIG_STANDALONE_LOAD_ADDR	?= 0xffffffff80200000
 endif
 
 PLATFORM_CPPFLAGS += -D__MIPS__
@@ -55,7 +53,7 @@ PLATFORM_ELFFLAGS += -B mips $(OBJCOPYFLAGS)
 # LDFLAGS_vmlinux		+= -G 0 -static -n -nostdlib
 # MODFLAGS			+= -mlong-calls
 #
-ifndef CONFIG_SPL_BUILD
+ifndef CONFIG_XPL_BUILD
 OBJCOPYFLAGS			+= -j .data.reloc -j .dtb.init.rodata
 LDFLAGS_FINAL			+= --emit-relocs
 endif
@@ -65,6 +63,6 @@ PLATFORM_CPPFLAGS		+= -msoft-float
 KBUILD_LDFLAGS			+= -G 0 -static -n -nostdlib
 PLATFORM_RELFLAGS		+= -ffunction-sections -fdata-sections
 LDFLAGS_FINAL			+= --gc-sections
-OBJCOPYFLAGS			+= -j .text -j .rodata -j .data -j .u_boot_list
+OBJCOPYFLAGS			+= -j .text -j .rodata -j .data -j __u_boot_list
 
 LDFLAGS_STANDALONE		+= --gc-sections

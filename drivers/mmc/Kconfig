@@ -3,7 +3,8 @@ menu "MMC Host controller Support"
 config MMC
 	bool "MMC/SD/SDIO card support"
 	default ARM || PPC || SANDBOX
-	select HAVE_BLOCK_DEVICE
+	select BLK
+	select DM_MMC
 	help
 	  This selects MultiMediaCard, Secure Digital and Secure
 	  Digital I/O support.
@@ -20,10 +21,18 @@ config MMC_WRITE
 
 config MMC_PWRSEQ
 	bool "HW reset support for eMMC"
-	depends on PWRSEQ
+	depends on PWRSEQ && DM_GPIO
 	help
-	  Ths select Hardware reset support aka pwrseq-emmc for eMMC
+	  This select Hardware reset support aka pwrseq-emmc for eMMC
 	  devices.
+
+config SPL_MMC_PWRSEQ
+	bool "HW reset support for eMMC in SPL"
+	depends on SPL_PWRSEQ && SPL_DM_GPIO
+	default y if MMC_PWRSEQ
+	help
+	  This select Hardware reset support aka pwrseq-emmc for eMMC
+	  devices in SPL.
 
 config MMC_BROKEN_CD
 	bool "Poll for broken card detection case"
@@ -31,8 +40,21 @@ config MMC_BROKEN_CD
 	  If card  detection feature is broken, just poll to detect.
 
 config DM_MMC
-	bool "Enable MMC controllers using Driver Model"
+	bool
 	depends on DM
+	help
+	  This enables the MultiMediaCard (MMC) driver model uclass which
+	  supports MMC and Secure Digital I/O (SDIO) cards. Both removable (SD,
+	  micro-SD, etc.) and non-removable (e.g. eMMC chip) devices are
+	  supported. These appear as block devices in U-Boot and can support
+	  filesystems such as EXT4 and FAT.
+
+config SPL_DM_MMC
+	bool "Enable MMC controllers using Driver Model in SPL"
+	depends on SPL_DM && DM_MMC
+	default n if ARCH_MVEBU && !MVEBU_SPL_BOOT_DEVICE_MMC
+	default y
+	select SPL_BLK
 	help
 	  This enables the MultiMediaCard (MMC) uclass which supports MMC and
 	  Secure Digital I/O (SDIO) cards. Both removable (SD, micro-SD, etc.)
@@ -40,10 +62,10 @@ config DM_MMC
 	  appear as block devices in U-Boot and can support filesystems such
 	  as EXT4 and FAT.
 
-config SPL_DM_MMC
-	bool "Enable MMC controllers using Driver Model in SPL"
-	depends on SPL_DM && DM_MMC
-	default y
+config TPL_DM_MMC
+	bool "Enable MMC controllers using Driver Model in TPL"
+	depends on TPL_DM && DM_MMC
+	select TPL_BLK
 	help
 	  This enables the MultiMediaCard (MMC) uclass which supports MMC and
 	  Secure Digital I/O (SDIO) cards. Both removable (SD, micro-SD, etc.)
@@ -58,7 +80,7 @@ config MMC_SDHCI_ADMA_HELPERS
 
 config MMC_SPI
 	bool "Support for SPI-based MMC controller"
-	depends on DM_MMC && DM_SPI
+	depends on DM_SPI
 	help
 	  This selects SPI-based MMC controllers.
 	  If you have an MMC controller on a SPI bus, say Y here.
@@ -80,7 +102,7 @@ config ARM_PL180_MMCI
 	  This selects the ARM(R) AMBA(R) PrimeCell Multimedia Card
 	  Interface (PL180, PL181 and compatible) support.
 	  If you have an ARM(R) platform with a Multimedia Card slot,
-	  say Y or M here.
+	  say Y here.
 
 config MMC_QUIRKS
 	bool "Enable quirks"
@@ -90,6 +112,13 @@ config MMC_QUIRKS
 	  This option enable workarounds to handle those quirks. Some of them
 	  are enabled by default, other may require additional flags or are
 	  enabled by the host driver.
+
+config SYS_MMC_MAX_BLK_COUNT
+	int "Block count limit"
+	default 65535
+	help
+	  The block count limit on MMC based devices. We default to 65535 due
+	  to a 16bit register limit on some hardware.
 
 config MMC_HW_PARTITIONING
 	bool "Support for HW partitioning command(eMMC)"
@@ -101,6 +130,7 @@ config MMC_HW_PARTITIONING
 config SUPPORT_EMMC_RPMB
 	bool "Support eMMC replay protected memory block (RPMB)"
 	imply CMD_MMC_RPMB
+	select SHA256
 	help
 	  Enable support for reading, writing and programming the
 	  key for the Replay Protection Memory Block partition in eMMC.
@@ -121,16 +151,23 @@ config MMC_IO_VOLTAGE
 
 config SPL_MMC_IO_VOLTAGE
 	bool "Support IO voltage configuration in SPL"
-	default n
+	depends on SPL_MMC
 	help
 	  IO voltage configuration allows selecting the voltage level of the IO
 	  lines (not the level of main supply). This is required for UHS
 	  support. For eMMC this not mandatory, but not enabling this option may
 	  prevent the driver of using the faster modes.
 
+config MMC_SUPPORTS_TUNING
+	bool
+
+config SPL_MMC_SUPPORTS_TUNING
+	bool
+
 config MMC_UHS_SUPPORT
 	bool "enable UHS support"
 	depends on MMC_IO_VOLTAGE
+	select MMC_SUPPORTS_TUNING
 	help
 	  The Ultra High Speed (UHS) bus is available on some SDHC and SDXC
 	  cards. The IO voltage must be switchable from 3.3v to 1.8v. The bus
@@ -139,6 +176,7 @@ config MMC_UHS_SUPPORT
 config SPL_MMC_UHS_SUPPORT
 	bool "enable UHS support in SPL"
 	depends on SPL_MMC_IO_VOLTAGE
+	select SPL_MMC_SUPPORTS_TUNING
 	help
 	  The Ultra High Speed (UHS) bus is available on some SDHC and SDXC
 	  cards. The IO voltage must be switchable from 3.3v to 1.8v. The bus
@@ -152,6 +190,7 @@ config MMC_HS400_ES_SUPPORT
 
 config SPL_MMC_HS400_ES_SUPPORT
 	bool "enable HS400 Enhanced Strobe support in SPL"
+	depends on SPL_MMC
 	help
 	  The HS400 Enhanced Strobe mode is support by some eMMC. The bus
 	  frequency is up to 200MHz. This mode does not tune the IO.
@@ -165,6 +204,7 @@ config MMC_HS400_SUPPORT
 
 config SPL_MMC_HS400_SUPPORT
 	bool "enable HS400 support in SPL"
+	depends on SPL_MMC
 	select SPL_MMC_HS200_SUPPORT
 	help
 	  The HS400 mode is support by some eMMC. The bus frequency is up to
@@ -172,12 +212,15 @@ config SPL_MMC_HS400_SUPPORT
 
 config MMC_HS200_SUPPORT
 	bool "enable HS200 support"
+	select MMC_SUPPORTS_TUNING
 	help
 	  The HS200 mode is support by some eMMC. The bus frequency is up to
 	  200MHz. This mode requires tuning the IO.
 
 config SPL_MMC_HS200_SUPPORT
 	bool "enable HS200 support in SPL"
+	depends on SPL_MMC
+	select SPL_MMC_SUPPORTS_TUNING
 	help
 	  The HS200 mode is support by some eMMC. The bus frequency is up to
 	  200MHz. This mode requires tuning the IO.
@@ -191,7 +234,6 @@ config MMC_VERBOSE
 
 config MMC_TRACE
 	bool "MMC debugging"
-	default n
 	help
 	  This is an option for use by developer. Enable MMC core debugging.
 
@@ -216,10 +258,7 @@ config MMC_DW
 
 config MMC_DW_CORTINA
 	bool "Cortina specific extensions for Synopsys DW Memory Card Interface"
-	depends on DM_MMC
 	depends on MMC_DW
-	depends on BLK
-	default n
 	help
 	  This selects support for Cortina SoC specific extensions to the
 	  Synopsys DesignWare Memory Card Interface driver. Select this option
@@ -245,13 +284,22 @@ config MMC_DW_K3
 
 config MMC_DW_ROCKCHIP
 	bool "Rockchip SD/MMC controller support"
-	depends on DM_MMC && OF_CONTROL
+	depends on OF_CONTROL
 	depends on MMC_DW
 	help
 	  This enables support for the Rockchip SD/MMM controller, which is
 	  based on Designware IP. The device is compatible with at least
 	  SD 3.0, SDIO 3.0 and MMC 4.5 and supports common eMMC chips as well
 	  as removeable SD and micro-SD cards.
+
+config MMC_SDHCI_ADI
+	bool "ADI SD/MMC controller support"
+	depends on ARCH_SC5XX
+	depends on DM_MMC && OF_CONTROL
+	depends on MMC_SDHCI && MMC_SDHCI_ADMA
+	help
+	  This enables support for the SD/MMC controller included in some Analog
+	  Devices SC5XX Socs.
 
 config MMC_DW_SOCFPGA
 	bool "SOCFPGA specific extensions for Synopsys DW Memory Card Interface"
@@ -266,7 +314,6 @@ config MMC_DW_SOCFPGA
 config MMC_DW_SNPS
 	bool "Extensions for DW Memory Card Interface used in Synopsys ARC devboards"
 	depends on MMC_DW
-	depends on DM_MMC
 	depends on OF_CONTROL
 	depends on CLK
 	help
@@ -277,13 +324,12 @@ config NEXELL_DWMMC
 	bool "Nexell SD/MMC controller support"
 	depends on ARCH_NEXELL
 	depends on MMC_DW
-	depends on DM_MMC
 	depends on PINCTRL_NEXELL
 	default y
 
 config MMC_MESON_GX
 	bool "Meson GX EMMC controller support"
-	depends on DM_MMC && BLK && ARCH_MESON
+	depends on ARCH_MESON
 	help
 	 Support for EMMC host controller on Meson GX ARM SoCs platform (S905)
 
@@ -295,6 +341,13 @@ config MMC_MXC
 	  with a Multimedia Card slot, say Y here.
 
 	  If unsure, say N.
+
+config MMC_OWL
+	bool "Actions OWL Multimedia Card Interface support"
+	depends on ARCH_OWL
+	help
+	  This selects the OWL SD/MMC host controller found on board
+	  based on Actions S700/S900 SoC.
 
 config MMC_MXS
 	bool "Freescale MXS Multimedia Card Interface support"
@@ -311,33 +364,34 @@ config MMC_MXS
 
 config MMC_PCI
 	bool "Support for MMC controllers on PCI"
+	depends on MMC_SDHCI
 	help
 	  This selects PCI-based MMC controllers.
 	  If you have an MMC controller on a PCI bus, say Y here.
 
 config MMC_OCTEONTX
-	bool "Marvell OcteonTX Multimedia Card Interface support"
-	depends on (ARCH_OCTEONTX || ARCH_OCTEONTX2)
-	depends on DM_MMC
+	bool "Marvell Octeon Multimedia Card Interface support"
+	depends on (ARCH_OCTEON || ARCH_OCTEONTX || ARCH_OCTEONTX2)
+	select MMC_SUPPORTS_TUNING if ARCH_OCTEONTX2
 	help
-	  This selects the OcteonTX Multimedia card Interface.
-	  If you have an OcteonTX/TX2 board with a Multimedia Card slot,
-	  say Y here.
+	  This selects the Octeon Multimedia card Interface.
+	  If you have an OcteonTX/TX2 or MIPS Octeon board with a
+	  Multimedia Card slot, say Y here.
 
 	  If unsure, say N.
 
-config PXA_MMC_GENERIC
-	bool "Support for MMC controllers on PXA"
+config MVEBU_MMC
+	bool "Kirkwood MMC controller support"
+	depends on ARCH_KIRKWOOD
 	help
-	  This selects MMC controllers on PXA.
-	  If you are on a PXA architecture, say Y here.
+	  Support for MMC host controller on Kirkwood SoCs.
+	  If you are on a Kirkwood architecture, say Y here.
 
 	  If unsure, say N.
 
 config MMC_OMAP_HS
 	bool "TI OMAP High Speed Multimedia Card Interface support"
-	select DM_REGULATOR_PBIAS if DM_MMC && DM_REGULATOR
-	select DM_REGULATOR_PBIAS if DM_MMC && DM_REGULATOR
+	select DM_REGULATOR_PBIAS if DM_REGULATOR
 	help
 	  This selects the TI OMAP High Speed Multimedia card Interface.
 	  If you have an omap2plus board with a Multimedia Card slot,
@@ -366,22 +420,20 @@ config MMC_OMAP36XX_PINS
 
 	  If unsure, say N.
 
-config SH_SDHI
-	bool "SuperH/Renesas ARM SoCs on-chip SDHI host controller support"
-	depends on ARCH_RMOBILE
-	help
-	  Support for the on-chip SDHI host controller on SuperH/Renesas ARM SoCs platform
+config HSMMC2_8BIT
+	bool "Enable 8-bit interface for eMMC (interface #2)"
+	depends on MMC_OMAP_HS && (OMAP54XX || DRA7XX || AM33XX || \
+		AM43XX || ARCH_KEYSTONE)
 
 config SH_MMCIF
 	bool "SuperH/Renesas ARM SoCs on-chip MMCIF host controller support"
-	depends on ARCH_RMOBILE || SH
+	depends on ARCH_RENESAS || SH
 	help
 	  Support for the on-chip MMCIF host controller on SuperH/Renesas ARM SoCs platform
 
 config MMC_UNIPHIER
 	bool "UniPhier SD/MMC Host Controller support"
 	depends on ARCH_UNIPHIER
-	depends on BLK && DM_MMC
 	depends on OF_CONTROL
 	help
 	  This selects support for the Matsushita SD/MMC Host Controller on
@@ -389,8 +441,7 @@ config MMC_UNIPHIER
 
 config RENESAS_SDHI
 	bool "Renesas R-Car SD/MMC Host Controller support"
-	depends on ARCH_RMOBILE
-	depends on BLK && DM_MMC
+	depends on ARCH_RENESAS
 	depends on OF_CONTROL
 	select BOUNCE_BUFFER
 	help
@@ -400,7 +451,6 @@ config RENESAS_SDHI
 config MMC_BCM2835
 	bool "BCM2835 family custom SD/MMC Host Controller support"
 	depends on ARCH_BCM283X
-	depends on BLK && DM_MMC
 	depends on OF_CONTROL
 	default y
 	help
@@ -420,7 +470,7 @@ config JZ47XX_MMC
 config MMC_SANDBOX
 	bool "Sandbox MMC support"
 	depends on SANDBOX
-	depends on BLK && DM_MMC && OF_CONTROL
+	depends on OF_CONTROL
 	help
 	  This select a dummy sandbox MMC driver. At present this does nothing
 	  other than allow sandbox to be build with MMC support. This
@@ -452,6 +502,14 @@ config MMC_SDHCI_SDMA
 	  This enables support for the SDMA (Single Operation DMA) defined
 	  in the SD Host Controller Standard Specification Version 1.00 .
 
+config SPL_MMC_SDHCI_SDMA
+	bool "Support SDHCI SDMA in SPL"
+	depends on SPL_MMC && MMC_SDHCI
+	default y if MMC_SDHCI_SDMA
+	help
+	  This enables support for the SDMA (Single Operation DMA) defined
+	  in the SD Host Controller Standard Specification Version 1.00 in SPL.
+
 config MMC_SDHCI_ADMA
 	bool "Support SDHCI ADMA2"
 	depends on MMC_SDHCI
@@ -462,17 +520,50 @@ config MMC_SDHCI_ADMA
 
 config SPL_MMC_SDHCI_ADMA
 	bool "Support SDHCI ADMA2 in SPL"
-	depends on MMC_SDHCI
+	depends on SPL_MMC && MMC_SDHCI
 	select MMC_SDHCI_ADMA_HELPERS
 	help
 	  This enables support for the ADMA (Advanced DMA) defined
 	  in the SD Host Controller Standard Specification Version 3.00 in SPL.
 
+config MMC_SDHCI_ADMA_FORCE_32BIT
+	bool "Force 32 bit mode for ADMA on 64 bit platforms"
+	depends on MMC_SDHCI_ADMA_HELPERS
+	help
+	  This forces SDHCI ADMA to be built for 32 bit descriptors, even
+	  on a 64 bit platform where they would otherwise be assumed to
+	  be 64 bits. This is necessary for certain hardware platforms
+	  that are 64-bit but include only 32-bit support within the selected
+	  SD host controller IP.
+
+config MMC_SDHCI_ADMA_64BIT
+	bool "Use SHDCI ADMA with 64 bit descriptors"
+	depends on MMC_SDHCI_ADMA_HELPERS
+	depends on !MMC_SDHCI_ADMA_FORCE_32BIT
+	default y if DMA_ADDR_T_64BIT
+	help
+	  This selects 64 bit descriptors for SDHCI ADMA. It is enabled by
+	  default on 64 bit systems, but can be disabled if one of these
+	  systems includes 32-bit ADMA.
+
+config FIXED_SDHCI_ALIGNED_BUFFER
+	hex "SDRAM address for fixed buffer"
+	depends on SPL && MVEBU_SPL_BOOT_DEVICE_MMC
+	default 0x00180000
+	help
+	  On the Marvell Armada 38x when the SPL runs it located in internal
+	  SRAM which is the L2 cache locked to memory. When the MMC buffers
+	  are located on the stack (or bss), the SDIO controller (SDHCI) can't
+	  write into this L2 cache memory.
+
+	  This specifies the address of a fixed buffer located in SDRAM that
+	  will be used for all SDHCI transfers in the SPL.
+
 config MMC_SDHCI_ASPEED
 	bool "Aspeed SDHCI controller"
 	depends on ARCH_ASPEED
-	depends on DM_MMC
 	depends on MMC_SDHCI
+	select MISC
 	help
 	  Enables support for the Aspeed SDHCI 2.0 controller present on Aspeed
 	  SoCs. This device is compatible with SD 3.0 and/or MMC 4.3
@@ -482,7 +573,7 @@ config MMC_SDHCI_ASPEED
 config MMC_SDHCI_ATMEL
 	bool "Atmel SDHCI controller support"
 	depends on ARCH_AT91
-	depends on DM_MMC && BLK && ARCH_AT91
+	depends on ARCH_AT91
 	depends on MMC_SDHCI
 	help
 	  This enables support for the Atmel SDHCI controller, which supports
@@ -517,7 +608,6 @@ config MMC_SDHCI_BCMSTB
 
 config MMC_SDHCI_CADENCE
 	bool "SDHCI support for the Cadence SD/SDIO/eMMC controller"
-	depends on BLK && DM_MMC
 	depends on MMC_SDHCI
 	depends on OF_CONTROL
 	help
@@ -527,11 +617,23 @@ config MMC_SDHCI_CADENCE
 
 	  If unsure, say N.
 
+config MMC_SDHCI_CV1800B
+	bool "SDHCI support for the CV1800B SD/SDIO/eMMC controller"
+	depends on MMC_SDHCI
+	depends on OF_CONTROL
+	help
+	  This selects the CV1800B SD/SDIO/eMMC driver.
+
+	  If you have a controller with this interface,
+	  say Y here.
+
+	  If unsure, say N.
+
 config MMC_SDHCI_AM654
 	bool "SDHCI Controller on TI's Am654 devices"
 	depends on ARCH_K3
 	depends on MMC_SDHCI
-	depends on DM_MMC && OF_CONTROL && BLK
+	depends on OF_CONTROL
 	depends on REGMAP
 	select MMC_SDHCI_IO_ACCESSORS
 	help
@@ -545,8 +647,17 @@ config MMC_SDHCI_IPROC
 	  This selects the iProc SD/MMC controller.
 
 	  If you have a Broadcom IPROC platform with SD or MMC devices,
-	  say Y or M here.
+	  say Y here.
 
+	  If unsure, say N.
+
+config MMC_SDHCI_F_SDH30
+	bool "SDHCI support for Fujitsu Semiconductor/Socionext F_SDH30"
+	depends on MMC_SDHCI
+	help
+	  This selects the Secure Digital Host Controller Interface (SDHCI)
+	  Needed by some Fujitsu/Socionext SoC for MMC / SD / SDIO support.
+	  If you have a controller with this interface, say Y here.
 	  If unsure, say N.
 
 config MMC_SDHCI_KONA
@@ -568,7 +679,6 @@ config MMC_SDHCI_MCOM
 
 config MMC_SDHCI_MSM
 	bool "Qualcomm SDHCI controller"
-	depends on BLK && DM_MMC
 	depends on MMC_SDHCI
 	help
 	  Enables support for SDHCI 2.0 controller present on some Qualcomm
@@ -588,9 +698,20 @@ config MMC_SDHCI_MV
 
 	  If unsure, say N.
 
+config MMC_SDHCI_NPCM
+	bool "SDHCI support on Nuvoton NPCM device"
+	depends on MMC_SDHCI
+	help
+	  This selects the Secure Digital Host Controller Interface (SDHCI)
+	  on Nuvoton NPCM device.
+
+	  If you have a controller with this interface, say Y here.
+
+	  If unsure, say N.
+
 config MMC_SDHCI_PIC32
 	bool "Microchip PIC32 on-chip SDHCI support"
-	depends on DM_MMC && MACH_PIC32
+	depends on MACH_PIC32
 	depends on MMC_SDHCI
 	help
 	  Support for Microchip PIC32 SDHCI controller.
@@ -598,7 +719,6 @@ config MMC_SDHCI_PIC32
 config MMC_SDHCI_ROCKCHIP
 	bool "Arasan SDHCI controller for Rockchip support"
 	depends on ARCH_ROCKCHIP
-	depends on DM_MMC && BLK
 	depends on MMC_SDHCI
 	help
 	  Support for Arasan SDHCI host controller on Rockchip ARM SoCs platform
@@ -614,15 +734,14 @@ config MMC_SDHCI_S5P
 
 	  If unsure, say N.
 
-config MMC_SDHCI_SPEAR
-	bool "SDHCI support on ST SPEAr platform"
+config MMC_SDHCI_SNPS
+	bool "Synopsys DesignWare SDHCI controller"
 	depends on MMC_SDHCI
 	help
-	  This selects the Secure Digital Host Controller Interface (SDHCI)
-	  often referrered to as the HSMMC block in some of the ST SPEAR range
-	  of SoC
-
-	  If you have a controller with this interface, say Y here.
+	  Support for DesignWare SDHCI host controller on Alibaba TH1520 SoC.
+	  This is a highly configurable and programmable, high performance
+	  Mobile Storage Host Controller (MSHC) with AXI as the bus interface
+	  for data transfer.
 
 	  If unsure, say N.
 
@@ -635,7 +754,7 @@ config MMC_SDHCI_STI
 
 config MMC_SDHCI_XENON
 	bool "SDHCI support for the Xenon SDHCI controller"
-	depends on MMC_SDHCI && DM_MMC && OF_CONTROL
+	depends on MMC_SDHCI && OF_CONTROL
 	help
 	  Support for Xenon SDHCI host controller on Marvell Armada 3700
 	  7k/8k ARM SoCs platforms
@@ -646,7 +765,6 @@ config MMC_SDHCI_XENON
 
 config MMC_SDHCI_TANGIER
 	bool "Tangier SDHCI controller support"
-	depends on DM_MMC && BLK
 	depends on MMC_SDHCI
 	help
 	  This selects support for SDHCI controller on Tanginer
@@ -682,7 +800,7 @@ config TEGRA124_MMC_DISABLE_EXT_LOOPBACK
 
 config MMC_SDHCI_ZYNQ
 	bool "Arasan SDHCI controller support"
-	depends on DM_MMC && OF_CONTROL && BLK
+	depends on OF_CONTROL
 	depends on MMC_SDHCI
 	help
 	  Support for Arasan SDHCI host controller on Zynq/ZynqMP ARM SoCs platform
@@ -708,7 +826,7 @@ config ZYNQ_HISPD_BROKEN
 
 config MMC_SUNXI
 	bool "Allwinner sunxi SD/MMC Host Controller support"
-	depends on ARCH_SUNXI && !UART0_PORT_F
+	depends on ARCH_SUNXI
 	default y
 	help
 	  This selects support for the SD/MMC Host Controller on
@@ -722,9 +840,17 @@ config MMC_SUNXI_HAS_MODE_SWITCH
 	bool
 	depends on MMC_SUNXI
 
+config MMC_PITON
+	bool "MMC support for OpenPiton SoC"
+	help
+	  This selects support for the SD host controller on OpenPiton SoC.
+	  Note that this SD controller directly exposes the contents of the
+	  SD card as memory mapped, so there is no manual configuration
+	  required
+
 config GENERIC_ATMEL_MCI
 	bool "Atmel Multimedia Card Interface support"
-	depends on DM_MMC && BLK && ARCH_AT91
+	depends on ARCH_AT91
 	help
 	  This enables support for Atmel High Speed Multimedia Card Interface
 	  (HSMCI), which supports the MultiMedia Card (MMC) Specification V4.3,
@@ -733,11 +859,11 @@ config GENERIC_ATMEL_MCI
 
 config STM32_SDMMC2
 	bool "STMicroelectronics STM32H7 SD/MMC Host Controller support"
-	depends on DM_MMC && BLK && OF_CONTROL
+	depends on OF_CONTROL
 	help
 	  This selects support for the SD/MMC controller on STM32H7 SoCs.
 	  If you have a board based on such a SoC and with a SD/MMC slot,
-	  say Y or M here.
+	  say Y here.
 
 config FTSDC010
 	bool "Ftsdc010 SD/MMC controller Support"
@@ -746,26 +872,29 @@ config FTSDC010
 
 config FTSDC010_SDIO
 	bool "Support ftsdc010 sdio"
-	default n
 	depends on FTSDC010
 	help
 		This can enable ftsdc010 sdio function.
 
 config MMC_MTK
 	bool "MediaTek SD/MMC Card Interface support"
-	depends on ARCH_MEDIATEK || ARCH_MTMIPS
-	depends on BLK && DM_MMC
+	depends on ARCH_MEDIATEK || ARCH_MTMIPS || ARCH_AIROHA
 	depends on OF_CONTROL
 	help
 	  This selects the MediaTek(R) Secure digital and Multimedia card Interface.
-	  If you have a machine with a integrated SD/MMC card reader, say Y or M here.
+	  If you have a machine with a integrated SD/MMC card reader, say Y here.
 	  This is needed if support for any SD/SDIO/MMC devices is required.
 	  If unsure, say N.
 
 endif
 
+config FSL_SDHC_V2_3
+	bool
+
 config FSL_ESDHC
 	bool "Freescale/NXP eSDHC controller support"
+	select FSL_SDHC_V2_3 if ARCH_P1010 || ARCH_BSC9131 || ARCH_BSC9132 \
+		|| ARCH_C29X
 	help
 	  This selects support for the eSDHC (Enhanced Secure Digital Host
 	  Controller) found on numerous Freescale/NXP SoCs.
@@ -780,8 +909,7 @@ config FSL_ESDHC_SUPPORT_ADMA2
 
 config FSL_ESDHC_33V_IO_RELIABILITY_WORKAROUND
 	bool "enable eSDHC workaround for 3.3v IO reliability issue"
-	depends on FSL_ESDHC && DM_MMC
-	default n
+	depends on FSL_ESDHC
 	help
 	  When eSDHC operates at 3.3v, damage can accumulate in an internal
 	  level shifter at a higher than expected rate. The faster the interface
@@ -793,18 +921,48 @@ config FSL_ESDHC_33V_IO_RELIABILITY_WORKAROUND
 	  This option assumes no hotplug, and u-boot has to make all the way to
 	  to linux to use 1.8v UHS-I speed mode if has card.
 
+config FSL_ESDHC_VS33_NOT_SUPPORT
+	bool "3.3V power supply not supported"
+	depends on FSL_ESDHC
+	help
+	  For eSDHC, power supply is through peripheral circuit. 3.3V support is
+	  common. Select this if 3.3V power supply not supported.
+
+config SYS_FSL_ESDHC_DEFAULT_BUS_WIDTH
+	int
+	depends on FSL_ESDHC
+	default 1
+
+config ESDHC_DETECT_QUIRK
+	bool "QIXIS-based eSDHC quirk detection"
+	depends on FSL_ESDHC && FSL_QIXIS
+
+config ESDHCI_QUIRK_BROKEN_TIMEOUT_VALUE
+	bool
+	depends on FSL_ESDHC || FSL_ESDHC_IMX
+	def_bool y if ARCH_T1024 || ARCH_T1040 || ARCH_T1042 || ARCH_T2080 \
+		|| FSL_ESDHC_IMX
+
 config FSL_ESDHC_IMX
 	bool "Freescale/NXP i.MX eSDHC controller support"
 	help
 	  This selects support for the i.MX eSDHC (Enhanced Secure Digital Host
 	  Controller) found on numerous Freescale/NXP SoCs.
 
+config SYS_FSL_ESDHC_HAS_DDR_MODE
+	bool "i.MX eSDHC controller supports DDR mode"
+	depends on FSL_ESDHC_IMX
+
 config FSL_USDHC
 	bool "Freescale/NXP i.MX uSDHC controller support"
-	depends on MX6 || MX7 ||ARCH_MX7ULP || IMX8 || IMX8M || IMXRT || TARGET_S32V234EVB
+	depends on MX6 || MX7 ||ARCH_MX7ULP || IMX8 || IMX8M || IMX8ULP || IMX9 || IMXRT
 	select FSL_ESDHC_IMX
 	help
 	  This enables the Ultra Secured Digital Host Controller enhancements
+
+config FSL_ESDHC_PIN_MUX
+	bool "Perform esdhc device-tree fixup"
+	depends on (FSL_ESDHC || FSL_ESDHC_IMX) && OF_LIBFDT
 
 endmenu
 
@@ -818,4 +976,10 @@ config SYS_FSL_ERRATUM_ESDHC135
 	bool
 
 config SYS_FSL_ERRATUM_ESDHC_A001
+	bool
+
+config SYS_FSL_ERRATUM_A011334
+	bool
+
+config SYS_FSL_ESDHC_UNRELIABLE_PULSE_DETECTION_WORKAROUND
 	bool

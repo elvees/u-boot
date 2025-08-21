@@ -3,7 +3,7 @@
  * Copyright 2017-2019 NXP
  */
 
-#include <common.h>
+#include <config.h>
 #include <asm/arch/fsl_serdes.h>
 #include <asm/arch/soc.h>
 #include <asm/io.h>
@@ -53,7 +53,7 @@ static struct serdes_config *serdes_cfg_tbl[] = {
 
 bool soc_has_mac1(void)
 {
-	struct ccsr_gur __iomem *gur = (void *)(CONFIG_SYS_FSL_GUTS_ADDR);
+	struct ccsr_gur __iomem *gur = (void *)(CFG_SYS_FSL_GUTS_ADDR);
 	unsigned int svr = gur_in32(&gur->svr);
 	unsigned int version = SVR_SOC_VER(svr);
 
@@ -100,7 +100,7 @@ enum srds_prtcl serdes_get_prtcl(int serdes, int cfg, int lane)
 	if (serdes >= ARRAY_SIZE(serdes_cfg_tbl))
 		return 0;
 	/*
-	 * LS1044A/1048A  support only one XFI port
+	 * LS1044A/1048A  support only one 10GBase-R port
 	 * Disable MAC1 for LS1044A/1048A
 	 */
 	if (serdes == FSL_SRDS_1 && lane == 2) {

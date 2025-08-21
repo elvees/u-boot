@@ -3,7 +3,6 @@
  * Copyright 2020 RnD Center "ELVEES", JSC
  */
 
-#include <common.h>
 #include <dm.h>
 #include <sysreset.h>
 #include <asm/io.h>

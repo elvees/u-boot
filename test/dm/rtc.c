@@ -4,7 +4,6 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
 #include <console.h>
 #include <dm.h>
 #include <i2c.h>
@@ -28,7 +27,7 @@ static int dm_test_rtc_base(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_rtc_base, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_rtc_base, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 static void show_time(const char *msg, struct rtc_time *time)
 {
@@ -60,16 +59,27 @@ static int dm_test_rtc_set_get(struct unit_test_state *uts)
 {
 	struct rtc_time now, time, cmp;
 	struct udevice *dev, *emul;
-	long offset, old_offset, old_base_time;
+	long offset, check_offset, old_offset, old_base_time;
+	int i;
 
 	ut_assertok(uclass_get_device(UCLASS_RTC, 0, &dev));
-	ut_assertok(dm_rtc_get(dev, &now));
 
 	ut_assertok(i2c_emul_find(dev, &emul));
-	ut_assert(emul != NULL);
+	ut_assertnonnull(emul);
 
-	/* Tell the RTC to go into manual mode */
-	old_offset = sandbox_i2c_rtc_set_offset(emul, false, 0);
+	/* Get the offset, putting the RTC into manual mode */
+	i = 0;
+	do {
+		check_offset = sandbox_i2c_rtc_set_offset(emul, false, 0);
+		ut_assertok(dm_rtc_get(dev, &now));
+
+		/* Tell the RTC to go into manual mode */
+		old_offset = sandbox_i2c_rtc_set_offset(emul, false, 0);
+
+		/* If the times changed in that period, read it again */
+	} while (++i < 2 && check_offset != old_offset);
+	ut_asserteq(check_offset, old_offset);
+
 	old_base_time = sandbox_i2c_rtc_get_set_base_time(emul, -1);
 
 	memset(&time, '\0', sizeof(time));
@@ -127,11 +137,12 @@ static int dm_test_rtc_set_get(struct unit_test_state *uts)
 		ut_asserteq(now.tm_sec + 1, cmp.tm_sec);
 	}
 
-	old_offset = sandbox_i2c_rtc_set_offset(emul, true, 0);
+	/* return RTC to normal mode */
+	sandbox_i2c_rtc_set_offset(emul, true, 0);
 
 	return 0;
 }
-DM_TEST(dm_test_rtc_set_get, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_rtc_set_get, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 static int dm_test_rtc_read_write(struct unit_test_state *uts)
 {
@@ -161,7 +172,7 @@ static int dm_test_rtc_read_write(struct unit_test_state *uts)
 	ut_asserteq(memcmp(buf, "at", 3), 0);
 
 	ut_assertok(i2c_emul_find(dev, &emul));
-	ut_assert(emul != NULL);
+	ut_assertnonnull(emul);
 
 	old_offset = sandbox_i2c_rtc_set_offset(emul, false, 0);
 	ut_assertok(dm_rtc_get(dev, &time));
@@ -175,13 +186,11 @@ static int dm_test_rtc_read_write(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_rtc_read_write, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_rtc_read_write, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 /* Test 'rtc list' command */
 static int dm_test_rtc_cmd_list(struct unit_test_state *uts)
 {
-	console_record_reset();
-
 	run_command("rtc list", 0);
 	ut_assert_nextline("RTC #0 - rtc@43");
 	ut_assert_nextline("RTC #1 - rtc@61");
@@ -189,13 +198,11 @@ static int dm_test_rtc_cmd_list(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_rtc_cmd_list, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_rtc_cmd_list, UTF_SCAN_PDATA | UTF_SCAN_FDT | UTF_CONSOLE);
 
 /* Test 'rtc read' and 'rtc write' commands */
 static int dm_test_rtc_cmd_rw(struct unit_test_state *uts)
 {
-	console_record_reset();
-
 	run_command("rtc dev 0", 0);
 	ut_assert_nextline("RTC #0 - rtc@43");
 	ut_assert_console_end();
@@ -204,7 +211,7 @@ static int dm_test_rtc_cmd_rw(struct unit_test_state *uts)
 	ut_assert_console_end();
 
 	run_command("rtc read 0x30 2", 0);
-	ut_assert_nextline("00000030: aa bb                                              ..");
+	ut_assert_nextline("00000030: aa bb                                            ..");
 	ut_assert_console_end();
 
 	run_command("rtc dev 1", 0);
@@ -215,7 +222,7 @@ static int dm_test_rtc_cmd_rw(struct unit_test_state *uts)
 	ut_assert_console_end();
 
 	run_command("rtc read 0x30 2", 0);
-	ut_assert_nextline("00000030: cc dd                                              ..");
+	ut_assert_nextline("00000030: cc dd                                            ..");
 	ut_assert_console_end();
 
 	/*
@@ -227,12 +234,12 @@ static int dm_test_rtc_cmd_rw(struct unit_test_state *uts)
 	ut_assert_console_end();
 
 	run_command("rtc read 0x30 2", 0);
-	ut_assert_nextline("00000030: aa bb                                              ..");
+	ut_assert_nextline("00000030: aa bb                                            ..");
 	ut_assert_console_end();
 
 	return 0;
 }
-DM_TEST(dm_test_rtc_cmd_rw, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_rtc_cmd_rw, UTF_SCAN_PDATA | UTF_SCAN_FDT | UTF_CONSOLE);
 
 /* Reset the time */
 static int dm_test_rtc_reset(struct unit_test_state *uts)
@@ -240,25 +247,36 @@ static int dm_test_rtc_reset(struct unit_test_state *uts)
 	struct rtc_time now;
 	struct udevice *dev, *emul;
 	long old_base_time, base_time;
+	int i;
 
 	ut_assertok(uclass_get_device(UCLASS_RTC, 0, &dev));
 	ut_assertok(dm_rtc_get(dev, &now));
 
 	ut_assertok(i2c_emul_find(dev, &emul));
-	ut_assert(emul != NULL);
+	ut_assertnonnull(emul);
 
-	old_base_time = sandbox_i2c_rtc_get_set_base_time(emul, 0);
+	i = 0;
+	do {
+		old_base_time = sandbox_i2c_rtc_get_set_base_time(emul, 0);
 
-	ut_asserteq(0, sandbox_i2c_rtc_get_set_base_time(emul, -1));
+		ut_asserteq(0, sandbox_i2c_rtc_get_set_base_time(emul, -1));
 
-	/* Resetting the RTC should put he base time back to normal */
-	ut_assertok(dm_rtc_reset(dev));
-	base_time = sandbox_i2c_rtc_get_set_base_time(emul, -1);
+		ut_assertok(dm_rtc_reset(dev));
+		base_time = sandbox_i2c_rtc_get_set_base_time(emul, -1);
+
+		/*
+		 * Resetting the RTC should put the base time back to normal.
+		 * Allow for a one-timeadjustment in case the time flips over
+		 * while this test process is pre-empted (either by a second
+		 * or a daylight-saving change), since reset_time() in
+		 * i2c_rtc_emul.c reads the time from the OS.
+		 */
+	} while (++i < 2 && base_time != old_base_time);
 	ut_asserteq(old_base_time, base_time);
 
 	return 0;
 }
-DM_TEST(dm_test_rtc_reset, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_rtc_reset, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 /* Check that two RTC devices can be used independently */
 static int dm_test_rtc_dual(struct unit_test_state *uts)
@@ -274,9 +292,9 @@ static int dm_test_rtc_dual(struct unit_test_state *uts)
 	ut_assertok(dm_rtc_get(dev2, &now2));
 
 	ut_assertok(i2c_emul_find(dev1, &emul1));
-	ut_assert(emul1 != NULL);
+	ut_assertnonnull(emul1);
 	ut_assertok(i2c_emul_find(dev2, &emul2));
-	ut_assert(emul2 != NULL);
+	ut_assertnonnull(emul2);
 
 	offset = sandbox_i2c_rtc_set_offset(emul1, false, -1);
 	sandbox_i2c_rtc_set_offset(emul2, false, offset + 1);
@@ -290,4 +308,4 @@ static int dm_test_rtc_dual(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_rtc_dual, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_rtc_dual, UTF_SCAN_PDATA | UTF_SCAN_FDT);

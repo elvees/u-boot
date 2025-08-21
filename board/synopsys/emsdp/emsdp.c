@@ -3,7 +3,6 @@
  * Copyright (C) 2018 Synopsys, Inc. All rights reserved.
  */
 
-#include <common.h>
 #include <command.h>
 #include <cpu_func.h>
 #include <dwmmc.h>
@@ -77,7 +76,6 @@ int board_early_init_r(void)
 	// Switch PSRAM controller back to memory mode
 	writel(0, PSRAM_FLASH_CONFIG_REG_0);
 
-
 	// Switch PSRAM controller to command mode
 	writel(CRE_ENABLE | CRE_DRIVE_CMD, PSRAM_FLASH_CONFIG_REG_1);
 	// Program Refresh Configuration Register (RCR) for BANK1
@@ -98,7 +96,7 @@ int board_early_init_r(void)
 /* Bits in CREG_BOOT register */
 #define CREG_BOOT_WP_BIT	BIT(8)
 
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 	writel(1, CREG_IP_SW_RESET);
 	while (1)

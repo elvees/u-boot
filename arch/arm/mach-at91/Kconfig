@@ -11,10 +11,6 @@ config AT91SAM9G20
 	bool
 	select CPU_ARM926EJS
 
-config AT91SAM9XE
-	bool
-	select CPU_ARM926EJS
-
 config AT91SAM9261
 	bool
 	select CPU_ARM926EJS
@@ -50,6 +46,7 @@ config SAM9X60
 config SAMA7G5
 	bool
 	select CPU_V7A
+	select AT91RESET_EXTRST
 
 config SAMA5D2
 	bool
@@ -69,36 +66,21 @@ choice
 	prompt "Atmel AT91 board select"
 	optional
 
-config TARGET_AT91RM9200EK
-	bool "Atmel AT91RM9200 evaluation kit"
-	select CPU_ARM920T
-
 config TARGET_AT91SAM9260EK
 	bool "Atmel at91sam9260 reference board"
 	select AT91SAM9260
 	select BOARD_EARLY_INIT_F
 
-config TARGET_ETHERNUT5
-	bool "Ethernut5 board"
-	select AT91SAM9XE
-
-config TARGET_SNAPPER9260
-	bool "Support snapper9260"
-	select AT91SAM9260
-	select DM
-	select DM_GPIO
-	select DM_SERIAL
-	imply CMD_DM
-
 config TARGET_GURNARD
 	bool "Support gurnard"
 	select AT91SAM9G45
+	select AT91_WANTS_COMMON_PHY
 	select BOARD_LATE_INIT
 	select DM
-	select DM_ETH
 	select DM_GPIO
 	select DM_SERIAL
 	select DM_SPI
+	select MTD
 	select SPI
 	imply CMD_DM
 
@@ -119,6 +101,7 @@ config TARGET_AT91SAM9263EK
 config TARGET_USB_A9263
 	bool "Caloa USB A9260 board"
 	select AT91SAM9263
+	select AT91_WANTS_COMMON_PHY
 
 config TARGET_PM9263
 	bool "Ronetix pm9263 board"
@@ -133,11 +116,6 @@ config TARGET_AT91SAM9M10G45EK
 config TARGET_PM9G45
 	bool "Ronetix pm9g45 board"
 	select AT91SAM9G45
-
-config TARGET_PICOSAM9G45
-	bool "Mini-box picosam9g45 board"
-	select AT91SAM9M10G45
-	select SUPPORT_SPL
 
 config TARGET_AT91SAM9N12EK
 	bool "Atmel AT91SAM9N12-EK board"
@@ -170,6 +148,12 @@ config TARGET_SAM9X60EK
 	select BOARD_EARLY_INIT_F
 	select BOARD_LATE_INIT
 
+config TARGET_SAM9X60_CURIOSITY
+        bool "SAM9X60 CURIOSITY board"
+        select SAM9X60
+        select BOARD_EARLY_INIT_F
+        select BOARD_LATE_INIT
+
 config TARGET_SAMA5D2_PTC_EK
 	bool "SAMA5D2 PTC EK board"
 	select BOARD_EARLY_INIT_F
@@ -185,6 +169,7 @@ config TARGET_SAMA5D2_XPLAINED
 
 config TARGET_SAMA5D27_SOM1_EK
 	bool "SAMA5D27 SOM1 EK board"
+	select SAMA5D2
 	select BOARD_EARLY_INIT_F
 	select BOARD_LATE_INIT
 	select CPU_V7A
@@ -212,6 +197,17 @@ config TARGET_SAMA5D27_WLSOM1_EK
 	  processor-based SAMA5D2 MPU with 2 Gbit LPDDR2-SDRAM
 	  in a single package.
 
+config TARGET_KSTR_SAMA5D27
+	bool "Conclusive KSTR-SAMA5D27 board"
+	select BOARD_EARLY_INIT_F
+	select SAMA5D2
+	help
+	  The KSTR-SAMA5D27 embeds SAMA5D27 SoC, together with
+	  256 MiB SDRAM, 10/100 Mbit/s Ethernet, 96 Mbit/s Wi-Fi b/g/n,
+	  Bluetooth 4.1 LE, USB OTG controller w/ type-C USB connector
+	  and stackable GPIO headers in an all-in-one SBC form factor:
+	  https://conclusive.pl/products/kstr-sama5d27-sbc/
+
 config TARGET_SAMA5D2_ICP
 	bool "SAMA5D2 Industrial Connectivity Platform (ICP)"
 	select SAMA5D2
@@ -222,6 +218,17 @@ config TARGET_SAMA5D2_ICP
 	  The SAMA5D2 ICP embeds SAMA5D27 rev. C SoC, together with
 	  a 64Mbit QSPI flash, 3xMikrobus connectors, 4xUSB ,
 	  EtherCat and WILC3000 devices on board.
+
+config TARGET_SAMA5D29_CURIOSITY
+	bool "SAMA5D29 CURIOSITY board"
+	select SAMA5D2
+	select BOARD_EARLY_INIT_F
+	select BOARD_LATE_INIT
+	select CPU_V7A
+	help
+	  The SAMA5D29 Curiosity embeds SAMA5D29 SoC with 4 Gbit LPDDR2-SDRAM,
+	  a 64Mbit QSPI flash with Mac-address, MCP16502 PMIC, RGB LCD connector,
+	  2 x Mikrobus connectors, 2 x SD-Card connectors, 2 x USB
 
 config TARGET_SAMA5D3_XPLAINED
 	bool "SAMA5D3 Xplained board"
@@ -258,8 +265,8 @@ config TARGET_MEESC
 config TARGET_CORVUS
 	bool "Support corvus"
 	select AT91SAM9M10G45
+	select AT91_WANTS_COMMON_PHY
 	select DM
-	select DM_ETH
 	select DM_GPIO
 	select DM_SERIAL
 	select SUPPORT_SPL
@@ -271,15 +278,25 @@ config TARGET_SAMA7G5EK
        select BOARD_EARLY_INIT_F
        select BOARD_LATE_INIT
 
+config TARGET_SAMA7G54_CURIOSITY
+	bool "SAMA7G54 CURIOSITY board"
+	select SAMA7G5
+	select CPU_V7A
+	help
+	  The SAMA7G54 Curiosity embeds SAMA7G54D2G SiP (System in Package)
+	  with 2Gbit DDR3-SDRAM, 64Mbit QSPI nor-flash with MAC-address,
+	  4Gbit SLC nand-flash, MCP16502 PMIC, 2 x Mikrobus connectors,
+	  1 x SD-Card connector, 1 x M.2 slot, 3 x USB
 
 config TARGET_TAURUS
 	bool "Support taurus"
 	select AT91SAM9G20
+	select AT91_WANTS_COMMON_PHY
 	select DM
-	select DM_ETH
 	select DM_GPIO
 	select DM_SERIAL
 	select DM_SPI
+	select MTD
 	select SPI
 	select SUPPORT_SPL
 	imply CMD_DM
@@ -287,8 +304,8 @@ config TARGET_TAURUS
 config TARGET_SMARTWEB
 	bool "Support smartweb"
 	select AT91SAM9260
+	select AT91_WANTS_COMMON_PHY
 	select DM
-	select DM_ETH
 	select DM_GPIO
 	select DM_SERIAL
 	select SUPPORT_SPL
@@ -298,34 +315,33 @@ config TARGET_VINCO
 	bool "Support VINCO"
 	select DM
 	select DM_SPI
+	select MTD
 	select SAMA5D4
 	select SPI
 	select SUPPORT_SPL
 	imply CMD_DM
 
-config TARGET_WB45N
-	bool "Support Laird WB45N"
-	select CPU_ARM926EJS
-	select SUPPORT_SPL
-
-config TARGET_WB50N
-	bool "Support Laird WB50N"
-	select BOARD_EARLY_INIT_F
-	select BOARD_LATE_INIT
-	select CPU_V7A
-	select SUPPORT_SPL
-	select ATMEL_SFR
-
 endchoice
 
 config ATMEL_SFR
 	bool
-	default n
+
+config AT91RESET_EXTRST
+	bool
 
 config SYS_SOC
 	default "at91"
 
-source "board/atmel/at91rm9200ek/Kconfig"
+config AT91_GPIO_PULLUP
+	bool "Keep pullups on peripheral pins"
+	depends on CPU_ARM926EJS
+
+config ATMEL_LEGACY
+	bool "Legacy GPIO support"
+
+config AT91_WANTS_COMMON_PHY
+	bool
+
 source "board/atmel/at91sam9260ek/Kconfig"
 source "board/atmel/at91sam9261ek/Kconfig"
 source "board/atmel/at91sam9263ek/Kconfig"
@@ -334,35 +350,30 @@ source "board/atmel/at91sam9n12ek/Kconfig"
 source "board/atmel/at91sam9rlek/Kconfig"
 source "board/atmel/at91sam9x5ek/Kconfig"
 source "board/atmel/sam9x60ek/Kconfig"
+source "board/atmel/sam9x60_curiosity/Kconfig"
 source "board/atmel/sama7g5ek/Kconfig"
+source "board/atmel/sama7g54_curiosity/Kconfig"
 source "board/atmel/sama5d2_ptc_ek/Kconfig"
 source "board/atmel/sama5d2_xplained/Kconfig"
 source "board/atmel/sama5d27_som1_ek/Kconfig"
 source "board/atmel/sama5d27_wlsom1_ek/Kconfig"
 source "board/atmel/sama5d2_icp/Kconfig"
+source "board/atmel/sama5d29_curiosity/Kconfig"
 source "board/atmel/sama5d3_xplained/Kconfig"
 source "board/atmel/sama5d3xek/Kconfig"
 source "board/atmel/sama5d4_xplained/Kconfig"
 source "board/atmel/sama5d4ek/Kconfig"
 source "board/bluewater/gurnard/Kconfig"
-source "board/bluewater/snapper9260/Kconfig"
 source "board/calao/usb_a9263/Kconfig"
-source "board/egnite/ethernut5/Kconfig"
+source "board/conclusive/kstr-sama5d27/Kconfig"
 source "board/esd/meesc/Kconfig"
 source "board/gardena/smart-gateway-at91sam/Kconfig"
 source "board/l+g/vinco/Kconfig"
-source "board/mini-box/picosam9g45/Kconfig"
 source "board/ronetix/pm9261/Kconfig"
 source "board/ronetix/pm9263/Kconfig"
 source "board/ronetix/pm9g45/Kconfig"
 source "board/siemens/corvus/Kconfig"
 source "board/siemens/taurus/Kconfig"
 source "board/siemens/smartweb/Kconfig"
-source "board/laird/wb45n/Kconfig"
-source "board/laird/wb50n/Kconfig"
-
-config SPL_LDSCRIPT
-	default "arch/arm/mach-at91/arm926ejs/u-boot-spl.lds" if CPU_ARM926EJS
-	default "arch/arm/mach-at91/armv7/u-boot-spl.lds" if CPU_V7A
 
 endif

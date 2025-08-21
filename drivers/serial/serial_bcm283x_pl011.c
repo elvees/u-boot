@@ -3,7 +3,6 @@
  * Copyright (c) 2018 Alexander Graf <agraf@suse.de>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <asm/gpio.h>
 #include <dm/pinctrl.h>
@@ -17,14 +16,14 @@
  * The serial device will only work properly if it has been muxed to the serial
  * pins by firmware. Check whether that happened here.
  *
- * @return true if serial device is muxed, false if not
+ * Return: true if serial device is muxed, false if not
  */
 static bool bcm283x_is_serial_muxed(void)
 {
 	int serial_gpio = 15;
 	struct udevice *dev;
 
-	if (uclass_first_device(UCLASS_PINCTRL, &dev) || !dev)
+	if (uclass_first_device_err(UCLASS_PINCTRL, &dev))
 		return false;
 
 	if (pinctrl_get_gpio_mux(dev, 0, serial_gpio) != BCM2835_GPIO_ALT0)
@@ -94,7 +93,7 @@ U_BOOT_DRIVER(bcm283x_pl011_uart) = {
 	.probe	= bcm283x_pl011_serial_probe,
 	.plat_auto	= sizeof(struct pl01x_serial_plat),
 	.ops	= &bcm283x_pl011_serial_ops,
-#if !CONFIG_IS_ENABLED(OF_CONTROL) || CONFIG_IS_ENABLED(OF_BOARD)
+#if !CONFIG_IS_ENABLED(OF_CONTROL) || IS_ENABLED(CONFIG_OF_BOARD)
 	.flags	= DM_FLAG_PRE_RELOC,
 #endif
 	.priv_auto	= sizeof(struct pl01x_priv),

@@ -4,7 +4,6 @@
  * Mario Six, Guntermann & Drunck GmbH, mario.six@gdsys.cc
  */
 
-#include <common.h>
 #include <i2c.h>
 #include <fdt_support.h>
 #include <asm-generic/gpio.h>
@@ -39,4 +38,3 @@ int request_gpio_by_name(struct gpio_desc *gpio, const char *gpio_dev_name,
 
 	return dm_gpio_request(gpio, gpio_name);
 }
-

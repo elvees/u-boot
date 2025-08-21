@@ -3,12 +3,12 @@
  * Copyright 2019 Google LLC
  */
 
-#include <common.h>
 #include <binman.h>
 #include <binman_sym.h>
 #include <bootstage.h>
 #include <cbfs.h>
 #include <dm.h>
+#include <event.h>
 #include <init.h>
 #include <log.h>
 #include <spi.h>
@@ -18,14 +18,14 @@
 #include <dm/uclass-internal.h>
 #include <asm/fsp2/fsp_internal.h>
 
-int arch_cpu_init_dm(void)
+int fsp_setup_pinctrl(void)
 {
 	struct udevice *dev;
 	ofnode node;
 	int ret;
 
 	/* Make sure pads are set up early in U-Boot */
-	if (!ll_boot_init() || spl_phase() != PHASE_BOARD_F)
+	if (!ll_boot_init() || xpl_phase() != PHASE_BOARD_F)
 		return 0;
 
 	/* Probe all pinctrl devices to set up the pads */
@@ -41,6 +41,7 @@ int arch_cpu_init_dm(void)
 
 	return ret;
 }
+EVENT_SPY_SIMPLE(EVT_DM_POST_INIT_F, fsp_setup_pinctrl);
 
 #if !defined(CONFIG_TPL_BUILD)
 binman_sym_declare(ulong, intel_fsp_m, image_pos);
@@ -84,7 +85,8 @@ static int get_cbfs_fsp(enum fsp_type_t type, ulong map_base,
 	struct cbfs_priv *cbfs;
 	int ret;
 
-	ret = cbfs_init_mem(map_base + cbfs_base, &cbfs);
+	ret = cbfs_init_mem(map_base + cbfs_base, CBFS_SIZE_UNKNOWN, true,
+			    &cbfs);
 	if (ret)
 		return ret;
 	if (!ret) {
@@ -105,7 +107,6 @@ int fsp_locate_fsp(enum fsp_type_t type, struct binman_entry *entry,
 		   bool use_spi_flash, struct udevice **devp,
 		   struct fsp_header **hdrp, ulong *rom_offsetp)
 {
-	ulong mask = CONFIG_ROM_SIZE - 1;
 	struct udevice *dev;
 	ulong rom_offset = 0;
 	uint map_size;
@@ -132,14 +133,14 @@ int fsp_locate_fsp(enum fsp_type_t type, struct binman_entry *entry,
 			return log_msg_ret("Could not get flash mmap", ret);
 	}
 
-	if (spl_phase() >= PHASE_BOARD_F) {
+	if (xpl_phase() >= PHASE_BOARD_F) {
 		if (type != FSP_S)
 			return -EPROTONOSUPPORT;
 		ret = binman_entry_find("intel-fsp-s", entry);
 		if (ret)
 			return log_msg_ret("binman entry", ret);
 		if (!use_spi_flash)
-			rom_offset = (map_base & mask) - CONFIG_ROM_SIZE;
+			rom_offset = map_base + CONFIG_ROM_SIZE;
 	} else {
 		ret = -ENOENT;
 		if (false)

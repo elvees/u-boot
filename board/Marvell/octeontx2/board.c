@@ -12,6 +12,7 @@
 #include <asm/global_data.h>
 #include <dm/uclass-internal.h>
 #include <env.h>
+#include <event.h>
 #include <init.h>
 #include <malloc.h>
 #include <net.h>
@@ -105,7 +106,7 @@ int timer_init(void)
 int dram_init(void)
 {
 	gd->ram_size = smc_dram_size(0);
-	gd->ram_size -= CONFIG_SYS_SDRAM_BASE;
+	gd->ram_size -= CFG_SYS_SDRAM_BASE;
 
 	mem_map_fill();
 
@@ -213,11 +214,12 @@ void board_acquire_flash_arb(bool acquire)
 	}
 }
 
-int last_stage_init(void)
+static int last_stage_init(void)
 {
 	(void)smc_flsf_fw_booted();
 	return 0;
 }
+EVENT_SPY_SIMPLE(EVT_LAST_STAGE_INIT, last_stage_init);
 
 static int do_go_uboot(struct cmd_tbl *cmdtp, int flag, int argc,
 		       char *const argv[])
@@ -226,12 +228,14 @@ static int do_go_uboot(struct cmd_tbl *cmdtp, int flag, int argc,
 	uboot_entry_t entry;
 	ulong addr;
 	void *fdt;
+	int err;
 
 	if (argc < 2)
 		return CMD_RET_USAGE;
 
-	addr = simple_strtoul(argv[1], NULL, 16);
-	fdt = board_fdt_blob_setup();
+	addr = hextoul(argv[1], NULL);
+	fdt = (void *)gd->fdt_blob;
+	err = board_fdt_blob_setup(&fdt);
 	entry = (uboot_entry_t)addr;
 	flush_cache((ulong)addr, 1 << 20);	/* 1MiB should be enough */
 	dcache_disable();

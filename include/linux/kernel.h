@@ -3,25 +3,18 @@
 
 #include <linux/types.h>
 #include <linux/printk.h> /* for printf/pr_* utilities */
+#include <limits.h>
 
 #define USHRT_MAX	((u16)(~0U))
 #define SHRT_MAX	((s16)(USHRT_MAX>>1))
 #define SHRT_MIN	((s16)(-SHRT_MAX - 1))
-#define INT_MAX		((int)(~0U>>1))
 #define INT_MIN		(-INT_MAX - 1)
-#define UINT_MAX	(~0U)
 #define LONG_MAX	((long)(~0UL>>1))
 #define LONG_MIN	(-LONG_MAX - 1)
 #define ULONG_MAX	(~0UL)
 #define LLONG_MAX	((long long)(~0ULL>>1))
 #define LLONG_MIN	(-LLONG_MAX - 1)
 #define ULLONG_MAX	(~0ULL)
-#ifndef SIZE_MAX
-#define SIZE_MAX	(~(size_t)0)
-#endif
-#ifndef SSIZE_MAX
-#define SSIZE_MAX	((ssize_t)(SIZE_MAX >> 1))
-#endif
 
 #define U8_MAX		((u8)~0U)
 #define S8_MAX		((s8)(U8_MAX>>1))
@@ -35,10 +28,6 @@
 #define U64_MAX		((u64)~0ULL)
 #define S64_MAX		((s64)(U64_MAX>>1))
 #define S64_MIN		((s64)(-S64_MAX - 1))
-
-/* Aliases defined by stdint.h */
-#define UINT32_MAX	U32_MAX
-#define UINT64_MAX	U64_MAX
 
 #define INT32_MAX	S32_MAX
 
@@ -255,7 +244,6 @@
  */
 #define clamp_val(val, lo, hi) clamp_t(typeof(val), val, lo, hi)
 
-
 /*
  * swap - swap value of @a and @b
  */
@@ -283,5 +271,29 @@
 #define check_member(structure, member, offset) _Static_assert( \
 	offsetof(struct structure, member) == (offset), \
 	"`struct " #structure "` offset for `" #member "` is not " #offset)
+
+#define __find_closest(x, a, as, op)					\
+({									\
+	typeof(as) __fc_i, __fc_as = (as) - 1;				\
+	typeof(x) __fc_x = (x);						\
+	typeof(*a) const *__fc_a = (a);					\
+	for (__fc_i = 0; __fc_i < __fc_as; __fc_i++) {			\
+		if (__fc_x op DIV_ROUND_CLOSEST(__fc_a[__fc_i] +	\
+						__fc_a[__fc_i + 1], 2))	\
+			break;						\
+	}								\
+	(__fc_i);							\
+})
+
+/**
+ * find_closest - locate the closest element in a sorted array
+ * @x: The reference value.
+ * @a: The array in which to look for the closest element. Must be sorted
+ *  in ascending order.
+ * @as: Size of 'a'.
+ *
+ * Returns the index of the element closest to 'x'.
+ */
+#define find_closest(x, a, as) __find_closest(x, a, as, <=)
 
 #endif

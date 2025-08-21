@@ -3,7 +3,6 @@
  * Copyright (c) 2019 Microsemi Corporation
  */
 
-#include <common.h>
 #include <config.h>
 #include <dm.h>
 #include <malloc.h>
@@ -16,6 +15,7 @@
 #include <miiphy.h>
 #include <net.h>
 #include <wait_bit.h>
+#include <linux/printk.h>
 
 #include "mscc_xfer.h"
 #include "mscc_miim.h"
@@ -412,7 +412,6 @@ static int servalt_probe(struct udevice *dev)
 	struct servalt_private *priv = dev_get_priv(dev);
 	int i;
 	struct resource res;
-	fdt32_t faddr;
 	phys_addr_t addr_base;
 	unsigned long addr_size;
 	ofnode eth_node, node, mdio_node;
@@ -461,9 +460,8 @@ static int servalt_probe(struct udevice *dev)
 
 		if (ofnode_read_resource(mdio_node, 0, &res))
 			return -ENOMEM;
-		faddr = cpu_to_fdt32(res.start);
 
-		addr_base = ofnode_translate_address(mdio_node, &faddr);
+		addr_base = res.start;
 		addr_size = res.end - res.start;
 
 		/* If the bus is new then create a new bus */
@@ -484,7 +482,7 @@ static int servalt_probe(struct udevice *dev)
 			continue;
 
 		phy_connect(priv->ports[i].bus, priv->ports[i].phy_addr, dev,
-			    PHY_INTERFACE_MODE_NONE);
+			    PHY_INTERFACE_MODE_NA);
 	}
 
 	return 0;

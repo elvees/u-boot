@@ -5,16 +5,20 @@
  *
  * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
  */
-#include <common.h>
-#include <malloc.h>
+
+#define LOG_CATEGORY UCLASS_CLK
+
+#include <clk.h>
 #include <clk-uclass.h>
+#include <div64.h>
+#include <log.h>
+#include <malloc.h>
 #include <dm/device.h>
 #include <dm/devres.h>
 #include <linux/clk-provider.h>
-#include <div64.h>
-#include <clk.h>
-#include "clk.h"
 #include <linux/err.h>
+
+#include "clk.h"
 
 #define UBOOT_DM_CLK_IMX_FIXED_FACTOR "ccf_clk_fixed_factor"
 
@@ -33,7 +37,7 @@ const struct clk_ops ccf_clk_fixed_factor_ops = {
 	.get_rate = clk_factor_recalc_rate,
 };
 
-struct clk *clk_hw_register_fixed_factor(struct device *dev,
+struct clk *clk_hw_register_fixed_factor(struct udevice *dev,
 		const char *name, const char *parent_name, unsigned long flags,
 		unsigned int mult, unsigned int div)
 {
@@ -52,7 +56,7 @@ struct clk *clk_hw_register_fixed_factor(struct device *dev,
 	clk->flags = flags;
 
 	ret = clk_register(clk, UBOOT_DM_CLK_IMX_FIXED_FACTOR, name,
-			   parent_name);
+			   clk_resolve_parent_clk(dev, parent_name));
 	if (ret) {
 		kfree(fix);
 		return ERR_PTR(ret);
@@ -61,7 +65,7 @@ struct clk *clk_hw_register_fixed_factor(struct device *dev,
 	return clk;
 }
 
-struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+struct clk *clk_register_fixed_factor(struct udevice *dev, const char *name,
 		const char *parent_name, unsigned long flags,
 		unsigned int mult, unsigned int div)
 {

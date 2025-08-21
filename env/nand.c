@@ -13,7 +13,6 @@
  * Andreas Heppel <aheppel@sysgo.de>
  */
 
-#include <common.h>
 #include <command.h>
 #include <env.h>
 #include <env_internal.h>
@@ -27,14 +26,10 @@
 #include <u-boot/crc.h>
 
 #if defined(CONFIG_CMD_SAVEENV) && defined(CONFIG_CMD_NAND) && \
-		!defined(CONFIG_SPL_BUILD)
+		!defined(CONFIG_XPL_BUILD)
 #define CMD_SAVEENV
-#elif defined(CONFIG_ENV_OFFSET_REDUND) && !defined(CONFIG_SPL_BUILD)
+#elif defined(CONFIG_ENV_OFFSET_REDUND) && !defined(CONFIG_XPL_BUILD)
 #error CONFIG_ENV_OFFSET_REDUND must have CONFIG_CMD_SAVEENV & CONFIG_CMD_NAND
-#endif
-
-#ifndef CONFIG_ENV_RANGE
-#define CONFIG_ENV_RANGE	CONFIG_ENV_SIZE
 #endif
 
 #if defined(ENV_IS_EMBEDDED)
@@ -107,8 +102,7 @@ static int env_nand_init(void)
 	gd->env_addr = (ulong)env_ptr->data;
 
 #else /* ENV_IS_EMBEDDED || CONFIG_NAND_ENV_DST */
-	gd->env_addr	= (ulong)&default_environment[0];
-	gd->env_valid	= ENV_VALID;
+	gd->env_valid	= ENV_INVALID;
 #endif /* ENV_IS_EMBEDDED || CONFIG_NAND_ENV_DST */
 
 	return 0;
@@ -202,10 +196,6 @@ static int env_nand_save(void)
 #endif
 	};
 
-
-	if (CONFIG_ENV_RANGE < CONFIG_ENV_SIZE)
-		return 1;
-
 	ret = env_export(env_new);
 	if (ret)
 		return ret;
@@ -234,7 +224,7 @@ static int env_nand_save(void)
 }
 #endif /* CMD_SAVEENV */
 
-#if defined(CONFIG_SPL_BUILD)
+#if defined(CONFIG_XPL_BUILD)
 static int readenv(size_t offset, u_char *buf)
 {
 	return nand_spl_load_image(offset, CONFIG_ENV_SIZE, buf);
@@ -275,7 +265,7 @@ static int readenv(size_t offset, u_char *buf)
 
 	return 0;
 }
-#endif /* #if defined(CONFIG_SPL_BUILD) */
+#endif /* #if defined(CONFIG_XPL_BUILD) */
 
 #ifdef CONFIG_ENV_OFFSET_OOB
 int get_nand_env_oob(struct mtd_info *mtd, unsigned long *result)

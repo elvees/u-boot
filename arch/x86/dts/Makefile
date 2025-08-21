@@ -22,12 +22,6 @@ dtb-y += bayleybay.dtb \
 	slimbootloader.dtb \
 	baytrail_som-db5800-som-6867.dtb
 
-targets += $(dtb-y)
+include $(srctree)/scripts/Makefile.dts
 
-DTC_FLAGS += -R 4 -p 0x1000
-
-PHONY += dtbs
-dtbs: $(addprefix $(obj)/, $(dtb-y))
-	@:
-
-clean-files := *.dtb
+DTC_FLAGS += -R 4 -p $(if $(CONFIG_EFI_APP),0x8000,0x1000)

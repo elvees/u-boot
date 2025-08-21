@@ -5,13 +5,12 @@
  * Author:  Weijie Gao <weijie.gao@mediatek.com>
  */
 
-#include <common.h>
 #include <asm/io.h>
 #include "mt7628.h"
 
 void mtmips_spl_serial_init(void)
 {
-#ifdef CONFIG_SPL_SERIAL_SUPPORT
+#ifdef CONFIG_SPL_SERIAL
 	void __iomem *base = ioremap_nocache(SYSCTL_BASE, SYSCTL_SIZE);
 
 #if CONFIG_CONS_INDEX == 1
@@ -30,5 +29,5 @@ void mtmips_spl_serial_init(void)
 		      1 << SPIS_MODE_S);
 #endif /* CONFIG_SPL_UART2_SPIS_PINMUX */
 #endif /* CONFIG_CONS_INDEX */
-#endif /* CONFIG_SPL_SERIAL_SUPPORT */
+#endif /* CONFIG_SPL_SERIAL */
 }

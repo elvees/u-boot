@@ -4,7 +4,6 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <pwm.h>
@@ -59,8 +58,15 @@ static int sandbox_pwm_set_config(struct udevice *dev, uint channel,
 	if (channel >= NUM_CHANNELS)
 		return -ENOSPC;
 	chan = &priv->chan[channel];
-	chan->period_ns = period_ns;
-	chan->duty_ns = duty_ns;
+
+	if (channel == 2) {
+		/* Pretend to have some fixed period */
+		chan->period_ns = 4096;
+		chan->duty_ns =  duty_ns * 4096 / period_ns;
+	} else {
+		chan->period_ns = period_ns;
+		chan->duty_ns = duty_ns;
+	}
 
 	return 0;
 }

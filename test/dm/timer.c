@@ -3,7 +3,6 @@
  * Copyright (C) 2015 Thomas Chou <thomas@wytron.com.tw>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <timer.h>
 #include <dm/test.h>
@@ -24,7 +23,7 @@ static int dm_test_timer_base(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_timer_base, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_timer_base, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 /*
  * Test of timebase fallback
@@ -33,18 +32,18 @@ static int dm_test_timer_timebase_fallback(struct unit_test_state *uts)
 {
 	struct udevice *dev;
 
-	cpu_sandbox_set_current("cpu-test1");
+	cpu_sandbox_set_current("cpu@1");
 	ut_assertok(uclass_get_device_by_name(UCLASS_TIMER, "timer@1", &dev));
 	ut_asserteq(3000000, timer_get_rate(dev));
 	ut_assertok(device_remove(dev, DM_REMOVE_NORMAL));
 
-	cpu_sandbox_set_current("cpu-test2");
+	cpu_sandbox_set_current("cpu@2");
 	ut_assertok(uclass_get_device_by_name(UCLASS_TIMER, "timer@1", &dev));
 	ut_asserteq(2000000, timer_get_rate(dev));
 
-	cpu_sandbox_set_current("cpu-test1");
+	cpu_sandbox_set_current("cpu@1");
 
 	return 0;
 }
 DM_TEST(dm_test_timer_timebase_fallback,
-	UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+	UTF_SCAN_PDATA | UTF_SCAN_FDT);

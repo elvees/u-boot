@@ -7,13 +7,13 @@
  *	Author: Feng Kan <fkan@apm.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <regmap.h>
 #include <sysreset.h>
 #include <syscon.h>
 #include <linux/err.h>
+#include <linux/printk.h>
 
 struct syscon_reboot_priv {
 	struct regmap *regmap;
@@ -39,7 +39,7 @@ static struct sysreset_ops syscon_reboot_ops = {
 	.request = syscon_reboot_request,
 };
 
-int syscon_reboot_probe(struct udevice *dev)
+static int syscon_reboot_probe(struct udevice *dev)
 {
 	struct syscon_reboot_priv *priv = dev_get_priv(dev);
 	int err;

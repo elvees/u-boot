@@ -8,7 +8,7 @@
  * CPU specific code
  */
 
-#include <common.h>
+#include <config.h>
 #include <command.h>
 #include <init.h>
 #include <vsprintf.h>
@@ -20,7 +20,7 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-gd_t *gd __attribute__((section(".data")));
+gd_t *gd __section(".data");
 
 #if defined(CONFIG_DISPLAY_CPUINFO)
 /*
@@ -45,11 +45,6 @@ int print_cpuinfo(void)
 
 int arch_cpu_init(void)
 {
-	gd->ram_size = CONFIG_SYS_SDRAM_SIZE;
-	return 0;
-}
-
-int dram_init(void)
-{
+	gd->ram_size = CFG_SYS_SDRAM_SIZE;
 	return 0;
 }

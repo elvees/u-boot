@@ -9,10 +9,9 @@
  * Ulf Samuelsson <ulf.samuelsson@atmel.com>
  */
 
-#include <common.h>
-#include <config.h>
 #include <command.h>
 #include <status_led.h>
+#include <vsprintf.h>
 
 struct led_tbl_s {
 	char		*string;	/* String for use in the command */
@@ -129,7 +128,7 @@ int do_legacy_led(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 				if (argc != 4)
 					return CMD_RET_USAGE;
 
-				freq = simple_strtoul(argv[3], NULL, 10);
+				freq = dectoul(argv[3], NULL);
 				__led_blink(led_commands[i].mask, freq);
 			}
 			/* Need to set only 1 led if led_name wasn't 'all' */

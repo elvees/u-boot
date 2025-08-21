@@ -7,7 +7,6 @@
  * Copyright (C) 2013 Xilinx, Inc. All rights reserved.
  */
 
-#include <common.h>
 #include <clk-uclass.h>
 #include <dm.h>
 #include <log.h>
@@ -44,13 +43,13 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 enum zynq_clk_rclk {mio_clk, emio_clk};
 #endif
 
 struct zynq_clk_priv {
 	ulong ps_clk_freq;
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 	struct clk gem_emio_clk[2];
 #endif
 };
@@ -76,7 +75,7 @@ static void *zynq_clk_get_register(enum zynq_clk id)
 		return &slcr_base->uart_clk_ctrl;
 	case spi0_clk ... spi1_clk:
 		return &slcr_base->spi_clk_ctrl;
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 	case dci_clk:
 		return &slcr_base->dci_clk_ctrl;
 	case gem0_clk:
@@ -151,7 +150,7 @@ static ulong zynq_clk_get_pll_rate(struct zynq_clk_priv *priv, enum zynq_clk id)
 	return priv->ps_clk_freq * mul;
 }
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 static enum zynq_clk_rclk zynq_clk_get_gem_rclk(enum zynq_clk id)
 {
 	u32 clk_ctrl, srcsel;
@@ -200,7 +199,7 @@ static ulong zynq_clk_get_cpu_rate(struct zynq_clk_priv *priv, enum zynq_clk id)
 	return DIV_ROUND_CLOSEST(zynq_clk_get_pll_rate(priv, pll), div);
 }
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 static ulong zynq_clk_get_ddr2x_rate(struct zynq_clk_priv *priv)
 {
 	u32 clk_ctrl, div;
@@ -224,7 +223,7 @@ static ulong zynq_clk_get_ddr3x_rate(struct zynq_clk_priv *priv)
 	return DIV_ROUND_CLOSEST(zynq_clk_get_pll_rate(priv, ddrpll_clk), div);
 }
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 static ulong zynq_clk_get_dci_rate(struct zynq_clk_priv *priv)
 {
 	u32 clk_ctrl, div0, div1;
@@ -252,7 +251,7 @@ static ulong zynq_clk_get_peripheral_rate(struct zynq_clk_priv *priv,
 	if (!div0)
 		div0 = 1;
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 	if (two_divs) {
 		div1 = (clk_ctrl & CLK_CTRL_DIV1_MASK) >> CLK_CTRL_DIV1_SHIFT;
 		if (!div1)
@@ -269,7 +268,7 @@ static ulong zynq_clk_get_peripheral_rate(struct zynq_clk_priv *priv,
 			div1);
 }
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 static ulong zynq_clk_get_gem_rate(struct zynq_clk_priv *priv, enum zynq_clk id)
 {
 	struct clk *parent;
@@ -367,7 +366,7 @@ static ulong zynq_clk_set_gem_rate(struct zynq_clk_priv *priv, enum zynq_clk id,
 }
 #endif
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 static ulong zynq_clk_get_rate(struct clk *clk)
 {
 	struct zynq_clk_priv *priv = dev_get_priv(clk->dev);
@@ -454,26 +453,77 @@ static int dummy_enable(struct clk *clk)
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_CMD_CLK)
+static const char * const clk_names[clk_max] = {
+	"armpll", "ddrpll", "iopll",
+	"cpu_6or4x", "cpu_3or2x", "cpu_2x", "cpu_1x",
+	"ddr2x", "ddr3x", "dci",
+	"lqspi", "smc", "pcap", "gem0", "gem1",
+	"fclk0", "fclk1", "fclk2", "fclk3", "can0", "can1",
+	"sdio0", "sdio1", "uart0", "uart1", "spi0", "spi1", "dma",
+	"usb0_aper", "usb1_aper", "gem0_aper", "gem1_aper",
+	"sdio0_aper", "sdio1_aper", "spi0_aper", "spi1_aper",
+	"can0_aper", "can1_aper", "i2c0_aper", "i2c1_aper",
+	"uart0_aper", "uart1_aper", "gpio_aper", "lqspi_aper",
+	"smc_aper", "swdt", "dbg_trc", "dbg_apb"
+};
+
+static void zynq_clk_dump(struct udevice *dev)
+{
+	int i, ret;
+
+	printf("clk\t\tfrequency\n");
+	for (i = 0; i < clk_max; i++) {
+		const char *name = clk_names[i];
+
+		if (name) {
+			struct clk clk;
+			unsigned long rate;
+
+			clk.id = i;
+			ret = clk_request(dev, &clk);
+			if (ret < 0) {
+				printf("%s clk_request() failed: %d\n",
+				       __func__, ret);
+				break;
+			}
+
+			rate = clk_get_rate(&clk);
+
+			if ((rate == (unsigned long)-ENOSYS) ||
+			    (rate == (unsigned long)-ENXIO))
+				printf("%10s%20s\n", name, "unknown");
+			else
+				printf("%10s%20lu\n", name, rate);
+		}
+	}
+}
+#endif
+
 static struct clk_ops zynq_clk_ops = {
 	.get_rate = zynq_clk_get_rate,
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 	.set_rate = zynq_clk_set_rate,
 #endif
 	.enable = dummy_enable,
+#if IS_ENABLED(CONFIG_CMD_CLK)
+	.dump = zynq_clk_dump,
+#endif
 };
 
 static int zynq_clk_probe(struct udevice *dev)
 {
 	struct zynq_clk_priv *priv = dev_get_priv(dev);
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 	unsigned int i;
 	char name[16];
 	int ret;
 
 	for (i = 0; i < 2; i++) {
 		sprintf(name, "gem%d_emio_clk", i);
-		ret = clk_get_by_name(dev, name, &priv->gem_emio_clk[i]);
-		if (ret < 0 && ret != -ENODATA) {
+		ret = clk_get_by_name_optional(dev, name,
+					       &priv->gem_emio_clk[i]);
+		if (ret) {
 			dev_err(dev, "failed to get %s clock\n", name);
 			return ret;
 		}

@@ -4,7 +4,6 @@
  */
 
 #ifndef USE_HOSTCC
-#include <common.h>
 #include <fdtdec.h>
 #include <log.h>
 #include <asm/types.h>
@@ -59,7 +58,7 @@ static void subtract_modulus(const struct rsa_public_key *key, uint32_t num[])
  *
  * @key:	Key containing modulus to check
  * @num:	Number to check against modulus, as little endian word array
- * @return 0 if num < modulus, 1 if num >= modulus
+ * Return: 0 if num < modulus, 1 if num >= modulus
  */
 static int greater_equal_modulus(const struct rsa_public_key *key,
 				 uint32_t num[])
@@ -315,7 +314,7 @@ int rsa_mod_exp_sw(const uint8_t *sig, uint32_t sig_len,
  *
  * @keyptr:	RSA key
  * @inout:	Big-endian word array containing value and result
- * @return 0 on successful calculation, otherwise failure error code
+ * Return: 0 on successful calculation, otherwise failure error code
  *
  * FIXME: Use pow_mod() instead of zynq_pow_mod()
  *        pow_mod calculation required for zynq is bit different from

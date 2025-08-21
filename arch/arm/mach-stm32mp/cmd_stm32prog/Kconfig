@@ -1,4 +1,3 @@
-
 config CMD_STM32PROG
 	bool "command stm32prog for STM32CudeProgrammer"
 	select DFU
@@ -18,6 +17,7 @@ config CMD_STM32PROG
 config CMD_STM32PROG_USB
 	bool "support stm32prog over USB"
 	depends on CMD_STM32PROG
+	depends on USB_GADGET_DOWNLOAD
 	default y
 	help
 		activate the command "stm32prog usb" for STM32MP soc family
@@ -27,8 +27,17 @@ config CMD_STM32PROG_USB
 config CMD_STM32PROG_SERIAL
 	bool "support stm32prog over UART"
 	depends on CMD_STM32PROG
+	imply DISABLE_CONSOLE
+	imply SILENT_CONSOLE
 	default y
 	help
 		activate the command "stm32prog serial" for STM32MP soc family
 		with the tools STM32CubeProgrammer using U-Boot serial device
 		and UART protocol.
+
+config CMD_STM32PROG_OTP
+	bool "support stm32prog for OTP update"
+	depends on CMD_STM32PROG
+	default y if ARM_SMCCC || OPTEE
+	help
+		Support the OTP update with the command "stm32prog" for STM32MP

@@ -4,7 +4,6 @@
  * Author: Neil Armstrong <narmstrong@baylibre.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <env_internal.h>
 #include <init.h>
@@ -14,7 +13,7 @@
 
 int misc_init_r(void)
 {
-	meson_eth_init(PHY_INTERFACE_MODE_RGMII, 0);
+	meson_generate_serial_ethaddr();
 
 	return 0;
 }

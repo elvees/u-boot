@@ -69,15 +69,40 @@
 /*
  * CNTHCTL_EL2 bits definitions
  */
-#define CNTHCTL_EL2_EL1PCEN_EN	(1 << 1)  /* Physical timer regs accessible   */
-#define CNTHCTL_EL2_EL1PCTEN_EN	(1 << 0)  /* Physical counter accessible      */
+#define CNTHCTL_EL2_EVNT_EN	BIT(2)	     /* Enable the event stream       */
+#define CNTHCTL_EL2_EVNT_I(val)	((val) << 4) /* Event stream trigger bits     */
+#define CNTHCTL_EL2_EL1PCEN_EN	(1 << 1)     /* Physical timer regs accessible */
+#define CNTHCTL_EL2_EL1PCTEN_EN	(1 << 0)     /* Physical counter accessible   */
 
 /*
  * HCR_EL2 bits definitions
  */
+#define HCR_EL2_API		(1 << 41) /* Trap pointer authentication
+				             instructions                     */
+#define HCR_EL2_APK		(1 << 40) /* Trap pointer authentication
+				             key access                       */
 #define HCR_EL2_RW_AARCH64	(1 << 31) /* EL1 is AArch64                   */
 #define HCR_EL2_RW_AARCH32	(0 << 31) /* Lower levels are AArch32         */
 #define HCR_EL2_HCD_DIS		(1 << 29) /* Hypervisor Call disabled         */
+#define HCR_EL2_AMO_EL2		(1 <<  5) /* Route SErrors to EL2             */
+
+#define ID_AA64ISAR0_EL1_RNDR	(0xFUL << 60) /* RNDR random registers */
+/*
+ * ID_AA64ISAR1_EL1 bits definitions
+ */
+#define ID_AA64ISAR1_EL1_GPI	(0xF << 28) /* Implementation-defined generic
+				               code auth algorithm            */
+#define ID_AA64ISAR1_EL1_GPA	(0xF << 24) /* QARMA generic code auth
+				               algorithm                      */
+#define ID_AA64ISAR1_EL1_API	(0xF << 8)  /* Implementation-defined address
+				               auth algorithm                 */
+#define ID_AA64ISAR1_EL1_APA	(0xF << 4)  /* QARMA address auth algorithm   */
+
+/*
+ * ID_AA64PFR0_EL1 bits definitions
+ */
+#define ID_AA64PFR0_EL1_EL3	(0xF << 12) /* EL3 implemented                */
+#define ID_AA64PFR0_EL1_EL2	(0xF << 8)  /* EL2 implemented                */
 
 /*
  * CPACR_EL1 bits definitions
@@ -131,6 +156,13 @@ enum dcache_option {
 	"wfi" : : : "memory");		\
 	})
 
+#define wfe()				\
+	({asm volatile(			\
+	"wfe" : : : "memory");		\
+	})
+
+#define sev() asm volatile("sev")
+
 static inline unsigned int current_el(void)
 {
 	unsigned long el;
@@ -139,7 +171,7 @@ static inline unsigned int current_el(void)
 	return 3 & (el >> 2);
 }
 
-static inline unsigned int get_sctlr(void)
+static inline unsigned long get_sctlr(void)
 {
 	unsigned int el;
 	unsigned long val;
@@ -207,6 +239,22 @@ int __asm_invalidate_l3_icache(void);
 void __asm_switch_ttbr(u64 new_ttbr);
 
 /*
+ * armv8_switch_to_el2_prep() - prepare for switch from EL3 to EL2 for ARMv8
+ *
+ * @args:        For loading 64-bit OS, fdt address.
+ *               For loading 32-bit OS, zero.
+ * @mach_nr:     For loading 64-bit OS, zero.
+ *               For loading 32-bit OS, machine nr
+ * @fdt_addr:    For loading 64-bit OS, zero.
+ *               For loading 32-bit OS, fdt address.
+ * @arg4:	 Input argument.
+ * @entry_point: kernel entry point
+ * @es_flag:     execution state flag, ES_TO_AARCH64 or ES_TO_AARCH32
+ */
+void armv8_switch_to_el2_prep(u64 args, u64 mach_nr, u64 fdt_addr,
+			      u64 arg4, u64 entry_point, u64 es_flag);
+
+/*
  * armv8_switch_to_el2() - switch from EL3 to EL2 for ARMv8
  *
  * @args:        For loading 64-bit OS, fdt address.
@@ -245,7 +293,35 @@ void protect_secure_region(void);
 void smp_kick_all_cpus(void);
 
 void flush_l3_cache(void);
+
+/**
+ * mmu_map_region() - map a region of previously unmapped memory.
+ * Will be mapped MT_NORMAL & PTE_BLOCK_INNER_SHARE.
+ *
+ * @start: Start address of the region
+ * @size: Size of the region
+ * @emerg: Also map the region in the emergency table
+ */
+void mmu_map_region(phys_addr_t start, u64 size, bool emerg);
+
+/**
+ * mmu_change_region_attr() - change a mapped region attributes
+ *
+ * @start: Start address of the region
+ * @size:  Size of the region
+ * @aatrs: New attributes
+ */
 void mmu_change_region_attr(phys_addr_t start, size_t size, u64 attrs);
+
+/**
+ * mmu_change_region_attr_nobreak() - change a mapped region attributes without doing
+ *                                    break-before-make
+ *
+ * @start: Start address of the region
+ * @size:  Size of the region
+ * @aatrs: New attributes
+ */
+void mmu_change_region_attr_nobreak(phys_addr_t addr, size_t size, u64 attrs);
 
 /*
  * smc_call() - issue a secure monitor call
@@ -346,9 +422,30 @@ void switch_to_hypervisor_ret(void);
 
 #ifdef __ARM_ARCH_7A__
 #define wfi() __asm__ __volatile__ ("wfi" : : : "memory")
+#define wfe() __asm__ __volatile__ ("wfe" : : : "memory")
+#define sev() __asm__ __volatile__ ("sev")
 #else
 #define wfi()
 #endif
+
+#if !defined(__thumb2__)
+/*
+ * We will need to switch to ARM mode (.arm) for some instructions such as
+ * mrc p15 etc.
+ */
+#define asm_arm_or_thumb2(insn) asm volatile(".arm\n\t" insn)
+#else
+#define asm_arm_or_thumb2(insn) asm volatile(insn)
+#endif
+
+static inline unsigned long read_mpidr(void)
+{
+	unsigned long val;
+
+	asm_arm_or_thumb2("mrc p15, 0, %0, c0, c0, 5" : "=r" (val));
+
+	return val;
+}
 
 static inline unsigned long get_cpsr(void)
 {
@@ -374,11 +471,13 @@ static inline unsigned int get_cr(void)
 	unsigned int val;
 
 	if (is_hyp())
-		asm volatile("mrc p15, 4, %0, c1, c0, 0	@ get CR" : "=r" (val)
+		asm_arm_or_thumb2("mrc p15, 4, %0, c1, c0, 0	@ get CR"
+								  : "=r" (val)
 								  :
 								  : "cc");
 	else
-		asm volatile("mrc p15, 0, %0, c1, c0, 0	@ get CR" : "=r" (val)
+		asm_arm_or_thumb2("mrc p15, 0, %0, c1, c0, 0	@ get CR"
+								  : "=r" (val)
 								  :
 								  : "cc");
 	return val;
@@ -387,27 +486,13 @@ static inline unsigned int get_cr(void)
 static inline void set_cr(unsigned int val)
 {
 	if (is_hyp())
-		asm volatile("mcr p15, 4, %0, c1, c0, 0	@ set CR" :
+		asm_arm_or_thumb2("mcr p15, 4, %0, c1, c0, 0	@ set CR" :
 								  : "r" (val)
 								  : "cc");
 	else
-		asm volatile("mcr p15, 0, %0, c1, c0, 0	@ set CR" :
+		asm_arm_or_thumb2("mcr p15, 0, %0, c1, c0, 0	@ set CR" :
 								  : "r" (val)
 								  : "cc");
-	isb();
-}
-
-static inline unsigned int get_dacr(void)
-{
-	unsigned int val;
-	asm("mrc p15, 0, %0, c3, c0, 0	@ get DACR" : "=r" (val) : : "cc");
-	return val;
-}
-
-static inline void set_dacr(unsigned int val)
-{
-	asm volatile("mcr p15, 0, %0, c3, c0, 0	@ set DACR"
-	  : : "r" (val) : "cc");
 	isb();
 }
 
@@ -475,7 +560,7 @@ enum dcache_option {
 #define TTB_SECT_XN_MASK	(1 << 4)
 #define TTB_SECT_C_MASK		(1 << 3)
 #define TTB_SECT_B_MASK		(1 << 2)
-#define TTB_SECT			(2 << 0)
+#define TTB_SECT		(2 << 0)
 
 /*
  * Short-descriptor format memory region attributes, without TEX remap
@@ -489,7 +574,7 @@ enum dcache_option {
  */
 enum dcache_option {
 	DCACHE_OFF = TTB_SECT_DOMAIN(0) | TTB_SECT_XN_MASK | TTB_SECT,
-	DCACHE_WRITETHROUGH = DCACHE_OFF | TTB_SECT_C_MASK,
+	DCACHE_WRITETHROUGH = TTB_SECT_DOMAIN(0) | TTB_SECT | TTB_SECT_C_MASK,
 	DCACHE_WRITEBACK = DCACHE_WRITETHROUGH | TTB_SECT_B_MASK,
 	DCACHE_WRITEALLOC = DCACHE_WRITEBACK | TTB_SECT_TEX(1),
 };
@@ -502,14 +587,6 @@ enum dcache_option {
 	DCACHE_WRITEBACK = 0x1e,
 	DCACHE_WRITEALLOC = 0x16,
 };
-#endif
-
-#if defined(CONFIG_SYS_ARM_CACHE_WRITETHROUGH)
-#define DCACHE_DEFAULT_OPTION	DCACHE_WRITETHROUGH
-#elif defined(CONFIG_SYS_ARM_CACHE_WRITEALLOC)
-#define DCACHE_DEFAULT_OPTION	DCACHE_WRITEALLOC
-#elif defined(CONFIG_SYS_ARM_CACHE_WRITEBACK)
-#define DCACHE_DEFAULT_OPTION	DCACHE_WRITEBACK
 #endif
 
 /* Size of an MMU section */
@@ -559,7 +636,6 @@ s32 psci_affinity_info(u32 function_id, u32 target_affinity,
 u32 psci_migrate_info_type(void);
 void psci_system_off(void);
 void psci_system_reset(void);
-s32 psci_features(u32 function_id, u32 psci_fid);
 #endif
 
 #endif /* __ASSEMBLY__ */
@@ -569,6 +645,14 @@ s32 psci_features(u32 function_id, u32 psci_fid);
 #endif /* __KERNEL__ */
 
 #endif /* CONFIG_ARM64 */
+
+#if defined(CONFIG_SYS_ARM_CACHE_WRITETHROUGH)
+#define DCACHE_DEFAULT_OPTION	DCACHE_WRITETHROUGH
+#elif defined(CONFIG_SYS_ARM_CACHE_WRITEALLOC)
+#define DCACHE_DEFAULT_OPTION	DCACHE_WRITEALLOC
+#elif defined(CONFIG_SYS_ARM_CACHE_WRITEBACK)
+#define DCACHE_DEFAULT_OPTION	DCACHE_WRITEBACK
+#endif
 
 #ifndef __ASSEMBLY__
 /**
@@ -626,22 +710,6 @@ void mmu_set_region_dcache_behaviour_phys(phys_addr_t virt, phys_addr_t phys,
  */
 void mmu_set_region_dcache_behaviour(phys_addr_t start, size_t size,
 				     enum dcache_option option);
-
-#ifdef CONFIG_SYS_NONCACHED_MEMORY
-/**
- * noncached_init() - Initialize non-cached memory region
- *
- * Initialize non-cached memory area. This memory region will be typically
- * located right below the malloc() area and mapped uncached in the MMU.
- *
- * It is called during the generic post-relocation init sequence.
- *
- * Return: 0 if OK
- */
-int noncached_init(void);
-
-phys_addr_t noncached_alloc(size_t size, size_t align);
-#endif /* CONFIG_SYS_NONCACHED_MEMORY */
 
 #endif /* __ASSEMBLY__ */
 

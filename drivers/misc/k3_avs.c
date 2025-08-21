@@ -2,12 +2,11 @@
 /*
  * Texas Instruments' K3 Clas 0 Adaptive Voltage Scaling driver
  *
- * Copyright (C) 2019 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2019 Texas Instruments Incorporated - https://www.ti.com/
  *      Tero Kristo <t-kristo@ti.com>
  *
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <asm/io.h>
@@ -15,6 +14,7 @@
 #include <k3-avs.h>
 #include <dm/device_compat.h>
 #include <linux/bitops.h>
+#include <linux/delay.h>
 #include <power/regulator.h>
 
 #define AM6_VTM_DEVINFO(i)	(priv->base + 0x100 + 0x20 * (i))
@@ -25,11 +25,28 @@
 #define AM6_VTM_OPP_SHIFT(opp)	(8 * (opp))
 #define AM6_VTM_OPP_MASK	0xff
 
+#define K3_VTM_DEVINFO_PWR0_OFFSET		0x4
+#define K3_VTM_DEVINFO_PWR0_TEMPSENS_CT_MASK	0xf0
+#define K3_VTM_TMPSENS0_CTRL_OFFSET		0x300
+#define K3_VTM_TMPSENS_STAT_OFFSET		0x8
+#define K3_VTM_ANYMAXT_OUTRG_ALERT_EN		0x1
+#define K3_VTM_LOW_TEMP_OFFSET			0x10
+#define K3_VTM_MISC_CTRL2_OFFSET		0x10
+#define K3_VTM_MISC_CTRL1_OFFSET		0xc
+#define K3_VTM_TMPSENS_CTRL1_SOC		BIT(5)
+#define K3_VTM_TMPSENS_CTRL_CLRZ		BIT(6)
+#define K3_VTM_TMPSENS_CTRL_MAXT_OUTRG_EN	BIT(11)
+#define K3_VTM_ADC_COUNT_FOR_123C		0x2f8
+#define K3_VTM_ADC_COUNT_FOR_105C		0x288
+#define K3_VTM_ADC_WA_VALUE			0x2c
+#define K3_VTM_FUSE_MASK			0xc0000000
+
 #define VD_FLAG_INIT_DONE	BIT(0)
 
 struct k3_avs_privdata {
 	void *base;
 	struct vd_config *vd_config;
+	struct udevice *dev;
 };
 
 struct opp {
@@ -104,6 +121,11 @@ static int k3_avs_program_voltage(struct k3_avs_privdata *priv,
 	if (!vd->supply)
 		return -ENODEV;
 
+	if (!volt) {
+		dev_err(priv->dev, "No efuse found for opp_%d\n", opp_id);
+		return -EINVAL;
+	}
+
 	vd->opp = opp_id;
 	vd->flags |= VD_FLAG_INIT_DONE;
 
@@ -176,6 +198,33 @@ static int match_opp(struct vd_data *vd, u32 freq)
 }
 
 /**
+ * k3_check_opp: Check for presence of opp efuse
+ * @dev: AVS device
+ * @vdd_id: voltage domain ID
+ * @opp_id: opp id to check if voltage is present
+ *
+ * Checks to see if an opp has voltage. k3_avs probe will populate
+ * voltage data if efuse is present. Returns 0 if data is valid.
+ */
+int k3_avs_check_opp(struct udevice *dev, int vdd_id, int opp_id)
+{
+	struct k3_avs_privdata *priv = dev_get_priv(dev);
+	struct vd_data *vd;
+	int volt;
+
+	vd = get_vd(priv, vdd_id);
+	if (!vd)
+		return -EINVAL;
+
+	volt = vd->opps[opp_id].volt;
+	if (volt)
+		return 0;
+
+	printf("No efuse found for opp_%d\n", opp_id);
+	return -EINVAL;
+}
+
+/**
  * k3_avs_notify_freq: Notify clock rate change towards AVS subsystem
  * @dev_id: Device ID for the clock to be changed
  * @clk_id: Clock ID for the clock to be changed
@@ -237,6 +286,88 @@ static int k3_avs_configure(struct udevice *dev, struct k3_avs_privdata *priv)
 	return 0;
 }
 
+/* k3_avs_program_tshut : Program thermal shutdown value for SOC
+ * set the values corresponding to thresholds to ~123C and 105C
+ * This is optional feature, Few times OS driver takes care of
+ * tshut programing.
+ */
+
+static void k3_avs_program_tshut(struct k3_avs_privdata *priv)
+{
+	int cnt, id, val;
+	int workaround_needed = 0;
+	u32 ctrl_offset;
+	void __iomem *cfg2_base;
+	void __iomem *fuse_base;
+
+	cfg2_base = (void __iomem *)devfdt_get_addr_index(priv->dev, 1);
+	if (IS_ERR(cfg2_base)) {
+		dev_err(priv->dev, "cfg base is not defined\n");
+		return;
+	}
+
+	/*
+	 * Some of TI's J721E SoCs require a software trimming procedure
+	 * for the temperature monitors to function properly. To determine
+	 * if this particular SoC is NOT affected, both bits in the
+	 * WKUP_SPARE_FUSE0[31:30] will be set (0xC0000000) indicating
+	 * when software trimming should NOT be applied.
+	 *
+	 * https://www.ti.com/lit/er/sprz455c/sprz455c.pdf
+	 * This routine checks if workaround_needed to be applied or not
+	 * based upon workaround_needed, adjust fixed value of tshut high and low
+	 */
+
+	if (device_is_compatible(priv->dev, "ti,j721e-vtm")) {
+		fuse_base = (void __iomem *)devfdt_get_addr_index(priv->dev, 2);
+		if (IS_ERR(fuse_base)) {
+			dev_err(priv->dev, "fuse-base is not defined for J721E Soc\n");
+			return;
+		}
+
+		if (!((readl(fuse_base) & K3_VTM_FUSE_MASK) == K3_VTM_FUSE_MASK))
+			workaround_needed = 1;
+	}
+
+	dev_dbg(priv->dev, "Work around %sneeded\n", workaround_needed ? "" : "not ");
+
+	/* Get the sensor count in the VTM */
+	val = readl(priv->base + K3_VTM_DEVINFO_PWR0_OFFSET);
+	cnt = val & K3_VTM_DEVINFO_PWR0_TEMPSENS_CT_MASK;
+	cnt >>= __ffs(K3_VTM_DEVINFO_PWR0_TEMPSENS_CT_MASK);
+
+	/* Program the thermal sensors */
+	for (id = 0; id < cnt; id++) {
+		ctrl_offset = K3_VTM_TMPSENS0_CTRL_OFFSET + id * 0x20;
+
+		val = readl(cfg2_base + ctrl_offset);
+		val |= (K3_VTM_TMPSENS_CTRL_MAXT_OUTRG_EN |
+			K3_VTM_TMPSENS_CTRL1_SOC |
+			K3_VTM_TMPSENS_CTRL_CLRZ | BIT(4));
+		writel(val, cfg2_base + ctrl_offset);
+	}
+
+	/*
+	 * Program TSHUT thresholds
+	 * Step 1: set the thresholds to ~123C and 105C WKUP_VTM_MISC_CTRL2
+	 * Step 2: WKUP_VTM_TMPSENS_CTRL_j set the MAXT_OUTRG_EN  bit
+	 *         This is already taken care as per of init
+	 * Step 3: WKUP_VTM_MISC_CTRL set the ANYMAXT_OUTRG_ALERT_EN  bit
+	 */
+
+	/* Low thresholds for tshut*/
+	val = (K3_VTM_ADC_COUNT_FOR_105C - workaround_needed * K3_VTM_ADC_WA_VALUE)
+		<< K3_VTM_LOW_TEMP_OFFSET;
+	/* high thresholds */
+	val |= K3_VTM_ADC_COUNT_FOR_123C - workaround_needed * K3_VTM_ADC_WA_VALUE;
+
+	writel(val, cfg2_base + K3_VTM_MISC_CTRL2_OFFSET);
+	/* ramp-up delay from Linux code */
+	mdelay(100);
+	val = readl(cfg2_base + K3_VTM_MISC_CTRL1_OFFSET) | K3_VTM_ANYMAXT_OUTRG_ALERT_EN;
+	writel(val, cfg2_base + K3_VTM_MISC_CTRL1_OFFSET);
+}
+
 /**
  * k3_avs_probe: parses VD info from VTM, and re-configures the OPP data
  *
@@ -253,8 +384,12 @@ static int k3_avs_probe(struct udevice *dev)
 	struct k3_avs_privdata *priv;
 	struct vd_data *vd;
 	int ret;
+	ofnode node;
+	struct ofnode_phandle_args phandle_args;
+	int i = 0;
 
 	priv = dev_get_priv(dev);
+	priv->dev = dev;
 
 	k3_avs_priv = priv;
 
@@ -267,6 +402,32 @@ static int k3_avs_probe(struct udevice *dev)
 		return -ENODEV;
 
 	for (vd = priv->vd_config->vds; vd->id >= 0; vd++) {
+		/* Get the clock and dev id for Jacinto platforms */
+		if (vd->id == J721E_VDD_MPU) {
+			node = ofnode_by_compatible(ofnode_null(), "ti,am654-rproc");
+			if (!ofnode_valid(node))
+				return -ENODEV;
+
+			i = ofnode_stringlist_search(node, "clock-names", "core");
+			if (i < 0)
+				return -ENODEV;
+
+			ret = ofnode_parse_phandle_with_args(node, "clocks",
+							     "#clock-cells",
+							     0, i,
+							     &phandle_args);
+			if (ret) {
+				printf("Couldn't get the clock node, ret = %d\n", ret);
+				return ret;
+			}
+
+			vd->dev_id = phandle_args.args[0];
+			vd->clk_id = phandle_args.args[1];
+
+			debug("%s: MPU dev_id: %d, clk_id: %d", __func__,
+			      vd->dev_id, vd->clk_id);
+		}
+
 		if (!(readl(AM6_VTM_DEVINFO(vd->id)) &
 		      AM6_VTM_AVS0_SUPPORTED)) {
 			dev_warn(dev, "AVS-class 0 not supported for VD%d\n",
@@ -291,8 +452,14 @@ static int k3_avs_probe(struct udevice *dev)
 		if (vd->flags & VD_FLAG_INIT_DONE)
 			continue;
 
-		k3_avs_program_voltage(priv, vd, vd->opp);
+		ret = k3_avs_program_voltage(priv, vd, vd->opp);
+		if (ret)
+			dev_warn(dev, "Could not program AVS voltage for VD%d, vd->opp=%d, ret=%d\n",
+				 vd->id, vd->opp, ret);
 	}
+
+	if (!device_is_compatible(priv->dev, "ti,am654-avs"))
+		k3_avs_program_tshut(priv);
 
 	return 0;
 }
@@ -357,9 +524,19 @@ static struct vd_data j721e_vd_data[] = {
 	{
 		.id = J721E_VDD_MPU,
 		.opp = AM6_OPP_NOM,
+		/*
+		 * XXX: DEPRECATION WARNING: Around 2 u-boot versions
+		 *
+		 * These values will be picked up from DT, kept for backward
+		 * compatibility
+		 */
 		.dev_id = 202, /* J721E_DEV_A72SS0_CORE0 */
 		.clk_id = 2, /* ARM clock */
 		.opps = {
+			[AM6_OPP_LOW] = {
+				.volt = 0, /* voltage TBD after OPP fuse reading */
+				.freq = 1000000000,
+			},
 			[AM6_OPP_NOM] = {
 				.volt = 880000, /* TBD in DM */
 				.freq = 2000000000,
@@ -382,6 +559,8 @@ static struct vd_config am654_vd_config = {
 static const struct udevice_id k3_avs_ids[] = {
 	{ .compatible = "ti,am654-avs", .data = (ulong)&am654_vd_config },
 	{ .compatible = "ti,j721e-avs", .data = (ulong)&j721e_vd_config },
+	{ .compatible = "ti,j721e-vtm", .data = (ulong)&j721e_vd_config },
+	{ .compatible = "ti,j7200-vtm", .data = (ulong)&j721e_vd_config },
 	{}
 };
 

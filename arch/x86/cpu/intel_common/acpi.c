@@ -8,7 +8,6 @@
  * Modified from coreboot src/soc/intel/common/block/acpi.c
  */
 
-#include <common.h>
 #include <bloblist.h>
 #include <cpu.h>
 #include <dm.h>
@@ -20,6 +19,7 @@
 #include <asm/global_data.h>
 #include <asm/intel_acpi.h>
 #include <asm/ioapic.h>
+#include <asm/lapic.h>
 #include <asm/mpspec.h>
 #include <asm/smm.h>
 #include <asm/turbo.h>
@@ -31,14 +31,17 @@
 #include <linux/err.h>
 #include <power/acpi_pmc.h>
 
-u32 acpi_fill_mcfg(u32 current)
+int acpi_fill_mcfg(struct acpi_ctx *ctx)
 {
+	size_t size;
+
 	/* PCI Segment Group 0, Start Bus Number 0, End Bus Number is 255 */
-	current += acpi_create_mcfg_mmconfig((void *)current,
-					     CONFIG_MMCONF_BASE_ADDRESS, 0, 0,
-					     (CONFIG_SA_PCIEX_LENGTH >> 20)
-					     - 1);
-	return current;
+	size = acpi_create_mcfg_mmconfig((void *)ctx->current,
+					 CONFIG_MMCONF_BASE_ADDRESS, 0, 0,
+					 (CONFIG_SA_PCIEX_LENGTH >> 20) - 1);
+	acpi_inc(ctx, size);
+
+	return 0;
 }
 
 static int acpi_sci_irq(void)
@@ -78,33 +81,40 @@ static int acpi_sci_irq(void)
 	return sci_irq;
 }
 
-static unsigned long acpi_madt_irq_overrides(unsigned long current)
+static void *acpi_madt_irq_overrides(void *current)
 {
 	int sci = acpi_sci_irq();
 	u16 flags = MP_IRQ_TRIGGER_LEVEL;
 
-	if (sci < 0)
-		return log_msg_ret("sci irq", sci);
+	if (sci < 0) {
+		log_err("sci irq %d", sci);
+		return current;
+	}
 
 	/* INT_SRC_OVR */
-	current += acpi_create_madt_irqoverride((void *)current, 0, 0, 2, 0);
+	current += acpi_create_madt_irqoverride(current, 0, 0, 2, 0);
 
 	flags |= arch_madt_sci_irq_polarity(sci);
 
 	/* SCI */
 	current +=
-	    acpi_create_madt_irqoverride((void *)current, 0, sci, sci, flags);
+	    acpi_create_madt_irqoverride(current, 0, sci, sci, flags);
 
 	return current;
 }
 
-u32 acpi_fill_madt(u32 current)
+void *acpi_fill_madt(struct acpi_madt *madt, struct acpi_ctx *ctx)
 {
+	void *current = ctx->current;
+
+	madt->lapic_addr = LAPIC_DEFAULT_BASE;
+	madt->flags = ACPI_MADT_PCAT_COMPAT;
+
 	/* Local APICs */
 	current += acpi_create_madt_lapics(current);
 
 	/* IOAPIC */
-	current += acpi_create_madt_ioapic((void *)current, 2, IO_APIC_ADDR, 0);
+	current += acpi_create_madt_ioapic(current, 2, IO_APIC_ADDR, 0);
 
 	return acpi_madt_irq_overrides(current);
 }

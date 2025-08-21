@@ -5,7 +5,6 @@
 
 #define LOG_CATEGORY LOGC_BOARD
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <asm/io.h>
@@ -185,35 +184,17 @@ static int stmpic_buck1_set(struct udevice *dev, u32 voltage_mv)
 }
 
 /* early init of PMIC */
-void stpmic1_init(u32 voltage_mv)
+struct udevice *stpmic1_init(u32 voltage_mv)
 {
 	struct udevice *dev;
 
 	if (uclass_get_device_by_driver(UCLASS_PMIC,
 					DM_DRIVER_GET(pmic_stpmic1), &dev))
-		return;
+		return NULL;
 
 	/* update VDDCORE = BUCK1 */
 	if (voltage_mv)
 		stmpic_buck1_set(dev, voltage_mv);
 
-	/* Keep vdd on during the reset cycle */
-	pmic_clrsetbits(dev,
-			STPMIC1_BUCKS_MRST_CR,
-			STPMIC1_MRST_BUCK(STPMIC1_BUCK3),
-			STPMIC1_MRST_BUCK(STPMIC1_BUCK3));
-
-	/* Check if debug is enabled to program PMIC according to the bit */
-	if (readl(TAMP_BOOT_CONTEXT) & TAMP_BOOT_DEBUG_ON) {
-		log_info("Keep debug unit ON\n");
-
-		pmic_clrsetbits(dev, STPMIC1_BUCKS_MRST_CR,
-				STPMIC1_MRST_BUCK_DEBUG,
-				STPMIC1_MRST_BUCK_DEBUG);
-
-		if (STPMIC1_MRST_LDO_DEBUG)
-			pmic_clrsetbits(dev, STPMIC1_LDOS_MRST_CR,
-					STPMIC1_MRST_LDO_DEBUG,
-					STPMIC1_MRST_LDO_DEBUG);
-	}
+	return dev;
 }

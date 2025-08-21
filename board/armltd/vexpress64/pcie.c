@@ -5,7 +5,6 @@
  * Author: Liviu Dudau <Liviu.Dudau@arm.com>
  */
 
-#include <common.h>
 #include <init.h>
 #include <log.h>
 #include <asm/io.h>
@@ -55,10 +54,6 @@
 #define XR3PCI_ATR_TRSLID_PCIE_CONF	(0x000001)
 #define XR3PCI_ATR_TRSLID_PCIE_IO	(0x020000)
 #define XR3PCI_ATR_TRSLID_PCIE_MEMORY	(0x000000)
-
-#define XR3PCI_ECAM_OFFSET(b, d, o)	(((b) << 20) | \
-					(PCI_SLOT(d) << 15) | \
-					(PCI_FUNC(d) << 12) | o)
 
 #define JUNO_RESET_CTRL			0x1004
 #define JUNO_RESET_CTRL_PHY		BIT(0)
@@ -114,7 +109,6 @@ static void xr3pci_setup_atr(void)
 			     XR3_PCI_MEMSPACE64_SIZE,
 			     XR3PCI_ATR_TRSLID_AXIMEMORY);
 
-
 	/* setup CPU to PCIe address translation table */
 	base = XR3_CONFIG_BASE + XR3PCI_ATR_AXI4_SLV0;
 
@@ -154,7 +148,7 @@ static void xr3pci_init(void)
 	/* allow ECRC */
 	writel(0x6006, XR3_CONFIG_BASE + XR3PCI_PEX_SPC2);
 	/* setup the correct class code for the host bridge */
-	writel(PCI_CLASS_BRIDGE_PCI << 16, XR3_CONFIG_BASE + XR3PCI_BRIDGE_PCI_IDS);
+	writel(PCI_CLASS_BRIDGE_PCI_NORMAL << 8, XR3_CONFIG_BASE + XR3PCI_BRIDGE_PCI_IDS);
 
 	/* reset phy and root complex */
 	writel(JUNO_RESET_CTRL_PHY | JUNO_RESET_CTRL_RC,

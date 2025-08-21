@@ -5,7 +5,6 @@
  * Copyright 2010-2011 Freescale Semiconductor, Inc.
  * author Andy Fleming
  */
-#include <common.h>
 #include <phy.h>
 
 #define MIIM_DM9161_SCR                0x10
@@ -21,7 +20,6 @@
 /* DM9161 10BT Configuration/Status */
 #define MIIM_DM9161_10BTCSR    0x12
 #define MIIM_DM9161_10BTCSR_INIT       0x7800
-
 
 /* Davicom DM9161E */
 static int dm9161_config(struct phy_device *phydev)
@@ -69,7 +67,7 @@ static int dm9161_startup(struct phy_device *phydev)
 	return dm9161_parse_status(phydev);
 }
 
-static struct phy_driver DM9161_driver = {
+U_BOOT_PHY_DRIVER(dm9161) = {
 	.name = "Davicom DM9161E",
 	.uid = 0x181b880,
 	.mask = 0xffffff0,
@@ -78,10 +76,3 @@ static struct phy_driver DM9161_driver = {
 	.startup = &dm9161_startup,
 	.shutdown = &genphy_shutdown,
 };
-
-int phy_davicom_init(void)
-{
-	phy_register(&DM9161_driver);
-
-	return 0;
-}

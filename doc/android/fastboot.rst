@@ -28,6 +28,9 @@ The following OEM commands are supported (if enabled):
 - ``oem partconf`` - this executes ``mmc partconf %x <arg> 0`` to configure eMMC
   with <arg> = boot_ack boot_partition
 - ``oem bootbus``  - this executes ``mmc bootbus %x %s`` to configure eMMC
+- ``oem run`` - this executes an arbitrary U-Boot command
+- ``oem console`` - this dumps U-Boot console record buffer
+- ``oem board`` - this executes a custom board function which is defined by the vendor
 
 Support for both eMMC and NAND devices is included.
 
@@ -226,6 +229,40 @@ and on the U-Boot side you should see::
    OK
 
    Starting kernel ...
+
+Running Shell Commands
+^^^^^^^^^^^^^^^^^^^^^^
+
+Normally, arbitrary U-Boot command execution is not enabled. This is so
+fastboot can be used to update systems using verified boot. However, such
+functionality can be useful for production or when verified boot is not in use.
+Enable ``CONFIG_FASTBOOT_OEM_RUN`` to use this functionality. This will enable
+``oem run`` command, which can be used with the fastboot client. For example,
+to print "Hello at 115200 baud" (or whatever ``CONFIG_BAUDRATE`` is), run::
+
+    $ fastboot oem run:'echo Hello at $baudrate baud'
+
+You can run any command you would normally run on the U-Boot command line,
+including multiple commands (using e.g. ``;`` or ``&&``) and control structures
+(``if``, ``while``, etc.). The exit code of ``fastboot`` will reflect the exit
+code of the command you ran.
+
+Running Custom Vendor Code
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+U-Boot allows you to execute custom fastboot logic, which can be defined
+in board/ files. It can still be used for production devices with verified
+boot, because the vendor defines logic at compile time by implementing
+fastboot_oem_board() function. The attacker will not be able to execute
+custom commands / code. For example, this can be useful for custom flashing
+or erasing protocols::
+
+    $ fastboot stage bootloader.img
+    $ fastboot oem board:write_bootloader
+
+In this case, ``cmd_parameter`` argument of the function ``fastboot_oem_board()``
+will contain string "write_bootloader" and ``data`` argument is a pointer to
+fastboot input buffer, which contains the contents of bootloader.img file.
 
 References
 ----------

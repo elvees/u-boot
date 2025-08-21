@@ -3,11 +3,12 @@
  * Copyright (C) 2020, STMicroelectronics - All Rights Reserved
  */
 
-#include <common.h>
+#include <bootm.h>
 #include <command.h>
 #include <dfu.h>
 #include <image.h>
 #include <asm/arch/stm32prog.h>
+#include <linux/printk.h>
 #include "stm32prog.h"
 
 struct stm32prog_data *stm32prog_data;
@@ -45,7 +46,6 @@ static int do_stm32prog(struct cmd_tbl *cmdtp, int flag, int argc,
 	bool reset = false;
 	struct image_header_s header;
 	struct stm32prog_data *data;
-	u32 uimage, dtb;
 
 	if (argc < 3 ||  argc > 5)
 		return CMD_RET_USAGE;
@@ -60,31 +60,27 @@ static int do_stm32prog(struct cmd_tbl *cmdtp, int flag, int argc,
 		return CMD_RET_USAGE;
 	}
 
-	dev = (int)simple_strtoul(argv[2], NULL, 10);
+	dev = (int)dectoul(argv[2], NULL);
 
-	addr = STM32_DDR_BASE;
+	addr = CONFIG_SYS_LOAD_ADDR;
 	size = 0;
 	if (argc > 3) {
-		addr = simple_strtoul(argv[3], NULL, 16);
+		addr = hextoul(argv[3], NULL);
 		if (!addr)
 			return CMD_RET_FAILURE;
 	}
 	if (argc > 4)
-		size = simple_strtoul(argv[4], NULL, 16);
+		size = hextoul(argv[4], NULL);
 
 	/* check STM32IMAGE presence */
-	if (size == 0 &&
-	    !stm32prog_header_check((struct raw_header_s *)addr, &header)) {
-		size = header.image_length + BL_HEADER_SIZE;
-
-		/* uImage detected in STM32IMAGE, execute the script */
-		if (IMAGE_FORMAT_LEGACY ==
-		    genimg_get_format((void *)(addr + BL_HEADER_SIZE)))
-			return image_source_script(addr + BL_HEADER_SIZE,
-						   "script@1");
+	if (size == 0) {
+		stm32prog_header_check(addr, &header);
+		if (header.type == HEADER_STM32IMAGE) {
+			size = header.image_length + header.length;
+		}
 	}
 
-	if (IS_ENABLED(CONFIG_DM_VIDEO))
+	if (IS_ENABLED(CONFIG_VIDEO))
 		enable_vidconsole();
 
 	data = (struct stm32prog_data *)malloc(sizeof(*data));
@@ -97,7 +93,7 @@ static int do_stm32prog(struct cmd_tbl *cmdtp, int flag, int argc,
 
 	ret = stm32prog_init(data, addr, size);
 	if (ret)
-		printf("Invalid or missing layout file.");
+		log_debug("Invalid or missing layout file at 0x%lx.\n", addr);
 
 	/* prepare DFU for device read/write */
 	ret = stm32prog_dfu_init(data);
@@ -118,37 +114,54 @@ static int do_stm32prog(struct cmd_tbl *cmdtp, int flag, int argc,
 		goto cleanup;
 	}
 
-	uimage = data->uimage;
-	dtb = data->dtb;
-
 	stm32prog_clean(data);
 	free(stm32prog_data);
 	stm32prog_data = NULL;
 
 	puts("Download done\n");
 
-	if (uimage) {
+	if (data->uimage) {
 		char boot_addr_start[20];
 		char dtb_addr[20];
-		char *bootm_argv[5] = {
-			"bootm", boot_addr_start, "-", dtb_addr, NULL
-		};
+		char initrd_addr[40];
+		char *fdt_arg, *initrd_arg;
+		const void *uimage = (void *)data->uimage;
+		const void *dtb = (void *)data->dtb;
+		const void *initrd = (void *)data->initrd;
+		struct bootm_info bmi;
+
+		fdt_arg = dtb_addr;
 		if (!dtb)
-			bootm_argv[3] = env_get("fdtcontroladdr");
+			fdt_arg = env_get("fdtcontroladdr");
 		else
-			snprintf(dtb_addr, sizeof(dtb_addr) - 1,
-				 "0x%x", dtb);
+			snprintf(dtb_addr, sizeof(dtb_addr) - 1, "0x%p", dtb);
 
 		snprintf(boot_addr_start, sizeof(boot_addr_start) - 1,
-			 "0x%x", uimage);
-		printf("Booting kernel at %s - %s...\n\n\n",
-		       boot_addr_start, bootm_argv[3]);
+			 "0x%p", uimage);
+
+		initrd_arg = NULL;
+		if (initrd) {
+			snprintf(initrd_addr, sizeof(initrd_addr) - 1,
+				 "0x%p:0x%zx", initrd, data->initrd_size);
+			initrd_arg = initrd_addr;
+		}
+
+		printf("Booting kernel at %s %s %s...\n\n\n", boot_addr_start,
+		       initrd_arg ?: "-", fdt_arg);
+
+		bootm_init(&bmi);
+		bmi.addr_img = boot_addr_start;
+		bmi.conf_ramdisk = initrd_arg;
+		bmi.conf_fdt = fdt_arg;
+
 		/* Try bootm for legacy and FIT format image */
-		if (genimg_get_format((void *)uimage) != IMAGE_FORMAT_INVALID)
-			do_bootm(cmdtp, 0, 4, bootm_argv);
-		else if (CONFIG_IS_ENABLED(CMD_BOOTZ))
-			do_bootz(cmdtp, 0, 4, bootm_argv);
+		if (genimg_get_format(uimage) != IMAGE_FORMAT_INVALID)
+			bootm_run(&bmi);
+		else if (IS_ENABLED(CONFIG_CMD_BOOTZ))
+			bootz_run(&bmi);
 	}
+	if (data->script)
+		cmd_source_script(data->script, NULL, NULL);
 
 	if (reset) {
 		puts("Reset...\n");
@@ -166,21 +179,13 @@ cleanup:
 }
 
 U_BOOT_CMD(stm32prog, 5, 0, do_stm32prog,
+	   "start communication with tools STM32Cubeprogrammer",
 	   "<link> <dev> [<addr>] [<size>]\n"
-	   "start communication with tools STM32Cubeprogrammer on <link> with Flashlayout at <addr>",
-	   "<link> = serial|usb\n"
-	   "<dev>  = device instance\n"
-	   "<addr> = address of flashlayout\n"
-	   "<size> = size of flashlayout\n"
+	   "  <link> = serial|usb\n"
+	   "  <dev>  = device instance\n"
+	   "  <addr> = address of flashlayout\n"
+	   "  <size> = size of flashlayout (optional for image with STM32 header)\n"
 );
-
-bool stm32prog_get_tee_partitions(void)
-{
-	if (stm32prog_data)
-		return stm32prog_data->tee_detected;
-
-	return false;
-}
 
 bool stm32prog_get_fsbl_nor(void)
 {

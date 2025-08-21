@@ -5,7 +5,6 @@
  * Copyright 2020, Heinrich Schuchadt <xypron.glpk@gmx.de>
  */
 
-#include <common.h>
 #include <command.h>
 #include <display_options.h>
 #include <asm/global_data.h>
@@ -18,12 +17,11 @@ DECLARE_GLOBAL_DATA_PTR;
 static int test_print_freq(struct unit_test_state *uts,
 			   uint64_t freq, char *expected)
 {
-	console_record_reset_enable();
 	print_freq(freq, ";\n");
-	gd->flags &= ~GD_FLG_RECORD;
 	console_record_readline(uts->actual_str, sizeof(uts->actual_str));
 	ut_asserteq_str(expected, uts->actual_str);
-	ut_assertok(ut_check_console_end(uts));
+	ut_assert_console_end();
+
 	return 0;
 }
 
@@ -40,18 +38,16 @@ static int lib_test_print_freq(struct unit_test_state *uts)
 	ut_assertok(test_print_freq(uts, 54321987654321, "54321.99 GHz;"));
 	return 0;
 }
-
-LIB_TEST(lib_test_print_freq, 0);
+LIB_TEST(lib_test_print_freq, UTF_CONSOLE);
 
 static int test_print_size(struct unit_test_state *uts,
 			   uint64_t freq, char *expected)
 {
-	console_record_reset_enable();
 	print_size(freq, ";\n");
-	gd->flags &= ~GD_FLG_RECORD;
 	console_record_readline(uts->actual_str, sizeof(uts->actual_str));
 	ut_asserteq_str(expected, uts->actual_str);
-	ut_assertok(ut_check_console_end(uts));
+	ut_assert_console_end();
+
 	return 0;
 }
 
@@ -64,9 +60,11 @@ static int lib_test_print_size(struct unit_test_state *uts)
 	ut_assertok(test_print_size(uts, 7654321, "7.3 MiB;"));
 	ut_assertok(test_print_size(uts, 87654321, "83.6 MiB;"));
 	ut_assertok(test_print_size(uts, 987654321, "941.9 MiB;"));
+	ut_assertok(test_print_size(uts, 1073689395, "1023.9 MiB;"));
+	ut_assertok(test_print_size(uts, 1073689396, "1 GiB;"));
+	ut_assertok(test_print_size(uts, 1073741824, "1 GiB;"));
 	ut_assertok(test_print_size(uts, 1987654321, "1.9 GiB;"));
 	ut_assertok(test_print_size(uts, 54321987654321, "49.4 TiB;"));
 	return 0;
 }
-
-LIB_TEST(lib_test_print_size, 0);
+LIB_TEST(lib_test_print_size, UTF_CONSOLE);

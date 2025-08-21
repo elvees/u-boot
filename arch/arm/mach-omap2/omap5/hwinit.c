@@ -11,7 +11,6 @@
  *	Steve Sakoman	<steve@sakoman.com>
  *	Sricharan	<r.sricharan@ti.com>
  */
-#include <common.h>
 #include <cpu_func.h>
 #include <palmas.h>
 #include <asm/armv7.h>
@@ -51,7 +50,7 @@ void do_set_mux32(u32 base, struct pad_conf_entry const *array, int size)
 		writel(pad->val, base + pad->offset);
 }
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 /* LPDDR2 specific IO settings */
 static void io_settings_lpddr2(void)
 {
@@ -417,7 +416,7 @@ void omap_die_id(unsigned int *die_id)
 	die_id[3] = readl((*ctrl)->control_std_fuse_die_id_3);
 }
 
-void reset_cpu(ulong ignored)
+void reset_cpu(void)
 {
 	u32 omap_rev = omap_revision();
 

@@ -3,7 +3,6 @@
  * Copyright (C) 2018 Xilinx, Inc.
  */
 
-#include <common.h>
 #include <command.h>
 #include <log.h>
 #include <asm/global_data.h>
@@ -422,7 +421,7 @@ static int do_zynq_rsa(struct cmd_tbl *cmdtp, int flag, int argc,
 	if (argc != cmdtp->maxargs)
 		return CMD_RET_FAILURE;
 
-	src_ptr = simple_strtoul(argv[2], &endp, 16);
+	src_ptr = hextoul(argv[2], &endp);
 	if (*argv[2] == 0 || *endp != 0)
 		return CMD_RET_USAGE;
 
@@ -453,26 +452,26 @@ static int zynq_decrypt_image(struct cmd_tbl *cmdtp, int flag, int argc,
 		else
 			return CMD_RET_USAGE;
 
-		srcaddr = simple_strtoul(argv[3], &endp, 16);
+		srcaddr = hextoul(argv[3], &endp);
 		if (*argv[3] == 0 || *endp != 0)
 			return CMD_RET_USAGE;
-		srclen = simple_strtoul(argv[4], &endp, 16);
+		srclen = hextoul(argv[4], &endp);
 		if (*argv[4] == 0 || *endp != 0)
 			return CMD_RET_USAGE;
 
 		dstaddr = 0xFFFFFFFF;
 		dstlen = srclen;
 	} else {
-		srcaddr = simple_strtoul(argv[2], &endp, 16);
+		srcaddr = hextoul(argv[2], &endp);
 		if (*argv[2] == 0 || *endp != 0)
 			return CMD_RET_USAGE;
-		srclen = simple_strtoul(argv[3], &endp, 16);
+		srclen = hextoul(argv[3], &endp);
 		if (*argv[3] == 0 || *endp != 0)
 			return CMD_RET_USAGE;
-		dstaddr = simple_strtoul(argv[4], &endp, 16);
+		dstaddr = hextoul(argv[4], &endp);
 		if (*argv[4] == 0 || *endp != 0)
 			return CMD_RET_USAGE;
-		dstlen = simple_strtoul(argv[5], &endp, 16);
+		dstlen = hextoul(argv[5], &endp);
 		if (*argv[5] == 0 || *endp != 0)
 			return CMD_RET_USAGE;
 	}
@@ -527,8 +526,7 @@ static int do_zynq(struct cmd_tbl *cmdtp, int flag, int argc,
 	return cmd_process_error(zynq_cmd, ret);
 }
 
-#ifdef CONFIG_SYS_LONGHELP
-static char zynq_help_text[] =
+U_BOOT_LONGHELP(zynq,
 	""
 #ifdef CONFIG_CMD_ZYNQ_RSA
 	"rsa <baseaddr>  - Verifies the authenticated and encrypted\n"
@@ -545,8 +543,7 @@ static char zynq_help_text[] =
 	"       if operation type is load or loadp, it loads the encrypted\n"
 	"       full or partial bitstream on to PL respectively.\n"
 #endif
-	;
-#endif
+	);
 
 U_BOOT_CMD(zynq,	6,	0,	do_zynq,
 	   "Zynq specific commands", zynq_help_text

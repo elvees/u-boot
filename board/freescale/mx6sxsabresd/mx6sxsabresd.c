@@ -21,7 +21,6 @@
 #include <env.h>
 #include <linux/delay.h>
 #include <linux/sizes.h>
-#include <common.h>
 #include <fsl_esdhc_imx.h>
 #include <mmc.h>
 #include <i2c.h>
@@ -320,7 +319,10 @@ int board_late_init(void)
 
 int checkboard(void)
 {
+#ifdef CONFIG_NXP_BOARD_REVISION
 	printf("Board: MX6SX SABRE SDB rev%c\n", nxp_board_rev_string());
-
+#else
+       puts("Board: MX6SX SABRE SDB");
+#endif
 	return 0;
 }

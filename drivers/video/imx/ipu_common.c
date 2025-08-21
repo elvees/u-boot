@@ -11,7 +11,7 @@
  */
 
 /* #define DEBUG */
-#include <common.h>
+#include <config.h>
 #include <log.h>
 #include <linux/delay.h>
 #include <linux/types.h>
@@ -204,7 +204,6 @@ static void clk_ipu_disable(struct clk *clk)
 #endif
 }
 
-
 static struct clk ipu_clk = {
 	.name = "ipu_clk",
 #if defined(CONFIG_MX51) || defined(CONFIG_MX53)
@@ -221,13 +220,13 @@ static struct clk ipu_clk = {
 	.usecount = 0,
 };
 
-#if !defined CONFIG_SYS_LDB_CLOCK
-#define CONFIG_SYS_LDB_CLOCK 65000000
+#if !defined CFG_SYS_LDB_CLOCK
+#define CFG_SYS_LDB_CLOCK 65000000
 #endif
 
 static struct clk ldb_clk = {
 	.name = "ldb_clk",
-	.rate = CONFIG_SYS_LDB_CLOCK,
+	.rate = CFG_SYS_LDB_CLOCK,
 	.usecount = 0,
 };
 
@@ -271,7 +270,6 @@ static inline int ipu_is_dmfc_chan(uint32_t dma_chan)
 {
 	return ((dma_chan >= 23) && (dma_chan <= 29));
 }
-
 
 static inline void ipu_ch_param_set_buffer(uint32_t ch, int bufNum,
 					    dma_addr_t phyaddr)
@@ -457,7 +455,7 @@ static void ipu_reset(void)
  * @param	dev	The device structure for the IPU passed in by the
  *			driver framework.
  *
- * @return      Returns 0 on success or negative error code on error
+ * Return:      Returns 0 on success or negative error code on error
  */
 int ipu_probe(void)
 {
@@ -574,7 +572,7 @@ void ipu_dump_registers(void)
  * @param       params  Input parameter containing union of channel
  *                      initialization parameters.
  *
- * @return      Returns 0 on success or negative error code on fail
+ * Return:      Returns 0 on success or negative error code on fail
  */
 int32_t ipu_init_channel(ipu_channel_t channel, ipu_channel_params_t *params)
 {
@@ -587,7 +585,6 @@ int32_t ipu_init_channel(ipu_channel_t channel, ipu_channel_params_t *params)
 		g_ipu_clk_enabled = 1;
 		clk_enable(g_ipu_clk);
 	}
-
 
 	if (g_channel_init_mask & (1L << IPU_CHAN_ID(channel))) {
 		printf("Warning: channel already initialized %d\n",
@@ -954,7 +951,6 @@ static void ipu_ch_param_init(int ch,
 		break;
 	}
 
-
 	if (uv_stride)
 		ipu_ch_param_set_field(&params, 1, 128, 14, uv_stride - 1);
 
@@ -1006,7 +1002,7 @@ static void ipu_ch_param_init(int ch,
  * @param       v		private v offset for additional cropping,
  *				zero if not used.
  *
- * @return      Returns 0 on success or negative error code on fail
+ * Return:      Returns 0 on success or negative error code on fail
  */
 int32_t ipu_init_channel_buffer(ipu_channel_t channel, ipu_buffer_t type,
 				uint32_t pixel_fmt,
@@ -1061,7 +1057,7 @@ int32_t ipu_init_channel_buffer(ipu_channel_t channel, ipu_buffer_t type,
  *
  * @param       channel         Input parameter for the logical channel ID.
  *
- * @return      This function returns 0 on success or negative error code on
+ * Return:      This function returns 0 on success or negative error code on
  *              fail.
  */
 int32_t ipu_enable_channel(ipu_channel_t channel)
@@ -1139,7 +1135,7 @@ void ipu_clear_buffer_ready(ipu_channel_t channel, ipu_buffer_t type,
  * @param       wait_for_stop   Flag to set whether to wait for channel end
  *                              of frame or return immediately.
  *
- * @return      This function returns 0 on success or negative error code on
+ * Return:      This function returns 0 on success or negative error code on
  *              fail.
  */
 int32_t ipu_disable_channel(ipu_channel_t channel)

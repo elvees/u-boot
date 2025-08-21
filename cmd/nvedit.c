@@ -23,71 +23,33 @@
  * environment. After that, we use a hash table.
  */
 
-#include <common.h>
+#include <config.h>
 #include <cli.h>
 #include <command.h>
 #include <console.h>
 #include <env.h>
 #include <env_internal.h>
 #include <log.h>
-#include <net.h>
 #include <search.h>
 #include <errno.h>
 #include <malloc.h>
 #include <mapmem.h>
 #include <asm/global_data.h>
 #include <linux/bitops.h>
+#include <linux/printk.h>
 #include <u-boot/crc.h>
-#include <watchdog.h>
 #include <linux/stddef.h>
 #include <asm/byteorder.h>
 #include <asm/io.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#if	defined(CONFIG_ENV_IS_IN_EEPROM)	|| \
-	defined(CONFIG_ENV_IS_IN_FLASH)		|| \
-	defined(CONFIG_ENV_IS_IN_MMC)		|| \
-	defined(CONFIG_ENV_IS_IN_FAT)		|| \
-	defined(CONFIG_ENV_IS_IN_EXT4)		|| \
-	defined(CONFIG_ENV_IS_IN_NAND)		|| \
-	defined(CONFIG_ENV_IS_IN_NVRAM)		|| \
-	defined(CONFIG_ENV_IS_IN_ONENAND)	|| \
-	defined(CONFIG_ENV_IS_IN_SATA)		|| \
-	defined(CONFIG_ENV_IS_IN_SPI_FLASH)	|| \
-	defined(CONFIG_ENV_IS_IN_REMOTE)	|| \
-	defined(CONFIG_ENV_IS_IN_UBI)
-
-#define ENV_IS_IN_DEVICE
-
-#endif
-
-#if	!defined(ENV_IS_IN_DEVICE)		&& \
-	!defined(CONFIG_ENV_IS_NOWHERE)
-# error Define one of CONFIG_ENV_IS_IN_{EEPROM|FLASH|MMC|FAT|EXT4|\
-NAND|NVRAM|ONENAND|SATA|SPI_FLASH|REMOTE|UBI} or CONFIG_ENV_IS_NOWHERE
-#endif
-
 /*
  * Maximum expected input data size for import command
  */
 #define	MAX_ENV_SIZE	(1 << 20)	/* 1 MiB */
 
-/*
- * This variable is incremented on each do_env_set(), so it can
- * be used via env_get_id() as an indication, if the environment
- * has changed or not. So it is possible to reread an environment
- * variable only if the environment was changed ... done so for
- * example in NetInitLoop()
- */
-static int env_id = 1;
-
-int env_get_id(void)
-{
-	return env_id;
-}
-
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 /*
  * Command interface: print one or all environment variables
  *
@@ -220,184 +182,23 @@ DONE:
 	return 0;
 }
 #endif
-#endif /* CONFIG_SPL_BUILD */
+#endif /* CONFIG_XPL_BUILD */
 
-/*
- * Set a new environment variable,
- * or replace or delete an existing one.
- */
-static int _do_env_set(int flag, int argc, char *const argv[], int env_flag)
-{
-	int   i, len;
-	char  *name, *value, *s;
-	struct env_entry e, *ep;
-
-	debug("Initial value for argc=%d\n", argc);
-
-#if CONFIG_IS_ENABLED(CMD_NVEDIT_EFI)
-	if (argc > 1 && argv[1][0] == '-' && argv[1][1] == 'e')
-		return do_env_set_efi(NULL, flag, --argc, ++argv);
-#endif
-
-	while (argc > 1 && **(argv + 1) == '-') {
-		char *arg = *++argv;
-
-		--argc;
-		while (*++arg) {
-			switch (*arg) {
-			case 'f':		/* force */
-				env_flag |= H_FORCE;
-				break;
-			default:
-				return CMD_RET_USAGE;
-			}
-		}
-	}
-	debug("Final value for argc=%d\n", argc);
-	name = argv[1];
-
-	if (strchr(name, '=')) {
-		printf("## Error: illegal character '='"
-		       "in variable name \"%s\"\n", name);
-		return 1;
-	}
-
-	env_id++;
-
-	/* Delete only ? */
-	if (argc < 3 || argv[2] == NULL) {
-		int rc = hdelete_r(name, &env_htab, env_flag);
-
-		/* If the variable didn't exist, don't report an error */
-		return rc && rc != -ENOENT ? 1 : 0;
-	}
-
-	/*
-	 * Insert / replace new value
-	 */
-	for (i = 2, len = 0; i < argc; ++i)
-		len += strlen(argv[i]) + 1;
-
-	value = malloc(len);
-	if (value == NULL) {
-		printf("## Can't malloc %d bytes\n", len);
-		return 1;
-	}
-	for (i = 2, s = value; i < argc; ++i) {
-		char *v = argv[i];
-
-		while ((*s++ = *v++) != '\0')
-			;
-		*(s - 1) = ' ';
-	}
-	if (s != value)
-		*--s = '\0';
-
-	e.key	= name;
-	e.data	= value;
-	hsearch_r(e, ENV_ENTER, &ep, &env_htab, env_flag);
-	free(value);
-	if (!ep) {
-		printf("## Error inserting \"%s\" variable, errno=%d\n",
-			name, errno);
-		return 1;
-	}
-
-	return 0;
-}
-
-int env_set(const char *varname, const char *varvalue)
-{
-	const char * const argv[4] = { "setenv", varname, varvalue, NULL };
-
-	/* before import into hashtable */
-	if (!(gd->flags & GD_FLG_ENV_READY))
-		return 1;
-
-	if (varvalue == NULL || varvalue[0] == '\0')
-		return _do_env_set(0, 2, (char * const *)argv, H_PROGRAMMATIC);
-	else
-		return _do_env_set(0, 3, (char * const *)argv, H_PROGRAMMATIC);
-}
-
-/**
- * Set an environment variable to an integer value
- *
- * @param varname	Environment variable to set
- * @param value		Value to set it to
- * @return 0 if ok, 1 on error
- */
-int env_set_ulong(const char *varname, ulong value)
-{
-	/* TODO: this should be unsigned */
-	char *str = simple_itoa(value);
-
-	return env_set(varname, str);
-}
-
-/**
- * Set an environment variable to an value in hex
- *
- * @param varname	Environment variable to set
- * @param value		Value to set it to
- * @return 0 if ok, 1 on error
- */
-int env_set_hex(const char *varname, ulong value)
-{
-	char str[17];
-
-	sprintf(str, "%lx", value);
-	return env_set(varname, str);
-}
-
-ulong env_get_hex(const char *varname, ulong default_val)
-{
-	const char *s;
-	ulong value;
-	char *endp;
-
-	s = env_get(varname);
-	if (s)
-		value = simple_strtoul(s, &endp, 16);
-	if (!s || endp == s)
-		return default_val;
-
-	return value;
-}
-
-int eth_env_get_enetaddr(const char *name, uint8_t *enetaddr)
-{
-	string_to_enetaddr(env_get(name), enetaddr);
-	return is_valid_ethaddr(enetaddr);
-}
-
-int eth_env_set_enetaddr(const char *name, const uint8_t *enetaddr)
-{
-	char buf[ARP_HLEN_ASCII + 1];
-
-	if (eth_env_get_enetaddr(name, (uint8_t *)buf))
-		return -EEXIST;
-
-	sprintf(buf, "%pM", enetaddr);
-
-	return env_set(name, buf);
-}
-
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 static int do_env_set(struct cmd_tbl *cmdtp, int flag, int argc,
 		      char *const argv[])
 {
 	if (argc < 2)
 		return CMD_RET_USAGE;
 
-	return _do_env_set(flag, argc, argv, H_INTERACTIVE);
+	return env_do_env_set(flag, argc, argv, H_INTERACTIVE);
 }
 
 /*
  * Prompt for environment variable
  */
 #if defined(CONFIG_CMD_ASKENV)
-int do_env_ask(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
+static int do_env_ask(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	char message[CONFIG_SYS_CBSIZE];
 	int i, len, pos, size;
@@ -423,7 +224,7 @@ int do_env_ask(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	 * the size.  Otherwise we echo it as part of the
 	 * message.
 	 */
-	i = simple_strtoul(argv[argc - 1], &endptr, 10);
+	i = dectoul(argv[argc - 1], &endptr);
 	if (*endptr != '\0') {			/* no size */
 		size = CONFIG_SYS_CBSIZE - 1;
 	} else {				/* size given */
@@ -468,7 +269,7 @@ int do_env_ask(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	}
 
 	/* Continue calling setenv code */
-	return _do_env_set(flag, len, local_args, H_INTERACTIVE);
+	return env_do_env_set(flag, len, local_args, H_INTERACTIVE);
 }
 #endif
 
@@ -495,11 +296,7 @@ static int print_active_callback(struct env_entry *entry)
 	for (i = 0, clbkp = ll_entry_start(struct env_clbk_tbl, env_clbk);
 	     i < num_callbacks;
 	     i++, clbkp++) {
-#if defined(CONFIG_NEEDS_MANUAL_RELOC)
-		if (entry->callback == clbkp->callback + gd->reloc_off)
-#else
 		if (entry->callback == clbkp->callback)
-#endif
 			break;
 	}
 
@@ -515,8 +312,8 @@ static int print_active_callback(struct env_entry *entry)
 /*
  * Print the callbacks available and what they are bound to
  */
-int do_env_callback(struct cmd_tbl *cmdtp, int flag, int argc,
-		    char *const argv[])
+static int do_env_callback(struct cmd_tbl *cmdtp, int flag, int argc,
+			   char *const argv[])
 {
 	struct env_clbk_tbl *clbkp;
 	int i;
@@ -584,7 +381,7 @@ static int print_active_flags(struct env_entry *entry)
 /*
  * Print the flags available and what variables have flags
  */
-int do_env_flags(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
+static int do_env_flags(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
 	/* Print the available variable types */
 	printf("Available variable type flags (position %d):\n",
@@ -652,125 +449,17 @@ static int do_env_edit(struct cmd_tbl *cmdtp, int flag, int argc,
 	if (buffer[0] == '\0') {
 		const char * const _argv[3] = { "setenv", argv[1], NULL };
 
-		return _do_env_set(0, 2, (char * const *)_argv, H_INTERACTIVE);
+		return env_do_env_set(0, 2, (char * const *)_argv, H_INTERACTIVE);
 	} else {
 		const char * const _argv[4] = { "setenv", argv[1], buffer,
 			NULL };
 
-		return _do_env_set(0, 3, (char * const *)_argv, H_INTERACTIVE);
+		return env_do_env_set(0, 3, (char * const *)_argv, H_INTERACTIVE);
 	}
 }
 #endif /* CONFIG_CMD_EDITENV */
-#endif /* CONFIG_SPL_BUILD */
 
-/*
- * Look up variable from environment,
- * return address of storage for that variable,
- * or NULL if not found
- */
-char *env_get(const char *name)
-{
-	if (gd->flags & GD_FLG_ENV_READY) { /* after import into hashtable */
-		struct env_entry e, *ep;
-
-		WATCHDOG_RESET();
-
-		e.key	= name;
-		e.data	= NULL;
-		hsearch_r(e, ENV_FIND, &ep, &env_htab, 0);
-
-		return ep ? ep->data : NULL;
-	}
-
-	/* restricted capabilities before import */
-	if (env_get_f(name, (char *)(gd->env_buf), sizeof(gd->env_buf)) > 0)
-		return (char *)(gd->env_buf);
-
-	return NULL;
-}
-
-/*
- * Like env_get, but prints an error if envvar isn't defined in the
- * environment.  It always returns what env_get does, so it can be used in
- * place of env_get without changing error handling otherwise.
- */
-char *from_env(const char *envvar)
-{
-	char *ret;
-
-	ret = env_get(envvar);
-
-	if (!ret)
-		printf("missing environment variable: %s\n", envvar);
-
-	return ret;
-}
-
-/*
- * Look up variable from environment for restricted C runtime env.
- */
-int env_get_f(const char *name, char *buf, unsigned len)
-{
-	int i, nxt, c;
-
-	for (i = 0; env_get_char(i) != '\0'; i = nxt + 1) {
-		int val, n;
-
-		for (nxt = i; (c = env_get_char(nxt)) != '\0'; ++nxt) {
-			if (c < 0)
-				return c;
-			if (nxt >= CONFIG_ENV_SIZE)
-				return -1;
-		}
-
-		val = env_match((uchar *)name, i);
-		if (val < 0)
-			continue;
-
-		/* found; copy out */
-		for (n = 0; n < len; ++n, ++buf) {
-			c = env_get_char(val++);
-			if (c < 0)
-				return c;
-			*buf = c;
-			if (*buf == '\0')
-				return n;
-		}
-
-		if (n)
-			*--buf = '\0';
-
-		printf("env_buf [%u bytes] too small for value of \"%s\"\n",
-		       len, name);
-
-		return n;
-	}
-
-	return -1;
-}
-
-/**
- * Decode the integer value of an environment variable and return it.
- *
- * @param name		Name of environment variable
- * @param base		Number base to use (normally 10, or 16 for hex)
- * @param default_val	Default value to return if the variable is not
- *			found
- * @return the decoded value, or default_val if not found
- */
-ulong env_get_ulong(const char *name, int base, ulong default_val)
-{
-	/*
-	 * We can use env_get() here, even before relocation, since the
-	 * environment variable value is an integer and thus short.
-	 */
-	const char *str = env_get(name);
-
-	return str ? simple_strtoul(str, NULL, base) : default_val;
-}
-
-#ifndef CONFIG_SPL_BUILD
-#if defined(CONFIG_CMD_SAVEENV) && defined(ENV_IS_IN_DEVICE)
+#if defined(CONFIG_CMD_SAVEENV) && !IS_ENABLED(CONFIG_ENV_IS_DEFAULT)
 static int do_env_save(struct cmd_tbl *cmdtp, int flag, int argc,
 		       char *const argv[])
 {
@@ -814,24 +503,9 @@ static int do_env_select(struct cmd_tbl *cmdtp, int flag, int argc,
 }
 #endif
 
-#endif /* CONFIG_SPL_BUILD */
+#endif /* CONFIG_XPL_BUILD */
 
-int env_match(uchar *s1, int i2)
-{
-	if (s1 == NULL)
-		return -1;
-
-	while (*s1 == env_get_char(i2++))
-		if (*s1++ == '=')
-			return i2;
-
-	if (*s1 == '\0' && env_get_char(i2-1) == '=')
-		return i2;
-
-	return -1;
-}
-
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 static int do_env_default(struct cmd_tbl *cmdtp, int flag,
 			  int argc, char *const argv[])
 {
@@ -848,6 +522,9 @@ static int do_env_default(struct cmd_tbl *cmdtp, int flag,
 				break;
 			case 'f':		/* force */
 				env_flag |= H_FORCE;
+				break;
+			case 'k':
+				env_flag |= H_NOCLEAR;
 				break;
 			default:
 				return cmd_usage(cmdtp);
@@ -893,7 +570,7 @@ static int do_env_delete(struct cmd_tbl *cmdtp, int flag,
 	}
 	debug("Final value for argc=%d\n", argc);
 
-	env_id++;
+	env_inc_id();
 
 	while (--argc > 0) {
 		char *name = *++argv;
@@ -984,7 +661,7 @@ static int do_env_export(struct cmd_tbl *cmdtp, int flag,
 			case 's':		/* size given */
 				if (--argc <= 0)
 					return cmd_usage(cmdtp);
-				size = simple_strtoul(*++argv, NULL, 16);
+				size = hextoul(*++argv, NULL);
 				goto NXTARG;
 			case 't':		/* text format */
 				if (fmt++)
@@ -1001,7 +678,7 @@ NXTARG:		;
 	if (argc < 1)
 		return CMD_RET_USAGE;
 
-	addr = simple_strtoul(argv[0], NULL, 16);
+	addr = hextoul(argv[0], NULL);
 	ptr = map_sysmem(addr, size);
 
 	if (size)
@@ -1140,11 +817,11 @@ static int do_env_import(struct cmd_tbl *cmdtp, int flag,
 	if (sep != '\n' && crlf_is_lf )
 		crlf_is_lf = 0;
 
-	addr = simple_strtoul(argv[0], NULL, 16);
+	addr = hextoul(argv[0], NULL);
 	ptr = map_sysmem(addr, 0);
 
 	if (argc >= 2 && strcmp(argv[1], "-")) {
-		size = simple_strtoul(argv[1], NULL, 16);
+		size = hextoul(argv[1], NULL);
 	} else if (chk) {
 		puts("## Error: external checksum format must pass size\n");
 		return CMD_RET_FAILURE;
@@ -1206,6 +883,42 @@ sep_err:
 }
 #endif
 
+#if defined(CONFIG_CMD_NVEDIT_INDIRECT)
+static int do_env_indirect(struct cmd_tbl *cmdtp, int flag,
+		       int argc, char *const argv[])
+{
+	char *to = argv[1];
+	char *from = argv[2];
+	char *default_value = NULL;
+	int ret = 0;
+	char *val;
+
+	if (argc < 3 || argc > 4) {
+		return CMD_RET_USAGE;
+	}
+
+	if (argc == 4) {
+		default_value = argv[3];
+	}
+
+	val = env_get(from) ?: default_value;
+	if (!val) {
+		printf("## env indirect: Environment variable for <from> (%s) does not exist.\n", from);
+
+		return CMD_RET_FAILURE;
+	}
+
+	ret = env_set(to, val);
+
+	if (ret == 0) {
+		return CMD_RET_SUCCESS;
+	}
+	else {
+		return CMD_RET_FAILURE;
+	}
+}
+#endif
+
 #if defined(CONFIG_CMD_NVEDIT_INFO)
 /*
  * print_env_info - print environment information
@@ -1258,7 +971,7 @@ static int do_env_info(struct cmd_tbl *cmdtp, int flag,
 	int eval_flags = 0;
 	int eval_results = 0;
 	bool quiet = false;
-#if defined(CONFIG_CMD_SAVEENV) && defined(ENV_IS_IN_DEVICE)
+#if defined(CONFIG_CMD_SAVEENV) && !IS_ENABLED(CONFIG_ENV_IS_DEFAULT)
 	enum env_location loc;
 #endif
 
@@ -1301,7 +1014,7 @@ static int do_env_info(struct cmd_tbl *cmdtp, int flag,
 
 	/* evaluate whether environment can be persisted */
 	if (eval_flags & ENV_INFO_IS_PERSISTED) {
-#if defined(CONFIG_CMD_SAVEENV) && defined(ENV_IS_IN_DEVICE)
+#if defined(CONFIG_CMD_SAVEENV) && !IS_ENABLED(CONFIG_ENV_IS_DEFAULT)
 		loc = env_get_location(ENVOP_SAVE, gd->env_load_prio);
 		if (ENVL_NOWHERE != loc && ENVL_UNKNOWN != loc) {
 			if (!quiet)
@@ -1369,6 +1082,9 @@ static struct cmd_tbl cmd_env_sub[] = {
 #if defined(CONFIG_CMD_IMPORTENV)
 	U_BOOT_CMD_MKENT(import, 5, 0, do_env_import, "", ""),
 #endif
+#if defined(CONFIG_CMD_NVEDIT_INDIRECT)
+	U_BOOT_CMD_MKENT(indirect, 3, 0, do_env_indirect, "", ""),
+#endif
 #if defined(CONFIG_CMD_NVEDIT_INFO)
 	U_BOOT_CMD_MKENT(info, 3, 0, do_env_info, "", ""),
 #endif
@@ -1379,7 +1095,7 @@ static struct cmd_tbl cmd_env_sub[] = {
 #if defined(CONFIG_CMD_RUN)
 	U_BOOT_CMD_MKENT(run, CONFIG_SYS_MAXARGS, 1, do_run, "", ""),
 #endif
-#if defined(CONFIG_CMD_SAVEENV) && defined(ENV_IS_IN_DEVICE)
+#if defined(CONFIG_CMD_SAVEENV) && !IS_ENABLED(CONFIG_ENV_IS_DEFAULT)
 	U_BOOT_CMD_MKENT(save, 1, 0, do_env_save, "", ""),
 #if defined(CONFIG_CMD_ERASEENV)
 	U_BOOT_CMD_MKENT(erase, 1, 0, do_env_erase, "", ""),
@@ -1393,13 +1109,6 @@ static struct cmd_tbl cmd_env_sub[] = {
 	U_BOOT_CMD_MKENT(exists, 2, 0, do_env_exists, "", ""),
 #endif
 };
-
-#if defined(CONFIG_NEEDS_MANUAL_RELOC)
-void env_reloc(void)
-{
-	fixup_cmdtable(cmd_env_sub, ARRAY_SIZE(cmd_env_sub));
-}
-#endif
 
 static int do_env(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
@@ -1420,16 +1129,16 @@ static int do_env(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	return CMD_RET_USAGE;
 }
 
-#ifdef CONFIG_SYS_LONGHELP
-static char env_help_text[] =
+U_BOOT_LONGHELP(env,
 #if defined(CONFIG_CMD_ASKENV)
 	"ask name [message] [size] - ask for environment variable\nenv "
 #endif
 #if defined(CONFIG_CMD_ENV_CALLBACK)
 	"callbacks - print callbacks and their associated variables\nenv "
 #endif
-	"default [-f] -a - [forcibly] reset default environment\n"
-	"env default [-f] var [...] - [forcibly] reset variable(s) to their default values\n"
+	"default [-k] [-f] -a - [forcibly] reset default environment\n"
+	"env default [-k] [-f] var [...] - [forcibly] reset variable(s) to their default values\n"
+	"      \"-k\": keep variables not defined in default environment\n"
 	"env delete [-f] var [...] - [forcibly] delete variable(s)\n"
 #if defined(CONFIG_CMD_EDITENV)
 	"env edit name - edit environment variable\n"
@@ -1453,6 +1162,9 @@ static char env_help_text[] =
 #if defined(CONFIG_CMD_IMPORTENV)
 	"env import [-d] [-t [-r] | -b | -c] addr [size] [var ...] - import environment\n"
 #endif
+#if defined(CONFIG_CMD_NVEDIT_INDIRECT)
+	"env indirect <to> <from> [default] - sets <to> to the value of <from>, using [default] when unset\n"
+#endif
 #if defined(CONFIG_CMD_NVEDIT_INFO)
 	"env info - display environment information\n"
 	"env info [-d] [-p] [-q] - evaluate environment information\n"
@@ -1467,7 +1179,7 @@ static char env_help_text[] =
 #if defined(CONFIG_CMD_RUN)
 	"env run var [...] - run commands in an environment variable\n"
 #endif
-#if defined(CONFIG_CMD_SAVEENV) && defined(ENV_IS_IN_DEVICE)
+#if defined(CONFIG_CMD_SAVEENV) && !IS_ENABLED(CONFIG_ENV_IS_DEFAULT)
 	"env save - save environment\n"
 #if defined(CONFIG_CMD_ERASEENV)
 	"env erase - erase environment\n"
@@ -1483,8 +1195,7 @@ static char env_help_text[] =
 	"env set -e [-nv][-bs][-rt][-at][-a][-i addr:size][-v] name [arg ...]\n"
 	"    - set UEFI variable; unset if '-i' or 'arg' not specified\n"
 #endif
-	"env set [-f] name [arg ...]\n";
-#endif
+	"env set [-f] name [arg ...]\n");
 
 U_BOOT_CMD(
 	env, CONFIG_SYS_MAXARGS, 1, do_env,
@@ -1552,7 +1263,7 @@ U_BOOT_CMD_COMPLETE(
 	"      \"-rt\": set runtime attribute\n"
 	"      \"-at\": set time-based authentication attribute\n"
 	"      \"-a\": append-write\n"
-	"      \"-i addr,size\": use <addr,size> as variable's value\n"
+	"      \"-i addr:size\": use <addr,size> as variable's value\n"
 	"      \"-v\": verbose message\n"
 	"    - delete UEFI variable 'name' if 'value' not specified\n"
 #endif
@@ -1582,4 +1293,4 @@ U_BOOT_CMD_COMPLETE(
 	var_complete
 );
 #endif
-#endif /* CONFIG_SPL_BUILD */
+#endif /* CONFIG_XPL_BUILD */

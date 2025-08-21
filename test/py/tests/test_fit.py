@@ -6,7 +6,8 @@
 import os
 import pytest
 import struct
-import u_boot_utils as util
+import utils
+import fit_util
 
 # Define a base ITS which we can adjust using % and a dictionary
 base_its = '''
@@ -89,6 +90,9 @@ base_fdt = '''
 	model = "Sandbox Verified Boot Test";
 	compatible = "sandbox";
 
+	binman {
+	};
+
 	reset@0 {
 		compatible = "sandbox,reset";
 		reg = <0>;
@@ -114,7 +118,7 @@ host save hostfs 0 %(loadables2_addr)x %(loadables2_out)s %(loadables2_size)x
 @pytest.mark.boardspec('sandbox')
 @pytest.mark.buildconfigspec('fit_signature')
 @pytest.mark.requiredtool('dtc')
-def test_fit(u_boot_console):
+def test_fit(ubman):
     def make_fname(leaf):
         """Make a temporary filename
 
@@ -123,8 +127,7 @@ def test_fit(u_boot_console):
         Return:
             Temporary filename
         """
-
-        return os.path.join(cons.config.build_dir, leaf)
+        return os.path.join(ubman.config.build_dir, leaf)
 
     def filesize(fname):
         """Get the size of a file
@@ -147,67 +150,6 @@ def test_fit(u_boot_console):
         with open(fname, 'rb') as fd:
             return fd.read()
 
-    def make_dtb():
-        """Make a sample .dts file and compile it to a .dtb
-
-        Returns:
-            Filename of .dtb file created
-        """
-        src = make_fname('u-boot.dts')
-        dtb = make_fname('u-boot.dtb')
-        with open(src, 'w') as fd:
-            fd.write(base_fdt)
-        util.run_and_log(cons, ['dtc', src, '-O', 'dtb', '-o', dtb])
-        return dtb
-
-    def make_its(params):
-        """Make a sample .its file with parameters embedded
-
-        Args:
-            params: Dictionary containing parameters to embed in the %() strings
-        Returns:
-            Filename of .its file created
-        """
-        its = make_fname('test.its')
-        with open(its, 'w') as fd:
-            print(base_its % params, file=fd)
-        return its
-
-    def make_fit(mkimage, params):
-        """Make a sample .fit file ready for loading
-
-        This creates a .its script with the selected parameters and uses mkimage to
-        turn this into a .fit image.
-
-        Args:
-            mkimage: Filename of 'mkimage' utility
-            params: Dictionary containing parameters to embed in the %() strings
-        Return:
-            Filename of .fit file created
-        """
-        fit = make_fname('test.fit')
-        its = make_its(params)
-        util.run_and_log(cons, [mkimage, '-f', its, fit])
-        with open(make_fname('u-boot.dts'), 'w') as fd:
-            fd.write(base_fdt)
-        return fit
-
-    def make_kernel(filename, text):
-        """Make a sample kernel with test data
-
-        Args:
-            filename: the name of the file you want to create
-        Returns:
-            Full path and filename of the kernel it created
-        """
-        fname = make_fname(filename)
-        data = ''
-        for i in range(100):
-            data += 'this %s %d is unlikely to boot\n' % (text, i)
-        with open(fname, 'w') as fd:
-            print(data, file=fd)
-        return fname
-
     def make_ramdisk(filename, text):
         """Make a sample ramdisk with test data
 
@@ -223,7 +165,7 @@ def test_fit(u_boot_console):
         return fname
 
     def make_compressed(filename):
-        util.run_and_log(cons, ['gzip', '-f', '-k', filename])
+        utils.run_and_log(ubman, ['gzip', '-f', '-k', filename])
         return filename + '.gz'
 
     def find_matching(text, match):
@@ -318,10 +260,10 @@ def test_fit(u_boot_console):
           - run code coverage to make sure we are testing all the code
         """
         # Set up invariant files
-        control_dtb = make_dtb()
-        kernel = make_kernel('test-kernel.bin', 'kernel')
+        control_dtb = fit_util.make_dtb(ubman, base_fdt, 'u-boot')
+        kernel = fit_util.make_kernel(ubman, 'test-kernel.bin', 'kernel')
         ramdisk = make_ramdisk('test-ramdisk.bin', 'ramdisk')
-        loadables1 = make_kernel('test-loadables1.bin', 'lenrek')
+        loadables1 = fit_util.make_kernel(ubman, 'test-loadables1.bin', 'lenrek')
         loadables2 = make_ramdisk('test-loadables2.bin', 'ksidmar')
         kernel_out = make_fname('kernel-out.bin')
         fdt = make_fname('u-boot.dtb')
@@ -369,16 +311,16 @@ def test_fit(u_boot_console):
         }
 
         # Make a basic FIT and a script to load it
-        fit = make_fit(mkimage, params)
+        fit = fit_util.make_fit(ubman, mkimage, base_its, params)
         params['fit'] = fit
         cmd = base_script % params
 
         # First check that we can load a kernel
         # We could perhaps reduce duplication with some loss of readability
-        cons.config.dtb = control_dtb
-        cons.restart_uboot()
-        with cons.log.section('Kernel load'):
-            output = cons.run_command_list(cmd.splitlines())
+        ubman.config.dtb = control_dtb
+        ubman.restart_uboot()
+        with ubman.log.section('Kernel load'):
+            output = ubman.run_command_list(cmd.splitlines())
             check_equal(kernel, kernel_out, 'Kernel not loaded')
             check_not_equal(control_dtb, fdt_out,
                             'FDT loaded but should be ignored')
@@ -397,64 +339,71 @@ def test_fit(u_boot_console):
                   'U-Boot loaded FDT from offset %#x, FDT is actually at %#x' %
                   (fit_offset, real_fit_offset))
 
+            # Check if bootargs strings substitution works
+            output = ubman.run_command_list([
+                'env set bootargs \\\"\'my_boot_var=${foo}\'\\\"',
+                'env set foo bar',
+                'bootm prep',
+                'env print bootargs'])
+            assert 'bootargs="my_boot_var=bar"' in output, "Bootargs strings not substituted"
+
         # Now a kernel and an FDT
-        with cons.log.section('Kernel + FDT load'):
+        with ubman.log.section('Kernel + FDT load'):
             params['fdt_load'] = 'load = <%#x>;' % params['fdt_addr']
-            fit = make_fit(mkimage, params)
-            cons.restart_uboot()
-            output = cons.run_command_list(cmd.splitlines())
+            fit = fit_util.make_fit(ubman, mkimage, base_its, params)
+            ubman.restart_uboot()
+            output = ubman.run_command_list(cmd.splitlines())
             check_equal(kernel, kernel_out, 'Kernel not loaded')
             check_equal(control_dtb, fdt_out, 'FDT not loaded')
             check_not_equal(ramdisk, ramdisk_out,
                             'Ramdisk loaded but should not be')
 
         # Try a ramdisk
-        with cons.log.section('Kernel + FDT + Ramdisk load'):
+        with ubman.log.section('Kernel + FDT + Ramdisk load'):
             params['ramdisk_config'] = 'ramdisk = "ramdisk-1";'
             params['ramdisk_load'] = 'load = <%#x>;' % params['ramdisk_addr']
-            fit = make_fit(mkimage, params)
-            cons.restart_uboot()
-            output = cons.run_command_list(cmd.splitlines())
+            fit = fit_util.make_fit(ubman, mkimage, base_its, params)
+            ubman.restart_uboot()
+            output = ubman.run_command_list(cmd.splitlines())
             check_equal(ramdisk, ramdisk_out, 'Ramdisk not loaded')
 
         # Configuration with some Loadables
-        with cons.log.section('Kernel + FDT + Ramdisk load + Loadables'):
+        with ubman.log.section('Kernel + FDT + Ramdisk load + Loadables'):
             params['loadables_config'] = 'loadables = "kernel-2", "ramdisk-2";'
             params['loadables1_load'] = ('load = <%#x>;' %
                                          params['loadables1_addr'])
             params['loadables2_load'] = ('load = <%#x>;' %
                                          params['loadables2_addr'])
-            fit = make_fit(mkimage, params)
-            cons.restart_uboot()
-            output = cons.run_command_list(cmd.splitlines())
+            fit = fit_util.make_fit(ubman, mkimage, base_its, params)
+            ubman.restart_uboot()
+            output = ubman.run_command_list(cmd.splitlines())
             check_equal(loadables1, loadables1_out,
                         'Loadables1 (kernel) not loaded')
             check_equal(loadables2, loadables2_out,
                         'Loadables2 (ramdisk) not loaded')
 
         # Kernel, FDT and Ramdisk all compressed
-        with cons.log.section('(Kernel + FDT + Ramdisk) compressed'):
+        with ubman.log.section('(Kernel + FDT + Ramdisk) compressed'):
             params['compression'] = 'gzip'
             params['kernel'] = make_compressed(kernel)
             params['fdt'] = make_compressed(fdt)
             params['ramdisk'] = make_compressed(ramdisk)
-            fit = make_fit(mkimage, params)
-            cons.restart_uboot()
-            output = cons.run_command_list(cmd.splitlines())
+            fit = fit_util.make_fit(ubman, mkimage, base_its, params)
+            ubman.restart_uboot()
+            output = ubman.run_command_list(cmd.splitlines())
             check_equal(kernel, kernel_out, 'Kernel not loaded')
             check_equal(control_dtb, fdt_out, 'FDT not loaded')
             check_not_equal(ramdisk, ramdisk_out, 'Ramdisk got decompressed?')
             check_equal(ramdisk + '.gz', ramdisk_out, 'Ramdist not loaded')
 
 
-    cons = u_boot_console
+    # We need to use our own device tree file. Remember to restore it
+    # afterwards.
+    old_dtb = ubman.config.dtb
     try:
-        # We need to use our own device tree file. Remember to restore it
-        # afterwards.
-        old_dtb = cons.config.dtb
-        mkimage = cons.config.build_dir + '/tools/mkimage'
+        mkimage = ubman.config.build_dir + '/tools/mkimage'
         run_fit_test(mkimage)
     finally:
         # Go back to the original U-Boot with the correct dtb.
-        cons.config.dtb = old_dtb
-        cons.restart_uboot()
+        ubman.config.dtb = old_dtb
+        ubman.restart_uboot()

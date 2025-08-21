@@ -9,11 +9,7 @@
  *	Copyright 2000-2002 Wolfgang Denk, wd@denx.de
  */
 
-#include <common.h>
 #include <net.h>
-#if defined(CONFIG_CDP_VERSION)
-#include <timestamp.h>
-#endif
 
 #include "cdp.h"
 

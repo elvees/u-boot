@@ -6,7 +6,6 @@
  * Based on arm/lib/image.c
  */
 
-#include <common.h>
 #include <image.h>
 #include <mapmem.h>
 #include <errno.h>
@@ -50,7 +49,12 @@ int booti_setup(ulong image, ulong *relocated_addr, ulong *size,
 		return -EINVAL;
 	}
 	*size = lhdr->image_size;
-	*relocated_addr = gd->ram_base + lhdr->text_offset;
+	if (force_reloc ||
+	   (gd->ram_base <= image && image < gd->ram_base + gd->ram_size)) {
+		*relocated_addr = gd->ram_base + lhdr->text_offset;
+	} else {
+		*relocated_addr = image;
+	}
 
 	unmap_sysmem(lhdr);
 

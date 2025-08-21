@@ -3,7 +3,6 @@
  * Copyright (C) 2015 Google, Inc
  */
 
-#include <common.h>
 #include <cpu.h>
 #include <dm.h>
 #include <malloc.h>
@@ -18,7 +17,7 @@ int qemu_cpu_fixup(void)
 	int cpu_num;
 	int cpu_online;
 	struct uclass *uc;
-	struct udevice *dev, *pdev;
+	struct udevice *dev, *pdev, *qfwdev;
 	struct cpu_plat *plat;
 	char *cpu;
 
@@ -39,6 +38,13 @@ int qemu_cpu_fixup(void)
 		return -ENODEV;
 	}
 
+	/* get qfw dev */
+	ret = qfw_get_dev(&qfwdev);
+	if (ret) {
+		printf("unable to find qfw device\n");
+		return ret;
+	}
+
 	/* calculate cpus that are already bound */
 	cpu_num = 0;
 	for (uclass_find_first_device(UCLASS_CPU, &dev);
@@ -48,7 +54,7 @@ int qemu_cpu_fixup(void)
 	}
 
 	/* get actual cpu number */
-	cpu_online = qemu_fwcfg_online_cpus();
+	cpu_online = qfw_online_cpus(qfwdev);
 	if (cpu_online < 0) {
 		printf("unable to get online cpu number: %d\n", cpu_online);
 		return cpu_online;

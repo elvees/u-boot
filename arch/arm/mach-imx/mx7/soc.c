@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2015 Freescale Semiconductor, Inc.
+ * Copyright 2021 NXP
  */
 
-#include <common.h>
 #include <init.h>
 #include <asm/io.h>
 #include <asm/arch/imx-regs.h>
@@ -14,11 +14,12 @@
 #include <asm/mach-imx/rdc-sema.h>
 #include <asm/arch/imx-rdc.h>
 #include <asm/mach-imx/boot_mode.h>
+#include <asm/mach-imx/sys_proto.h>
 #include <asm/arch/crm_regs.h>
+#include <asm/bootm.h>
 #include <dm.h>
 #include <env.h>
 #include <imx_thermal.h>
-#include <fsl_sec.h>
 #include <asm/setup.h>
 #include <linux/delay.h>
 
@@ -126,8 +127,13 @@ static void isolate_resource(void)
 #endif
 
 #if defined(CONFIG_IMX_HAB)
-struct imx_sec_config_fuse_t const imx_sec_config_fuse = {
+struct imx_fuse const imx_sec_config_fuse = {
 	.bank = 1,
+	.word = 3,
+};
+
+struct imx_fuse const imx_field_return_fuse = {
+	.bank = 8,
 	.word = 3,
 };
 #endif
@@ -222,9 +228,14 @@ const struct rproc_att hostmap[] = {
 	{ 0x80000000, 0x80000000, 0x60000000 }, /* DDRC */
 	{ /* sentinel */ }
 };
+
+const struct rproc_att *imx_bootaux_get_hostmap(void)
+{
+	return hostmap;
+}
 #endif
 
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT)
 /* enable all periherial can be accessed in nosec mode */
 static void init_csu(void)
 {
@@ -322,6 +333,8 @@ int arch_cpu_init(void)
 
 	imx_gpcv2_init();
 
+	enable_ca7_smp();
+
 	return 0;
 }
 #else
@@ -337,21 +350,34 @@ int arch_cpu_init(void)
 int arch_misc_init(void)
 {
 #ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
+	struct tag_serialnr serialnr;
+	char serial_string[0x20];
+
 	if (is_mx7d())
 		env_set("soc", "imx7d");
 	else
 		env_set("soc", "imx7s");
+
+	/* Set serial# standard environment variable based on OTP settings */
+	get_board_serial(&serialnr);
+	snprintf(serial_string, sizeof(serial_string), "0x%08x%08x",
+		 serialnr.low, serialnr.high);
+	env_set("serial#", serial_string);
 #endif
 
-#ifdef CONFIG_FSL_CAAM
-	sec_init();
-#endif
+	if (IS_ENABLED(CONFIG_FSL_CAAM)) {
+		struct udevice *dev;
+		int ret;
+		ret = uclass_get_device_by_driver(UCLASS_MISC, DM_DRIVER_GET(caam_jr), &dev);
+		if (ret)
+			printf("Failed to initialize caam_jr: %d\n", ret);
+	}
 
 	return 0;
 }
 #endif
 
-#ifdef CONFIG_SERIAL_TAG
+#ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
 /*
  * OCOTP_TESTER
  * i.MX 7Solo Applications Processor Reference Manual, Rev. 0.1, 08/2016
@@ -411,7 +437,7 @@ void s_init(void)
 	return;
 }
 
-#ifndef CONFIG_SPL_BUILD
+#ifndef CONFIG_XPL_BUILD
 const struct boot_mode soc_boot_modes[] = {
 	{"normal",	MAKE_CFGVAL(0x00, 0x00, 0x00, 0x00)},
 	{"primary",	MAKE_CFGVAL_PRIMARY_BOOT},
@@ -429,10 +455,9 @@ int boot_mode_getprisec(void)
 
 void reset_misc(void)
 {
-#ifndef CONFIG_SPL_BUILD
-#if defined(CONFIG_VIDEO_MXS) && !defined(CONFIG_DM_VIDEO)
+#ifndef CONFIG_XPL_BUILD
+#if defined(CONFIG_VIDEO_MXS) && !defined(CONFIG_VIDEO)
 	lcdif_power_down();
 #endif
 #endif
 }
-

@@ -3,7 +3,6 @@
  * Copyright (C) 2015 Google, Inc
  */
 
-#include <common.h>
 #include <console.h>
 #include <dm.h>
 #include <part.h>
@@ -34,7 +33,7 @@ static int dm_test_usb_base(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_usb_base, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_usb_base, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 /*
  * Test that we can use the flash stick. This is more of a functional test. It
@@ -43,25 +42,47 @@ DM_TEST(dm_test_usb_base, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
  */
 static int dm_test_usb_flash(struct unit_test_state *uts)
 {
-	struct udevice *dev;
-	struct blk_desc *dev_desc;
+	struct blk_desc *dev_desc, *chk;
+	struct udevice *dev, *blk;
 	char cmp[1024];
 
 	state_set_skip_delays(true);
 	ut_assertok(usb_init());
 	ut_assertok(uclass_get_device(UCLASS_MASS_STORAGE, 0, &dev));
 	ut_assertok(blk_get_device_by_str("usb", "0", &dev_desc));
+	chk = blk_get_by_device(dev);
+	ut_asserteq_ptr(chk, dev_desc);
+
+	ut_assertok(device_find_first_child_by_uclass(dev, UCLASS_BLK, &blk));
+	ut_asserteq_ptr(chk, blk_get_by_device(dev));
 
 	/* Read a few blocks and look for the string we expect */
 	ut_asserteq(512, dev_desc->blksz);
 	memset(cmp, '\0', sizeof(cmp));
-	ut_asserteq(2, blk_dread(dev_desc, 0, 2, cmp));
-	ut_assertok(strcmp(cmp, "this is a test"));
+	ut_asserteq(2, blk_read(blk, 0, 2, cmp));
+	ut_asserteq_str("this is a test", cmp);
+
+	strcpy(cmp, "another test");
+	ut_asserteq(1, blk_write(blk, 1, 1, cmp));
+
+	memset(cmp, '\0', sizeof(cmp));
+	ut_asserteq(2, blk_read(blk, 0, 2, cmp));
+	ut_asserteq_str("this is a test", cmp);
+	ut_asserteq_str("another test", cmp + 512);
+
+	memset(cmp, '\0', sizeof(cmp));
+	ut_asserteq(1, blk_write(blk, 1, 1, cmp));
+
+	memset(cmp, '\0', sizeof(cmp));
+	ut_asserteq(2, blk_read(blk, 0, 2, cmp));
+	ut_asserteq_str("this is a test", cmp);
+	ut_asserteq_str("", cmp + 512);
+
 	ut_assertok(usb_stop());
 
 	return 0;
 }
-DM_TEST(dm_test_usb_flash, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_usb_flash, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 /* test that we can handle multiple storage devices */
 static int dm_test_usb_multi(struct unit_test_state *uts)
@@ -77,7 +98,7 @@ static int dm_test_usb_multi(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_usb_multi, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_usb_multi, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 /* test that we have an associated ofnode with the usb device */
 static int dm_test_usb_fdt_node(struct unit_test_state *uts)
@@ -99,7 +120,7 @@ static int dm_test_usb_fdt_node(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_usb_fdt_node, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_usb_fdt_node, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 static int count_usb_devices(void)
 {
@@ -143,7 +164,7 @@ static int dm_test_usb_stop(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_usb_stop, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_usb_stop, UTF_SCAN_PDATA | UTF_SCAN_FDT);
 
 /**
  * dm_test_usb_keyb() - test USB keyboard driver
@@ -402,7 +423,6 @@ static int dm_test_usb_keyb(struct unit_test_state *uts)
 		{0x00, 0x00, "\0"}
 	};
 
-
 	state_set_skip_delays(true);
 	ut_assertok(usb_init());
 
@@ -435,4 +455,4 @@ static int dm_test_usb_keyb(struct unit_test_state *uts)
 
 	return 0;
 }
-DM_TEST(dm_test_usb_keyb, UT_TESTF_SCAN_PDATA | UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_usb_keyb, UTF_SCAN_PDATA | UTF_SCAN_FDT);

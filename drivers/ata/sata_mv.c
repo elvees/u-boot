@@ -31,9 +31,9 @@
  * No port multiplier support
  */
 
-#include <common.h>
 #include <ahci.h>
 #include <blk.h>
+#include <bootdev.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <log.h>
@@ -45,6 +45,7 @@
 #include <libata.h>
 #include <malloc.h>
 #include <sata.h>
+#include <time.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
@@ -809,6 +810,7 @@ static int mv_ata_exec_ata_cmd_nondma(struct udevice *dev, int port,
 static int mv_sata_identify(struct udevice *dev, int port, u16 *id)
 {
 	struct sata_fis_h2d h2d;
+	int len;
 
 	memset(&h2d, 0, sizeof(struct sata_fis_h2d));
 
@@ -818,8 +820,32 @@ static int mv_sata_identify(struct udevice *dev, int port, u16 *id)
 	/* Give device time to get operational */
 	mdelay(10);
 
-	return mv_ata_exec_ata_cmd_nondma(dev, port, &h2d, (u8 *)id,
-					  ATA_ID_WORDS * 2, READ_CMD);
+	/* During cold start, with some HDDs, the first ATA ID command does
+	 * not populate the ID words. In fact, the first ATA ID
+	 * command will only power up the drive, and then the ATA ID command
+	 * processing is lost in the process.
+	 */
+	len = mv_ata_exec_ata_cmd_nondma(dev, port, &h2d, (u8 *)id,
+					 ATA_ID_WORDS * 2, READ_CMD);
+
+	/* If drive capacity has been filled in, then it was successfully
+	 * identified (the drive has been powered up before, i.e.
+	 * this function is invoked during a reboot)
+	 */
+	if (ata_id_n_sectors(id) != 0)
+		return len;
+
+	/* Issue the 2nd ATA ID command to make sure the ID words are
+	 * populated properly.
+	 */
+	mdelay(10);
+	len = mv_ata_exec_ata_cmd_nondma(dev, port, &h2d, (u8 *)id,
+					 ATA_ID_WORDS * 2, READ_CMD);
+	if (ata_id_n_sectors(id) != 0)
+		return len;
+
+	printf("Err: Failed to identify SATA device %d\n", port);
+	return -ENODEV;
 }
 
 static void mv_sata_xfer_mode(struct udevice *dev, int port, u16 *id)
@@ -1043,6 +1069,7 @@ static int sata_mv_probe(struct udevice *dev)
 	int nr_ports;
 	int ret;
 	int i;
+	int status = -ENODEV; /* If the probe fails to detected any SATA port */
 
 	/* Get number of ports of this SATA controller */
 	nr_ports = min(fdtdec_get_int(blob, node, "nr-ports", -1),
@@ -1050,10 +1077,11 @@ static int sata_mv_probe(struct udevice *dev)
 
 	for (i = 0; i < nr_ports; i++) {
 		ret = blk_create_devicef(dev, "sata_mv_blk", "blk",
-					 IF_TYPE_SATA, -1, 512, 0, &blk);
+					 UCLASS_AHCI, -1, DEFAULT_BLKSZ,
+					 0, &blk);
 		if (ret) {
 			debug("Can't create device\n");
-			return ret;
+			continue;
 		}
 
 		priv = dev_get_plat(blk);
@@ -1063,24 +1091,39 @@ static int sata_mv_probe(struct udevice *dev)
 		ret = sata_mv_init_sata(blk, i);
 		if (ret) {
 			debug("%s: Failed to init bus\n", __func__);
-			return ret;
+			continue;
 		}
 
 		/* Scan SATA port */
 		ret = sata_mv_scan_sata(blk, i);
 		if (ret) {
 			debug("%s: Failed to scan bus\n", __func__);
-			return ret;
+			continue;
 		}
+
+		ret = blk_probe_or_unbind(dev);
+		if (ret < 0)
+			/* TODO: undo create */
+			continue;
+
+		ret = bootdev_setup_for_sibling_blk(blk, "sata_bootdev");
+		if (ret) {
+			printf("%s: Failed to create bootdev\n", __func__);
+			continue;
+		}
+
+		/* If we got here, the current SATA port was probed
+		 * successfully, so set the probe status to successful.
+		 */
+		status = 0;
 	}
 
-	return 0;
+	return status;
 }
 
 static int sata_mv_scan(struct udevice *dev)
 {
 	/* Nothing to do here */
-
 	return 0;
 }
 

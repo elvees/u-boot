@@ -6,6 +6,7 @@
  * Copyright 2013 Freescale Semiconductor, Inc.
  */
 
+#include <event.h>
 #include <asm/cache.h>
 #include <asm/fsl_fdt.h>
 #include <asm/fsl_law.h>
@@ -33,7 +34,7 @@ static uchar ivm_content[CONFIG_SYS_IVM_EEPROM_MAX_LEN];
 
 int checkboard(void)
 {
-	printf("Board: Hitachi Power Grids %s\n", KM_BOARD_NAME);
+	printf("Board: Hitachi Power Grids kmcent2\n");
 
 	return 0;
 }
@@ -43,8 +44,8 @@ int checkboard(void)
 
 int board_early_init_f(void)
 {
-	struct fsl_ifc ifc = {(void *)CONFIG_SYS_IFC_ADDR, (void *)NULL};
-	ccsr_gur_t *gur = (void *)(CONFIG_SYS_MPC85xx_GUTS_ADDR);
+	struct fsl_ifc ifc = {(void *)CFG_SYS_IFC_ADDR, (void *)NULL};
+	ccsr_gur_t *gur = (void *)(CFG_SYS_MPC85xx_GUTS_ADDR);
 	bool cpuwd_flag = false;
 
 	/* board specific IFC configuration: increased bus turnaround time */
@@ -140,7 +141,7 @@ int board_early_init_r(void)
 {
 	int ret = 0;
 
-	const unsigned int flashbase = CONFIG_SYS_FLASH_BASE;
+	const unsigned int flashbase = CFG_SYS_FLASH_BASE;
 	int flash_esel = find_tlb_idx((void *)flashbase, 1);
 
 	/*
@@ -161,7 +162,7 @@ int board_early_init_r(void)
 		disable_tlb(flash_esel);
 	}
 
-	set_tlb(1, flashbase, CONFIG_SYS_FLASH_BASE_PHYS,
+	set_tlb(1, flashbase, CFG_SYS_FLASH_BASE_PHYS,
 		MAS3_SX | MAS3_SW | MAS3_SR, MAS2_I | MAS2_G,
 		0, flash_esel, BOOKE_PAGESZ_256M, 1);
 
@@ -181,12 +182,7 @@ unsigned long get_serial_clock(unsigned long dummy)
 	return (gd->bus_clk / 2);
 }
 
-unsigned long get_board_sys_clk(unsigned long dummy)
-{
-	return 66666666;
-}
-
-int misc_init_f(void)
+static int kmcent2_misc_init_f(void)
 {
 	/* configure QRIO pis for i2c deblocking */
 	i2c_deblock_gpio_cfg();
@@ -214,6 +210,7 @@ int misc_init_f(void)
 
 	return 0;
 }
+EVENT_SPY_SIMPLE(EVT_MISC_INIT_F, kmcent2_misc_init_f);
 
 #define USED_SRDS_BANK 0
 #define EXPECTED_SRDS_RFCK SRDS_PLLCR0_RFCK_SEL_100
@@ -223,9 +220,9 @@ int misc_init_f(void)
 
 int misc_init_r(void)
 {
-	serdes_corenet_t *regs = (void *)CONFIG_SYS_FSL_CORENET_SERDES_ADDR;
-	struct ccsr_scfg *scfg = (struct ccsr_scfg *)CONFIG_SYS_MPC85xx_SCFG;
-	ccsr_gur_t __iomem *gur = (ccsr_gur_t __iomem *)CONFIG_SYS_MPC85xx_GUTS_ADDR;
+	serdes_corenet_t *regs = (void *)CFG_SYS_FSL_CORENET_SERDES_ADDR;
+	struct ccsr_scfg *scfg = (struct ccsr_scfg *)CFG_SYS_MPC85xx_SCFG;
+	ccsr_gur_t __iomem *gur = (ccsr_gur_t __iomem *)CFG_SYS_MPC85xx_GUTS_ADDR;
 
 	/* check SERDES bank 0 reference clock */
 	u32 actual = in_be32(&regs->bank[USED_SRDS_BANK].pllcr0);
@@ -264,7 +261,7 @@ int hush_init_var(void)
 	return 0;
 }
 
-int last_stage_init(void)
+static int last_stage_init(void)
 {
 	const char *kmem;
 	/* DIP switch support on BFTIC */
@@ -290,11 +287,12 @@ int last_stage_init(void)
 
 	return 0;
 }
+EVENT_SPY_SIMPLE(EVT_LAST_STAGE_INIT, last_stage_init);
 
 void fdt_fixup_fman_mac_addresses(void *blob)
 {
 	int node, ret;
-	char path[24];
+	char path[25];
 	unsigned char mac_addr[6];
 
 	/*

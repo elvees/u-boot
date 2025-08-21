@@ -3,7 +3,6 @@
  * Copyright (C) 2017 Álvaro Fernández Rojas <noltari@gmail.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <malloc.h>
 #include <power-domain-uclass.h>
@@ -21,11 +20,6 @@ static int bcm6328_power_domain_request(struct power_domain *power_domain)
 	if (power_domain->id >= MAX_DOMAINS)
 		return -EINVAL;
 
-	return 0;
-}
-
-static int bcm6328_power_domain_free(struct power_domain *power_domain)
-{
 	return 0;
 }
 
@@ -64,7 +58,6 @@ static const struct udevice_id bcm6328_power_domain_ids[] = {
 };
 
 struct power_domain_ops bcm6328_power_domain_ops = {
-	.rfree = bcm6328_power_domain_free,
 	.off = bcm6328_power_domain_off,
 	.on = bcm6328_power_domain_on,
 	.request = bcm6328_power_domain_request,

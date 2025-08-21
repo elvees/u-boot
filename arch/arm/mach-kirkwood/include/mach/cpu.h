@@ -68,6 +68,9 @@ enum kwcpu_attrib {
 #define KW_DEFADR_SPIF		0xE8000000
 #define KW_DEFADR_BOOTROM	0xF8000000
 
+#define KW_DEFADR_PCI_MEM_SIZE	(1024 * 1024 * 256)
+#define KW_DEFADR_PCI_IO_SIZE	(1024 * 64)
+
 struct mbus_win {
 	u32 base;
 	u32 size;
@@ -82,8 +85,9 @@ struct mbus_win {
 static inline unsigned int readfr_extra_feature_reg(void)
 {
 	unsigned int val;
-	asm volatile ("mrc p15, 1, %0, c15, c1, 0 @ readfr exfr":"=r"
-			(val)::"cc");
+
+	asm_arm_or_thumb2("mrc p15, 1, %0, c15, c1, 0 @ readfr exfr":"=r"
+			  (val)::"cc");
 	return val;
 }
 
@@ -93,8 +97,8 @@ static inline unsigned int readfr_extra_feature_reg(void)
  */
 static inline void writefr_extra_feature_reg(unsigned int val)
 {
-	asm volatile ("mcr p15, 1, %0, c15, c1, 0 @ writefr exfr"::"r"
-			(val):"cc");
+	asm_arm_or_thumb2("mcr p15, 1, %0, c15, c1, 0 @ writefr exfr"::"r"
+			  (val):"cc");
 	isb();
 }
 
@@ -141,16 +145,13 @@ struct kwgpio_registers {
 	u32 irq_level;
 };
 
-/* Needed for dynamic (board-specific) mbus configuration */
-extern struct mvebu_mbus_state mbus_state;
-
 /*
  * functions
  */
 unsigned int mvebu_sdram_bar(enum memory_bank bank);
 unsigned int mvebu_sdram_bs(enum memory_bank bank);
 void mvebu_sdram_size_adjust(enum memory_bank bank);
-int mvebu_mbus_probe(struct mbus_win windows[], int count);
+int mvebu_mbus_probe(const struct mbus_win windows[], int count);
 void mvebu_config_gpio(unsigned int gpp0_oe_val, unsigned int gpp1_oe_val,
 		unsigned int gpp0_oe, unsigned int gpp1_oe);
 int kw_config_mpp(unsigned int mpp0_7, unsigned int mpp8_15,

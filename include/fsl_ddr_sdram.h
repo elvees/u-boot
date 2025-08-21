@@ -48,25 +48,25 @@
 #if defined(CONFIG_SYS_FSL_DDR1)
 #define FSL_DDR_MIN_TCKE_PULSE_WIDTH_DDR	(1)
 typedef ddr1_spd_eeprom_t generic_spd_eeprom_t;
-#ifndef CONFIG_FSL_SDRAM_TYPE
-#define CONFIG_FSL_SDRAM_TYPE	SDRAM_TYPE_DDR1
+#ifndef CFG_FSL_SDRAM_TYPE
+#define CFG_FSL_SDRAM_TYPE	SDRAM_TYPE_DDR1
 #endif
 #elif defined(CONFIG_SYS_FSL_DDR2)
 #define FSL_DDR_MIN_TCKE_PULSE_WIDTH_DDR	(3)
 typedef ddr2_spd_eeprom_t generic_spd_eeprom_t;
-#ifndef CONFIG_FSL_SDRAM_TYPE
-#define CONFIG_FSL_SDRAM_TYPE	SDRAM_TYPE_DDR2
+#ifndef CFG_FSL_SDRAM_TYPE
+#define CFG_FSL_SDRAM_TYPE	SDRAM_TYPE_DDR2
 #endif
 #elif defined(CONFIG_SYS_FSL_DDR3)
 typedef ddr3_spd_eeprom_t generic_spd_eeprom_t;
-#ifndef CONFIG_FSL_SDRAM_TYPE
-#define CONFIG_FSL_SDRAM_TYPE	SDRAM_TYPE_DDR3
+#ifndef CFG_FSL_SDRAM_TYPE
+#define CFG_FSL_SDRAM_TYPE	SDRAM_TYPE_DDR3
 #endif
 #elif defined(CONFIG_SYS_FSL_DDR4)
 #define FSL_DDR_MIN_TCKE_PULSE_WIDTH_DDR	(3)	/* FIXME */
 typedef struct ddr4_spd_eeprom_s generic_spd_eeprom_t;
-#ifndef CONFIG_FSL_SDRAM_TYPE
-#define CONFIG_FSL_SDRAM_TYPE	SDRAM_TYPE_DDR4
+#ifndef CFG_FSL_SDRAM_TYPE
+#define CFG_FSL_SDRAM_TYPE	SDRAM_TYPE_DDR4
 #endif
 #endif	/* #if defined(CONFIG_SYS_FSL_DDR1) */
 
@@ -196,7 +196,6 @@ typedef struct ddr4_spd_eeprom_s generic_spd_eeprom_t;
 
 /* DEBUG_29 register */
 #define DDR_TX_BD_DIS	(1 << 10) /* Transmit Bit Deskew Disable */
-
 
 #if (defined(CONFIG_SYS_FSL_DDR_VER) && \
 	(CONFIG_SYS_FSL_DDR_VER >= FSL_DDR_VER_4_7))
@@ -473,7 +472,6 @@ extern phys_size_t fixed_sdram(void);
 extern void ddr_enable_ecc(unsigned int dram_size);
 #endif
 
-
 typedef struct fixed_ddr_parm{
 	int min_freq;
 	int max_freq;
@@ -483,7 +481,7 @@ typedef struct fixed_ddr_parm{
 /**
  * fsl_initdram() - Set up the SDRAM
  *
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int fsl_initdram(void);
 

@@ -237,15 +237,15 @@ multiboot_header:
 	/* checksum */
 	.long	-0x1BADB002 - (1 << 16)
 	/* header addr */
-	.long	multiboot_header - _x86boot_start + CONFIG_SYS_TEXT_BASE
+	.long	multiboot_header - _x86boot_start + CONFIG_TEXT_BASE
 	/* load addr */
-	.long	CONFIG_SYS_TEXT_BASE
+	.long	CONFIG_TEXT_BASE
 	/* load end addr */
 	.long	0
 	/* bss end addr */
 	.long	0
 	/* entry addr */
-	.long	CONFIG_SYS_TEXT_BASE
+	.long	CONFIG_TEXT_BASE
 
 #ifdef CONFIG_X86_LOAD_FROM_32_BIT
 	/*
@@ -254,7 +254,7 @@ multiboot_header:
 	 * GDT is setup in a safe location in RAM
 	 */
 gdt_ptr2:
-	.word	0x1f		/* limit (31 bytes = 4 GDT entries - 1) */
+	.word	gdt2_end - gdt_ptr2 - 1
 	.long	gdt_rom2	/* base */
 
 	/* Some CPUs are picky about GDT alignment... */
@@ -313,4 +313,6 @@ gdt_rom2:
 	.byte	0x93		/* access */
 	.byte	0xcf		/* flags + limit_high */
 	.byte	0x00		/* base_high */
+gdt2_end:
+
 #endif

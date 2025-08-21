@@ -4,7 +4,6 @@
  * Alex Marginean, NXP
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <miiphy.h>
@@ -38,21 +37,20 @@ static int dm_test_mdio(struct unit_test_state *uts)
 	ut_assertnonnull(ops->read);
 	ut_assertnonnull(ops->write);
 
-	ut_assertok(ops->write(dev, SANDBOX_PHY_ADDR, MDIO_DEVAD_NONE,
-			       SANDBOX_PHY_REG, TEST_REG_VALUE));
-	reg = ops->read(dev, SANDBOX_PHY_ADDR, MDIO_DEVAD_NONE,
-			SANDBOX_PHY_REG);
+	ut_assertok(dm_mdio_write(dev, SANDBOX_PHY_ADDR, MDIO_DEVAD_NONE,
+				  SANDBOX_PHY_REG, TEST_REG_VALUE));
+	reg = dm_mdio_read(dev, SANDBOX_PHY_ADDR, MDIO_DEVAD_NONE,
+			   SANDBOX_PHY_REG);
 	ut_asserteq(reg, TEST_REG_VALUE);
 
-	ut_assert(ops->read(dev, SANDBOX_PHY_ADDR + 1, MDIO_DEVAD_NONE,
-			    SANDBOX_PHY_REG) != 0);
+	ut_assert(dm_mdio_read(dev, SANDBOX_PHY_ADDR + 1, MDIO_DEVAD_NONE,
+			       SANDBOX_PHY_REG) != 0);
 
-	ut_assertok(ops->reset(dev));
-	reg = ops->read(dev, SANDBOX_PHY_ADDR, MDIO_DEVAD_NONE,
-			SANDBOX_PHY_REG);
+	ut_assertok(dm_mdio_reset(dev));
+	reg = dm_mdio_read(dev, SANDBOX_PHY_ADDR, MDIO_DEVAD_NONE,
+			   SANDBOX_PHY_REG);
 	ut_asserteq(reg, 0);
 
 	return 0;
 }
-
-DM_TEST(dm_test_mdio, UT_TESTF_SCAN_FDT);
+DM_TEST(dm_test_mdio, UTF_SCAN_FDT);

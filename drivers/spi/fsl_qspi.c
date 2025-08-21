@@ -23,7 +23,6 @@
  * Transition to spi-mem in spi-fsl-qspi.c
  */
 
-#include <common.h>
 #include <dm.h>
 #include <dm/device_compat.h>
 #include <log.h>
@@ -473,7 +472,13 @@ static void fsl_qspi_prepare_lut(struct fsl_qspi *q,
 		    op->addr.nbytes) {
 			for (i = 0; i < ARRAY_SIZE(lutval); i++)
 				qspi_writel(q, lutval[i], base + QUADSPI_AHB_LUT_REG(i));
+
+			qspi_writel(q, QUADSPI_BFGENCR_SEQID(SEQID_LUT_AHB),
+				q->iobase + QUADSPI_BFGENCR);
 		}
+	} else {
+		qspi_writel(q, QUADSPI_BFGENCR_SEQID(SEQID_LUT),
+			q->iobase + QUADSPI_BFGENCR);
 	}
 
 	/* lock LUT */
@@ -511,10 +516,10 @@ static void fsl_qspi_select_mem(struct fsl_qspi *q, struct spi_slave *slave)
 	struct dm_spi_slave_plat *plat =
 		dev_get_parent_plat(slave->dev);
 
-	if (q->selected == plat->cs)
+	if (q->selected == plat->cs[0])
 		return;
 
-	q->selected = plat->cs;
+	q->selected = plat->cs[0];
 	fsl_qspi_invalidate(q);
 }
 
@@ -737,13 +742,6 @@ static int fsl_qspi_default_setup(struct fsl_qspi *q)
 	qspi_writel(q, 0, base + QUADSPI_BUF0IND);
 	qspi_writel(q, 0, base + QUADSPI_BUF1IND);
 	qspi_writel(q, 0, base + QUADSPI_BUF2IND);
-
-	if (IS_ENABLED(CONFIG_FSL_QSPI_AHB_FULL_MAP))
-		qspi_writel(q, QUADSPI_BFGENCR_SEQID(SEQID_LUT_AHB),
-			    q->iobase + QUADSPI_BFGENCR);
-	else
-		qspi_writel(q, QUADSPI_BFGENCR_SEQID(SEQID_LUT),
-			    q->iobase + QUADSPI_BFGENCR);
 
 	qspi_writel(q, QUADSPI_RBCT_WMRK_MASK, base + QUADSPI_RBCT);
 	qspi_writel(q, QUADSPI_BUF3CR_ALLMST_MASK |

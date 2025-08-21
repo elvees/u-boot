@@ -6,7 +6,7 @@
  *     Texas Instruments Incorporated, <www.ti.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <command.h>
 #include <image.h>
 #include <mach/mon.h>
@@ -17,17 +17,17 @@ static int do_mon_install(struct cmd_tbl *cmdtp, int flag, int argc,
 {
 	u32 addr, dpsc_base = 0x1E80000, freq, load_addr, size;
 	int     rcode = 0;
-	struct image_header *header;
+	struct legacy_img_hdr *header;
 	u32 ecrypt_bm_addr = 0;
 
 	if (argc < 2)
 		return CMD_RET_USAGE;
 
-	freq = CONFIG_SYS_HZ_CLOCK;
+	freq = CFG_SYS_HZ_CLOCK;
 
-	addr = simple_strtoul(argv[1], NULL, 16);
+	addr = hextoul(argv[1], NULL);
 
-	header = (struct image_header *)addr;
+	header = (struct legacy_img_hdr *)addr;
 
 	if (image_get_magic(header) != IH_MAGIC) {
 		printf("## Please update monitor image\n");
@@ -36,11 +36,11 @@ static int do_mon_install(struct cmd_tbl *cmdtp, int flag, int argc,
 
 	load_addr = image_get_load(header);
 	size = image_get_data_size(header);
-	memcpy((void *)load_addr, (void *)(addr + sizeof(struct image_header)),
+	memcpy((void *)load_addr, (void *)(addr + sizeof(struct legacy_img_hdr)),
 	       size);
 
 	if (argc >=  3)
-		ecrypt_bm_addr = simple_strtoul(argv[2], NULL, 16);
+		ecrypt_bm_addr = hextoul(argv[2], NULL);
 
 	rcode = mon_install(load_addr, dpsc_base, freq, ecrypt_bm_addr);
 	printf("## installed monitor @ 0x%x, freq [%d], status %d\n",
@@ -76,8 +76,8 @@ int do_mon_power(struct cmd_tbl *cmdtp, int flag, int argc,
 	if (argc < 3)
 		return CMD_RET_USAGE;
 
-	core_id = simple_strtoul(argv[1], NULL, 16);
-	on = simple_strtoul(argv[2], NULL, 16);
+	core_id = hextoul(argv[1], NULL);
+	on = hextoul(argv[2], NULL);
 
 	if (on)
 		rcode = mon_power_on(core_id, fn);

@@ -3,7 +3,6 @@
  * Copyright (C) 2016 Google, Inc
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <fdtdec.h>
@@ -160,11 +159,9 @@ static int ich6_pinctrl_probe(struct udevice *dev)
 	u32 iobase = -1;
 
 	debug("%s: start\n", __func__);
-	ret = uclass_first_device(UCLASS_PCH, &pch);
+	ret = uclass_first_device_err(UCLASS_PCH, &pch);
 	if (ret)
 		return ret;
-	if (!pch)
-		return -ENODEV;
 
 	/*
 	 * Get the memory/io base address to configure every pins.

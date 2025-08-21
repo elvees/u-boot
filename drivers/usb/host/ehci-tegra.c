@@ -5,7 +5,6 @@
  * Copyright (c) 2013 Lucas Stach
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <linux/delay.h>
@@ -25,13 +24,6 @@
 
 #define HOSTPC1_DEVLC	0x84
 #define HOSTPC1_PSPD(x)		(((x) >> 25) & 0x3)
-
-#ifdef CONFIG_USB_ULPI
-	#ifndef CONFIG_USB_ULPI_VIEWPORT
-	#error	"To use CONFIG_USB_ULPI on Tegra Boards you have to also \
-		define CONFIG_USB_ULPI_VIEWPORT"
-	#endif
-#endif
 
 /* Parameters we need for USB */
 enum {
@@ -67,9 +59,24 @@ enum usb_ctlr_type {
 	USB_CTRL_COUNT,
 };
 
+struct tegra_utmip_config {
+	u32 hssync_start_delay;
+	u32 elastic_limit;
+	u32 idle_wait_delay;
+	u32 term_range_adj;
+	bool xcvr_setup_use_fuses;
+	u32 xcvr_setup;
+	u32 xcvr_lsfslew;
+	u32 xcvr_lsrslew;
+	u32 xcvr_hsslew;
+	u32 hssquelch_level;
+	u32 hsdiscon_level;
+};
+
 /* Information about a USB port */
 struct fdt_usb {
 	struct ehci_ctrl ehci;
+	struct tegra_utmip_config utmip_config;
 	struct usb_ctlr *reg;	/* address of registers in physical memory */
 	unsigned utmi:1;	/* 1 if port has external tranceiver, else 0 */
 	unsigned ulpi:1;	/* 1 if port has external ULPI transceiver */
@@ -127,52 +134,71 @@ struct fdt_usb {
 static const unsigned T20_usb_pll[CLOCK_OSC_FREQ_COUNT][PARAM_COUNT] = {
 	/* DivN, DivM, DivP, CPCON, LFCON, Delays             Debounce, Bias */
 	{ 0x3C0, 0x0D, 0x00, 0xC,   0,  0x02, 0x33, 0x05, 0x7F, 0x7EF4, 5 },
-	{ 0x0C8, 0x04, 0x00, 0x3,   0,  0x03, 0x4B, 0x06, 0xBB, 0xBB80, 7 },
-	{ 0x3C0, 0x0C, 0x00, 0xC,   0,  0x02, 0x2F, 0x04, 0x76, 0x7530, 5 },
-	{ 0x3C0, 0x1A, 0x00, 0xC,   0,  0x04, 0x66, 0x09, 0xFE, 0xFDE8, 9 },
+	{ 0x3C0, 0x0D, 0x00, 0xC,   0,  0x02, 0x33, 0x05, 0x7F, 0x7EF4, 5 },
 	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
-	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 }
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
+	{ 0x0C8, 0x04, 0x00, 0x3,   0,  0x03, 0x4B, 0x06, 0xBB, 0xBB80, 7 },
+	{ 0x0C8, 0x04, 0x00, 0x3,   0,  0x03, 0x4B, 0x06, 0xBB, 0xBB80, 7 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
+	{ 0x3C0, 0x0C, 0x00, 0xC,   0,  0x02, 0x2F, 0x04, 0x76, 0x7530, 5 },
+	{ 0x3C0, 0x0C, 0x00, 0xC,   0,  0x02, 0x2F, 0x04, 0x76, 0x7530, 5 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
+	{ 0x3C0, 0x1A, 0x00, 0xC,   0,  0x04, 0x66, 0x09, 0xFE, 0xFDE8, 9 }
 };
 
 static const unsigned T30_usb_pll[CLOCK_OSC_FREQ_COUNT][PARAM_COUNT] = {
 	/* DivN, DivM, DivP, CPCON, LFCON, Delays             Debounce, Bias */
 	{ 0x3C0, 0x0D, 0x00, 0xC,   1,  0x02, 0x33, 0x09, 0x7F, 0x7EF4, 5 },
-	{ 0x0C8, 0x04, 0x00, 0x3,   0,  0x03, 0x4B, 0x0C, 0xBB, 0xBB80, 7 },
-	{ 0x3C0, 0x0C, 0x00, 0xC,   1,  0x02, 0x2F, 0x08, 0x76, 0x7530, 5 },
-	{ 0x3C0, 0x1A, 0x00, 0xC,   1,  0x04, 0x66, 0x09, 0xFE, 0xFDE8, 9 },
+	{ 0x3C0, 0x0D, 0x00, 0xC,   1,  0x02, 0x33, 0x09, 0x7F, 0x7EF4, 5 },
 	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
-	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 }
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
+	{ 0x0C8, 0x04, 0x00, 0x3,   0,  0x03, 0x4B, 0x0C, 0xBB, 0xBB80, 7 },
+	{ 0x0C8, 0x04, 0x00, 0x3,   0,  0x03, 0x4B, 0x0C, 0xBB, 0xBB80, 7 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
+	{ 0x3C0, 0x0C, 0x00, 0xC,   1,  0x02, 0x2F, 0x08, 0x76, 0x7530, 5 },
+	{ 0x3C0, 0x0C, 0x00, 0xC,   1,  0x02, 0x2F, 0x08, 0x76, 0x7530, 5 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
+	{ 0x3C0, 0x1A, 0x00, 0xC,   1,  0x04, 0x66, 0x09, 0xFE, 0xFDE8, 9 }
 };
 
 static const unsigned T114_usb_pll[CLOCK_OSC_FREQ_COUNT][PARAM_COUNT] = {
 	/* DivN, DivM, DivP, CPCON, LFCON, Delays             Debounce, Bias */
 	{ 0x3C0, 0x0D, 0x00, 0xC,   2,  0x02, 0x33, 0x09, 0x7F, 0x7EF4, 6 },
-	{ 0x0C8, 0x04, 0x00, 0x3,   2,  0x03, 0x4B, 0x0C, 0xBB, 0xBB80, 8 },
-	{ 0x3C0, 0x0C, 0x00, 0xC,   2,  0x02, 0x2F, 0x08, 0x76, 0x7530, 5 },
-	{ 0x3C0, 0x1A, 0x00, 0xC,   2,  0x04, 0x66, 0x09, 0xFE, 0xFDE8, 11 },
+	{ 0x3C0, 0x0D, 0x00, 0xC,   2,  0x02, 0x33, 0x09, 0x7F, 0x7EF4, 6 },
 	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
-	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 }
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
+	{ 0x0C8, 0x04, 0x00, 0x3,   2,  0x03, 0x4B, 0x0C, 0xBB, 0xBB80, 8 },
+	{ 0x0C8, 0x04, 0x00, 0x3,   2,  0x03, 0x4B, 0x0C, 0xBB, 0xBB80, 8 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
+	{ 0x3C0, 0x0C, 0x00, 0xC,   2,  0x02, 0x2F, 0x08, 0x76, 0x7530, 5 },
+	{ 0x3C0, 0x0C, 0x00, 0xC,   2,  0x02, 0x2F, 0x08, 0x76, 0x7530, 5 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00, 0x0000, 0 },
+	{ 0x3C0, 0x1A, 0x00, 0xC,   2,  0x04, 0x66, 0x09, 0xFE, 0xFDE8, 11 }
 };
 
 /* NOTE: 13/26MHz settings are N/A for T210, so dupe 12MHz settings for now */
 static const unsigned T210_usb_pll[CLOCK_OSC_FREQ_COUNT][PARAM_COUNT] = {
 	/* DivN, DivM, DivP, KCP,   KVCO,  Delays              Debounce, Bias */
 	{ 0x028, 0x01, 0x01, 0x0,   0,  0x02, 0x2F, 0x08, 0x76,  32500,  5 },
+	{ 0x028, 0x01, 0x01, 0x0,   0,  0x02, 0x2F, 0x08, 0x76,  32500,  5 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00,      0,  0 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00,      0,  0 },
 	{ 0x019, 0x01, 0x01, 0x0,   0,  0x03, 0x4B, 0x0C, 0xBB,  48000,  8 },
-	{ 0x028, 0x01, 0x01, 0x0,   0,  0x02, 0x2F, 0x08, 0x76,  30000,  5 },
-	{ 0x028, 0x01, 0x01, 0x0,   0,  0x02, 0x2F, 0x08, 0x76,  65000,  5 },
 	{ 0x019, 0x02, 0x01, 0x0,   0,  0x05, 0x96, 0x18, 0x177, 96000, 15 },
-	{ 0x028, 0x04, 0x01, 0x0,   0,  0x04, 0x66, 0x09, 0xFE, 120000, 20 }
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00,      0,  0 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00,      0,  0 },
+	{ 0x028, 0x01, 0x01, 0x0,   0,  0x02, 0x2F, 0x08, 0x76,  30000,  5 },
+	{ 0x028, 0x04, 0x01, 0x0,   0,  0x04, 0x66, 0x09, 0xFE, 120000, 20 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00,      0,  0 },
+	{ 0x000, 0x00, 0x00, 0x0,   0,  0x00, 0x00, 0x00, 0x00,      0,  0 },
+	{ 0x028, 0x01, 0x01, 0x0,   0,  0x02, 0x2F, 0x08, 0x76,  65000,  5 }
 };
-
-/* UTMIP Idle Wait Delay */
-static const u8 utmip_idle_wait_delay = 17;
-
-/* UTMIP Elastic limit */
-static const u8 utmip_elastic_limit = 16;
-
-/* UTMIP High Speed Sync Start Delay */
-static const u8 utmip_hs_sync_start_delay = 9;
 
 struct fdt_usb_controller {
 	/* flag to determine whether controller supports hostpc register */
@@ -350,6 +376,7 @@ static int init_utmi_usb_controller(struct fdt_usb *config,
 	u32 b_sess_valid_mask, val;
 	int loop_count;
 	const unsigned *timing;
+	struct tegra_utmip_config *utmip_config = &config->utmip_config;
 	struct usb_ctlr *usbctlr = config->reg;
 	struct clk_rst_ctlr *clkrst;
 	struct usb_ctlr *usb1ctlr;
@@ -436,16 +463,29 @@ static int init_utmi_usb_controller(struct fdt_usb *config,
 
 		/* Recommended PHY settings for EYE diagram */
 		val = readl(&usbctlr->utmip_xcvr_cfg0);
-		clrsetbits_le32(&val, UTMIP_XCVR_SETUP_MASK,
-				0x4 << UTMIP_XCVR_SETUP_SHIFT);
-		clrsetbits_le32(&val, UTMIP_XCVR_SETUP_MSB_MASK,
-				0x3 << UTMIP_XCVR_SETUP_MSB_SHIFT);
-		clrsetbits_le32(&val, UTMIP_XCVR_HSSLEW_MSB_MASK,
-				0x8 << UTMIP_XCVR_HSSLEW_MSB_SHIFT);
+
+		if (!utmip_config->xcvr_setup_use_fuses) {
+			clrsetbits_le32(&val, UTMIP_XCVR_SETUP(~0),
+					UTMIP_XCVR_SETUP(utmip_config->xcvr_setup));
+			clrsetbits_le32(&val, UTMIP_XCVR_SETUP_MSB(~0),
+					UTMIP_XCVR_SETUP_MSB(utmip_config->xcvr_setup));
+		}
+
+		clrsetbits_le32(&val, UTMIP_XCVR_LSFSLEW(~0),
+				UTMIP_XCVR_LSFSLEW(utmip_config->xcvr_lsfslew));
+		clrsetbits_le32(&val, UTMIP_XCVR_LSRSLEW(~0),
+				UTMIP_XCVR_LSRSLEW(utmip_config->xcvr_lsrslew));
+
+		clrsetbits_le32(&val, UTMIP_XCVR_HSSLEW(~0),
+				UTMIP_XCVR_HSSLEW(utmip_config->xcvr_hsslew));
+		clrsetbits_le32(&val, UTMIP_XCVR_HSSLEW_MSB(~0),
+				UTMIP_XCVR_HSSLEW_MSB(utmip_config->xcvr_hsslew));
 		writel(val, &usbctlr->utmip_xcvr_cfg0);
+
 		clrsetbits_le32(&usbctlr->utmip_xcvr_cfg1,
 				UTMIP_XCVR_TERM_RANGE_ADJ_MASK,
-				0x7 << UTMIP_XCVR_TERM_RANGE_ADJ_SHIFT);
+				utmip_config->term_range_adj <<
+				UTMIP_XCVR_TERM_RANGE_ADJ_SHIFT);
 
 		/* Some registers can be controlled from USB1 only. */
 		if (config->periph_id != PERIPH_ID_USBD) {
@@ -458,9 +498,11 @@ static int init_utmi_usb_controller(struct fdt_usb *config,
 		val = readl(&usb1ctlr->utmip_bias_cfg0);
 		setbits_le32(&val, UTMIP_HSDISCON_LEVEL_MSB);
 		clrsetbits_le32(&val, UTMIP_HSDISCON_LEVEL_MASK,
-				0x1 << UTMIP_HSDISCON_LEVEL_SHIFT);
+				utmip_config->hsdiscon_level <<
+				UTMIP_HSDISCON_LEVEL_SHIFT);
 		clrsetbits_le32(&val, UTMIP_HSSQUELCH_LEVEL_MASK,
-				0x2 << UTMIP_HSSQUELCH_LEVEL_SHIFT);
+				utmip_config->hssquelch_level <<
+				UTMIP_HSSQUELCH_LEVEL_SHIFT);
 		writel(val, &usb1ctlr->utmip_bias_cfg0);
 
 		/* Miscellaneous setting mentioned in Programming Guide */
@@ -494,7 +536,11 @@ static int init_utmi_usb_controller(struct fdt_usb *config,
 	setbits_le32(&usbctlr->utmip_bat_chrg_cfg0, UTMIP_PD_CHRG);
 
 	clrbits_le32(&usbctlr->utmip_xcvr_cfg0, UTMIP_XCVR_LSBIAS_SE);
-	setbits_le32(&usbctlr->utmip_spare_cfg0, FUSE_SETUP_SEL);
+
+	if (utmip_config->xcvr_setup_use_fuses)
+		setbits_le32(&usbctlr->utmip_spare_cfg0, FUSE_SETUP_SEL);
+	else
+		clrbits_le32(&usbctlr->utmip_spare_cfg0, FUSE_SETUP_SEL);
 
 	/*
 	 * Configure the UTMIP_IDLE_WAIT and UTMIP_ELASTIC_LIMIT
@@ -508,15 +554,16 @@ static int init_utmi_usb_controller(struct fdt_usb *config,
 	/* Set PLL enable delay count and Crystal frequency count */
 	val = readl(&usbctlr->utmip_hsrx_cfg0);
 	clrsetbits_le32(&val, UTMIP_IDLE_WAIT_MASK,
-		utmip_idle_wait_delay << UTMIP_IDLE_WAIT_SHIFT);
+		utmip_config->idle_wait_delay << UTMIP_IDLE_WAIT_SHIFT);
 	clrsetbits_le32(&val, UTMIP_ELASTIC_LIMIT_MASK,
-		utmip_elastic_limit << UTMIP_ELASTIC_LIMIT_SHIFT);
+		utmip_config->elastic_limit << UTMIP_ELASTIC_LIMIT_SHIFT);
 	writel(val, &usbctlr->utmip_hsrx_cfg0);
 
 	/* Configure the UTMIP_HS_SYNC_START_DLY */
 	clrsetbits_le32(&usbctlr->utmip_hsrx_cfg1,
 		UTMIP_HS_SYNC_START_DLY_MASK,
-		utmip_hs_sync_start_delay << UTMIP_HS_SYNC_START_DLY_SHIFT);
+		utmip_config->hssync_start_delay <<
+		UTMIP_HS_SYNC_START_DLY_SHIFT);
 
 	/* Preceed the crystal clock disable by >100ns delay. */
 	udelay(1);
@@ -578,8 +625,8 @@ static int init_utmi_usb_controller(struct fdt_usb *config,
 
 #ifdef CONFIG_USB_ULPI
 /* if board file does not set a ULPI reference frequency we default to 24MHz */
-#ifndef CONFIG_ULPI_REF_CLK
-#define CONFIG_ULPI_REF_CLK 24000000
+#ifndef CFG_ULPI_REF_CLK
+#define CFG_ULPI_REF_CLK 24000000
 #endif
 
 /* set up the ULPI USB controller with the parameters provided */
@@ -594,7 +641,7 @@ static int init_ulpi_usb_controller(struct fdt_usb *config,
 
 	/* set up ULPI reference clock on pllp_out4 */
 	clock_enable(PERIPH_ID_DEV2_OUT);
-	clock_set_pllout(CLOCK_ID_PERIPH, PLL_OUT4, CONFIG_ULPI_REF_CLK);
+	clock_set_pllout(CLOCK_ID_PERIPH, PLL_OUT4, CFG_ULPI_REF_CLK);
 
 	/* reset ULPI phy */
 	if (dm_gpio_is_valid(&config->phy_reset_gpio)) {
@@ -695,7 +742,7 @@ static int fdt_decode_usb(struct udevice *dev, struct fdt_usb *config)
 {
 	const char *phy, *mode;
 
-	config->reg = (struct usb_ctlr *)dev_read_addr(dev);
+	config->reg = dev_read_addr_ptr(dev);
 	debug("reg=%p\n", config->reg);
 	mode = dev_read_string(dev, "dr_mode");
 	if (mode) {
@@ -734,6 +781,69 @@ static int fdt_decode_usb(struct udevice *dev, struct fdt_usb *config)
 	      config->reg);
 
 	return 0;
+}
+
+static void fdt_decode_usb_phy(struct udevice *dev)
+{
+	struct fdt_usb *priv = dev_get_priv(dev);
+	struct tegra_utmip_config *utmip_config = &priv->utmip_config;
+	u32 usb_phy_phandle;
+	ofnode usb_phy_node;
+	int ret;
+
+	ret = ofnode_read_u32(dev_ofnode(dev), "nvidia,phy", &usb_phy_phandle);
+	if (ret)
+		log_debug("%s: required usb phy node isn't provided\n", __func__);
+
+	usb_phy_node = ofnode_get_by_phandle(usb_phy_phandle);
+	if (!ofnode_valid(usb_phy_node) || !ofnode_is_enabled(usb_phy_node)) {
+		log_debug("%s: failed to find usb phy node or it is disabled\n", __func__);
+		utmip_config->xcvr_setup_use_fuses = true;
+	} else {
+		utmip_config->xcvr_setup_use_fuses =
+			ofnode_read_bool(usb_phy_node, "nvidia,xcvr-setup-use-fuses");
+	}
+
+	utmip_config->hssync_start_delay =
+		ofnode_read_u32_default(usb_phy_node,
+					"nvidia,hssync-start-delay", 0x9);
+
+	utmip_config->elastic_limit =
+		ofnode_read_u32_default(usb_phy_node,
+					"nvidia,elastic-limit", 0x10);
+
+	utmip_config->idle_wait_delay =
+		ofnode_read_u32_default(usb_phy_node,
+					"nvidia,idle-wait-delay", 0x11);
+
+	utmip_config->term_range_adj =
+		ofnode_read_u32_default(usb_phy_node,
+					"nvidia,term-range-adj", 0x7);
+
+	utmip_config->xcvr_lsfslew =
+		ofnode_read_u32_default(usb_phy_node,
+					"nvidia,xcvr-lsfslew", 0x0);
+
+	utmip_config->xcvr_lsrslew =
+		ofnode_read_u32_default(usb_phy_node,
+					"nvidia,xcvr-lsrslew", 0x3);
+
+	utmip_config->xcvr_hsslew =
+		ofnode_read_u32_default(usb_phy_node,
+					"nvidia,xcvr-hsslew", 0x8);
+
+	utmip_config->hssquelch_level =
+		ofnode_read_u32_default(usb_phy_node,
+					"nvidia,hssquelch-level", 0x2);
+
+	utmip_config->hsdiscon_level =
+		ofnode_read_u32_default(usb_phy_node,
+					"nvidia,hsdiscon-level", 0x1);
+
+	if (!utmip_config->xcvr_setup_use_fuses) {
+		ofnode_read_u32(usb_phy_node, "nvidia,xcvr-setup",
+				&utmip_config->xcvr_setup);
+	}
 }
 
 int usb_common_init(struct fdt_usb *config, enum usb_init_type init)
@@ -822,6 +932,8 @@ static int ehci_usb_of_to_plat(struct udevice *dev)
 		return ret;
 
 	priv->type = dev_get_driver_data(dev);
+
+	fdt_decode_usb_phy(dev);
 
 	return 0;
 }

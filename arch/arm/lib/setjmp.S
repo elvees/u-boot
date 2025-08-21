@@ -17,7 +17,7 @@ ENTRY(setjmp)
 	mov  ip, sp
 	stm  a1, {v1-v8, ip, lr}
 	mov  a1, #0
-	bx   lr
+	ret  lr
 ENDPROC(setjmp)
 .popsection
 
@@ -31,6 +31,18 @@ ENTRY(longjmp)
 	bne  1f
 	mov  a1, #1
 1:
-	bx   lr
+	ret  lr
 ENDPROC(longjmp)
+.popsection
+
+.pushsection .text.initjmp, "ax"
+ENTRY(initjmp)
+	stm  a1, {v1-v8}
+	/* a2: entry point address, a3: stack base, a4: stack size */
+	add  a3, a3, a4
+	str  a3, [a1, #32]  /* where setjmp would save sp */
+	str  a2, [a1, #36]  /* where setjmp would save lr */
+	mov  a1, #0
+	ret  lr
+ENDPROC(initjmp)
 .popsection

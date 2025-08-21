@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2017 Marek Behun <marek.behun@nic.cz>
+ * Copyright (C) 2017 Marek Behún <kabel@kernel.org>
  */
 
 / {
@@ -12,40 +12,95 @@
 };
 
 &i2c0 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 
 	i2cmux: i2cmux@70 {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 
 		i2c@0 {
-			u-boot,dm-pre-reloc;
+			bootph-all;
 		};
 
 		i2c@1 {
-			u-boot,dm-pre-reloc;
+			bootph-all;
 		};
 
 		i2c@5 {
-			u-boot,dm-pre-reloc;
+			bootph-all;
 
-			/* ATSHA204A at address 0x64 */
-			atsha204a@64 {
-				u-boot,dm-pre-reloc;
-				compatible = "atmel,atsha204a";
-				reg = <0x64>;
+			crypto@64 {
+				bootph-all;
 			};
 		};
 	};
 };
 
-&spi0 {
-	u-boot,dm-pre-reloc;
+&mdio {
+	switch@10 {
+		mdio {
+			#address-cells = <1>;
+			#size-cells = <0>;
 
-	spi-nor@0 {
-		u-boot,dm-pre-reloc;
+			sw_phy0: ethernet-phy@0 {
+				reg = <0x0>;
+			};
+
+			sw_phy1: ethernet-phy@1 {
+				reg = <0x1>;
+			};
+
+			sw_phy2: ethernet-phy@2 {
+				reg = <0x2>;
+			};
+
+			sw_phy3: ethernet-phy@3 {
+				reg = <0x3>;
+			};
+
+			sw_phy4: ethernet-phy@4 {
+				reg = <0x4>;
+			};
+		};
+		ports {
+			ports@0 {
+				phy-handle = <&sw_phy0>;
+				phy-mode = "internal";
+			};
+			ports@1 {
+				phy-handle = <&sw_phy1>;
+				phy-mode = "internal";
+			};
+			ports@2 {
+				phy-handle = <&sw_phy2>;
+				phy-mode = "internal";
+			};
+			ports@3 {
+				phy-handle = <&sw_phy3>;
+				phy-mode = "internal";
+			};
+			ports@4 {
+				phy-handle = <&sw_phy4>;
+				phy-mode = "internal";
+			};
+		};
 	};
 };
 
-&uart0 {
-	u-boot,dm-pre-reloc;
+#ifdef CONFIG_ENV_IS_IN_SPI_FLASH
+&spi0 {
+	flash@0 {
+		partitions {
+			partition@0 {
+				reg = <0x0 CONFIG_ENV_OFFSET>;
+			};
+
+			partition@f0000 {
+				reg = <CONFIG_ENV_OFFSET CONFIG_ENV_SIZE>;
+				label = "u-boot-env";
+			};
+		};
+	};
 };
+#endif
+
+#include "mvebu-u-boot.dtsi"

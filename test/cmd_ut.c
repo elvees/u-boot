@@ -4,178 +4,334 @@
  * Joe Hershberger, National Instruments, joe.hershberger@ni.com
  */
 
-#include <common.h>
 #include <command.h>
 #include <console.h>
-#include <test/suites.h>
+#include <vsprintf.h>
 #include <test/test.h>
+#include <test/ut.h>
 
-static int do_ut_all(struct cmd_tbl *cmdtp, int flag, int argc,
-		     char *const argv[]);
-
-int cmd_ut_category(const char *name, const char *prefix,
-		    struct unit_test *tests, int n_ents,
-		    int argc, char *const argv[])
-{
-	struct unit_test_state uts = { .fail_count = 0 };
-	struct unit_test *test;
-	int prefix_len = prefix ? strlen(prefix) : 0;
-
-	if (argc == 1)
-		printf("Running %d %s tests\n", n_ents, name);
-
-	for (test = tests; test < tests + n_ents; test++) {
-		const char *test_name = test->name;
-
-		/* Remove the prefix */
-		if (prefix && !strncmp(test_name, prefix, prefix_len))
-			test_name += prefix_len;
-
-		if (argc > 1 && strcmp(argv[1], test_name))
-			continue;
-		printf("Test: %s\n", test->name);
-
-		if (test->flags & UT_TESTF_CONSOLE_REC) {
-			int ret = console_record_reset_enable();
-
-			if (ret) {
-				printf("Skipping: Console recording disabled\n");
-				continue;
-			}
-		}
-
-		uts.start = mallinfo();
-
-		test->func(&uts);
-	}
-
-	printf("Failures: %d\n", uts.fail_count);
-
-	return uts.fail_count ? CMD_RET_FAILURE : 0;
-}
-
-static struct cmd_tbl cmd_ut_sub[] = {
-	U_BOOT_CMD_MKENT(all, CONFIG_SYS_MAXARGS, 1, do_ut_all, "", ""),
-#if defined(CONFIG_UT_DM)
-	U_BOOT_CMD_MKENT(dm, CONFIG_SYS_MAXARGS, 1, do_ut_dm, "", ""),
-#endif
-#if defined(CONFIG_UT_ENV)
-	U_BOOT_CMD_MKENT(env, CONFIG_SYS_MAXARGS, 1, do_ut_env, "", ""),
-#endif
-#ifdef CONFIG_UT_OPTEE
-	U_BOOT_CMD_MKENT(optee, CONFIG_SYS_MAXARGS, 1, do_ut_optee, "", ""),
-#endif
-#ifdef CONFIG_UT_OVERLAY
-	U_BOOT_CMD_MKENT(overlay, CONFIG_SYS_MAXARGS, 1, do_ut_overlay, "", ""),
-#endif
-#ifdef CONFIG_UT_LIB
-	U_BOOT_CMD_MKENT(lib, CONFIG_SYS_MAXARGS, 1, do_ut_lib, "", ""),
-#endif
-#ifdef CONFIG_UT_LOG
-	U_BOOT_CMD_MKENT(log, CONFIG_SYS_MAXARGS, 1, do_ut_log, "", ""),
-#endif
-	U_BOOT_CMD_MKENT(mem, CONFIG_SYS_MAXARGS, 1, do_ut_mem, "", ""),
-#ifdef CONFIG_CMD_SETEXPR
-	U_BOOT_CMD_MKENT(setexpr, CONFIG_SYS_MAXARGS, 1, do_ut_setexpr, "",
-			 ""),
-#endif
-#ifdef CONFIG_UT_TIME
-	U_BOOT_CMD_MKENT(time, CONFIG_SYS_MAXARGS, 1, do_ut_time, "", ""),
-#endif
-#if CONFIG_IS_ENABLED(UT_UNICODE) && !defined(API_BUILD)
-	U_BOOT_CMD_MKENT(unicode, CONFIG_SYS_MAXARGS, 1, do_ut_unicode, "", ""),
-#endif
-#ifdef CONFIG_SANDBOX
-	U_BOOT_CMD_MKENT(compression, CONFIG_SYS_MAXARGS, 1, do_ut_compression,
-			 "", ""),
-	U_BOOT_CMD_MKENT(bloblist, CONFIG_SYS_MAXARGS, 1, do_ut_bloblist,
-			 "", ""),
-	U_BOOT_CMD_MKENT(bootm, CONFIG_SYS_MAXARGS, 1, do_ut_bootm, "", ""),
-#endif
-	U_BOOT_CMD_MKENT(str, CONFIG_SYS_MAXARGS, 1, do_ut_str, "", ""),
-#ifdef CONFIG_CMD_ADDRMAP
-	U_BOOT_CMD_MKENT(addrmap, CONFIG_SYS_MAXARGS, 1, do_ut_addrmap, "", ""),
-#endif
+/**
+ * struct suite - A set of tests for a certain topic
+ *
+ * All tests end up in a single 'struct unit_test' linker-list array, in order
+ * of the suite they are in
+ *
+ * @name: Name of suite
+ * @start: First test in suite
+ * @end: End test in suite (points to the first test in the next suite)
+ * @help: Help-string to show for this suite
+ */
+struct suite {
+	const char *name;
+	struct unit_test *start;
+	struct unit_test *end;
+	const char *help;
 };
 
-static int do_ut_all(struct cmd_tbl *cmdtp, int flag, int argc,
-		     char *const argv[])
+static int do_ut_all(struct unit_test_state *uts, const char *select_name,
+		     int runs_per_test, bool force_run,
+		     const char *test_insert);
+
+static int do_ut_info(bool show_suites);
+
+/* declare linker-list symbols for the start and end of a suite */
+#define SUITE_DECL(_name) \
+	ll_start_decl(suite_start_ ## _name, struct unit_test, ut_ ## _name); \
+	ll_end_decl(suite_end_ ## _name, struct unit_test, ut_ ## _name)
+
+/* declare a test suite which can be run directly without a subcommand */
+#define SUITE(_name, _help) { \
+	#_name, \
+	suite_start_ ## _name, \
+	suite_end_ ## _name, \
+	_help, \
+	}
+
+SUITE_DECL(addrmap);
+SUITE_DECL(bdinfo);
+SUITE_DECL(bloblist);
+SUITE_DECL(bootm);
+SUITE_DECL(bootstd);
+SUITE_DECL(cmd);
+SUITE_DECL(common);
+SUITE_DECL(dm);
+SUITE_DECL(env);
+SUITE_DECL(exit);
+SUITE_DECL(fdt);
+SUITE_DECL(fdt_overlay);
+SUITE_DECL(font);
+SUITE_DECL(hush);
+SUITE_DECL(lib);
+SUITE_DECL(loadm);
+SUITE_DECL(log);
+SUITE_DECL(mbr);
+SUITE_DECL(measurement);
+SUITE_DECL(mem);
+SUITE_DECL(optee);
+SUITE_DECL(pci_mps);
+SUITE_DECL(seama);
+SUITE_DECL(setexpr);
+SUITE_DECL(upl);
+
+static struct suite suites[] = {
+	SUITE(addrmap, "very basic test of addrmap command"),
+	SUITE(bdinfo, "bdinfo (board info) command"),
+	SUITE(bloblist, "bloblist implementation"),
+	SUITE(bootm, "bootm command"),
+	SUITE(bootstd, "standard boot implementation"),
+	SUITE(cmd, "various commands"),
+	SUITE(common, "tests for common/ directory"),
+	SUITE(dm, "driver model"),
+	SUITE(env, "environment"),
+	SUITE(exit, "shell exit and variables"),
+	SUITE(fdt, "fdt command"),
+	SUITE(fdt_overlay, "device tree overlays"),
+	SUITE(font, "font command"),
+	SUITE(hush, "hush behaviour"),
+	SUITE(lib, "library functions"),
+	SUITE(loadm, "loadm command parameters and loading memory blob"),
+	SUITE(log, "logging functions"),
+	SUITE(mbr, "mbr command"),
+	SUITE(measurement, "TPM-based measured boot"),
+	SUITE(mem, "memory-related commands"),
+	SUITE(optee, "OP-TEE"),
+	SUITE(pci_mps, "PCI Express Maximum Payload Size"),
+	SUITE(seama, "seama command parameters loading and decoding"),
+	SUITE(setexpr, "setexpr command"),
+	SUITE(upl, "Universal payload support"),
+};
+
+/**
+ * has_tests() - Check if a suite has tests, i.e. is supported in this build
+ *
+ * If the suite is run using a command, we have to assume that tests may be
+ * present, since we have no visibility
+ *
+ * @ste: Suite to check
+ * Return: true if supported, false if not
+ */
+static bool has_tests(struct suite *ste)
+{
+	int n_ents = ste->end - ste->start;
+
+	return n_ents;
+}
+
+/** run_suite() - Run a suite of tests */
+static int run_suite(struct unit_test_state *uts, struct suite *ste,
+		     const char *select_name, int runs_per_test, bool force_run,
+		     const char *test_insert)
+{
+	int n_ents = ste->end - ste->start;
+	char prefix[30];
+	int ret;
+
+	/* use a standard prefix */
+	snprintf(prefix, sizeof(prefix), "%s_test_", ste->name);
+
+	ret = ut_run_list(uts, ste->name, prefix, ste->start, n_ents,
+			  select_name, runs_per_test, force_run, test_insert);
+
+	return ret;
+}
+
+static void show_stats(struct unit_test_state *uts)
+{
+	if (uts->run_count < 2)
+		return;
+
+	ut_report(&uts->total, uts->run_count);
+	if (CONFIG_IS_ENABLED(UNIT_TEST_DURATION) &&
+	    uts->total.test_count && uts->worst) {
+		ulong avg = uts->total.duration_ms / uts->total.test_count;
+
+		printf("Average test time: %ld ms, worst case '%s' took %d ms\n",
+		       avg, uts->worst->name, uts->worst_ms);
+	}
+}
+
+static void update_stats(struct unit_test_state *uts, const struct suite *ste)
+{
+	if (CONFIG_IS_ENABLED(UNIT_TEST_DURATION) && uts->cur.test_count) {
+		ulong avg;
+
+		avg = uts->cur.duration_ms ?
+			uts->cur.duration_ms /
+			uts->cur.test_count : 0;
+		if (avg > uts->worst_ms) {
+			uts->worst_ms = avg;
+			uts->worst = ste;
+		}
+	}
+}
+
+static int do_ut_all(struct unit_test_state *uts, const char *select_name,
+		     int runs_per_test, bool force_run, const char *test_insert)
 {
 	int i;
 	int retval;
 	int any_fail = 0;
 
-	for (i = 1; i < ARRAY_SIZE(cmd_ut_sub); i++) {
-		printf("----Running %s tests----\n", cmd_ut_sub[i].name);
-		retval = cmd_ut_sub[i].cmd(cmdtp, flag, 1, &cmd_ut_sub[i].name);
-		if (!any_fail)
-			any_fail = retval;
+	for (i = 0; i < ARRAY_SIZE(suites); i++) {
+		struct suite *ste = &suites[i];
+
+		if (has_tests(ste)) {
+			printf("----Running %s tests----\n", ste->name);
+			retval = run_suite(uts, ste, select_name, runs_per_test,
+					   force_run, test_insert);
+			if (!any_fail)
+				any_fail = retval;
+			update_stats(uts, ste);
+		}
 	}
 
 	return any_fail;
 }
 
+static int do_ut_info(bool show_suites)
+{
+	int suite_count, i;
+
+	for (suite_count = 0, i = 0; i < ARRAY_SIZE(suites); i++) {
+		struct suite *ste = &suites[i];
+
+		if (has_tests(ste))
+			suite_count++;
+	}
+
+	printf("Test suites: %d\n", suite_count);
+	printf("Total tests: %d\n", (int)UNIT_TEST_ALL_COUNT());
+
+	if (show_suites) {
+		int i, total;
+
+		puts("\nTests  Suite         Purpose");
+		puts("\n-----  ------------  -------------------------\n");
+		for (i = 0, total = 0; i < ARRAY_SIZE(suites); i++) {
+			struct suite *ste = &suites[i];
+			long n_ent = ste->end - ste->start;
+
+			if (n_ent) {
+				printf("%5ld  %-13.13s %s\n", n_ent, ste->name,
+				       ste->help);
+				total += n_ent;
+			}
+		}
+		puts("-----  ------------  -------------------------\n");
+		printf("%5d  %-13.13s\n", total, "Total");
+
+		if (UNIT_TEST_ALL_COUNT() != total)
+			puts("Error: Suite test-count does not match total\n");
+	}
+
+	return 0;
+}
+
+static struct suite *find_suite(const char *name)
+{
+	struct suite *ste;
+	int i;
+
+	for (i = 0, ste = suites; i < ARRAY_SIZE(suites); i++, ste++) {
+		if (!strcmp(ste->name, name))
+			return ste;
+	}
+
+	return NULL;
+}
+
 static int do_ut(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
-	struct cmd_tbl *cp;
-
-	if (argc < 2)
-		return CMD_RET_USAGE;
+	const char *test_insert = NULL, *select_name;
+	struct unit_test_state uts;
+	bool show_suites = false;
+	bool force_run = false;
+	int runs_per_text = 1;
+	struct suite *ste;
+	char *name;
+	int ret;
 
 	/* drop initial "ut" arg */
 	argc--;
 	argv++;
 
-	cp = find_cmd_tbl(argv[0], cmd_ut_sub, ARRAY_SIZE(cmd_ut_sub));
+	while (argc > 0 && *argv[0] == '-') {
+		const char *str = argv[0];
 
-	if (cp)
-		return cp->cmd(cmdtp, flag, argc, argv);
+		switch (str[1]) {
+		case 'r':
+			runs_per_text = dectoul(str + 2, NULL);
+			break;
+		case 'f':
+			force_run = true;
+			break;
+		case 'I':
+			test_insert = str + 2;
+			if (!strchr(test_insert, ':'))
+				return CMD_RET_USAGE;
+			break;
+		case 's':
+			show_suites = true;
+			break;
+		}
+		argv++;
+		argc--;
+	}
 
-	return CMD_RET_USAGE;
+	if (argc < 1)
+		return CMD_RET_USAGE;
+
+	ut_init_state(&uts);
+	name = argv[0];
+	select_name = cmd_arg1(argc, argv);
+	if (!strcmp(name, "all")) {
+		ret = do_ut_all(&uts, select_name, runs_per_text, force_run,
+				test_insert);
+	} else if (!strcmp(name, "info")) {
+		ret = do_ut_info(show_suites);
+	} else {
+		int any_fail = 0;
+		const char *p;
+
+		for (; p = strsep(&name, ","), p; name = NULL) {
+			ste = find_suite(p);
+			if (!ste) {
+				printf("Suite '%s' not found\n", p);
+				return CMD_RET_FAILURE;
+			} else if (!has_tests(ste)) {
+				/* perhaps a Kconfig option needs to be set? */
+				printf("Suite '%s' is not enabled\n", p);
+				return CMD_RET_FAILURE;
+			}
+
+			ret = run_suite(&uts, ste, select_name, runs_per_text,
+					force_run, test_insert);
+			if (!any_fail)
+				any_fail = ret;
+			update_stats(&uts, ste);
+		}
+		ret = any_fail;
+	}
+	show_stats(&uts);
+	if (ret)
+		return ret;
+	ut_uninit_state(&uts);
+
+	return 0;
 }
 
-#ifdef CONFIG_SYS_LONGHELP
-static char ut_help_text[] =
-	"all - execute all enabled tests\n"
-#ifdef CONFIG_SANDBOX
-	"ut bloblist - Test bloblist implementation\n"
-	"ut compression - Test compressors and bootm decompression\n"
-#endif
-#ifdef CONFIG_UT_DM
-	"ut dm [test-name]\n"
-#endif
-#ifdef CONFIG_UT_ENV
-	"ut env [test-name]\n"
-#endif
-#ifdef CONFIG_UT_LIB
-	"ut lib [test-name] - test library functions\n"
-#endif
-#ifdef CONFIG_UT_LOG
-	"ut log [test-name] - test logging functions\n"
-#endif
-	"ut mem [test-name] - test memory-related commands\n"
-#ifdef CONFIG_UT_OPTEE
-	"ut optee [test-name]\n"
-#endif
-#ifdef CONFIG_UT_OVERLAY
-	"ut overlay [test-name]\n"
-#endif
-	"ut setexpr [test-name] - test setexpr command\n"
-#ifdef CONFIG_SANDBOX
-	"ut str - Basic test of string functions\n"
-#endif
-#ifdef CONFIG_UT_TIME
-	"ut time - Very basic test of time functions\n"
-#endif
-#if defined(CONFIG_UT_UNICODE) && \
-	!defined(CONFIG_SPL_BUILD) && !defined(API_BUILD)
-	"ut unicode [test-name] - test Unicode functions\n"
-#endif
-#ifdef CONFIG_CMD_ADDRMAP
-	"ut addrmap - Very basic test of addrmap command\n"
-#endif
-	;
-#endif /* CONFIG_SYS_LONGHELP */
+U_BOOT_LONGHELP(ut,
+	"[-rs] [-f] [-I<n>:<one_test>][<suites>] - run unit tests\n"
+	"   -r<runs>   Number of times to run each test\n"
+	"   -f         Force 'manual' tests to run as well\n"
+	"   -I         Test to run after <n> other tests have run\n"
+	"   -s         Show all suites with ut info\n"
+	"   <suites>   Comma-separated list of suites to run\n"
+	"\n"
+	"Options for <suite>:\n"
+	"all       - execute all enabled tests\n"
+	"info      - show info about tests [and suites]"
+	);
 
 U_BOOT_CMD(
 	ut, CONFIG_SYS_MAXARGS, 1, do_ut,

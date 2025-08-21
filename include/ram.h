@@ -7,6 +7,8 @@
 #ifndef __RAM_H
 #define __RAM_H
 
+#include <linux/types.h>
+
 struct udevice;
 
 struct ram_info {
@@ -32,7 +34,7 @@ struct ram_ops {
  *
  * @dev:	Device to check (UCLASS_RAM)
  * @info:	Returns RAM info
- * @return 0 if OK, -ve on error
+ * Return: 0 if OK, -ve on error
  */
 int ram_get_info(struct udevice *dev, struct ram_info *info);
 

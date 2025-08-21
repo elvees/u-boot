@@ -3,13 +3,16 @@
  * Copyright (c) 2011-2012 The Chromium OS Authors.
  */
 
-#include <common.h>
+#include <bloblist.h>
+#include <config.h>
 #include <errno.h>
 #include <fdtdec.h>
 #include <log.h>
 #include <os.h>
+#include <trace.h>
 #include <asm/malloc.h>
 #include <asm/state.h>
+#include <asm/test.h>
 
 /* Main state record for the sandbox */
 static struct sandbox_state main_state;
@@ -29,17 +32,17 @@ static int state_ensure_space(int extra_size)
 		return 0;
 
 	size = used + extra_size;
-	buf = malloc(size);
+	buf = os_malloc(size);
 	if (!buf)
 		return -ENOMEM;
 
 	ret = fdt_open_into(blob, buf, size);
 	if (ret) {
-		free(buf);
+		os_free(buf);
 		return -EIO;
 	}
 
-	free(blob);
+	os_free(blob);
 	state->state_fdt = buf;
 	return 0;
 }
@@ -55,7 +58,7 @@ static int state_read_file(struct sandbox_state *state, const char *fname)
 		printf("Cannot find sandbox state file '%s'\n", fname);
 		return -ENOENT;
 	}
-	state->state_fdt = malloc(size);
+	state->state_fdt = os_malloc(size);
 	if (!state->state_fdt) {
 		puts("No memory to read sandbox state\n");
 		return -ENOMEM;
@@ -77,7 +80,11 @@ static int state_read_file(struct sandbox_state *state, const char *fname)
 err_read:
 	os_close(fd);
 err_open:
-	free(state->state_fdt);
+	/*
+	 * tainted scalar, since size is obtained from the file. But we can rely
+	 * on os_malloc() to handle invalid values.
+	 */
+	os_free(state->state_fdt);
 	state->state_fdt = NULL;
 
 	return ret;
@@ -95,7 +102,7 @@ err_open:
  * @state: Sandbox state
  * @io: Method to use for reading state
  * @blob: FDT containing state
- * @return 0 if OK, -EINVAL if the read function returned failure
+ * Return: 0 if OK, -EINVAL if the read function returned failure
  */
 int sandbox_read_state_nodes(struct sandbox_state *state,
 			     struct sandbox_state_io *io, const void *blob)
@@ -184,7 +191,7 @@ int sandbox_read_state(struct sandbox_state *state, const char *fname)
  *
  * @state: Sandbox state
  * @io: Method to use for writing state
- * @return 0 if OK, -EIO if there is a fatal error (such as out of space
+ * Return: 0 if OK, -EIO if there is a fatal error (such as out of space
  * for adding the data), -EINVAL if the write function failed.
  */
 int sandbox_write_state_node(struct sandbox_state *state,
@@ -244,7 +251,7 @@ int sandbox_write_state(struct sandbox_state *state, const char *fname)
 	/* Create a state FDT if we don't have one */
 	if (!state->state_fdt) {
 		size = 0x4000;
-		state->state_fdt = malloc(size);
+		state->state_fdt = os_malloc(size);
 		if (!state->state_fdt) {
 			puts("No memory to create FDT\n");
 			return -ENOMEM;
@@ -302,7 +309,7 @@ int sandbox_write_state(struct sandbox_state *state, const char *fname)
 err_write:
 	os_close(fd);
 err_create:
-	free(state->state_fdt);
+	os_free(state->state_fdt);
 
 	return ret;
 }
@@ -360,24 +367,119 @@ void state_reset_for_test(struct sandbox_state *state)
 	state->sysreset_allowed[SYSRESET_POWER_OFF] = true;
 	state->sysreset_allowed[SYSRESET_COLD] = true;
 	state->allow_memio = false;
+	sandbox_set_eth_enable(true);
 
 	memset(&state->wdt, '\0', sizeof(state->wdt));
 	memset(state->spi, '\0', sizeof(state->spi));
 
 	/*
-	 * Set up the memory tag list. Use the top of emulated SDRAM for the
-	 * first tag number, since that address offset is outside the legal
-	 * range, and can be assumed to be a tag.
+	 * Set up the memory tag list. We could use the top of emulated SDRAM
+	 * for the first tag number, since that address offset is outside the
+	 * legal SDRAM range, but PCI can have address there. So use a very
+	 * large address instead
 	 */
 	INIT_LIST_HEAD(&state->mapmem_head);
-	state->next_tag = state->ram_size;
+	state->next_tag = 0xff000000;
+}
+
+bool autoboot_keyed(void)
+{
+	struct sandbox_state *state = state_get_current();
+
+	return IS_ENABLED(CONFIG_AUTOBOOT_KEYED) && state->autoboot_keyed;
+}
+
+bool autoboot_set_keyed(bool autoboot_keyed)
+{
+	struct sandbox_state *state = state_get_current();
+	bool old_val = state->autoboot_keyed;
+
+	state->autoboot_keyed = autoboot_keyed;
+
+	return old_val;
+}
+
+int state_get_rel_filename(const char *rel_path, char *buf, int size)
+{
+	struct sandbox_state *state = state_get_current();
+	int rel_len, prog_len;
+	char *p;
+	int len;
+
+	rel_len = strlen(rel_path);
+	p = strrchr(state->argv[0], '/');
+	prog_len = p ? p - state->argv[0] : 0;
+
+	/* allow space for a / and a terminator */
+	len = prog_len + 1 + rel_len + 1;
+	if (len > size)
+		return -ENOSPC;
+	strncpy(buf, state->argv[0], prog_len);
+	buf[prog_len] = '/';
+	strcpy(buf + prog_len + 1, rel_path);
+
+	return len;
+}
+
+int state_load_other_fdt(const char **bufp, int *sizep)
+{
+	struct sandbox_state *state = state_get_current();
+	char fname[256];
+	int len, ret;
+
+	/* load the file if needed */
+	if (!state->other_fdt_buf) {
+		len = state_get_rel_filename("arch/sandbox/dts/other.dtb",
+					     fname, sizeof(fname));
+		if (len < 0)
+			return len;
+
+		ret = os_read_file(fname, &state->other_fdt_buf,
+				   &state->other_size);
+		if (ret) {
+			log_err("Cannot read file '%s'\n", fname);
+			return ret;
+		}
+	}
+	*bufp = state->other_fdt_buf;
+	*sizep = state->other_size;
+
+	return 0;
+}
+
+void sandbox_set_eth_enable(bool enable)
+{
+	struct sandbox_state *state = state_get_current();
+
+	state->disable_eth = !enable;
+}
+
+bool sandbox_eth_enabled(void)
+{
+	struct sandbox_state *state = state_get_current();
+
+	return !state->disable_eth;
+}
+
+void sandbox_sf_set_enable_bootdevs(bool enable)
+{
+	struct sandbox_state *state = state_get_current();
+
+	state->disable_sf_bootdevs = !enable;
+}
+
+bool sandbox_sf_bootdev_enabled(void)
+{
+	struct sandbox_state *state = state_get_current();
+
+	return !state->disable_sf_bootdevs;
 }
 
 int state_init(void)
 {
 	state = &main_state;
 
-	state->ram_size = CONFIG_SYS_SDRAM_SIZE;
+	state->ram_size = CFG_SYS_SDRAM_SIZE;
 	state->ram_buf = os_malloc(state->ram_size);
 	if (!state->ram_buf) {
 		printf("Out of memory\n");
@@ -398,7 +500,12 @@ int state_uninit(void)
 {
 	int err;
 
+	if (state->write_ram_buf || state->write_state)
+		log_debug("Writing sandbox state\n");
 	state = &main_state;
+
+	/* Finish the bloblist, so that it is correct before writing memory */
+	bloblist_finish();
 
 	if (state->write_ram_buf) {
 		err = os_write_ram_buf(state->ram_buf_fname);
@@ -406,6 +513,7 @@ int state_uninit(void)
 			printf("Failed to write RAM buffer\n");
 			return err;
 		}
+		log_debug("Wrote RAM to file '%s'\n", state->ram_buf_fname);
 	}
 
 	if (state->write_state) {
@@ -413,14 +521,19 @@ int state_uninit(void)
 			printf("Failed to write sandbox state\n");
 			return -1;
 		}
+		log_debug("Wrote state to file '%s'\n", state->ram_buf_fname);
 	}
 
 	/* Delete this at the last moment so as not to upset gdb too much */
 	if (state->jumped_fname)
 		os_unlink(state->jumped_fname);
 
-	if (state->state_fdt)
-		free(state->state_fdt);
+	/* Disable tracing before unmapping RAM */
+	if (IS_ENABLED(CONFIG_TRACE))
+		trace_set_enabled(0);
+
+	os_free(state->state_fdt);
+	os_free(state->ram_buf);
 	memset(state, '\0', sizeof(*state));
 
 	return 0;

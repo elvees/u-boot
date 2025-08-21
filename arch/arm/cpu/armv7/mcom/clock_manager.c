@@ -5,8 +5,9 @@
  * SPDX-License-Identifier:	GPL-2.0+
  */
 
-#include <common.h>
 #include <asm/arch/clock_manager.h>
+#include <linux/types.h>
+#include <configs/mcom.h>
 
 int dw_spi_get_clk(struct udevice *bus, ulong *rate)
 {

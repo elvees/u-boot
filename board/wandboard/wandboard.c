@@ -6,7 +6,6 @@
  * Author: Fabio Estevam <fabio.estevam@freescale.com>
  */
 
-#include <common.h>
 #include <image.h>
 #include <init.h>
 #include <log.h>
@@ -28,7 +27,6 @@
 #include <env.h>
 #include <linux/delay.h>
 #include <linux/sizes.h>
-#include <common.h>
 #include <miiphy.h>
 #include <netdev.h>
 #include <phy.h>
@@ -352,9 +350,8 @@ static void setup_display(void)
 int board_early_init_f(void)
 {
 	setup_iomux_uart();
-#ifdef CONFIG_SATA
-	setup_sata();
-#endif
+	if (CONFIG_IS_ENABLED(SATA))
+		setup_sata();
 
 	return 0;
 }

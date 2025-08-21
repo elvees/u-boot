@@ -8,7 +8,7 @@
  * Copyright (C) 2015 Cogent Embedded, Inc.
  */
 
-#include <common.h>
+#include <clock_legacy.h>
 #include <env.h>
 #include <init.h>
 #include <malloc.h>
@@ -25,10 +25,8 @@
 #include <linux/errno.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/gpio.h>
-#include <asm/arch/rmobile.h>
+#include <asm/arch/renesas.h>
 #include <asm/arch/rcar-mstp.h>
-#include <asm/arch/mmc.h>
-#include <asm/arch/sh_sdhi.h>
 #include <miiphy.h>
 #include <i2c.h>
 #include <mmc.h>
@@ -48,9 +46,9 @@ void s_init(void)
 	writel(0xA5A5A500, &swdt->swtcsra);
 
 	/* CPU frequency setting. Set to 1.4GHz */
-	if (rmobile_get_cpu_rev_integer() >= R8A7790_CUT_ES2X) {
+	if (renesas_get_cpu_rev_integer() >= R8A7790_CUT_ES2X) {
 		u32 stat = 0;
-		u32 stc = ((1400 / CLK2MHZ(CONFIG_SYS_CLK_FREQ)) - 1)
+		u32 stc = ((1400 / CLK2MHZ(get_board_sys_clk())) - 1)
 			<< PLL0_STC_BIT;
 		clrsetbits_le32(PLL0CR, PLL0_STC_MASK, stc);
 
@@ -87,7 +85,7 @@ int board_early_init_f(void)
 int board_init(void)
 {
 	/* adress of boot parameters */
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE + 0x100;
 
 	cpld_init();
 

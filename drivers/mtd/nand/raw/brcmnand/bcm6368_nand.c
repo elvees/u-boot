@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0+
 
-#include <common.h>
 #include <asm/io.h>
 #include <memalign.h>
 #include <nand.h>
@@ -9,6 +8,7 @@
 #include <linux/io.h>
 #include <linux/ioport.h>
 #include <dm.h>
+#include <linux/printk.h>
 
 #include "brcmnand.h"
 

@@ -3,8 +3,8 @@
  * Copyright (c) 2014 Google, Inc
  */
 
-#include <common.h>
-#include <eeprom.h>
+#define LOG_CATEGORY UCLASS_I2C_EEPROM
+
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/kernel.h>
@@ -31,7 +31,8 @@ int i2c_eeprom_read(struct udevice *dev, int offset, uint8_t *buf, int size)
 	return ops->read(dev, offset, buf, size);
 }
 
-int i2c_eeprom_write(struct udevice *dev, int offset, uint8_t *buf, int size)
+int i2c_eeprom_write(struct udevice *dev, int offset, const uint8_t *buf,
+		     int size)
 {
 	const struct i2c_eeprom_ops *ops = device_get_ops(dev);
 
@@ -57,6 +58,17 @@ static int i2c_eeprom_std_read(struct udevice *dev, int offset, uint8_t *buf,
 	return dm_i2c_read(dev, offset, buf, size);
 }
 
+static int i2c_eeprom_len(int offset, int len, int pagesize)
+{
+	int page_offset = offset & (pagesize - 1);
+	int maxlen = pagesize - page_offset;
+
+	if (len > maxlen)
+		len = maxlen;
+
+	return len;
+}
+
 static int i2c_eeprom_std_write(struct udevice *dev, int offset,
 				const uint8_t *buf, int size)
 {
@@ -64,7 +76,7 @@ static int i2c_eeprom_std_write(struct udevice *dev, int offset,
 	int ret;
 
 	while (size > 0) {
-		int write_size = min_t(int, size, priv->pagesize);
+		int write_size = i2c_eeprom_len(offset, size, priv->pagesize);
 
 		ret = dm_i2c_write(dev, offset, buf, write_size);
 		if (ret)
@@ -167,13 +179,6 @@ static const struct i2c_eeprom_drv_data eeprom_data = {
 	.offset_len = 1,
 };
 
-static const struct i2c_eeprom_drv_data mc24aa02e48_data = {
-	.size = 256,
-	.pagesize = 8,
-	.addr_offset_mask = 0,
-	.offset_len = 1,
-};
-
 static const struct i2c_eeprom_drv_data atmel24c01a_data = {
 	.size = 128,
 	.pagesize = 8,
@@ -231,6 +236,13 @@ static const struct i2c_eeprom_drv_data atmel24c32_data = {
 	.offset_len = 2,
 };
 
+static const struct i2c_eeprom_drv_data atmel24c32d_wlp_data = {
+	.size = 32,
+	.pagesize = 32,
+	.addr_offset_mask = 0,
+	.offset_len = 2,
+};
+
 static const struct i2c_eeprom_drv_data atmel24c64_data = {
 	.size = 8192,
 	.pagesize = 32,
@@ -252,6 +264,13 @@ static const struct i2c_eeprom_drv_data atmel24c256_data = {
 	.offset_len = 2,
 };
 
+static const struct i2c_eeprom_drv_data st24256e_wlp_data = {
+	.size = 64,
+	.pagesize = 64,
+	.addr_offset_mask = 0,
+	.offset_len = 2,
+};
+
 static const struct i2c_eeprom_drv_data atmel24c512_data = {
 	.size = 65536,
 	.pagesize = 64,
@@ -261,7 +280,7 @@ static const struct i2c_eeprom_drv_data atmel24c512_data = {
 
 static const struct udevice_id i2c_eeprom_std_ids[] = {
 	{ .compatible = "i2c-eeprom", (ulong)&eeprom_data },
-	{ .compatible = "microchip,24aa02e48", (ulong)&mc24aa02e48_data },
+	{ .compatible = "atmel,24c01", (ulong)&atmel24c01a_data },
 	{ .compatible = "atmel,24c01a", (ulong)&atmel24c01a_data },
 	{ .compatible = "atmel,24c02", (ulong)&atmel24c02_data },
 	{ .compatible = "atmel,24c04", (ulong)&atmel24c04_data },
@@ -270,10 +289,12 @@ static const struct udevice_id i2c_eeprom_std_ids[] = {
 	{ .compatible = "atmel,24c16a", (ulong)&atmel24c16a_data },
 	{ .compatible = "atmel,24mac402", (ulong)&atmel24mac402_data },
 	{ .compatible = "atmel,24c32", (ulong)&atmel24c32_data },
+	{ .compatible = "atmel,24c32d-wl", (ulong)&atmel24c32d_wlp_data },
 	{ .compatible = "atmel,24c64", (ulong)&atmel24c64_data },
 	{ .compatible = "atmel,24c128", (ulong)&atmel24c128_data },
 	{ .compatible = "atmel,24c256", (ulong)&atmel24c256_data },
 	{ .compatible = "atmel,24c512", (ulong)&atmel24c512_data },
+	{ .compatible = "st,24256e-wl", (ulong)&st24256e_wlp_data },
 	{ }
 };
 

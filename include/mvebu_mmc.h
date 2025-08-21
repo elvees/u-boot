@@ -21,7 +21,7 @@
 
 #define MVEBU_MMC_CLOCKRATE_MAX			50000000
 #define MVEBU_MMC_BASE_DIV_MAX			0x7ff
-#define MVEBU_MMC_BASE_FAST_CLOCK		CONFIG_SYS_TCLK
+#define MVEBU_MMC_BASE_FAST_CLOCK		CFG_SYS_TCLK
 #define MVEBU_MMC_BASE_FAST_CLK_100		100000000
 #define MVEBU_MMC_BASE_FAST_CLK_200		200000000
 
@@ -258,17 +258,10 @@
 /* Hardware reset */
 #define MMC_CAP_HW_RESET			(1 << 31)
 
-struct mvebu_mmc_cfg {
-	u32	mvebu_mmc_base;
-	u32	mvebu_mmc_clk;
-	u8	max_bus_width;
+struct mvebu_mmc_plat {
+	void *iobase;
 	struct mmc_config cfg;
+	struct mmc mmc;
 };
-
-/*
- * Functions prototypes
- */
-
-int mvebu_mmc_init(struct bd_info *bis);
 
 #endif /* __MVEBU_MMC_H__ */

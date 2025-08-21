@@ -7,7 +7,7 @@
  * Copyright (C) 2013 Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
  */
 
-#include <common.h>
+#include <clock_legacy.h>
 #include <cpu_func.h>
 #include <env.h>
 #include <env_internal.h>
@@ -26,10 +26,8 @@
 #include <linux/errno.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/gpio.h>
-#include <asm/arch/rmobile.h>
+#include <asm/arch/renesas.h>
 #include <asm/arch/rcar-mstp.h>
-#include <asm/arch/mmc.h>
-#include <asm/arch/sh_sdhi.h>
 #include <miiphy.h>
 #include <i2c.h>
 #include <mmc.h>
@@ -48,9 +46,9 @@ void s_init(void)
 	writel(0xA5A5A500, &swdt->swtcsra);
 
 	/* CPU frequency setting. Set to 1.4GHz */
-	if (rmobile_get_cpu_rev_integer() >= R8A7790_CUT_ES2X) {
+	if (renesas_get_cpu_rev_integer() >= R8A7790_CUT_ES2X) {
 		u32 stat = 0;
-		u32 stc = ((1400 / CLK2MHZ(CONFIG_SYS_CLK_FREQ)) - 1)
+		u32 stc = ((1400 / CLK2MHZ(get_board_sys_clk())) - 1)
 			<< PLL0_STC_BIT;
 		clrsetbits_le32(PLL0CR, PLL0_STC_MASK, stc);
 
@@ -88,7 +86,7 @@ int board_early_init_f(void)
 int board_init(void)
 {
 	/* adress of boot parameters */
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE + 0x100;
 
 	/* Force ethernet PHY out of reset */
 	gpio_request(ETHERNET_PHY_RESET, "phy_reset");
@@ -128,7 +126,7 @@ int board_phy_config(struct phy_device *phydev)
 	return 0;
 }
 
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 	struct udevice *dev;
 	const u8 pmic_bus = 2;

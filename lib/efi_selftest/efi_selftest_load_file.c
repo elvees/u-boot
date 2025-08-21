@@ -101,7 +101,7 @@ static struct {
 			FILE_NAME_SIZE * sizeof(u16),
 		}
 	},
-	L"\\lf.efi",
+	u"\\lf.efi",
 	{
 		DEVICE_PATH_TYPE_END,
 		DEVICE_PATH_SUB_TYPE_END,
@@ -152,7 +152,7 @@ static struct {
 			FILE_NAME_SIZE * sizeof(u16),
 		}
 	},
-	L"\\lf2.efi",
+	u"\\lf2.efi",
 	{
 		DEVICE_PATH_TYPE_END,
 		DEVICE_PATH_SUB_TYPE_END,
@@ -166,7 +166,7 @@ struct efi_device_path *dp_lf2_file_remainder = &dp_lf2_file.f.dp;
  * Decompress the disk image.
  *
  * @image	decompressed disk image
- * @return	status code
+ * Return:	status code
  */
 static efi_status_t decompress(u8 **image)
 {
@@ -206,11 +206,11 @@ static efi_status_t decompress(u8 **image)
  * @buffer_size:	(required) buffer size
  * @buffer:		buffer to which the file is to be loaded
  */
-efi_status_t EFIAPI load_file(struct efi_load_file_protocol *this,
-			      struct efi_device_path *file_path,
-			      bool boot_policy,
-			      efi_uintn_t *buffer_size,
-			      void *buffer)
+static efi_status_t EFIAPI load_file(struct efi_load_file_protocol *this,
+				     struct efi_device_path *file_path,
+				     bool boot_policy,
+				     efi_uintn_t *buffer_size,
+				     void *buffer)
 {
 	++load_file_call_count;
 	if (memcmp(file_path, dp_lf_file_remainder,
@@ -233,7 +233,6 @@ efi_status_t EFIAPI load_file(struct efi_load_file_protocol *this,
 	return EFI_SUCCESS;
 }
 
-
 /*
  * load_file2() - LoadFile() service of a EFI_LOAD_FILE2_PROTOCOL
  *
@@ -243,11 +242,11 @@ efi_status_t EFIAPI load_file(struct efi_load_file_protocol *this,
  * @buffer_size:	(required) buffer size
  * @buffer:		buffer to which the file is to be loaded
  */
-efi_status_t EFIAPI load_file2(struct efi_load_file_protocol *this,
-			       struct efi_device_path *file_path,
-			       bool boot_policy,
-			       efi_uintn_t *buffer_size,
-			       void *buffer)
+static efi_status_t EFIAPI load_file2(struct efi_load_file_protocol *this,
+				      struct efi_device_path *file_path,
+				      bool boot_policy,
+				      efi_uintn_t *buffer_size,
+				      void *buffer)
 {
 	++load_file2_call_count;
 	if (memcmp(file_path, dp_lf2_file_remainder,
@@ -284,7 +283,7 @@ static struct efi_load_file_protocol lf2_prot = {load_file2};
  *
  * @handle:	handle of the loaded image
  * @systable:	system table
- * @return:	EFI_ST_SUCCESS for success
+ * Return:	EFI_ST_SUCCESS for success
  */
 static int efi_st_load_file_setup(const efi_handle_t handle,
 				  const struct efi_system_table *systable)
@@ -326,7 +325,7 @@ static int efi_st_load_file_setup(const efi_handle_t handle,
 /*
  * Tear down unit test.
  *
- * @return:	EFI_ST_SUCCESS for success
+ * Return:	EFI_ST_SUCCESS for success
  */
 static int efi_st_load_file_teardown(void)
 {
@@ -377,7 +376,7 @@ static int efi_st_load_file_teardown(void)
  * Try loading an image via the EFI_LOAD_FILE_PROTOCOL and the
  * EFI_LOAD_FILE2_PROTOCOL. Finally execute the image.
  *
- * @return:	EFI_ST_SUCCESS for success
+ * Return:	EFI_ST_SUCCESS for success
  */
 static int efi_st_load_file_execute(void)
 {

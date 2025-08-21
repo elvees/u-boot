@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright 2008-2014 Freescale Semiconductor, Inc.
+ * Copyright 2021 NXP
  */
 
 /*
@@ -9,7 +10,8 @@
  * Author: James Yang [at freescale.com]
  */
 
-#include <common.h>
+#include <config.h>
+#include <display_options.h>
 #include <dm.h>
 #include <i2c.h>
 #include <fsl_ddr_sdram.h>
@@ -19,18 +21,18 @@
 #include <asm/bitops.h>
 
 /*
- * CONFIG_SYS_FSL_DDR_SDRAM_BASE_PHY is the physical address from the view
- * of DDR controllers. It is the same as CONFIG_SYS_DDR_SDRAM_BASE for
+ * CFG_SYS_FSL_DDR_SDRAM_BASE_PHY is the physical address from the view
+ * of DDR controllers. It is the same as CFG_SYS_DDR_SDRAM_BASE for
  * all Power SoCs. But it could be different for ARM SoCs. For example,
  * fsl_lsch3 has a mapping mechanism to map DDR memory to ranges (in order) of
  * 0x00_8000_0000 ~ 0x00_ffff_ffff
  * 0x80_8000_0000 ~ 0xff_ffff_ffff
  */
-#ifndef CONFIG_SYS_FSL_DDR_SDRAM_BASE_PHY
+#ifndef CFG_SYS_FSL_DDR_SDRAM_BASE_PHY
 #ifdef CONFIG_MPC83xx
-#define CONFIG_SYS_FSL_DDR_SDRAM_BASE_PHY CONFIG_SYS_SDRAM_BASE
+#define CFG_SYS_FSL_DDR_SDRAM_BASE_PHY CFG_SYS_SDRAM_BASE
 #else
-#define CONFIG_SYS_FSL_DDR_SDRAM_BASE_PHY CONFIG_SYS_DDR_SDRAM_BASE
+#define CFG_SYS_FSL_DDR_SDRAM_BASE_PHY CFG_SYS_DDR_SDRAM_BASE
 #endif
 #endif
 
@@ -109,7 +111,7 @@ static int ddr_i2c_read(DEV_TYPE *dev, unsigned int addr,
 #if CONFIG_IS_ENABLED(DM_I2C)
 	ret = dm_i2c_read(dev, 0, buf, len);
 #else
-	ret = i2c_read(dev->chip, addr, alen, buf, len);
+	ret = 0;
 #endif
 
 	return ret;
@@ -160,7 +162,6 @@ static void __get_spd(generic_spd_eeprom_t *spd, u8 i2c_address)
 	};
 	dev = &ldev;
 
-	i2c_set_bus_num(CONFIG_SYS_SPD_BUS_NUM);
 #endif
 
 #ifdef CONFIG_SYS_FSL_DDR4
@@ -297,9 +298,13 @@ const char * step_to_string(unsigned int step) {
 
 	unsigned int s = __ilog2(step);
 
-	if ((1 << s) != step)
-		return step_string_tbl[7];
-
+	if (s <= 31) {
+		if ((1 << s) != step)
+			return step_string_tbl[7];
+	} else {
+		if ((1 << (s - 32)) != step)
+			return step_string_tbl[7];
+	}
 	if (s >= ARRAY_SIZE(step_string_tbl)) {
 		printf("Error for the step in %s\n", __func__);
 		s = 0;
@@ -851,16 +856,31 @@ phys_size_t __fsl_ddr_sdram(fsl_ddr_info_t *pinfo)
 	debug("total_memory by %s = %llu\n", __func__, total_memory);
 
 #if !defined(CONFIG_PHYS_64BIT)
-	/* Check for 4G or more.  Bad. */
-	if ((first_ctrl == 0) && (total_memory >= (1ull << 32))) {
+	/*
+	 * Show warning about big DDR moodules. But avoid warning for 4 GB DDR
+	 * modules when U-Boot supports RAM of maximal size 4 GB - 1 byte.
+	 */
+	if ((first_ctrl == 0) && (total_memory - 1 > (phys_size_t)~0ULL)) {
 		puts("Detected ");
 		print_size(total_memory, " of memory\n");
-		printf("       This U-Boot only supports < 4G of DDR\n");
-		printf("       You could rebuild it with CONFIG_PHYS_64BIT\n");
-		printf("       "); /* re-align to match init_dram print */
-		total_memory = CONFIG_MAX_MEM_MAPPED;
+#ifndef CONFIG_XPL_BUILD
+		puts("       "); /* re-align to match init_dram print */
+#endif
+		puts("This U-Boot only supports <= ");
+		print_size((unsigned long long)((phys_size_t)~0ULL)+1, " of DDR\n");
+#ifndef CONFIG_XPL_BUILD
+		puts("       "); /* re-align to match init_dram print */
+#endif
+		puts("You could rebuild it with CONFIG_PHYS_64BIT\n");
+#ifndef CONFIG_XPL_BUILD
+		puts("       "); /* re-align to match init_dram print */
+#endif
 	}
 #endif
+
+	/* Ensure that total_memory does not overflow on return */
+	if (total_memory > (phys_size_t)~0ULL)
+		total_memory = (phys_size_t)~0ULL;
 
 	return total_memory;
 }
@@ -877,7 +897,7 @@ phys_size_t fsl_ddr_sdram(void)
 
 	/* Reset info structure. */
 	memset(&info, 0, sizeof(fsl_ddr_info_t));
-	info.mem_base = CONFIG_SYS_FSL_DDR_SDRAM_BASE_PHY;
+	info.mem_base = CFG_SYS_FSL_DDR_SDRAM_BASE_PHY;
 	info.first_ctrl = 0;
 	info.num_ctrls = CONFIG_SYS_FSL_DDR_MAIN_NUM_CTRLS;
 	info.dimm_slots_per_ctrl = CONFIG_DIMM_SLOTS_PER_CTLR;
@@ -925,7 +945,7 @@ fsl_ddr_sdram_size(void)
 	unsigned long long total_memory = 0;
 
 	memset(&info, 0 , sizeof(fsl_ddr_info_t));
-	info.mem_base = CONFIG_SYS_FSL_DDR_SDRAM_BASE_PHY;
+	info.mem_base = CFG_SYS_FSL_DDR_SDRAM_BASE_PHY;
 	info.first_ctrl = 0;
 	info.num_ctrls = CONFIG_SYS_FSL_DDR_MAIN_NUM_CTRLS;
 	info.dimm_slots_per_ctrl = CONFIG_DIMM_SLOTS_PER_CTLR;
@@ -934,6 +954,10 @@ fsl_ddr_sdram_size(void)
 
 	/* Compute it once normally. */
 	total_memory = fsl_ddr_compute(&info, STEP_GET_SPD, 1);
+
+	/* Ensure that total_memory does not overflow on return */
+	if (total_memory > (phys_size_t)~0ULL)
+		total_memory = (phys_size_t)~0ULL;
 
 	return total_memory;
 }

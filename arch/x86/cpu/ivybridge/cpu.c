@@ -10,10 +10,10 @@
  * Copyright (C) 2011 Google Inc.
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <errno.h>
+#include <event.h>
 #include <fdtdec.h>
 #include <init.h>
 #include <log.h>
@@ -53,9 +53,8 @@ int arch_cpu_init(void)
 	return x86_cpu_init_f();
 }
 
-int arch_cpu_init_dm(void)
+static int ivybridge_cpu_init(void)
 {
-	struct pci_controller *hose;
 	struct udevice *bus, *dev;
 	int ret;
 
@@ -65,10 +64,6 @@ int arch_cpu_init_dm(void)
 	if (ret)
 		return ret;
 	post_code(0x72);
-	hose = dev_get_uclass_priv(bus);
-
-	/* TODO(sjg@chromium.org): Get rid of gd->hose */
-	gd->hose = hose;
 
 	ret = uclass_first_device_err(UCLASS_LPC, &dev);
 	if (ret)
@@ -85,6 +80,7 @@ int arch_cpu_init_dm(void)
 
 	return 0;
 }
+EVENT_SPY_SIMPLE(EVT_DM_POST_INIT_F, ivybridge_cpu_init);
 
 #define PCH_EHCI0_TEMP_BAR0 0xe8000000
 #define PCH_EHCI1_TEMP_BAR0 0xe8000400
@@ -143,7 +139,7 @@ int checkcpu(void)
 
 		/* System is not happy after keyboard reset... */
 		debug("Issuing CF9 warm reset\n");
-		reset_cpu(0);
+		reset_cpu();
 	}
 
 	ret = cpu_common_init();
@@ -182,20 +178,6 @@ int checkcpu(void)
 	}
 
 	gd->arch.pei_boot_mode = boot_mode;
-
-	return 0;
-}
-
-int print_cpuinfo(void)
-{
-	char processor_name[CPU_MAX_NAME_LEN];
-	const char *name;
-
-	/* Print processor name */
-	name = cpu_get_name(processor_name);
-	printf("CPU:   %s\n", name);
-
-	post_code(POST_CPU_INFO);
 
 	return 0;
 }

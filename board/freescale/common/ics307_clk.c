@@ -3,7 +3,8 @@
  * Copyright 2010-2011 Freescale Semiconductor, Inc.
  */
 
-#include <common.h>
+#include <config.h>
+#include <clock_legacy.h>
 #include <log.h>
 #include <asm/io.h>
 
@@ -49,7 +50,7 @@ static u8 ics307_s_to_od[] = {
  */
 unsigned long ics307_sysclk_calculator(unsigned long out_freq)
 {
-	const unsigned long input_freq = CONFIG_ICS307_REFCLK_HZ;
+	const unsigned long input_freq = CFG_ICS307_REFCLK_HZ;
 	unsigned long vdw, rdw, odp, s_vdw = 0, s_rdw = 0, s_odp = 0, od;
 	unsigned long tmp_out, diff, result = 0;
 	int found = 0;
@@ -100,7 +101,7 @@ unsigned long ics307_sysclk_calculator(unsigned long out_freq)
  */
 static unsigned long ics307_clk_freq(u8 cw0, u8 cw1, u8 cw2)
 {
-	const unsigned long input_freq = CONFIG_ICS307_REFCLK_HZ;
+	const unsigned long input_freq = CFG_ICS307_REFCLK_HZ;
 	unsigned long vdw = ((cw1 << 1) & 0x1FE) + ((cw2 >> 7) & 1);
 	unsigned long rdw = cw2 & 0x7F;
 	unsigned long od = ics307_s_to_od[cw0 & 0x7];
@@ -137,6 +138,7 @@ unsigned long get_board_sys_clk(void)
 			in_8(&fpga_reg->sclk[2]));
 }
 
+#ifdef CONFIG_DYNAMIC_DDR_CLK_FREQ
 unsigned long get_board_ddr_clk(void)
 {
 	return ics307_clk_freq(
@@ -144,3 +146,4 @@ unsigned long get_board_ddr_clk(void)
 			in_8(&fpga_reg->dclk[1]),
 			in_8(&fpga_reg->dclk[2]));
 }
+#endif

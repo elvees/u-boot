@@ -7,13 +7,14 @@
  * Author: Nikita Kiryanov <nikita@compulab.co.il>
  */
 
-#include <common.h>
+#include <config.h>
 #include <ahci.h>
 #include <dm.h>
 #include <dwc_ahsata.h>
 #include <env.h>
 #include <fsl_esdhc_imx.h>
 #include <init.h>
+#include <i2c.h>
 #include <miiphy.h>
 #include <mtd_node.h>
 #include <net.h>
@@ -252,12 +253,11 @@ I2C_PADS(i2c2_pads,
 	 PAD_GPIO_6__GPIO1_IO06 | MUX_PAD_CTRL(I2C_PAD_CTRL),
 	 IMX_GPIO_NR(1, 6));
 
-
 static int cm_fx6_setup_one_i2c(int busnum, struct i2c_pads_info *pads)
 {
 	int ret;
 
-	ret = setup_i2c(busnum, CONFIG_SYS_I2C_SPEED, 0x7f, pads);
+	ret = setup_i2c(busnum, I2C_SPEED_STANDARD_RATE, 0x7f, pads);
 	if (ret)
 		printf("Warning: I2C%d setup failed: %d\n", busnum, ret);
 
@@ -622,7 +622,7 @@ int board_init(void)
 		int i;
 
 		cm_fx6_set_usdhc_iomux();
-		for (i = 0; i < CONFIG_SYS_FSL_USDHC_NUM; i++)
+		for (i = 0; i < CFG_SYS_FSL_USDHC_NUM; i++)
 			enable_usdhc_clk(1, i);
 	}
 #endif
@@ -720,10 +720,12 @@ int dram_init(void)
 	return 0;
 }
 
+#ifdef CONFIG_REVISION_TAG
 u32 get_board_rev(void)
 {
 	return cl_eeprom_get_board_rev(CONFIG_SYS_I2C_EEPROM_BUS);
 }
+#endif
 
 static struct mxc_serial_plat cm_fx6_mxc_serial_plat = {
 	.reg = (struct mxc_uart *)UART4_BASE,
@@ -734,7 +736,7 @@ U_BOOT_DRVINFO(cm_fx6_serial) = {
 	.plat = &cm_fx6_mxc_serial_plat,
 };
 
-#if CONFIG_IS_ENABLED(AHCI)
+#if IS_ENABLED(CONFIG_AHCI)
 static int sata_imx_probe(struct udevice *dev)
 {
 	int i, err;

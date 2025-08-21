@@ -3,7 +3,6 @@
  * Copyright 2017 NXP
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <malloc.h>
@@ -14,7 +13,7 @@
 #include <dm/device-internal.h>
 #include <dm/device.h>
 #include <dm/uclass-internal.h>
-#include <asm/arch/sci/sci.h>
+#include <firmware/imx/sci/sci.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -84,26 +83,11 @@ int imx8_power_domain_lookup_name(const char *name,
 	return 0;
 }
 
-static int imx8_power_domain_request(struct power_domain *power_domain)
-{
-	debug("%s(power_domain=%p)\n", __func__, power_domain);
-
-	return 0;
-}
-
-static int imx8_power_domain_free(struct power_domain *power_domain)
-{
-	debug("%s(power_domain=%p)\n", __func__, power_domain);
-
-	return 0;
-}
-
 static int imx8_power_domain_on(struct power_domain *power_domain)
 {
 	struct udevice *dev = power_domain->dev;
 	struct imx8_power_domain_plat *pdata;
 	struct imx8_power_domain_priv *ppriv;
-	sc_err_t ret;
 	int err;
 
 	struct power_domain parent_domain;
@@ -131,11 +115,11 @@ static int imx8_power_domain_on(struct power_domain *power_domain)
 		if (!sc_rm_is_resource_owned(-1, pdata->resource_id))
 			printf("%s [%d] not owned by curr partition\n", dev->name, pdata->resource_id);
 
-		ret = sc_pm_set_resource_power_mode(-1, pdata->resource_id,
+		err = sc_pm_set_resource_power_mode(-1, pdata->resource_id,
 						    SC_PM_PW_MODE_ON);
-		if (ret) {
+		if (err) {
 			printf("Error: %s Power up failed! (error = %d)\n",
-			       dev->name, ret);
+			       dev->name, err);
 			return -EIO;
 		}
 	}
@@ -153,7 +137,7 @@ static int imx8_power_domain_off_node(struct power_domain *power_domain)
 	struct imx8_power_domain_priv *ppriv;
 	struct imx8_power_domain_priv *child_ppriv;
 	struct imx8_power_domain_plat *pdata;
-	sc_err_t ret;
+	int ret;
 
 	ppriv = dev_get_priv(dev);
 	pdata = dev_get_plat(dev);
@@ -364,8 +348,6 @@ static const struct udevice_id imx8_power_domain_ids[] = {
 };
 
 struct power_domain_ops imx8_power_domain_ops = {
-	.request = imx8_power_domain_request,
-	.rfree = imx8_power_domain_free,
 	.on = imx8_power_domain_on,
 	.off = imx8_power_domain_off,
 	.of_xlate = imx8_power_domain_of_xlate,

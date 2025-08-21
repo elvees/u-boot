@@ -6,7 +6,6 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
@@ -165,6 +164,9 @@ static int sandbox_swap_case_read_config(const struct udevice *emul,
 	case PCI_CAP_ID_EXP_OFFSET + PCI_CAP_LIST_NEXT:
 		*valuep = PCI_CAP_ID_MSIX_OFFSET;
 		break;
+	case PCI_CAP_ID_EXP_OFFSET + PCI_EXP_DEVCAP:
+		*valuep = PCI_EXP_DEVCAP_PAYLOAD_256B;
+		break;
 	case PCI_CAP_ID_MSIX_OFFSET:
 		if (sandbox_swap_case_use_ea(emul))
 			*valuep = (PCI_CAP_ID_EA_OFFSET << 8) | PCI_CAP_ID_MSIX;
@@ -302,7 +304,6 @@ static int sandbox_swap_case_write_io(struct udevice *dev, unsigned int addr,
 }
 
 static int pci_ea_bar2_magic = PCI_EA_BAR2_MAGIC;
-static int pci_ea_bar4_magic = PCI_EA_BAR4_MAGIC;
 
 static int sandbox_swap_case_map_physmem(struct udevice *dev,
 		phys_addr_t addr, unsigned long *lenp, void **ptrp)
@@ -332,12 +333,22 @@ static int sandbox_swap_case_map_physmem(struct udevice *dev,
 			*ptrp = &pci_ea_bar2_magic;
 			*lenp = PCI_CAP_EA_SIZE_LO;
 			break;
+#ifdef CONFIG_HOST_64BIT
+		/*
+		 * This cannot be work on a 32-bit machine since *lenp is ulong
+		 * which is 32-bits, but it needs to have a 64-bit value
+		 * assigned
+		 */
 		case (phys_addr_t)((PCI_CAP_EA_BASE_HI4 << 32) |
-				   PCI_CAP_EA_BASE_LO4):
+				   PCI_CAP_EA_BASE_LO4): {
+			static int pci_ea_bar4_magic = PCI_EA_BAR4_MAGIC;
+
 			*ptrp = &pci_ea_bar4_magic;
 			*lenp = (PCI_CAP_EA_SIZE_HI << 32) |
 				PCI_CAP_EA_SIZE_LO;
 			break;
+		}
+#endif
 		default:
 			return -ENOENT;
 		}

@@ -10,12 +10,13 @@
  * Author: James Yang [at freescale.com]
  */
 
-#include <common.h>
+#include <config.h>
 #include <fsl_ddr_sdram.h>
 #include <fsl_errata.h>
 #include <fsl_ddr.h>
 #include <fsl_immap.h>
 #include <log.h>
+#include <linux/string.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #if defined(CONFIG_FSL_LSCH2) || defined(CONFIG_FSL_LSCH3) || \
@@ -214,7 +215,7 @@ static void set_csn_config(int dimm_number, int i, fsl_ddr_cfg_regs_t *ddr,
 		odt_rd_cfg = popts->cs_local_opts[i].odt_rd_cfg;
 		odt_wr_cfg = popts->cs_local_opts[i].odt_wr_cfg;
 #ifdef CONFIG_SYS_FSL_DDR4
-		ba_bits_cs_n = dimm_params[dimm_number].bank_addr_bits;
+		ba_bits_cs_n = dimm_params[dimm_number].bank_addr_bits - 2;
 		bg_bits_cs_n = dimm_params[dimm_number].bank_group_bits;
 #else
 		n_banks_per_sdram_device
@@ -822,7 +823,7 @@ static void set_ddr_sdram_cfg(fsl_ddr_cfg_regs_t *ddr,
 		twot_en = popts->twot_en;
 	}
 
-	sdram_type = CONFIG_FSL_SDRAM_TYPE;
+	sdram_type = CFG_FSL_SDRAM_TYPE;
 
 	dyn_pwr = popts->dynamic_power;
 	dbw = popts->data_bus_width;
@@ -926,7 +927,7 @@ static void set_ddr_sdram_cfg_2(const unsigned int ctrl_num,
 		rcw_en = 1;
 
 	/* DDR4 can have address parity for UDIMM and discrete */
-	if ((CONFIG_FSL_SDRAM_TYPE != SDRAM_TYPE_DDR4) &&
+	if ((CFG_FSL_SDRAM_TYPE != SDRAM_TYPE_DDR4) &&
 	    (!popts->registered_dimm_en)) {
 		ap_en = 0;
 	} else {
@@ -938,7 +939,7 @@ static void set_ddr_sdram_cfg_2(const unsigned int ctrl_num,
 #if defined(CONFIG_ECC_INIT_VIA_DDRCONTROLLER)
 	/* Use the DDR controller to auto initialize memory. */
 	d_init = popts->ecc_init_using_memctl;
-	ddr->ddr_data_init = CONFIG_MEM_INIT_VALUE;
+	ddr->ddr_data_init = 0xDEADBEEF;
 	debug("DDR: ddr_data_init = 0x%08x\n", ddr->ddr_data_init);
 #else
 	/* Memory will be initialized via DMA, or not at all. */
@@ -1188,7 +1189,7 @@ static void set_ddr_sdram_mode_9(fsl_ddr_cfg_regs_t *ddr,
 	 * handled by register chip and RCW settings.
 	 */
 	if ((ddr->ddr_sdram_cfg_2 & SDRAM_CFG2_AP_EN) &&
-	    ((CONFIG_FSL_SDRAM_TYPE != SDRAM_TYPE_DDR4) ||
+	    ((CFG_FSL_SDRAM_TYPE != SDRAM_TYPE_DDR4) ||
 	     !popts->registered_dimm_en)) {
 		if (mclk_ps >= 935) {
 			/* for DDR4-1600/1866/2133 */
@@ -1223,7 +1224,7 @@ static void set_ddr_sdram_mode_9(fsl_ddr_cfg_regs_t *ddr,
 			}
 
 			if ((ddr->ddr_sdram_cfg_2 & SDRAM_CFG2_AP_EN) &&
-			    ((CONFIG_FSL_SDRAM_TYPE != SDRAM_TYPE_DDR4) ||
+			    ((CFG_FSL_SDRAM_TYPE != SDRAM_TYPE_DDR4) ||
 			     !popts->registered_dimm_en)) {
 				if (mclk_ps >= 935) {
 					/* for DDR4-1600/1866/2133 */
@@ -1842,19 +1843,6 @@ static void set_ddr_sdram_mode(const unsigned int ctrl_num,
 }
 #endif
 
-/* DDR SDRAM Data Initialization (DDR_DATA_INIT) */
-static void set_ddr_data_init(fsl_ddr_cfg_regs_t *ddr)
-{
-	unsigned int init_value;	/* Initialization value */
-
-#ifdef CONFIG_MEM_INIT_VALUE
-	init_value = CONFIG_MEM_INIT_VALUE;
-#else
-	init_value = 0xDEADBEEF;
-#endif
-	ddr->ddr_data_init = init_value;
-}
-
 /*
  * DDR SDRAM Clock Control (DDR_SDRAM_CLK_CNTL)
  * The old controller on the 8540/60 doesn't have this register.
@@ -1863,25 +1851,13 @@ static void set_ddr_data_init(fsl_ddr_cfg_regs_t *ddr)
 static void set_ddr_sdram_clk_cntl(fsl_ddr_cfg_regs_t *ddr,
 					 const memctl_options_t *popts)
 {
-	unsigned int clk_adjust;	/* Clock adjust */
-	unsigned int ss_en = 0;		/* Source synchronous enable */
-
-#if defined(CONFIG_ARCH_MPC8541) || defined(CONFIG_ARCH_MPC8555)
-	/* Per FSL Application Note: AN2805 */
-	ss_en = 1;
-#endif
-	if (fsl_ddr_get_version(0) >= 0x40701) {
+	if (fsl_ddr_get_version(0) >= 0x40701)
 		/* clk_adjust in 5-bits on T-series and LS-series */
-		clk_adjust = (popts->clk_adjust & 0x1F) << 22;
-	} else {
+		ddr->ddr_sdram_clk_cntl = (popts->clk_adjust & 0x1F) << 22;
+	else
 		/* clk_adjust in 4-bits on earlier MPC85xx and P-series */
-		clk_adjust = (popts->clk_adjust & 0xF) << 23;
-	}
+		ddr->ddr_sdram_clk_cntl = (popts->clk_adjust & 0xF) << 23;
 
-	ddr->ddr_sdram_clk_cntl = (0
-				   | ((ss_en & 0x1) << 31)
-				   | clk_adjust
-				   );
 	debug("FSLDDR: clk_cntl = 0x%08x\n", ddr->ddr_sdram_clk_cntl);
 }
 
@@ -2008,7 +1984,7 @@ static void set_timing_cfg_7(const unsigned int ctrl_num,
 	tcksrx = max(5U, picos_to_mclk(ctrl_num, 10000));
 
 	if (ddr->ddr_sdram_cfg_2 & SDRAM_CFG2_AP_EN &&
-	    CONFIG_FSL_SDRAM_TYPE == SDRAM_TYPE_DDR4) {
+	    CFG_FSL_SDRAM_TYPE == SDRAM_TYPE_DDR4) {
 		/* for DDR4 only */
 		par_lat = (ddr->ddr_sdram_rcw_2 & 0xf) + 1;
 		debug("PAR_LAT = %u for mclk_ps = %d\n", par_lat, mclk_ps);
@@ -2549,7 +2525,7 @@ compute_fsl_memctl_config_regs(const unsigned int ctrl_num,
 	set_ddr_sdram_rcw(ctrl_num, ddr, popts, common_dimm);
 
 	set_ddr_sdram_interval(ctrl_num, ddr, popts, common_dimm);
-	set_ddr_data_init(ddr);
+	ddr->ddr_data_init = 0xDEADBEEF;
 	set_ddr_sdram_clk_cntl(ddr, popts);
 	set_ddr_init_addr(ddr);
 	set_ddr_init_ext_addr(ddr);
@@ -2602,7 +2578,7 @@ compute_fsl_memctl_config_regs(const unsigned int ctrl_num,
 void erratum_a009942_check_cpo(void)
 {
 	struct ccsr_ddr __iomem *ddr =
-		(struct ccsr_ddr __iomem *)(CONFIG_SYS_FSL_DDR_ADDR);
+		(struct ccsr_ddr __iomem *)(CFG_SYS_FSL_DDR_ADDR);
 	u32 cpo, cpo_e, cpo_o, cpo_target, cpo_optimal;
 	u32 cpo_min = ddr_in32(&ddr->debug[9]) >> 24;
 	u32 cpo_max = cpo_min;

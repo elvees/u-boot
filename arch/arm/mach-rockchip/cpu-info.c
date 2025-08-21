@@ -4,10 +4,8 @@
  * Author: Jagan Teki <jagan@amarulasolutions.com>
  */
 
-#include <common.h>
 #include <env.h>
 #include <init.h>
-#include <asm/io.h>
 #include <asm/arch-rockchip/clock.h>
 #include <asm/arch-rockchip/cru.h>
 #include <asm/arch-rockchip/hardware.h>
@@ -44,7 +42,7 @@ char *get_reset_cause(void)
 	return cause;
 }
 
-#if CONFIG_IS_ENABLED(DISPLAY_CPUINFO)
+#if IS_ENABLED(CONFIG_DISPLAY_CPUINFO)
 int print_cpuinfo(void)
 {
 	char *cause = get_reset_cause();

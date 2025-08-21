@@ -7,7 +7,7 @@
  * Written-by: Prafulla Wadaskar <prafulla@marvell.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <init.h>
 #include <time.h>
 #include <asm/global_data.h>
@@ -69,12 +69,12 @@ struct orion5x_tmr_registers *orion5x_tmr_regs =
 #define TVR_ARM_TIMER_OFFS		0
 #define TVR_ARM_TIMER_MASK		0xffffffff
 #define TVR_ARM_TIMER_MAX		0xffffffff
-#define TIMER_LOAD_VAL 			0xffffffff
+#define TIMER_LOAD_VAL			0xffffffff
 
 static inline ulong read_timer(void)
 {
 	return readl(CNTMR_VAL_REG(UBOOT_CNTR))
-	      / (CONFIG_SYS_TCLK / 1000);
+	      / (CFG_SYS_TCLK / 1000);
 }
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -92,7 +92,7 @@ static ulong get_timer_masked(void)
 	} else {
 		/* we have an overflow ... */
 		timestamp += lastdec +
-			(TIMER_LOAD_VAL / (CONFIG_SYS_TCLK / 1000)) - now;
+			(TIMER_LOAD_VAL / (CFG_SYS_TCLK / 1000)) - now;
 	}
 	lastdec = now;
 
@@ -115,7 +115,7 @@ void __udelay(unsigned long usec)
 	ulong delayticks;
 
 	current = uboot_cntr_val();
-	delayticks = (usec * (CONFIG_SYS_TCLK / 1000000));
+	delayticks = (usec * (CFG_SYS_TCLK / 1000000));
 
 	if (current < delayticks) {
 		delayticks -= current;

@@ -6,7 +6,6 @@
 #ifndef __IOTRACE_H
 #define __IOTRACE_H
 
-//#include <common.h>
 #include <linux/types.h>
 
 /* Support up to the machine word length for now */
@@ -43,7 +42,7 @@ struct iotrace_record {
  */
 
 #if defined(CONFIG_IO_TRACE) && !defined(IOTRACE_IMPL) && \
-	!defined(CONFIG_SPL_BUILD)
+	!defined(CONFIG_XPL_BUILD)
 
 #undef readl
 #define readl(addr)	iotrace_readl((const void *)(addr))
@@ -81,7 +80,7 @@ void iotrace_reset_checksum(void);
 /**
  * iotrace_get_checksum() - Get the current checksum value
  *
- * @return currect checksum value
+ * Return: currect checksum value
  */
 u32 iotrace_get_checksum(void);
 
@@ -122,7 +121,7 @@ void iotrace_set_enabled(int enable);
 /**
  * iotrace_get_enabled() - Get whether iotracing is enabled or not
  *
- * @return true if enabled, false if disabled
+ * Return: true if enabled, false if disabled
  */
 int iotrace_get_enabled(void);
 

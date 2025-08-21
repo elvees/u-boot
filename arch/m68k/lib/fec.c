@@ -3,14 +3,14 @@
  * (C) 2019 Angelo Dureghello <angelo.dureghello@timesys.com>
  */
 
-#include <common.h>
 #include <asm/global_data.h>
+#include <linux/errno.h>
 #include <linux/libfdt.h>
 #include <fdt_support.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#if defined(CONFIG_MCFFEC) || defined(CONFIG_FSLDMAFEC)
+#if defined(CONFIG_MCFFEC)
 static int fec_get_node(int fec_idx)
 {
 	char fec_alias[5] = {"fec"};
@@ -77,4 +77,4 @@ int fec_get_mii_base(int fec_idx, u32 *mii_base)
 	return fec_get_fdt_prop(fec_idx, "mii-base", mii_base);
 }
 
-#endif //CONFIG_MCFFEC || CONFIG_FSLDMAFEC
+#endif //CONFIG_MCFFEC

@@ -20,6 +20,7 @@ The support for following drivers are already enabled:
 2. Microchip Clock Driver.
 3. Cadence MACB ethernet driver for networking support.
 4. Cadence MMC Driver for eMMC/SD support.
+5. Microchip I2C Driver.
 
 Booting from eMMC using HSS
 ---------------------------
@@ -133,7 +134,7 @@ Build OpenSBI
 .. code-block:: none
 
    make PLATFORM=generic FW_PAYLOAD_PATH=<u-boot-directory>/u-boot.bin
-   FW_FDT_PATH=<u-boot-directory>/arch/riscv/dts/microchip-mpfs-icicle-kit-.dtb
+   FW_FDT_PATH=<u-boot-directory>/arch/riscv/dts/mpfs-icicle-kit-.dtb
 
 3. Output "fw_payload.bin" file available at
    "<opensbi-directory>/build/platform/generic/firmware/fw_payload.bin"
@@ -208,13 +209,14 @@ GUID type
 ~~~~~~~~~
 
 The HSS always picks up HSS payload from a GPT partition with
-GIUD type "21686148-6449-6E6F-744E-656564454649" or sector '0' of the eMMC if no
+GUID type "21686148-6449-6E6F-744E-656564454649" or sector '0' of the eMMC if no
 GPT partition.
 
 Booting
 ~~~~~~~
 
-You should see the U-Boot prompt on UART0.
+You should see the U-Boot prompt on UART1.
+(Note: UART0 is reserved for HSS)
 
 Sample boot log from MPFS Icicle Kit
 ''''''''''''''''''''''''''''''''''''
@@ -275,14 +277,14 @@ load uImage (with initramfs).
    done
    Bytes transferred = 14482480 (dcfc30 hex)
 
-   RISC-V # tftpboot ${fdt_addr_r} microchip-mpfs-icicle-kit.dtb
+   RISC-V # tftpboot ${fdt_addr_r} mpfs-icicle-kit.dtb
    ethernet@20112000: PHY present at 9
    ethernet@20112000: Starting autonegotiation...
    ethernet@20112000: Autonegotiation complete
    ethernet@20112000: link up, 1000Mbps full-duplex (lpa: 0x7800)
    Using ethernet@20112000 device
    TFTP from server 192.168.1.3; our IP address is 192.168.1.5
-   Filename 'microchip-mpfs-icicle-kit.dtb'.
+   Filename 'mpfs-icicle-kit.dtb'.
    Load address: 0x82200000
    Loading: #
 			2.5 MiB/s
@@ -451,13 +453,14 @@ copied payload and Linux image.
 
     sudo dd if=<payload_binary> of=/dev/sdX2 bs=512
 
-You should see the U-Boot prompt on UART0.
+You should see the U-Boot prompt on UART1.
+(Note: UART0 is reserved for HSS)
 
 GUID type
 ~~~~~~~~~
 
 The HSS always picks up the HSS payload from a GPT partition with
-GIUD type "21686148-6449-6E6F-744E-656564454649" or sector '0' of the eMMC if no
+GUID type "21686148-6449-6E6F-744E-656564454649" or sector '0' of the eMMC if no
 GPT partition.
 
 Sample boot log from MPFS Icicle Kit

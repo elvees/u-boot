@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
+ * Copyright (C) 2022 Josua Mayer <josua@solid-run.com>
+ *
  * Copyright (C) 2015 Freescale Semiconductor, Inc.
  *
  * Author: Fabio Estevam <fabio.estevam@freescale.com>
@@ -13,7 +15,7 @@
  * Ported to SolidRun microSOM by Rabeeh Khoury <rabeeh@solid-run.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <image.h>
 #include <init.h>
 #include <log.h>
@@ -30,6 +32,7 @@
 #include <asm/mach-imx/iomux-v3.h>
 #include <asm/mach-imx/sata.h>
 #include <asm/mach-imx/video.h>
+#include <asm/sections.h>
 #include <mmc.h>
 #include <fsl_esdhc_imx.h>
 #include <malloc.h>
@@ -39,6 +42,8 @@
 #include <spl.h>
 #include <usb.h>
 #include <usb/ehci-ci.h>
+#include <netdev.h>
+#include <phy.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -103,7 +108,7 @@ int dram_init(void)
 {
 	u32 max_size = imx_ddr_size();
 
-	gd->ram_size = get_ram_size_stride_test((u32 *) CONFIG_SYS_SDRAM_BASE,
+	gd->ram_size = get_ram_size_stride_test((u32 *) CFG_SYS_SDRAM_BASE,
 						(u32)max_size);
 
 	return 0;
@@ -271,9 +276,8 @@ int board_early_init_f(void)
 {
 	setup_iomux_uart();
 
-#ifdef CONFIG_CMD_SATA
-	setup_sata();
-#endif
+	if (CONFIG_IS_ENABLED(SATA))
+		setup_sata();
 	setup_fec();
 
 	return 0;
@@ -284,7 +288,7 @@ int board_init(void)
 	int ret = 0;
 
 	/* address of boot parameters */
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE + 0x100;
 
 #ifdef CONFIG_VIDEO_IPUV3
 	ret = setup_display();
@@ -332,20 +336,17 @@ static enum board_type board_type(void)
 	 * HB             1     1    x
 	 */
 
-	gpio_direction_input(IMX_GPIO_NR(2, 8));
-	val3 = gpio_get_value(IMX_GPIO_NR(2, 8));
+	val3 = !!dm_gpio_get_value(&board_detect_desc[0]);
 
 	if (val3 == 0)
 		return HUMMINGBOARD2;
 
-	gpio_direction_input(IMX_GPIO_NR(3, 4));
-	val2 = gpio_get_value(IMX_GPIO_NR(3, 4));
+	val2 = !!dm_gpio_get_value(&board_detect_desc[1]);
 
 	if (val2 == 0)
 		return HUMMINGBOARD;
 
-	gpio_direction_input(IMX_GPIO_NR(4, 9));
-	val1 = gpio_get_value(IMX_GPIO_NR(4, 9));
+	val1 = !!dm_gpio_get_value(&board_detect_desc[2]);
 
 	if (val1 == 0) {
 		return CUBOXI;
@@ -359,8 +360,8 @@ static bool is_rev_15_som(void)
 	int val1, val2;
 	SETUP_IOMUX_PADS(som_rev_detect);
 
-	val1 = gpio_get_value(IMX_GPIO_NR(6, 0));
-	val2 = gpio_get_value(IMX_GPIO_NR(6, 4));
+	val1 = !!dm_gpio_get_value(&board_detect_desc[3]);
+	val2 = !!dm_gpio_get_value(&board_detect_desc[4]);
 
 	if (val1 == 1 && val2 == 0)
 		return true;
@@ -374,44 +375,93 @@ static bool has_emmc(void)
 	mmc = find_mmc_device(2);
 	if (!mmc)
 		return 0;
-	return (mmc_get_op_cond(mmc) < 0) ? 0 : 1;
+	return (mmc_get_op_cond(mmc, true) < 0) ? 0 : 1;
 }
 
-int checkboard(void)
+static int find_ethernet_phy(void)
 {
-	request_detect_gpios();
+	struct mii_dev *bus = NULL;
+	struct phy_device *phydev = NULL;
+	int phy_addr = -ENOENT;
 
-	switch (board_type()) {
-	case CUBOXI:
-		puts("Board: MX6 Cubox-i");
-		break;
-	case HUMMINGBOARD:
-		puts("Board: MX6 HummingBoard");
-		break;
-	case HUMMINGBOARD2:
-		puts("Board: MX6 HummingBoard2");
-		break;
-	case UNKNOWN:
-	default:
-		puts("Board: Unknown\n");
-		goto out;
+#ifdef CONFIG_FEC_MXC
+	bus = fec_get_miibus(NULL, ENET_BASE_ADDR, -1);
+	if (!bus)
+		return -ENOENT;
+
+	// scan address 0, 1, 4
+	phydev = phy_find_by_mask(bus, 0b00010011);
+	if (!phydev) {
+		free(bus);
+		return -ENOENT;
+	}
+	pr_debug("%s: detected ethernet phy at address %d\n", __func__, phydev->addr);
+	phy_addr = phydev->addr;
+
+	free(phydev);
+#endif
+
+	return phy_addr;
+}
+
+#if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)
+/*
+ * Configure the correct ethernet PHYs nodes in device-tree:
+ * - AR8035 at addresses 0 or 4: Cubox
+ * - AR8035 at address 0: HummingBoard, HummingBoard 2
+ * - ADIN1300 at address 1: since SoM rev 1.9
+ */
+int ft_board_setup(void *fdt, struct bd_info *bd)
+{
+	int node_phy0, node_phy1, node_phy4;
+	int ret, phy;
+	bool enable_phy0 = false, enable_phy1 = false, enable_phy4 = false;
+	enum board_type board;
+
+	// detect device
+	request_detect_gpios();
+	board = board_type();
+	free_detect_gpios();
+
+	// detect phy
+	phy = find_ethernet_phy();
+	if (phy == 0 || phy == 4) {
+		enable_phy0 = true;
+		switch (board) {
+		case HUMMINGBOARD:
+		case HUMMINGBOARD2:
+			/* atheros phy may appear only at address 0 */
+			break;
+		case CUBOXI:
+		case UNKNOWN:
+		default:
+			/* atheros phy may appear at either address 0 or 4 */
+			enable_phy4 = true;
+		}
+	} else if (phy == 1) {
+		enable_phy1 = true;
+	} else {
+		pr_err("%s: couldn't detect ethernet phy, not patching dtb!\n", __func__);
+		return 0;
 	}
 
-	if (is_rev_15_som())
-		puts(" (som rev 1.5)\n");
-	else
-		puts("\n");
+	// update all phy nodes status
+	node_phy0 = fdt_path_offset(fdt, "/soc/bus@2100000/ethernet@2188000/mdio/ethernet-phy@0");
+	ret = fdt_setprop_string(fdt, node_phy0, "status", enable_phy0 ? "okay" : "disabled");
+	if (ret < 0 && enable_phy0)
+		pr_err("%s: failed to enable ethernet phy at address 0 in dtb!\n", __func__);
+	node_phy1 = fdt_path_offset(fdt, "/soc/bus@2100000/ethernet@2188000/mdio/ethernet-phy@1");
+	ret = fdt_setprop_string(fdt, node_phy1, "status", enable_phy1 ? "okay" : "disabled");
+	if (ret < 0 && enable_phy1)
+		pr_err("%s: failed to enable ethernet phy at address 1 in dtb!\n", __func__);
+	node_phy4 = fdt_path_offset(fdt, "/soc/bus@2100000/ethernet@2188000/mdio/ethernet-phy@4");
+	ret = fdt_setprop_string(fdt, node_phy4, "status", enable_phy4 ? "okay" : "disabled");
+	if (ret < 0 && enable_phy4)
+		pr_err("%s: failed to enable ethernet phy at address 4 in dtb!\n", __func__);
 
-	free_detect_gpios();
-out:
 	return 0;
 }
-
-/* Override the default implementation, DT model is not accurate */
-int show_board_info(void)
-{
-	return checkboard();
-}
+#endif
 
 int board_late_init(void)
 {
@@ -421,12 +471,15 @@ int board_late_init(void)
 	switch (board_type()) {
 	case CUBOXI:
 		env_set("board_name", "CUBOXI");
+		puts("Board: MX6 Cubox-i");
 		break;
 	case HUMMINGBOARD:
 		env_set("board_name", "HUMMINGBOARD");
+		puts("Board: MX6 HummingBoard");
 		break;
 	case HUMMINGBOARD2:
 		env_set("board_name", "HUMMINGBOARD2");
+		puts("Board: MX6 HummingBoard2");
 		break;
 	case UNKNOWN:
 	default:
@@ -438,8 +491,12 @@ int board_late_init(void)
 	else
 		env_set("board_rev", "MX6DL");
 
-	if (is_rev_15_som())
+	if (is_rev_15_som()) {
 		env_set("som_rev", "V15");
+		puts(" (som rev 1.5)\n");
+	} else {
+		puts("\n");
+	}
 
 	if (has_emmc())
 		env_set("has_emmc", "yes");
@@ -513,7 +570,7 @@ void board_boot_order(u32 *spl_boot_list)
 	spl_boot_list[1] = BOOT_DEVICE_BOARD;
 }
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 #include <asm/arch/mx6-ddr.h>
 static const struct mx6dq_iomux_ddr_regs mx6q_ddr_ioregs = {
 	.dram_sdclk_0 =  0x00020030,
@@ -754,6 +811,9 @@ void board_init_f(ulong dummy)
 
 	/* setup GP timer */
 	timer_init();
+
+	/* Enable device tree and early DM support*/
+	spl_early_init();
 
 	/* UART clocks enabled and gd valid - init serial console */
 	preloader_console_init();

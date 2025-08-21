@@ -71,7 +71,6 @@ struct ed {
 } __attribute__((aligned(ED_ALIGNMENT)));
 typedef struct ed ed_t;
 
-
 /* TD info field */
 #define TD_CC	    0xf0000000
 #define TD_CC_GET(td_p) ((td_p >>28) & 0x0f)
@@ -106,7 +105,6 @@ typedef struct ed ed_t;
 #define TD_BUFFEROVERRUN   0x0C
 #define TD_BUFFERUNDERRUN  0x0D
 #define TD_NOTACCESSED	   0x0F
-
 
 #define MAXPSW 1
 
@@ -146,14 +144,6 @@ struct ohci_hcca {
 	u8		reserved_for_hc[116];
 } __attribute__((aligned(256)));
 
-
-/*
- * Maximum number of root hub ports.
- */
-#ifndef CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS
-# error "CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS undefined!"
-#endif
-
 /*
  * This is the structure of the OHCI controller's memory mapped I/O
  * region.  This is Memory Mapped I/O.	You must use the ohci_readl() and
@@ -186,7 +176,7 @@ struct ohci_regs {
 		__u32	a;
 		__u32	b;
 		__u32	status;
-		__u32	portstatus[CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS];
+		__u32	portstatus[];
 	} roothub;
 } __attribute__((aligned(32)));
 
@@ -240,7 +230,6 @@ struct ohci_regs {
 #define OHCI_INTR_OC	(1 << 30)	/* ownership change */
 #define OHCI_INTR_MIE	(1 << 31)	/* master interrupt enable */
 
-
 /* Virtual Root HUB */
 struct virt_root_hub {
 	int devnum; /* Address of Root Hub endpoint */
@@ -276,7 +265,6 @@ struct virt_root_hub {
 /* Our Vendor Specific Request */
 #define RH_SET_EP		0x2000
 
-
 /* Hub port features */
 #define RH_PORT_CONNECTION	   0x00
 #define RH_PORT_ENABLE		   0x01
@@ -302,7 +290,6 @@ struct virt_root_hub {
 #define RH_ACK			   0x01
 #define RH_REQ_ERR		   -1
 #define RH_NACK			   0x00
-
 
 /* OHCI ROOT HUB REGISTER MASKS */
 
@@ -379,7 +366,6 @@ typedef struct ohci_device {
  * Note how the "proper" USB information is just
  * a subset of what the full implementation needs. (Linus)
  */
-
 
 typedef struct ohci {
 	/* this allocates EDs for all possible endpoints */

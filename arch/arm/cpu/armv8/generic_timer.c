@@ -4,7 +4,6 @@
  * David Feng <fenghua@phytium.com.cn>
  */
 
-#include <common.h>
 #include <bootstage.h>
 #include <command.h>
 #include <time.h>
@@ -17,7 +16,7 @@ DECLARE_GLOBAL_DATA_PTR;
 /*
  * Generic timer implementation of get_tbclk()
  */
-unsigned long get_tbclk(void)
+unsigned long notrace get_tbclk(void)
 {
 	unsigned long cntfrq;
 	asm volatile("mrs %0, cntfrq_el0" : "=r" (cntfrq));
@@ -78,7 +77,7 @@ unsigned long timer_read_counter(void)
 /*
  * timer_read_counter() using the Arm Generic Timer (aka arch timer).
  */
-unsigned long timer_read_counter(void)
+unsigned long notrace timer_read_counter(void)
 {
 	unsigned long cntpct;
 
@@ -89,7 +88,7 @@ unsigned long timer_read_counter(void)
 }
 #endif
 
-uint64_t get_ticks(void)
+uint64_t notrace get_ticks(void)
 {
 	unsigned long ticks = timer_read_counter();
 
@@ -115,3 +114,30 @@ ulong timer_get_boot_us(void)
 
 	return val / get_tbclk();
 }
+
+#if CONFIG_IS_ENABLED(ARMV8_UDELAY_EVENT_STREAM)
+void __udelay(unsigned long usec)
+{
+	u64 target = get_ticks() + usec_to_tick(usec);
+
+	/* At EL2 or above, use the event stream to avoid polling CNTPCT_EL0 so often */
+	if (current_el() >= 2) {
+		u32 cnthctl_val;
+		const u8 event_period = 0x7;
+
+		asm volatile("mrs %0, cnthctl_el2" : "=r" (cnthctl_val));
+		asm volatile("msr cnthctl_el2, %0" : : "r"
+			(cnthctl_val | CNTHCTL_EL2_EVNT_EN | CNTHCTL_EL2_EVNT_I(event_period)));
+
+		while (get_ticks() + (1ULL << event_period) <= target)
+			wfe();
+
+		/* Reset the event stream */
+		asm volatile("msr cnthctl_el2, %0" : : "r" (cnthctl_val));
+	}
+
+	/* Fall back to polling CNTPCT_EL0 */
+	while (get_ticks() <= target)
+		;
+}
+#endif

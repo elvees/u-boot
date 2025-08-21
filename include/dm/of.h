@@ -7,7 +7,6 @@
 #ifndef _DM_OF_H
 #define _DM_OF_H
 
-#include <asm/u-boot.h>
 #include <asm/global_data.h>
 
 /* integer value within a device tree property which references another node */
@@ -31,10 +30,21 @@ struct property {
 /**
  * struct device_node: Device tree node
  *
- * @name: Node name
+ * The top of this tree is typically gd->of_root which points to the root node.
+ *
+ * The head of the list of children for the root node (and any other node) is
+ * in @child, with @sibling providing a link to the next child.
+ *
+ * Each child has a pointer to its parent in @parent.
+ *
+ * A node may have properties in which case the head of the list of properties
+ * @properties pointers to the first one, with struct property->@next pointing
+ * to the next one.
+ *
+ * @name: Node name, "" for the root node
  * @type: Node type (value of device_type property) or "<NULL>" if none
  * @phandle: Phandle value of this none, or 0 if none
- * @full_name: Full path to node, e.g. "/bus@1/spi@1100"
+ * @full_name: Full path to node, e.g. "/bus@1/spi@1100" ("/" for the root node)
  * @properties: Pointer to head of list of properties, or NULL if none
  * @parent: Pointer to parent node, or NULL if this is the root node
  * @child: Pointer to head of child node list, or NULL if no children
@@ -52,20 +62,21 @@ struct device_node {
 	struct device_node *sibling;
 };
 
+#define BAD_OF_ROOT	0xdead11e3
+
 #define OF_MAX_PHANDLE_ARGS 16
 
 /**
  * struct of_phandle_args - structure to hold phandle and arguments
  *
  * This is used when decoding a phandle in a device tree property. Typically
- * these look like this:
+ * these look like this::
  *
- * wibble {
- *    phandle = <5>;
- * };
- *
- * ...
- * some-prop = <&wibble 1 2 3>
+ *   wibble {
+ *     phandle = <5>;
+ *   };
+ *   ...
+ *   some-prop = <&wibble 1 2 3>
  *
  * Here &node is the phandle of the node 'wibble', i.e. 5. There are three
  * arguments: 1, 2, 3.

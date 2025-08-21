@@ -8,7 +8,13 @@
 
 #include <linux/errno.h>
 
-extern int errno;
+#ifdef __SANDBOX__
+#define __errno_asm_label asm("__u_boot_errno")
+#else
+#define __errno_asm_label
+#endif
+
+extern int errno __errno_asm_label;
 
 #define __set_errno(val) do { errno = val; } while (0)
 
@@ -19,7 +25,7 @@ extern int errno;
  * Return:	string describing the error. If CONFIG_ERRNO_STR is not
  *		defined an empty string is returned.
  */
-#ifdef CONFIG_ERRNO_STR
+#if CONFIG_IS_ENABLED(ERRNO_STR)
 const char *errno_str(int errno);
 #else
 static const char error_message[] = "";

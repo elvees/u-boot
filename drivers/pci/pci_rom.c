@@ -24,8 +24,8 @@
 
 #define LOG_CATEGORY UCLASS_PCI
 
-#include <common.h>
 #include <bios_emul.h>
+#include <bloblist.h>
 #include <bootstage.h>
 #include <dm.h>
 #include <errno.h>
@@ -34,9 +34,10 @@
 #include <malloc.h>
 #include <pci.h>
 #include <pci_rom.h>
-#include <vbe.h>
+#include <spl.h>
+#include <time.h>
+#include <vesa.h>
 #include <video.h>
-#include <video_fb.h>
 #include <acpi/acpi_s3.h>
 #include <asm/global_data.h>
 #include <linux/screen_info.h>
@@ -92,6 +93,7 @@ static int pci_rom_probe(struct udevice *dev, struct pci_rom_header **hdrp)
 		debug("%s: rom_address=%x\n", __func__, rom_address);
 		return -ENOENT;
 	}
+	rom_address &= PCI_ROM_ADDRESS_MASK;
 
 	/* Enable expansion ROM address decoding. */
 	dm_pci_write_config32(dev, PCI_ROM_ADDRESS,
@@ -149,7 +151,7 @@ static int pci_rom_probe(struct udevice *dev, struct pci_rom_header **hdrp)
  * @ram_headerp:	Returns a pointer to the image in RAM
  * @allocedp:		Returns true if @ram_headerp was allocated and needs
  *			to be freed
- * @return 0 if OK, -ve on error. Note that @allocedp is set up regardless of
+ * Return: 0 if OK, -ve on error. Note that @allocedp is set up regardless of
  * the error state. Even if this function returns an error, it may have
  * allocated memory.
  */
@@ -203,7 +205,7 @@ static int pci_rom_load(struct pci_rom_header *rom_header,
 	return 0;
 }
 
-struct vbe_mode_info mode_info;
+struct vesa_state mode_info;
 
 void setup_video(struct screen_info *screen_info)
 {
@@ -255,14 +257,16 @@ int dm_pci_run_vga_bios(struct udevice *dev, int (*int15_handler)(void),
 
 	ret = pci_rom_probe(dev, &rom);
 	if (ret)
-		return ret;
+		return log_msg_ret("pro", ret);
 
 	ret = pci_rom_load(rom, &ram, &alloced);
-	if (ret)
+	if (ret) {
+		ret = log_msg_ret("ld", ret);
 		goto err;
+	}
 
 	if (!board_should_run_oprom(dev)) {
-		ret = -ENXIO;
+		ret = log_msg_ret("run", -ENXIO);
 		goto err;
 	}
 
@@ -270,7 +274,7 @@ int dm_pci_run_vga_bios(struct udevice *dev, int (*int15_handler)(void),
 		defined(CONFIG_FRAMEBUFFER_VESA_MODE)
 	vesa_mode = CONFIG_FRAMEBUFFER_VESA_MODE;
 #endif
-	debug("Selected vesa mode %#x\n", vesa_mode);
+	debug("Selected vesa mode 0x%x\n", vesa_mode);
 
 	if (exec_method & PCI_ROM_USE_NATIVE) {
 #ifdef CONFIG_X86
@@ -297,27 +301,31 @@ int dm_pci_run_vga_bios(struct udevice *dev, int (*int15_handler)(void),
 	}
 
 	if (emulate) {
-#ifdef CONFIG_BIOSEMU
-		BE_VGAInfo *info;
+		if (CONFIG_IS_ENABLED(BIOSEMU)) {
+			BE_VGAInfo *info;
 
-		ret = biosemu_setup(dev, &info);
-		if (ret)
-			goto err;
-		biosemu_set_interrupt_handler(0x15, int15_handler);
-		ret = biosemu_run(dev, (uchar *)ram, 1 << 16, info,
-				  true, vesa_mode, &mode_info);
-		if (ret)
-			goto err;
-#endif
+			log_debug("Running video BIOS with emulator...");
+			ret = biosemu_setup(dev, &info);
+			if (ret)
+				goto err;
+			biosemu_set_interrupt_handler(0x15, int15_handler);
+			ret = biosemu_run(dev, (uchar *)ram, 1 << 16, info,
+					  true, vesa_mode, &mode_info);
+			log_debug("done\n");
+			if (ret)
+				goto err;
+		}
 	} else {
 #if defined(CONFIG_X86) && (CONFIG_IS_ENABLED(X86_32BIT_INIT) || CONFIG_TPL)
+		log_debug("Running video BIOS...");
 		bios_set_interrupt_handler(0x15, int15_handler);
 
 		bios_run_on_x86(dev, (unsigned long)ram, vesa_mode,
 				&mode_info);
+		log_debug("done\n");
 #endif
 	}
-	debug("Final vesa mode %#x\n", mode_info.video_mode);
+	debug("Final vesa mode %x\n", mode_info.video_mode);
 	ret = 0;
 
 err:
@@ -326,10 +334,9 @@ err:
 	return ret;
 }
 
-#ifdef CONFIG_DM_VIDEO
-int vbe_setup_video_priv(struct vesa_mode_info *vesa,
-			 struct video_priv *uc_priv,
-			 struct video_uc_plat *plat)
+int vesa_setup_video_priv(struct vesa_mode_info *vesa, u64 fb,
+			  struct video_priv *uc_priv,
+			  struct video_uc_plat *plat)
 {
 	if (!vesa->x_resolution)
 		return log_msg_ret("No x resolution", -ENXIO);
@@ -340,6 +347,7 @@ int vbe_setup_video_priv(struct vesa_mode_info *vesa,
 	case 32:
 	case 24:
 		uc_priv->bpix = VIDEO_BPP32;
+		uc_priv->format = VIDEO_X8B8G8R8;
 		break;
 	case 16:
 		uc_priv->bpix = VIDEO_BPP16;
@@ -349,20 +357,17 @@ int vbe_setup_video_priv(struct vesa_mode_info *vesa,
 	}
 
 	/* Use double buffering if enabled */
-	if (IS_ENABLED(CONFIG_VIDEO_COPY)) {
-		if (!plat->base)
-			return log_msg_ret("copy", -ENFILE);
-		plat->copy_base = vesa->phys_base_ptr;
-	} else {
-		plat->base = vesa->phys_base_ptr;
-	}
+	if (IS_ENABLED(CONFIG_VIDEO_COPY) && plat->base)
+		plat->copy_base = fb;
+	else
+		plat->base = fb;
 	log_debug("base = %lx, copy_base = %lx\n", plat->base, plat->copy_base);
 	plat->size = vesa->bytes_per_scanline * vesa->y_resolution;
 
 	return 0;
 }
 
-int vbe_setup_video(struct udevice *dev, int (*int15_handler)(void))
+int vesa_setup_video(struct udevice *dev, int (*int15_handler)(void))
 {
 	struct video_uc_plat *plat = dev_get_uclass_plat(dev);
 	struct video_priv *uc_priv = dev_get_uclass_priv(dev);
@@ -373,33 +378,70 @@ int vbe_setup_video(struct udevice *dev, int (*int15_handler)(void))
 		printf("Not available (previous bootloader prevents it)\n");
 		return -EPERM;
 	}
-	bootstage_start(BOOTSTAGE_ID_ACCUM_LCD, "vesa display");
-	ret = dm_pci_run_vga_bios(dev, int15_handler, PCI_ROM_USE_NATIVE |
-					PCI_ROM_ALLOW_FALLBACK);
-	bootstage_accum(BOOTSTAGE_ID_ACCUM_LCD);
-	if (ret) {
-		debug("failed to run video BIOS: %d\n", ret);
-		return ret;
-	}
 
-	ret = vbe_setup_video_priv(&mode_info.vesa, uc_priv, plat);
-	if (ret) {
-		if (ret == -ENFILE) {
-			/*
-			 * See video-uclass.c for how to set up reserved memory
-			 * in your video driver
-			 */
-			log_err("CONFIG_VIDEO_COPY enabled but driver '%s' set up no reserved memory\n",
-				dev->driver->name);
+	/* In U-Boot proper, collect the information added by SPL (see below) */
+	if (IS_ENABLED(CONFIG_SPL_VIDEO) && xpl_phase() > PHASE_SPL &&
+	    CONFIG_IS_ENABLED(BLOBLIST)) {
+		struct video_handoff *ho;
+
+		ho = bloblist_find(BLOBLISTT_U_BOOT_VIDEO, sizeof(*ho));
+		if (!ho)
+			return log_msg_ret("blf", -ENOENT);
+		plat->base = ho->fb;
+		plat->size = ho->size;
+		uc_priv->xsize = ho->xsize;
+		uc_priv->ysize = ho->ysize;
+		uc_priv->line_length = ho->line_length;
+		uc_priv->bpix = ho->bpix;
+		uc_priv->format = ho->format;
+	} else {
+		bootstage_start(BOOTSTAGE_ID_ACCUM_LCD, "vesa display");
+		ret = dm_pci_run_vga_bios(dev, int15_handler,
+					  PCI_ROM_USE_NATIVE |
+					  PCI_ROM_ALLOW_FALLBACK);
+		bootstage_accum(BOOTSTAGE_ID_ACCUM_LCD);
+		if (ret) {
+			debug("failed to run video BIOS: %d\n", ret);
+			return ret;
 		}
 
-		debug("No video mode configured\n");
-		return ret;
+		ret = vesa_setup_video_priv(&mode_info.vesa,
+					    mode_info.vesa.phys_base_ptr,
+					    uc_priv, plat);
+		if (ret) {
+			if (ret == -ENFILE) {
+				/*
+				 * See video-uclass.c for how to set up reserved
+				 * memory in your video driver
+				 */
+				log_err("CONFIG_VIDEO_COPY enabled but driver '%s' set up no reserved memory\n",
+					dev->driver->name);
+			}
+
+			debug("No video mode configured\n");
+			return ret;
+		}
 	}
 
 	printf("Video: %dx%dx%d\n", uc_priv->xsize, uc_priv->ysize,
 	       mode_info.vesa.bits_per_pixel);
 
+	/* In SPL, store the information for use by U-Boot proper */
+	if (xpl_phase() == PHASE_SPL && CONFIG_IS_ENABLED(BLOBLIST)) {
+		struct video_handoff *ho;
+
+		ho = bloblist_add(BLOBLISTT_U_BOOT_VIDEO, sizeof(*ho), 0);
+		if (!ho)
+			return log_msg_ret("blc", -ENOMEM);
+
+		ho->fb = plat->base;
+		ho->size = plat->size;
+		ho->xsize = uc_priv->xsize;
+		ho->ysize = uc_priv->ysize;
+		ho->line_length = uc_priv->line_length;
+		ho->bpix = uc_priv->bpix;
+		ho->format = uc_priv->format;
+	}
+
 	return 0;
 }
-#endif

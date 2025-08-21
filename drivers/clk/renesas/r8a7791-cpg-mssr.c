@@ -1,10 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Renesas R8A7791 CPG MSSR driver
- *
- * Copyright (C) 2018 Marek Vasut <marek.vasut@gmail.com>
- *
- * Based on the following driver from Linux kernel:
  * r8a7791 Clock Pulse Generator / Module Standby and Software Reset
  *
  * Copyright (C) 2015-2017 Glider bvba
@@ -14,7 +9,6 @@
  * Copyright (C) 2013 Ideas On Board SPRL
  */
 
-#include <common.h>
 #include <clk-uclass.h>
 #include <dm.h>
 #include <linux/bitops.h>
@@ -43,7 +37,7 @@ enum clk_ids {
 	MOD_CLK_BASE
 };
 
-static const struct cpg_core_clk r8a7791_core_clks[] = {
+static struct cpg_core_clk r8a7791_core_clks[] __initdata = {
 	/* External Clock Inputs */
 	DEF_INPUT("extal",     CLK_EXTAL),
 	DEF_INPUT("usb_extal", CLK_USB_EXTAL),
@@ -89,7 +83,7 @@ static const struct cpg_core_clk r8a7791_core_clks[] = {
 	DEF_DIV6P1("ssprs", R8A7791_CLK_SSPRS, CLK_PLL1_DIV2, 0x24c),
 };
 
-static const struct mssr_mod_clk r8a7791_mod_clks[] = {
+static const struct mssr_mod_clk r8a7791_mod_clks[] __initconst = {
 	DEF_MOD("msiof0",		   0,	R8A7791_CLK_MP),
 	DEF_MOD("vcp0",			 101,	R8A7791_CLK_ZS),
 	DEF_MOD("vpc0",			 103,	R8A7791_CLK_ZS),
@@ -106,7 +100,7 @@ static const struct mssr_mod_clk r8a7791_mod_clks[] = {
 	DEF_MOD("tmu0",			 125,	R8A7791_CLK_CP),
 	DEF_MOD("vsp1du1",		 127,	R8A7791_CLK_ZS),
 	DEF_MOD("vsp1du0",		 128,	R8A7791_CLK_ZS),
-	DEF_MOD("vsp1-sy",		 131,	R8A7791_CLK_ZS),
+	DEF_MOD("vsps",			 131,	R8A7791_CLK_ZS),
 	DEF_MOD("scifa2",		 202,	R8A7791_CLK_MP),
 	DEF_MOD("scifa1",		 203,	R8A7791_CLK_MP),
 	DEF_MOD("scifa0",		 204,	R8A7791_CLK_MP),
@@ -232,7 +226,7 @@ static const struct mssr_mod_clk r8a7791_mod_clks[] = {
 #define CPG_PLL_CONFIG_INDEX(md)	((((md) & BIT(14)) >> 12) | \
 					 (((md) & BIT(13)) >> 12) | \
 					 (((md) & BIT(19)) >> 19))
-static const struct rcar_gen2_cpg_pll_config cpg_pll_configs[8] = {
+static const struct rcar_gen2_cpg_pll_config cpg_pll_configs[8] __initconst = {
 	{ 1, 208, 106 }, { 1, 208,  88 }, { 1, 156,  80 }, { 1, 156,  66 },
 	{ 2, 240, 122 }, { 2, 240, 102 }, { 2, 208, 106 }, { 2, 208,  88 },
 };
@@ -245,7 +239,7 @@ static const struct mstp_stop_table r8a7791_mstp_table[] = {
 	{ 0x800001C4, 0x180, 0x800001C4, 0x0 },
 	{ 0x44C00046, 0x0, 0x44C00046, 0x0 },
 	{ 0x0, 0x0, 0x0, 0x0 },	/* SMSTP6 is not present on Gen2 */
-	{ 0x05BFE618, 0x200000, 0x05BFE618, 0x0 },
+	{ 0x25BFE618, 0x200000, 0x25BFE618, 0x0 },
 	{ 0x40C0FE85, 0x0, 0x40C0FE85, 0x0 },
 	{ 0xFF979FFF, 0x0, 0xFF979FFF, 0x0 },
 	{ 0xFFFEFFE0, 0x0, 0xFFFEFFE0, 0x0 },
@@ -265,6 +259,7 @@ static const struct cpg_mssr_info r8a7791_cpg_mssr_info = {
 	.mstp_table		= r8a7791_mstp_table,
 	.mstp_table_size	= ARRAY_SIZE(r8a7791_mstp_table),
 	.reset_node		= "renesas,r8a7791-rst",
+	.reset_modemr_offset	= CPG_RST_MODEMR,
 	.extal_usb_node		= "usb_extal",
 	.mod_clk_base		= MOD_CLK_BASE,
 	.clk_extal_id		= CLK_EXTAL,

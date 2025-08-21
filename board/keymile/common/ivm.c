@@ -4,10 +4,11 @@
  * Holger Brunck, Keymile GmbH Hannover, holger.brunck@keymile.com
  */
 
-#include <common.h>
 #include <cli_hush.h>
 #include <env.h>
 #include <i2c.h>
+#include <stdio.h>
+#include <vsprintf.h>
 #include "common.h"
 
 #define MAC_STR_SZ	20
@@ -306,11 +307,7 @@ static int ivm_populate_env(unsigned char *buf, int len, int mac_address_offset)
 		return 0;
 	page2 = &buf[CONFIG_SYS_IVM_EEPROM_PAGE_LEN * 2];
 
-	if (!IS_ENABLED(CONFIG_KMTEGR1)) {
-		/* if an offset is defined, add it */
-		process_mac(valbuf, page2, mac_address_offset, true);
-		env_set((char *)"ethaddr", (char *)valbuf);
-	} else {
+	if (IS_ENABLED(CONFIG_TARGET_KMTEGR1)) {
 		/* KMTEGR1 has a special setup. eth0 has no connection to the
 		 * outside and gets an locally administred MAC address, eth1 is
 		 * the debug interface and gets the official MAC address from
@@ -320,6 +317,19 @@ static int ivm_populate_env(unsigned char *buf, int len, int mac_address_offset)
 		env_set((char *)"ethaddr", (char *)valbuf);
 		process_mac(valbuf, page2, mac_address_offset, true);
 		env_set((char *)"eth1addr", (char *)valbuf);
+	} else if (IS_ENABLED(CONFIG_ARCH_LS1021A)) {
+		/* LS102xA has 1xRGMII for debug connection and
+		 * 2xSGMII for back-plane mgmt connection
+		 */
+		process_mac(valbuf, page2, 1, true);
+		env_set((char *)"ethaddr", (char *)valbuf);
+		process_mac(valbuf, page2, 2, true);
+		env_set((char *)"eth1addr", (char *)valbuf);
+		process_mac(valbuf, page2, mac_address_offset, true);
+		env_set((char *)"eth2addr", (char *)valbuf);
+	} else {
+		process_mac(valbuf, page2, mac_address_offset, true);
+		env_set((char *)"ethaddr", (char *)valbuf);
 	}
 	if (IS_ENABLED(CONFIG_TARGET_KMCENT2)) {
 		/* 3rd ethernet interface */
@@ -332,34 +342,28 @@ static int ivm_populate_env(unsigned char *buf, int len, int mac_address_offset)
 
 int ivm_read_eeprom(unsigned char *buf, int len, int mac_address_offset)
 {
-	int ret;
-#if CONFIG_IS_ENABLED(DM_I2C)
 	struct udevice *eedev = NULL;
+	int ret;
 
 	ret = i2c_get_chip_for_busnum(CONFIG_KM_IVM_BUS,
-				      CONFIG_SYS_I2C_EEPROM_ADDR, 1, &eedev);
+				      CONFIG_SYS_IVM_EEPROM_ADR, 1, &eedev);
 	if (ret) {
 		printf("failed to get device for EEPROM at address 0x%02x\n",
-		       CONFIG_SYS_I2C_EEPROM_ADDR);
+		       CONFIG_SYS_IVM_EEPROM_ADR);
 		return 1;
 	}
+
+#if CONFIG_IS_ENABLED(ARCH_LS1021A)
+	/* add deblocking here */
+	i2c_make_abort();
+#endif
 
 	ret = dm_i2c_read(eedev, 0, buf, len);
 	if (ret != 0) {
 		printf("Error: Unable to read from I2C EEPROM at address %02X:%02X\n",
-		       CONFIG_SYS_I2C_EEPROM_ADDR, 0);
+		       CONFIG_SYS_IVM_EEPROM_ADR, 0);
 		return 1;
 	}
-#else
-	i2c_set_bus_num(CONFIG_KM_IVM_BUS);
-	/* add deblocking here */
-	i2c_make_abort();
 
-	ret = i2c_read(CONFIG_SYS_IVM_EEPROM_ADR, 0, 1, buf, len);
-	if (ret != 0) {
-		printf("Error reading EEprom\n");
-		return -2;
-	}
-#endif
 	return ivm_populate_env(buf, len, mac_address_offset);
 }

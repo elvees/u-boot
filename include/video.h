@@ -1,13 +1,7 @@
 /*
- * Video uclass and legacy implementation
+ * Video uclass to support displays (see also vidconsole for text)
  *
  * Copyright (c) 2015 Google, Inc
- *
- * MPC823 Video Controller
- * =======================
- * (C) 2000 by Paolo Scaffardi (arsenio@tin.it)
- * AIRVENT SAM s.p.a - RIMINI(ITALY)
- *
  */
 
 #ifndef _VIDEO_H_
@@ -27,15 +21,22 @@ struct udevice;
  * @align: Frame-buffer alignment, indicating the memory boundary the frame
  *	buffer should start on. If 0, 1MB is assumed
  * @size: Frame-buffer size, in bytes
- * @base: Base address of frame buffer, 0 if not yet known
- * @copy_base: Base address of a hardware copy of the frame buffer. See
- *	CONFIG_VIDEO_COPY.
+ * @base: Base address of frame buffer, 0 if not yet known. If CONFIG_VIDEO_COPY
+ *	is enabled, this is the software copy, so writes to this will not be
+ *	visible until vidconsole_sync_copy() is called. If CONFIG_VIDEO_COPY is
+ *	disabled, this is the hardware framebuffer.
+ * @copy_base: Base address of a hardware copy of the frame buffer. If
+ *	CONFIG_VIDEO_COPY is disabled, this is not used.
+ * @copy_size: Size of copy framebuffer, used if @size is 0
+ * @hide_logo: Hide the logo (used for testing)
  */
 struct video_uc_plat {
 	uint align;
 	uint size;
 	ulong base;
 	ulong copy_base;
+	ulong copy_size;
+	bool hide_logo;
 };
 
 enum video_polarity {
@@ -56,21 +57,27 @@ enum video_log2_bpp {
 	VIDEO_BPP32,
 };
 
-/*
- * Convert enum video_log2_bpp to bytes and bits. Note we omit the outer
- * brackets to allow multiplication by fractional pixels.
- */
-#define VNBYTES(bpix)	(1 << (bpix)) / 8
-
+/* Convert enum video_log2_bpp to bytes and bits */
+#define VNBYTES(bpix)	((1 << (bpix)) / 8)
 #define VNBITS(bpix)	(1 << (bpix))
+
+enum video_format {
+	VIDEO_UNKNOWN,
+	VIDEO_RGBA8888,
+	VIDEO_X8B8G8R8,
+	VIDEO_X8R8G8B8,
+	VIDEO_X2R10G10B10,
+};
 
 /**
  * struct video_priv - Device information used by the video uclass
  *
  * @xsize:	Number of pixel columns (e.g. 1366)
  * @ysize:	Number of pixels rows (e.g.. 768)
- * @rot:	Display rotation (0=none, 1=90 degrees clockwise, etc.)
+ * @rot:	Display rotation (0=none, 1=90 degrees clockwise, etc.). THis
+ *		does not affect @xsize and @ysize
  * @bpix:	Encoded bits per pixel (enum video_log2_bpp)
+ * @format:	Pixel format (enum video_format)
  * @vidconsole_drv_name:	Driver to use for the text console, NULL to
  *		select automatically
  * @font_size:	Font size in pixels (0 to use a default value)
@@ -78,6 +85,11 @@ enum video_log2_bpp {
  * @fb_size:	Frame buffer size
  * @copy_fb:	Copy of the frame buffer to keep up to date; see struct
  *		video_uc_plat
+ * @damage:	A bounding box of framebuffer regions updated since last sync
+ * @damage.xstart:	X start position in pixels from the left
+ * @damage.ystart:	Y start position in pixels from the top
+ * @damage.xend:	X end position in pixels from the left
+ * @damage.xend:	Y end position in pixels from the top
  * @line_length:	Length of each frame buffer line, in bytes. This can be
  *		set by the driver, but if not, the uclass will set it after
  *		probing
@@ -85,9 +97,10 @@ enum video_log2_bpp {
  * @colour_bg:	Background colour (pixel value)
  * @flush_dcache:	true to enable flushing of the data cache after
  *		the LCD is updated
- * @cmap:	Colour map for 8-bit-per-pixel displays
  * @fg_col_idx:	Foreground color code (bit 3 = bold, bit 0-2 = color)
  * @bg_col_idx:	Background color code (bit 3 = bold, bit 0-2 = color)
+ * @last_sync:	Monotonic time of last video sync
+ * @white_on_black: Use a black background
  */
 struct video_priv {
 	/* Things set up by the driver: */
@@ -95,6 +108,7 @@ struct video_priv {
 	ushort ysize;
 	ushort rot;
 	enum video_log2_bpp bpix;
+	enum video_format format;
 	const char *vidconsole_drv_name;
 	int font_size;
 
@@ -105,13 +119,20 @@ struct video_priv {
 	void *fb;
 	int fb_size;
 	void *copy_fb;
+	struct {
+		int xstart;
+		int ystart;
+		int xend;
+		int yend;
+	} damage;
 	int line_length;
 	u32 colour_fg;
 	u32 colour_bg;
 	bool flush_dcache;
-	ushort *cmap;
 	u8 fg_col_idx;
 	u8 bg_col_idx;
+	ulong last_sync;
+	bool white_on_black;
 };
 
 /**
@@ -129,6 +150,68 @@ struct video_ops {
 #define video_get_ops(dev)        ((struct video_ops *)(dev)->driver->ops)
 
 /**
+ * struct video_handoff - video information passed from SPL
+ *
+ * This is used when video is set up by SPL, to provide the details to U-Boot
+ * proper.
+ *
+ * @fb: Base address of frame buffer, 0 if not yet known
+ * @size: Frame-buffer size, in bytes
+ * @xsize:	Number of pixel columns (e.g. 1366)
+ * @ysize:	Number of pixels rows (e.g.. 768)
+ * @line_length:	Length of each frame buffer line, in bytes. This can be
+ *		set by the driver, but if not, the uclass will set it after
+ *		probing
+ * @bpix:	Encoded bits per pixel (enum video_log2_bpp)
+ * @format:	Video format (enum video_format)
+ */
+struct video_handoff {
+	u64 fb;
+	u32 size;
+	u16 xsize;
+	u16 ysize;
+	u32 line_length;
+	u8 bpix;
+	u8 format;
+};
+
+/** enum colour_idx - the 16 colors supported by consoles */
+enum colour_idx {
+	VID_BLACK = 0,
+	VID_RED,
+	VID_GREEN,
+	VID_BROWN,
+	VID_BLUE,
+	VID_MAGENTA,
+	VID_CYAN,
+	VID_LIGHT_GRAY,
+	VID_GRAY,
+	VID_LIGHT_RED,
+	VID_LIGHT_GREEN,
+	VID_YELLOW,
+	VID_LIGHT_BLUE,
+	VID_LIGHT_MAGENTA,
+	VID_LIGHT_CYAN,
+	VID_WHITE,
+	VID_DARK_GREY,
+
+	VID_COLOUR_COUNT
+};
+
+/**
+ * video_index_to_colour() - convert a color code to a pixel's internal
+ * representation
+ *
+ * The caller has to guarantee that the color index is less than
+ * VID_COLOR_COUNT.
+ *
+ * @priv	private data of the video device (UCLASS_VIDEO)
+ * @idx		color index (e.g. VID_YELLOW)
+ * Return:	color value
+ */
+u32 video_index_to_colour(struct video_priv *priv, enum colour_idx idx);
+
+/**
  * video_reserve() - Reserve frame-buffer memory for video devices
  *
  * Note: This function is for internal use.
@@ -142,19 +225,59 @@ struct video_ops {
  *
  * @addrp:	On entry, the top of available memory. On exit, the new top,
  *		after allocating the required memory.
- * @return 0
+ * Return: 0
  */
 int video_reserve(ulong *addrp);
 
-#ifdef CONFIG_DM_VIDEO
 /**
- * video_clear() - Clear a device's frame buffer to background color.
+ * video_clear() - Clear a device's frame buffer to background colour.
  *
  * @dev:	Device to clear
- * @return 0
+ * Return: 0 on success
  */
 int video_clear(struct udevice *dev);
-#endif /* CONFIG_DM_VIDEO */
+
+/**
+ * video_fill() - Fill a device's frame buffer to a colour.
+ *
+ * @dev:	Device to fill
+ * @colour:	Colour to use, in the frame buffer's format
+ * Return: 0 on success
+ */
+int video_fill(struct udevice *dev, u32 colour);
+
+/**
+ * video_fill_part() - Erase a region
+ *
+ * Erase a rectangle on the display within the given bounds
+ *
+ * @dev:	Device to update
+ * @xstart:	X start position in pixels from the left
+ * @ystart:	Y start position in pixels from the top
+ * @xend:	X end position in pixels from the left
+ * @yend:	Y end position  in pixels from the top
+ * @colour:	Value to write
+ * Return: 0 if OK, -ENOSYS if the display depth is not supported
+ */
+int video_fill_part(struct udevice *dev, int xstart, int ystart, int xend,
+		    int yend, u32 colour);
+
+/**
+ * video_draw_box() - Draw a box
+ *
+ * Draw a rectangle on the display within the given bounds
+ *
+ * @dev:	Device to update
+ * @x0:		X start position in pixels from the left
+ * @y0:		Y start position in pixels from the top
+ * @x1:		X end position in pixels from the left
+ * @y1:		Y end position in pixels from the top
+ * @width:	width in pixels
+ * @colour:	Value to write
+ * Return: 0 if OK, -ENOSYS if the display depth is not supported
+ */
+int video_draw_box(struct udevice *dev, int x0, int y0, int x1, int y1,
+		   int width, u32 colour);
 
 /**
  * video_sync() - Sync a device's frame buffer with its hardware
@@ -166,17 +289,29 @@ int video_clear(struct udevice *dev);
  * @return: 0 on success, error code otherwise
  *
  * Some frame buffers are cached or have a secondary frame buffer. This
- * function syncs these up so that the current contents of the U-Boot frame
- * buffer are displayed to the user.
+ * function syncs the damaged parts of them up so that the current contents
+ * of the U-Boot frame buffer are displayed to the user. It clears the damage
+ * buffer.
  */
 int video_sync(struct udevice *vid, bool force);
 
 /**
- * video_sync_all() - Sync all devices' frame buffers with there hardware
+ * video_sync_all() - Sync all devices' frame buffers with their hardware
  *
  * This calls video_sync() on all active video devices.
  */
 void video_sync_all(void);
+
+/**
+ * video_bmp_get_info() - Get information about a bitmap image
+ *
+ * @bmp_image: Pointer to BMP image to check
+ * @widthp: Returns width in pixels
+ * @heightp: Returns height in pixels
+ * @bpixp: Returns log2 of bits per pixel
+ */
+void video_bmp_get_info(void *bmp_image, ulong *widthp, ulong *heightp,
+			uint *bpixp);
 
 /**
  * video_bmp_display() - Display a BMP file
@@ -192,8 +327,8 @@ void video_sync_all(void);
  *		  that direction
  *		- if a coordinate is -ve then it will be offset to the
  *		  left/top of the centre by that many pixels
- *		- if a coordinate is positive it will be used unchnaged.
- * @return 0 if OK, -ve on error
+ *		- if a coordinate is positive it will be used unchanged.
+ * Return: 0 if OK, -ve on error
  */
 int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
 		      bool align);
@@ -202,7 +337,7 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
  * video_get_xsize() - Get the width of the display in pixels
  *
  * @dev:	Device to check
- * @return device frame buffer width in pixels
+ * Return: device frame buffer width in pixels
  */
 int video_get_xsize(struct udevice *dev);
 
@@ -210,7 +345,7 @@ int video_get_xsize(struct udevice *dev);
  * video_get_ysize() - Get the height of the display in pixels
  *
  * @dev:	Device to check
- * @return device frame buffer height in pixels
+ * Return: device frame buffer height in pixels
  */
 int video_get_ysize(struct udevice *dev);
 
@@ -230,115 +365,98 @@ void video_set_flush_dcache(struct udevice *dev, bool flush);
  */
 void video_set_default_colors(struct udevice *dev, bool invert);
 
-#ifdef CONFIG_VIDEO_COPY
 /**
- * vidconsole_sync_copy() - Sync back to the copy framebuffer
+ * video_set_white_on_black() - Change the setting for white-on-black
  *
- * This ensures that the copy framebuffer has the same data as the framebuffer
- * for a particular region. It should be called after the framebuffer is updated
+ * This does nothing if the setting is already the same.
  *
- * @from and @to can be in either order. The region between them is synced.
- *
- * @dev: Vidconsole device being updated
- * @from: Start/end address within the framebuffer (->fb)
- * @to: Other address within the frame buffer
- * @return 0 if OK, -EFAULT if the start address is before the start of the
- *	frame buffer start
+ * @dev: video device
+ * @white_on_black: true to use white-on-black, false for black-on-white
  */
-int video_sync_copy(struct udevice *dev, void *from, void *to);
+void video_set_white_on_black(struct udevice *dev, bool white_on_black);
 
 /**
- * video_sync_copy_all() - Sync the entire framebuffer to the copy
+ * video_default_font_height() - Get the default font height
  *
- * @dev: Vidconsole device being updated
- * @return 0 (always)
+ * @dev:	video device
+ * Returns: Default font height in pixels, which depends on which console driver
+ * is in use
  */
-int video_sync_copy_all(struct udevice *dev);
+int video_default_font_height(struct udevice *dev);
+
+#ifdef CONFIG_VIDEO_DAMAGE
+/**
+ * video_damage() - Notify the video subsystem about screen updates.
+ *
+ * @vid:	Device to sync
+ * @x:	        Upper left X coordinate of the damaged rectangle
+ * @y:	        Upper left Y coordinate of the damaged rectangle
+ * @width:	Width of the damaged rectangle
+ * @height:	Height of the damaged rectangle
+ *
+ * Some frame buffers are cached or have a secondary frame buffer. This
+ * function notifies the video subsystem about rectangles that were updated
+ * within the frame buffer. They may only get written to the screen on the
+ * next call to video_sync().
+ */
+void video_damage(struct udevice *vid, int x, int y, int width, int height);
 #else
-static inline int video_sync_copy(struct udevice *dev, void *from, void *to)
+static inline void video_damage(struct udevice *vid, int x, int y, int width,
+				int height)
 {
-	return 0;
+	return;
 }
-
-static inline int video_sync_copy_all(struct udevice *dev)
-{
-	return 0;
-}
-
-#endif
-
-#ifndef CONFIG_DM_VIDEO
-
-/* Video functions */
+#endif /* CONFIG_VIDEO_DAMAGE */
 
 /**
- * Display a BMP format bitmap on the screen
+ * video_is_active() - Test if one video device it active
  *
- * @param bmp_image	Address of BMP image
- * @param x		X position to draw image
- * @param y		Y position to draw image
+ * Return: true if at least one video device is active, else false.
  */
-int video_display_bitmap(ulong bmp_image, int x, int y);
+bool video_is_active(void);
 
 /**
- * Get the width of the screen in pixels
+ * video_get_u_boot_logo() - Get a pointer to the U-Boot logo
  *
- * @return width of screen in pixels
+ * Returns: Pointer to logo
  */
-int video_get_pixel_width(void);
-
-/**
- * Get the height of the screen in pixels
- *
- * @return height of screen in pixels
- */
-int video_get_pixel_height(void);
-
-/**
- * Get the number of text lines/rows on the screen
- *
- * @return number of rows
- */
-int video_get_screen_rows(void);
-
-/**
- * Get the number of text columns on the screen
- *
- * @return number of columns
- */
-int video_get_screen_columns(void);
-
-/**
- * Set the position of the text cursor
- *
- * @param col	Column to place cursor (0 = left side)
- * @param row	Row to place cursor (0 = top line)
- */
-void video_position_cursor(unsigned col, unsigned row);
-
-/* Clear the display */
-void video_clear(void);
-
-#if defined(CONFIG_FORMIKE)
-int kwh043st20_f01_spi_startup(unsigned int bus, unsigned int cs,
-	unsigned int max_hz, unsigned int spi_mode);
-#endif
-#if defined(CONFIG_LG4573)
-int lg4573_spi_startup(unsigned int bus, unsigned int cs,
-	unsigned int max_hz, unsigned int spi_mode);
-#endif
+void *video_get_u_boot_logo(void);
 
 /*
- * video_get_info_str() - obtain a board string: type, speed, etc.
+ * bmp_display() - Display BMP (bitmap) data located in memory
  *
- * This is called if CONFIG_CONSOLE_EXTRA_INFO is enabled.
- *
- * line_number:	location to place info string beside logo
- * info:	buffer for info string (empty if nothing to display on this
- * line)
+ * @addr: address of the bmp data
+ * @x: Position of bitmap from the left side, in pixels
+ * @y: Position of bitmap from the top, in pixels
  */
-void video_get_info_str(int line_number, char *info);
+int bmp_display(ulong addr, int x, int y);
 
-#endif /* !CONFIG_DM_VIDEO */
+/*
+ * bmp_info() - Show information about bmp file
+ *
+ * @addr: address of bmp file
+ * Returns: 0 if OK, else 1 if bmp image not found
+ */
+int bmp_info(ulong addr);
+
+/*
+ * video_reserve_from_bloblist()- Reserve frame-buffer memory for video devices
+ * using blobs.
+ *
+ * @ho: video information passed from SPL
+ * Returns: 0 (always)
+ */
+int video_reserve_from_bloblist(struct video_handoff *ho);
+
+/**
+ * video_get_fb() - Get the first framebuffer address
+ *
+ * This function does not probe video devices, so can only be used after a video
+ * device has been activated.
+ *
+ * Return: address of the framebuffer of the first video device found, or 0 if
+ * there is no device
+ */
+ulong video_get_fb(void);
 
 #endif

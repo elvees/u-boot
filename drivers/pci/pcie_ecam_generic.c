@@ -7,12 +7,14 @@
  * Copyright (C) 2016 Imagination Technologies
  */
 
-#include <common.h>
 #include <dm.h>
 #include <pci.h>
-#include <asm/global_data.h>
+#include <linux/ioport.h>
+#include <linux/printk.h>
 
 #include <asm/io.h>
+
+#define TYPE_PCI 0x1
 
 /**
  * struct generic_ecam_pcie - generic_ecam PCIe controller state
@@ -46,10 +48,14 @@ static int pci_generic_ecam_conf_address(const struct udevice *bus,
 	void *addr;
 
 	addr = pcie->cfg_base;
-	addr += (PCI_BUS(bdf) - pcie->first_busno) << 20;
-	addr += PCI_DEV(bdf) << 15;
-	addr += PCI_FUNC(bdf) << 12;
-	addr += offset;
+
+	if (dev_get_driver_data(bus) == TYPE_PCI) {
+		addr += ((PCI_BUS(bdf) - pcie->first_busno) << 16) |
+			 (PCI_DEV(bdf) << 11) | (PCI_FUNC(bdf) << 8) | offset;
+	} else {
+		addr += PCIE_ECAM_OFFSET(PCI_BUS(bdf) - pcie->first_busno,
+					 PCI_DEV(bdf), PCI_FUNC(bdf), offset);
+	}
 	*paddress = addr;
 
 	return 0;
@@ -126,18 +132,17 @@ static int pci_generic_ecam_write_config(struct udevice *bus, pci_dev_t bdf,
 static int pci_generic_ecam_of_to_plat(struct udevice *dev)
 {
 	struct generic_ecam_pcie *pcie = dev_get_priv(dev);
-	struct fdt_resource reg_res;
-	DECLARE_GLOBAL_DATA_PTR;
+	ofnode node = dev_ofnode(dev);
+	struct resource reg_res;
 	int err;
 
-	err = fdt_get_resource(gd->fdt_blob, dev_of_offset(dev), "reg",
-			       0, &reg_res);
+	err = ofnode_read_resource(node, 0, &reg_res);
 	if (err < 0) {
 		pr_err("\"reg\" resource not found\n");
 		return err;
 	}
 
-	pcie->size = fdt_resource_size(&reg_res);
+	pcie->size = resource_size(&reg_res);
 	pcie->cfg_base = map_physmem(reg_res.start, pcie->size, MAP_NOCACHE);
 
 	return 0;
@@ -158,7 +163,8 @@ static const struct dm_pci_ops pci_generic_ecam_ops = {
 };
 
 static const struct udevice_id pci_generic_ecam_ids[] = {
-	{ .compatible = "pci-host-ecam-generic" },
+	{ .compatible = "pci-host-ecam-generic" /* PCI-E */ },
+	{ .compatible = "pci-host-cam-generic", .data = TYPE_PCI },
 	{ }
 };
 

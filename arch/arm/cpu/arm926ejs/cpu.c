@@ -12,7 +12,6 @@
  * CPU specific code
  */
 
-#include <common.h>
 #include <command.h>
 #include <cpu_func.h>
 #include <irq_func.h>
@@ -20,6 +19,19 @@
 #include <asm/system.h>
 
 static void cache_flush(void);
+
+/************************************************************
+ * sdelay() - simple spin loop.  Will be constant time as
+ *  its generally used in bypass conditions only.  This
+ *  is necessary until timers are accessible.
+ *
+ *  not inline to increase chances its in cache when called
+ *************************************************************/
+void sdelay(unsigned long loops)
+{
+	__asm__ volatile ("1:\n" "subs %0, %1, #1\n"
+			  "bne 1b":"=r" (loops):"0"(loops));
+}
 
 int cleanup_before_linux (void)
 {
@@ -31,7 +43,6 @@ int cleanup_before_linux (void)
 	 */
 
 	disable_interrupts();
-
 
 	/* turn off I/D-cache */
 	icache_disable();

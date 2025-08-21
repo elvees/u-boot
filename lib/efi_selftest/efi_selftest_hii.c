@@ -28,7 +28,7 @@ static struct efi_hii_string_protocol *hii_string_protocol;
  * @handle:	handle of the loaded image
  * @systable:	system table
  *
- * @return:	EFI_ST_SUCCESS for success
+ * Return:	EFI_ST_SUCCESS for success
  */
 static int setup(const efi_handle_t handle,
 		 const struct efi_system_table *systable)
@@ -220,14 +220,12 @@ static int test_hii_database_list_package_lists(void)
 	if (ret != EFI_BUFFER_TOO_SMALL) {
 		efi_st_error("list_package_lists returned %u\n",
 			     (unsigned int)ret);
-		ret = EFI_ST_FAILURE;
 		goto out;
 	}
 	ret = boottime->allocate_pool(EFI_LOADER_DATA, handles_size,
 				      (void **)&handles);
 	if (ret != EFI_SUCCESS) {
 		efi_st_error("AllocatePool failed\n");
-		ret = EFI_ST_FAILURE;
 		goto out;
 	}
 	ret = hii_database_protocol->list_package_lists(hii_database_protocol,
@@ -236,7 +234,6 @@ static int test_hii_database_list_package_lists(void)
 	if (ret != EFI_SUCCESS) {
 		efi_st_error("list_package_lists returned %u\n",
 			     (unsigned int)ret);
-		ret = EFI_ST_FAILURE;
 		goto out;
 	}
 	ret = boottime->free_pool(handles);
@@ -254,14 +251,12 @@ static int test_hii_database_list_package_lists(void)
 	if (ret != EFI_BUFFER_TOO_SMALL) {
 		efi_st_error("list_package_lists returned %u\n",
 			     (unsigned int)ret);
-		ret = EFI_ST_FAILURE;
 		goto out;
 	}
 	ret = boottime->allocate_pool(EFI_LOADER_DATA, handles_size,
 				      (void **)&handles);
 	if (ret != EFI_SUCCESS) {
 		efi_st_error("AllocatePool failed\n");
-		ret = EFI_ST_FAILURE;
 		goto out;
 	}
 	ret = hii_database_protocol->list_package_lists(hii_database_protocol,
@@ -270,13 +265,11 @@ static int test_hii_database_list_package_lists(void)
 	if (ret != EFI_SUCCESS) {
 		efi_st_error("list_package_lists returned %u\n",
 			     (unsigned int)ret);
-		ret = EFI_ST_FAILURE;
 		goto out;
 	}
 	ret = boottime->free_pool(handles);
 	if (ret != EFI_SUCCESS) {
 		efi_st_error("FreePool failed\n");
-		ret = EFI_ST_FAILURE;
 		goto out;
 	}
 
@@ -289,14 +282,12 @@ static int test_hii_database_list_package_lists(void)
 	if (ret != EFI_BUFFER_TOO_SMALL) {
 		efi_st_error("list_package_lists returned %u\n",
 			     (unsigned int)ret);
-		ret = EFI_ST_FAILURE;
 		goto out;
 	}
 	ret = boottime->allocate_pool(EFI_LOADER_DATA, handles_size,
 				      (void **)&handles);
 	if (ret != EFI_SUCCESS) {
 		efi_st_error("AllocatePool failed\n");
-		ret = EFI_ST_FAILURE;
 		goto out;
 	}
 	ret = hii_database_protocol->list_package_lists(hii_database_protocol,
@@ -305,13 +296,11 @@ static int test_hii_database_list_package_lists(void)
 	if (ret != EFI_SUCCESS) {
 		efi_st_error("list_package_lists returned %u\n",
 			     (unsigned int)ret);
-		ret = EFI_ST_FAILURE;
 		goto out;
 	}
 	ret = boottime->free_pool(handles);
 	if (ret != EFI_SUCCESS) {
 		efi_st_error("FreePool failed\n");
-		ret = EFI_ST_FAILURE;
 		goto out;
 	}
 
@@ -564,7 +553,19 @@ out:
  */
 static int test_hii_database_set_keyboard_layout(void)
 {
+	efi_status_t ret;
+
 	PRINT_TESTNAME;
+
+	/* Invalid key guid. */
+	ret = hii_database_protocol->set_keyboard_layout(
+			hii_database_protocol, NULL);
+	if (ret != EFI_INVALID_PARAMETER) {
+		efi_st_error("set_keyboard_layout returned %u not invalid\n",
+			     (unsigned int)ret);
+		return EFI_ST_FAILURE;
+	}
+
 	/* set_keyboard_layout() not implemented yet */
 	return EFI_ST_SUCCESS;
 }
@@ -608,14 +609,12 @@ static int test_hii_database_get_package_list_handle(void)
 	result = EFI_ST_SUCCESS;
 
 out:
-	if (handle) {
-		ret = hii_database_protocol->remove_package_list(
-				hii_database_protocol, handle);
-		if (ret != EFI_SUCCESS) {
-			efi_st_error("remove_package_list returned %u\n",
-				     (unsigned int)ret);
-			return EFI_ST_FAILURE;
-		}
+	ret = hii_database_protocol->remove_package_list(
+			hii_database_protocol, handle);
+	if (ret != EFI_SUCCESS) {
+		efi_st_error("remove_package_list returned %u\n",
+			     (unsigned int)ret);
+		return EFI_ST_FAILURE;
 	}
 
 	return result;
@@ -699,7 +698,7 @@ static int test_hii_string_new_string(void)
 
 	ret = hii_string_protocol->new_string(hii_string_protocol, handle,
 					      &id, (u8 *)"en-US",
-					      L"Japanese", L"Japanese", NULL);
+					      u"Japanese", u"Japanese", NULL);
 	if (ret != EFI_SUCCESS) {
 		efi_st_error("new_string returned %u\n",
 			     (unsigned int)ret);
@@ -710,14 +709,12 @@ static int test_hii_string_new_string(void)
 	result = EFI_ST_SUCCESS;
 
 out:
-	if (handle) {
-		ret = hii_database_protocol->remove_package_list(
-				hii_database_protocol, handle);
-		if (ret != EFI_SUCCESS) {
-			efi_st_error("remove_package_list returned %u\n",
-				     (unsigned int)ret);
-			return EFI_ST_FAILURE;
-		}
+	ret = hii_database_protocol->remove_package_list(
+			hii_database_protocol, handle);
+	if (ret != EFI_SUCCESS) {
+		efi_st_error("remove_package_list returned %u\n",
+			     (unsigned int)ret);
+		return EFI_ST_FAILURE;
 	}
 
 	return result;
@@ -752,7 +749,7 @@ static int test_hii_string_get_string(void)
 
 	ret = hii_string_protocol->new_string(hii_string_protocol, handle,
 					      &id, (u8 *)"en-US",
-					      L"Japanese", L"Japanese", NULL);
+					      u"Japanese", u"Japanese", NULL);
 	if (ret != EFI_SUCCESS) {
 		efi_st_error("new_string returned %u\n",
 			     (unsigned int)ret);
@@ -791,14 +788,12 @@ static int test_hii_string_get_string(void)
 	result = EFI_ST_SUCCESS;
 
 out:
-	if (handle) {
-		ret = hii_database_protocol->remove_package_list(
-				hii_database_protocol, handle);
-		if (ret != EFI_SUCCESS) {
-			efi_st_error("remove_package_list returned %u\n",
-				     (unsigned int)ret);
-			return EFI_ST_FAILURE;
-		}
+	ret = hii_database_protocol->remove_package_list(
+			hii_database_protocol, handle);
+	if (ret != EFI_SUCCESS) {
+		efi_st_error("remove_package_list returned %u\n",
+			     (unsigned int)ret);
+		return EFI_ST_FAILURE;
 	}
 
 	return result;
@@ -831,7 +826,7 @@ static int test_hii_string_set_string(void)
 
 	ret = hii_string_protocol->new_string(hii_string_protocol, handle,
 					      &id, (u8 *)"en-US",
-					      L"Japanese", L"Japanese", NULL);
+					      u"Japanese", u"Japanese", NULL);
 	if (ret != EFI_SUCCESS) {
 		efi_st_error("new_string returned %u\n",
 			     (unsigned int)ret);
@@ -840,7 +835,7 @@ static int test_hii_string_set_string(void)
 
 	ret = hii_string_protocol->set_string(hii_string_protocol, handle,
 					      id, (u8 *)"en-US",
-					      L"Nihongo", NULL);
+					      u"Nihongo", NULL);
 	if (ret != EFI_SUCCESS) {
 		efi_st_error("set_string returned %u\n",
 			     (unsigned int)ret);
@@ -850,14 +845,12 @@ static int test_hii_string_set_string(void)
 	result = EFI_ST_SUCCESS;
 
 out:
-	if (handle) {
-		ret = hii_database_protocol->remove_package_list(
-				hii_database_protocol, handle);
-		if (ret != EFI_SUCCESS) {
-			efi_st_error("remove_package_list returned %u\n",
-				     (unsigned int)ret);
-			return EFI_ST_FAILURE;
-		}
+	ret = hii_database_protocol->remove_package_list(
+			hii_database_protocol, handle);
+	if (ret != EFI_SUCCESS) {
+		efi_st_error("remove_package_list returned %u\n",
+			     (unsigned int)ret);
+		return EFI_ST_FAILURE;
 	}
 
 	return result;
@@ -912,19 +905,17 @@ static int test_hii_string_get_languages(void)
 		goto out;
 	}
 
-	efi_st_printf("got languages are %s\n", languages);
+	efi_st_printf("Available languages: %s\n", languages);
 
 	result = EFI_ST_SUCCESS;
 
 out:
-	if (handle) {
-		ret = hii_database_protocol->remove_package_list(
-				hii_database_protocol, handle);
-		if (ret != EFI_SUCCESS) {
-			efi_st_error("remove_package_list returned %u\n",
-				     (unsigned int)ret);
-			return EFI_ST_FAILURE;
-		}
+	ret = hii_database_protocol->remove_package_list(
+			hii_database_protocol, handle);
+	if (ret != EFI_SUCCESS) {
+		efi_st_error("remove_package_list returned %u\n",
+			     (unsigned int)ret);
+		return EFI_ST_FAILURE;
 	}
 
 	return result;
@@ -990,14 +981,12 @@ static int test_hii_string_get_secondary_languages(void)
 	result = EFI_ST_SUCCESS;
 
 out:
-	if (handle) {
-		ret = hii_database_protocol->remove_package_list(
-				hii_database_protocol, handle);
-		if (ret != EFI_SUCCESS) {
-			efi_st_error("remove_package_list returned %u\n",
-				     (unsigned int)ret);
-			return EFI_ST_FAILURE;
-		}
+	ret = hii_database_protocol->remove_package_list(
+			hii_database_protocol, handle);
+	if (ret != EFI_SUCCESS) {
+		efi_st_error("remove_package_list returned %u\n",
+			     (unsigned int)ret);
+		return EFI_ST_FAILURE;
 	}
 
 	return result;
@@ -1033,7 +1022,7 @@ static int test_hii_string_protocol(void)
 /*
  * Execute unit test.
  *
- * @return:	EFI_ST_SUCCESS for success, EFI_ST_FAILURE for failure
+ * Return:	EFI_ST_SUCCESS for success, EFI_ST_FAILURE for failure
  */
 static int execute(void)
 {

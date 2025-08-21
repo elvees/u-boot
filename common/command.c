@@ -8,12 +8,15 @@
  *  Command Processor Table
  */
 
-#include <common.h>
+#include <config.h>
 #include <compiler.h>
 #include <command.h>
 #include <console.h>
 #include <env.h>
+#include <image.h>
 #include <log.h>
+#include <mapmem.h>
+#include <time.h>
 #include <asm/global_data.h>
 #include <linux/ctype.h>
 
@@ -66,7 +69,7 @@ int _do_help(struct cmd_tbl *cmd_start, int cmd_items, struct cmd_tbl *cmdtp,
 				return 1;
 			if (usage == NULL)
 				continue;
-			printf("%-*s- %s\n", CONFIG_SYS_HELP_CMD_WIDTH,
+			printf("%-*s- %s\n", CFG_SYS_HELP_CMD_WIDTH,
 			       cmd_array[i]->name, usage);
 		}
 		return 0;
@@ -353,10 +356,9 @@ static int find_common_prefix(char *const argv[])
 	return len;
 }
 
-static char tmp_buf[CONFIG_SYS_CBSIZE + 1];	/* copy of console I/O buffer */
-
 int cmd_auto_complete(const char *const prompt, char *buf, int *np, int *colp)
 {
+	char tmp_buf[CONFIG_SYS_CBSIZE + 1];	/* copy of console I/O buffer */
 	int n = *np, col = *colp;
 	char *argv[CONFIG_SYS_MAXARGS + 1];		/* NULL terminated	*/
 	char *cmdv[20];
@@ -464,12 +466,12 @@ int cmd_auto_complete(const char *const prompt, char *buf, int *np, int *colp)
 #endif
 
 #ifdef CMD_DATA_SIZE
-int cmd_get_data_size(char* arg, int default_size)
+int cmd_get_data_size(const char *arg, int default_size)
 {
 	/* Check for a size specification .b, .w or .l.
 	 */
 	int len = strlen(arg);
-	if (len > 2 && arg[len-2] == '.') {
+	if (len >= 2 && arg[len-2] == '.') {
 		switch (arg[len-1]) {
 		case 'b':
 			return 1;
@@ -482,7 +484,7 @@ int cmd_get_data_size(char* arg, int default_size)
 		case 'q':
 			if (MEM_SUPPORT_64BIT_DATA)
 				return 8;
-			/* no break */
+			fallthrough;
 		default:
 			return CMD_DATA_SIZE_ERR;
 		}
@@ -570,7 +572,7 @@ int cmd_discard_repeatable(struct cmd_tbl *cmdtp, int flag, int argc,
  * @param argc		Number of arguments (arg 0 must be the command text)
  * @param argv		Arguments
  * @param repeatable	Can the command be repeated
- * @return 0 if command succeeded, else non-zero (CMD_RET_...)
+ * Return: 0 if command succeeded, else non-zero (CMD_RET_...)
  */
 static int cmd_call(struct cmd_tbl *cmdtp, int flag, int argc,
 		    char *const argv[], int *repeatable)
@@ -653,4 +655,21 @@ int cmd_process_error(struct cmd_tbl *cmdtp, int err)
 	}
 
 	return CMD_RET_SUCCESS;
+}
+
+int cmd_source_script(ulong addr, const char *fit_uname, const char *confname)
+{
+	char *data;
+	void *buf;
+	uint len;
+	int ret;
+
+	buf = map_sysmem(addr, 0);
+	ret = image_locate_script(buf, 0, fit_uname, confname, &data, &len);
+	unmap_sysmem(buf);
+	if (ret)
+		return CMD_RET_FAILURE;
+
+	debug("** Script length: %d\n", len);
+	return run_command_list(data, len, 0);
 }

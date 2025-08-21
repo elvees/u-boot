@@ -37,6 +37,9 @@
 
 #ifndef __ASSEMBLY__
 
+#include <linux/errno.h>
+#include <linux/types.h>
+
 extern char __wakeup[];
 extern int __wakeup_size;
 
@@ -93,7 +96,7 @@ static inline enum acpi_sleep_state acpi_sleep_from_pm1(u32 pm1_cnt)
  * This returns chipset previous sleep state from ACPI registers.
  * Platform codes must supply this routine in order to support ACPI S3.
  *
- * @return ACPI_S0/S1/S2/S3/S4/S5.
+ * Return: ACPI_S0/S1/S2/S3/S4/S5.
  */
 enum acpi_sleep_state chipset_prev_sleep_state(void);
 

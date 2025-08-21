@@ -5,7 +5,8 @@
  * Copyright (c) 2017 Rob Clark
  */
 
-#include <common.h>
+#define LOG_CATEGORY LOGC_EFI
+
 #include <charset.h>
 #include <efi_loader.h>
 #include <log.h>
@@ -39,7 +40,7 @@ struct file_handle {
 	struct fs_dir_stream *dirs;
 	struct fs_dirent *dent;
 
-	char path[0];
+	char *path;
 };
 #define to_fh(x) container_of(x, struct file_handle, base)
 
@@ -177,6 +178,7 @@ static struct efi_file_handle *file_open(struct file_system *fs,
 		u64 attributes)
 {
 	struct file_handle *fh;
+	char *path;
 	char f0[MAX_UTF8_PER_UTF16] = {0};
 	int plen = 0;
 	int flen = 0;
@@ -193,9 +195,13 @@ static struct efi_file_handle *file_open(struct file_system *fs,
 		plen = strlen(parent->path) + 1;
 	}
 
+	fh = calloc(1, sizeof(*fh));
 	/* +2 is for null and '/' */
-	fh = calloc(1, sizeof(*fh) + plen + (flen * MAX_UTF8_PER_UTF16) + 2);
+	path = calloc(1, plen + (flen * MAX_UTF8_PER_UTF16) + 2);
+	if (!fh || !path)
+		goto error;
 
+	fh->path = path;
 	fh->open_mode = open_mode;
 	fh->base = efi_file_handle_protocol;
 	fh->fs = fs;
@@ -242,14 +248,15 @@ static struct efi_file_handle *file_open(struct file_system *fs,
 	return &fh->base;
 
 error:
+	free(fh->path);
 	free(fh);
 	return NULL;
 }
 
-static efi_status_t efi_file_open_int(struct efi_file_handle *this,
-				      struct efi_file_handle **new_handle,
-				      u16 *file_name, u64 open_mode,
-				      u64 attributes)
+efi_status_t efi_file_open_int(struct efi_file_handle *this,
+			       struct efi_file_handle **new_handle,
+			       u16 *file_name, u64 open_mode,
+			       u64 attributes)
 {
 	struct file_handle *fh = to_fh(this);
 	efi_status_t ret;
@@ -294,7 +301,7 @@ out:
 }
 
 /**
- * efi_file_open_()
+ * efi_file_open() - open file synchronously
  *
  * This function implements the Open service of the File Protocol.
  * See the UEFI spec for details.
@@ -365,15 +372,22 @@ out:
 static efi_status_t file_close(struct file_handle *fh)
 {
 	fs_closedir(fh->dirs);
+	free(fh->path);
 	free(fh);
 	return EFI_SUCCESS;
 }
 
-static efi_status_t EFIAPI efi_file_close(struct efi_file_handle *file)
+efi_status_t efi_file_close_int(struct efi_file_handle *file)
 {
 	struct file_handle *fh = to_fh(file);
+
+	return file_close(fh);
+}
+
+static efi_status_t EFIAPI efi_file_close(struct efi_file_handle *file)
+{
 	EFI_ENTRY("%p", file);
-	return EFI_EXIT(file_close(fh));
+	return EFI_EXIT(efi_file_close_int(file));
 }
 
 static efi_status_t EFIAPI efi_file_delete(struct efi_file_handle *file)
@@ -409,6 +423,45 @@ static efi_status_t efi_get_file_size(struct file_handle *fh,
 	return EFI_SUCCESS;
 }
 
+/**
+ * efi_file_size() - Get the size of a file using an EFI file handle
+ *
+ * @fh:		EFI file handle
+ * @size:	buffer to fill in the discovered size
+ *
+ * Return:	size of the file
+ */
+efi_status_t efi_file_size(struct efi_file_handle *fh, efi_uintn_t *size)
+{
+	struct efi_file_info *info = NULL;
+	efi_uintn_t bs = 0;
+	efi_status_t ret;
+
+	*size = 0;
+	ret = EFI_CALL(fh->getinfo(fh, (efi_guid_t *)&efi_file_info_guid, &bs,
+				   info));
+	if (ret != EFI_BUFFER_TOO_SMALL) {
+		ret = EFI_DEVICE_ERROR;
+		goto out;
+	}
+
+	info = malloc(bs);
+	if (!info) {
+		ret = EFI_OUT_OF_RESOURCES;
+		goto out;
+	}
+	ret = EFI_CALL(fh->getinfo(fh, (efi_guid_t *)&efi_file_info_guid, &bs,
+				   info));
+	if (ret != EFI_SUCCESS)
+		goto out;
+
+	*size = info->file_size;
+
+out:
+	free(info);
+	return ret;
+}
+
 static efi_status_t file_read(struct file_handle *fh, u64 *buffer_size,
 		void *buffer)
 {
@@ -439,6 +492,17 @@ static efi_status_t file_read(struct file_handle *fh, u64 *buffer_size,
 	fh->offset += actread;
 
 	return EFI_SUCCESS;
+}
+
+static void rtc2efi(struct efi_time *time, struct rtc_time *tm)
+{
+	memset(time, 0, sizeof(struct efi_time));
+	time->year = tm->tm_year;
+	time->month = tm->tm_mon;
+	time->day = tm->tm_mday;
+	time->hour = tm->tm_hour;
+	time->minute = tm->tm_min;
+	time->second = tm->tm_sec;
 }
 
 static efi_status_t dir_read(struct file_handle *fh, u64 *buffer_size,
@@ -496,6 +560,10 @@ static efi_status_t dir_read(struct file_handle *fh, u64 *buffer_size,
 	info->size = required_size;
 	info->file_size = dent->size;
 	info->physical_size = dent->size;
+	info->attribute = dent->attr;
+	rtc2efi(&info->create_time, &dent->create_time);
+	rtc2efi(&info->modification_time, &dent->change_time);
+	rtc2efi(&info->last_access_time, &dent->access_time);
 
 	if (dent->type == FS_DT_DIR)
 		info->attribute |= EFI_FILE_DIRECTORY;
@@ -508,14 +576,14 @@ static efi_status_t dir_read(struct file_handle *fh, u64 *buffer_size,
 	return EFI_SUCCESS;
 }
 
-static efi_status_t efi_file_read_int(struct efi_file_handle *this,
-				      efi_uintn_t *buffer_size, void *buffer)
+efi_status_t efi_file_read_int(struct efi_file_handle *this,
+			       efi_uintn_t *buffer_size, void *buffer)
 {
 	struct file_handle *fh = to_fh(this);
 	efi_status_t ret = EFI_SUCCESS;
 	u64 bs;
 
-	if (!this || !buffer_size || !buffer)
+	if (!this || !buffer_size)
 		return EFI_INVALID_PARAMETER;
 
 	bs = *buffer_size;
@@ -719,23 +787,10 @@ out:
 	return EFI_EXIT(ret);
 }
 
-/**
- * efi_file_setpos() - set current position in file
- *
- * This function implements the SetPosition service of the EFI file protocol.
- * See the UEFI spec for details.
- *
- * @file:	file handle
- * @pos:	new file position
- * Return:	status code
- */
-static efi_status_t EFIAPI efi_file_setpos(struct efi_file_handle *file,
-					   u64 pos)
+efi_status_t efi_file_setpos_int(struct efi_file_handle *file, u64 pos)
 {
 	struct file_handle *fh = to_fh(file);
 	efi_status_t ret = EFI_SUCCESS;
-
-	EFI_ENTRY("%p, %llu", file, pos);
 
 	if (fh->isdir) {
 		if (pos != 0) {
@@ -758,6 +813,28 @@ static efi_status_t EFIAPI efi_file_setpos(struct efi_file_handle *file,
 	fh->offset = pos;
 
 error:
+	return ret;
+}
+
+/**
+ * efi_file_setpos() - set current position in file
+ *
+ * This function implements the SetPosition service of the EFI file protocol.
+ * See the UEFI spec for details.
+ *
+ * @file:	file handle
+ * @pos:	new file position
+ * Return:	status code
+ */
+static efi_status_t EFIAPI efi_file_setpos(struct efi_file_handle *file,
+					   u64 pos)
+{
+	efi_status_t ret = EFI_SUCCESS;
+
+	EFI_ENTRY("%p, %llu", file, pos);
+
+	ret = efi_file_setpos_int(file, pos);
+
 	return EFI_EXIT(ret);
 }
 
@@ -770,7 +847,7 @@ static efi_status_t EFIAPI efi_file_getinfo(struct efi_file_handle *file,
 	efi_status_t ret = EFI_SUCCESS;
 	u16 *dst;
 
-	EFI_ENTRY("%p, %pUl, %p, %p", file, info_type, buffer_size, buffer);
+	EFI_ENTRY("%p, %pUs, %p, %p", file, info_type, buffer_size, buffer);
 
 	if (!file || !info_type || !buffer_size ||
 	    (*buffer_size && !buffer)) {
@@ -794,8 +871,16 @@ static efi_status_t EFIAPI efi_file_getinfo(struct efi_file_handle *file,
 		}
 
 		ret = efi_get_file_size(fh, &file_size);
-		if (ret != EFI_SUCCESS)
-			goto error;
+		if (ret != EFI_SUCCESS) {
+			if (!fh->isdir)
+				goto error;
+			/*
+			 * Some file drivers don't implement fs_size() for
+			 * directories. Use a dummy non-zero value.
+			 */
+			file_size = 4096;
+			ret = EFI_SUCCESS;
+		}
 
 		memset(info, 0, required_size);
 
@@ -869,8 +954,9 @@ static efi_status_t EFIAPI efi_file_setinfo(struct efi_file_handle *file,
 {
 	struct file_handle *fh = to_fh(file);
 	efi_status_t ret = EFI_UNSUPPORTED;
+	char *new_file_name = NULL, *new_path = NULL;
 
-	EFI_ENTRY("%p, %pUl, %zu, %p", file, info_type, buffer_size, buffer);
+	EFI_ENTRY("%p, %pUs, %zu, %p", file, info_type, buffer_size, buffer);
 
 	if (!guidcmp(info_type, &efi_file_info_guid)) {
 		struct efi_file_info *info = (struct efi_file_info *)buffer;
@@ -898,22 +984,54 @@ static efi_status_t EFIAPI efi_file_setinfo(struct efi_file_handle *file,
 		pos = new_file_name;
 		utf16_utf8_strcpy(&pos, info->file_name);
 		if (strcmp(new_file_name, filename)) {
-			/* TODO: we do not support renaming */
-			EFI_PRINT("Renaming not supported\n");
-			free(new_file_name);
-			ret = EFI_ACCESS_DENIED;
-			goto out;
+			int dlen;
+			int rv;
+
+			if (set_blk_dev(fh)) {
+				ret = EFI_DEVICE_ERROR;
+				goto out;
+			}
+			dlen = filename - fh->path;
+			new_path = calloc(1, dlen + strlen(new_file_name) + 1);
+			if (!new_path) {
+				ret = EFI_OUT_OF_RESOURCES;
+				goto out;
+			}
+			memcpy(new_path, fh->path, dlen);
+			strcpy(new_path + dlen, new_file_name);
+			sanitize_path(new_path);
+			rv = fs_exists(new_path);
+			if (rv) {
+				ret = EFI_ACCESS_DENIED;
+				goto out;
+			}
+			/* fs_exists() calls fs_close(), so open file system again */
+			if (set_blk_dev(fh)) {
+				ret = EFI_DEVICE_ERROR;
+				goto out;
+			}
+			rv = fs_rename(fh->path, new_path);
+			if (rv) {
+				ret = EFI_ACCESS_DENIED;
+				goto out;
+			}
+			free(fh->path);
+			fh->path = new_path;
+			/* Prevent new_path from being freed on out */
+			new_path = NULL;
+			ret = EFI_SUCCESS;
 		}
-		free(new_file_name);
 		/* Check for truncation */
-		ret = efi_get_file_size(fh, &file_size);
-		if (ret != EFI_SUCCESS)
-			goto out;
-		if (file_size != info->file_size) {
-			/* TODO: we do not support truncation */
-			EFI_PRINT("Truncation not supported\n");
-			ret = EFI_ACCESS_DENIED;
-			goto out;
+		if (!fh->isdir) {
+			ret = efi_get_file_size(fh, &file_size);
+			if (ret != EFI_SUCCESS)
+				goto out;
+			if (file_size != info->file_size) {
+				/* TODO: we do not support truncation */
+				EFI_PRINT("Truncation not supported\n");
+				ret = EFI_ACCESS_DENIED;
+				goto out;
+			}
 		}
 		/*
 		 * We do not care for the other attributes
@@ -925,6 +1043,8 @@ static efi_status_t EFIAPI efi_file_setinfo(struct efi_file_handle *file,
 		ret = EFI_UNSUPPORTED;
 	}
 out:
+	free(new_path);
+	free(new_file_name);
 	return EFI_EXIT(ret);
 }
 
@@ -1029,8 +1149,17 @@ static const struct efi_file_handle efi_file_handle_protocol = {
 /**
  * efi_file_from_path() - open file via device path
  *
+ * The device path @fp consists of the device path of the handle with the
+ * simple file system protocol and one or more file path device path nodes.
+ * The concatenation of all file path names provides the total file path.
+ *
+ * The code starts at the first file path node and tries to open that file or
+ * directory. If there is a succeding file path node, the code opens it relative
+ * to this directory and continues iterating until reaching the last file path
+ * node.
+ *
  * @fp:		device path
- * @return:	EFI_FILE_PROTOCOL for the file or NULL
+ * Return:	EFI_FILE_PROTOCOL for the file or NULL
  */
 struct efi_file_handle *efi_file_from_path(struct efi_device_path *fp)
 {
@@ -1059,16 +1188,27 @@ struct efi_file_handle *efi_file_from_path(struct efi_device_path *fp)
 			container_of(fp, struct efi_device_path_file_path, dp);
 		struct efi_file_handle *f2;
 		u16 *filename;
+		size_t filename_sz;
 
 		if (!EFI_DP_TYPE(fp, MEDIA_DEVICE, FILE_PATH)) {
 			printf("bad file path!\n");
-			f->close(f);
+			EFI_CALL(f->close(f));
 			return NULL;
 		}
 
-		filename = u16_strdup(fdp->str);
+		/*
+		 * UEFI specification requires pointers that are passed to
+		 * protocol member functions to be aligned.  So memcpy it
+		 * unconditionally
+		 */
+		if (fdp->dp.length <= offsetof(struct efi_device_path_file_path, str))
+			return NULL;
+		filename_sz = fdp->dp.length -
+			offsetof(struct efi_device_path_file_path, str);
+		filename = malloc(filename_sz);
 		if (!filename)
 			return NULL;
+		memcpy(filename, fdp->str, filename_sz);
 		EFI_CALL(ret = f->open(f, &f2, filename,
 				       EFI_FILE_MODE_READ, 0));
 		free(filename);
@@ -1084,31 +1224,41 @@ struct efi_file_handle *efi_file_from_path(struct efi_device_path *fp)
 	return f;
 }
 
+efi_status_t efi_open_volume_int(struct efi_simple_file_system_protocol *this,
+				 struct efi_file_handle **root)
+{
+	struct file_system *fs = to_fs(this);
+
+	*root = file_open(fs, NULL, NULL, 0, 0);
+
+	return EFI_SUCCESS;
+}
+
 static efi_status_t EFIAPI
 efi_open_volume(struct efi_simple_file_system_protocol *this,
 		struct efi_file_handle **root)
 {
-	struct file_system *fs = to_fs(this);
-
 	EFI_ENTRY("%p, %p", this, root);
 
-	*root = file_open(fs, NULL, NULL, 0, 0);
-
-	return EFI_EXIT(EFI_SUCCESS);
+	return EFI_EXIT(efi_open_volume_int(this, root));
 }
 
-struct efi_simple_file_system_protocol *
-efi_simple_file_system(struct blk_desc *desc, int part,
-		       struct efi_device_path *dp)
+efi_status_t
+efi_create_simple_file_system(struct blk_desc *desc, int part,
+			      struct efi_device_path *dp,
+			      struct efi_simple_file_system_protocol **fsp)
 {
 	struct file_system *fs;
 
 	fs = calloc(1, sizeof(*fs));
+	if (!fs)
+		return EFI_OUT_OF_RESOURCES;
 	fs->base.rev = EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_REVISION;
 	fs->base.open_volume = efi_open_volume;
 	fs->desc = desc;
 	fs->part = part;
 	fs->dp = dp;
+	*fsp = &fs->base;
 
-	return &fs->base;
+	return EFI_SUCCESS;
 }

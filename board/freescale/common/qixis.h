@@ -100,12 +100,12 @@ u16 qixis_read_minor(void);
 char *qixis_read_time(char *result);
 char *qixis_read_tag(char *buf);
 const char *byte_to_binary_mask(u8 val, u8 mask, char *buf);
-#ifdef CONFIG_SYS_I2C_FPGA_ADDR
+#ifdef CFG_SYS_I2C_FPGA_ADDR
 u8 qixis_read_i2c(unsigned int reg);
 void qixis_write_i2c(unsigned int reg, u8 value);
 #endif
 
-#if defined(CONFIG_QIXIS_I2C_ACCESS) && defined(CONFIG_SYS_I2C_FPGA_ADDR)
+#if defined(CONFIG_QIXIS_I2C_ACCESS) && defined(CFG_SYS_I2C_FPGA_ADDR)
 #define QIXIS_READ(reg) qixis_read_i2c(offsetof(struct qixis, reg))
 #define QIXIS_WRITE(reg, value) \
 	qixis_write_i2c(offsetof(struct qixis, reg), value)
@@ -114,7 +114,7 @@ void qixis_write_i2c(unsigned int reg, u8 value);
 #define QIXIS_WRITE(reg, value) qixis_write(offsetof(struct qixis, reg), value)
 #endif
 
-#ifdef CONFIG_SYS_I2C_FPGA_ADDR
+#ifdef CFG_SYS_I2C_FPGA_ADDR
 #define QIXIS_READ_I2C(reg) qixis_read_i2c(offsetof(struct qixis, reg))
 #define QIXIS_WRITE_I2C(reg, value) \
 			qixis_write_i2c(offsetof(struct qixis, reg), value)
@@ -165,5 +165,26 @@ defined(CONFIG_TARGET_LX2160ARDB)
 #define QIXIS_SDID_MASK			0x07
 #define QIXIS_ESDHC_NO_ADAPTER		0x7
 #endif
+
+/*
+ * implementation of CONFIG_ESDHC_DETECT_QUIRK Macro.
+ */
+static inline u8 qixis_esdhc_detect_quirk(void)
+{
+	/*
+	 * SDHC1 Card ID:
+	 * Specifies the type of card installed in the SDHC1 adapter slot.
+	 * 000= (reserved)
+	 * 001= eMMC V4.5 adapter is installed.
+	 * 010= SD/MMC 3.3V adapter is installed.
+	 * 011= eMMC V4.4 adapter is installed.
+	 * 100= eMMC V5.0 adapter is installed.
+	 * 101= MMC card/Legacy (3.3V) adapter is installed.
+	 * 110= SDCard V2/V3 adapter installed.
+	 * 111= no adapter is installed.
+	 */
+	return ((QIXIS_READ(sdhc1) & QIXIS_SDID_MASK) !=
+		 QIXIS_ESDHC_NO_ADAPTER);
+}
 
 #endif

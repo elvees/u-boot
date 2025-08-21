@@ -3,7 +3,6 @@
  * Copyright (C) 2013 The Chromium OS Authors.
  */
 
-#include <common.h>
 #include <asm/arch/cpu.h>
 #include <asm/arch/spl.h>
 #include <asm/arch/clk.h>
@@ -12,7 +11,7 @@
 
 /* Parameters of early board initialization in SPL */
 static struct spl_machine_param machine_param
-		__attribute__((section(".machine_param"))) = {
+		__section(".machine_param") = {
 	.signature	= SIGNATURE,
 	.version	= 1,
 	.params		= "vmubfasirM",

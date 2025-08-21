@@ -10,9 +10,19 @@
 #ifndef SCMI_AGENT_H
 #define SCMI_AGENT_H
 
+#include <scmi_protocols.h>
 #include <asm/types.h>
 
 struct udevice;
+struct scmi_channel;
+
+/**
+ * struct scmi_agent_proto_priv - Private data in device for SCMI agent
+ * @channel: Reference to the SCMI channel to use
+ */
+struct scmi_agent_proto_priv {
+	struct scmi_channel *channel;
+};
 
 /*
  * struct scmi_msg - Context of a SCMI message sent and the response received
@@ -45,23 +55,44 @@ struct scmi_msg {
 	}
 
 /**
- * scmi_send_and_process_msg() - send and process a SCMI message
+ * devm_scmi_of_get_channel() - Get SCMI channel handle from SCMI agent DT node
  *
- * Send a message to a SCMI server through a target SCMI agent device.
+ * @dev:	Device requesting a channel
+ * @return 0 on success and a negative errno on failure
+ */
+int devm_scmi_of_get_channel(struct udevice *dev);
+
+/**
+ * devm_scmi_process_msg() - Send and process an SCMI message
+ *
+ * Send a message to an SCMI server through a target SCMI agent device.
  * Caller sets scmi_msg::out_msg_sz to the output message buffer size.
  * On return, scmi_msg::out_msg_sz stores the response payload size.
  *
- * @dev:	SCMI agent device
+ * @dev:	SCMI device
  * @msg:	Message structure reference
- * @return 0 on success and a negative errno on failure
+ * Return: 0 on success and a negative errno on failure
  */
 int devm_scmi_process_msg(struct udevice *dev, struct scmi_msg *msg);
+
+/**
+ * scmi_get_protocol() - get protocol instance
+ *
+ * @dev:	SCMI agent device
+ * @id:		SCMI protocol ID
+ *
+ * Obtain the device instance for given protocol ID, @id.
+ *
+ * Return:	Pointer to the device if found, null otherwise
+ */
+struct udevice *scmi_get_protocol(struct udevice *dev,
+				  enum scmi_std_protocol id);
 
 /**
  * scmi_to_linux_errno() - Convert an SCMI error code into a Linux errno code
  *
  * @scmi_errno:	SCMI error code value
- * @return 0 for successful status and a negative errno otherwise
+ * Return: 0 for successful status and a negative errno otherwise
  */
 int scmi_to_linux_errno(s32 scmi_errno);
 

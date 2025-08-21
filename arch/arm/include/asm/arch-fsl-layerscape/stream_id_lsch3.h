@@ -23,7 +23,7 @@
  *
  *  -PCIe
  *     -there is a range of stream IDs set aside for PCI in this
- *      file.  U-boot will scan the PCI bus and for each device discovered:
+ *      file.  U-Boot will scan the PCI bus and for each device discovered:
  *         -allocate a streamID
  *         -set a PEXn LUT table entry mapping 'requester ID' to 'stream ID'
  *         -set a msi-map entry in the PEXn controller node in the
@@ -96,7 +96,6 @@
 #elif defined(CONFIG_ARCH_LX2160A) || defined(CONFIG_ARCH_LX2162A)
 #define FSL_PEX_STREAM_ID_END          (0x100)
 #endif
-
 
 /* DPAA2 - set in MC DPC and alloced by MC */
 #define FSL_DPAA2_STREAM_ID_START	23

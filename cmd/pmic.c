@@ -3,7 +3,6 @@
  * Copyright (C) 2014-2015 Samsung Electronics
  * Przemyslaw Marczak <p.marczak@samsung.com>
  */
-#include <common.h>
 #include <command.h>
 #include <errno.h>
 #include <dm.h>
@@ -35,6 +34,7 @@ static int do_dev(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 			printf("Can't get PMIC: %s!\n", name);
 			return failure(ret);
 		}
+		fallthrough;
 	case 1:
 		if (!currdev) {
 			printf("PMIC device is not set!\n\n");
@@ -51,25 +51,26 @@ static int do_list(struct cmd_tbl *cmdtp, int flag, int argc,
 		   char *const argv[])
 {
 	struct udevice *dev;
-	int ret;
+	int ret, err = 0;
 
 	printf("| %-*.*s| %-*.*s| %s @ %s\n",
 	       LIMIT_DEV, LIMIT_DEV, "Name",
 	       LIMIT_PARENT, LIMIT_PARENT, "Parent name",
 	       "Parent uclass", "seq");
 
-	for (ret = uclass_first_device(UCLASS_PMIC, &dev); dev;
-	     ret = uclass_next_device(&dev)) {
+	for (ret = uclass_first_device_check(UCLASS_PMIC, &dev); dev;
+	     ret = uclass_next_device_check(&dev)) {
 		if (ret)
-			continue;
+			err = ret;
 
-		printf("| %-*.*s| %-*.*s| %s @ %d\n",
+		printf("| %-*.*s| %-*.*s| %s @ %d | status: %i\n",
 		       LIMIT_DEV, LIMIT_DEV, dev->name,
 		       LIMIT_PARENT, LIMIT_PARENT, dev->parent->name,
-		       dev_get_uclass_name(dev->parent), dev_seq(dev->parent));
+		       dev_get_uclass_name(dev->parent), dev_seq(dev->parent),
+		       ret);
 	}
 
-	if (ret)
+	if (err)
 		return CMD_RET_FAILURE;
 
 	return CMD_RET_SUCCESS;
@@ -224,6 +225,6 @@ U_BOOT_CMD(pmic, CONFIG_SYS_MAXARGS, 1, do_pmic,
 	"list          - list pmic devices\n"
 	"pmic dev [name]    - show or [set] operating PMIC device\n"
 	"pmic dump          - dump registers\n"
-	"pmic read address  - read byte of register at address\n"
-	"pmic write address - write byte to register at address\n"
+	"pmic read <reg>    - read byte of 'reg' register\n"
+	"pmic write <reg> <byte> - write 'byte' byte to 'reg' register\n"
 );

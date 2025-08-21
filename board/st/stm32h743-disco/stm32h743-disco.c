@@ -4,7 +4,6 @@
  * Author(s): Patrice Chotard, <patrice.chotard@foss.st.com> for STMicroelectronics.
  */
 
-#include <common.h>
 #include <dm.h>
 #include <init.h>
 #include <log.h>
@@ -36,13 +35,7 @@ int dram_init_banksize(void)
 	return 0;
 }
 
-u32 get_board_rev(void)
-{
-	return 0;
-}
-
 int board_init(void)
 {
-	gd->bd->bi_boot_params = gd->bd->bi_dram[0].start + 0x100;
 	return 0;
 }

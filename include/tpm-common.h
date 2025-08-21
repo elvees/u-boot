@@ -43,11 +43,19 @@ enum tpm_version {
 };
 
 /**
+ * define TPM2_NUM_PCR_BANKS - number of PCR banks
+ * The value 16 can be found in the current standard
+ * TCG TSS 2.0 Overview and Common Structures Specification 1.0, rev 10
+ */
+#define TPM2_NUM_PCR_BANKS 16
+
+/**
  * struct tpm_chip_priv - Information about a TPM, stored by the uclass
  *
- * These values must be set up by the device's probe() method before
+ * Some of hese values must be set up by the device's probe() method before
  * communcation is attempted. If the device has an xfer() method, this is
  * not needed. There is no need to set up @buf.
+ * The active_banks is only valid for TPMv2 after the device is initialized.
  *
  * @version:		TPM stack to be used
  * @duration_ms:	Length of each duration type in milliseconds
@@ -55,6 +63,10 @@ enum tpm_version {
  * @buf:		Buffer used during the exchanges with the chip
  * @pcr_count:		Number of PCR per bank
  * @pcr_select_min:	Minimum size in bytes of the pcrSelect array
+ * @active_bank_count:	Number of active PCR banks
+ * @active_banks:	Array of active PCRs
+ * @plat_hier_disabled:	Platform hierarchy has been disabled (TPM is locked
+ *			down until next reboot)
  */
 struct tpm_chip_priv {
 	enum tpm_version version;
@@ -66,6 +78,11 @@ struct tpm_chip_priv {
 	/* TPM v2 specific data */
 	uint pcr_count;
 	uint pcr_select_min;
+#if IS_ENABLED(CONFIG_TPM_V2)
+	u8 active_bank_count;
+	u32 active_banks[TPM2_NUM_PCR_BANKS];
+#endif
+	bool plat_hier_disabled;
 };
 
 /**
@@ -91,7 +108,7 @@ struct tpm_ops {
 	 * close().
 	 *
 	 * @dev:	Device to open
-	 * @return 0 ok OK, -ve on error
+	 * @return 0 ok OK, -EBUSY if already opened, other -ve on other error
 	 */
 	int (*open)(struct udevice *dev);
 
@@ -115,6 +132,16 @@ struct tpm_ops {
 	 * @return length of string, or -ENOSPC it no space
 	 */
 	int (*get_desc)(struct udevice *dev, char *buf, int size);
+
+	/**
+	 * report_state() - Collect information about the current TPM state
+	 *
+	 * @dev:	Device to check
+	 * @buf:	Buffer to put the string
+	 * @size:	Maximum size of buffer
+	 * Return: return code of the operation (0 = success)
+	 */
+	int (*report_state)(struct udevice *dev, char *buf, int size);
 
 	/**
 	 * send() - send data to the TPM
@@ -217,7 +244,7 @@ int tpm_close(struct udevice *dev);
  * tpm_clear_and_reenable() - Force clear the TPM and reenable it
  *
  * @dev: TPM device
- * @return 0 on success, -ve on failure
+ * Return: 0 on success, -ve on failure
  */
 u32 tpm_clear_and_reenable(struct udevice *dev);
 
@@ -227,9 +254,19 @@ u32 tpm_clear_and_reenable(struct udevice *dev);
  * @dev:	Device to check
  * @buf:	Buffer to put the string
  * @size:	Maximum size of buffer
- * @return length of string, or -ENOSPC it no space
+ * Return: length of string, or -ENOSPC it no space
  */
 int tpm_get_desc(struct udevice *dev, char *buf, int size);
+
+/**
+ * tpm_report_state() - Collect information about the current TPM state
+ *
+ * @dev:	Device to check
+ * @buf:	Buffer to put the string
+ * @size:	Maximum size of buffer
+ * Return: return code of the operation (0 = success)
+ */
+int tpm_report_state(struct udevice *dev, char *buf, int size);
 
 /**
  * tpm_xfer() - send data to the TPM and get response
@@ -260,14 +297,14 @@ int tpm_xfer(struct udevice *dev, const u8 *sendbuf, size_t send_size,
  * Initialize TPM device.  It must be called before any TPM commands.
  *
  * @dev - TPM device
- * @return 0 on success, non-0 on error.
+ * Return: 0 on success, non-0 on error.
  */
 int tpm_init(struct udevice *dev);
 
 /**
  * Retrieve the array containing all the v1 (resp. v2) commands.
  *
- * @return a struct cmd_tbl array.
+ * Return: a struct cmd_tbl array.
  */
 #if defined(CONFIG_TPM_V1)
 struct cmd_tbl *get_tpm1_commands(unsigned int *size);
@@ -293,7 +330,7 @@ static inline struct cmd_tbl *get_tpm2_commands(unsigned int *size)
  * it supports.
  *
  * @dev: TPM device
- * @return version number (TPM_V1 or TPMV2)
+ * Return: version number (TPM_V1 or TPMV2)
  */
 enum tpm_version tpm_get_version(struct udevice *dev);
 

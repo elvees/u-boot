@@ -10,171 +10,51 @@
 #define __CONFIG_J721E_EVM_H
 
 #include <linux/sizes.h>
-#include <config_distro_bootcmd.h>
-#include <environment/ti/mmc.h>
-#include <environment/ti/k3_rproc.h>
-#include <environment/ti/ufs.h>
-#include <environment/ti/k3_dfu.h>
 
-/* DDR Configuration */
-#define CONFIG_SYS_SDRAM_BASE1		0x880000000
+/* FLASH Configuration */
+#define CFG_SYS_FLASH_BASE		0x000000000
 
 /* SPL Loader Configuration */
-#if defined(CONFIG_TARGET_J721E_A72_EVM) || defined(CONFIG_TARGET_J7200_A72_EVM)
-#define CONFIG_SYS_INIT_SP_ADDR         (CONFIG_SPL_TEXT_BASE +	\
-					 CONFIG_SYS_K3_NON_SECURE_MSRAM_SIZE)
-#define CONFIG_SYS_UBOOT_BASE		0x50280000
-/* Image load address in RAM for DFU boot*/
+#if defined(CONFIG_TARGET_J721E_A72_EVM)
+#define CFG_SYS_UBOOT_BASE		0x50280000
+#elif defined(CONFIG_TARGET_J7200_A72_EVM)
+#define CFG_SYS_UBOOT_BASE		0x50300000
+#elif defined(CONFIG_TARGET_J721E_R5_EVM)
+#define CFG_SYS_UBOOT_BASE		0x50080000
 #else
-#define CONFIG_SYS_UBOOT_BASE		0x50080000
-/*
- * Maximum size in memory allocated to the SPL BSS. Keep it as tight as
- * possible (to allow the build to go through), as this directly affects
- * our memory footprint. The less we use for BSS the more we have available
- * for everything else.
+#define CFG_SYS_UBOOT_BASE		0x50100000
+#endif
+
+/**
+ * define J721E_SK_TIBOOT3_IMAGE_GUID - firmware GUID for J721e sk tiboot3.bin
+ * define J721E_SK_SPL_IMAGE_GUID     - firmware GUID for J721e sk SPL
+ * define J721E_SK_UBOOT_IMAGE_GUID   - firmware GUID for J721e sk UBOOT
+ * define J721E_SK_SYSFW_IMAGE_GUID   - firmware GUID for J721e sk SYSFW
+ *
+ * These GUIDs are used in capsules updates to identify the corresponding
+ * firmware object.
+ *
+ * Board developers using this as a starting reference should
+ * define their own GUIDs to ensure that firmware repositories (like
+ * LVFS) do not confuse them.
  */
-#define CONFIG_SPL_BSS_MAX_SIZE		0xA000
-/*
- * Link BSS to be within SPL in a dedicated region located near the top of
- * the MCU SRAM, this way making it available also before relocation. Note
- * that we are not using the actual top of the MCU SRAM as there is a memory
- * location filled in by the boot ROM that we want to read out without any
- * interference from the C context.
- */
-#define CONFIG_SPL_BSS_START_ADDR	(CONFIG_SYS_K3_BOOT_PARAM_TABLE_INDEX -\
-					 CONFIG_SPL_BSS_MAX_SIZE)
-/* Set the stack right below the SPL BSS section */
-#define CONFIG_SYS_INIT_SP_ADDR         CONFIG_SPL_BSS_START_ADDR
-/* Configure R5 SPL post-relocation malloc pool in DDR */
-#define CONFIG_SYS_SPL_MALLOC_START	0x84000000
-#define CONFIG_SYS_SPL_MALLOC_SIZE	SZ_16M
-/* Image load address in RAM for DFU boot*/
-#endif
+#define J721E_SK_TIBOOT3_IMAGE_GUID \
+	EFI_GUID(0xe672b518, 0x7cd7, 0x4014, 0xbd, 0x8d, \
+		 0x40, 0x72, 0x4d, 0x0a, 0xd4, 0xdc)
 
-#ifdef CONFIG_SYS_K3_SPL_ATF
-#define CONFIG_SPL_FS_LOAD_PAYLOAD_NAME	"tispl.bin"
-#endif
+#define J721E_SK_SPL_IMAGE_GUID \
+	EFI_GUID(0x86f710ad, 0x10cf, 0x46ea, 0xac, 0x67, \
+		 0x85, 0x6a, 0xe0, 0x6e, 0xfa, 0xd2)
 
-#define CONFIG_SPL_MAX_SIZE		CONFIG_SYS_K3_MAX_DOWNLODABLE_IMAGE_SIZE
+#define J721E_SK_UBOOT_IMAGE_GUID \
+	EFI_GUID(0x81b58fb0, 0x3b00, 0x4add, 0xa2, 0x0a, \
+		 0xc1, 0x85, 0xbb, 0xac, 0xa1, 0xed)
 
-#define CONFIG_SYS_BOOTM_LEN		SZ_64M
-#define CONFIG_CQSPI_REF_CLK		133333333
-
-/* HyperFlash related configuration */
-#define CONFIG_SYS_MAX_FLASH_BANKS_DETECT 1
-
-/* U-Boot general configuration */
-#define EXTRA_ENV_J721E_BOARD_SETTINGS					\
-	"default_device_tree=" CONFIG_DEFAULT_DEVICE_TREE ".dtb\0"	\
-	"findfdt="							\
-		"setenv name_fdt ${default_device_tree};"		\
-		"setenv fdtfile ${name_fdt}\0"				\
-	"name_kern=Image\0"						\
-	"console=ttyS2,115200n8\0"					\
-	"args_all=setenv optargs earlycon=ns16550a,mmio32,0x02800000 "	\
-		"${mtdparts}\0"						\
-	"run_kern=booti ${loadaddr} ${rd_spec} ${fdtaddr}\0"
-
-#define PARTS_DEFAULT \
-	/* Linux partitions */ \
-	"uuid_disk=${uuid_gpt_disk};" \
-	"name=rootfs,start=0,size=-,uuid=${uuid_gpt_rootfs}\0"
-
-#ifdef CONFIG_SYS_K3_SPL_ATF
-#if defined(CONFIG_TARGET_J721E_R5_EVM)
-#define EXTRA_ENV_R5_SPL_RPROC_FW_ARGS_MMC				\
-	"addr_mainr5f0_0load=0x88000000\0"				\
-	"name_mainr5f0_0fw=/lib/firmware/j7-main-r5f0_0-fw\0"		\
-	"addr_mcur5f0_0load=0x89000000\0"				\
-	"name_mcur5f0_0fw=/lib/firmware/j7-mcu-r5f0_0-fw\0"
-#elif defined(CONFIG_TARGET_J7200_R5_EVM)
-#define EXTRA_ENV_R5_SPL_RPROC_FW_ARGS_MMC				\
-	"addr_mcur5f0_0load=0x89000000\0"				\
-	"name_mcur5f0_0fw=/lib/firmware/j7200-mcu-r5f0_0-fw\0"
-#endif /* CONFIG_TARGET_J721E_R5_EVM */
-#else
-#define EXTRA_ENV_R5_SPL_RPROC_FW_ARGS_MMC ""
-#endif /* CONFIG_SYS_K3_SPL_ATF */
-
-/* U-Boot MMC-specific configuration */
-#define EXTRA_ENV_J721E_BOARD_SETTINGS_MMC				\
-	"boot=mmc\0"							\
-	"mmcdev=1\0"							\
-	"bootpart=1:2\0"						\
-	"bootdir=/boot\0"						\
-	EXTRA_ENV_R5_SPL_RPROC_FW_ARGS_MMC				\
-	"rd_spec=-\0"							\
-	"init_mmc=run args_all args_mmc\0"				\
-	"get_fdt_mmc=load mmc ${bootpart} ${fdtaddr} ${bootdir}/${name_fdt}\0" \
-	"get_overlay_mmc="						\
-		"fdt address ${fdtaddr};"				\
-		"fdt resize 0x100000;"					\
-		"for overlay in $name_overlays;"			\
-		"do;"							\
-		"load mmc ${bootpart} ${dtboaddr} ${bootdir}/${overlay} && "	\
-		"fdt apply ${dtboaddr};"				\
-		"done;\0"						\
-	"partitions=" PARTS_DEFAULT					\
-	"get_kern_mmc=load mmc ${bootpart} ${loadaddr} "		\
-		"${bootdir}/${name_kern}\0"				\
-	"get_fit_mmc=load mmc ${bootpart} ${addr_fit} "			\
-		"${bootdir}/${name_fit}\0"				\
-	"partitions=" PARTS_DEFAULT
-
-/* Set the default list of remote processors to boot */
-#if defined(CONFIG_TARGET_J721E_A72_EVM) || defined(CONFIG_TARGET_J7200_A72_EVM)
-#ifdef DEFAULT_RPROCS
-#undef DEFAULT_RPROCS
-#endif
-#endif
-
-#ifdef CONFIG_TARGET_J721E_A72_EVM
-#define DEFAULT_RPROCS	""						\
-		"3 /lib/firmware/j7-main-r5f0_1-fw "			\
-		"4 /lib/firmware/j7-main-r5f1_0-fw "			\
-		"5 /lib/firmware/j7-main-r5f1_1-fw "			\
-		"6 /lib/firmware/j7-c66_0-fw "				\
-		"7 /lib/firmware/j7-c66_1-fw "				\
-		"8 /lib/firmware/j7-c71_0-fw "
-#endif /* CONFIG_TARGET_J721E_A72_EVM */
-
-#ifdef CONFIG_TARGET_J7200_A72_EVM
-#define DEFAULT_RPROCS ""						\
-		"2 /lib/firmware/j7200-main-r5f0_0-fw "			\
-		"3 /lib/firmware/j7200-main-r5f0_1-fw "
-#endif /* CONFIG_TARGET_J7200_A72_EVM */
-
-/* set default dfu_bufsiz to 128KB (sector size of OSPI) */
-#define EXTRA_ENV_DFUARGS \
-	"dfu_bufsiz=0x20000\0" \
-	DFU_ALT_INFO_MMC \
-	DFU_ALT_INFO_EMMC \
-	DFU_ALT_INFO_RAM \
-	DFU_ALT_INFO_OSPI
-
-#if defined(CONFIG_TARGET_J721E_A72_EVM) || defined(CONFIG_TARGET_J7200_A72_EVM)
-#define EXTRA_ENV_J721E_BOARD_SETTINGS_MTD				\
-	"mtdids=" CONFIG_MTDIDS_DEFAULT "\0"				\
-	"mtdparts=" CONFIG_MTDPARTS_DEFAULT "\0"
-#else
-#define EXTRA_ENV_J721E_BOARD_SETTINGS_MTD
-#endif
-
-/* Incorporate settings into the U-Boot environment */
-#define CONFIG_EXTRA_ENV_SETTINGS					\
-	DEFAULT_LINUX_BOOT_ENV						\
-	DEFAULT_MMC_TI_ARGS						\
-	DEFAULT_FIT_TI_ARGS						\
-	EXTRA_ENV_J721E_BOARD_SETTINGS					\
-	EXTRA_ENV_J721E_BOARD_SETTINGS_MMC				\
-	EXTRA_ENV_RPROC_SETTINGS					\
-	EXTRA_ENV_DFUARGS						\
-	DEFAULT_UFS_TI_ARGS						\
-	EXTRA_ENV_J721E_BOARD_SETTINGS_MTD
+#define J721E_SK_SYSFW_IMAGE_GUID \
+	EFI_GUID(0x6fd10680, 0x361b, 0x431f, 0x80, 0xaa, \
+		 0x89, 0x94, 0x55, 0x81, 0x9e, 0x11)
 
 /* Now for the remaining common defines */
 #include <configs/ti_armv7_common.h>
-
-/* MMC ENV related defines */
 
 #endif /* __CONFIG_J721E_EVM_H */

@@ -58,6 +58,10 @@ enum {
 	X86_SYSCON_PUNIT,	/* Power unit */
 };
 
+#define CPUID_FEATURE_PAE	BIT(6)
+#define CPUID_FEATURE_PSE36	BIT(17)
+#define CPUID_FEAURE_HTT	BIT(28)
+
 struct cpuid_result {
 	uint32_t eax;
 	uint32_t ebx;
@@ -105,68 +109,47 @@ static inline struct cpuid_result cpuid_ext(int op, unsigned ecx)
 	return result;
 }
 
+static inline void native_cpuid(unsigned int *eax, unsigned int *ebx,
+				unsigned int *ecx, unsigned int *edx)
+{
+	/* ecx is often an input as well as an output. */
+	asm volatile("cpuid"
+	    : "=a" (*eax),
+	      "=b" (*ebx),
+	      "=c" (*ecx),
+	      "=d" (*edx)
+	    : "0" (*eax), "2" (*ecx)
+	    : "memory");
+}
+
+#define native_cpuid_reg(reg)					\
+static inline unsigned int cpuid_##reg(unsigned int op)	\
+{								\
+	unsigned int eax = op, ebx, ecx = 0, edx;		\
+								\
+	native_cpuid(&eax, &ebx, &ecx, &edx);			\
+								\
+	return reg;						\
+}
+
 /*
- * CPUID functions returning a single datum
+ * Native CPUID functions returning a single datum.
  */
-static inline unsigned int cpuid_eax(unsigned int op)
+native_cpuid_reg(eax)
+native_cpuid_reg(ebx)
+native_cpuid_reg(ecx)
+native_cpuid_reg(edx)
+
+#if CONFIG_IS_ENABLED(X86_64)
+static inline int flag_is_changeable_p(u32 flag)
 {
-	unsigned int eax;
-
-	__asm__("mov %%ebx, %%edi;"
-		"cpuid;"
-		"mov %%edi, %%ebx;"
-		: "=a" (eax)
-		: "0" (op)
-		: "ecx", "edx", "edi");
-	return eax;
+	return 1;
 }
-
-static inline unsigned int cpuid_ebx(unsigned int op)
-{
-	unsigned int eax, ebx;
-
-	__asm__("mov %%ebx, %%edi;"
-		"cpuid;"
-		"mov %%ebx, %%esi;"
-		"mov %%edi, %%ebx;"
-		: "=a" (eax), "=S" (ebx)
-		: "0" (op)
-		: "ecx", "edx", "edi");
-	return ebx;
-}
-
-static inline unsigned int cpuid_ecx(unsigned int op)
-{
-	unsigned int eax, ecx;
-
-	__asm__("mov %%ebx, %%edi;"
-		"cpuid;"
-		"mov %%edi, %%ebx;"
-		: "=a" (eax), "=c" (ecx)
-		: "0" (op)
-		: "edx", "edi");
-	return ecx;
-}
-
-static inline unsigned int cpuid_edx(unsigned int op)
-{
-	unsigned int eax, edx;
-
-	__asm__("mov %%ebx, %%edi;"
-		"cpuid;"
-		"mov %%edi, %%ebx;"
-		: "=a" (eax), "=d" (edx)
-		: "0" (op)
-		: "ecx", "edi");
-	return edx;
-}
-
-#if !CONFIG_IS_ENABLED(X86_64)
-
+#else
 /* Standard macro to see if a specific flag is changeable */
-static inline int flag_is_changeable_p(uint32_t flag)
+static inline int flag_is_changeable_p(u32 flag)
 {
-	uint32_t f1, f2;
+	u32 f1, f2;
 
 	asm(
 		"pushfl\n\t"
@@ -181,14 +164,9 @@ static inline int flag_is_changeable_p(uint32_t flag)
 		"popfl\n\t"
 		: "=&r" (f1), "=&r" (f2)
 		: "ir" (flag));
-	return ((f1^f2) & flag) != 0;
+	return ((f1 ^ f2) & flag) != 0;
 }
-#endif
-
-static inline void mfence(void)
-{
-	__asm__ __volatile__("mfence" : : : "memory");
-}
+#endif /* X86_64 */
 
 /**
  * cpu_enable_paging_pae() - Enable PAE-paging
@@ -205,7 +183,7 @@ void cpu_disable_paging_pae(void);
 /**
  * cpu_has_64bit() - Check if the CPU has 64-bit support
  *
- * @return 1 if this CPU supports long mode (64-bit), 0 if not
+ * Return: 1 if this CPU supports long mode (64-bit), 0 if not
  */
 int cpu_has_64bit(void);
 
@@ -224,7 +202,7 @@ const char *cpu_vendor_name(int vendor);
  * cpu_get_name() - Get the name of the current cpu
  *
  * @name: Place to put name, which must be CPU_MAX_NAME_LEN bytes including
- * @return pointer to name, which will likely be a few bytes after the start
+ * Return: pointer to name, which will likely be a few bytes after the start
  * of @name
  * \0 terminator
  */
@@ -262,6 +240,7 @@ void cpu_call32(ulong code_seg32, ulong target, ulong table);
  *
  * @setup_base:	Pointer to the setup.bin information for the kernel
  * @target:	Pointer to the start of the kernel image
+ * Return: -EFAULT if the kernel returned; otherwise does not return
  */
 int cpu_jump_to_64bit(ulong setup_base, ulong target);
 
@@ -277,24 +256,35 @@ int cpu_jump_to_64bit_uboot(ulong target);
 /**
  * cpu_get_family_model() - Get the family and model for the CPU
  *
- * @return the CPU ID masked with 0x0fff0ff0
+ * Return: the CPU ID masked with 0x0fff0ff0
  */
 u32 cpu_get_family_model(void);
 
 /**
  * cpu_get_stepping() - Get the stepping value for the CPU
  *
- * @return the CPU ID masked with 0xf
+ * Return: the CPU ID masked with 0xf
  */
 u32 cpu_get_stepping(void);
 
 /**
- * cpu_phys_address_size() - Get the physical address size in bits
+ * board_final_init() - Final initialization hook (optional)
  *
- * This is 32 for older CPUs but newer ones may support 36.
- *
- * @return address size (typically 32 or 36)
+ * Implements a custom initialization for boards that need to do it
+ * before the system is ready.
  */
-int cpu_phys_address_size(void);
+void board_final_init(void);
+
+/**
+ * board_final_cleanup() - Final cleanup hook (optional)
+ *
+ * Implements a custom cleanup for boards that need to do it before
+ * booting the OS.
+ */
+void board_final_cleanup(void);
+
+#ifndef CONFIG_EFI_STUB
+int reserve_arch(void);
+#endif
 
 #endif

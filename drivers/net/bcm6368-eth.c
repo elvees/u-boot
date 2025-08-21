@@ -6,7 +6,6 @@
  *	Copyright (C) 2008 Maxime Bizon <mbizon@freebox.fr>
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <dma.h>
@@ -19,6 +18,7 @@
 #include <asm/io.h>
 #include <dm/device_compat.h>
 #include <linux/delay.h>
+#include <linux/printk.h>
 
 #define ETH_PORT_STR			"brcm,enetsw-port"
 
@@ -543,12 +543,6 @@ static int bcm6368_eth_probe(struct udevice *dev)
 		ret = clk_enable(&clk);
 		if (ret < 0) {
 			pr_err("%s: error enabling clock %d\n", __func__, i);
-			return ret;
-		}
-
-		ret = clk_free(&clk);
-		if (ret < 0) {
-			pr_err("%s: error freeing clock %d\n", __func__, i);
 			return ret;
 		}
 	}

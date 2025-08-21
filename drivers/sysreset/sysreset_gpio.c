@@ -3,7 +3,6 @@
  * Copyright (C) 2018 Xilinx, Inc. - Michal Simek
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
@@ -17,6 +16,7 @@ struct gpio_reboot_priv {
 static int gpio_reboot_request(struct udevice *dev, enum sysreset_t type)
 {
 	struct gpio_reboot_priv *priv = dev_get_priv(dev);
+	int ret;
 
 	/*
 	 * When debug log is enabled please make sure that chars won't end up
@@ -26,14 +26,18 @@ static int gpio_reboot_request(struct udevice *dev, enum sysreset_t type)
 	debug("GPIO reset\n");
 
 	/* Writing 1 respects polarity (active high/low) based on gpio->flags */
-	return dm_gpio_set_value(&priv->gpio, 1);
+	ret = dm_gpio_set_value(&priv->gpio, 1);
+	if (ret < 0)
+		return ret;
+
+	return -EINPROGRESS;
 }
 
 static struct sysreset_ops gpio_reboot_ops = {
 	.request = gpio_reboot_request,
 };
 
-int gpio_reboot_probe(struct udevice *dev)
+static int gpio_reboot_probe(struct udevice *dev)
 {
 	struct gpio_reboot_priv *priv = dev_get_priv(dev);
 

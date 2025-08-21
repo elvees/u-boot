@@ -4,7 +4,6 @@
  * Author: Andy Yan <andy.yan@rock-chips.com>
  */
 
-#include <common.h>
 #include <bitfield.h>
 #include <clk-uclass.h>
 #include <dm.h>
@@ -13,7 +12,6 @@
 #include <malloc.h>
 #include <syscon.h>
 #include <asm/global_data.h>
-#include <asm/io.h>
 #include <asm/arch-rockchip/clock.h>
 #include <asm/arch-rockchip/cru_rv1108.h>
 #include <asm/arch-rockchip/hardware.h>
@@ -706,7 +704,7 @@ static int rv1108_clk_bind(struct udevice *dev)
 	ret = offsetof(struct rv1108_cru, softrst_con[0]);
 	ret = rockchip_reset_bind(dev, ret, 13);
 	if (ret)
-		debug("Warning: software reset driver bind faile\n");
+		debug("Warning: software reset driver bind failed\n");
 #endif
 
 	return 0;

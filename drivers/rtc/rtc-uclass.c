@@ -4,7 +4,8 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_RTC
+
 #include <dm.h>
 #include <errno.h>
 #include <log.h>
@@ -174,7 +175,8 @@ int rtc_write32(struct udevice *dev, unsigned int reg, u32 value)
 UCLASS_DRIVER(rtc) = {
 	.name		= "rtc",
 	.id		= UCLASS_RTC,
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+	.flags		= DM_UC_FLAG_SEQ_ALIAS,
+#if CONFIG_IS_ENABLED(OF_REAL)
 	.post_bind	= dm_scan_fdt_dev,
 #endif
 };

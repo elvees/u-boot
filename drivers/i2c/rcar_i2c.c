@@ -11,7 +11,6 @@
  *   Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <i2c.h>
@@ -55,7 +54,6 @@
 #define RCAR_I2C_ICFBSCR		0x38
 #define RCAR_I2C_ICFBSCR_TCYC17		0x0f /* 17*Tcyc */
 
-
 enum rcar_i2c_type {
 	RCAR_I2C_TYPE_GEN2,
 	RCAR_I2C_TYPE_GEN3,
@@ -64,6 +62,8 @@ enum rcar_i2c_type {
 struct rcar_i2c_priv {
 	void __iomem		*base;
 	struct clk		clk;
+	u32			fall_ns;
+	u32			rise_ns;
 	u32			intdelay;
 	u32			icccr;
 	enum rcar_i2c_type	type;
@@ -278,7 +278,7 @@ static int rcar_i2c_set_speed(struct udevice *dev, uint bus_freq_hz)
 	 *  = F[sum * ick / 1000000000]
 	 *  = F[(ick / 1000000) * sum / 1000]
 	 */
-	sum = 35 + 200 + priv->intdelay;
+	sum = priv->fall_ns + priv->rise_ns + priv->intdelay;
 	round = (ick + 500000) / 1000000 * sum;
 	round = (round + 500) / 1000;
 
@@ -323,6 +323,10 @@ static int rcar_i2c_probe(struct udevice *dev)
 	int ret;
 
 	priv->base = dev_read_addr_ptr(dev);
+	priv->rise_ns = dev_read_u32_default(dev,
+					     "i2c-scl-rising-time-ns", 200);
+	priv->fall_ns = dev_read_u32_default(dev,
+					     "i2c-scl-falling-time-ns", 35);
 	priv->intdelay = dev_read_u32_default(dev,
 					      "i2c-scl-internal-delay-ns", 5);
 	priv->type = dev_get_driver_data(dev);
@@ -363,6 +367,7 @@ static const struct dm_i2c_ops rcar_i2c_ops = {
 static const struct udevice_id rcar_i2c_ids[] = {
 	{ .compatible = "renesas,rcar-gen2-i2c", .data = RCAR_I2C_TYPE_GEN2 },
 	{ .compatible = "renesas,rcar-gen3-i2c", .data = RCAR_I2C_TYPE_GEN3 },
+	{ .compatible = "renesas,rcar-gen4-i2c", .data = RCAR_I2C_TYPE_GEN3 },
 	{ }
 };
 

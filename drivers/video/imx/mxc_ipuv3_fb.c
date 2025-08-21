@@ -10,7 +10,6 @@
  * (C) Copyright 2004-2010 Freescale Semiconductor, Inc.
  */
 
-#include <common.h>
 #include <log.h>
 #include <part.h>
 #include <asm/cache.h>
@@ -22,7 +21,6 @@
 #include <asm/io.h>
 #include <asm/mach-imx/video.h>
 #include <malloc.h>
-#include <video_fb.h>
 #include "../videomodes.h"
 #include "ipu.h"
 #include "mxcfb.h"
@@ -405,7 +403,6 @@ static int mxcfb_map_video_memory(struct fb_info *fbi)
 		(uint32_t) fbi->fix.smem_start, fbi->fix.smem_len);
 
 	fbi->screen_size = fbi->fix.smem_len;
-	gd->fb_base = fbi->fix.smem_start;
 
 	/* Clear the screen */
 	memset((char *)fbi->screen_base, 0, fbi->fix.smem_len);
@@ -428,7 +425,7 @@ static int mxcfb_unmap_video_memory(struct fb_info *fbi)
  * structures.  This includes information such as bits per pixel,
  * color maps, screen width/height and RGBA offsets.
  *
- * @return      Framebuffer structure initialized with our information
+ * Return:      Framebuffer structure initialized with our information
  */
 static struct fb_info *mxcfb_init_fbinfo(void)
 {
@@ -479,7 +476,7 @@ extern struct clk *g_ipu_clk;
  * this routine: Framebuffer initialization, Memory allocation and
  * mapping, Framebuffer registration, IPU initialization.
  *
- * @return      Appropriate error code to the kernel common code
+ * Return:      Appropriate error code to the kernel common code
  */
 static int mxcfb_probe(struct udevice *dev, u32 interface_pix_fmt,
 		       uint8_t disp, struct fb_videomode const *mode)
@@ -610,14 +607,13 @@ static int ipuv3_video_probe(struct udevice *dev)
 		return ret;
 
 #if defined(CONFIG_DISPLAY)
-	ret = uclass_first_device(UCLASS_DISPLAY, &disp_dev);
-	if (disp_dev) {
+	ret = uclass_first_device_err(UCLASS_DISPLAY, &disp_dev);
+	if (!ret)
 		ret = display_enable(disp_dev, 16, NULL);
-		if (ret < 0)
-			return ret;
-	}
+	if (ret < 0)
+		return ret;
 #endif
-	if (CONFIG_IS_ENABLED(PANEL)) {
+	if (IS_ENABLED(CONFIG_PANEL)) {
 		struct udevice *panel_dev;
 
 		ret = uclass_get_device(UCLASS_PANEL, 0, &panel_dev);
@@ -636,7 +632,6 @@ static int ipuv3_video_probe(struct udevice *dev)
 	mmu_set_region_dcache_behaviour(fb_start, fb_end - fb_start,
 					DCACHE_WRITEBACK);
 	video_set_flush_dcache(dev, true);
-	gd->fb_base = fb_start;
 
 	return 0;
 }

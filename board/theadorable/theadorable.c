@@ -3,7 +3,6 @@
  * Copyright (C) 2015-2019 Stefan Roese <sr@denx.de>
  */
 
-#include <common.h>
 #include <command.h>
 #include <console.h>
 #include <dm.h>
@@ -11,7 +10,7 @@
 #include <init.h>
 #include <net.h>
 #include <pci.h>
-#if !defined(CONFIG_SPL_BUILD)
+#if !defined(CONFIG_XPL_BUILD)
 #include <bootcount.h>
 #endif
 #include <asm/global_data.h>
@@ -208,9 +207,9 @@ int board_init(void)
 	 * Map SPI devices via MBUS so that they can be accessed via
 	 * the SPI direct access mode
 	 */
-	mbus_dt_setup_win(&mbus_state, SPI_BUS0_DEV1_BASE, SPI_BUS0_DEV1_SIZE,
+	mbus_dt_setup_win(SPI_BUS0_DEV1_BASE, SPI_BUS0_DEV1_SIZE,
 			  CPU_TARGET_DEVICEBUS_BOOTROM_SPI, CPU_ATTR_SPI0_CS1);
-	mbus_dt_setup_win(&mbus_state, SPI_BUS1_DEV2_BASE, SPI_BUS0_DEV1_SIZE,
+	mbus_dt_setup_win(SPI_BUS1_DEV2_BASE, SPI_BUS0_DEV1_SIZE,
 			  CPU_TARGET_DEVICEBUS_BOOTROM_SPI, CPU_ATTR_SPI1_CS2);
 
 	/*
@@ -253,7 +252,7 @@ int board_eth_init(struct bd_info *bis)
 }
 #endif
 
-#if !defined(CONFIG_SPL_BUILD) && defined(CONFIG_BOARD_LATE_INIT)
+#if !defined(CONFIG_XPL_BUILD) && defined(CONFIG_BOARD_LATE_INIT)
 int board_late_init(void)
 {
 	pci_dev_t bdf;
@@ -289,7 +288,6 @@ int board_late_init(void)
 			}
 		} while (get_timer(start_time) < ABORT_TIMEOUT);
 
-
 		/*
 		 * At this stage the bootcounter has not been incremented
 		 * yet. We need to do this manually here to get an actually
@@ -298,10 +296,19 @@ int board_late_init(void)
 		bootcount_inc();
 
 		if (bootcount > PEX_SWITCH_NOT_FOUNT_LIMIT) {
-			printf("Issuing power-switch via uC!\n");
+			struct udevice *dev;
 
 			printf("Issuing power-switch via uC!\n");
-			i2c_set_bus_num(STM_I2C_BUS);
+			ret = i2c_get_chip_for_busnum(STM_I2C_BUS, STM_I2C_ADDR,
+						      1, &dev);
+			if (ret) {
+				printf("Error selecting STM on I2C bus (ret=%d)\n",
+				       ret);
+				printf("Issuing soft-reset...\n");
+				/* default handling: SOFT reset */
+				do_reset(NULL, 0, 0, NULL);
+			}
+
 			i2c_buf[0] = STM_I2C_ADDR << 1;
 			i2c_buf[1] = 0xc5;	/* cmd */
 			i2c_buf[2] = 0x01;	/* enable */
@@ -313,7 +320,7 @@ int board_late_init(void)
 			i2c_buf[6] = 0x00;
 			i2c_buf[7] = crc8(0x72, &i2c_buf[0], 7);
 
-			ret = i2c_write(STM_I2C_ADDR, 0, 0, &i2c_buf[1], 7);
+			ret = dm_i2c_write(dev, 0, &i2c_buf[1], 7);
 			if (ret) {
 				printf("I2C write error (ret=%d)\n", ret);
 				printf("Issuing soft-reset...\n");
@@ -336,7 +343,7 @@ int board_late_init(void)
 }
 #endif
 
-#if !defined(CONFIG_SPL_BUILD) && defined(CONFIG_PCI)
+#if !defined(CONFIG_XPL_BUILD) && defined(CONFIG_PCI)
 static int pcie_get_link_speed_width(pci_dev_t bdf, int *speed, int *width)
 {
 	struct udevice *dev;

@@ -5,7 +5,7 @@
  * Author: Nicolas Ferre <nicolas.ferre@microcihp.com>
  */
 
-#include <common.h>
+#include <config.h>
 #include <debug_uart.h>
 #include <init.h>
 #include <asm/global_data.h>
@@ -22,10 +22,17 @@ extern void at91_pda_detect(void);
 
 DECLARE_GLOBAL_DATA_PTR;
 
+static void rgb_leds_init(void)
+{
+	atmel_pio4_set_pio_output(AT91_PIO_PORTA, 6, 0);	/* LED RED */
+	atmel_pio4_set_pio_output(AT91_PIO_PORTA, 7, 0);	/* LED GREEN */
+	atmel_pio4_set_pio_output(AT91_PIO_PORTA, 8, 1);	/* LED BLUE */
+}
+
 #ifdef CONFIG_BOARD_LATE_INIT
 int board_late_init(void)
 {
-#ifdef CONFIG_DM_VIDEO
+#ifdef CONFIG_VIDEO
 	at91_video_show_board_info();
 #endif
 	at91_pda_detect();
@@ -51,10 +58,6 @@ void board_debug_uart_init(void)
 #ifdef CONFIG_BOARD_EARLY_INIT_F
 int board_early_init_f(void)
 {
-#ifdef CONFIG_DEBUG_UART
-	debug_uart_init();
-#endif
-
 	return 0;
 }
 #endif
@@ -62,7 +65,9 @@ int board_early_init_f(void)
 int board_init(void)
 {
 	/* address of boot parameters */
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE + 0x100;
+
+	rgb_leds_init();
 
 	return 0;
 }
@@ -79,13 +84,13 @@ int misc_init_r(void)
 
 int dram_init(void)
 {
-	gd->ram_size = get_ram_size((void *)CONFIG_SYS_SDRAM_BASE,
-				    CONFIG_SYS_SDRAM_SIZE);
+	gd->ram_size = get_ram_size((void *)CFG_SYS_SDRAM_BASE,
+				    CFG_SYS_SDRAM_SIZE);
 	return 0;
 }
 
 /* SPL */
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 
 static void board_leds_init(void)
 {
@@ -203,7 +208,7 @@ static void ddrc_conf(struct atmel_mpddrc_config *ddrc)
 	ddrc->cal_mr4 |= ATMEL_MPDDRC_CAL_MR4_MR4R(0xFFFE);
 }
 
-void mem_init(void)
+void at91_mem_init(void)
 {
 	struct at91_pmc *pmc = (struct at91_pmc *)ATMEL_BASE_PMC;
 	struct atmel_mpddr *mpddrc = (struct atmel_mpddr *)ATMEL_BASE_MPDDRC;

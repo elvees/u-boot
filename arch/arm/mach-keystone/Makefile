@@ -9,7 +9,8 @@ obj-y	+= init.o
 obj-y	+= psc.o
 obj-y	+= clock.o
 obj-y	+= mon.o
-ifndef CONFIG_SPL_BUILD
+CFLAGS_REMOVE_mon.o := $(LTO_CFLAGS)
+ifndef CONFIG_XPL_BUILD
 obj-y	+= cmd_clock.o
 obj-y	+= cmd_mon.o
 obj-y	+= cmd_poweroff.o

@@ -3,9 +3,9 @@
  * Copyright (C) 2014 NVIDIA Corporation
  */
 
-#include <common.h>
 #include <dm.h>
 #include <asm/gpio.h>
+#include <linux/printk.h>
 #include <power/as3722.h>
 #include <power/pmic.h>
 

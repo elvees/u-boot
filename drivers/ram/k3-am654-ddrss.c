@@ -2,21 +2,23 @@
 /*
  * Texas Instruments' AM654 DDRSS driver
  *
- * Copyright (C) 2018 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2018 Texas Instruments Incorporated - https://www.ti.com/
  *	Lokesh Vutla <lokeshvutla@ti.com>
  */
 
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <log.h>
 #include <ram.h>
 #include <asm/io.h>
 #include <power-domain.h>
-#include <asm/arch/sys_proto.h>
 #include <dm/device_compat.h>
 #include <power/regulator.h>
 #include "k3-am654-ddrss.h"
+
+void sdelay(unsigned long loops);
+u32 wait_on_value(u32 read_bit_mask, u32 match_value, void *read_addr,
+		  u32 bound);
 
 #define LDELAY 10000
 
@@ -264,6 +266,16 @@ static void am654_ddrss_phy_configuration(struct am654_ddrss_desc *ddrss)
 	ddrss_phy_writel(DDRSS_DDRPHY_ACIOCR3, ioctl->ddrphy_aciocr3);
 	ddrss_phy_writel(DDRSS_DDRPHY_ACIOCR5, ioctl->ddrphy_aciocr5);
 	ddrss_phy_writel(DDRSS_DDRPHY_IOVCR0, ioctl->ddrphy_iovcr0);
+
+	ddrss_phy_writel(DDRSS_DDRPHY_DX2GCR0, cfg->ddrphy_dx2gcr0);
+	ddrss_phy_writel(DDRSS_DDRPHY_DX2GCR1, cfg->ddrphy_dx2gcr1);
+	ddrss_phy_writel(DDRSS_DDRPHY_DX2GCR2, cfg->ddrphy_dx2gcr2);
+	ddrss_phy_writel(DDRSS_DDRPHY_DX2GCR3, cfg->ddrphy_dx2gcr3);
+
+	ddrss_phy_writel(DDRSS_DDRPHY_DX3GCR0, cfg->ddrphy_dx3gcr0);
+	ddrss_phy_writel(DDRSS_DDRPHY_DX3GCR1, cfg->ddrphy_dx3gcr1);
+	ddrss_phy_writel(DDRSS_DDRPHY_DX3GCR2, cfg->ddrphy_dx3gcr2);
+	ddrss_phy_writel(DDRSS_DDRPHY_DX3GCR3, cfg->ddrphy_dx3gcr3);
 
 	ddrss_phy_writel(DDRSS_DDRPHY_DX4GCR0, cfg->ddrphy_dx4gcr0);
 	ddrss_phy_writel(DDRSS_DDRPHY_DX4GCR1, cfg->ddrphy_dx4gcr1);
@@ -874,9 +886,8 @@ static int am654_ddrss_power_on(struct am654_ddrss_desc *ddrss)
 	device_get_supply_regulator(ddrss->dev, "vtt-supply",
 				    &ddrss->vtt_supply);
 	ret = regulator_set_value(ddrss->vtt_supply, 3300000);
-	if (ret)
-		return ret;
-	debug("VTT regulator enabled\n");
+	if (ret == 0)
+		debug("VTT regulator enabled\n");
 #endif
 
 	return 0;
@@ -891,7 +902,7 @@ static int am654_ddrss_power_on(struct am654_ddrss_desc *ddrss)
 static int am654_ddrss_ofdata_to_priv(struct udevice *dev)
 {
 	struct am654_ddrss_desc *ddrss = dev_get_priv(dev);
-	phys_addr_t reg;
+	void *reg;
 	int ret;
 
 	debug("%s(dev=%p)\n", __func__, dev);
@@ -914,26 +925,26 @@ static int am654_ddrss_ofdata_to_priv(struct udevice *dev)
 		return ret;
 	}
 
-	reg = devfdt_get_addr_name(dev, "ss");
-	if (reg == FDT_ADDR_T_NONE) {
+	reg = dev_read_addr_name_ptr(dev, "ss");
+	if (!reg) {
 		dev_err(dev, "No reg property for DDRSS wrapper logic\n");
 		return -EINVAL;
 	}
-	ddrss->ddrss_ss_cfg = (void *)reg;
+	ddrss->ddrss_ss_cfg = reg;
 
-	reg = devfdt_get_addr_name(dev, "ctl");
-	if (reg == FDT_ADDR_T_NONE) {
+	reg = dev_read_addr_name_ptr(dev, "ctl");
+	if (!reg) {
 		dev_err(dev, "No reg property for Controller region\n");
 		return -EINVAL;
 	}
-	ddrss->ddrss_ctl_cfg = (void *)reg;
+	ddrss->ddrss_ctl_cfg = reg;
 
-	reg = devfdt_get_addr_name(dev, "phy");
-	if (reg == FDT_ADDR_T_NONE) {
+	reg = dev_read_addr_name_ptr(dev, "phy");
+	if (!reg) {
 		dev_err(dev, "No reg property for PHY region\n");
 		return -EINVAL;
 	}
-	ddrss->ddrss_phy_cfg = (void *)reg;
+	ddrss->ddrss_phy_cfg = reg;
 
 	ret = dev_read_u32_array(dev, "ti,ss-reg",
 			         (u32 *)&ddrss->params.ss_reg,

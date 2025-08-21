@@ -4,7 +4,6 @@
  * Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
  */
 
-#include <common.h>
 #include <cpu_func.h>
 #include <dm.h>
 #include <init.h>
@@ -60,7 +59,7 @@ int checkboard(void)
 	return 0;
 }
 
-void reset_cpu(ulong addr)
+void reset_cpu(void)
 {
 	psci_system_reset();
 }
@@ -195,4 +194,3 @@ int board_init(void)
 
 	return 0;
 }
-

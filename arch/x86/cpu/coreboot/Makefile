@@ -14,11 +14,10 @@
 ifndef CONFIG_SPL
 obj-y += car.o
 endif
-ifdef CONFIG_SPL_BUILD
+ifdef CONFIG_XPL_BUILD
 obj-y += coreboot_spl.o
 else
 obj-y += sdram.o
 endif
 obj-y += coreboot.o
-obj-y += tables.o
 obj-y += timestamp.o

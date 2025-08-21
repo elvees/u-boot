@@ -3,7 +3,6 @@
  * (C) Copyright 2019 Rockchip Electronics Co., Ltd
  */
 
-#include <common.h>
 #include <dm.h>
 #include <log.h>
 #include <dm/pinctrl.h>
@@ -80,7 +79,7 @@ static int px30_set_mux(struct rockchip_pin_bank *bank, int pin, int mux)
 	struct regmap *regmap;
 	int reg, ret, mask, mux_type;
 	u8 bit;
-	u32 data, route_reg, route_val;
+	u32 data;
 
 	regmap = (bank->iomux[iomux_num].type & IOMUX_SOURCE_PMU)
 				? priv->regmap_pmu : priv->regmap_base;
@@ -89,15 +88,6 @@ static int px30_set_mux(struct rockchip_pin_bank *bank, int pin, int mux)
 	mux_type = bank->iomux[iomux_num].type;
 	reg = bank->iomux[iomux_num].offset;
 	reg += rockchip_get_mux_data(mux_type, pin, &bit, &mask);
-
-	if (bank->route_mask & BIT(pin)) {
-		if (rockchip_get_mux_route(bank, pin, mux, &route_reg,
-					   &route_val)) {
-			ret = regmap_write(regmap, route_reg, route_val);
-			if (ret)
-				return ret;
-		}
-	}
 
 	data = (mask << (bit + 16));
 	data |= (mux & mask) << bit;
@@ -334,7 +324,7 @@ static struct rockchip_pin_bank px30_pin_banks[] = {
 			    ),
 };
 
-static struct rockchip_pin_ctrl px30_pin_ctrl = {
+static const struct rockchip_pin_ctrl px30_pin_ctrl = {
 	.pin_banks		= px30_pin_banks,
 	.nr_banks		= ARRAY_SIZE(px30_pin_banks),
 	.grf_mux_offset		= 0x0,
@@ -363,7 +353,7 @@ U_BOOT_DRIVER(pinctrl_px30) = {
 	.of_match	= px30_pinctrl_ids,
 	.priv_auto	= sizeof(struct rockchip_pinctrl_priv),
 	.ops		= &rockchip_pinctrl_ops,
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 	.bind		= dm_scan_fdt_dev,
 #endif
 	.probe		= rockchip_pinctrl_probe,

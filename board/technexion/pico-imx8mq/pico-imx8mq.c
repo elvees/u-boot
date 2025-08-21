@@ -3,7 +3,6 @@
  * Copyright 2018 NXP
  */
 
-#include <common.h>
 #include <env.h>
 #include <init.h>
 #include <malloc.h>
@@ -54,7 +53,7 @@ int board_early_init_f(void)
 
 int board_phys_sdram_size(phys_size_t *size)
 {
-	int ddr_size = readl(M4_BOOTROM_BASE_ADDR);
+	int ddr_size = readl(MCU_BOOTROM_BASE_ADDR);
 
 	if (ddr_size == 0x4) {
 		*size = 0x100000000;

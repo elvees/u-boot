@@ -12,7 +12,6 @@
 
 #ifndef CONFIG_MPC83XX_SDRAM
 
-#include <common.h>
 #include <cpu_func.h>
 #include <log.h>
 #include <time.h>
@@ -59,15 +58,15 @@ void board_add_ram_info(int use_default)
 
 	printf(", %s MHz)", strmhz(buf, gd->mem_clk));
 
-#if defined(CONFIG_SYS_LB_SDRAM) && defined(CONFIG_SYS_LBC_SDRAM_SIZE)
+#if defined(CONFIG_SYS_LB_SDRAM) && defined(CFG_SYS_LBC_SDRAM_SIZE)
 	puts("\nSDRAM: ");
-	print_size (CONFIG_SYS_LBC_SDRAM_SIZE * 1024 * 1024, " (local bus)");
+	print_size (CFG_SYS_LBC_SDRAM_SIZE * 1024 * 1024, " (local bus)");
 #endif
 }
 
 #ifdef CONFIG_SPD_EEPROM
-#ifndef	CONFIG_SYS_READ_SPD
-#define CONFIG_SYS_READ_SPD	i2c_read
+#ifndef	CFG_SYS_READ_SPD
+#define CFG_SYS_READ_SPD	i2c_read
 #endif
 #ifndef SPD_EEPROM_OFFSET
 #define SPD_EEPROM_OFFSET	0
@@ -167,7 +166,7 @@ long int spd_sdram()
 	isync();
 
 	/* Read SPD parameters with I2C */
-	CONFIG_SYS_READ_SPD(SPD_EEPROM_ADDRESS, SPD_EEPROM_OFFSET,
+	CFG_SYS_READ_SPD(SPD_EEPROM_ADDRESS, SPD_EEPROM_OFFSET,
 		SPD_EEPROM_ADDR_LEN, (uchar *) &spd, sizeof(spd));
 #ifdef SPD_DEBUG
 	spd_debug(&spd);
@@ -204,12 +203,12 @@ long int spd_sdram()
 		return 0;
 	}
 
-#ifdef CONFIG_SYS_DDRCDR_VALUE
+#ifdef CFG_SYS_DDRCDR_VALUE
 	/*
 	 * Adjust DDR II IO voltage biasing.  It just makes it work.
 	 */
 	if(spd.mem_type == SPD_MEMTYPE_DDR2) {
-		immap->sysconf.ddrcdr = CONFIG_SYS_DDRCDR_VALUE;
+		immap->sysconf.ddrcdr = CFG_SYS_DDRCDR_VALUE;
 	}
 	udelay(50000);
 #endif
@@ -288,7 +287,7 @@ long int spd_sdram()
 	/*
 	 * Set up LAWBAR for all of DDR.
 	 */
-	ecm->bar = CONFIG_SYS_SDRAM_BASE & 0xfffff000;
+	ecm->bar = CFG_SYS_SDRAM_BASE & 0xfffff000;
 	ecm->ar  = (LAWAR_EN | LAWAR_TRGT_IF_DDR | (LAWAR_SIZE & law_size));
 	debug("DDR:bar=0x%08x\n", ecm->bar);
 	debug("DDR:ar=0x%08x\n", ecm->ar);
@@ -693,7 +692,7 @@ long int spd_sdram()
 		ddr->sdram_mode =
 			(0
 			 | (1 << (16 + 10))             /* DQS Differential disable */
-#ifdef CONFIG_SYS_DDR_MODE_WEAK
+#ifdef CFG_SYS_DDR_MODE_WEAK
 			 | (1 << (16 + 1))		/* weak driver (~60%) */
 #endif
 			 | (add_lat << (16 + 3))        /* Additive Latency in EMRS1 */
@@ -767,8 +766,8 @@ long int spd_sdram()
 		debug("DDR: sdram_cfg2  = 0x%08x\n", ddr->sdram_cfg2);
 	}
 
-#ifdef CONFIG_SYS_DDR_SDRAM_CLK_CNTL	/* Optional platform specific value */
-	ddr->sdram_clk_cntl = CONFIG_SYS_DDR_SDRAM_CLK_CNTL;
+#ifdef CFG_SYS_DDR_SDRAM_CLK_CNTL	/* Optional platform specific value */
+	ddr->sdram_clk_cntl = CFG_SYS_DDR_SDRAM_CLK_CNTL;
 #endif
 	debug("DDR:sdram_clk_cntl=0x%08x\n", ddr->sdram_clk_cntl);
 
@@ -834,12 +833,6 @@ long int spd_sdram()
 #endif
 	debug("   DDRC ECC mode: %s\n", ddrc_ecc_enable ? "ON":"OFF");
 
-#if defined(CONFIG_DDR_2T_TIMING)
-	/*
-	 * Enable 2T timing by setting sdram_cfg[16].
-	 */
-	sdram_cfg |= SDRAM_CFG_2T_EN;
-#endif
 	/* Enable controller, and GO! */
 	ddr->sdram_cfg = sdram_cfg;
 	sync();
@@ -914,16 +907,12 @@ void ddr_enable_ecc(unsigned int dram_size)
 	pattern[0] = 0xdeadbeef;
 	pattern[1] = 0xdeadbeef;
 
-#if defined(CONFIG_DDR_ECC_INIT_VIA_DMA)
-	dma_meminit(pattern[0], dram_size);
-#else
 	debug("ddr init: CPU FP write method\n");
 	size = dram_size;
 	for (p = 0; p < (u64*)(size); p++) {
 		ppcDWstore((u32*)p, pattern);
 	}
 	sync();
-#endif
 
 	t_end = get_tbms();
 	icache_disable();

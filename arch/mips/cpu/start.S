@@ -10,11 +10,7 @@
 #include <asm/asm.h>
 #include <asm/regdef.h>
 #include <asm/mipsregs.h>
-
-#ifndef CONFIG_SYS_INIT_SP_ADDR
-#define CONFIG_SYS_INIT_SP_ADDR	(CONFIG_SYS_SDRAM_BASE + \
-				CONFIG_SYS_INIT_SP_OFFSET)
-#endif
+#include <system-constants.h>
 
 #ifdef CONFIG_32BIT
 # define STATUS_SET	0
@@ -44,13 +40,13 @@
 
 	.macro setup_stack_gd
 	li	t0, -16
-	PTR_LI	t1, CONFIG_SYS_INIT_SP_ADDR
+	PTR_LI	t1, SYS_INIT_SP_ADDR
 	and	sp, t1, t0		# force 16 byte alignment
 	PTR_SUBU \
 		sp, sp, GD_SIZE		# reserve space for gd
 	and	sp, sp, t0		# force 16 byte alignment
 	move	k0, sp			# save gd pointer
-#if CONFIG_VAL(SYS_MALLOC_F_LEN) && \
+#if CONFIG_IS_ENABLED(SYS_MALLOC_F) && \
     !CONFIG_IS_ENABLED(INIT_STACK_WITHOUT_MALLOC_F)
 	li	t2, CONFIG_VAL(SYS_MALLOC_F_LEN)
 	PTR_SUBU \
@@ -67,7 +63,7 @@
 	blt	t0, t1, 1b
 	 nop
 
-#if CONFIG_VAL(SYS_MALLOC_F_LEN) && \
+#if CONFIG_IS_ENABLED(SYS_MALLOC_F) && \
     !CONFIG_IS_ENABLED(INIT_STACK_WITHOUT_MALLOC_F)
 	PTR_S	sp, GD_MALLOC_BASE(k0)	# gd->malloc_base offset
 #endif
@@ -233,7 +229,7 @@ wr_done:
 # endif
 #endif
 
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT)
 # ifdef CONFIG_SYS_MIPS_CACHE_INIT_RAM_LOAD
 	/* Initialize any external memory */
 	PTR_LA	t9, lowlevel_init
@@ -254,7 +250,7 @@ wr_done:
 	 nop
 #endif
 
-#ifndef CONFIG_SKIP_LOWLEVEL_INIT
+#if !CONFIG_IS_ENABLED(SKIP_LOWLEVEL_INIT)
 # ifndef CONFIG_SYS_MIPS_CACHE_INIT_RAM_LOAD
 	/* Initialize any external memory */
 	PTR_LA	t9, lowlevel_init

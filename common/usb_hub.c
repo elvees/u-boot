@@ -21,7 +21,6 @@
  * Probes device for being a hub and configurate it
  */
 
-#include <common.h>
 #include <command.h>
 #include <dm.h>
 #include <env.h>
@@ -29,6 +28,7 @@
 #include <log.h>
 #include <malloc.h>
 #include <memalign.h>
+#include <time.h>
 #include <asm/processor.h>
 #include <asm/unaligned.h>
 #include <linux/ctype.h>
@@ -46,6 +46,8 @@
 
 #define HUB_SHORT_RESET_TIME	20
 #define HUB_LONG_RESET_TIME	200
+
+#define HUB_DEBOUNCE_TIMEOUT	CONFIG_USB_HUB_DEBOUNCE_TIMEOUT
 
 #define PORT_OVERCURRENT_MAX_SCAN_COUNT		3
 
@@ -144,7 +146,8 @@ int usb_get_port_status(struct usb_device *dev, int port, void *data)
 
 	if (!usb_hub_is_root_hub(dev->dev) && usb_hub_is_superspeed(dev)) {
 		struct usb_port_status *status = (struct usb_port_status *)data;
-		u16 tmp = (status->wPortStatus) & USB_SS_PORT_STAT_MASK;
+		u16 tmp = le16_to_cpu(status->wPortStatus) &
+			USB_SS_PORT_STAT_MASK;
 
 		if (status->wPortStatus & USB_SS_PORT_STAT_POWER)
 			tmp |= USB_PORT_STAT_POWER;
@@ -152,27 +155,30 @@ int usb_get_port_status(struct usb_device *dev, int port, void *data)
 		    USB_SS_PORT_STAT_SPEED_5GBPS)
 			tmp |= USB_PORT_STAT_SUPER_SPEED;
 
-		status->wPortStatus = tmp;
+		status->wPortStatus = cpu_to_le16(tmp);
 	}
 #endif
 
 	return ret;
 }
 
-
 static void usb_hub_power_on(struct usb_hub_device *hub)
 {
 	int i;
 	struct usb_device *dev;
 	unsigned pgood_delay = hub->desc.bPwrOn2PwrGood * 2;
-	const char *env;
+	const char __maybe_unused *env;
 
 	dev = hub->pusb_dev;
 
 	debug("enabling power on all ports\n");
 	for (i = 0; i < dev->maxchild; i++) {
+		if (usb_hub_is_superspeed(dev)) {
+			usb_set_port_feature(dev, i + 1, USB_PORT_FEAT_RESET);
+			debug("Reset : port %d returns %lX\n", i + 1, dev->status);
+		}
 		usb_set_port_feature(dev, i + 1, USB_PORT_FEAT_POWER);
-		debug("port %d returns %lX\n", i + 1, dev->status);
+		debug("PowerOn : port %d returns %lX\n", i + 1, dev->status);
 	}
 
 #ifdef CONFIG_SANDBOX
@@ -190,10 +196,12 @@ static void usb_hub_power_on(struct usb_hub_device *hub)
 	 * but allow this time to be increased via env variable as some
 	 * devices break the spec and require longer warm-up times
 	 */
+#if CONFIG_IS_ENABLED(ENV_SUPPORT)
 	env = env_get("usb_pgood_delay");
 	if (env)
 		pgood_delay = max(pgood_delay,
 			          (unsigned)simple_strtol(env, NULL, 0));
+#endif
 	debug("pgood_delay=%dms\n", pgood_delay);
 
 	printf("USB%d: Waiting %u ms for power to become stable...\n",
@@ -210,10 +218,10 @@ static void usb_hub_power_on(struct usb_hub_device *hub)
 	 * will be done based on this value in the USB port loop in
 	 * usb_hub_configure() later.
 	 */
-	hub->connect_timeout = hub->query_delay + 1000;
+	hub->connect_timeout = hub->query_delay + HUB_DEBOUNCE_TIMEOUT;
 	debug("devnum=%d poweron: query_delay=%d connect_timeout=%d\n",
 	      dev->devnum, max(100, (int)pgood_delay),
-	      max(100, (int)pgood_delay) + 1000);
+	      max(100, (int)pgood_delay) + HUB_DEBOUNCE_TIMEOUT);
 }
 
 #if !CONFIG_IS_ENABLED(DM_USB)
@@ -393,6 +401,13 @@ int usb_hub_port_connect_change(struct usb_device *dev, int port)
 		break;
 	}
 
+	/*
+	 * USB 2.0 7.1.7.5: devices must be able to accept a SetAddress()
+	 * request (refer to Section 11.24.2 and Section 9.4 respectively)
+	 * after the reset recovery time 10 ms
+	 */
+	mdelay(10);
+
 #if CONFIG_IS_ENABLED(DM_USB)
 	struct udevice *child;
 
@@ -505,11 +520,6 @@ static int usb_scan_port(struct usb_device_scan *usb_scan)
 		debug("port %d enable change, status %x\n", i + 1, portstatus);
 		usb_clear_port_feature(dev, i + 1, USB_PORT_FEAT_C_ENABLE);
 		/*
-		 * The following hack causes a ghost device problem
-		 * to Faraday EHCI
-		 */
-#ifndef CONFIG_USB_EHCI_FARADAY
-		/*
 		 * EM interference sometimes causes bad shielded USB
 		 * devices to be shutdown by the hub, this hack enables
 		 * them again. Works at least with mouse driver
@@ -521,7 +531,6 @@ static int usb_scan_port(struct usb_device_scan *usb_scan)
 			      i + 1);
 			usb_hub_port_connect_change(dev, i);
 		}
-#endif
 	}
 
 	if (portstatus & USB_PORT_STAT_SUSPEND) {

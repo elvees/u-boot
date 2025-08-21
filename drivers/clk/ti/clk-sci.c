@@ -2,13 +2,12 @@
 /*
  * Texas Instruments System Control Interface (TI SCI) clock driver
  *
- * Copyright (C) 2018 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2018 Texas Instruments Incorporated - https://www.ti.com/
  *	Andreas Dannenberg <dannenberg@ti.com>
  *
  * Loosely based on Linux kernel sci-clk.c...
  */
 
-#include <common.h>
 #include <dm.h>
 #include <errno.h>
 #include <clk-uclass.h>
@@ -64,18 +63,6 @@ static int ti_sci_clk_of_xlate(struct clk *clk,
 	return 0;
 }
 
-static int ti_sci_clk_request(struct clk *clk)
-{
-	debug("%s(clk=%p)\n", __func__, clk);
-	return 0;
-}
-
-static int ti_sci_clk_free(struct clk *clk)
-{
-	debug("%s(clk=%p)\n", __func__, clk);
-	return 0;
-}
-
 static ulong ti_sci_clk_get_rate(struct clk *clk)
 {
 	struct ti_sci_clk_data *data = dev_get_priv(clk->dev);
@@ -103,18 +90,23 @@ static ulong ti_sci_clk_set_rate(struct clk *clk, ulong rate)
 	const struct ti_sci_handle *sci = data->sci;
 	const struct ti_sci_clk_ops *cops = &sci->ops.clk_ops;
 	int ret;
+	int freq_scale_up = rate >= ti_sci_clk_get_rate(clk) ? 1 : 0;
 
 	debug("%s(clk=%p, rate=%lu)\n", __func__, clk, rate);
 
-#ifdef CONFIG_K3_AVS0
-	k3_avs_notify_freq(clk->id, clk->data, rate);
-#endif
+	if (IS_ENABLED(CONFIG_K3_AVS0) && freq_scale_up)
+		k3_avs_notify_freq(clk->id, clk->data, rate);
 
 	ret = cops->set_freq(sci, clk->id, clk->data, 0, rate, ULONG_MAX);
-	if (ret)
+	if (ret) {
 		dev_err(clk->dev, "%s: set_freq failed (%d)\n", __func__, ret);
+		return ret;
+	}
 
-	return ret;
+	if (IS_ENABLED(CONFIG_K3_AVS0) && !freq_scale_up)
+		k3_avs_notify_freq(clk->id, clk->data, rate);
+
+	return rate;
 }
 
 static int ti_sci_clk_set_parent(struct clk *clk, struct clk *parent)
@@ -206,8 +198,6 @@ static const struct udevice_id ti_sci_clk_of_match[] = {
 
 static struct clk_ops ti_sci_clk_ops = {
 	.of_xlate = ti_sci_clk_of_xlate,
-	.request = ti_sci_clk_request,
-	.rfree = ti_sci_clk_free,
 	.get_rate = ti_sci_clk_get_rate,
 	.set_rate = ti_sci_clk_set_rate,
 	.set_parent = ti_sci_clk_set_parent,

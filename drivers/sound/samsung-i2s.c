@@ -4,11 +4,11 @@
  * R. Chandrasekar <rcsekar@samsung.com>
  */
 
-#include <common.h>
 #include <dm.h>
 #include <i2s.h>
 #include <log.h>
 #include <sound.h>
+#include <time.h>
 #include <asm/arch/clk.h>
 #include <asm/arch/pinmux.h>
 #include <asm/arch/i2s-regs.h>
@@ -126,7 +126,7 @@ static void i2s_fifo(struct i2s_reg *i2s_reg, unsigned int flush)
  * @param i2s_reg	i2s register address
  * @param dir		Clock direction
  *
- * @return		int value 0 for success, -1 in case of error
+ * Return:		int value 0 for success, -1 in case of error
  */
 static int i2s_set_sysclk_dir(struct i2s_reg *i2s_reg, int dir)
 {
@@ -148,7 +148,7 @@ static int i2s_set_sysclk_dir(struct i2s_reg *i2s_reg, int dir)
  * @param fmt		i2s clock properties
  * @param i2s_reg	i2s register address
  *
- * @return		int value 0 for success, -1 in case of error
+ * Return:		int value 0 for success, -1 in case of error
  */
 static int i2s_set_fmt(struct i2s_reg *i2s_reg, unsigned int fmt)
 {
@@ -225,7 +225,7 @@ static int i2s_set_fmt(struct i2s_reg *i2s_reg, unsigned int fmt)
  * @param blc		samplewidth (size of sample in bits)
  * @param i2s_reg	i2s register address
  *
- * @return		int value 0 for success, -1 in case of error
+ * Return:		int value 0 for success, -1 in case of error
  */
 static int i2s_set_samplesize(struct i2s_reg *i2s_reg, unsigned int blc)
 {

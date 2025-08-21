@@ -16,7 +16,11 @@
 #define CENTRAL_RX		1
 #define NUM_OF_CENTRAL_TYPES	2
 
+#if   defined(CONFIG_DDR4) /* DDR4 16/32-bit */
+u32 start_pattern = PATTERN_KILLER_DQ0, end_pattern = PATTERN_KILLER_DQ7_INV;
+#else /* DDR3 16/32-bit */
 u32 start_pattern = PATTERN_KILLER_DQ0, end_pattern = PATTERN_KILLER_DQ7;
+#endif /* CONFIG_64BIT */
 
 u32 start_if = 0, end_if = (MAX_INTERFACE_NUM - 1);
 u8 bus_end_window[NUM_OF_CENTRAL_TYPES][MAX_INTERFACE_NUM][MAX_BUS_NUM];
@@ -55,6 +59,7 @@ static int ddr3_tip_centralization(u32 dev_num, u32 mode)
 	enum hws_training_ip_stat training_result[MAX_INTERFACE_NUM];
 	u32 if_id, pattern_id, bit_id;
 	u8 bus_id;
+	u8 current_byte_status;
 	u8 cur_start_win[BUS_WIDTH_IN_BITS];
 	u8 centralization_result[MAX_INTERFACE_NUM][BUS_WIDTH_IN_BITS];
 	u8 cur_end_win[BUS_WIDTH_IN_BITS];
@@ -166,6 +171,10 @@ static int ddr3_tip_centralization(u32 dev_num, u32 mode)
 						  result[search_dir_id][7]));
 				}
 
+				current_byte_status =
+					mv_ddr_tip_sub_phy_byte_status_get(if_id,
+									   bus_id);
+
 				for (bit_id = 0; bit_id < BUS_WIDTH_IN_BITS;
 				     bit_id++) {
 					/* check if this code is valid for 2 edge, probably not :( */
@@ -174,11 +183,34 @@ static int ddr3_tip_centralization(u32 dev_num, u32 mode)
 							       [HWS_LOW2HIGH]
 							       [bit_id],
 							       EDGE_1);
+					if (current_byte_status &
+					    (BYTE_SPLIT_OUT_MIX |
+					     BYTE_HOMOGENEOUS_SPLIT_OUT)) {
+						if (cur_start_win[bit_id] >= 64)
+							cur_start_win[bit_id] -= 64;
+						else
+							cur_start_win[bit_id] = 0;
+						DEBUG_CENTRALIZATION_ENGINE
+							(DEBUG_LEVEL_INFO,
+							 ("pattern %d IF %d pup %d bit %d subtract 64 adll from start\n",
+							  pattern_id, if_id, bus_id, bit_id));
+					}
 					cur_end_win[bit_id] =
 						GET_TAP_RESULT(result
 							       [HWS_HIGH2LOW]
 							       [bit_id],
 							       EDGE_1);
+					if (cur_end_win[bit_id] >= 64 &&
+					    (current_byte_status &
+					     (BYTE_SPLIT_OUT_MIX |
+					      BYTE_HOMOGENEOUS_SPLIT_OUT))) {
+						cur_end_win[bit_id] -= 64;
+						DEBUG_CENTRALIZATION_ENGINE
+							(DEBUG_LEVEL_INFO,
+							 ("pattern %d IF %d pup %d bit %d subtract 64 adll from end\n",
+							  pattern_id, if_id, bus_id, bit_id));
+					}
+
 					/* window length */
 					current_window[bit_id] =
 						cur_end_win[bit_id] -

@@ -3,7 +3,7 @@
  * Copyright (C) 2018 MediaTek Inc.
  */
 
-#include <common.h>
+#include <config.h>
 #include <mmc.h>
 #include <asm/global_data.h>
 
@@ -12,7 +12,7 @@ DECLARE_GLOBAL_DATA_PTR;
 int board_init(void)
 {
 	/* address of boot parameters */
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE + 0x100;
 
 	return 0;
 }

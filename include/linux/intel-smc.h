@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (C) 2017-2018, Intel Corporation
+ * Copyright (C) 2025 Altera Corporation <www.altera.com>
  */
 
 #ifndef __INTEL_SMC_H
@@ -482,10 +483,16 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
  * Call register usage:
  * a0 INTEL_SIP_SMC_HPS_SET_BRIDGES
  * a1 Set bridges status:
- *      0 - Disable
- *      1 - Enable
- * a2-7 not used
- *
+ *	Bit 0: 0 - Disable, 1 - Enable
+ *	Bit 1: 1 - Has mask value in a2
+ * a2 Mask value
+ *	Bit 0: soc2fpga
+ *	Bit 1: lwhps2fpga
+ *	Bit 2: fpga2soc
+ *	Bit 3: f2sdram0	(For Stratix 10 only)
+ *	Bit 4: f2sdram1	(For Stratix 10 only)
+ *	Bit 5: f2sdram2	(For Stratix 10 only)
+ * a3-7 not used
  * Return status
  * a0 INTEL_SIP_SMC_STATUS_OK
  */
@@ -519,55 +526,21 @@ INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_FPGA_CONFIG_COMPLETED_WRITE)
 	INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_MBOX_SEND_CMD)
 
 /*
- * Request INTEL_SIP_SMC_HPS_SET_PHYINTF
+ * Request INTEL_SIP_SMC_GET_USERCODE
  *
- * Select EMACx PHY interface
+ * Send mailbox command to get usercode from SDM
  *
  * Call register usage:
- * a0 INTEL_SIP_SMC_HPS_SET_PHYINTF
- * a1 EMAC number:
- *      0 - EMAC0
- *      1 - EMAC1
- *      2 - EMAC2
- * a2 Type of PHY interface:
- *      0 - GMII_MII
- *      1 - RGMII
- *      2 - RMII
- *      3 - RESET
- * a3-7 not used
+ * a0 INTEL_SIP_SMC_GET_USERCODE
+ * a1-7 not used.
  *
  * Return status
  * a0 INTEL_SIP_SMC_STATUS_OK or INTEL_SIP_SMC_STATUS_ERROR
+ * a1 User code
+ * a2-3 not used.
  */
-#define INTEL_SIP_SMC_FUNCID_HPS_SET_PHYINTF	61
-#define INTEL_SIP_SMC_HPS_SET_PHYINTF \
-	INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_HPS_SET_PHYINTF)
-
-/*
- * Request INTEL_SIP_SMC_HPS_SET_SDMMC_CCLK
- *
- * Select which phase shift of the clocks (drvsel & smplsel) for SDMMC
- *
- * Call register usage:
- * a0 INTEL_SIP_SMC_HPS_SET_SDMMC_CCLK
- * a1 Select which phase shift of the clock for cclk_in_drv (drvsel):
- *      0 - 0 degree
- *      1 - 45 degrees
- *      2 - 90 degrees
- *      3 - 135 degrees
- *      4 - 180 degrees
- *      5 - 225 degrees
- *      6 - 270 degrees
- *      7 - 315 degrees
- * a2 Select which phase shift of the clock for cclk_in_sample (smplsel):
- *      (Same as above)
- * a3-7 not used
- *
- * Return status
- * a0 INTEL_SIP_SMC_STATUS_OK
- */
-#define INTEL_SIP_SMC_FUNCID_HPS_SET_SDMMC_CCLK	62
-#define INTEL_SIP_SMC_HPS_SET_SDMMC_CCLK \
-	INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_HPS_SET_SDMMC_CCLK)
+#define INTEL_SIP_SMC_FUNCID_GET_USERCODE	61
+#define INTEL_SIP_SMC_GET_USERCODE \
+	INTEL_SIP_SMC_FAST_CALL_VAL(INTEL_SIP_SMC_FUNCID_GET_USERCODE)
 
 #endif

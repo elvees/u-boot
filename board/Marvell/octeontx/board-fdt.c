@@ -281,31 +281,24 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 	}
 
 	if (blob) {
+		/* delete cavium,bdk node if it exists */
 		offset = fdt_path_offset(blob, "/cavium,bdk");
-		if (offset < 0) {
-			printf("ERROR: FDT BDK node not found\n");
-			return offset;
+		if (offset >= 0) {
+			ret = fdt_del_node(blob, offset);
+			if (ret < 0) {
+				printf("WARNING : could not remove bdk node\n");
+				return ret;
+			}
+			debug("%s deleted bdk node\n", __func__);
 		}
-
-		/* delete node */
-		ret = fdt_del_node(blob, offset);
-		if (ret < 0) {
-			printf("WARNING : could not remove bdk node\n");
-			return ret;
-		}
-
-		debug("%s deleted bdk node\n", __func__);
 	}
 
 	return 0;
 }
 
-/**
- * Return the FDT base address that was passed by ATF
- *
- * @return	FDT base address received from ATF in x1 register
- */
-void *board_fdt_blob_setup(void)
+int board_fdt_blob_setup(void **fdtp)
 {
-	return (void *)fdt_base_addr;
+	*fdtp = (void *)fdt_base_addr;
+
+	return 0;
 }

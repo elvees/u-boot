@@ -23,6 +23,8 @@
 #endif
 #include <asm/ptrace.h>
 
+#define MMU_SECTION_SIZE	(1 * 1024 * 1024)
+
 #define prepare_to_switch()	do { } while (0)
 
 /*
@@ -37,7 +39,6 @@ extern void *switch_thread (struct thread_struct *last,
 		(last) = switch_thread (&prev->thread, &next->thread);	\
 	}								\
 } while (0)
-
 
 /* Enable/disable interrupts.  */
 #define __sti() \

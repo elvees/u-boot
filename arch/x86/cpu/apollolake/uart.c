@@ -7,7 +7,6 @@
  * Some code from coreboot lpss.c
  */
 
-#include <common.h>
 #include <dm.h>
 #include <dt-structs.h>
 #include <malloc.h>
@@ -123,7 +122,7 @@ static int apl_ns16550_of_to_plat(struct udevice *dev)
 	return 0;
 }
 
-#if !CONFIG_IS_ENABLED(OF_PLATDATA)
+#if CONFIG_IS_ENABLED(OF_REAL)
 static const struct udevice_id apl_ns16550_serial_ids[] = {
 	{ .compatible = "intel,apl-ns16550" },
 	{ },

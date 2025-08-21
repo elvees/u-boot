@@ -30,16 +30,8 @@
 #  endif
 # endif
 #else				/* U-Boot build */
-# include <common.h>
 # include <linux/string.h>
 # include <linux/ctype.h>
-#endif
-
-#ifndef	CONFIG_ENV_MIN_ENTRIES	/* minimum number of entries */
-#define	CONFIG_ENV_MIN_ENTRIES 64
-#endif
-#ifndef	CONFIG_ENV_MAX_ENTRIES	/* maximum number of entries */
-#define	CONFIG_ENV_MAX_ENTRIES 512
 #endif
 
 #define USED_FREE 0
@@ -65,7 +57,6 @@ struct env_entry_node {
 	int used;
 	struct env_entry entry;
 };
-
 
 static void _hdelete(const char *key, struct hsearch_data *htab,
 		     struct env_entry *ep, int idx);
@@ -134,7 +125,6 @@ int hcreate_r(size_t nel, struct hsearch_data *htab)
 	/* everything went alright */
 	return 1;
 }
-
 
 /*
  * hdestroy()
@@ -231,11 +221,32 @@ static int
 do_callback(const struct env_entry *e, const char *name, const char *value,
 	    enum env_op op, int flags)
 {
-#ifndef CONFIG_SPL_BUILD
-	if (e->callback)
-		return e->callback(name, value, op, flags);
+	int ret = 0;
+
+#ifndef CONFIG_XPL_BUILD
+	static bool in_callback;
+
+	if (!e->callback || in_callback)
+		return 0;
+
+	/*
+	 * In case there are two variables which each implement env callback
+	 * that performs env_set() on the other variable, the callbacks will
+	 * call each other recursively until the stack runs out. Prevent such
+	 * a recursion from happening.
+	 *
+	 * Example which triggers this behavior:
+	 * static int on_foo(...) { env_set("bar", 0); ... }
+	 * static int on_bar(...) { env_set("foo", 0); ... }
+	 * U_BOOT_ENV_CALLBACK(foo, on_foo);
+	 * U_BOOT_ENV_CALLBACK(bar, on_bar);
+	 */
+	in_callback = true;
+	ret = e->callback(name, value, op, flags);
+	in_callback = false;
 #endif
-	return 0;
+
+	return ret;
 }
 
 /*
@@ -436,7 +447,6 @@ int hsearch_r(struct env_entry item, enum env_action action,
 	return 0;
 }
 
-
 /*
  * hdelete()
  */
@@ -498,7 +508,7 @@ int hdelete_r(const char *key, struct hsearch_data *htab, int flag)
 	return 0;
 }
 
-#if !(defined(CONFIG_SPL_BUILD) && !defined(CONFIG_SPL_SAVEENV))
+#if !(defined(CONFIG_XPL_BUILD) && !defined(CONFIG_SPL_SAVEENV))
 /*
  * hexport()
  */
@@ -726,7 +736,6 @@ ssize_t hexport_r(struct hsearch_data *htab, const char sep, int flag,
 }
 #endif
 
-
 /*
  * himport()
  */
@@ -949,7 +958,7 @@ int himport_r(struct hsearch_data *htab,
 		e.data = value;
 
 		hsearch_r(e, ENV_ENTER, &rv, htab, flag);
-#if !CONFIG_IS_ENABLED(ENV_WRITEABLE_LIST)
+#if !IS_ENABLED(CONFIG_ENV_WRITEABLE_LIST)
 		if (rv == NULL) {
 			printf("himport_r: can't insert \"%s=%s\" into hash table\n",
 				name, value);

@@ -7,7 +7,6 @@
  *
  */
 
-#include <common.h>
 #include <dm.h>
 #include <serial.h>
 #include <asm/global_data.h>
@@ -24,7 +23,6 @@ struct arc_serial_regs {
 	unsigned int baudl;
 	unsigned int baudh;
 };
-
 
 struct arc_serial_plat {
 	struct arc_serial_regs *reg;
@@ -53,8 +51,8 @@ static int arc_serial_putc(struct udevice *dev, const char c)
 	struct arc_serial_plat *plat = dev_get_plat(dev);
 	struct arc_serial_regs *const regs = plat->reg;
 
-	while (!(readb(&regs->status) & UART_TXEMPTY))
-		;
+	if (!(readb(&regs->status) & UART_TXEMPTY))
+		return -EAGAIN;
 
 	writeb(c, &regs->data);
 
@@ -83,8 +81,8 @@ static int arc_serial_getc(struct udevice *dev)
 	struct arc_serial_plat *plat = dev_get_plat(dev);
 	struct arc_serial_regs *const regs = plat->reg;
 
-	while (!arc_serial_tstc(regs))
-		;
+	if (!arc_serial_tstc(regs))
+		return -EAGAIN;
 
 	/* Check for overflow errors */
 	if (readb(&regs->status) & UART_OVERFLOW_ERR)
@@ -137,7 +135,7 @@ U_BOOT_DRIVER(serial_arc) = {
 
 static inline void _debug_uart_init(void)
 {
-	struct arc_serial_regs *regs = (struct arc_serial_regs *)CONFIG_DEBUG_UART_BASE;
+	struct arc_serial_regs *regs = (struct arc_serial_regs *)CONFIG_VAL(DEBUG_UART_BASE);
 	int arc_console_baud = CONFIG_DEBUG_UART_CLOCK / (CONFIG_BAUDRATE * 4) - 1;
 
 	writeb(arc_console_baud & 0xff, &regs->baudl);
@@ -146,7 +144,7 @@ static inline void _debug_uart_init(void)
 
 static inline void _debug_uart_putc(int c)
 {
-	struct arc_serial_regs *regs = (struct arc_serial_regs *)CONFIG_DEBUG_UART_BASE;
+	struct arc_serial_regs *regs = (struct arc_serial_regs *)CONFIG_VAL(DEBUG_UART_BASE);
 
 	while (!(readb(&regs->status) & UART_TXEMPTY))
 		;

@@ -9,7 +9,6 @@
  * Dirk Eibach,  Guntermann & Drunck GmbH, eibach@gdsys.de
  */
 
-#include <common.h>
 #include <dm.h>
 #include <clk-uclass.h>
 #include <i2c.h>
@@ -180,11 +179,6 @@ static ulong ics8n3qv01_set_rate(struct clk *clk, ulong fout)
 	return 0;
 }
 
-static int ics8n3qv01_request(struct clk *clock)
-{
-	return 0;
-}
-
 static ulong ics8n3qv01_get_rate(struct clk *clk)
 {
 	struct ics8n3qv01_priv *priv = dev_get_priv(clk->dev);
@@ -203,7 +197,6 @@ static int ics8n3qv01_disable(struct clk *clk)
 }
 
 static const struct clk_ops ics8n3qv01_ops = {
-	.request = ics8n3qv01_request,
 	.get_rate = ics8n3qv01_get_rate,
 	.set_rate = ics8n3qv01_set_rate,
 	.enable = ics8n3qv01_enable,

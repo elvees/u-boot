@@ -4,7 +4,6 @@
  * Hyunseok, Jung <hsjung@nexell.co.kr>
  */
 
-#include <common.h>
 #include <log.h>
 
 #include <asm/io.h>
@@ -23,9 +22,9 @@
  * Section ".data" must be used because BSS is not available before relocation,
  * in board_init_f(), respectively! I.e. global variables can not be used!
  */
-static unsigned long timestamp __attribute__ ((section(".data")));
-static unsigned long lastdec __attribute__ ((section(".data")));
-static int	timerinit __attribute__ ((section(".data")));
+static unsigned long timestamp __section(".data");
+static unsigned long lastdec __section(".data");
+static int	timerinit __section(".data");
 
 /* macro to hw timer tick config */
 static long	TIMER_FREQ  = 1000000;

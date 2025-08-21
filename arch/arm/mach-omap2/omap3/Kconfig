@@ -30,17 +30,8 @@ config TARGET_AM3517_EVM
 	select DM
 	select DM_GPIO
 	select DM_I2C
-	select DM_MMC
 	select DM_SERIAL
-	imply CMD_DM
-
-config TARGET_OMAP3_BEAGLE
-	bool "TI OMAP3 BeagleBoard"
-	select DM
-	select DM_GPIO
-	select DM_SERIAL
-	select OMAP3_GPIO_5
-	select OMAP3_GPIO_6
+	select MMC
 	imply CMD_DM
 
 config TARGET_CM_T35
@@ -89,17 +80,10 @@ config TARGET_OMAP3_OVERO
 	select OMAP3_GPIO_6
 	imply CMD_DM
 
-config TARGET_AM3517_CRANE
-	bool "am3517_crane"
-
 config TARGET_OMAP3_PANDORA
 	bool "OMAP3 Pandora"
 	select OMAP3_GPIO_4
 	select OMAP3_GPIO_6
-
-config TARGET_TRICORDER
-	bool "Tricorder"
-	select OMAP3_GPIO_2
 
 config TARGET_OMAP3_LOGIC
 	bool "OMAP3 Logic"
@@ -111,9 +95,7 @@ config TARGET_OMAP3_LOGIC
 	select OMAP3_GPIO_4
 	select OMAP3_GPIO_6
 	imply CMD_DM
-
-config TARGET_NOKIA_RX51
-	bool "Nokia RX51"
+	imply VIDEO_DAMAGE
 
 config TARGET_TAO3530
 	bool "TAO3530"
@@ -154,6 +136,7 @@ endchoice
 
 config SPL_OMAP3_ID_NAND
 	bool "Support OMAP3-specific ID and MFR function"
+	depends on NAND_OMAP_GPMC
 	help
 	  Support for an OMAP3-specific set of functions to return the
 	  ID and MFR of the first attached NAND chip, if present.
@@ -162,15 +145,10 @@ config SYS_SOC
 	default "omap3"
 
 source "board/logicpd/am3517evm/Kconfig"
-source "board/ti/beagle/Kconfig"
 source "board/timll/devkit8000/Kconfig"
-source "board/ti/evm/Kconfig"
+source "board/ti/omap3evm/Kconfig"
 source "board/isee/igep00x0/Kconfig"
-source "board/ti/am3517crane/Kconfig"
-source "board/corscience/tricorder/Kconfig"
 source "board/logicpd/omap3som/Kconfig"
-source "board/nokia/rx51/Kconfig"
-source "board/technexion/tao3530/Kconfig"
 source "board/lg/sniper/Kconfig"
 
 endif

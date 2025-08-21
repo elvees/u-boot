@@ -21,17 +21,21 @@
 		pinctrl1 = &pinctrl_z;
 	};
 
+	binman: binman {
+		multiple-images;
+	};
+
 	clocks {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 	};
 
 	/* need PSCI for sysreset during board_f */
 	psci {
-		u-boot,dm-pre-proper;
+		bootph-some-ram;
 	};
 
 	reboot {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 		compatible = "syscon-reboot";
 		regmap = <&rcc>;
 		offset = <0x404>;
@@ -39,124 +43,128 @@
 	};
 
 	soc {
-		u-boot,dm-pre-reloc;
+		bootph-all;
 
 		ddr: ddr@5a003000 {
-			u-boot,dm-pre-reloc;
+			bootph-all;
 
 			compatible = "st,stm32mp1-ddr";
 
-			reg = <0x5A003000 0x550
-			       0x5A004000 0x234>;
-
-			clocks = <&rcc AXIDCG>,
-				 <&rcc DDRC1>,
-				 <&rcc DDRC2>,
-				 <&rcc DDRPHYC>,
-				 <&rcc DDRCAPB>,
-				 <&rcc DDRPHYCAPB>;
-
-			clock-names = "axidcg",
-				      "ddrc1",
-				      "ddrc2",
-				      "ddrphyc",
-				      "ddrcapb",
-				      "ddrphycapb";
+			reg = <0x5a003000 0x550
+			       0x5a004000 0x234>;
 
 			status = "okay";
+		};
+	};
+
+	cpu0_opp_table: cpu0-opp-table {
+		compatible = "operating-points-v2";
+		opp-shared;
+		bootph-pre-ram;
+		opp-650000000 {
+			bootph-pre-ram;
+			opp-hz = /bits/ 64 <650000000>;
+			opp-microvolt = <1200000>;
+			opp-supported-hw = <0x1>;
+		};
+		opp-800000000 {
+			bootph-pre-ram;
+			opp-hz = /bits/ 64 <800000000>;
+			opp-microvolt = <1350000>;
+			opp-supported-hw = <0x2>;
 		};
 	};
 };
 
 &bsec {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &clk_csi {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &clk_hsi {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &clk_hse {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &clk_lsi {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &clk_lse {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
-&cpu0_opp_table {
-	u-boot,dm-spl;
-	opp-650000000 {
-		u-boot,dm-spl;
-	};
-	opp-800000000 {
-		u-boot,dm-spl;
-	};
+&cpu0 {
+	nvmem-cells = <&part_number_otp>;
+	nvmem-cell-names = "part_number";
+	operating-points-v2 = <&cpu0_opp_table>;
+};
+
+&etzpc {
+	bootph-all;
 };
 
 &gpioa {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpiob {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioc {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpiod {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioe {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpiof {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpiog {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioh {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioi {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioj {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpiok {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &gpioz {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &iwdg2 {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 /* pre-reloc probe = reserve video frame buffer in video_reserve() */
 &ltdc {
-	u-boot,dm-pre-proper;
+	bootph-some-ram;
 };
 
 /* temp = waiting kernel update */
@@ -167,33 +175,24 @@
 };
 
 &pinctrl {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &pinctrl_z {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &pwr_regulators {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 };
 
 &rcc {
-	u-boot,dm-pre-reloc;
+	bootph-all;
 	#address-cells = <1>;
 	#size-cells = <0>;
-};
-
-&sdmmc1 {
-	compatible = "st,stm32-sdmmc2", "arm,pl18x", "arm,primecell";
-};
-
-&sdmmc2 {
-	compatible = "st,stm32-sdmmc2", "arm,pl18x", "arm,primecell";
-};
-
-&sdmmc3 {
-	compatible = "st,stm32-sdmmc2", "arm,pl18x", "arm,primecell";
+	clock-names = "hse", "hsi", "csi", "lse", "lsi";
+	clocks = <&clk_hse>, <&clk_hsi>, <&clk_csi>,
+		 <&clk_lse>, <&clk_lsi>;
 };
 
 &usart1 {
@@ -228,3 +227,29 @@
 	resets = <&rcc UART8_R>;
 };
 
+#if defined(CONFIG_STM32MP15X_STM32IMAGE)
+&binman {
+	u-boot-stm32 {
+		filename = "u-boot.stm32";
+		mkimage {
+			args = "-T stm32image -a 0xc0100000 -e 0xc0100000";
+			u-boot {
+			};
+		};
+	};
+};
+#endif
+
+#if defined(CONFIG_SPL)
+&binman {
+	spl-stm32 {
+		filename = "u-boot-spl.stm32";
+		mkimage {
+			args = "-T stm32image -a 0x2ffc2500 -e 0x2ffc2500";
+			u-boot-spl {
+				no-write-symbols;
+			};
+		};
+	};
+};
+#endif

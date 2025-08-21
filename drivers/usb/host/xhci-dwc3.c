@@ -7,10 +7,11 @@
  * Author: Ramneek Mehresh<ramneek.mehresh@freescale.com>
  */
 
-#include <common.h>
+#include <clk.h>
 #include <dm.h>
 #include <generic-phy.h>
 #include <log.h>
+#include <reset.h>
 #include <usb.h>
 #include <dwc3-uboot.h>
 #include <linux/delay.h>
@@ -21,7 +22,9 @@
 #include <linux/usb/otg.h>
 
 struct xhci_dwc3_plat {
+	struct clk_bulk clks;
 	struct phy_bulk phys;
+	struct reset_ctl_bulk resets;
 };
 
 void dwc3_set_mode(struct dwc3 *dwc3_reg, u32 mode)
@@ -70,7 +73,8 @@ int dwc3_core_init(struct dwc3 *dwc3_reg)
 
 	revision = readl(&dwc3_reg->g_snpsid);
 	/* This should read as U3 followed by revision number */
-	if ((revision & DWC3_GSNPSID_MASK) != 0x55330000) {
+	if ((revision & DWC3_GSNPSID_MASK) != 0x55330000 &&
+	    (revision & DWC3_GSNPSID_MASK) != 0x33310000) {
 		puts("this is not a DesignWare USB3 DRD Core\n");
 		return -1;
 	}
@@ -111,6 +115,46 @@ void dwc3_set_fladj(struct dwc3 *dwc3_reg, u32 val)
 }
 
 #if CONFIG_IS_ENABLED(DM_USB)
+static int xhci_dwc3_reset_init(struct udevice *dev,
+				struct xhci_dwc3_plat *plat)
+{
+	int ret;
+
+	ret = reset_get_bulk(dev, &plat->resets);
+	if (ret == -ENOTSUPP || ret == -ENOENT)
+		return 0;
+	else if (ret)
+		return ret;
+
+	ret = reset_deassert_bulk(&plat->resets);
+	if (ret) {
+		reset_release_bulk(&plat->resets);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int xhci_dwc3_clk_init(struct udevice *dev,
+			      struct xhci_dwc3_plat *plat)
+{
+	int ret;
+
+	ret = clk_get_bulk(dev, &plat->clks);
+	if (ret == -ENOSYS || ret == -ENOENT)
+		return 0;
+	if (ret)
+		return ret;
+
+	ret = clk_enable_bulk(&plat->clks);
+	if (ret) {
+		clk_release_bulk(&plat->clks);
+		return ret;
+	}
+
+	return 0;
+}
+
 static int xhci_dwc3_probe(struct udevice *dev)
 {
 	struct xhci_hcor *hcor;
@@ -121,6 +165,14 @@ static int xhci_dwc3_probe(struct udevice *dev)
 	const char *phy;
 	u32 reg;
 	int ret;
+
+	ret = xhci_dwc3_reset_init(dev, plat);
+	if (ret)
+		return ret;
+
+	ret = xhci_dwc3_clk_init(dev, plat);
+	if (ret)
+		return ret;
 
 	hccr = (struct xhci_hccr *)((uintptr_t)dev_remap_addr(dev));
 	hcor = (struct xhci_hcor *)((uintptr_t)hccr +
@@ -144,7 +196,7 @@ static int xhci_dwc3_probe(struct udevice *dev)
 		reg |= DWC3_GUSB2PHYCFG_USBTRDTIM_16BIT;
 	}
 
-	if (dev_read_bool(dev, "snps,dis_enblslpm-quirk"))
+	if (dev_read_bool(dev, "snps,dis_enblslpm_quirk"))
 		reg &= ~DWC3_GUSB2PHYCFG_ENBLSLPM;
 
 	if (dev_read_bool(dev, "snps,dis-u2-freeclk-exists-quirk"))
@@ -156,6 +208,12 @@ static int xhci_dwc3_probe(struct udevice *dev)
 	writel(reg, &dwc3_reg->g_usb2phycfg[0]);
 
 	dr_mode = usb_get_dr_mode(dev_ofnode(dev));
+	if (dr_mode == USB_DR_MODE_OTG &&
+	    dev_read_bool(dev, "usb-role-switch")) {
+		dr_mode = usb_get_role_switch_default_mode(dev_ofnode(dev));
+		if (dr_mode == USB_DR_MODE_UNKNOWN)
+			dr_mode = USB_DR_MODE_OTG;
+	}
 	if (dr_mode == USB_DR_MODE_UNKNOWN)
 		/* by default set dual role mode to HOST */
 		dr_mode = USB_DR_MODE_HOST;
@@ -170,6 +228,10 @@ static int xhci_dwc3_remove(struct udevice *dev)
 	struct xhci_dwc3_plat *plat = dev_get_plat(dev);
 
 	dwc3_shutdown_phy(dev, &plat->phys);
+
+	clk_release_bulk(&plat->clks);
+
+	reset_release_bulk(&plat->resets);
 
 	return xhci_deregister(dev);
 }

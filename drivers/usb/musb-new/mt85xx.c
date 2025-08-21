@@ -9,13 +9,13 @@
  *
  * This file is part of the Inventra Controller Driver for Linux.
  */
-#include <common.h>
 #include <clk.h>
 #include <dm.h>
 #include <dm/device_compat.h>
 #include <dm/lists.h>
 #include <dm/root.h>
 #include <linux/delay.h>
+#include <linux/printk.h>
 #include <linux/usb/musb.h>
 #include <usb.h>
 #include "linux-compat.h"

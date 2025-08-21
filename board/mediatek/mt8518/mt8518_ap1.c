@@ -3,18 +3,19 @@
  * Copyright (C) 2019 MediaTek Inc.
  */
 
-#include <common.h>
+#include <config.h>
 #include <dm.h>
 #include <init.h>
 #include <log.h>
 #include <asm/global_data.h>
+#include <linux/printk.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
 int board_init(void)
 {
 	/* address of boot parameters */
-	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
+	gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE + 0x100;
 
 	debug("gd->fdt_blob is %p\n", gd->fdt_blob);
 	return 0;

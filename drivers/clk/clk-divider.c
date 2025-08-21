@@ -9,14 +9,17 @@
  *
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_CLK
+
 #include <asm/io.h>
 #include <malloc.h>
 #include <clk-uclass.h>
+#include <log.h>
 #include <dm/device.h>
 #include <dm/devres.h>
 #include <dm/uclass.h>
 #include <dm/lists.h>
+#include <dm/device_compat.h>
 #include <dm/device-internal.h>
 #include <linux/bug.h>
 #include <linux/clk-provider.h>
@@ -24,6 +27,7 @@
 #include <linux/log2.h>
 #include <div64.h>
 #include <clk.h>
+#include <linux/printk.h>
 #include "clk.h"
 
 #define UBOOT_DM_CLK_CCF_DIVIDER "ccf_clk_divider"
@@ -77,7 +81,7 @@ static ulong clk_divider_recalc_rate(struct clk *clk)
 	unsigned long parent_rate = clk_get_parent_rate(clk);
 	unsigned int val;
 
-#if CONFIG_IS_ENABLED(SANDBOX_CLK_CCF)
+#if IS_ENABLED(CONFIG_SANDBOX_CLK_CCF)
 	val = divider->io_divider_val;
 #else
 	val = readl(divider->reg);
@@ -179,7 +183,7 @@ const struct clk_ops clk_divider_ops = {
 	.set_rate = clk_divider_set_rate,
 };
 
-static struct clk *_register_divider(struct device *dev, const char *name,
+static struct clk *_register_divider(struct udevice *dev, const char *name,
 		const char *parent_name, unsigned long flags,
 		void __iomem *reg, u8 shift, u8 width,
 		u8 clk_divider_flags, const struct clk_div_table *table)
@@ -190,7 +194,7 @@ static struct clk *_register_divider(struct device *dev, const char *name,
 
 	if (clk_divider_flags & CLK_DIVIDER_HIWORD_MASK) {
 		if (width + shift > 16) {
-			pr_warn("divider value exceeds LOWORD field\n");
+			dev_warn(dev, "divider value exceeds LOWORD field\n");
 			return ERR_PTR(-EINVAL);
 		}
 	}
@@ -206,7 +210,7 @@ static struct clk *_register_divider(struct device *dev, const char *name,
 	div->width = width;
 	div->flags = clk_divider_flags;
 	div->table = table;
-#if CONFIG_IS_ENABLED(SANDBOX_CLK_CCF)
+#if IS_ENABLED(CONFIG_SANDBOX_CLK_CCF)
 	div->io_divider_val = *(u32 *)reg;
 #endif
 
@@ -214,7 +218,8 @@ static struct clk *_register_divider(struct device *dev, const char *name,
 	clk = &div->clk;
 	clk->flags = flags;
 
-	ret = clk_register(clk, UBOOT_DM_CLK_CCF_DIVIDER, name, parent_name);
+	ret = clk_register(clk, UBOOT_DM_CLK_CCF_DIVIDER, name,
+			   clk_resolve_parent_clk(dev, parent_name));
 	if (ret) {
 		kfree(div);
 		return ERR_PTR(ret);
@@ -223,7 +228,7 @@ static struct clk *_register_divider(struct device *dev, const char *name,
 	return clk;
 }
 
-struct clk *clk_register_divider(struct device *dev, const char *name,
+struct clk *clk_register_divider(struct udevice *dev, const char *name,
 		const char *parent_name, unsigned long flags,
 		void __iomem *reg, u8 shift, u8 width,
 		u8 clk_divider_flags)

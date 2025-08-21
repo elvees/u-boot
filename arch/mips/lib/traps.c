@@ -10,9 +10,9 @@
  * Copyright (C) 2014, Imagination Technologies Ltd.
  */
 
-#include <common.h>
 #include <asm/global_data.h>
 #include <asm/ptrace.h>
+#include <config.h>
 #include <cpu_func.h>
 #include <hang.h>
 #include <init.h>
@@ -135,7 +135,7 @@ void trap_restore(void)
 
 int arch_initr_trap(void)
 {
-	trap_init(CONFIG_SYS_SDRAM_BASE);
+	trap_init(CFG_SYS_SDRAM_BASE);
 
 	return 0;
 }

@@ -6,12 +6,13 @@
  * Copyright (C) 2013 Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
  */
 
-#include <common.h>
+#define LOG_CATEGORY UCLASS_SPI
+
 #include <console.h>
 #include <malloc.h>
 #include <spi.h>
 #include <wait_bit.h>
-#include <asm/arch/rmobile.h>
+#include <asm/arch/renesas.h>
 #include <asm/io.h>
 #include <linux/bitops.h>
 
@@ -160,7 +161,7 @@ static int sh_qspi_xfer_common(struct sh_qspi_slave *ss, unsigned int bitlen,
 	}
 
 	if (bitlen % 8) {
-		printf("%s: bitlen is not 8bit alined %d", __func__, bitlen);
+		log_warning("bitlen is not 8bit aligned %d", bitlen);
 		return 1;
 	}
 
@@ -332,7 +333,7 @@ static int sh_qspi_of_to_plat(struct udevice *dev)
 {
 	struct sh_qspi_slave *plat = dev_get_plat(dev);
 
-	plat->regs = (struct sh_qspi_regs *)dev_read_addr(dev);
+	plat->regs = dev_read_addr_ptr(dev);
 
 	return 0;
 }

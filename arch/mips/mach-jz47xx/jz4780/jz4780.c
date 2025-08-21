@@ -7,7 +7,6 @@
  */
 
 #include <config.h>
-#include <common.h>
 #include <cpu_func.h>
 #include <hang.h>
 #include <image.h>
@@ -20,17 +19,17 @@
 #include <mmc.h>
 #include <spl.h>
 
-#ifdef CONFIG_SPL_BUILD
+#ifdef CONFIG_XPL_BUILD
 /* Pointer to the global data structure for SPL */
 DECLARE_GLOBAL_DATA_PTR;
-gd_t gdata __attribute__ ((section(".bss")));
+gd_t gdata __section(".bss");
 
 void board_init_f(ulong dummy)
 {
 	typedef void __noreturn (*image_entry_noargs_t)(void);
 	struct mmc *mmc;
 	unsigned long count;
-	struct image_header *header;
+	struct legacy_img_hdr *header;
 	int ret;
 
 	/* Set global data pointer */
@@ -42,7 +41,7 @@ void board_init_f(ulong dummy)
 	enable_caches();
 
 	/* Clear the BSS */
-	memset(__bss_start, 0, (char *)&__bss_end - __bss_start);
+	memset(__bss_start, 0, (size_t)__bss_end - (size_t)__bss_start);
 
 	gd->flags |= GD_FLG_SPL_INIT;
 
@@ -58,8 +57,8 @@ void board_init_f(ulong dummy)
 	if (ret)
 		hang();
 
-	header = (struct image_header *)(CONFIG_SYS_TEXT_BASE -
-					 sizeof(struct image_header));
+	header = (struct legacy_img_hdr *)(CONFIG_TEXT_BASE -
+					 sizeof(struct legacy_img_hdr));
 
 	count = blk_dread(mmc_get_blk_desc(mmc),
 			  CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR,
@@ -68,17 +67,17 @@ void board_init_f(ulong dummy)
 		hang();
 
 	image_entry_noargs_t image_entry =
-		(image_entry_noargs_t)CONFIG_SYS_TEXT_BASE;
+		(image_entry_noargs_t)CONFIG_TEXT_BASE;
 
 	image_entry();
 
 	hang();
 }
-#endif /* CONFIG_SPL_BUILD */
+#endif /* CONFIG_XPL_BUILD */
 
-ulong board_get_usable_ram_top(ulong total_size)
+phys_addr_t board_get_usable_ram_top(phys_size_t total_size)
 {
-	return CONFIG_SYS_SDRAM_BASE + (256 * 1024 * 1024);
+	return CFG_SYS_SDRAM_BASE + (256 * 1024 * 1024);
 }
 
 int print_cpuinfo(void)
