@@ -1316,7 +1316,6 @@ dtb-$(CONFIG_TARGET_MCOM03) += \
 	mcom03-elvmc03smarc-r2.10.0-elvsmarccb-r3.3.0.dtb \
 	mcom03-elvmc03smarc-r2.11.0-elvsmarccb-r3.3.0.dtb \
 	mcom03-mcom03bub-r1.3.0.dtb \
-	mcom03-iqcam-r1.0.dtb \
 	mcom03-monoboard-r1.1.1.dtb \
 	mcom03-monoboard-r1.2.2.dtb \
 	mcom03-pico-itx-r2.dtb \
@@ -1329,7 +1328,6 @@ dtb-$(CONFIG_TARGET_MCOM03_ECAM03) += \
 	mcom03-ecam03dm-r1.0.dtb \
 	mcom03-ecam03ptz-r1.0.dtb \
 	mcom03-elvmc03smarc-r1.0-rockpi-n10.dtb \
-	mcom03-iqcam-r1.0.dtb \
 	mcom03-pm03cam-r1.0.dtb \
 	mcom03-pm03cam-r2.0-ecam03common-r2.0.dtb \
 	mcom03-pm03camosm-r1.04-ecam03ptz-r1.0.dtb
@@ -1339,7 +1337,6 @@ dtb-$(CONFIG_TARGET_MCOM03_ECAM03_RECOVERY) += \
 	mcom03-ecam03dm-r1.0.dtb \
 	mcom03-ecam03ptz-r1.0.dtb \
 	mcom03-elvmc03smarc-r1.0-rockpi-n10.dtb \
-	mcom03-iqcam-r1.0.dtb \
 	mcom03-pm03cam-r1.0.dtb \
 	mcom03-pm03cam-r2.0-ecam03common-r2.0.dtb \
 	mcom03-pm03camosm-r1.04-ecam03ptz-r1.0.dtb

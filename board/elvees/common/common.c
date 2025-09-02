@@ -232,46 +232,6 @@ static void board_pads_cfg(void)
 
 		/* U-Boot doesn't have pinctrl driver, so switch pad voltage manually */
 		lsperiph1_v18_pad_cfg();
-	} else if (of_machine_is_compatible("elvees,iqcam")) {
-		/* Set lens motors GPIO pins to logical one output mode in order to prevent
-		 * motors overheating caused by bug #IPCAM-740.
-		 */
-		/* Setup MOT_I_IN1..4 pins */
-		val = readl(LSP0_GPIO_SWPORTC_DDR);
-		val |= BIT(4) | BIT(2) | BIT(1) | BIT(0);
-		writel(val, LSP0_GPIO_SWPORTC_DDR);
-		val = readl(LSP0_GPIO_SWPORTC_DR);
-		val |= BIT(4) | BIT(2) | BIT(1) | BIT(0);
-		writel(val, LSP0_GPIO_SWPORTC_DR);
-
-		/* Setup ICR_ON/OFF pins */
-		val = readl(LSP0_GPIO_SWPORTD_DDR);
-		val |= BIT(1) | BIT(0);
-		writel(val, LSP0_GPIO_SWPORTD_DDR);
-		val = readl(LSP0_GPIO_SWPORTD_DR);
-		val |= BIT(1) | BIT(0);
-		writel(val, LSP0_GPIO_SWPORTD_DR);
-
-		/* U-Boot doesn't have pinctrl driver, so switch pad voltage manually */
-		lsperiph1_v18_pad_cfg();
-
-		/* Setup MOT_F_IN1..4, MOT_Z_IN1..3 pins */
-		val = readl(LSP1_GPIO_SWPORTC_DDR);
-		val |= BIT(7) | BIT(5) | BIT(4) |
-		       BIT(3) | BIT(2) | BIT(1) | BIT(0);
-		writel(val, LSP1_GPIO_SWPORTC_DDR);
-		val = readl(LSP1_GPIO_SWPORTC_DR);
-		val |= BIT(7) | BIT(5) | BIT(4) |
-		       BIT(3) | BIT(2) | BIT(1) | BIT(0);
-		writel(val, LSP1_GPIO_SWPORTC_DR);
-
-		/* Setup MOT_Z_IN4 pin */
-		val = readl(LSP1_GPIO_SWPORTD_DDR);
-		val |= BIT(2);
-		writel(val, LSP1_GPIO_SWPORTD_DDR);
-		val = readl(LSP1_GPIO_SWPORTD_DR);
-		val |= BIT(2);
-		writel(val, LSP1_GPIO_SWPORTD_DR);
 	} else if (of_machine_is_compatible("elvees,pm03cam-r2.0")) {
 		/* Set lens motors GPIO pins to logical one output mode in order to prevent
 		 * motors overheating caused by bug #IPCAM-740.
