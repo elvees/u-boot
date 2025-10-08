@@ -140,13 +140,17 @@
 		#clock-cells = <1>;
 		compatible = "elvees,mcom03-clk";
 		clocks = <&xti_clk>, <&clk125>, <&i2s_sclk_in>;
+
+		/* The Timers0 clock is setup in SBL and has not to be changed here
+		 * to keep counter accurately. To achieve this the CLK_LSP1_PLL0 and
+		 * the CLK_LSP1_UCG0_TIMERS0 shall not be used in assigned-clocks list.
+		 */
 		assigned-clocks = <&clock CLK_HSP_REFMUX0>,
 				  <&clock CLK_HSP_REFMUX1>,
 				  <&clock CLK_HSP_REFMUX2>,
 				  <&clock CLK_HSP_REFMUX3>,
 				  <&clock CLK_HSP_PLL0>,
 				  <&clock CLK_LSP0_PLL0>,
-				  <&clock CLK_LSP1_PLL0>,
 
 		/* Setup common subsystem clocks here instead of corresponding
 		 * bus nodes. If common subsystem clocks are setup inside bus
@@ -192,7 +196,6 @@
 					0           /* CLK_HSP_REFMUX3 */
 					1125000000  /* CLK_HSP_PLL0 */
 					189000000   /* CLK_LSP0_PLL0 */
-					614250000   /* CLK_LSP1_PLL0 */
 					225000000   /* CLK_HSP_UCG0_SYS */
 					225000000   /* CLK_HSP_UCG0_DMA */
 					93750000    /* CLK_HSP_UCG0_CTR */
@@ -620,6 +623,8 @@
 			reg-io-width = <4>;
 			status = "disabled";
 		};
+
+		/* timer7 is reserved for SBL and shall not be used here */
 
 		gpio1: gpio@1780000 {
 			compatible = "snps,dw-apb-gpio";
