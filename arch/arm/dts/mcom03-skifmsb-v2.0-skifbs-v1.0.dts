@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright 2025 RnD Center "ELVEES", JSC
+
+/dts-v1/;
+
+#include "mcom03-skifmsb-v2.0-skifmp-v2.0.dts"
+
+/ {
+	model = "Skif-MSB v2.0, Skif-BS v1.0";
+	compatible = "elvees,skifmsb-v2.0-skifbs-v1.0",
+		     "elvees,skifmsb-skifbs",
+		     "elvees,skifbs-v1.0",
+		     "elvees,skifbs",
+		     "elvees,skifmsb-v2.0",
+		     "elvees,skifmsb",
+		     "elvees,mcom03";
+};
+
+/* Pin for device power management.
+ * 'low' - device is power on.
+ * 'high' - device is power off.
+ */
+&gpio0b {
+	power-ctl-hog {
+		/delete-property/ output-high;
+		output-low;
+	};
+};
+
+&emac1 {
+	status = "okay";
+
+	phy-mode = "rgmii-id";
+	phy-reset-gpios = <&gpio0d 7 GPIO_ACTIVE_LOW>;
+	phy-handle = <&ethernet_phy1>;
+
+	ethernet_phy1: ethernet-phy@1 {
+		reg = <0x1>;
+		motorcomm,clk-out-frequency-hz = <0>;
+		rx-internal-delay-ps = <1900>;
+		tx-internal-delay-ps = <1650>;
+	};
+};
