@@ -34,6 +34,7 @@ struct factory_settings {
 	char *eth1_mac;
 	char *serial;
 	char *boot_targets;
+	char *disable_console;
 } factory;
 
 static int get_mmc_device_num(void)
@@ -353,6 +354,9 @@ int load_factory_settings(void)
 	/* Duplicate factory_boot_targets */
 	factory.boot_targets = strdup(env_get("factory_boot_targets"));
 
+	/* Duplicate factory_disable_console */
+	factory.disable_console = strdup(env_get("factory_disable_console"));
+
 	/* Restore saved environment */
 	if (!himport_r(&env_htab, saved_env, saved_size, '\n', 0, 0, 0, NULL)) {
 		log_err("\n   Unable to restore env: (%d)\n", errno);
@@ -448,6 +452,18 @@ int do_factory_settings(const char *board_name)
 		}
 	}
 
+	if (IS_ENABLED(CONFIG_DISABLE_CONSOLE)) {
+		/* Set disable_console with factory value if necessary */
+		if (factory.disable_console) {
+			if (env_set("disable_console", factory.disable_console)) {
+				log_err("Unable to set disable_console using factory value %s\n",
+					factory.disable_console);
+				ret = -EINVAL;
+				goto exit;
+			}
+		}
+	}
+
 exit:
 	/* Free allocated resources if necessary */
 	if (factory.wp)
@@ -462,6 +478,8 @@ exit:
 		free(factory.serial);
 	if (factory.boot_targets)
 		free(factory.boot_targets);
+	if (factory.disable_console)
+		free(factory.disable_console);
 
 	return ret;
 }

@@ -565,7 +565,17 @@ int misc_init_r(void)
 		writel(val, LSP1_GPIO_SWPORTD_DR);
 	}
 
-	return do_factory_settings(board_name);
+	ret = do_factory_settings(board_name);
+	if (ret)
+		return ret;
+
+	if (IS_ENABLED(CONFIG_DISABLE_CONSOLE)) {
+		int disable_console = dectoul(env_get("disable_console"), NULL);
+		if (disable_console)
+			gd->flags |= GD_FLG_DISABLE_CONSOLE;
+	}
+
+	return 0;
 }
 
 int board_late_init(void)
