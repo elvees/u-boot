@@ -1349,6 +1349,12 @@ dtb-$(CONFIG_TARGET_MCOM03R) += \
 	mcom03r-skifmsb-v2.0-skifbs-v1.0.dtb \
 	mcom03r-skifmsb-v2.0-skifmp-v2.0.dtb
 
+dtb-$(CONFIG_TARGET_MCOM03R_ECAM03) += \
+	mcom03r-pm03cam-r3.0-ecam03common-r3.0.dtb
+
+dtb-$(CONFIG_TARGET_MCOM03R_ECAM03_RECOVERY) += \
+	mcom03r-pm03cam-r3.0-ecam03common-r3.0.dtb
+
 dtb-$(CONFIG_TARGET_GXP) += hpe-bmc-dl360gen10.dts
 
 dtb-$(CONFIG_TARGET_IMX8MM_CL_IOT_GATE) += imx8mm-cl-iot-gate.dtb \

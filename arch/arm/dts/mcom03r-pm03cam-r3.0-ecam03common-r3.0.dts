@@ -1,0 +1,76 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright 2025 RnD Center "ELVEES", JSC
+
+/dts-v1/;
+
+#include "mcom03r-pm03cam-r3.0.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+
+/ {
+	model = "ECAM03COMMON r3.0";
+	compatible = "elvees,pm03cam-r3.0-ecam03common-r3.0",
+		     "elvees,pm03cam-r3.0",
+		     "elvees,mcom03r";
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		factory-reset {
+			label = "Factory reset";
+			gpios = <&gpio0a 7 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
+};
+
+&uart0 {
+	status = "okay";
+
+	clock-frequency = <27920454>;
+};
+
+&sdhci1 {
+	status = "okay";
+
+	/* Disable 1.8V support
+	 * Disable SDR50, SDR104 and DDR50 support
+	 */
+	sdhci-caps-mask = <0x7 0x4000000>;
+	sdhci-caps = <0x0 0x0>;
+};
+
+&emac0 {
+	status = "okay";
+
+	phy-handle = <&ethernet_phy0>;
+
+	reset-gpios = <&gpio0c 6 GPIO_ACTIVE_LOW>;
+
+	ethernet_phy0: ethernet-phy@0 {
+		compatible = "ethernet-phy-id0000.011a", "ethernet-phy-ieee802.3-c22";
+		reg = <0x0>;
+
+		motorcomm,clk-out-frequency-hz = <0>;
+		rx-internal-delay-ps = <1800>;
+		tx-internal-delay-ps = <1200>;
+	};
+};
+
+&usb1 {
+	status = "okay";
+	clocks = <&clock CLK_HSP_UCG0_USB1>,
+		 <&clock CLK_HSP_UCG3_USB1_REF_ALT>,
+		 <&clock CLK_HSP_UCG3_USB1_SUSPEND>;
+	assigned-clocks = <&clock CLK_HSP_UCG0_USB1>,
+			  <&clock CLK_HSP_UCG3_USB1_REF_ALT>,
+			  <&clock CLK_HSP_UCG3_USB1_SUSPEND>;
+	assigned-clock-rates = <125000000
+				25000000
+				25000000>;
+	elvees,clk-ref-alt;
+
+	dwc3@10100000 {
+		dr_mode = "peripheral";
+	};
+};
