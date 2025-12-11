@@ -16,6 +16,7 @@
 #include <phy.h>
 #include <reset.h>
 #include <linux/delay.h>
+#include <linux/ioport.h>
 #include <cpu_func.h>
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -140,6 +141,7 @@ struct arasan_gemac_priv {
 	struct clk axiahb_clk;
 	struct clk tx_clk;
 	int phy_addr;
+	struct resource spram;
 	phy_interface_t phy_interface;
 	struct gpio_desc phy_reset;
 	struct gpio_desc phy_txclk;
@@ -171,15 +173,25 @@ static int arasan_gemac_buffers_alloc(struct udevice *dev)
 {
 	struct arasan_gemac_priv *priv = dev_get_priv(dev);
 
-	priv->tx_desc_ring = malloc_cache_aligned(TX_DESC_NUMBER *
+	if (priv->spram.end == 0) {
+		priv->tx_desc_ring = malloc_cache_aligned(TX_DESC_NUMBER *
 						  sizeof(*priv->tx_desc_ring));
-	if (!priv->tx_desc_ring)
-		return -ENOMEM;
+		if (!priv->tx_desc_ring)
+			return -ENOMEM;
+	} else
+		priv->tx_desc_ring = (void *)priv->spram.start;
 
-	priv->rx_desc_ring = malloc_cache_aligned(RX_DESC_NUMBER *
+	if (priv->spram.end == 0) {
+		priv->rx_desc_ring = malloc_cache_aligned(RX_DESC_NUMBER *
 						  sizeof(*priv->rx_desc_ring));
-	if (!priv->rx_desc_ring)
-		return -ENOMEM;
+		if (!priv->rx_desc_ring)
+			return -ENOMEM;
+	} else {
+		int offset;
+		offset = TX_DESC_NUMBER * sizeof(*priv->tx_desc_ring);
+		offset = roundup(offset, ARCH_DMA_MINALIGN);
+		priv->rx_desc_ring = (void *)(priv->spram.start + offset);
+	}
 
 	priv->tx_buffer = malloc_cache_aligned(TX_DESC_NUMBER * PKTSIZE_ALIGN);
 	if (!priv->tx_buffer)
@@ -196,8 +208,10 @@ static void arasan_gemac_buffers_free(struct udevice *dev)
 {
 	struct arasan_gemac_priv *priv = dev_get_priv(dev);
 
-	free(priv->tx_desc_ring);
-	free(priv->rx_desc_ring);
+	if (priv->spram.end == 0) {
+		free(priv->tx_desc_ring);
+		free(priv->rx_desc_ring);
+	}
 	free(priv->tx_buffer);
 	free(priv->rx_buffer);
 }
@@ -564,7 +578,7 @@ static int arasan_gemac_probe(struct udevice *dev)
 {
 	struct arasan_gemac_priv *priv = dev_get_priv(dev);
 	int ret;
-	struct ofnode_phandle_args phandle_args;
+	struct ofnode_phandle_args phandle_args, spram_args;
 
 	priv->base = (void *)devfdt_get_addr(dev);
 
@@ -580,6 +594,11 @@ static int arasan_gemac_probe(struct udevice *dev)
 	priv->phy_addr = ofnode_read_u32_default(phandle_args.node, "reg", -1);
 	if (priv->phy_addr < 0)
 		return -EINVAL;
+
+	ret = dev_read_phandle_with_args(dev, "arasan,spram", NULL, 0, 0,
+					 &spram_args);
+	if (!ret)
+		ofnode_read_resource(spram_args.node, 0, &priv->spram);
 
 	priv->max_speed = ofnode_read_u32_default(phandle_args.node, "max-speed",
 						  0);
