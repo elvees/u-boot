@@ -1347,6 +1347,7 @@ dtb-$(CONFIG_TARGET_MCOM03R) += \
 	mcom03r-elvmc03smarc-r3.0.0-elvsmarccb-r3.3.0.dtb \
 	mcom03r-elvmc03smarc-r3.0.0-smarccommoncb-r1.0.dtb \
 	mcom03r-ip-ku-m1-r1.0.dtb \
+	mcom03r-ip-ku-m1-r1.1.dtb \
 	mcom03r-skifmsb-v2.0-skifbs-v1.0.dtb \
 	mcom03r-skifmsb-v2.0-skifmp-v2.0.dtb
 
