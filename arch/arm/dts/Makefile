@@ -1299,6 +1299,8 @@ dtb-$(CONFIG_TARGET_MCOM03) += \
 	mcom03-elvmc03smarc-r2.9.1-smarccommoncb-r1.0.dtb \
 	mcom03-elvmc03smarc-r2.10.0-smarccommoncb-r1.0.dtb \
 	mcom03-elvmc03smarc-r2.11.0-smarccommoncb-r1.0.dtb \
+	mcom03-elvmc03smarc-r1.0-bmc-multicluster-r2.2.dtb \
+	mcom03-elvmc03smarc-r1.0-unit-multicluster-r2.2.dtb \
 	mcom03-elvmc03smarc-r1.0-ngfwcb-r1.0.dtb \
 	mcom03-elvmc03smarc-r1.0-elvsmarccb-r1.0.dtb \
 	mcom03-elvmc03smarc-r1.0-elvsmarccb-r2.10.3.dtb \

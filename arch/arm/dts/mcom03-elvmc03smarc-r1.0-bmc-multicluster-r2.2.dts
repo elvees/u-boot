@@ -1,0 +1,63 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright 2021-2026 RnD Center "ELVEES", JSC
+
+/dts-v1/;
+
+#include "mcom03-elvmc03smarc-r1.0.dtsi"
+
+/ {
+	model = "ELV-MC03-SMARC r1.0, BMC, MultiCluster r2.2";
+	compatible = "elvees,elvmc03smarc-r1.0-bmc-multicluster-r2.2",
+		     "elvees,elvmc03smarc-bmc-multicluster",
+		     "elvees,bmc-multicluster-r2.2",
+		     "elvees,elvmc03smarc-r1.0",
+		     "elvees,elvmc03smarc",
+		     "elvees,mcom03";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+};
+
+&uart0 {
+	status = "okay";
+	clock-frequency = <27920454>;
+};
+
+/* Connected to MicroSD card */
+&sdhci1 {
+	status = "okay";
+
+	/* TODO: Check higher speeds */
+	max-frequency = <12000000>;
+
+	/* Disable High Speed support
+	 * Disable 1.8V support
+	 * Disable SDR50, SDR104 and DDR50 support
+	 */
+	sdhci-caps-mask = <0x7 0x4200000>;
+	sdhci-caps = <0x0 0x0>;
+
+	/* TODO: Check if SDIO_WP is connected on board */
+	disable-wp;
+};
+
+/* Connected to USB 3.0 Type-A */
+&usb0 {
+	status = "okay";
+};
+
+/* Connected to USB hub on ELV-MC03-SMARC
+ * TODO: Move to mcom03-elvmc03smarc-r1.0.dtsi */
+&usb1 {
+	status = "okay";
+};
+
+/* Connected to RJ-45 */
+&emac0 {
+	status = "okay";
+};
+
+&i2c2 {
+	status = "okay";
+};
