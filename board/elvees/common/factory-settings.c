@@ -184,7 +184,8 @@ static int get_board_name_from_eeprom(char board_name[])
 		return -ENODEV;
 	}
 
-	ret = i2c_get_chip(i2c_bus, I2C_PM_CHIP_ADDR, 0, &i2c_chip);
+	// I2C EEPROM address length is set to 2 bytes by default
+	ret = i2c_get_chip(i2c_bus, I2C_PM_CHIP_ADDR, CONFIG_SYS_I2C_EEPROM_ADDR_LEN, &i2c_chip);
 	if (ret) {
 		log_err("Failed to find chip %x on bus %s\n", I2C_PM_CHIP_ADDR,
 			ofnode_get_name(i2c_pm_node));
@@ -197,10 +198,6 @@ static int get_board_name_from_eeprom(char board_name[])
 		log_err("Failed to read carrier board I2C EEPROM\n");
 		return ret;
 	}
-
-	/* FIXME: for some reason U-Boot reads wrong data from I2C ID EEPROM for every 2nd reset
-	 * (via button). The additional dm_i2c_read() helps to avoid this problem. */
-	dm_i2c_read(i2c_chip, 0, (char[EEPROM_BOARD_NAME_MAX_SIZE]){}, EEPROM_BOARD_NAME_MAX_SIZE);
 
 	if (!isprint(eeprom_data[0])) {
 		log_err("I2C EEPROM is empty\n");
