@@ -44,12 +44,6 @@
 
 #define PP_ON				0x10
 
-#define BOOT_TARGET_DEVICES_TRUSTPHONEPM \
-	BOOT_TARGET_DEVICES_USB(BOOTENV_DEV_NAME) \
-	BOOT_TARGET_DEVICES_MMC(BOOTENV_DEV_NAME) \
-	BOOT_TARGET_DEVICES_PXE(BOOTENV_DEV_NAME) \
-	""
-
 struct ddrinfo {
 	u64 dram_size[CONFIG_DDRMC_MAX_NUMBER];
 	u64 total_dram_size;
@@ -324,40 +318,6 @@ static void power_init_elvmc03smarc_r22(void)
 	writel(val, LSP1_GPIO_SWPORTC_DR);
 }
 
-static void power_init_trustphonepm(void)
-{
-	u32 val;
-
-	/* LTE module requires a pulse on PWRKEY input pin to turn on.
-	 * Pulse duration must be at least 500ms.
-	 * TODO: Move it to userspace.
-	 */
-	/* Reset deassert */
-	val = readl(MFBSP1_DIR);
-	val |= BIT(7);
-	writel(val, MFBSP1_DIR);
-
-	val = readl(MFBSP1_DR);
-	val |= BIT(7);
-	writel(val, MFBSP1_DR);
-
-	/* PWR OFF */
-	val = readl(LSP1_GPIO_SWPORTD_DDR);
-	val |= BIT(4);
-	writel(val, LSP1_GPIO_SWPORTD_DDR);
-
-	val = readl(LSP1_GPIO_SWPORTD_DR);
-	val &= ~BIT(4);
-	writel(val, LSP1_GPIO_SWPORTD_DR);
-
-	mdelay(500);
-
-	/* PWR ON */
-	val = readl(LSP1_GPIO_SWPORTD_DR);
-	val |= BIT(4);
-	writel(val, LSP1_GPIO_SWPORTD_DR);
-}
-
 static void power_init_pm03cam_osm_r104(void)
 {
 	struct udevice *udev;
@@ -393,8 +353,6 @@ int power_init_board(void)
 		 of_machine_is_compatible("elvees,elvmc03smarc-r2.7.1") ||
 		 of_machine_is_compatible("elvees,elvmc03smarc-r2.9.1"))
 		power_init_elvmc03smarc_r22();
-	else if (of_machine_is_compatible("elvees,trustphonepm"))
-		power_init_trustphonepm();
 
 	return 0;
 }
@@ -541,10 +499,6 @@ int misc_init_r(void)
 
 int board_late_init(void)
 {
-	if (of_machine_is_compatible("elvees,trustphonepm"))
-		env_set("boot_targets",
-			BOOT_TARGET_DEVICES_TRUSTPHONEPM);
-
 	return 0;
 }
 

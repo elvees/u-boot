@@ -1321,9 +1321,7 @@ dtb-$(CONFIG_TARGET_MCOM03) += \
 	mcom03-pico-itx-r2.dtb \
 	mcom03-skifmp-v1.0.dtb \
 	mcom03-skifmsb-v2.0-skifbs-v1.0.dtb \
-	mcom03-skifmsb-v2.0-skifmp-v2.0.dtb \
-	mcom03-trustphonepm-r1.5-trustphonecb-r1.1.dtb \
-	mcom03-trustphonepm-r2.1-trustphonecb-r2.0.dtb
+	mcom03-skifmsb-v2.0-skifmp-v2.0.dtb
 
 dtb-$(CONFIG_TARGET_MCOM03_ECAM03) += \
 	mcom03-ecam03bl-r1.0.dtb \
