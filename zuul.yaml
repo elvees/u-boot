@@ -1,5 +1,14 @@
----
 - project:
+    gate:
+      jobs:
+        - ecam03-dev-buildroot-build
+        - ecam03-update-firmware-tests:
+            dependencies: ecam03-dev-buildroot-build
+            files:
+              - arch/arm/dts/Makefile
+              - board/elvees/
+              - .*ecam03
+              - .*pm03cam
     # Run all jobs regardless which files were modified.
     experimental:
       jobs:
