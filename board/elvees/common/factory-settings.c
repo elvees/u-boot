@@ -158,6 +158,7 @@ static int get_factory_settings(int dev_num, int hwpart, int part, const char *f
 	return ret;
 }
 
+#if defined(CONFIG_CMD_EEPROM) && (defined(CONFIG_TARGET_MCOM03) || defined(CONFIG_TARGET_MCOM03R))
 static int get_board_name_from_eeprom(char board_name[])
 {
 	int ret = 0;
@@ -235,6 +236,7 @@ static int get_board_name_from_eeprom(char board_name[])
 
 	return 0;
 }
+#endif
 
 static int get_board_from_dtb(char board_name[])
 {
@@ -264,7 +266,7 @@ int detect_board_name(char board_name[])
 		strlcpy(board_name, factory.board, BOARD_NAME_MAX_SIZE);
 		log_info("Board name set from factory settings: %s\n", board_name);
 		return 0;
-#if defined(CONFIG_TARGET_MCOM03) || defined(CONFIG_TARGET_MCOM03R)
+#if defined(CONFIG_CMD_EEPROM) && (defined(CONFIG_TARGET_MCOM03) || defined(CONFIG_TARGET_MCOM03R))
 	} else if (!get_board_name_from_eeprom(board_name)) {
 		log_info("Board name set from ID EEPROM: %s\n", board_name);
 		return 0;

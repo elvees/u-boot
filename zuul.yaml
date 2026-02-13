@@ -3,4 +3,6 @@
     # Run all jobs regardless which files were modified.
     experimental:
       jobs:
-        - mcom03-linux510-buildroot-build
+        - ecam03-dev-buildroot-build
+        - ecam03-update-firmware-tests:
+            dependencies: ecam03-dev-buildroot-build
