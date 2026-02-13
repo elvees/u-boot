@@ -158,9 +158,9 @@ static int get_factory_settings(int dev_num, int hwpart, int part, const char *f
 	return ret;
 }
 
-#if defined(CONFIG_CMD_EEPROM) && (defined(CONFIG_TARGET_MCOM03) || defined(CONFIG_TARGET_MCOM03R))
 static int get_board_name_from_eeprom(char board_name[])
 {
+#if defined(CONFIG_CMD_EEPROM)
 	int ret = 0;
 	char *s_pos;
 	ofnode i2c_pm_node;
@@ -235,8 +235,10 @@ static int get_board_name_from_eeprom(char board_name[])
 	strcat(board_name, eeprom_data);
 
 	return 0;
-}
+#else
+	return -ENODEV;
 #endif
+}
 
 static int get_board_from_dtb(char board_name[])
 {
@@ -266,7 +268,6 @@ int detect_board_name(char board_name[])
 		strlcpy(board_name, factory.board, BOARD_NAME_MAX_SIZE);
 		log_info("Board name set from factory settings: %s\n", board_name);
 		return 0;
-#if defined(CONFIG_CMD_EEPROM) && (defined(CONFIG_TARGET_MCOM03) || defined(CONFIG_TARGET_MCOM03R))
 	} else if (!get_board_name_from_eeprom(board_name)) {
 		log_info("Board name set from ID EEPROM: %s\n", board_name);
 		return 0;
@@ -276,7 +277,6 @@ int detect_board_name(char board_name[])
 		strcpy(board_name, "elvmc03smarc-r1.0-rockpi-n10");
 		log_info("Board name set to: %s\n", board_name);
 		return 0;
-#endif
 	} else if (!get_board_from_dtb(board_name)) {
 		log_info("Board name set from DTB: %s\n", board_name);
 		return 0;
