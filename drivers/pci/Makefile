@@ -54,3 +54,4 @@ obj-$(CONFIG_PCIE_XILINX_NWL) += pcie-xilinx-nwl.o
 obj-$(CONFIG_PCIE_PLDA_COMMON) += pcie_plda_common.o
 obj-$(CONFIG_PCIE_STARFIVE_JH7110) += pcie_starfive_jh7110.o
 obj-$(CONFIG_PCIE_DW_IMX) += pcie_dw_imx.o
+obj-$(CONFIG_PCIE_DW_MCOM03) += pcie_dw_mcom03.o
