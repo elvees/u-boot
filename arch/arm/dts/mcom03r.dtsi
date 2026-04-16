@@ -731,6 +731,64 @@
 				#reset-cells = <1>;
 			};
 		};
+
+		pcie0: pcie@2000000 {
+			compatible = "elvees,mcom03-pcie";
+			status = "disabled";
+			reg = <0x0 0x2000000 0x0 0x100000>,
+			      <0x0 0x2100000 0x0 0x100000>,
+			      <0x0 0x2300000 0x0 0x80000>,
+			      <0x0 0x1a00000 0x0 0x800>,
+			      <0x0 0x60000000 0x0 0x8000000>;
+			reg-names = "dbi", "dbi2", "atu", "apb", "config";
+			#address-cells = <3>;
+			#size-cells = <2>;
+			device_type = "pci";
+			ranges = <0x82000000 0x0 0x10000000
+				  0x0 0x68000000
+				  0x0 0x8000000>;
+			dma-ranges = <0x42000000 0x0 0x40000000
+				      0x8 0x40000000 0x2 0x80000000>,
+				     <0x42000000 0x4 0x0
+				      0xc 0x0 0x1 0x80000000>;
+			bus-range = <0x00 0x7f>;
+			num-lanes = <4>;
+			resets = <&sdr_reset SDR_RST_PCI_ICT>,
+				 <&sdr_reset SDR_RST_PCI0_BTN>,
+				 <&sdr_reset SDR_RST_PCI0_PERSTN_PAD>;
+			clocks = <&clock CLK_SDR_GATE_PCIE0>,
+				 <&clock CLK_SDR_UCG0_AUX_PCI>;
+			clock-names = "core", "aux";
+		};
+
+		pcie1: pcie@2400000 {
+			compatible = "elvees,mcom03-pcie";
+			status = "disabled";
+			reg = <0x0 0x2400000 0x0 0x100000>,
+			      <0x0 0x2500000 0x0 0x100000>,
+			      <0x0 0x2700000 0x0 0x80000>,
+			      <0x0 0x1d00000 0x0 0x800>,
+			      <0x0 0x70000000 0x0 0x8000000>;
+			reg-names = "dbi", "dbi2", "atu", "apb", "config";
+			#address-cells = <3>;
+			#size-cells = <2>;
+			device_type = "pci";
+			ranges = <0x82000000 0x0 0x10000000
+				  0x0 0x78000000
+				  0x0 0x8000000>;
+			dma-ranges = <0x42000000 0x0 0x40000000
+				      0x8 0x40000000 0x2 0x80000000>,
+				     <0x42000000 0x4 0x0
+				      0xc 0x0 0x1 0x80000000>;
+			bus-range = <0x00 0x7f>;
+			num-lanes = <4>;
+			resets = <&sdr_reset SDR_RST_PCI_ICT>,
+				 <&sdr_reset SDR_RST_PCI1_BTN>,
+				 <&sdr_reset SDR_RST_PCI1_PERSTN_PAD>;
+			clocks = <&clock CLK_SDR_GATE_PCIE1>,
+				 <&clock CLK_SDR_UCG0_AUX_PCI>;
+			clock-names = "core", "aux";
+		};
 	};
 
 	xti_clk: xti_clk {
