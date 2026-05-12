@@ -225,4 +225,8 @@
 /* LSP1 I2S_UCG */
 #define CLK_LSP1_UCG_I2S_I2S0 0x190
 
+/* SDR PCIE GATE */
+#define CLK_SDR_GATE_PCIE0 0x1a0
+#define CLK_SDR_GATE_PCIE1 0x1a3
+
 #endif
