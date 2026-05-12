@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * Copyright 2021 RnD Center "ELVEES", JSC
+ * Copyright 2021-2026 RnD Center "ELVEES", JSC
  */
 
 #ifndef __DT_BINDINGS_ELVEES_MCOM03_H
@@ -22,11 +22,14 @@
 #define MCOM03_SUBSYSTEM_SERVICE	10
 #define MCOM03_SUBSYSTEM_MAX		11
 
-#define SDR_RST_PCI0			0
-#define SDR_RST_PCI1			1
+#define SDR_RST_PCI0_BTN		0
+#define SDR_RST_PCI1_BTN		1
 #define SDR_RST_DSP0			2
 #define SDR_RST_DSP1			3
 #define SDR_RST_RISC1			4
+#define SDR_RST_PCI_ICT			5
+#define SDR_RST_PCI0_PERSTN_PAD		6
+#define SDR_RST_PCI1_PERSTN_PAD		7
 
 #define MEDIA_RST_ISP			0
 #define MEDIA_RST_GPU			1
