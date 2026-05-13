@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright 2023 RnD Center "ELVEES", JSC
+ * Copyright 2023-2026 RnD Center "ELVEES", JSC
  */
 
 #define LOG_CATEGORY UCLASS_CLK
@@ -115,6 +115,14 @@ struct mcom03_refmux {
 	u8 width;
 	u8 ucg_id;
 	u8 subsystem;
+};
+
+struct mcom03_gate {
+	const char *name;
+	const char *parent_name;
+	fdt_addr_t base_addr;
+	u32 clk_id;
+	u8 bit_idx;
 };
 
 struct mcom03_pll pll_clocks[] = {
@@ -438,6 +446,23 @@ static struct mcom03_ucg ucg_clocks[] = {
 		.parent_name = "lsperiph1_refmux_i2s",
 		.subsystem = SUBSYSTEM_LSP1_I2S_UCG,
 	},
+};
+
+struct mcom03_gate gate_clocks[] = {
+	{
+		.name		= "pci0_clk",
+		.parent_name	= "pci_aclk",
+		.clk_id		= CLK_SDR_GATE_PCIE0,
+		.base_addr	= 0x01910050,
+		.bit_idx	= 0,
+	},
+	{
+		.name		= "pci1_clk",
+		.parent_name	= "pci_aclk",
+		.clk_id		= CLK_SDR_GATE_PCIE1,
+		.base_addr	= 0x01910054,
+		.bit_idx	= 0,
+	}
 };
 
 static struct mcom03_pll *mcom03_clk_pll_find_by_id(u32 id)
@@ -1180,6 +1205,33 @@ static void mcom03_clk_register_ucg_clocks(struct udevice *dev)
 	}
 }
 
+static void mcom03_clk_register_gate_clocks(struct udevice *dev)
+{
+	struct mcom03_clk_plat *plat = dev_get_plat(dev);
+
+	for (int i = 0; i < ARRAY_SIZE(gate_clocks); i++) {
+		struct clk *clk;
+		struct mcom03_gate *gate = &gate_clocks[i];
+
+		clk = clk_register_gate(NULL,
+					gate->name,
+					gate->parent_name,
+					0,
+					map_sysmem(gate->base_addr, 4),
+					gate->bit_idx,
+					0,
+					NULL);
+		if (IS_ERR(clk)) {
+			log_err("%s: Failed to register %s (%ld)\n",
+				dev->name, gate->name, PTR_ERR(clk));
+			continue;
+		}
+
+		dev_set_priv(clk->dev, plat);
+		clk->id = gate->clk_id;
+	}
+}
+
 static int mcom03_clk_of_to_plat(struct udevice *dev)
 {
 	struct mcom03_clk_plat *plat = dev_get_plat(dev);
@@ -1226,6 +1278,8 @@ static int mcom03_clk_of_to_plat(struct udevice *dev)
 	mcom03_clk_register_refmux_clocks(dev);
 
 	mcom03_clk_register_ucg_clocks(dev);
+
+	mcom03_clk_register_gate_clocks(dev);
 
 	return 0;
 }
