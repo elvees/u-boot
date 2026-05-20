@@ -44,6 +44,8 @@
 
 #define PP_ON				0x10
 
+#define SDR_NODE_PATH			"/sdr@1900000"
+
 struct ddrinfo {
 	u64 dram_size[CONFIG_DDRMC_MAX_NUMBER];
 	u64 total_dram_size;
@@ -417,6 +419,21 @@ static int mcom03_subsystem_init(enum subsystem_reset_lines line)
 	return 0;
 }
 
+/*
+ * is_sdr_enabled() - Checks availability of SDR in DT.
+ * Not all carrier board supports or needs devices from SDR subsystem,
+ * so this can help you to determine availability of SDR.
+ */
+static bool is_sdr_enabled(void)
+{
+	ofnode sdr_node = ofnode_path(SDR_NODE_PATH);
+
+	if (!ofnode_valid(sdr_node))
+		return false;
+
+	return ofnode_is_enabled(sdr_node);
+}
+
 int board_init(void)
 {
 	int ret;
@@ -432,6 +449,12 @@ int board_init(void)
 	ret = mcom03_subsystem_init(MEDIA_SUBS);
 	if (ret)
 		return ret;
+
+	if (is_sdr_enabled()) {
+		ret = mcom03_subsystem_init(SDR_SUBS);
+		if (ret)
+			return ret;
+	}
 
 	writel(DISPLAY_PARALLEL_POR_EN, MEDIA_SUBSYSTEM_CFG);
 
