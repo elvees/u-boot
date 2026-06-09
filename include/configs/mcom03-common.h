@@ -82,6 +82,12 @@
 #define BOOT_TARGET_DEVICES_DHCP(func)
 #endif
 
+#if IS_ENABLED(CONFIG_CMD_SCSI)
+#define BOOT_TARGET_DEVICES_SCSI(func) func(SCSI, scsi, 0)
+#else
+#define BOOT_TARGET_DEVICES_SCSI(func)
+#endif
+
 #if IS_ENABLED(CONFIG_PANIC_HANG)
 #define MCOM03_BOOT_FIT_PANIC_CMD "bootcmd_panic=panic\0"
 #define MCOM03_BOOT_FIT_PANIC_TARGETS "panic"
