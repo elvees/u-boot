@@ -16,7 +16,8 @@
 	BOOT_TARGET_DEVICES_USB(func) \
 	BOOT_TARGET_DEVICES_PXE(func) \
 	BOOT_TARGET_DEVICES_DHCP(func) \
-	BOOT_TARGET_DEVICES_SCSI(func)
+	BOOT_TARGET_DEVICES_SCSI(func) \
+	BOOT_TARGET_DEVICES_NVME(func)
 
 #include <config_distro_bootcmd.h>
 #endif

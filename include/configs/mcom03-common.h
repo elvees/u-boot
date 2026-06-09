@@ -88,6 +88,12 @@
 #define BOOT_TARGET_DEVICES_SCSI(func)
 #endif
 
+#if IS_ENABLED(CONFIG_CMD_NVME)
+#define BOOT_TARGET_DEVICES_NVME(func) func(NVME, nvme, 0)
+#else
+#define BOOT_TARGET_DEVICES_NVME(func)
+#endif
+
 #if IS_ENABLED(CONFIG_PANIC_HANG)
 #define MCOM03_BOOT_FIT_PANIC_CMD "bootcmd_panic=panic\0"
 #define MCOM03_BOOT_FIT_PANIC_TARGETS "panic"
