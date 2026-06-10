@@ -75,6 +75,8 @@ enum property_type {
 
 struct mcom03_clk_plat {
 	struct clk xti_clk;
+	struct clk clk125;
+	struct clk i2s_sclk_in;
 	struct regmap *serv_urb;
 	void __iomem *i2s_ucg_rstn_pstatus;
 };
@@ -105,7 +107,6 @@ struct mcom03_ucg {
 
 struct mcom03_refmux {
 	const char *name;
-	struct clk *clk;
 	const char *parent_names[4];
 	fdt_addr_t base_addr;
 	u32 clk_id;
@@ -1087,13 +1088,102 @@ static int mcom03_clk_read_settings(struct udevice *dev,
 	return 0;
 }
 
+static void mcom03_clk_register_pll_clocks(struct udevice *dev)
+{
+	struct mcom03_clk_plat *plat = dev_get_plat(dev);
+
+	for (int i = 0; i < ARRAY_SIZE(pll_clocks); i++) {
+		struct mcom03_pll *pll = &pll_clocks[i];
+		int res = 0;
+
+		pll->iobase = map_sysmem(pll->base_addr, PLL_SIZE);
+
+		res = clk_register(&pll->clk, dev->driver->name,
+				   pll->name,
+				   plat->xti_clk.dev->name);
+		if (res) {
+			log_warning("%s: Failed to register %s (%d)\n",
+				    dev->name, pll->name, res);
+			continue;
+		}
+
+		dev_set_priv(pll->clk.dev, plat);
+	}
+}
+
+static void mcom03_clk_register_refmux_clocks(struct udevice *dev)
+{
+	struct mcom03_clk_plat *plat = dev_get_plat(dev);
+
+	for (int i = 0; i < ARRAY_SIZE(refmux_clocks); i++) {
+		struct clk *clk;
+		struct mcom03_refmux *refmux = &refmux_clocks[i];
+
+		if (refmux->clk_id >= CLK_HSP_REFMUX0 &&
+		    refmux->clk_id <= CLK_HSP_REFMUX3)
+			refmux->parent_names[1] = plat->clk125.dev->name;
+		else
+			refmux->parent_names[1] = plat->i2s_sclk_in.dev->name;
+
+		clk = clk_register_mux(NULL, refmux->name,
+				       refmux->parent_names,
+				       refmux->num_parents,
+				       CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE,
+				       map_sysmem(refmux->base_addr, 4),
+				       refmux->shift,
+				       refmux->width, 0);
+		if (IS_ERR(clk)) {
+			log_warning("%s: Failed to register %s (%ld)\n",
+				    dev->name, refmux->name, PTR_ERR(clk));
+			continue;
+		}
+
+		/* Dirty hack because we want to use clk_ops from current
+		 * driver, not from clk_mux.
+		 */
+		clk->dev->driver = dev->driver;
+
+		dev_set_priv(clk->dev, plat);
+		clk->id = refmux->clk_id;
+	}
+}
+
+static void mcom03_clk_register_ucg_clocks(struct udevice *dev)
+{
+	struct mcom03_clk_plat *plat = dev_get_plat(dev);
+
+	for (int i = 0; i < ARRAY_SIZE(ucg_clocks); i++) {
+		struct mcom03_ucg *ucg = &ucg_clocks[i];
+
+		ucg->iobase = map_sysmem(ucg->base_addr, UCG_SIZE);
+
+		for (int chan = 0; chan < ARRAY_SIZE(ucg->names); chan++) {
+			int res = 0;
+			/* names[chan] can be NULL for channel 0 of JESD UCGs */
+			if (!ucg->names[chan])
+				continue;
+
+			ucg->clks[chan].id = ucg->first_chan_id + chan;
+			res = clk_register(&ucg->clks[chan],
+					   dev->driver->name,
+					   ucg->names[chan],
+					   ucg->parent_name);
+			if (res) {
+				log_warning("%s: Failed to register %s\n",
+					    dev->name,
+					    ucg->names[chan]);
+				continue;
+			}
+
+			dev_set_priv(ucg->clks[chan].dev, plat);
+		}
+	}
+}
+
 static int mcom03_clk_of_to_plat(struct udevice *dev)
 {
 	struct mcom03_clk_plat *plat = dev_get_plat(dev);
-	struct clk clk125;
-	struct clk i2s_sclk_in;
 	int res;
-	int i;
 
 	res = clk_get_by_index(dev, 0, &plat->xti_clk);
 	if (res < 0) {
@@ -1101,13 +1191,13 @@ static int mcom03_clk_of_to_plat(struct udevice *dev)
 		return -EINVAL;
 	}
 
-	res = clk_get_by_index(dev, 1, &clk125);
+	res = clk_get_by_index(dev, 1, &plat->clk125);
 	if (res < 0) {
 		log_err("%s: Failed to find parent clock\n", dev->name);
 		return -EINVAL;
 	}
 
-	res = clk_get_by_index(dev, 2, &i2s_sclk_in);
+	res = clk_get_by_index(dev, 2, &plat->i2s_sclk_in);
 	if (res < 0) {
 		log_err("%s: Failed to find parent clock\n", dev->name);
 		return -EINVAL;
@@ -1131,78 +1221,11 @@ static int mcom03_clk_of_to_plat(struct udevice *dev)
 	if (IS_ERR(plat->serv_urb))
 		return PTR_ERR(plat->serv_urb);
 
-	for (i = 0; i < ARRAY_SIZE(pll_clocks); i++) {
-		pll_clocks[i].iobase = map_sysmem(pll_clocks[i].base_addr,
-						  PLL_SIZE);
-		res = clk_register(&pll_clocks[i].clk, dev->driver->name,
-				   pll_clocks[i].name,
-				   plat->xti_clk.dev->name);
-		if (res) {
-			log_err("%s: Failed to register %s (%d)\n",
-				dev->name, pll_clocks[i].name, res);
-			continue;
-		}
+	mcom03_clk_register_pll_clocks(dev);
 
-		dev_set_priv(pll_clocks[i].clk.dev, plat);
-	}
+	mcom03_clk_register_refmux_clocks(dev);
 
-	for (i = 0; i < ARRAY_SIZE(refmux_clocks); i++) {
-		struct clk *clk;
-
-		if (refmux_clocks[i].clk_id >= CLK_HSP_REFMUX0 &&
-		    refmux_clocks[i].clk_id <= CLK_HSP_REFMUX3)
-			refmux_clocks[i].parent_names[1] = clk125.dev->name;
-		else
-			refmux_clocks[i].parent_names[1] = i2s_sclk_in.dev->name;
-
-		clk = clk_register_mux(NULL, refmux_clocks[i].name,
-				       refmux_clocks[i].parent_names,
-				       refmux_clocks[i].num_parents,
-				       CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE,
-				       map_sysmem(refmux_clocks[i].base_addr, 4),
-				       refmux_clocks[i].shift,
-				       refmux_clocks[i].width, 0);
-		if (IS_ERR(clk)) {
-			log_err("%s: Failed to register %s (%ld)\n",
-				dev->name, refmux_clocks[i].name, PTR_ERR(clk));
-			continue;
-		}
-
-		/* Dirty hack because we want to use clk_ops from current
-		 * driver, not from clk_mux.
-		 */
-		clk->dev->driver = dev->driver;
-
-		dev_set_priv(clk->dev, plat);
-		clk->id = refmux_clocks[i].clk_id;
-	}
-
-	for (i = 0; i < ARRAY_SIZE(ucg_clocks); i++) {
-		int chan;
-
-		ucg_clocks[i].iobase = map_sysmem(ucg_clocks[i].base_addr,
-						  UCG_SIZE);
-		for (chan = 0; chan < ARRAY_SIZE(ucg_clocks[i].names); chan++) {
-			/* names[chan] can be NULL for channel 0 of JESD UCGs */
-			if (!ucg_clocks[i].names[chan])
-				continue;
-
-			ucg_clocks[i].clks[chan].id = ucg_clocks[i].first_chan_id +
-						      chan;
-			res = clk_register(&ucg_clocks[i].clks[chan],
-					   dev->driver->name,
-					   ucg_clocks[i].names[chan],
-					   ucg_clocks[i].parent_name);
-			if (res) {
-				log_err("%s: Failed to register %s\n",
-					dev->name,
-					ucg_clocks[i].names[chan]);
-				continue;
-			}
-
-			dev_set_priv(ucg_clocks[i].clks[chan].dev, plat);
-		}
-	}
+	mcom03_clk_register_ucg_clocks(dev);
 
 	return 0;
 }
