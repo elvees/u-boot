@@ -114,6 +114,8 @@
 	phy-reset-gpios = <&gpio0d 6 GPIO_ACTIVE_LOW>;
 	phy-handle = <&ethernet_phy0>;
 
+	elvees,pads-1v8-en;
+
 	ethernet_phy0: ethernet-phy@1 {
 		reg = <0x1>;
 		motorcomm,clk-out-frequency-hz = <0>;
