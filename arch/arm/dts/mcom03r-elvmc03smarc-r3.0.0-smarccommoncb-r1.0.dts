@@ -20,3 +20,13 @@
 		stdout-path = "serial0:115200n8";
 	};
 };
+
+&sdhci1 {
+	/* The default pad drive strength of 6 mA is insufficient for
+	 * SMARC-UKF-TFK r1.1.1 resulting in unstable SDMMC performance,
+	 * especially at lower board temperatures(MCOM03SW-4269).
+	 */
+	elvees,drive-strength-clk = <10>;
+	elvees,drive-strength-dat = <8>;
+	elvees,drive-strength-cmd = <8>;
+};
