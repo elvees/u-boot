@@ -172,7 +172,14 @@
 		/* We can not setup UART0 clock in uart0 node because UART0
 		 * driver starts before clock driver.
 		 */
-				  <&clock CLK_LSP1_UCG0_UART0>;
+				  <&clock CLK_LSP1_UCG0_UART0>,
+
+		/* PCI Express clocks
+		*/
+				  <&clock CLK_SDR_PLL0>,
+				  <&clock CLK_SDR_UCG0_CFG>,
+				  <&clock CLK_SDR_UCG0_PCI>,
+				  <&clock CLK_SDR_UCG0_AUX_PCI>;
 
 		/* After SoC reset REFMUX2 and REFMUX3 uses CLK125 as parent
 		 * clock. But most boards do not have a signal on CLK125 pad.
@@ -202,7 +209,11 @@
 					225000000   /* CLK_HSP_UCG0_SPRAM */
 					94500000    /* CLK_LSP0_UCG0_SYS */
 					87750000    /* CLK_LSP1_UCG0_SYS */
-					27920454>;  /* CLK_LSP1_UCG0_UART0 */
+					27920454    /* CLK_LSP1_UCG0_UART0 */
+					1200000000  /* CLK_SDR_PLL0 */
+					200000000   /* CLK_SDR_UCG0_CFG */
+					200000000   /* CLK_SDR_UCG0_PCI */
+					50000000>;  /* CLK_SDR_UCG0_AUX_PCI */
 		assigned-clock-parents = <&clock CLK_HSP_PLL0>,
 					 <&clock CLK_HSP_PLL0>,
 					 <&clock CLK_HSP_PLL0>,
