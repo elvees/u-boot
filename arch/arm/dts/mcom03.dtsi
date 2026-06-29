@@ -651,11 +651,21 @@
 		};
 	};
 
-	sdr@1900000 {
+	sdr: sdr@1900000 {
 		compatible = "simple-bus";
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;
+		status = "disabled";
+
+		sdr_urb: urb@1910000 {
+			compatible = "elvees,mcom03-urb", "syscon",
+				     "simple-mfd";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			reg = <0 0x1910000 0 0x4000>;
+			ranges = <0 0 0 0x4000>;
+		};
 
 		/* For DeviceTree bindings see linux/modules/velcore3
 		 * repository
