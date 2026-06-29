@@ -712,6 +712,13 @@
 			#size-cells = <1>;
 			reg = <0 0x1910000 0 0x4000>;
 			ranges = <0 0 0 0x4000>;
+
+			sdr_reset: reset-controller@50 {
+				compatible = "elvees,mcom03-reset";
+				reg = <0x50 0x100>;
+				elvees,subsystem = <MCOM03_SUBSYSTEM_SDR>;
+				#reset-cells = <1>;
+			};
 		};
 	};
 
