@@ -193,6 +193,7 @@ function factory_set() {
         echo "$1=$2" >>"$FACTORY_DIR/$FACTORY_SETTINGS" # Set/Update factory setting
     fi
     sort -o "$FACTORY_DIR/$FACTORY_SETTINGS" "$FACTORY_DIR/$FACTORY_SETTINGS" # Keep sorted
+    sync
 }
 
 function factory_print() {
