@@ -1345,6 +1345,7 @@ dtb-$(CONFIG_TARGET_MCOM03_ECAM03_RECOVERY) += \
 
 dtb-$(CONFIG_TARGET_MCOM03R) += \
 	mcom03r-elvmc03ce-r3.2.0-elvcecb-r3.3.0.dtb \
+	mcom03r-elvmc03q7-r3.3.0-elvq7cb-r3.3.0.dtb \
 	mcom03r-elvmc03smarc-r3.0.0-elvsmarccb-r3.3.0.dtb \
 	mcom03r-elvmc03smarc-r3.0.0-salute-pm-ett-ssmarc-r2.0.0.dtb \
 	mcom03r-elvmc03smarc-r3.0.0-smarccommoncb-r1.0.dtb \
