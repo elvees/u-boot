@@ -46,3 +46,15 @@
 &usb1 {
 	status = "okay";
 };
+
+&sdr {
+	status = "okay";
+};
+
+&pcie0 {
+	status = "okay";
+};
+
+&pcie1 {
+	status = "okay";
+};
