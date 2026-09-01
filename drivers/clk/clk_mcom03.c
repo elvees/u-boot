@@ -1137,9 +1137,11 @@ static int mcom03_clk_of_to_plat(struct udevice *dev)
 		res = clk_register(&pll_clocks[i].clk, dev->driver->name,
 				   pll_clocks[i].name,
 				   plat->xti_clk.dev->name);
-		if (res)
+		if (res) {
 			log_err("%s: Failed to register %s (%d)\n",
 				dev->name, pll_clocks[i].name, res);
+			continue;
+		}
 
 		dev_set_priv(pll_clocks[i].clk.dev, plat);
 	}
@@ -1160,9 +1162,11 @@ static int mcom03_clk_of_to_plat(struct udevice *dev)
 				       map_sysmem(refmux_clocks[i].base_addr, 4),
 				       refmux_clocks[i].shift,
 				       refmux_clocks[i].width, 0);
-		if (IS_ERR(clk))
+		if (IS_ERR(clk)) {
 			log_err("%s: Failed to register %s (%ld)\n",
 				dev->name, refmux_clocks[i].name, PTR_ERR(clk));
+			continue;
+		}
 
 		/* Dirty hack because we want to use clk_ops from current
 		 * driver, not from clk_mux.
@@ -1189,10 +1193,12 @@ static int mcom03_clk_of_to_plat(struct udevice *dev)
 					   dev->driver->name,
 					   ucg_clocks[i].names[chan],
 					   ucg_clocks[i].parent_name);
-			if (res)
+			if (res) {
 				log_err("%s: Failed to register %s\n",
 					dev->name,
 					ucg_clocks[i].names[chan]);
+				continue;
+			}
 
 			dev_set_priv(ucg_clocks[i].clks[chan].dev, plat);
 		}
