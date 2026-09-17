@@ -32,6 +32,8 @@
 
 #define SYS_JESD_EN_OFFSET 0x300
 
+#define MAX_RETRIES 50
+
 struct mcom03_pcie {
 	struct pcie_dw dw;
 	void __iomem *dbi2_base;
@@ -177,13 +179,13 @@ static int mcom03_pcie_link_up(struct mcom03_pcie *priv)
 	mcom03_pcie_ltssm_toggle(priv, true);
 
 	/* Check if the link is up or not */
-	for (retries = 0; retries < 50; retries++) {
+	for (retries = 0; retries < MAX_RETRIES; retries++) {
 		if (mcom03_pcie_is_link_up(priv))
 			break;
 		mdelay(20);
 	}
 
-	if (retries >= 10) {
+	if (retries >= MAX_RETRIES) {
 		dev_err(priv->dw.dev, "PCIe-%d Link Fail\n",
 			dev_seq(priv->dw.dev));
 		return -EIO;
